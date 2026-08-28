@@ -45,19 +45,34 @@ namespace IronFlag.UI
         /// <summary>Reference width the HUD is laid out in, in canvas units.</summary>
         public const float ReferenceWidth = 1920.0f;
 
+        /// <summary>How far the select console sits in from the edges of the viewport.</summary>
+        /// <remarks>
+        /// Wider than the driving panel's inset, because this one runs the whole width and a
+        /// strip that reached the corners would read as a letterbox bar rather than as a
+        /// piece of equipment sitting in the picture.
+        /// </remarks>
+        private const float ConsoleInset = 30.0f;
+
         [SerializeField]
         [Tooltip("The player whose bunker and vehicle this HUD is showing.")]
         private PlayerVehicleDriver player;
 
         private readonly List<Image> rowPlates = new List<Image>();
+        private readonly List<HudBracket> rowFrames = new List<HudBracket>();
         private readonly List<Text> rowNames = new List<Text>();
         private readonly List<Text> rowStates = new List<Text>();
+        private readonly List<Text> rowLoads = new List<Text>();
 
         private RectTransform panels;
         private RectTransform bunkerPanel;
         private RectTransform statusPanel;
         private RectTransform objectivePanel;
         private RectTransform resultPanel;
+        private HudBracket bunkerFrame;
+        private HudBracket statusFrame;
+        private HudBracket resultFrame;
+        private HudGlyph attackMark;
+        private HudGlyph defenceMark;
         private Text attackLine;
         private Text defenceLine;
         private Text resultTitle;
@@ -240,58 +255,101 @@ namespace IronFlag.UI
         private void LateUpdate() => Refresh();
 
         /// <summary>
-        /// Builds the panel a player chooses their next vehicle on.
+        /// Builds the console a player chooses their next vehicle on.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A strip across the bottom of the viewport rather than a list floating over the
+        /// picture, and that is the whole point of it: the player is looking at their own
+        /// base, four bays with the vehicles visibly in them, and a panel in the middle of
+        /// that is a panel covering the thing it is about. It takes the same slot the driving
+        /// gauges take, so the bottom of the screen is instruments in both halves of the loop
+        /// and the middle of it is the world in both.
+        /// </para>
+        /// <para>
+        /// <strong>The selection is not a highlighted row.</strong> Which vehicle is picked is
+        /// said in the world - the bay lights up and the lift car comes to that deck - and the
+        /// console only agrees with it, by putting corner marks round one cell and its name in
+        /// full ink. A filled highlight bar here would be the menu this view exists to stop
+        /// being.
+        /// </para>
+        /// <para>
+        /// What each cell carries instead is the thing worth knowing while choosing: how much
+        /// fuel and how many rounds that vehicle <em>holds</em>. Everything in a bunker is
+        /// always full, so a gauge would read 100% four times over; a capacity is the
+        /// difference between the four of them and is what the choice is actually about.
+        /// </para>
+        /// </remarks>
         private void BuildBunkerPanel()
         {
-            const float width = 760.0f;
-            const float rowHeight = 52.0f;
-            const float margin = 20.0f;
+            const float height = 150.0f;
+            const float margin = 14.0f;
+            const float gap = 10.0f;
+            const float header = 30.0f;
 
-            int rows = player == null ? 0 : player.Roster.Count;
-            float height = margin + 40.0f + 10.0f + (rows * rowHeight) + 10.0f + 40.0f + margin;
+            float width = ReferenceWidth - (ConsoleInset * 2.0f);
+            int cells = player == null ? 0 : player.Roster.Count;
 
-            Image plate = HudPalette.Box("Bunker", panels, HudPalette.Panel);
+            HudPlate plate = HudPalette.Plate("Bunker", panels, HudPalette.Panel);
             bunkerPanel = plate.rectTransform;
-            bunkerPanel.anchorMin = new Vector2(0.5f, 0.5f);
-            bunkerPanel.anchorMax = new Vector2(0.5f, 0.5f);
-            bunkerPanel.pivot = new Vector2(0.5f, 0.5f);
-            // Off to the left rather than dead centre. The camera is parked on the player's
-            // own bunker while they choose, and a panel in the middle of the view would be
-            // covering the building it is a panel about.
-            bunkerPanel.anchoredPosition = new Vector2(-ReferenceWidth * 0.25f, 0.0f);
+            bunkerPanel.anchorMin = new Vector2(0.5f, 0.0f);
+            bunkerPanel.anchorMax = new Vector2(0.5f, 0.0f);
+            bunkerPanel.pivot = new Vector2(0.5f, 0.0f);
+            bunkerPanel.anchoredPosition = new Vector2(0.0f, ConsoleInset);
             bunkerPanel.sizeDelta = new Vector2(width, height);
 
-            bunkerTitle = HudPalette.Label("Title", bunkerPanel, 30, TextAnchor.MiddleLeft);
+            bunkerFrame = HudPalette.Bracket("Bunker Frame", bunkerPanel, HudPalette.FadedInk);
+
+            bunkerTitle = HudPalette.Label("Title", bunkerPanel, 26, TextAnchor.MiddleLeft);
             HudPalette.Place(
-                bunkerTitle.rectTransform, margin, height - margin - 40.0f, width - (margin * 2.0f), 40.0f);
+                bunkerTitle.rectTransform, margin, height - margin - header, 520.0f, header);
+
+            bunkerPrompt = HudPalette.Label("Prompt", bunkerPanel, 24, TextAnchor.MiddleRight);
+            bunkerPrompt.color = HudPalette.FadedInk;
+            HudPalette.Place(
+                bunkerPrompt.rectTransform, width - margin - 900.0f, height - margin - header,
+                900.0f, header);
 
             rowPlates.Clear();
+            rowFrames.Clear();
             rowNames.Clear();
             rowStates.Clear();
+            rowLoads.Clear();
 
-            for (int row = 0; row < rows; row++)
+            if (cells == 0)
             {
-                float bottom = height - margin - 50.0f - ((row + 1) * rowHeight);
-
-                Image highlight = HudPalette.Box($"Row {row}", bunkerPanel, HudPalette.Highlight);
-                HudPalette.Place(
-                    highlight.rectTransform, margin * 0.5f, bottom, width - margin, rowHeight - 4.0f);
-                rowPlates.Add(highlight);
-
-                Text name = HudPalette.Label($"Row {row} Name", bunkerPanel, 28, TextAnchor.MiddleLeft);
-                HudPalette.Place(name.rectTransform, margin + 12.0f, bottom, 420.0f, rowHeight - 4.0f);
-                rowNames.Add(name);
-
-                Text state = HudPalette.Label($"Row {row} State", bunkerPanel, 24, TextAnchor.MiddleRight);
-                HudPalette.Place(
-                    state.rectTransform, width - margin - 320.0f, bottom, 300.0f, rowHeight - 4.0f);
-                rowStates.Add(state);
+                return;
             }
 
-            bunkerPrompt = HudPalette.Label("Prompt", bunkerPanel, 24, TextAnchor.MiddleCenter);
-            bunkerPrompt.color = HudPalette.FadedInk;
-            HudPalette.Place(bunkerPrompt.rectTransform, margin, margin, width - (margin * 2.0f), 36.0f);
+            float cellHeight = height - (margin * 2.0f) - header - 6.0f;
+            float cellWidth = (width - (margin * 2.0f) - (gap * (cells - 1))) / cells;
+
+            for (int cell = 0; cell < cells; cell++)
+            {
+                float left = margin + (cell * (cellWidth + gap));
+
+                Image slot = HudPalette.Box($"Cell {cell}", bunkerPanel, HudPalette.Track);
+                HudPalette.Place(slot.rectTransform, left, margin, cellWidth, cellHeight);
+                rowPlates.Add(slot);
+
+                HudBracket frame = HudPalette.Bracket(
+                    $"Cell {cell} Frame", slot.rectTransform, HudPalette.FadedInk);
+                rowFrames.Add(frame);
+
+                Text name = HudPalette.Label($"Cell {cell} Name", slot.rectTransform, 28, TextAnchor.MiddleLeft);
+                HudPalette.Place(
+                    name.rectTransform, 18.0f, cellHeight - 40.0f, cellWidth - 36.0f, 34.0f);
+                rowNames.Add(name);
+
+                Text state = HudPalette.Label($"Cell {cell} State", slot.rectTransform, 22, TextAnchor.MiddleLeft);
+                HudPalette.Place(state.rectTransform, 18.0f, 8.0f, cellWidth - 36.0f, 28.0f);
+                rowStates.Add(state);
+
+                Text load = HudPalette.Label($"Cell {cell} Load", slot.rectTransform, 22, TextAnchor.MiddleRight);
+                load.color = HudPalette.FadedInk;
+                HudPalette.Place(load.rectTransform, 18.0f, 8.0f, cellWidth - 36.0f, 28.0f);
+                rowLoads.Add(load);
+            }
         }
 
         /// <summary>
@@ -303,13 +361,15 @@ namespace IronFlag.UI
             const float height = 214.0f;
             const float margin = 16.0f;
 
-            Image plate = HudPalette.Box("Status", panels, HudPalette.Panel);
+            HudPlate plate = HudPalette.Plate("Status", panels, HudPalette.Panel);
             statusPanel = plate.rectTransform;
             statusPanel.anchorMin = Vector2.zero;
             statusPanel.anchorMax = Vector2.zero;
             statusPanel.pivot = Vector2.zero;
             statusPanel.anchoredPosition = new Vector2(34.0f, 30.0f);
             statusPanel.sizeDelta = new Vector2(width, height);
+
+            statusFrame = HudPalette.Bracket("Status Frame", statusPanel, HudPalette.FadedInk);
 
             statusName = HudPalette.Label("Name", statusPanel, 28, TextAnchor.MiddleLeft);
             HudPalette.Place(statusName.rectTransform, margin, height - margin - 34.0f, 300.0f, 34.0f);
@@ -320,11 +380,24 @@ namespace IronFlag.UI
                 statusNote.rectTransform, width - margin - 300.0f, height - margin - 34.0f, 300.0f, 34.0f);
 
             float row = width - (margin * 2.0f);
-            armour = HudBar.Build(statusPanel, "Armour", HudPalette.Armour, margin, 122.0f, row, 32.0f);
-            fuel = HudBar.Build(statusPanel, "Fuel", HudPalette.Fuel, margin, 86.0f, row, 32.0f);
+            armour = HudBar.Build(
+                statusPanel, "Armour", HudGlyphKind.Armour, HudPalette.Armour,
+                margin, 122.0f, row, 32.0f);
+            fuel = HudBar.Build(
+                statusPanel, "Fuel", HudGlyphKind.Fuel, HudPalette.Fuel,
+                margin, 86.0f, row, 32.0f);
             ammunition = HudBar.Build(
-                statusPanel, "Rounds", HudPalette.Ammunition, margin, 50.0f, row, 32.0f);
-            leaving = HudBar.Build(statusPanel, "Scuttle", HudPalette.Alarm, margin, 12.0f, row, 30.0f);
+                statusPanel, "Rounds", HudGlyphKind.Rounds, HudPalette.Ammunition,
+                margin, 50.0f, row, 32.0f);
+
+            // No mark on the fourth row, and that is a decision rather than an omission. This
+            // bar means two different things - scuttling a vehicle in the field, stowing one
+            // at home - and renames itself between them; a mark that had to change meaning
+            // with the word beside it would be a mark that means nothing on its own, which is
+            // the only thing a mark is for.
+            leaving = HudBar.Build(
+                statusPanel, "Scuttle", HudGlyphKind.None, HudPalette.Alarm,
+                margin, 12.0f, row, 30.0f);
         }
 
         /// <summary>
@@ -342,7 +415,10 @@ namespace IronFlag.UI
             const float height = 84.0f;
             const float margin = 14.0f;
 
-            Image plate = HudPalette.Box("Objective", panels, HudPalette.Panel);
+            const float markWidth = 24.0f;
+            const float markGutter = 8.0f;
+
+            HudPlate plate = HudPalette.Plate("Objective", panels, HudPalette.Panel);
             objectivePanel = plate.rectTransform;
             objectivePanel.anchorMin = new Vector2(0.5f, 1.0f);
             objectivePanel.anchorMax = new Vector2(0.5f, 1.0f);
@@ -350,12 +426,25 @@ namespace IronFlag.UI
             objectivePanel.anchoredPosition = new Vector2(0.0f, -18.0f);
             objectivePanel.sizeDelta = new Vector2(width, height);
 
-            float row = width - (margin * 2.0f);
+            // No corner marks on this one. They carry a side's accent - see HudBracket - and
+            // this is the only panel on the HUD that is about both sides at once.
+            float left = margin + markWidth + markGutter;
+            float row = width - margin - left;
+            float upper = height - margin - 30.0f;
+
+            attackMark = HudPalette.Glyph(
+                "Attack Mark", objectivePanel, HudGlyphKind.Flag, HudPalette.FadedInk);
+            HudPalette.Place(attackMark.rectTransform, margin, upper, markWidth, 30.0f);
+
             attackLine = HudPalette.Label("Attack", objectivePanel, 24, TextAnchor.MiddleLeft);
-            HudPalette.Place(attackLine.rectTransform, margin, height - margin - 30.0f, row, 30.0f);
+            HudPalette.Place(attackLine.rectTransform, left, upper, row, 30.0f);
+
+            defenceMark = HudPalette.Glyph(
+                "Defence Mark", objectivePanel, HudGlyphKind.Flag, HudPalette.FadedInk);
+            HudPalette.Place(defenceMark.rectTransform, margin, margin, markWidth, 30.0f);
 
             defenceLine = HudPalette.Label("Defence", objectivePanel, 24, TextAnchor.MiddleLeft);
-            HudPalette.Place(defenceLine.rectTransform, margin, margin, row, 30.0f);
+            HudPalette.Place(defenceLine.rectTransform, left, margin, row, 30.0f);
         }
 
         /// <summary>
@@ -373,7 +462,7 @@ namespace IronFlag.UI
             const float width = 820.0f;
             const float height = 190.0f;
 
-            Image plate = HudPalette.Box("Result", panels, HudPalette.Panel);
+            HudPlate plate = HudPalette.Plate("Result", panels, HudPalette.Panel);
             resultPanel = plate.rectTransform;
             resultPanel.anchorMin = new Vector2(0.5f, 0.5f);
             resultPanel.anchorMax = new Vector2(0.5f, 0.5f);
@@ -381,7 +470,9 @@ namespace IronFlag.UI
             resultPanel.anchoredPosition = Vector2.zero;
             resultPanel.sizeDelta = new Vector2(width, height);
 
-            resultTitle = HudPalette.Label("Title", resultPanel, 72, TextAnchor.MiddleCenter);
+            resultFrame = HudPalette.Bracket("Result Frame", resultPanel, HudPalette.FadedInk);
+
+            resultTitle = HudPalette.Headline("Title", resultPanel, 72, TextAnchor.MiddleCenter);
             HudPalette.Place(resultTitle.rectTransform, 0.0f, 74.0f, width, 92.0f);
 
             resultNote = HudPalette.Label("Note", resultPanel, 28, TextAnchor.MiddleCenter);
@@ -406,6 +497,12 @@ namespace IronFlag.UI
             attackLine.color = AttackColour(theirs);
             defenceLine.text = DefenceText(ours);
             defenceLine.color = DefenceColour(ours);
+
+            // The mark takes the line's colour rather than the flag's own. Which flag each
+            // line is about is already said in words at the start of it; what the colour is
+            // for is how that flag is doing, and a shape reads that faster than a sentence.
+            attackMark.color = attackLine.color;
+            defenceMark.color = defenceLine.color;
         }
 
         /// <summary>
@@ -422,6 +519,7 @@ namespace IronFlag.UI
             bool won = match.Winner == player.Team;
             resultTitle.text = won ? "VICTORY" : "DEFEAT";
             resultTitle.color = won ? HudPalette.For(match.Winner) : HudPalette.FadedInk;
+            resultFrame.color = resultTitle.color;
             resultNote.text = ResultNote(match);
         }
 
@@ -584,6 +682,7 @@ namespace IronFlag.UI
             Team side = player.Team;
             bunkerTitle.color = HudPalette.For(side);
             bunkerTitle.text = $"{side.ToString().ToUpperInvariant()} BUNKER";
+            bunkerFrame.color = bunkerTitle.color;
 
             for (int row = 0; row < rowNames.Count; row++)
             {
@@ -599,17 +698,45 @@ namespace IronFlag.UI
                 bool counted = vehicle != null && left != int.MaxValue;
                 bool gone = counted && left <= 0;
 
-                rowPlates[row].enabled = chosen;
+                // The corner marks are the whole of the selection on this panel. They take
+                // the side's colour on the chosen cell and go out on the rest, which is the
+                // same thing the marks round every other panel in this game are saying:
+                // this region is the one being watched.
+                rowFrames[row].enabled = chosen;
+                rowFrames[row].color = bunkerTitle.color;
+
                 rowNames[row].color = chosen ? HudPalette.Ink : HudPalette.FadedInk;
-                rowNames[row].text = chosen
-                    ? $"> {NameOf(vehicle)}{Stock(counted, left)}"
-                    : $"  {NameOf(vehicle)}{Stock(counted, left)}";
+                rowNames[row].text = $"{NameOf(vehicle).ToUpperInvariant()}{Stock(counted, left)}";
 
                 rowStates[row].text = gone ? "NONE LEFT" : StateOf(bay);
                 rowStates[row].color = gone ? HudPalette.Alarm : ColorOf(bay, side);
+                rowLoads[row].text = Load(vehicle);
             }
 
             bunkerPrompt.text = Prompt();
+        }
+
+        /// <summary>
+        /// Returns what one vehicle carries, as it reads on the console.
+        /// </summary>
+        /// <param name="vehicle">The roster entry.</param>
+        /// <returns>Its fuel and its rounds, or nothing when nothing is counting either.</returns>
+        /// <remarks>
+        /// Capacities rather than levels. Everything waiting in a bunker is full - the bunker
+        /// fills both pools the instant a vehicle is inside it - so a gauge here would read
+        /// the same on all four. What differs is what each one <em>holds</em>, and that is
+        /// most of what the choice is between: seventy seconds of fuel is the price of the
+        /// helicopter's gun.
+        /// </remarks>
+        private static string Load(VehicleController vehicle)
+        {
+            var supply = vehicle == null ? null : vehicle.GetComponent<VehicleSupply>();
+            if (supply == null || (supply.FuelCapacity <= 0.0f && supply.RoundsCarried <= 0))
+            {
+                return string.Empty;
+            }
+
+            return $"{Mathf.RoundToInt(supply.FuelCapacity)}s   {supply.RoundsCarried} RDS";
         }
 
         /// <summary>
@@ -618,11 +745,12 @@ namespace IronFlag.UI
         private void RefreshStatus()
         {
             VehicleController vehicle = player.ActiveVehicle;
-            Watch(vehicle);
+            bool swapped = Watch(vehicle);
 
             statusName.color = HudPalette.For(player.Team);
             statusName.text = NameOf(vehicle).ToUpperInvariant();
             statusNote.text = Note();
+            statusFrame.color = statusName.color;
 
             if (watchedHull == null)
             {
@@ -634,7 +762,7 @@ namespace IronFlag.UI
                 armour.Show(
                     watchedHull.Fraction,
                     $"{Mathf.CeilToInt(watchedHull.HitPoints)}/{Mathf.RoundToInt(watchedHull.MaxHitPoints)}",
-                    HudPalette.Level(HudPalette.Armour, watchedHull.Fraction));
+                    HudPalette.Armour);
             }
 
             if (watchedSupply == null)
@@ -648,13 +776,13 @@ namespace IronFlag.UI
                 fuel.Show(
                     watchedSupply.FuelFraction,
                     $"{Mathf.CeilToInt(watchedSupply.Fuel)}s",
-                    HudPalette.Level(HudPalette.Fuel, watchedSupply.FuelFraction));
+                    HudPalette.Fuel);
 
                 ammunition.SetVisible(true);
                 ammunition.Show(
                     watchedSupply.RoundsFraction,
                     $"{watchedSupply.Rounds}/{watchedSupply.RoundsCarried}",
-                    HudPalette.Level(HudPalette.Ammunition, watchedSupply.RoundsFraction));
+                    HudPalette.Ammunition);
             }
 
             float held = player.RecallProgress;
@@ -662,7 +790,32 @@ namespace IronFlag.UI
             if (held > 0.0f)
             {
                 leaving.Rename(player.IsHome ? "Stowing" : "Scuttle");
-                leaving.Show(held, $"{Mathf.RoundToInt(held * 100.0f)}%", HudPalette.Alarm);
+                leaving.ShowProgress(held, $"{Mathf.RoundToInt(held * 100.0f)}%", HudPalette.Alarm);
+            }
+
+            // After the readings rather than before them, so a bar moves towards the number it
+            // has just been given rather than the one it was given last frame - and jumps
+            // straight to it on the frame the vehicle underneath it changed.
+            Settle(armour, swapped, Time.deltaTime);
+            Settle(fuel, swapped, Time.deltaTime);
+            Settle(ammunition, swapped, Time.deltaTime);
+        }
+
+        /// <summary>
+        /// Moves one bar on by a frame, or puts it straight where it belongs.
+        /// </summary>
+        /// <param name="bar">The bar to move.</param>
+        /// <param name="swapped">Whether the vehicle underneath it has just changed.</param>
+        /// <param name="deltaTime">Seconds since the last frame, ignored when it swapped.</param>
+        private static void Settle(HudBar bar, bool swapped, float deltaTime)
+        {
+            if (swapped)
+            {
+                bar.Jump();
+            }
+            else
+            {
+                bar.Advance(deltaTime);
             }
         }
 
@@ -671,20 +824,29 @@ namespace IronFlag.UI
         /// </summary>
         /// <param name="vehicle">The vehicle now being driven.</param>
         /// <remarks>
+        /// <para>
         /// A HUD that looked its own readings up every frame would do six component searches
         /// a frame for two players, all of them answering the same question they answered
         /// last frame.
+        /// </para>
+        /// <para>
+        /// It is also the moment the gauges have to stop easing and jump. Every bar on this
+        /// strip is about the vehicle being driven, so the one frame where that changes is the
+        /// one frame where sliding from the old reading to the new one would be drawing a
+        /// tank's armour on a jeep's gauge. See <see cref="HudBar.Jump"/>.
+        /// </para>
         /// </remarks>
-        private void Watch(VehicleController vehicle)
+        private bool Watch(VehicleController vehicle)
         {
             if (watched == vehicle)
             {
-                return;
+                return false;
             }
 
             watched = vehicle;
             watchedHull = vehicle == null ? null : vehicle.GetComponent<VehicleHealth>();
             watchedSupply = vehicle == null ? null : vehicle.GetComponent<VehicleSupply>();
+            return true;
         }
 
         /// <summary>
@@ -855,9 +1017,16 @@ namespace IronFlag.UI
             statusPanel = null;
             objectivePanel = null;
             resultPanel = null;
+            bunkerFrame = null;
+            statusFrame = null;
+            resultFrame = null;
+            attackMark = null;
+            defenceMark = null;
             rowPlates.Clear();
+            rowFrames.Clear();
             rowNames.Clear();
             rowStates.Clear();
+            rowLoads.Clear();
         }
     }
 }

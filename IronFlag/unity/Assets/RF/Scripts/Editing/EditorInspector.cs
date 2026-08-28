@@ -4,6 +4,7 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Core;
 using IronFlag.Levels;
 using IronFlag.Vehicles;
@@ -515,7 +516,7 @@ namespace IronFlag.Editing
                 button.SetVisible(true);
                 button.SetEnabled(true);
                 button.SetChosen(side == current);
-                button.OnPress(() => set(side));
+                button.OnPress(() => set(side), SfxKind.UiSelect);
             }
         }
 

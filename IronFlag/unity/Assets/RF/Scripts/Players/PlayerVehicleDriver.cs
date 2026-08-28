@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Objective;
@@ -304,6 +305,7 @@ namespace IronFlag.Players
             }
 
             selected = Wrap(index);
+            ShowTheChoice();
         }
 
         /// <summary>
@@ -323,9 +325,18 @@ namespace IronFlag.Players
                 return false;
             }
 
-            // Follow the ride out. The lift and the launch pad are a pacing beat rather
-            // than a loading screen, and a beat nobody is shown is just a delay.
-            Watch(roster[selected]);
+            // The ride out is a pacing beat rather than a loading screen, and a beat nobody
+            // is shown is just a delay - so it is watched either way, from wherever the whole
+            // of it can be seen. From the cutaway that is where the camera already is: the
+            // vehicle rolls out of its bay, boards the lift and climbs out of the top of the
+            // picture. Without a hall to be inside there is nothing to see until it clears
+            // the ground, so the camera goes with it as it always did.
+            TeamBunker bunker = TeamBunker.For(Team);
+            if (bunker == null || !bunker.HasHall)
+            {
+                Watch(roster[selected]);
+            }
+
             return true;
         }
 
@@ -490,15 +501,28 @@ namespace IronFlag.Players
             if (controls.NextVehicle)
             {
                 Select(selected + 1);
+                Sfx.Play(SfxKind.UiSelect);
             }
             else if (controls.PreviousVehicle)
             {
                 Select(selected - 1);
+                Sfx.Play(SfxKind.UiSelect);
             }
 
             if (controls.Deploy)
             {
-                DeploySelected();
+                // The bunker roster is a menu, so it answers like one. The refusal is worth
+                // more than the acceptance here: a vehicle that goes out is a vehicle the
+                // player can see leaving, and one that does not is a countdown or an empty
+                // reserve they cannot - see CanDeploy for the three reasons.
+                if (DeploySelected())
+                {
+                    Sfx.Play(SfxKind.UiClick);
+                }
+                else
+                {
+                    Sfx.Play(SfxKind.UiDenied);
+                }
             }
         }
 
@@ -638,24 +662,79 @@ namespace IronFlag.Players
         {
             wreckHold = 0.0f;
 
+            TeamBunker bunker = TeamBunker.For(Team);
+            if (bunker != null)
+            {
+                bunker.ShowHall(true);
+            }
+
+            ShowTheChoice();
+
             if (cameraRig == null)
             {
                 return;
             }
 
-            TeamBunker bunker = TeamBunker.For(Team);
-            if (bunker != null)
-            {
-                cameraRig.Park(bunker.transform.position);
-            }
-            else
+            if (bunker == null)
             {
                 cameraRig.SetTarget(null, false);
+                return;
+            }
+
+            if (!bunker.HasHall)
+            {
+                cameraRig.Park(bunker.transform.position);
+                return;
+            }
+
+            Camera view = cameraRig.View;
+            cameraRig.Park(BunkerView.Solve(bunker, view.fieldOfView, view.aspect));
+        }
+
+        /// <summary>
+        /// Says which vehicle is highlighted, in the world rather than on a panel.
+        /// </summary>
+        /// <remarks>
+        /// Two things say it: the bay lights up, and the lift car comes to that deck and
+        /// waits there. The second is the half worth having - it is the only part of the
+        /// select screen that answers "what did I just press" while the player is looking at
+        /// the picture rather than at the words under it, and it means the ride out starts
+        /// with the lift already where it needs to be.
+        /// </remarks>
+        private void ShowTheChoice()
+        {
+            TeamBunker bunker = TeamBunker.For(Team);
+            if (bunker == null || !bunker.HasHall || !AtTheBunker)
+            {
+                return;
+            }
+
+            bunker.ChooseBay(selected);
+
+            if (bunker.Car != null && !IsDeploying)
+            {
+                bunker.Car.SendTo(bunker.BayFor(selected).y);
             }
         }
 
         private void Watch(VehicleController vehicle)
         {
+            TeamBunker bunker = TeamBunker.For(Team);
+            if (bunker != null)
+            {
+                // Out on the field: nobody is looking into this base, so it is not drawn.
+                // The ground is opaque from above and would hide it anyway - the shaft is
+                // the hole in that argument, and a player driving over their own bunker
+                // would otherwise be looking down a lit stairwell.
+                bunker.ShowHall(false);
+                bunker.ChooseBay(-1);
+
+                if (bunker.Car != null)
+                {
+                    bunker.Car.SendTo(bunker.LiftPoint.y);
+                }
+            }
+
             if (cameraRig != null)
             {
                 cameraRig.SetTarget(vehicle, true);

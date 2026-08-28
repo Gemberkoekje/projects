@@ -1,4 +1,5 @@
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Core;
 using IronFlag.Supply;
 using IronFlag.Vehicles;
@@ -200,8 +201,11 @@ namespace IronFlag.Combat
             }
 
             // After the round, not before it: a gun that flashed and then failed to produce
-            // anything would be showing the player a shot that was never taken.
+            // anything would be showing the player a shot that was never taken. The report
+            // goes with the flash for the same reason, and through the same one call site -
+            // an emplacement's autocannon and a tank's main gun are both heard here.
             MuzzleFlash.Spawn(flash, muzzle, tuning.Radius);
+            Sfx.PlayAt(AudioRoster.ShotOf(tuning.Kind), muzzle.position);
 
             if (supply != null)
             {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Vfx;
 
 namespace IronFlag.Combat
@@ -48,6 +49,28 @@ namespace IronFlag.Combat
         [Tooltip("Scorch left on the ground underneath. Optional.")]
         private GroundMark scorch;
 
+        /// <summary>Blasts smaller than this radius go off in silence, in metres.</summary>
+        /// <remarks>
+        /// <para>
+        /// Deliberately the same line <see cref="GroundMark.SmallestBlast"/> draws, converted
+        /// from a mark's width back to the radius that made it, so that a blast leaves a
+        /// scorch if and only if it is worth hearing. Two thresholds for the same question
+        /// would eventually disagree, and the version where they disagree is a bang with no
+        /// mark under it.
+        /// </para>
+        /// <para>
+        /// The floor exists for exactly the reason the mark's does: a chaingun round goes off
+        /// at about 0.4 metres and the gun fires eight of them a second, so without it a
+        /// single ASV would sound like an artillery barrage. Rounds that small are already
+        /// heard - as <see cref="Audio.SfxKind.Impact"/>, off the armour they struck, from
+        /// <see cref="Projectile"/>'s spark - and that is the right sound for them. Above the
+        /// floor are the cannon, the rocket, the grenade and every wreck: the shots that are
+        /// events.
+        /// </para>
+        /// </remarks>
+        public static readonly float HeardAbove =
+            GroundMark.SmallestBlast / (GroundMark.BlastShare * 2.0f);
+
         private float elapsed;
 
         /// <summary>Radius the ball reaches at its widest, in metres.</summary>
@@ -79,6 +102,14 @@ namespace IronFlag.Combat
         /// choosing a size. <see cref="GroundMark.Spawn"/> refuses the ones too small to be
         /// events and the ones over water.
         /// </para>
+        /// <para>
+        /// The bang is hung off it for exactly that reason too, and it is the one place in
+        /// the game a detonation is heard from - but only above
+        /// <see cref="HeardAbove"/>, because every round in the game comes through here and
+        /// most of them are bullets. Note that it is inside the null check rather than above
+        /// it: a caller with no explosion prefab is a test rig, and a rig that draws nothing
+        /// should not be the one thing on the map still making a noise.
+        /// </para>
         /// </remarks>
         public static Explosion Spawn(Explosion prefab, Vector3 at, float blastRadius)
         {
@@ -89,6 +120,11 @@ namespace IronFlag.Combat
 
             Explosion burst = Instantiate(prefab, at, Quaternion.identity);
             burst.radius = Mathf.Max(0.1f, blastRadius);
+
+            if (burst.radius >= HeardAbove)
+            {
+                Sfx.PlayAt(SfxKind.Explosion, at);
+            }
 
             GroundMark.Spawn(
                 burst.scorch, at, burst.radius * GroundMark.BlastShare * 2.0f, GroundMark.Fade);

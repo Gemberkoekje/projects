@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using IronFlag.Vehicles;
 
@@ -53,10 +54,23 @@ namespace IronFlag.Core
         [Range(0.0f, 1.0f)]
         private float altitudeFollow = 0.35f;
 
+        private static readonly List<TopDownCameraRig> Watching = new List<TopDownCameraRig>();
+
         private VehicleController target;
         private Camera view;
         private Vector3 focus;
         private Vector3 focusVelocity;
+        private CutawayPose parked;
+
+        /// <summary>Every view currently on screen, in the order the seats were built.</summary>
+        /// <remarks>
+        /// Kept the way <see cref="IronFlag.Objective.Flag"/> and
+        /// <see cref="VehicleController"/> keep theirs, and for a new reason: the sound mix
+        /// needs to know where the players are looking, and asking the scene every time
+        /// something fires a gun would be a search per shot. See
+        /// <see cref="IronFlag.Audio.AudioDirector"/>, which is the only reader.
+        /// </remarks>
+        public static IReadOnlyList<TopDownCameraRig> Seats => Watching;
 
         /// <summary>Downward tilt of the view, in degrees.</summary>
         public float PitchDegrees => pitchDegrees;
@@ -69,6 +83,18 @@ namespace IronFlag.Core
 
         /// <summary>The vehicle being followed, or null when the rig is parked.</summary>
         public VehicleController Target => target;
+
+        /// <summary>Where the rig was last parked, which is meaningless while it is following.</summary>
+        public CutawayPose Parked => parked;
+
+        /// <summary>The point on the map this view is centred on.</summary>
+        /// <remarks>
+        /// Where this player is looking, rather than where their camera is standing - the
+        /// camera is 34 metres back and 29 up, and measuring a distance from there would put
+        /// every sound on the map that much further away than it looks. This is the point a
+        /// seat's ear sits at; see <see cref="IronFlag.Audio.AudioMixdown"/>.
+        /// </remarks>
+        public Vector3 Focus => focus;
 
         /// <summary>The camera this rig drives.</summary>
         public Camera View
@@ -134,7 +160,29 @@ namespace IronFlag.Core
             target = null;
             focus = point;
             focusVelocity = Vector3.zero;
+            parked = new CutawayPose(point, pitchDegrees, yawDegrees, distance);
             ApplyFocus();
+        }
+
+        /// <summary>
+        /// Parks the camera at a pose of its own, rather than at its usual angle.
+        /// </summary>
+        /// <param name="pose">Where to stand, which way to face, and how far back.</param>
+        /// <remarks>
+        /// The select view is the only thing that uses this, and it needs all four numbers:
+        /// it looks along the bunker's own heading, nearly level rather than at the
+        /// battlefield's 58 degrees, and from a distance that depends on the shape of the
+        /// viewport. See <see cref="BunkerView"/>, which is where those four come from.
+        /// Following a vehicle again puts the rig back on its own angle - the fixed heading
+        /// the whole of M2 rests on is not something a parked camera gets to keep.
+        /// </remarks>
+        public void Park(CutawayPose pose)
+        {
+            target = null;
+            focus = pose.Focus;
+            focusVelocity = Vector3.zero;
+            parked = pose;
+            transform.SetPositionAndRotation(pose.Position, pose.Rotation);
         }
 
         /// <summary>
@@ -203,6 +251,16 @@ namespace IronFlag.Core
             => Quaternion.Euler(pitchDegrees, yawDegrees, 0.0f);
 
         private void Awake() => view = GetComponent<Camera>();
+
+        private void OnEnable()
+        {
+            if (!Watching.Contains(this))
+            {
+                Watching.Add(this);
+            }
+        }
+
+        private void OnDisable() => Watching.Remove(this);
 
         private void LateUpdate()
         {

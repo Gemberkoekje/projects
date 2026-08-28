@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using IronFlag.Audio;
 
 namespace IronFlag.Editing
 {
@@ -83,12 +84,44 @@ namespace IronFlag.Editing
         /// listeners have to be replaceable - and adding one without removing the last is how
         /// a button ends up doing four things at once.
         /// </remarks>
-        public void OnPress(Action does)
+        public void OnPress(Action does) => OnPress(does, SfxKind.UiClick);
+
+        /// <summary>
+        /// Replaces what pressing the button does, and what it sounds like.
+        /// </summary>
+        /// <param name="does">What to do when it is pressed.</param>
+        /// <param name="sound">The noise the press makes.</param>
+        /// <remarks>
+        /// <para>
+        /// <strong>This is the only place in the project a button is given a voice.</strong>
+        /// Every button in the game - the editor's palettes, the main menu, the pause panel -
+        /// is an <see cref="EditorButton"/> and reaches its action through here, so one line
+        /// makes all of them audible and no call site has to remember to be. The alternative,
+        /// a <c>Sfx.Play</c> at the top of forty listeners, is thirty-nine chances to forget.
+        /// </para>
+        /// <para>
+        /// The sound plays before the action, which matters for the handful of buttons that
+        /// load a scene. The <see cref="IronFlag.Audio.AudioDirector"/> belongs to the scene
+        /// it is in, so PLAY and MAIN MENU have their click cut off partway through by the
+        /// load; starting it first means what survives is the front of the click rather than
+        /// nothing at all.
+        /// </para>
+        /// <para>
+        /// A button with no action stays silent. The value shown between the two arrows of a
+        /// stepper is a button so it can be built out of the same plate as its neighbours,
+        /// and it should no more click than a caption should.
+        /// </para>
+        /// </remarks>
+        public void OnPress(Action does, SfxKind sound)
         {
             control.onClick.RemoveAllListeners();
             if (does != null)
             {
-                control.onClick.AddListener(() => does());
+                control.onClick.AddListener(() =>
+                {
+                    Sfx.Play(sound);
+                    does();
+                });
             }
         }
     }

@@ -176,6 +176,13 @@ namespace IronFlag.Editor.Gameplay
             EditorCameraRig view = CreateView(level);
             CreateEventSystem(controls);
 
+            // Sounds but no music. The editor is a workspace rather than a match, and a
+            // soundtrack under somebody dragging a coastline about for an hour is a
+            // soundtrack they turn off - but its panels are the game's panels, built out of
+            // EditorTheme, and a button that clicks in the menu and not here would be the
+            // odd one out.
+            AudioCatalogBuilder.AddToScene(withMusic: false);
+
             var host = new GameObject("Level Editor");
             LevelEditorSession session = host.AddComponent<LevelEditorSession>();
             session.Configure(loader, view, VehicleSandboxScene.LevelName);

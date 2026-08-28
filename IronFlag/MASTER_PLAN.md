@@ -38,9 +38,11 @@ between.
 5. ~~[Combat & Movement VFX](#5-combat--movement-vfx)~~ — **done**, see [VFX_NOTES.md](VFX_NOTES.md).
 6. ~~[1-Player Mode](#6-1-player-mode)~~ — **done**, see [SOLO_NOTES.md](SOLO_NOTES.md).
 7. ~~[Ground & Water Material Upgrade](#7-ground--water-material-upgrade)~~ — **done**, see [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md).
-8. [Sounds and Music](#8-sounds-and-music) — pipeline half **done** (see [AUDIO_NOTES.md](AUDIO_NOTES.md)); wiring into gameplay still to do.
-9. [UI Visual Identity](#9-ui-visual-identity) — determines the final skin for items 4 and 10.
-10. [Bunker View Rework](#10-bunker-view-rework) — polish pass on an already-functional screen.
+8. ~~[Sounds and Music](#8-sounds-and-music)~~ — **done**, see [AUDIO_NOTES.md](AUDIO_NOTES.md).
+9. ~~[UI Visual Identity](#9-ui-visual-identity)~~ — **done**, see [UI_NOTES.md](UI_NOTES.md).
+10. ~~[Bunker View Rework](#10-bunker-view-rework)~~ — **done**, see [M4_NOTES.md](M4_NOTES.md#the-bunker-view-what-the-player-is-looking-at-while-they-choose).
+
+**Every item on this plan is now done.** What comes next is not on it.
 
 ## Design stance for the visual work (items 1, 5, 7, 9)
 
@@ -800,13 +802,15 @@ into a UV channel), new Decal Projector prefabs.
 
 ## 8. Sounds and Music
 
-> **Pipeline half done** — see [AUDIO_NOTES.md](AUDIO_NOTES.md). Open question 1 below is
-> answered: **synthesise**, not license or commission. Thirty clips (SFX, music, UI, engine
-> loops) render from committed SuperCollider `.scd` source via `Tools > IronFlag > Rebuild All
-> Audio from SuperCollider`, byte-identical on every re-render, measured non-silent and
-> un-clipped. **Nothing is wired into gameplay** — no `AudioCatalog`, no `Sfx`/`MusicPlayer`,
-> no call sites touched — so open questions 2 and 3 below, and the "Concrete wire-up points"
-> list, are all still open exactly as written.
+> **Done** — see [AUDIO_NOTES.md](AUDIO_NOTES.md), which is written in the two halves this
+> was built in. Thirty clips render from committed SuperCollider `.scd` source
+> (open question 1: **synthesise**), and every wire-up point below now plays one. Open
+> question 2 is answered **non-positional but attenuated** — panning is the half of 3D audio
+> that a single listener breaks, and volume-by-distance is the half it does not, so the mix
+> lives in a static, testable `AudioMixdown` rather than on a rolloff curve. Open question 3
+> is answered **all of it**, engine loops included. A master volume was also added, which this
+> plan's § 3 lists and which `GameSettings` had previously ruled out for want of any sounds
+> to turn down.
 
 The design doc's own M8 "polish pass" has always listed "per-vehicle
 music/SFX hook" as its scope — this isn't new scope, it's finally starting
@@ -902,20 +906,49 @@ positional audio if flat 2D sound turns out to feel wrong in practice.
 - `unity/Assets/RF/Audio/Music/`, `unity/Assets/RF/Audio/SFX/` — actual
   clip files, once sourced
 
-### Open questions
-1. ~~**Sourcing**~~ — **answered: synthesise**, not license or commission. See
-   [AUDIO_NOTES.md](AUDIO_NOTES.md) for why the recommendation below was overridden and what
+### Open questions — all answered
+1. ~~**Sourcing**~~ — **synthesise**, not license or commission. See
+   [AUDIO_NOTES.md](AUDIO_NOTES.md) for why the recommendation above was overridden and what
    it cost.
-2. **Positional vs. non-positional** — confirm starting non-positional
-   given the single-listener constraint, or accept the spatial compromise
-   for one seat.
-3. **Scope of a first pass** — every wire-up point above, or a smaller
-   starting subset (e.g. weapon fire + music only, engine sound later
-   given it's the one continuous/non-trivial hook)?
+2. ~~**Positional vs. non-positional**~~ — **non-positional, but attenuated by distance.**
+   The recommendation above is taken, and sharpened: of the two things positional audio does,
+   only *panning* breaks under one listener (a shot to seat one's left is to seat two's right).
+   *Attenuation* does not — a shell in the far corner is quiet for everybody, wherever the
+   listener sits. So every clip is flat and the volume is computed from the distance to the
+   nearest seat, which keeps a firefight across the map out of the mix without ever putting a
+   sound on the wrong side of anybody's screen.
+3. ~~**Scope of a first pass**~~ — **every wire-up point**, engine loops included. The
+   continuous hook turned out to be the cheap one: `VehicleBay.IsOnField` already meant
+   "out, with somebody at the controls", so the only new number an engine needed was how loud
+   it is with the throttle shut — which is also the only difference between an engine and the
+   helicopter's rotor.
+
+### What still makes no noise
+Nothing is blocked; each of these needs a SuperCollider recipe first, then one line at a call
+site that already exists: a team door sinking, a supply point refuelling, a vehicle riding the
+lift out of its bunker. There is also no `AudioMixer` — two volumes multiply straight into the
+sources — which is the obvious next step if the mix turns out to want ducking.
 
 ---
 
 ## 9. UI Visual Identity
+
+> **Done** — see [UI_NOTES.md](UI_NOTES.md). Its open question is answered **Saira Condensed
+> SemiBold**, with **Saira Stencil One** for the three headlines: one OFL superfamily, two
+> roles, committed with its licences beside the models and the audio recipes.
+>
+> **Step 1 went the other way, and that is the decision worth a second look.** TextMeshPro's
+> runtime shaders are not in `com.unity.ugui`; taking TMP means importing four megabytes of
+> `.asset` and `.shader` files, which is the "asset nobody can review in a diff" objection
+> items 5 and 7 both settled the other way round. Two of the three benefits the plan cites for
+> TMP — a chosen typeface, small-text legibility — turn out not to need it, so the interface
+> stayed on legacy `Text` and the whole item landed on the text stack the project already had.
+> What that cost is letter-spacing, which is real and is written up in the notes.
+>
+> Everything else shipped as written: corner brackets, a plate carrying the world's own
+> vignette, four drawn marks, eased gauges with an alarm pulse, a fade-and-rise between menu
+> screens, and the same face and glass in the level editor. The original text is left below
+> unchanged.
 
 **Why this priority**: cosmetic/UX character rather than "does the game
 look good in a screenshot" — and it directly determines how the Main Menu
@@ -956,6 +989,23 @@ whatever typeface/visual-language decisions land here.
 ---
 
 ## 10. Bunker View Rework
+
+> **Done**, all five phases — see
+> [M4_NOTES.md](M4_NOTES.md#the-bunker-view-what-the-player-is-looking-at-while-they-choose),
+> folded into M4 rather than given a notes file of its own because it is the same milestone
+> finished properly. The three open questions below were answered **two levels** (as the plan
+> leaned), **keep it blind** (unchanged — going underground made it more emphatic and that was
+> the point), and **the console stays generated**: it is built out of the plate, the corner
+> marks and the type that [UI_NOTES.md](UI_NOTES.md) had just established, and no hand-authored
+> art was added. That last one is the sharp line the Design Stance section flagged, and it did
+> not need crossing — the reference's chrome was carrying a *hardware* metaphor, and this
+> project already had its own answer to what an instrument looks like.
+>
+> Two of the plan's premises turned out to be wrong and both are worth knowing. The camera
+> cannot simply be pointed at the hall: **the sea slab is drawn under the island**, so the whole
+> base had to hang below it, and there is nothing above the hall to draw, so the picture is hung
+> from the hall's *roofline* rather than centred on it. And the ride out could not stay at
+> 1.2 s once it had twenty metres to cover. The original text is left below unchanged.
 
 Condensed from the original `M4_BUNKER_VIEW_PLAN.md`. A follow-on pass over
 M4's vehicle-select screen — M4 itself is finished (`M4_NOTES.md`); nothing
@@ -1106,6 +1156,34 @@ point).
 ---
 
 ## Completed
+
+### The Bunker View: a base rather than a menu
+Finished — see [M4_NOTES.md](M4_NOTES.md#the-bunker-view-what-the-player-is-looking-at-while-they-choose).
+Item 10, all five phases. A player choosing a vehicle now looks into their own underground base
+from the field side: two decks of two bays around a lift shaft, their own four vehicles parked
+in them under the lights, and a console strip along the bottom of the viewport instead of a list
+floating over the roof. Two new assets, one new material, three new components, and **the
+selection moved out of the interface into the world** — the bay lights up and the lift car comes
+to that deck, and the console only agrees with it.
+
+Three things carried forward. **The cutaway is a modelling convention** — the field-facing wall
+of `RF_Structure_BunkerHall` is simply not built, so the asset reads from exactly one direction
+and a free-look camera would show it hollow. **The framing is solved rather than written down**,
+because the viewport is a whole screen for one player and a 3.5:1 letterbox for two; it fits
+whichever dimension fits worse and then pins the top of the picture to a marker on the hall's
+roofline, because above that line there is nothing in this world to draw. And **the base has to
+hang below the sea**: a level's sea slab is a box as wide as the whole map, drawn under the
+island as well as around it, so the roof sits at −4.2 m and the shipped maps' seabed is at −3.7.
+
+Two numbers moved. The ride out went **1.2 s → 2.0 s** — it used to be a metre and a half of
+empty ground and it is now up to twenty metres of hall and shaft — and it is split into fixed
+*fractions* rather than a speed, so the jeep on the lower deck and the tank on the upper take
+exactly as long as each other. EditMode 542/542, PlayMode 196/196.
+
+The one thing it turned up and deliberately did not fix: **`LevelBuilder` paints every bunker's
+team trim `Team.None`**, so both sides' blockhouses wear the neutral placeholder and are
+indistinguishable. That has always been true; the bunker view is just where somebody will
+finally notice, because the console says GREEN BUNKER over a building that is not green.
 
 ### Ground & Water: the project's first shaders
 Finished — see [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md). Item 7, all four bullets.

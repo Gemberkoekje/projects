@@ -77,6 +77,17 @@ namespace IronFlag.Editor.ArtPipeline
         /// <summary>Asset name of the material a flying piece of a building wears.</summary>
         public const string Debris = "RF_Debris";
 
+        /// <summary>Asset name of the material a lamp in a bunker bay wears.</summary>
+        /// <remarks>
+        /// One asset for all eight lamps on the map, and every one of them is a different
+        /// brightness: which bay a player has chosen is shown by lighting it, so the
+        /// emission is written per renderer through a <c>MaterialPropertyBlock</c> rather
+        /// than by instancing a material per bay. What is baked in here is the resting
+        /// state - the colour and the dim end of the range - see
+        /// <see cref="IronFlag.Core.BunkerView"/> for the other end.
+        /// </remarks>
+        public const string BayLight = "RF_BayLight";
+
         /// <summary>Asset name of the material a scorch on the ground wears.</summary>
         /// <remarks>
         /// Two assets rather than one for the two marks, because the shader has to be told
@@ -148,6 +159,20 @@ namespace IronFlag.Editor.ArtPipeline
         /// than the rubble they land next to.
         /// </summary>
         private static readonly Color DebrisColor = new Color(0.16f, 0.15f, 0.14f);
+
+        /// <summary>
+        /// A bunker bay's lamp: warm, and the only reason anything underground is visible.
+        /// </summary>
+        /// <remarks>
+        /// Warm because the hall gets nothing from the sun and everything from these, and a
+        /// neutral white strip underground reads as a lightbox rather than as a room with
+        /// the lights on. The emission is well under the 4.0 that M3 found clips a blast to
+        /// a flat white disc, because this one is a large flat surface rather than a
+        /// four-frame flash: the same value that reads as bright on a sphere reads as blown
+        /// out on a strip two metres long.
+        /// </remarks>
+        private static readonly Color BayLightColor = new Color(1.00f, 0.90f, 0.72f);
+        private static readonly Color BayLightEmission = new Color(1.90f, 1.42f, 0.86f);
 
         /// <summary>Emission colors, above 1 so the lights read as lit rather than pale.</summary>
         private static readonly Color FrontLightEmission = new Color(1.70f, 1.55f, 1.20f);
@@ -764,6 +789,7 @@ namespace IronFlag.Editor.ArtPipeline
                 (Tracer, TracerColor, TracerEmission, DefaultSmoothness),
                 (Blast, BlastColor, BlastEmission, DefaultSmoothness),
                 (Debris, DebrisColor, Color.black, DefaultSmoothness),
+                (BayLight, BayLightColor, BayLightEmission, DefaultSmoothness),
             };
 
             return set;

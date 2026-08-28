@@ -41,6 +41,14 @@ namespace IronFlag.Levels
         private GameObject bunker;
 
         [SerializeField]
+        [Tooltip("The underground hall model, hung under each bunker.")]
+        private GameObject bunkerHall;
+
+        [SerializeField]
+        [Tooltip("The lift car model, which rides each bunker's shaft.")]
+        private GameObject bunkerLift;
+
+        [SerializeField]
         [Tooltip("The flag tower prefab, used for both the real one and the decoy.")]
         private GameObject tower;
 
@@ -74,8 +82,25 @@ namespace IronFlag.Levels
         [Tooltip("Material worn by tail-light geometry.")]
         private Material rearLight;
 
+        [SerializeField]
+        [Tooltip("Material worn by the lamp in a bunker bay.")]
+        private Material bayLight;
+
         /// <summary>The bunker model, one per side.</summary>
         public GameObject Bunker => bunker;
+
+        /// <summary>The underground hall model, hung under each bunker.</summary>
+        /// <remarks>
+        /// Optional, and deliberately so: it is scenery for one camera, a map built without
+        /// it plays identically, and every test that assembles a bunker by hand has none.
+        /// </remarks>
+        public GameObject BunkerHall => bunkerHall;
+
+        /// <summary>The lift car model, which rides each bunker's shaft.</summary>
+        public GameObject BunkerLift => bunkerLift;
+
+        /// <summary>Material worn by the lamp in a bunker bay.</summary>
+        public Material BayLight => bayLight;
 
         /// <summary>The flag tower prefab.</summary>
         public GameObject Tower => tower;
@@ -103,17 +128,23 @@ namespace IronFlag.Levels
         /// </summary>
         /// <param name="rows">One row per destructible kind.</param>
         /// <param name="bunkerModel">The bunker model.</param>
+        /// <param name="hallModel">The underground hall model.</param>
+        /// <param name="liftModel">The lift car model.</param>
         /// <param name="towerPrefab">The flag tower prefab.</param>
         /// <param name="flagPrefab">The flag prefab.</param>
         /// <remarks>Called by the editor's catalog builder; nothing assigns these by hand.</remarks>
         public void Configure(
             List<LevelStructurePrefab> rows,
             GameObject bunkerModel,
+            GameObject hallModel,
+            GameObject liftModel,
             GameObject towerPrefab,
             GameObject flagPrefab)
         {
             structures = rows == null ? new List<LevelStructurePrefab>() : rows;
             bunker = bunkerModel;
+            bunkerHall = hallModel;
+            bunkerLift = liftModel;
             tower = towerPrefab;
             flag = flagPrefab;
         }
@@ -127,14 +158,17 @@ namespace IronFlag.Levels
         /// <param name="brown">Team accent worn by the brown side.</param>
         /// <param name="front">Material worn by headlight geometry.</param>
         /// <param name="rear">Material worn by tail-light geometry.</param>
+        /// <param name="bay">Material worn by the lamp in a bunker bay.</param>
         public void ConfigureMaterials(
             List<LevelSurfaceMaterial> surfaceRows,
             Material waterMaterial,
             Material green,
             Material brown,
             Material front,
-            Material rear)
+            Material rear,
+            Material bay)
         {
+            bayLight = bay;
             surfaces = surfaceRows == null ? new List<LevelSurfaceMaterial>() : surfaceRows;
             water = waterMaterial;
             greenTrim = green;
@@ -247,6 +281,24 @@ namespace IronFlag.Levels
             if (bunker == null)
             {
                 problems.Add("The catalog has no bunker model: nobody would have anywhere to deploy from.");
+            }
+
+            if (bunkerHall == null)
+            {
+                problems.Add("The catalog has no bunker hall model: a player choosing a "
+                    + "vehicle would be looking at an empty hole in the ground.");
+            }
+
+            if (bunkerLift == null)
+            {
+                problems.Add("The catalog has no lift car model: vehicles would rise out of "
+                    + "the shaft standing on nothing.");
+            }
+
+            if (bayLight == null)
+            {
+                problems.Add("The catalog has no bay light material, so nothing underground "
+                    + "would be lit.");
             }
 
             if (tower == null)

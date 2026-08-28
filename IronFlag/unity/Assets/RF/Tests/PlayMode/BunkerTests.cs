@@ -67,10 +67,19 @@ namespace IronFlag.Tests.PlayMode
                     vehicle.GetComponent<VehicleBay>().IsReady,
                     Is.True,
                     $"{vehicle.Kind} is not available to be picked");
+
+                // What takes a waiting vehicle off the field is being intangible, not being
+                // invisible. It used to be both; the bunker view made the roster something
+                // to look at, so the renderers stay on and the colliders are the whole of
+                // the rule now.
                 Assert.That(
-                    vehicle.GetComponentInChildren<Renderer>(true).enabled,
+                    vehicle.GetComponentInChildren<Collider>(true).enabled,
                     Is.False,
-                    $"{vehicle.Kind} is standing out on the field");
+                    $"{vehicle.Kind} can still be hit while it waits in the bunker");
+                Assert.That(
+                    vehicle.GetComponent<Rigidbody>().isKinematic,
+                    Is.True,
+                    $"{vehicle.Kind} is still being simulated in the bunker");
             }
         }
 

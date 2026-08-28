@@ -5,17 +5,25 @@ using UnityEngine;
 namespace IronFlag.Menu
 {
     /// <summary>
-    /// The three things about the window a player is allowed to change, and where they are
-    /// remembered between sessions.
+    /// What a player is allowed to change about the window and the mix, and where those
+    /// choices are remembered between sessions.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The first stored preference this project has ever had, which is why it is three
-    /// settings rather than a panel of them. The rule used to pick them was that a setting has
-    /// to <em>do</em> something the day it ships: a master volume would be a slider over a game
-    /// with no sounds in it, and key rebinding is a feature rather than a row. Screen mode,
-    /// resolution and quality tier all take effect the moment they are pressed, on a machine
-    /// somebody is looking at.
+    /// The first stored preferences this project ever had, which is why it is five settings
+    /// rather than a panel of them. The rule used to pick them was that a setting has to
+    /// <em>do</em> something the day it ships: key rebinding is a feature rather than a row,
+    /// and screen mode, resolution and quality tier all take effect the moment they are
+    /// pressed, on a machine somebody is looking at.
+    /// </para>
+    /// <para>
+    /// The two volumes arrived later, under that same rule and only once it was true of them.
+    /// This class used to give a master volume as its example of a setting that would fail
+    /// it - "a slider over a game with no sounds in it" - and it was right until
+    /// <see cref="IronFlag.Audio.AudioDirector"/> existed. There are two rather than one
+    /// because the mix has two halves that people genuinely want at different levels: a
+    /// soundtrack somebody has heard forty times, and the gunfire telling them where they
+    /// are being shot from.
     /// </para>
     /// <para>
     /// Written through on every change rather than saved on the way out. A menu is the one
@@ -44,6 +52,37 @@ namespace IronFlag.Menu
         /// <summary>Preference key holding the name of the quality tier.</summary>
         public const string QualityKey = "IronFlag.Quality";
 
+        /// <summary>Preference key holding how loud the sound effects are.</summary>
+        public const string SoundKey = "IronFlag.SoundVolume";
+
+        /// <summary>Preference key holding how loud the music is.</summary>
+        public const string MusicKey = "IronFlag.MusicVolume";
+
+        /// <summary>How far one press moves a volume, as a fraction of full.</summary>
+        /// <remarks>
+        /// A tenth, so the range is eleven positions a player can step through without
+        /// holding a key down. The panel is built out of steppers rather than sliders
+        /// because everything else on it is - see <c>MainMenuController</c> - and a slider
+        /// would be the one control on the screen that needed dragging.
+        /// </remarks>
+        public const float VolumeStep = 0.1f;
+
+        /// <summary>How loud sound effects are by default, in 0..1.</summary>
+        /// <remarks>
+        /// Full. The clips are rendered at levels chosen against each other rather than at
+        /// whatever fits - a menu click peaks near a quarter and a cannon near two thirds -
+        /// so the mix is already the mix, and starting it turned down would only mean every
+        /// player's first act is turning it back up.
+        /// </remarks>
+        public const float DefaultSoundVolume = 1.0f;
+
+        /// <summary>How loud music is by default, in 0..1.</summary>
+        /// <remarks>
+        /// Under the effects, because music is the half a player is not listening <em>for</em>.
+        /// A theme at the same level as the gunfire is a theme that hides the gunfire.
+        /// </remarks>
+        public const float DefaultMusicVolume = 0.7f;
+
         /// <summary>Smallest window the interface was laid out to survive, in pixels.</summary>
         /// <remarks>
         /// The level editor's panels are pixel-exact - see
@@ -65,6 +104,17 @@ namespace IronFlag.Menu
         /// under its own name, so renaming a tier or adding a third one degrades to the truth
         /// rather than to a blank row.
         /// </remarks>
+        /// <summary>Cached sound volume; negative until it has been read from disk.</summary>
+        /// <remarks>
+        /// A sentinel rather than a nullable, and negative rather than zero, because zero is
+        /// a volume somebody may genuinely have chosen and re-reading it every frame would
+        /// undo the point of caching it.
+        /// </remarks>
+        private static float sound = -1.0f;
+
+        /// <summary>Cached music volume; negative until it has been read from disk.</summary>
+        private static float music = -1.0f;
+
         private static readonly Dictionary<string, string> FriendlyNames =
             new Dictionary<string, string>
             {
@@ -97,6 +147,51 @@ namespace IronFlag.Menu
         {
             get => PlayerPrefs.GetString(QualityKey, CurrentQuality());
             private set => PlayerPrefs.SetString(QualityKey, value);
+        }
+
+        /// <summary>How loud sound effects are, in 0..1.</summary>
+        /// <remarks>
+        /// Cached, unlike everything else here. The other settings are read when a panel is
+        /// drawn; this one is read by every engine loop on the field on every frame, and
+        /// <see cref="PlayerPrefs"/> is a string lookup rather than a field.
+        /// </remarks>
+        public static float SoundVolume
+        {
+            get
+            {
+                if (sound < 0.0f)
+                {
+                    sound = Mathf.Clamp01(PlayerPrefs.GetFloat(SoundKey, DefaultSoundVolume));
+                }
+
+                return sound;
+            }
+
+            private set
+            {
+                sound = Mathf.Clamp01(value);
+                PlayerPrefs.SetFloat(SoundKey, sound);
+            }
+        }
+
+        /// <summary>How loud music is, in 0..1.</summary>
+        public static float MusicVolume
+        {
+            get
+            {
+                if (music < 0.0f)
+                {
+                    music = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicKey, DefaultMusicVolume));
+                }
+
+                return music;
+            }
+
+            private set
+            {
+                music = Mathf.Clamp01(value);
+                PlayerPrefs.SetFloat(MusicKey, music);
+            }
         }
 
         /// <summary>
@@ -163,6 +258,47 @@ namespace IronFlag.Menu
             Quality = name == null ? string.Empty : name;
             PlayerPrefs.Save();
             Apply();
+        }
+
+        /// <summary>
+        /// Changes how loud sound effects are.
+        /// </summary>
+        /// <param name="level">Volume in 0..1; anything outside is clamped.</param>
+        /// <remarks>
+        /// No <see cref="Apply"/> call, unlike the three window settings. Nothing has to be
+        /// pushed anywhere: <see cref="IronFlag.Audio.AudioDirector"/> and
+        /// <see cref="IronFlag.Audio.MusicPlayer"/> read the value at the moment they play
+        /// something, so a change is audible on the next sound rather than on the next scene.
+        /// </remarks>
+        public static void SetSoundVolume(float level)
+        {
+            SoundVolume = level;
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Changes how loud music is.
+        /// </summary>
+        /// <param name="level">Volume in 0..1; anything outside is clamped.</param>
+        public static void SetMusicVolume(float level)
+        {
+            MusicVolume = level;
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Returns how a volume reads on a menu.
+        /// </summary>
+        /// <param name="level">Volume in 0..1.</param>
+        /// <returns>The volume as a whole percentage, or OFF at the bottom of the range.</returns>
+        /// <remarks>
+        /// "OFF" rather than "0%" because zero is a decision rather than a quantity, and a
+        /// player stepping down to it wants to read that they have turned the thing off.
+        /// </remarks>
+        public static string NameOfVolume(float level)
+        {
+            int percent = Mathf.RoundToInt(Mathf.Clamp01(level) * 100.0f);
+            return percent <= 0 ? "OFF" : $"{percent}%";
         }
 
         /// <summary>
@@ -263,7 +399,15 @@ namespace IronFlag.Menu
             PlayerPrefs.DeleteKey(WidthKey);
             PlayerPrefs.DeleteKey(HeightKey);
             PlayerPrefs.DeleteKey(QualityKey);
+            PlayerPrefs.DeleteKey(SoundKey);
+            PlayerPrefs.DeleteKey(MusicKey);
             PlayerPrefs.Save();
+
+            // The volumes are cached, so deleting the keys is not enough on its own: a test
+            // that forgot the settings and then read one back would get whatever the last
+            // test set, from memory, with nothing on disk to disagree with it.
+            sound = -1.0f;
+            music = -1.0f;
         }
 
         private static string CurrentQuality()

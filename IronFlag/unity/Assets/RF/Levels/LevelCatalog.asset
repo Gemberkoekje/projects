@@ -32,6 +32,8 @@ MonoBehaviour:
   - Kind: 10
     Prefab: {fileID: 9088407427530043840, guid: 602e31fd6e3464b46983de9676c45704, type: 3}
   bunker: {fileID: 7350495116598894301, guid: 5a8598d1424d6644c9b4c11db0d729a8, type: 3}
+  bunkerHall: {fileID: -7105496039487770557, guid: a5d9440591a19574ebe930df690b88dc, type: 3}
+  bunkerLift: {fileID: -7649114289034011407, guid: 3be82675caef93e41ac9cf0639f06f7f, type: 3}
   tower: {fileID: 3393270847052785822, guid: a94e5f60a2f6fd440b8995d5172af954, type: 3}
   flag: {fileID: 4965343357232036794, guid: aaf184bc273be4147a3b52b937b6fa08, type: 3}
   surfaces:
@@ -55,3 +57,4 @@ MonoBehaviour:
   brownTrim: {fileID: 2100000, guid: 525d5602beb90904aa415fe12ccd6989, type: 2}
   frontLight: {fileID: 2100000, guid: 516a43ab2834b124c8d4d556f63443e6, type: 2}
   rearLight: {fileID: 2100000, guid: 8129624ef5fe20041bcc51e89b9489f4, type: 2}
+  bayLight: {fileID: 2100000, guid: a592d693a442a16479cf27fc83799064, type: 2}

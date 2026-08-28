@@ -9,6 +9,12 @@ Both spawn points from the design doc's core loop are modelled, because the lift
 and the pad are meant to be a visible pacing beat rather than a menu: the lift bay
 opens at the front for ground vehicles, and the helipad sits on the roof.
 
+``LiftPlatform`` is a **collar around a hole**, not a slab. It used to be the deck
+a vehicle stood on; the deck is now the lift car in ``RF_Structure_BunkerLift``,
+which rises through this collar out of ``RF_Structure_BunkerHall`` below and stops
+flush with its top. The origin has not moved, so nothing that deploys from it
+noticed.
+
 Each of those two is left as its own named child object with its origin on the
 surface a vehicle stands on, rather than joined into the hull. Unity deploys from
 those origins - see ``TeamBunker`` - for the same reason it fires rounds from the
@@ -36,6 +42,48 @@ _ROOF_REAR_Y = 5.20
 _LIFT_NAME = "LiftPlatform"
 _HELIPAD_NAME = "Helipad"
 
+#: The shaft mouth. Shared with structure_bunker_hall.py, which puts the shaft
+#: under it, and with the lift car, which stops flush with the collar's top. The
+#: hole is 200 mm tighter than the shaft, and shallower across Y than across X
+#: because the block's front wall is only 1.8 m beyond the shaft's centre.
+_SHAFT_Y = -5.20
+_HOLE_HALF_X = 1.90
+_HOLE_HALF_Y = 1.60
+_COLLAR_WIDTH = 0.60
+_COLLAR_TOP = 0.25
+
+
+def _collar():
+    """Build the rim around the shaft mouth.
+
+    Returns:
+        Boxes framing the hole, their tops level with ``_COLLAR_TOP``.
+
+    A rim rather than a deck: what a vehicle stands on is the lift car, and a slab
+    across the hole would be a lid on the shaft it rises through.
+    """
+    reach = _HOLE_HALF_X + _COLLAR_WIDTH
+    parts = []
+
+    for sign in (-1.0, 1.0):
+        parts.append(p.box(
+            "CollarSide", size=(_COLLAR_WIDTH, _HOLE_HALF_Y * 2.0, _COLLAR_TOP),
+            at=(sign * (_HOLE_HALF_X + (_COLLAR_WIDTH * 0.5)), _SHAFT_Y, _COLLAR_TOP * 0.5),
+            color=palette.METAL_DARK))
+        parts.append(p.box(
+            "CollarEnd", size=(reach * 2.0, _COLLAR_WIDTH, _COLLAR_TOP),
+            at=(0.0, _SHAFT_Y + (sign * (_HOLE_HALF_Y + (_COLLAR_WIDTH * 0.5))),
+                _COLLAR_TOP * 0.5),
+            color=palette.METAL_DARK))
+        # Hazard paint sunk flush into the rim, on the two edges a vehicle crosses.
+        parts.append(p.box(
+            "CollarHazard", size=(reach * 2.0, 0.24, 0.06),
+            at=(0.0, _SHAFT_Y + (sign * (_HOLE_HALF_Y + (_COLLAR_WIDTH * 0.5))),
+                _COLLAR_TOP - 0.03),
+            color=palette.WARNING))
+
+    return parts
+
 
 def build():
     """Build the bunker and return its root object.
@@ -57,11 +105,8 @@ def build():
     # The two deploy points stay separate objects with their origins on the surface a
     # vehicle stands on, because Unity reads those origins as the places vehicles come
     # out of. Joining either into the hull would hide it from the importer.
-    lift = p.join(_LIFT_NAME, [
-        p.box(_LIFT_NAME, size=(3.20, 2.80, 0.25), at=(0.0, -5.20, 0.125),
-              color=palette.METAL_DARK),
-    ])
-    p.set_pivot(lift, (0.0, -5.20, 0.25))
+    lift = p.join(_LIFT_NAME, _collar())
+    p.set_pivot(lift, (0.0, _SHAFT_Y, _COLLAR_TOP))
     p.attach(lift, root)
 
     pad = p.join(_HELIPAD_NAME, [

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Editing;
 using IronFlag.Levels;
 using IronFlag.Objective;
@@ -140,7 +141,7 @@ namespace IronFlag.Menu
             scaler.referenceResolution = new Vector2(1920.0f, 1080.0f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            Image plate = EditorTheme.Plate("Plate", host.transform, HudPalette.Panel);
+            HudPlate plate = EditorTheme.Panel("Plate", host.transform, HudPalette.Panel);
             panel = plate.rectTransform;
             panel.anchorMin = new Vector2(0.5f, 0.5f);
             panel.anchorMax = new Vector2(0.5f, 0.5f);
@@ -148,11 +149,19 @@ namespace IronFlag.Menu
             panel.anchoredPosition = Vector2.zero;
             panel.sizeDelta = new Vector2(PanelWidth, PanelHeight);
 
-            title = EditorTheme.Label("Title", panel, 34, TextAnchor.MiddleCenter);
+            EditorTheme.Bracket("Frame", panel, HudPalette.FadedInk);
+
+            // One of the three headlines in the game, and the only one on a panel rather than
+            // over the whole screen. PAUSED is the game speaking rather than the interface
+            // labelling something, which is the line the stencil face is on the right side of.
+            title = HudPalette.Headline("Title", panel, 34, TextAnchor.MiddleCenter);
             EditorTheme.Place(
                 title.rectTransform, 0.0f, PanelHeight - Margin - 50.0f, PanelWidth, 50.0f);
 
-            continueButton = EditorTheme.Button("Continue", panel, "CONTINUE", 24, Close);
+            // CONTINUE leaves a panel rather than committing to anything, so it is the
+            // same gesture as a BACK button on the menu and makes the same noise.
+            continueButton = EditorTheme.Button(
+                "Continue", panel, "CONTINUE", 24, Close, SfxKind.UiBack);
             mainMenuButton = EditorTheme.Button("Main Menu", panel, "MAIN MENU", 24, BackToMenu);
 
             panel.gameObject.SetActive(false);

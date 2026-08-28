@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Core;
 using IronFlag.Levels;
 using IronFlag.Vfx;
@@ -469,6 +470,11 @@ namespace IronFlag.Combat
             }
 
             ImpactSparks.Spawn(sparks, at, -state.Velocity, weapon.Radius);
+
+            // The same sentence in sound: a round off armour, and only where the sparks
+            // agree there was some. A kill is already an explosion and a collapse is already
+            // its own noise, so this never doubles up with either.
+            Sfx.PlayAt(SfxKind.Impact, at);
         }
 
         /// <summary>

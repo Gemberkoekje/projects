@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Editing;
 using IronFlag.Levels;
 using IronFlag.UI;
@@ -67,6 +68,14 @@ namespace IronFlag.Menu
         private const float CaptionWidth = 140.0f;
         private const float ArrowWidth = 58.0f;
 
+        /// <summary>How far below its place a screen starts, in canvas units.</summary>
+        /// <remarks>
+        /// Deliberately small. A screen that slid a visible distance would be a screen the
+        /// player had to wait for; this is far enough that the eye registers movement and
+        /// short enough that it is over before anybody could have read the first line.
+        /// </remarks>
+        private const float EntryRise = 18.0f;
+
         private readonly List<EditorButton> levelButtons = new List<EditorButton>();
         private readonly List<Text> levelNotes = new List<Text>();
         private readonly List<MapCard> cards = new List<MapCard>();
@@ -75,10 +84,17 @@ namespace IronFlag.Menu
         private RectTransform rootPanel;
         private RectTransform levelsPanel;
         private RectTransform settingsPanel;
+        private CanvasGroup rootFade;
+        private CanvasGroup levelsFade;
+        private CanvasGroup settingsFade;
+        private Vector2 panelRest;
+        private float entered = 1.0f;
         private EditorButton moreButton;
         private EditorButton fullscreenButton;
         private EditorButton sizeButton;
         private EditorButton qualityButton;
+        private EditorButton soundButton;
+        private EditorButton musicButton;
         private Text note;
         private MenuPanel showing = MenuPanel.None;
         private int page;
@@ -162,7 +178,7 @@ namespace IronFlag.Menu
             menu.offsetMin = Vector2.zero;
             menu.offsetMax = Vector2.zero;
 
-            Image plate = EditorTheme.Plate("Column", menu, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Column", menu, EditorTheme.Chrome);
             EditorTheme.Cling(plate.rectTransform, RectTransform.Edge.Left, ColumnWidth, 0.0f, 0.0f);
             RectTransform column = plate.rectTransform;
 
@@ -172,6 +188,16 @@ namespace IronFlag.Menu
             rootPanel = BuildPanel(column, "Root");
             levelsPanel = BuildPanel(column, "Levels");
             settingsPanel = BuildPanel(column, "Settings");
+
+            rootFade = rootPanel.GetComponent<CanvasGroup>();
+            levelsFade = levelsPanel.GetComponent<CanvasGroup>();
+            settingsFade = settingsPanel.GetComponent<CanvasGroup>();
+
+            // Where a screen sits when it has finished arriving. Read off one of them rather
+            // than worked out, and shared by all three because BuildPanel gives them identical
+            // anchors - a screen that slid to a place it was never built in would arrive
+            // somewhere slightly wrong and stay there.
+            panelRest = rootPanel.anchoredPosition;
 
             BuildRoot();
             BuildLevels();
@@ -213,6 +239,13 @@ namespace IronFlag.Menu
             rootPanel.gameObject.SetActive(panel == MenuPanel.Root);
             levelsPanel.gameObject.SetActive(panel == MenuPanel.Levels);
             settingsPanel.gameObject.SetActive(panel == MenuPanel.Settings);
+
+            // Already arrived when nothing is running. The menu's still is rendered from an
+            // edit-mode scene where no Update ever fires, so a screen that started faded out
+            // there would stay faded out - and the picture of the menu would be a picture of
+            // an empty column.
+            entered = Application.isPlaying ? 0.0f : 1.0f;
+            ApplyEntry();
 
             Say(string.Empty);
 
@@ -326,10 +359,34 @@ namespace IronFlag.Menu
         /// its quality tier as a side effect of pressing a menu item.
         /// </para>
         /// </remarks>
-        private void Start() => GameSettings.Apply();
+        /// <summary>
+        /// Puts the stored settings into effect and starts the menu's theme.
+        /// </summary>
+        /// <remarks>
+        /// The menu is the first scene in the build, so this is the first music anybody
+        /// hears and the only place it is asked for by name - everything after this is the
+        /// match, and <see cref="IronFlag.Audio.MatchMusic"/> decides that from what is being
+        /// driven. A scene assembled without a player - the still that photographs this menu -
+        /// simply has none, which is why the reference is checked rather than assumed.
+        /// </remarks>
+        private void Start()
+        {
+            GameSettings.Apply();
+
+            MusicPlayer music = MusicPlayer.Current;
+            if (music != null)
+            {
+                music.Play(MusicKind.MenuTheme);
+            }
+        }
 
         private void Update()
         {
+            // Unscaled, unlike everything on the HUD. Nothing here is ever drawn over a
+            // running match, and a menu that stopped animating because somebody had paused
+            // something is a menu that has stopped working - see HudMotion.
+            Advance(Time.unscaledDeltaTime);
+
             Keyboard keys = Keyboard.current;
             if (keys == null || !keys.escapeKey.wasPressedThisFrame)
             {
@@ -345,11 +402,74 @@ namespace IronFlag.Menu
             }
         }
 
+        /// <summary>
+        /// Moves the screen that is up a little further into place.
+        /// </summary>
+        /// <param name="deltaTime">Seconds since this was last called.</param>
+        /// <remarks>
+        /// A screen fades up and rises the last few units into place rather than appearing.
+        /// It is a small thing and it is doing one job: three screens that share a column and
+        /// a set of anchors are otherwise indistinguishable at the moment they swap, and a
+        /// player who presses PLAY and gets a differently-worded list in the same rectangle
+        /// has to read it to find out anything happened. Motion says "this is a new screen"
+        /// before a single word of it has been read.
+        /// </remarks>
+        private void Advance(float deltaTime)
+        {
+            if (entered >= 1.0f)
+            {
+                return;
+            }
+
+            entered = HudMotion.Ease(entered, 1.0f, HudMotion.FadeRate, deltaTime);
+            ApplyEntry();
+        }
+
+        /// <summary>
+        /// Puts the screen that is up where its arrival has got to.
+        /// </summary>
+        private void ApplyEntry()
+        {
+            CanvasGroup fade = FadeOf(showing);
+            if (fade == null)
+            {
+                return;
+            }
+
+            float left = 1.0f - entered;
+            fade.alpha = entered;
+
+            var rect = (RectTransform)fade.transform;
+            rect.anchoredPosition = panelRest - new Vector2(0.0f, left * EntryRise);
+        }
+
+        /// <summary>
+        /// Returns the fade belonging to one of the three screens.
+        /// </summary>
+        /// <param name="panel">The screen to look up.</param>
+        /// <returns>Its canvas group, or nothing at all before the menu is built.</returns>
+        private CanvasGroup FadeOf(MenuPanel panel)
+        {
+            switch (panel)
+            {
+                case MenuPanel.Root:
+                    return rootFade;
+                case MenuPanel.Levels:
+                    return levelsFade;
+                case MenuPanel.Settings:
+                    return settingsFade;
+                default:
+                    return null;
+            }
+        }
+
         private void BuildHeader(RectTransform column)
         {
             float inner = ColumnWidth - (Margin * 2.0f);
 
-            Text title = EditorTheme.Label("Title", column, 62, TextAnchor.LowerLeft);
+            // The game's name is the one place a stencil belongs most obviously, and one of
+            // only three in the whole project entitled to it - see HudPalette.DisplayFace.
+            Text title = HudPalette.Headline("Title", column, 62, TextAnchor.LowerLeft);
             title.text = "IRON FLAG";
             Hang(title.rectTransform, Margin, -Margin - 20.0f, inner, 72.0f);
 
@@ -377,7 +497,7 @@ namespace IronFlag.Menu
         /// </summary>
         private static RectTransform BuildPanel(RectTransform column, string name)
         {
-            var host = new GameObject(name, typeof(RectTransform));
+            var host = new GameObject(name, typeof(RectTransform), typeof(CanvasGroup));
             host.transform.SetParent(column, false);
 
             var rect = host.GetComponent<RectTransform>();
@@ -445,7 +565,7 @@ namespace IronFlag.Menu
             float half = (inner - Gutter) * 0.5f;
 
             EditorButton back = EditorTheme.Button(
-                "Levels Back", levelsPanel, "BACK", 22, () => Show(MenuPanel.Root));
+                "Levels Back", levelsPanel, "BACK", 22, () => Show(MenuPanel.Root), SfxKind.UiBack);
             Foot(back.Rect, 0.0f, half);
 
             moreButton = EditorTheme.Button("Levels More", levelsPanel, "MORE", 22, NextPage);
@@ -471,17 +591,26 @@ namespace IronFlag.Menu
             top -= RowHeight + Gutter;
 
             qualityButton = Stepper("Quality", "DETAIL", top, inner, StepQuality);
+            top -= RowHeight + Gutter;
+
+            // Two volumes rather than one. The soundtrack is the half a player turns down
+            // after the fortieth match; the gunfire is the half telling them where they are
+            // being shot from, and tying the two together makes silencing one silence both.
+            soundButton = Stepper("Sound", "SOUND", top, inner, StepSound, SfxKind.None);
+            top -= RowHeight + Gutter;
+
+            musicButton = Stepper("Music", "MUSIC", top, inner, StepMusic);
             top -= RowHeight + (Gutter * 2.0f);
 
             Text explain = EditorTheme.Paragraph("Settings Note", settingsPanel, 17);
             explain.color = EditorTheme.FadedInk;
             Hang(explain.rectTransform, 0.0f, top, inner, 96.0f);
             explain.text =
-                "The window and the detail level are remembered between sessions. "
-                + "Detail chooses which render pipeline tier the game draws with.";
+                "Every setting is remembered between sessions. Detail chooses which render "
+                + "pipeline tier the game draws with; the volumes take effect as you press them.";
 
             EditorButton back = EditorTheme.Button(
-                "Settings Back", settingsPanel, "BACK", 22, () => Show(MenuPanel.Root));
+                "Settings Back", settingsPanel, "BACK", 22, () => Show(MenuPanel.Root), SfxKind.UiBack);
             Foot(back.Rect, 0.0f, inner);
         }
 
@@ -507,7 +636,8 @@ namespace IronFlag.Menu
             Caption(name, caption, top);
 
             float width = inner - CaptionWidth - Gutter;
-            EditorButton button = EditorTheme.Button(name, settingsPanel, string.Empty, 21, does);
+            EditorButton button = EditorTheme.Button(
+                name, settingsPanel, string.Empty, 21, does, SfxKind.UiSelect);
             Hang(button.Rect, CaptionWidth + Gutter, top, width, RowHeight);
             return button;
         }
@@ -523,6 +653,25 @@ namespace IronFlag.Menu
         /// </remarks>
         private EditorButton Stepper(
             string name, string caption, float top, float inner, System.Action<int> step)
+            => Stepper(name, caption, top, inner, step, SfxKind.UiSelect);
+
+        /// <summary>
+        /// Builds a stepper whose arrows make a particular noise.
+        /// </summary>
+        /// <remarks>
+        /// One caller, and it wants silence: the sound stepper plays its own sample
+        /// <em>after</em> it has applied the change, because a volume control that clicked at
+        /// the level you just left is the one control on this panel that would be lying. See
+        /// <see cref="StepSound"/>; the arrow click and that sample are the same press, and
+        /// only one of them can be it.
+        /// </remarks>
+        private EditorButton Stepper(
+            string name,
+            string caption,
+            float top,
+            float inner,
+            System.Action<int> step,
+            SfxKind arrow)
         {
             Caption(name, caption, top);
 
@@ -530,14 +679,14 @@ namespace IronFlag.Menu
             float width = inner - left - (ArrowWidth * 2.0f) - (Gutter * 2.0f);
 
             EditorButton down = EditorTheme.Button(
-                $"{name} Down", settingsPanel, "<", 22, () => step(-1));
+                $"{name} Down", settingsPanel, "<", 22, () => step(-1), arrow);
             Hang(down.Rect, left, top, ArrowWidth, RowHeight);
 
             EditorButton value = EditorTheme.Button($"{name} Value", settingsPanel, string.Empty, 21, null);
             Hang(value.Rect, left + ArrowWidth + Gutter, top, width, RowHeight);
 
             EditorButton up = EditorTheme.Button(
-                $"{name} Up", settingsPanel, ">", 22, () => step(1));
+                $"{name} Up", settingsPanel, ">", 22, () => step(1), arrow);
             Hang(up.Rect, left + ArrowWidth + Gutter + width + Gutter, top, ArrowWidth, RowHeight);
 
             return value;
@@ -576,6 +725,45 @@ namespace IronFlag.Menu
             RefreshSettings();
         }
 
+        /// <summary>
+        /// Steps the sound effects up or down one notch.
+        /// </summary>
+        /// <param name="by">Which way to step: -1 quieter, 1 louder.</param>
+        /// <remarks>
+        /// Clamped at both ends rather than wrapped, unlike the two steppers above it. A
+        /// resolution list has no quiet end and a player stepping off it wants to come round;
+        /// a volume does, and coming round from OFF to full is how somebody deafens
+        /// themselves at two in the morning.
+        /// </remarks>
+        private void StepSound(int by)
+        {
+            GameSettings.SetSoundVolume(
+                GameSettings.SoundVolume + (by * GameSettings.VolumeStep));
+            RefreshSettings();
+
+            // Played after the change rather than by the arrow itself, so the press is heard
+            // at the level it has just set - which is the only way a volume control tells you
+            // anything. It is also the only feedback there is when stepping up off OFF, where
+            // a click fired before the change would have been played at a volume of nothing.
+            Sfx.Play(SfxKind.UiSelect);
+        }
+
+        /// <summary>
+        /// Steps the music up or down one notch.
+        /// </summary>
+        /// <param name="by">Which way to step: -1 quieter, 1 louder.</param>
+        /// <remarks>
+        /// No sample to play afterwards, unlike <see cref="StepSound"/>: the music is already
+        /// playing, and <see cref="IronFlag.Audio.MusicPlayer"/> reads the setting every frame,
+        /// so the bed under the menu changes level as the button is pressed.
+        /// </remarks>
+        private void StepMusic(int by)
+        {
+            GameSettings.SetMusicVolume(
+                GameSettings.MusicVolume + (by * GameSettings.VolumeStep));
+            RefreshSettings();
+        }
+
         private void RefreshSettings()
         {
             if (fullscreenButton == null)
@@ -589,6 +777,8 @@ namespace IronFlag.Menu
 
             sizeButton.SetText(GameSettings.NameOfSize(GameSettings.Size));
             qualityButton.SetText(GameSettings.NameOfQuality(GameSettings.Quality));
+            soundButton.SetText(GameSettings.NameOfVolume(GameSettings.SoundVolume));
+            musicButton.SetText(GameSettings.NameOfVolume(GameSettings.MusicVolume));
 
             // The size is what the window is, not what it can be, so it stops meaning anything
             // while the game is filling the screen - and a stepper that changed a number

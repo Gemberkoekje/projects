@@ -133,6 +133,35 @@ rounds from the `Muzzle` object — so moving the lift or the pad is an art chan
 nothing else. Renaming either one silently drops the bunker back to a guess at where its
 own door is.
 
+**Bunker Hall (`RF_Structure_BunkerHall`, added with the bunker view)**
+- The underground half of the same base: two decks of two bays around a central lift
+  shaft, hung under the blockhouse at the same origin
+- **The field-facing wall is not built.** It is a cutaway, not a room — one camera ever
+  looks into it, from in front of the bunker along the bunker's own heading, and from any
+  other angle it reads as hollow. That is a modelling convention rather than a shader
+- Four child objects `Bay0`..`Bay3` are the deck plates vehicles wait on, numbered by
+  **roster order** (jeep, tank, ASV, helicopter), origins on the plate — the same rule as
+  `LiftPlatform`. **-X is the left of the picture**, because glTFast negates X on import
+  and the select camera looks back along the bunker's heading — two flips that do not
+  cancel
+- Each bay carries a `Lamp<n>` child. Unity gives those the emissive `RF_BayLight`
+  material and hangs a point light under each; they are the only light down there
+- A `Skyline` child caps the top of the cutaway face. The select camera pins the top of
+  its picture to it, which is what keeps sky — and the underside of the sea slab — out of
+  a shot of an underground room
+- **No colliders and no destruction states.** Nothing can reach it
+- **It must hang below the sea slab.** A level's sea is a box as wide as the whole map,
+  drawn under the island as well as around it, so anything reaching up into it gets a
+  sheet of water drawn across the middle of the picture
+
+**Bunker Lift (`RF_Structure_BunkerLift`, added with the bunker view)**
+- The car that rides the shaft, its own asset because it moves and the hall does not
+- Origin on the middle of the deck's top face, so parking it at a point puts the surface a
+  vehicle stands on exactly there
+- At its top stop the deck is flush with `LiftPlatform`, which is a **collar around the
+  shaft mouth** rather than the slab it used to be — the deck a vehicle stands on is the
+  car now
+
 **Flag Tower (real + decoy — must be visually identical to each other)**
 - Pyramidal silhouette — distinct shape from everything else so it reads instantly on minimap and battlefield
 - Neutral color only, no team tint (decoys must be indistinguishable from the real tower)

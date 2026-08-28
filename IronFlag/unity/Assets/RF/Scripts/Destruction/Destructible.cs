@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Supply;
@@ -340,6 +341,13 @@ namespace IronFlag.Destruction
                 float spread = tuning.DebrisRadius
                     * (wanted == DestructionState.Destroyed ? 1.0f : 0.6f);
                 DebrisBurst.Spawn(debris, origin, spread);
+
+                // Behind the same flag as the debris, and that is the point of putting it
+                // here: a structure also arrives in a state by being built, by being loaded
+                // from a map that was saved damaged, and by being put back up in the editor.
+                // None of those are events, and a map with nine broken walls on it would
+                // otherwise open with nine collapses.
+                Sfx.PlayAt(AudioRoster.DamageOf(wanted), origin);
             }
 
             StateChanged?.Invoke(this);

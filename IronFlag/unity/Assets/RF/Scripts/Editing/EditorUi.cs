@@ -411,7 +411,7 @@ namespace IronFlag.Editing
         /// </summary>
         private void BuildTopBar()
         {
-            Image plate = EditorTheme.Plate("Top Bar", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Top Bar", panels, EditorTheme.Chrome);
             EditorTheme.Cling(plate.rectTransform, RectTransform.Edge.Top, TopBarHeight, 0.0f, 0.0f);
 
             RectTransform bar = plate.rectTransform;
@@ -494,7 +494,7 @@ namespace IronFlag.Editing
         /// </summary>
         private void BuildToolColumn()
         {
-            Image plate = EditorTheme.Plate("Tools", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Tools", panels, EditorTheme.Chrome);
             EditorTheme.Cling(
                 plate.rectTransform, RectTransform.Edge.Left, LeftWidth, StatusHeight, TopBarHeight);
 
@@ -553,7 +553,7 @@ namespace IronFlag.Editing
         /// </summary>
         private void BuildInspectorColumn()
         {
-            Image plate = EditorTheme.Plate("Inspector", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Inspector", panels, EditorTheme.Chrome);
             EditorTheme.Cling(
                 plate.rectTransform, RectTransform.Edge.Right, RightWidth, StatusHeight, TopBarHeight);
 
@@ -583,7 +583,7 @@ namespace IronFlag.Editing
         /// </summary>
         private void BuildStatusBar()
         {
-            Image plate = EditorTheme.Plate("Status", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Status", panels, EditorTheme.Chrome);
             EditorTheme.Cling(
                 plate.rectTransform, RectTransform.Edge.Bottom, StatusHeight, 0.0f, 0.0f);
 
@@ -627,7 +627,7 @@ namespace IronFlag.Editing
         /// </remarks>
         private void BuildOpenPanel()
         {
-            Image plate = EditorTheme.Plate("Open", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Open", panels, EditorTheme.Chrome);
             openPanel = plate.rectTransform;
             openPanel.anchorMin = new Vector2(0.5f, 0.5f);
             openPanel.anchorMax = new Vector2(0.5f, 0.5f);
@@ -718,7 +718,7 @@ namespace IronFlag.Editing
         /// </remarks>
         private void BuildMakePanel()
         {
-            Image plate = EditorTheme.Plate("Generate Panel", panels, EditorTheme.Chrome);
+            HudPlate plate = EditorTheme.Panel("Generate Panel", panels, EditorTheme.Chrome);
             makePanel = plate.rectTransform;
             makePanel.anchorMin = new Vector2(0.5f, 0.5f);
             makePanel.anchorMax = new Vector2(0.5f, 0.5f);

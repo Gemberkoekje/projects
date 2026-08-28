@@ -37,6 +37,12 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Model the bunkers are placed from.</summary>
         public const string BunkerModel = "RF_Structure_Bunker";
 
+        /// <summary>Model of the underground hall hung under each bunker.</summary>
+        public const string BunkerHallModel = "RF_Structure_BunkerHall";
+
+        /// <summary>Model of the lift car that rides each bunker's shaft.</summary>
+        public const string BunkerLiftModel = "RF_Structure_BunkerLift";
+
         /// <summary>
         /// Rebuilds the level catalog from whatever is on disk now.
         /// </summary>
@@ -88,6 +94,8 @@ namespace IronFlag.Editor.Gameplay
             catalog.Configure(
                 rows,
                 AssetDatabase.LoadAssetAtPath<GameObject>($"{ModelFolder}/{BunkerModel}.glb"),
+                AssetDatabase.LoadAssetAtPath<GameObject>($"{ModelFolder}/{BunkerHallModel}.glb"),
+                AssetDatabase.LoadAssetAtPath<GameObject>($"{ModelFolder}/{BunkerLiftModel}.glb"),
                 ObjectivePrefabBuilder.LoadTower(),
                 ObjectivePrefabBuilder.LoadFlag());
 
@@ -115,7 +123,8 @@ namespace IronFlag.Editor.Gameplay
                 GeneratedMaterials.Load(GeneratedMaterials.Green),
                 GeneratedMaterials.Load(GeneratedMaterials.Brown),
                 GeneratedMaterials.Load(GeneratedMaterials.FrontLight),
-                GeneratedMaterials.Load(GeneratedMaterials.RearLight));
+                GeneratedMaterials.Load(GeneratedMaterials.RearLight),
+                GeneratedMaterials.Load(GeneratedMaterials.BayLight));
 
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();

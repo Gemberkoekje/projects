@@ -21,8 +21,11 @@ before you have lost, [TURRETS_NOTES.md](TURRETS_NOTES.md) why an emplacement wa
 for twelve metres before it starts shooting, [SOLO_NOTES.md](SOLO_NOTES.md) how to play
 on your own, [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md) how the sea came to move and
 what a shell leaves on the beach, and [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) what Escape
-does now. [AUDIO_NOTES.md](AUDIO_NOTES.md) covers the sound and music pipeline — built and
-rendered, but not yet wired into the game itself.
+does now. [AUDIO_NOTES.md](AUDIO_NOTES.md) covers the sound and music: thirty clips
+synthesised from committed SuperCollider source, and how they reach the speakers of a split
+screen that only has one pair of ears. [UI_NOTES.md](UI_NOTES.md) covers what the interface
+is made of: a real typeface, corner-bracketed glass carrying the world's own vignette, marks
+drawn from their own coordinates, and gauges that move.
 
 ---
 
@@ -38,14 +41,20 @@ IronFlag/
 │   ├── build.py                        headless entry point
 │   ├── rf/                             shared primitive/material/export helpers
 │   └── assets/                         one module per asset family
+├── audio/                              sound and music generation (SuperCollider), mirrors blender/
+│   ├── build.ps1 / build.sh            run a build
+│   ├── rf/                             shared DSP vocabulary
+│   └── sounds/                         one module per sound family
 └── unity/                              the Unity 6 (URP) project
     ├── Assets/StreamingAssets/Levels/  the maps, as JSON. Edit these
     └── Assets/RF/                      everything else lives under here
         ├── Art/Models/                 .glb output from blender/ (committed)
+        ├── Audio/                      .wav output from audio/ (committed) + AudioCatalog.asset
         ├── Editor/ArtPipeline/         the "rebuild art" editor menu
         ├── Editor/Gameplay/            vehicle, combat, destructible and scene generators
         ├── Input/                      input actions
         ├── Levels/                     the catalog: what a map is built out of
+        ├── Scripts/Audio/              the runtime side of sound and music
         ├── Scripts/Levels/             the level format, its loader and its rules
         ├── Scripts/Editing/            the in-game level editor
         ├── Scripts/Menu/               the main menu, its settings and the ways back to it
@@ -72,6 +81,7 @@ the one exception to "all project content lives under `Assets/RF/`".
 |---|---|---|
 | Unity | 6000.5.9f1 | Pinned in `unity/ProjectSettings/ProjectVersion.txt` |
 | Blender | 5.2 LTS | Found automatically; override with `IRONFLAG_BLENDER` |
+| SuperCollider | any recent release | Found automatically; override with `IRONFLAG_SUPERCOLLIDER` |
 
 ## Getting started
 
@@ -91,13 +101,24 @@ or, from inside the editor, **Tools > IronFlag > Rebuild All Art from Blender**.
 See [blender/README.md](blender/README.md) for the asset pipeline and the list of
 models still to build.
 
+To rebuild the sound and music:
+
+```bash
+./audio/build.ps1
+```
+
+or, from inside the editor, **Tools > IronFlag > Rebuild All Audio from SuperCollider**,
+then **Tools > IronFlag > Build Audio Catalog**. See [audio/README.md](audio/README.md) for
+the pipeline and its traps, and [AUDIO_NOTES.md](AUDIO_NOTES.md) for how the sounds reach
+the game.
+
 ## Playing it
 
 Open `unity/Assets/RF/Scenes/MainMenu.unity` and press Play. **PLAY** lists every map in both
 level folders — the ones that shipped and the ones you have drawn — with what each one is
 underneath its name; pick one and the match starts. **LEVEL EDITOR** goes straight to the
-editor and **SETTINGS** holds the window and the detail level, which are remembered between
-sessions. `ESC` backs out of either panel, and from inside a match it pauses it — see
+editor and **SETTINGS** holds the window, the detail level and the two mix volumes, which
+are remembered between sessions. `ESC` backs out of either panel, and from inside a match it pauses it — see
 [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md). In the editor the way back is the **MENU** button,
 which asks twice if you have unsaved work. (`Scenes/Sandbox.unity` still opens straight into a
 match if you would rather skip the menu.)
@@ -108,15 +129,19 @@ one of you, you have the whole screen, and the enemy is a field of flag towers b
 own emplacements with nobody driving. The menu marks those maps `1 PLAYER`; the shipped one is
 `IRON WATCH`, and the level editor generates more. See [SOLO_NOTES.md](SOLO_NOTES.md).
 
-Either way you start **inside your bunker**, looking at a panel listing your
-four vehicles — pick one and send it out, and it rides up the lift (or lifts off the roof pad,
-if you picked the helicopter) before you can drive it.
+Either way you start **inside your bunker**, and it is a place rather than a menu: two decks of
+two bays around a lift shaft, cut away so you are looking into your own base from the field
+side, with your four vehicles parked in it under the lights. Moving the highlight lights a
+different bay and sends the lift down to that deck; sending one out rolls it onto the car, up
+the shaft and out at the surface, which you watch from where you are standing. The strip along
+the bottom is what each one is carrying. See
+[M4_NOTES.md](M4_NOTES.md#the-bunker-view-what-the-player-is-looking-at-while-they-choose).
 
 Player one is on the keyboard and mouse — `WASD` drives, the mouse aims, the left button
-fires, `Q` and `E` move down the roster, `F` deploys, `Space` and `Left Ctrl` fly the
-helicopter up and down. Player two picks up a gamepad: left stick drives, right stick aims,
-right trigger fires, the shoulder buttons move down the roster, `X` deploys, `A` and `B` climb
-and descend. Plug a second pad in and both players move onto pads. Full details are in
+fires, `Q` and `E` move down the roster, `F` deploys. Player two picks up a gamepad: left
+stick drives, right stick aims, right trigger fires, the shoulder buttons move down the
+roster, `X` deploys. Plug a second pad in and both players move onto pads. The helicopter
+flies at one fixed altitude and needs no separate controls of its own. Full details are in
 [M2_NOTES.md](M2_NOTES.md).
 
 You only ever have one vehicle out. To swap, **hold** the deploy button: standing on your own
@@ -125,11 +150,11 @@ else it blows the vehicle up — which is also the way out when you have run dry
 of the map. A wreck spends four seconds being repaired before it can be picked again, and it
 costs you one of that vehicle for good.
 
-Because **you only have so many**. The count beside each row of the roster is how many of that
+Because **you only have so many**. The count beside each name on the console is how many of that
 vehicle your side has left — eight jeeps, three tanks, three ASVs and three helicopters to
 start with, and whatever the map says instead. Anything destroyed comes off it and nothing
 puts one back: not the bunker, which repairs and refuels everything else, and not time. Run out
-of a vehicle and its row says **NONE LEFT** and stays there, unpickable, for the rest of the
+of a vehicle and its cell says **NONE LEFT** and stays there, unpickable, for the rest of the
 match. **Run out of jeeps and you have lost** — only a jeep can carry a flag, so a side without
 one has no way left to win. Blowing up your own vehicle rather than driving it home is
 therefore a real price now, which is the whole point of it. Details in
@@ -255,8 +280,9 @@ ways a match ends; the other is one side running out of jeeps, which is the same
 backwards.
 
 The scenes and the prefabs are all generated — **Tools > IronFlag > Build Vehicle Sandbox
-Scene**, **Build Level Editor Scene**, **Build Vehicle Prefabs**, **Build Combat Prefabs** and
-**Build Destructible Prefabs** — so rebuild them rather than editing them by hand. The flag and
+Scene**, **Build Level Editor Scene**, **Build Main Menu Scene**, **Build Vehicle Prefabs**,
+**Build Combat Prefabs** and **Build Destructible Prefabs** — so rebuild them rather than
+editing them by hand. The flag and
 its tower come from **Build Objective Prefabs**, and **Build Level Catalog** is what tells the
 running game which prefab a level file's `"Bridge"` means. Run that one after changing any
 generated material, or the next render will still show the old colour.
@@ -284,9 +310,11 @@ rebuilt from the file on the first frame of play.
   than about the Input System template.
 - **M3 — combat basics**: done. See [M3_NOTES.md](M3_NOTES.md). Four weapons, projectiles
   that sweep rather than tunnel, a hit-point pool per vehicle, and wrecks that leave the field.
-- **M4 — bunker & vehicle selection**: done. See [M4_NOTES.md](M4_NOTES.md). A roster panel
-  per split-screen half, one vehicle out at a time, a lift and a helipad to leave from, and
-  fuel and ammunition with depots and bunkers to refill them at.
+- **M4 — bunker & vehicle selection**: done. See [M4_NOTES.md](M4_NOTES.md). One vehicle out
+  at a time, a lift and a helipad to leave from, and fuel and ammunition with depots and
+  bunkers to refill them at. The screen you choose on was
+  [rebuilt later](M4_NOTES.md#the-bunker-view-what-the-player-is-looking-at-while-they-choose)
+  into a cutaway of the base itself, with the vehicles visible in their bays.
 - **M5 — destruction (state-swap)**: done. See [M5_NOTES.md](M5_NOTES.md). Every prop and
   building on the map has a hit point pool and three models, a round hurts a wall the same way
   it hurts a hull, rubble stops being cover, and the depots can be taken away.
@@ -309,11 +337,24 @@ rebuilt from the file on the first frame of play.
   behind all of it. `ESC` pauses a match — see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) — and
   a guarded **MENU** button leaves the editor, which is what makes it a screen you use rather
   than one you pass through at boot.
-- **M8 - polish pass**: not started as gameplay. The sound and music side has a build pipeline
-  now — 30 clips synthesised from committed SuperCollider source, see
-  [AUDIO_NOTES.md](AUDIO_NOTES.md) — but none of it is wired into the game yet. Per-vehicle
-  audio hookup, a minimap, HUD readability and juice are all still to do. The minimap has a
-  data source: a level is a list of rectangles.
+- **M8 - polish pass**: the sound and music half is done, including the per-vehicle audio
+  hookup this milestone always listed. Thirty clips are synthesised from committed
+  SuperCollider source, and every event in the game that should make a noise now does - guns,
+  blasts, the flag changing hands, four looping engines and four match themes, with a volume
+  for each half of the mix in the settings panel. See [AUDIO_NOTES.md](AUDIO_NOTES.md), whose
+  short version is that distance decides loudness and nothing ever decides direction, because
+  a split screen has one pair of ears and two people looking in different places. HUD
+  readability is done too — see below. A minimap is what is left, and it has a data source: a
+  level is a list of rectangles.
+- **The interface's own look**: done. See [UI_NOTES.md](UI_NOTES.md). The game is set in a
+  real typeface now — Saira Condensed, with its stencil sibling for the three headlines — and
+  every panel is glass rather than a rectangle: it carries the same vignette the grade puts on
+  the world, corner marks in the colour of whoever the panel belongs to, and a shield, a drop
+  and a round beside the three gauges, each drawn from its own coordinates rather than out of
+  an icon sheet. The gauges slide to their readings instead of snapping and breathe when they
+  are nearly empty, the menu's screens fade and rise into place, and the level editor got the
+  same face and the same glass. TextMeshPro was considered for it and deliberately left out;
+  the argument is in the notes.
 - **Surfaces**: done, all five phases. See [SURFACES_NOTES.md](SURFACES_NOTES.md). The map is
   made of more than one thing: a level file names a surface per piece of land, one table
   says what each surface is, and the crossings are grey roads through green country instead of
@@ -333,7 +374,7 @@ rebuilt from the file on the first frame of play.
   a driver cutting the corner at a crossing would take, and the road is the way round it - so
   the surface table finally decides a route instead of only a colour. The plan the whole pass
   was built against is kept in [SURFACES_NOTES.md](SURFACES_NOTES.md#appendix-the-original-plan-as-written).
-- **Not scheduled**: a near-term backlog -
-  locking the helicopter to a fixed altitude, automated turrets, and finishing off destruction
-  (no hitbox once wrecked, everything actually destructible) - kept in
-  [return-fire-homage-design-doc.md §10](return-fire-homage-design-doc.md#10-near-term-backlog-not-yet-scheduled-to-a-milestone).
+- **M9 - near-term backlog**: done, and the backlog it cleared is empty. See
+  [M9_NOTES.md](M9_NOTES.md): the helicopter locked to a fixed altitude, automated turrets,
+  a destroyed structure losing its collider, and the audit that every structure kind really
+  is destructible end to end.

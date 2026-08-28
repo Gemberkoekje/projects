@@ -148,6 +148,7 @@ namespace IronFlag.Editor.Gameplay
             MenuBackdrop backdrop = CreateView(level);
             LightScene(backdrop.Distance);
             CreateEventSystem(controls);
+            AudioCatalogBuilder.AddToScene(withMusic: true);
 
             Camera panelView = ViewStack.InterfaceView(backdrop.View);
             return CreateMenu(panelView);

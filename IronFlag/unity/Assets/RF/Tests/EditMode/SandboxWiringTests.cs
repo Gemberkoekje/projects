@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Destruction;
@@ -164,6 +165,73 @@ namespace IronFlag.Tests.EditMode
             }
         }
 
+        /// <summary>
+        /// The scene can make a noise, and making one did not cost it its single pair of
+        /// ears. A director is not a listener - it is the thing holding the clips - and the
+        /// distinction is the whole reason adding sound to a split-screen game did not need
+        /// a second listener. See <c>AudioMixdown</c>.
+        /// </summary>
+        [Test]
+        public void TheMatchHasSomethingToMakeANoiseWith()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                Assert.That(
+                    sandbox.All<AudioDirector>().Count,
+                    Is.EqualTo(1),
+                    "there is not exactly one thing in the scene that plays sounds");
+
+                Assert.That(
+                    sandbox.All<MusicPlayer>().Count,
+                    Is.EqualTo(1),
+                    "there is not exactly one thing in the scene that plays music");
+
+                Assert.That(
+                    sandbox.All<MatchMusic>().Count,
+                    Is.EqualTo(1),
+                    "nothing is deciding what the match sounds like");
+
+                foreach (AudioDirector director in sandbox.All<AudioDirector>())
+                {
+                    Assert.That(
+                        director.Catalog,
+                        Is.Not.Null,
+                        "the director has no catalog, so the match would be silent");
+
+                    Assert.That(director.Catalog.Problems(), Is.Empty);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every vehicle on the field has an engine to be heard running, and the helicopter's
+        /// is the one that is loud standing still - which is the only difference between a
+        /// rotor and an engine in this game.
+        /// </summary>
+        [Test]
+        public void EveryVehicleHasAnEngineToBeHeardRunning()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                foreach (VehicleController vehicle in sandbox.All<VehicleController>())
+                {
+                    var engine = vehicle.GetComponent<EngineAudio>();
+
+                    Assert.That(engine, Is.Not.Null, $"the {vehicle.Kind} drives in silence");
+                    Assert.That(
+                        engine.Loop,
+                        Is.Not.Null,
+                        $"the {vehicle.Kind}'s engine has nothing to play through");
+
+                    bool rotor = vehicle.Kind == VehicleKind.Helicopter;
+                    Assert.That(
+                        engine.IdleShare,
+                        rotor ? Is.GreaterThan(0.5f) : Is.LessThan(0.5f),
+                        $"the {vehicle.Kind} idles at the wrong level for what it is");
+                }
+            }
+        }
+
         [Test]
         public void EachSideHasABunkerToComeBackTo()
         {
@@ -221,6 +289,169 @@ namespace IronFlag.Tests.EditMode
                         bunker.HelipadPoint.y,
                         Is.GreaterThan(2.0f),
                         $"{bunker.name} launches the helicopter from the ground");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every bunker has a hall under it with a bay per roster slot, a lamp in each, and a
+        /// car in its shaft.
+        /// </summary>
+        /// <remarks>
+        /// All of it is found in the model by name, so a rename in Blender or a missing
+        /// rebuild has one symptom: a vehicle waiting at the top of the shaft instead of in a
+        /// room, in a picture with nothing in it. Nothing throws and nothing warns twice.
+        /// </remarks>
+        [Test]
+        public void EveryBunkerHasAHallWithABayPerVehicle()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                List<TeamBunker> bunkers = sandbox.All<TeamBunker>();
+                Assert.That(bunkers, Is.Not.Empty, "the sandbox has no bunkers at all");
+
+                foreach (TeamBunker bunker in bunkers)
+                {
+                    Assert.That(
+                        bunker.HasHall,
+                        Is.True,
+                        $"{bunker.name} has nothing under it; rebuild the level catalog");
+                    Assert.That(
+                        bunker.BayCount,
+                        Is.EqualTo(VehicleRoster.Kinds.Length),
+                        $"{bunker.name} is short of bays; rebuild the bunker hall in Blender");
+                    Assert.That(
+                        bunker.Car,
+                        Is.Not.Null,
+                        $"{bunker.name} has no lift car, so vehicles would surface standing on air");
+
+                    for (int slot = 0; slot < bunker.BayCount; slot++)
+                    {
+                        Transform deck = bunker.BayNode(slot);
+                        Assert.That(deck, Is.Not.Null, $"{bunker.name} has no bay {slot}");
+                        Assert.That(
+                            deck.Find($"{TeamBunker.LampNodePrefix}{slot}"),
+                            Is.Not.Null,
+                            $"{bunker.name} bay {slot} has no lamp, so nothing in it is lit");
+                        Assert.That(
+                            deck.GetComponentInChildren<Light>(true),
+                            Is.Not.Null,
+                            $"{bunker.name} bay {slot} throws no light");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The hall is scenery: it has no colliders, it is switched off, and it is entirely
+        /// under both the ground and the sea.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The colliders are the trap. Every other model this project places gets a
+        /// <c>MeshCollider</c> per mesh, and doing that here would buy several hundred
+        /// triangles of physics per bunker for a room nothing can reach - it is below the
+        /// island's own collider, and every round in this game resolves on a plane that
+        /// starts at ground level.
+        /// </para>
+        /// <para>
+        /// The sea is the other one, and it is the reason the hall hangs as deep as it does.
+        /// A level's sea is a box as wide as the whole map, drawn under the island as well as
+        /// around it, so a hall that reached up into it would have a sheet of water drawn
+        /// across the middle of the select view.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void TheHallIsSceneryUnderTheGroundAndUnderTheSea()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                float seabed = float.MaxValue;
+                foreach (WaterLine water in sandbox.All<WaterLine>())
+                {
+                    Bounds slab = water.GetComponent<Renderer>().bounds;
+                    seabed = Mathf.Min(seabed, slab.min.y);
+                }
+
+                foreach (TeamBunker bunker in sandbox.All<TeamBunker>())
+                {
+                    GameObject hall = bunker.Hall;
+                    Assert.That(hall, Is.Not.Null, $"{bunker.name} has no hall");
+                    Assert.That(
+                        hall.activeSelf,
+                        Is.False,
+                        $"{bunker.name} leaves its hall drawn for everybody on the map");
+                    Assert.That(
+                        hall.GetComponentsInChildren<Collider>(true),
+                        Is.Empty,
+                        $"{bunker.name} put physics on a room nothing can reach");
+                    Assert.That(
+                        bunker.SkylineHeight,
+                        Is.LessThan(seabed),
+                        $"{bunker.name}'s hall reaches into the sea slab");
+
+                    foreach (Renderer piece in hall.GetComponentsInChildren<Renderer>(true))
+                    {
+                        Assert.That(
+                            piece.bounds.max.y,
+                            Is.LessThan(0.0f),
+                            $"{piece.name} pokes up through the ground");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The bays are in roster order, two columns of two, with the heavy pair upstairs -
+        /// and roster order reads left to right in the picture.
+        /// </summary>
+        /// <remarks>
+        /// The reading direction is the part worth asserting, and it is the part that is easy
+        /// to get backwards: glTFast negates x on import, so the model's +x is the game's -x,
+        /// and the select camera looks back along the bunker's heading, so <em>its</em> right
+        /// is the bunker's -x. The two flips do not cancel. Get it wrong and the console
+        /// strip reads jeep-to-helicopter while the bays read helicopter-to-jeep.
+        /// </remarks>
+        [Test]
+        public void TheBaysReadInRosterOrderFromTheLeftOfThePicture()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                foreach (TeamBunker bunker in sandbox.All<TeamBunker>())
+                {
+                    if (!bunker.HasHall)
+                    {
+                        continue;
+                    }
+
+                    var across = new List<float>();
+                    var up = new List<float>();
+                    for (int slot = 0; slot < bunker.BayCount; slot++)
+                    {
+                        Vector3 local = bunker.transform.InverseTransformPoint(bunker.BayFor(slot));
+                        across.Add(local.x);
+                        up.Add(local.y);
+                    }
+
+                    // The select camera's right-hand vector is the bunker's -x, so a bay
+                    // further left in the picture is a bay further along +x.
+                    Assert.That(
+                        across[0], Is.GreaterThan(0.0f), $"{bunker.name} puts the jeep on the right");
+                    Assert.That(
+                        across[1], Is.GreaterThan(0.0f), $"{bunker.name} puts the tank on the right");
+                    Assert.That(
+                        across[2], Is.LessThan(0.0f), $"{bunker.name} puts the ASV on the left");
+                    Assert.That(
+                        across[3], Is.LessThan(0.0f), $"{bunker.name} puts the helicopter on the left");
+
+                    // The two that weigh the most or leave from the roof are the two upstairs.
+                    Assert.That(up[1], Is.GreaterThan(up[0]), $"{bunker.name} has the tank downstairs");
+                    Assert.That(
+                        up[3], Is.GreaterThan(up[2]), $"{bunker.name} has the helicopter downstairs");
+                    Assert.That(
+                        up[0], Is.EqualTo(up[2]).Within(0.01f), $"{bunker.name}'s lower deck is not level");
+                    Assert.That(
+                        up[1], Is.EqualTo(up[3]).Within(0.01f), $"{bunker.name}'s upper deck is not level");
                 }
             }
         }
@@ -717,6 +948,75 @@ namespace IronFlag.Tests.EditMode
                             (drawnBy & (1 << other.gameObject.layer)) != 0,
                             Is.EqualTo(hud == other),
                             $"{hud.name} camera and {other.name} disagree about who sees what");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A generated HUD is built out of the project's own pieces, in the project's own
+        /// face - which is the half of the look that cannot be seen in a still.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The font check is the point of this test. <see cref="HudPalette"/> falls back to
+        /// Unity's built-in face rather than failing when the asset is missing, so a broken
+        /// import, a renamed file or a label built by hand instead of through the palette all
+        /// have the same symptom: the game silently goes back to being set in Arial. Nothing
+        /// throws and no still looks obviously wrong.
+        /// </para>
+        /// <para>
+        /// It walks every <see cref="Text"/> on the canvas rather than checking the palette,
+        /// so it also catches the other half - somebody adding a label with
+        /// <c>new GameObject(..., typeof(Text))</c> and never setting a font at all.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void EveryHudIsBuiltFromTheProjectsOwnPiecesAndSetInItsOwnFace()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                foreach (PlayerHud hud in sandbox.All<PlayerHud>())
+                {
+                    // The saved scene carries an empty canvas on purpose - see PlayerHud.Build
+                    // - so there is nothing to look at until it is filled in.
+                    hud.Build();
+
+                    Assert.That(
+                        hud.GetComponentsInChildren<HudPlate>(true).Length,
+                        Is.EqualTo(4),
+                        $"{hud.name} is missing one of its four panels");
+                    // Three panels wear corner marks, and so does every cell of the select
+                    // console - which is where the marks stopped being decoration: they are
+                    // the only thing on that panel saying which vehicle is chosen, because
+                    // the rest of the answer is a lit bay out in the world.
+                    Assert.That(
+                        hud.GetComponentsInChildren<HudBracket>(true).Length,
+                        Is.EqualTo(3 + VehicleRoster.Kinds.Length),
+                        $"{hud.name} has lost a set of corner marks");
+
+                    // Three gauges and two flags. The fourth bar carries a mark of nothing on
+                    // purpose - see PlayerHud.BuildStatusPanel - so the count is of the marks
+                    // that actually draw rather than of the objects.
+                    int drawn = 0;
+                    foreach (HudGlyph mark in hud.GetComponentsInChildren<HudGlyph>(true))
+                    {
+                        if (mark.Kind != HudGlyphKind.None)
+                        {
+                            drawn++;
+                        }
+                    }
+
+                    Assert.That(drawn, Is.EqualTo(5), $"{hud.name} has lost one of its marks");
+
+                    foreach (Text line in hud.GetComponentsInChildren<Text>(true))
+                    {
+                        Assert.That(line.font, Is.Not.Null, $"{line.name} has no font");
+                        Assert.That(
+                            line.font.name,
+                            Is.EqualTo(HudPalette.BodyFaceName)
+                                .Or.EqualTo(HudPalette.DisplayFaceName),
+                            $"{line.name} fell back to the built-in face");
                     }
                 }
             }

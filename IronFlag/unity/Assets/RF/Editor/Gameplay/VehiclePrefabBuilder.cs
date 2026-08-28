@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Editor.ArtPipeline;
@@ -74,8 +75,25 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Seconds a wrecked vehicle spends being repaired in the bunker.</summary>
         private const float RepairSeconds = 4.0f;
 
-        /// <summary>Seconds the ride out of the bunker takes, on the lift or off the pad.</summary>
-        private const float DeployRideSeconds = 1.2f;
+        /// <summary>Seconds the ride out of the bunker takes, bay to shaft to surface.</summary>
+        /// <remarks>
+        /// 1.2 s until the bunker had an inside. The ride was a metre and a half of empty
+        /// ground then; it is now up to twenty metres of hall and shaft, and holding the old
+        /// number would have sent every vehicle up the shaft at forty miles an hour. Two
+        /// seconds is the beat M4 argued for stretched to cover the distance M10 gave it,
+        /// and it is still the same two seconds whichever deck the vehicle started on.
+        /// </remarks>
+        private const float DeployRideSeconds = 2.0f;
+
+        /// <summary>How loud a rotor is with the stick centred, in 0..1.</summary>
+        /// <remarks>
+        /// Nearly all of it. A helicopter holds itself up by working, so it is at full song
+        /// hovering and only a little louder crossing the map - where a tank sitting still is
+        /// idling. That difference is this number against
+        /// <see cref="AudioMixdown.EngineIdleShare"/>, and it is the only thing that makes
+        /// the two vehicles' engines behave differently.
+        /// </remarks>
+        private const float RotorIdleShare = 0.9f;
 
         /// <summary>Smallest explosion a wreck is allowed to make, in metres.</summary>
         private const float SmallestWreckBlast = 2.5f;
@@ -216,6 +234,7 @@ namespace IronFlag.Editor.Gameplay
                 AddDust(root, controller, hull);
                 AddTracks(root, controller, hull);
                 root.AddComponent<VehicleBay>().Configure(RepairSeconds, DeployRideSeconds);
+                AddEngineAudio(root, controller);
 
                 string prefabPath = PrefabPathFor(kind);
                 return PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
@@ -366,6 +385,46 @@ namespace IronFlag.Editor.Gameplay
                 hull.center.z - (hull.extents.z * 0.85f));
 
             VfxPrefabBuilder.AddDustTrail(root, at, hull.size.x);
+        }
+
+        /// <summary>
+        /// Gives a vehicle an engine to be heard running.
+        /// </summary>
+        /// <param name="root">Prefab root the component goes on.</param>
+        /// <param name="controller">The movement component, to tell a driver from a pilot.</param>
+        /// <remarks>
+        /// <para>
+        /// The only per-vehicle number here is how loud the thing is with the throttle shut,
+        /// and it is what tells an engine from a rotor: a helicopter is at full song from the
+        /// moment it leaves the ground, so its floor is near the ceiling, and a ground vehicle
+        /// idles at a quarter. Asked the same way <see cref="AddDust"/> asks - is this a
+        /// <see cref="GroundVehicle"/> - so nothing here names the helicopter either.
+        /// </para>
+        /// <para>
+        /// The source is a child rather than a component on the root, because the root already
+        /// carries eleven and a twelfth that has to be found by type would be one more thing
+        /// for <see cref="VehicleHealth"/> or the bay to trip over. It is flat -
+        /// <c>spatialBlend</c> at zero - like everything else in this game; see
+        /// <see cref="AudioMixdown"/> for why a split screen cannot pan.
+        /// </para>
+        /// </remarks>
+        private static void AddEngineAudio(GameObject root, VehicleController controller)
+        {
+            var host = new GameObject(EngineAudio.SourceNodeName);
+            host.transform.SetParent(root.transform, false);
+
+            var source = host.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.loop = true;
+            source.spatialBlend = 0.0f;
+            source.dopplerLevel = 0.0f;
+            source.volume = 0.0f;
+
+            float idle = controller is GroundVehicle
+                ? AudioMixdown.EngineIdleShare
+                : RotorIdleShare;
+
+            root.AddComponent<EngineAudio>().Configure(source, idle);
         }
 
         /// <summary>

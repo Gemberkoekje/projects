@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Destruction;
@@ -96,6 +97,14 @@ namespace IronFlag.Editor.Gameplay
         /// </remarks>
         private const int StagedVehicle = 0;
 
+        /// <summary>Roster slot the still shows the other player highlighting, which is the tank.</summary>
+        /// <remarks>
+        /// Not the jeep, which is what a match actually opens on. The choice is shown by
+        /// lighting a bay and by parking the lift car at that deck, and both of those read
+        /// better on the upper floor than on the one the car is already resting nearest.
+        /// </remarks>
+        private const int StagedChoice = 1;
+
         /// <summary>Metres back down the road home the still puts the raider.</summary>
         /// <remarks>
         /// Clear of the tower it has just robbed, so the still is a picture of a jeep
@@ -171,7 +180,7 @@ namespace IronFlag.Editor.Gameplay
             ShowHuds();
 
             CameraCapture.RenderToPng(
-                FrameOnPlayers(players),
+                FrameOnPlayers(players, width, height),
                 width,
                 height,
                 CameraCapture.OutputPathFromCommandLine(OutputArgument, DefaultOutputFile));
@@ -216,6 +225,18 @@ namespace IronFlag.Editor.Gameplay
                     }
                 }
             }
+
+            // Seat one is choosing, so their base is open and one of its bays is lit. In a
+            // real match that is `Start` doing it; nothing here has started, so the still has
+            // to ask for the same state through the same two calls the game makes.
+            PlayerVehicleDriver chooser = players[0];
+            TeamBunker home = TeamBunker.For(chooser.Team);
+            if (home != null)
+            {
+                home.ShowHall(true);
+            }
+
+            chooser.Select(StagedChoice);
 
             PlayerVehicleDriver raider = players[1];
             if (!raider.TakeTheField(StagedVehicle))
@@ -809,6 +830,11 @@ namespace IronFlag.Editor.Gameplay
             // MainMenuScene, which sets the same thing up the same way.
             CreateEventSystem(LevelEditorScene.EnsureUiActions());
 
+            // Sounds and a soundtrack. The director is its own object rather than a
+            // component on the session below, because it is nothing to do with who is
+            // playing - a scene makes a noise whether or not anybody is seated.
+            AudioCatalogBuilder.AddToScene(withMusic: true);
+
             var host = new GameObject("Local Multiplayer");
             LocalMultiplayer session = host.AddComponent<LocalMultiplayer>();
             session.Configure(controls, players);
@@ -833,6 +859,11 @@ namespace IronFlag.Editor.Gameplay
             // it. Always on, unlike the one above - the menu is where every session started,
             // so there is always something behind a match to go back to.
             host.AddComponent<PauseMenu>();
+
+            // What the match sounds like. On this object rather than on the audio one,
+            // because the two questions it answers - what is being driven, and who won - are
+            // the session's and the match's, and both of those are siblings here.
+            host.AddComponent<MatchMusic>();
         }
 
         /// <summary>
@@ -860,8 +891,18 @@ namespace IronFlag.Editor.Gameplay
         /// Points each player's camera at their own start line, for the command-line render.
         /// </summary>
         /// <param name="players">The local players, in seat order.</param>
+        /// <param name="width">Width of the whole still, in pixels.</param>
+        /// <param name="height">Its height, in pixels.</param>
         /// <returns>The framed cameras, in seat order.</returns>
-        private static Camera[] FrameOnPlayers(List<PlayerVehicleDriver> players)
+        /// <remarks>
+        /// The aspect is worked out from the picture being taken rather than read off the
+        /// camera, because a camera that has not been given its render texture yet reports
+        /// whatever the game view was - and in batch mode there is no game view. The select
+        /// view is the only framing in this game that depends on the shape of the viewport,
+        /// so this is also the only place that has ever had to care.
+        /// </remarks>
+        private static Camera[] FrameOnPlayers(
+            List<PlayerVehicleDriver> players, int width, int height)
         {
             var framed = new List<Camera>();
 
@@ -875,8 +916,19 @@ namespace IronFlag.Editor.Gameplay
                 }
 
                 // Whatever that player is actually looking at: their vehicle if they have
-                // one out, and their own bunker if they are still choosing.
+                // one out, their own base in cutaway if they are choosing, and the building
+                // from above when there is no base under it to look into.
                 TeamBunker home = TeamBunker.For(driver.Team);
+                if (driver.ActiveVehicle == null && home != null && home.HasHall)
+                {
+                    Rect slice = rig.View.rect;
+                    float aspect = (width * slice.width) / Mathf.Max(1.0f, height * slice.height);
+                    CutawayPose pose = BunkerView.Solve(home, rig.View.fieldOfView, aspect);
+                    rig.transform.SetPositionAndRotation(pose.Position, pose.Rotation);
+                    framed.Add(rig.View);
+                    continue;
+                }
+
                 Vector3 at = driver.ActiveVehicle != null
                     ? driver.ActiveVehicle.transform.position
                     : home == null ? driver.Roster[0].transform.position : home.transform.position;

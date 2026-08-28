@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using IronFlag.Audio;
 using IronFlag.Core;
 using IronFlag.UI;
 
@@ -108,6 +109,46 @@ namespace IronFlag.Editing
         }
 
         /// <summary>
+        /// Creates an outer panel: the HUD's own glass, with the clicks swallowed.
+        /// </summary>
+        /// <param name="name">Object name.</param>
+        /// <param name="parent">Object to hang it off.</param>
+        /// <param name="color">Colour to fill it with.</param>
+        /// <returns>The plate, with its rect transform ready to be positioned.</returns>
+        /// <remarks>
+        /// <para>
+        /// The one place the borrowed look is deliberately not identical. A
+        /// <see cref="HudPlate"/> carries the world's vignette on it, which is what makes a
+        /// panel look like a surface rather than a rectangle, and it also carries scanlines,
+        /// which are switched off here. A player glances at a HUD and a mapper reads a list of
+        /// map names off this one; texture under a word somebody is reading is texture in the
+        /// way. Same glass, no grain.
+        /// </para>
+        /// <para>
+        /// For the outer panels only. Buttons, fields, rules and headers stay flat
+        /// <see cref="Plate"/>s - a falloff across a fifty-unit button is a button that looks
+        /// dirty rather than one that looks like glass.
+        /// </para>
+        /// </remarks>
+        public static HudPlate Panel(string name, Transform parent, Color color)
+        {
+            HudPlate plate = HudPalette.Plate(name, parent, color);
+            plate.Scanlines = false;
+            plate.raycastTarget = true;
+            return plate;
+        }
+
+        /// <summary>
+        /// Creates the four corner marks around a panel, stretched to fit it.
+        /// </summary>
+        /// <param name="name">Object name.</param>
+        /// <param name="parent">The panel to frame.</param>
+        /// <param name="color">Colour of the marks.</param>
+        /// <returns>The bracket, already filling its parent.</returns>
+        public static HudBracket Bracket(string name, Transform parent, Color color)
+            => HudPalette.Bracket(name, parent, color);
+
+        /// <summary>
         /// Creates a line of text, which clicks pass straight through.
         /// </summary>
         /// <param name="name">Object name.</param>
@@ -150,6 +191,27 @@ namespace IronFlag.Editing
         /// <returns>The button, its plate and its caption.</returns>
         public static EditorButton Button(
             string name, Transform parent, string words, int size, Action does)
+            => Button(name, parent, words, size, does, SfxKind.UiClick);
+
+        /// <summary>
+        /// Creates a button that makes a particular noise.
+        /// </summary>
+        /// <param name="name">Object name.</param>
+        /// <param name="parent">Object to hang it off.</param>
+        /// <param name="words">What it says.</param>
+        /// <param name="size">Type size in canvas units.</param>
+        /// <param name="does">What pressing it does.</param>
+        /// <param name="sound">The noise the press makes.</param>
+        /// <returns>The button, its plate and its caption.</returns>
+        /// <remarks>
+        /// Almost nothing needs this. A press is a click; the exceptions are the handful of
+        /// buttons that leave a panel rather than commit to something
+        /// (<see cref="SfxKind.UiBack"/>) and the ones that change a value in place rather
+        /// than doing anything (<see cref="SfxKind.UiSelect"/>) - so what the game sounds
+        /// like is decided by four call sites instead of forty.
+        /// </remarks>
+        public static EditorButton Button(
+            string name, Transform parent, string words, int size, Action does, SfxKind sound)
         {
             Image plate = Plate(name, parent, ButtonFace);
             var control = plate.gameObject.AddComponent<Button>();
@@ -168,7 +230,7 @@ namespace IronFlag.Editing
             Fill(caption.rectTransform, 6.0f);
 
             var button = new EditorButton(control, plate, caption);
-            button.OnPress(does);
+            button.OnPress(does, sound);
             button.SetChosen(false);
             return button;
         }
@@ -190,9 +252,12 @@ namespace IronFlag.Editing
         /// through.
         /// </para>
         /// <para>
-        /// Unity's legacy <see cref="InputField"/> rather than TextMeshPro's, because this
-        /// project has no font assets and no TMP essentials imported - and the HUD is already
-        /// set in the built-in font for the same reason.
+        /// Unity's legacy <see cref="InputField"/> rather than TextMeshPro's, which is now a
+        /// decision rather than a default. The project has a real typeface - see
+        /// <see cref="HudPalette.Face"/> - and taking TextMeshPro with it would have meant
+        /// importing its essential resources, four megabytes of shaders and font assets that
+        /// nobody can review in a diff, to buy an outline this interface does not use. See
+        /// <c>UI_NOTES.md</c> for the whole of that argument and for the one thing it cost.
         /// </para>
         /// </remarks>
         public static InputField Field(string name, Transform parent, int size, Action<string> done)

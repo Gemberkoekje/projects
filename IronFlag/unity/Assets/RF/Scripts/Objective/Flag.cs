@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using IronFlag.Audio;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Supply;
@@ -267,7 +268,7 @@ namespace IronFlag.Objective
             carriedBy = side;
             carriedAt = vehicle.transform.position;
             returning = 0.0f;
-            Enter(FlagState.Carried);
+            Enter(FlagState.Carried, heard: true);
             Ride();
             AnyTaken?.Invoke(this);
             return true;
@@ -295,7 +296,7 @@ namespace IronFlag.Objective
             carrier = null;
             returning = FlagRules.ReturnSeconds;
             Place(CombatPlane.Flatten(carriedAt), 0.0f);
-            Enter(FlagState.Dropped);
+            Enter(FlagState.Dropped, heard: true);
             return true;
         }
 
@@ -313,7 +314,7 @@ namespace IronFlag.Objective
             carriedBy = Team.None;
             returning = 0.0f;
             Place(HomePoint(), HomeYaw());
-            Enter(FlagState.AtTower);
+            Enter(FlagState.AtTower, heard: true);
         }
 
         /// <summary>
@@ -334,7 +335,7 @@ namespace IronFlag.Objective
 
             Place(CombatPlane.Flatten(carriedAt), carrier == null ? 0.0f : carrier.YawDegrees);
             carrier = null;
-            Enter(FlagState.Captured);
+            Enter(FlagState.Captured, heard: true);
             AnyCaptured?.Invoke(this);
             return true;
         }
@@ -527,7 +528,7 @@ namespace IronFlag.Objective
             if (state == FlagState.None)
             {
                 Place(HomePoint(), HomeYaw());
-                Enter(FlagState.AtTower);
+                Enter(FlagState.AtTower, heard: false);
             }
         }
 
@@ -535,10 +536,29 @@ namespace IronFlag.Objective
         /// Moves to a new state, shows or hides the flag, and tells anybody listening.
         /// </summary>
         /// <param name="wanted">State to move to.</param>
-        private void Enter(FlagState wanted)
+        /// <param name="heard">Whether arriving there is an event somebody should hear.</param>
+        /// <remarks>
+        /// The flag on its tower is the one state that is reached two ways: taken back after
+        /// a raid, which is the loudest thing that can happen to a defending side, and raised
+        /// for the first time when the map is built, which is nothing at all. The same
+        /// distinction <see cref="IronFlag.Destruction.Destructible"/> draws with its debris,
+        /// and drawn here for the same reason - a match that opened with both sides' flags
+        /// announcing themselves would be reporting an event that never happened.
+        /// </remarks>
+        private void Enter(FlagState wanted, bool heard)
         {
             state = wanted;
             SetVisible(IsVisible);
+
+            if (heard)
+            {
+                // Flat and at full volume, unlike a shot or a blast. Where the flag is has
+                // nothing to do with how much it matters: it is the only thing on the map
+                // both sides are playing for, and news of it from the far corner is still
+                // news. See Sfx for the two kinds of sound and which is which.
+                Sfx.Play(AudioRoster.FlagOf(wanted));
+            }
+
             StateChanged?.Invoke(this);
         }
 

@@ -60,6 +60,25 @@ namespace IronFlag.Levels
         /// <summary>Name of the object the bunkers hang off.</summary>
         private const string BunkerName = "Bunkers";
 
+        /// <summary>Name of the underground hall under one bunker.</summary>
+        private const string HallName = "Hall";
+
+        /// <summary>Name of the lift car in one bunker's shaft.</summary>
+        private const string LiftName = "Lift";
+
+        /// <summary>Name of the light inside one bay.</summary>
+        private const string BayLightName = "Bay Light";
+
+        /// <summary>
+        /// How far below its lamp a bay's light hangs, in metres.
+        /// </summary>
+        /// <remarks>
+        /// A point light on the surface of the strip it is pretending to come from lights the
+        /// ceiling and nothing else. Dropping it clear of the lamp is what puts the pool on
+        /// the deck and on the vehicle standing there.
+        /// </remarks>
+        private const float BayLightDrop = 1.4f;
+
         /// <summary>Name of the object the towers and flags hang off.</summary>
         private const string ObjectiveName = "Objective";
 
@@ -367,7 +386,9 @@ namespace IronFlag.Levels
                         + "Vehicles will deploy from a guess at where the door is.");
                 }
 
-                instance.AddComponent<TeamBunker>().Configure(placement.Side, lift, pad);
+                TeamBunker bunker = instance.AddComponent<TeamBunker>();
+                bunker.Configure(placement.Side, lift, pad);
+                BuildBase(instance, bunker, catalog, make);
 
                 // Everything this side has to spend, on the building it spends it from. A
                 // level that says nothing about it is a level played on the standard
@@ -389,6 +410,144 @@ namespace IronFlag.Levels
                     placement.SupplyRate,
                     true);
             }
+        }
+
+        /// <summary>
+        /// Hangs the underground hall under one bunker and puts a car in its shaft.
+        /// </summary>
+        /// <param name="instance">The bunker the base belongs to.</param>
+        /// <param name="bunker">Its component, already told where its lift and pad are.</param>
+        /// <param name="catalog">What to build it out of.</param>
+        /// <param name="make">How to instantiate a prefab.</param>
+        /// <remarks>
+        /// <para>
+        /// <strong>The hall gets no colliders</strong>, unlike every other model this class
+        /// places. Nothing can reach it - it is under the island's own collider, and every
+        /// round in this game resolves on a plane that starts at ground level - so a mesh
+        /// collider per piece of it would be several hundred triangles of physics per bunker
+        /// bought for nothing.
+        /// </para>
+        /// <para>
+        /// It is also switched off here and stays off until a player is actually choosing.
+        /// The ground is one-sided and opaque from above, so it hides the hall from the
+        /// battlefield camera on its own - but the shaft is a hole through it, and a player
+        /// driving over their own bunker would otherwise be looking down a lit stairwell.
+        /// </para>
+        /// <para>
+        /// A catalog with no hall in it is a normal thing rather than a broken one: the
+        /// bunker keeps working, every vehicle waits at the top of the shaft as it did
+        /// before there was a hall, and the select camera falls back to looking at the
+        /// building from above.
+        /// </para>
+        /// </remarks>
+        private static void BuildBase(
+            GameObject instance, TeamBunker bunker, LevelCatalog catalog,
+            Func<GameObject, GameObject> make)
+        {
+            if (catalog.BunkerHall == null)
+            {
+                return;
+            }
+
+            GameObject hall = PlaceInstance(
+                catalog.BunkerHall, HallName, instance.transform,
+                instance.transform.position, instance.transform.eulerAngles.y, make);
+            MarkStatic(hall);
+
+            int slots = VehicleRoster.Kinds.Length;
+            var decks = new Transform[slots];
+            var lamps = new Renderer[slots];
+            var glow = new Light[slots];
+
+            for (int slot = 0; slot < slots; slot++)
+            {
+                decks[slot] = Find(hall.transform, $"{TeamBunker.BayNodePrefix}{slot}");
+                if (decks[slot] == null)
+                {
+                    Debug.LogWarning(
+                        $"IronFlag: {hall.name} has no {TeamBunker.BayNodePrefix}{slot}; rebuild "
+                        + "the bunker hall in Blender. That vehicle will wait in the shaft.");
+                    continue;
+                }
+
+                Transform lamp = Find(decks[slot], $"{TeamBunker.LampNodePrefix}{slot}");
+                if (lamp == null)
+                {
+                    continue;
+                }
+
+                lamps[slot] = lamp.GetComponent<Renderer>();
+                if (lamps[slot] != null && catalog.BayLight != null)
+                {
+                    lamps[slot].sharedMaterial = catalog.BayLight;
+                }
+
+                glow[slot] = BayLight(lamp);
+            }
+
+            bunker.ConfigureBase(
+                hall, Find(hall.transform, TeamBunker.SkylineNodeName), decks, lamps, glow,
+                BuildLiftCar(instance, bunker, catalog, make));
+
+            hall.SetActive(false);
+        }
+
+        /// <summary>
+        /// Hangs a point light under one bay's lamp.
+        /// </summary>
+        /// <param name="lamp">The lamp geometry to hang it off.</param>
+        /// <returns>The light.</returns>
+        /// <remarks>
+        /// It casts no shadows, and that is a decision rather than a default. There are eight
+        /// of these on a two-sided map; the room they are in is four flat surfaces and one
+        /// vehicle; and what a shadow would buy is the underside of a jeep. The emissive
+        /// strip is what says where the light comes from.
+        /// </remarks>
+        private static Light BayLight(Transform lamp)
+        {
+            var host = new GameObject(BayLightName);
+            host.transform.SetParent(lamp, false);
+            host.transform.localPosition = Vector3.zero;
+            host.transform.position += Vector3.down * BayLightDrop;
+
+            Light light = host.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = BunkerView.LampRange;
+            light.shadows = LightShadows.None;
+            light.intensity = BunkerView.LampIntensity(false);
+            light.color = BunkerView.LampColour(false, Team.None);
+            return light;
+        }
+
+        /// <summary>
+        /// Puts the lift car at the top of one bunker's shaft.
+        /// </summary>
+        /// <param name="instance">The bunker the shaft belongs to.</param>
+        /// <param name="bunker">Its component, which knows where the top of the shaft is.</param>
+        /// <param name="catalog">What to build it out of.</param>
+        /// <param name="make">How to instantiate a prefab.</param>
+        /// <returns>The car, or <c>null</c> when the catalog has no model for one.</returns>
+        /// <remarks>
+        /// A sibling of the hall rather than a child of it, because the two are hidden on
+        /// different terms: the hall is only ever seen by the player choosing from it, and
+        /// the car is the deck the battlefield camera sees a vehicle standing on. It gets no
+        /// collider for the same reason nothing else here does - a vehicle riding it is
+        /// kinematic and is being placed, not carried.
+        /// </remarks>
+        private static BunkerLift BuildLiftCar(
+            GameObject instance, TeamBunker bunker, LevelCatalog catalog,
+            Func<GameObject, GameObject> make)
+        {
+            if (catalog.BunkerLift == null)
+            {
+                return null;
+            }
+
+            GameObject car = PlaceInstance(
+                catalog.BunkerLift, LiftName, instance.transform,
+                bunker.LiftPoint, instance.transform.eulerAngles.y, make);
+
+            return car.AddComponent<BunkerLift>();
         }
 
         /// <summary>
