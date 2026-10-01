@@ -96,9 +96,9 @@ get the next D-number.
 | D6 | Exclude the `spacetraders` database from the nightly `pg_dumpall`? | **No change.** The size guard (1.6) keeps the database small, and the dump stays the consistent copy. A file-level copy of a running Postgres can only be restored reliably if the NAS snapshot is atomic. |
 | D7 | Delete `SpaceTradersV3/`? | **Done 2026-10-01.** |
 | D8 | Size guard limits (slice 1.6). | **Soft limit 1 GB** (anomaly), **hard limit 3 GB** (pause automation). |
-| D9 | Which plans run in the first run after the redeploy? All five run on every tick today, and nothing can switch one off; slice 1.7 adds the switches. | **Open.** Suggestion: scout and contract only. Probes, mining and trading come on one at a time in phase 6, after their known issues (B15–B17, B25) are fixed. |
-| D10 | Remove the settings that nothing reads (B18), or keep them as placeholders? | **Open.** Suggestion: remove them from the seed, so the settings page shows only settings that work. A feature that needs one adds it back. |
-| D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **Open.** Suggestion: LAN only, like Grafana (`whitelist-source-range` on the ingress). That also keeps the key in `config.js` off the internet. |
+| D9 | Which plans run in the first run after the redeploy? All five run on every tick today, and nothing can switch one off; slice 1.7 adds the switches. | **Scout and contract only.** Probes, mining and trading come on one at a time in phase 6, after their known issues (B15–B17, B25) are fixed. |
+| D10 | Remove the settings that nothing reads (B18), or keep them as placeholders? | **Remove them**, so the settings page shows only settings that work. A feature that needs one adds it back (slice 2.6). |
+| D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **LAN only**, like Grafana (slice 4.2). |
 
 ## Phases
 
@@ -190,7 +190,7 @@ cluster (phase 4).
     `Automation.Enabled`;
   - add one setting per plan (`Automation.Plan.Scout.Enabled`, `.Contract`,
     `.ProbeDeployment`, `.Mining`, `.Trading`). The tick skips a disabled plan's bootstrap.
-    Defaults follow D9.
+    Per D9, Scout and Contract default to on, the other three to off.
 - Done when: tests show that a tick with automation disabled issues no ship commands, and that a
   disabled plan neither bootstraps nor buys anything.
 
@@ -331,9 +331,14 @@ its own retention, so the bot's database stays small.
 - Grafana only reads this file at startup, so it needs a rollout restart.
 
 **2.6 Only settings that do something (B18, D10)**
-- Do: per D10, remove (or clearly mark) the seeded settings that nothing reads, and keep the
-  settings table in `docs/HOW_IT_WORKS.md` current.
-- Done when: every setting on the settings page changes what the bot does.
+- Do: remove from the seed every setting that nothing reads at runtime:
+  - the 21 keys that no code reads;
+  - the `Navigation.*` and `Maintenance.*` keys, which only code that never runs reads.
+
+  Then update the settings table in `docs/HOW_IT_WORKS.md`. Keep the `Runtime.*` status flags
+  for now; moving them out of the settings is a separate cleanup. The database starts empty, so
+  no old rows need removing.
+- Done when: apart from the `Runtime.*` flags, every seeded setting is read by code that runs.
 
 ### Phase 3: Health rules (the bot checks itself)
 
@@ -375,13 +380,17 @@ its own retention, so the bot's database stays small.
   changes:
   - Prometheus annotations for the metrics port;
   - a ConfigMap with Serilog overrides;
-  - TLS secret `spacetraders-tls` (per-app names since 2026-09-26);
   - no route to the old `spacetraders-app-service`, because that project no longer exists;
   - the WebUI deployment comes back too (D5);
-  - an ingress restricted to the LAN, per D11 (B22);
+  - a LAN-only ingress (D11, B22), modelled on `grafana-internal-ingress.yaml`:
+    - no public hosts;
+    - `nginx.ingress.kubernetes.io/whitelist-source-range: "192.168.0.0/16,10.0.0.0/8"`;
+    - `/spacetraders/api` and `/spacetraders/dashboard` on http://192.168.1.230;
+    - no certificate needed;
   - `/health/startup` as the startup probe (B23).
 
 **4.3 First-run watch**
+- Only the scout and contract plans are on (D9).
 - First hour: messages per minute, database size, log lines per minute, anomalies. Then check
   again after 24 hours, then after a full reset period.
 - Phase 6 starts after a clean reset period.
