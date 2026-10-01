@@ -48,8 +48,10 @@
 - Phase 1 is done (2026-10-01): the soak test (1.14) ran the bot for four hours against the live
   API from an empty local database.
 - Phase 2 is done in the code (2026-10-01): metrics, the ledger and the journal. Its Grafana
-  dashboard and alerts (2.4, 2.5) are ready on gembernodes branch `claude/spacetraders-dashboard`,
-  not yet merged. The bot stays off the cluster until phase 4.
+  dashboard and alerts (2.4, 2.5) are up for review as gembernodes PR #10, not yet merged. The bot
+  stays off the cluster until phase 4.
+- Phase 3 is done in the code (2026-10-01): ten health rules check the bot's own state every
+  minute, and each broken one is an anomaly (a metric and journal lines).
 
 ## Known issues
 
@@ -119,6 +121,7 @@ get the next D-number.
 | D10 | Remove the settings that nothing reads (B18), or keep them as placeholders? | **Remove them**, so the settings page shows only settings that work. A feature that needs one adds it back (slice 2.6). |
 | D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **LAN only**, like Grafana (slice 4.2). |
 | D12 | The credit-drop alert (B37) would fire on every purchase above 10% of the credits. Fix it as it is meant, change what it watches, or remove it? | **Remove it** (2026-10-01): credits only drop when the bot spends them, so it could only report the bot's own spending. Removed (B37). |
+| D13 | Two of 3.2's rules clash with D9 and D1 in the first run: with only scout and contract on, the starting probe, the command ship after scouting and the drone after its contract are idle by design, and once the contract has paid, the credits stop changing. Taken literally, "idle for at most N minutes" and "credits change at least once in 24 hours" would stay active for the rest of every reset, and phase 6 needs a clean reset period. | **Only when work waits** (2026-10-01): a ship counts as idle only while a plan that is on has work it could give that ship, and the credits must change daily only while ships have work. |
 
 ## Phases
 
@@ -633,7 +636,7 @@ its own retention, so the bot's database stays small.
   - `.claude/skills/st-investigate/SKILL.md`: the journal and metrics rows and queries now name
     what exists; the stale B2 and B12 queries are gone.
 
-**2.4 Grafana dashboard** (gembernodes; ready, not merged)
+**2.4 Grafana dashboard** (gembernodes PR #10; not merged)
 - Location: `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`, added to the
   monitoring `configMapGenerator`.
 - Panels:
@@ -648,7 +651,8 @@ its own retention, so the bot's database stays small.
   - the journal (from Loki).
 - `SettingChanged` and `ResetDetected` appear as annotations, so you can see what changed when.
 - Done, on gembernodes branch `claude/spacetraders-dashboard` (commit `3df654a`), not merged: it
-  deploys through Flux once it is on `main`.
+  deploys through Flux once it is on `main`. Up for review as PR Gemberkoekje/gembernodes#10
+  (2026-10-01).
   - Every panel above, plus a row of numbers (credits, credits in the last hour, next reset,
     database size, active anomalies, whether Prometheus reaches the bot), goal steps and breaker
     trips, and log lines per hour against the 50,000-a-day budget. Series are aggregated with
@@ -658,7 +662,7 @@ its own retention, so the bot's database stays small.
     JSON log from a local run, and returned the journal lines and the annotation fields.
   - It can't be checked against real data until the bot runs on the cluster (phase 4).
 
-**2.5 Grafana alerts** (gembernodes `grafana-alerting-provisioning.yaml`; ready, not merged)
+**2.5 Grafana alerts** (gembernodes `grafana-alerting-provisioning.yaml`, PR #10; not merged)
 - Rules:
   - the bot is down (no scrape for 10 minutes);
   - an anomaly has been active for more than 15 minutes;
@@ -700,7 +704,7 @@ its own retention, so the bot's database stays small.
     `Outfitting.` and so on as a strategy change that starts a new run. Those prefixes are now
     only reachable through `PUT /settings/{key}`, which accepts any key.
 
-**Phase 2 in short** (done 2026-10-01 in the code; the dashboard and alerts await their merge)
+**Phase 2 in short** (done 2026-10-01 in the code; the dashboard and alerts await their merge, gembernodes PR #10)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
   metric: credits, the ledger by category, each ship's state, contracts, the API by endpoint,
   messages, goal steps, anomalies, the database and the next reset (2.1). Sales, purchases and
@@ -726,15 +730,35 @@ its own retention, so the bot's database stays small.
 
 ### Phase 3: Health rules (the bot checks itself)
 
-**3.1 Rule mechanism**
+**3.1 Rule mechanism** (done)
 - Do: evaluate the rules every minute against the bot's own state.
   - Each violation is an anomaly: rule, subject, since when, details.
   - It's exposed as `spacetraders_anomaly_active{rule,subject}` and as AnomalyRaised and
     AnomalyCleared events.
   - Thresholds are settings.
 - Done when: there's a unit test per rule.
+- Done:
+  - `HealthMonitorService`, the last step of the startup chain, evaluates every `IHealthRule` at
+    start and then every minute, each in the scope of one evaluation. A subject that breaks a rule
+    is an anomaly: the journal logs `AnomalyRaised` at Warning, with `Rule`, `Subject` and `Details`
+    (what the rule saw, its limit and the setting that holds it), and the metric turns 1. Once the
+    rule holds again: `AnomalyCleared`, with `ActiveMinutes`, and 0. "Since when" is the raised
+    line's time.
+  - Anomalies live in memory: after a restart the first evaluation raises the ones still there
+    again. A rule that throws is logged at Error and keeps its anomalies; the others carry on.
+  - The rules count time no earlier than the monitor saw the bot able to work
+    (`HealthCheckContext.WorkingSince`: automation and the plan on, API calls not paused after a
+    502), so switching automation off and on, or a restart, doesn't look like a stall. Conditions
+    without a timestamp of their own get one from the monitor's memory (`HeldSince`).
+  - Thresholds are eight `Health.*` settings. Claude picked the defaults (3.2), from the soak test
+    where it had data; they're yours to change. `Health.` isn't a strategy prefix, so a change
+    doesn't start a new run.
+  - The size guard's two limits stay in the guard, where 1.6 made them the first anomalies: its hard
+    limit has to act before the tick starts.
+  - `HealthMonitorServiceTests` covers raising, clearing, one anomaly per subject, a failing rule
+    and the clocks. Every rule has its own tests (`tests/SpaceTraders.Application.Tests/Health`).
 
-**3.2 First set of rules.** Each one states an intended behaviour:
+**3.2 First set of rules** (done). Each one states an intended behaviour:
 - **Contracts:**
   - an accepted contract makes progress within N hours;
   - a fulfilled contract has no active plan or assignment;
@@ -748,6 +772,65 @@ its own retention, so the bot's database stays small.
 - **API:** no 401 or reset errors, and at most N 429s an hour.
 - **Database:** under the soft size limit.
 - Done when: a deliberately broken scenario in a test host raises each rule.
+- Done:
+  - Ten rules, plus the size guard's: `ContractStalled`, `ContractLeftOpen`,
+    `ContractDeadlineAtRisk`, `ShipStuck`, `ShipLeftIdle`, `CircuitBreakerTripped`,
+    `RepeatingError`, `CreditsUnchanged`, `ApiUnauthorized`, `ApiThrottled`, and `DbSizeSoftLimit`.
+    `docs/HOW_IT_WORKS.md` section 12 has what breaks each, and its setting.
+    `HealthRuleScenarioTests` breaks one thing per rule in the real host and sees its anomaly
+    raised, through the real log pipeline, API client handlers and circuit breaker where a rule
+    reads them.
+  - D13: the idle-ship and credits rules count only while work waits. A ship is "left idle" only
+    while a plan that is on has work it could give it; the credits must change daily only while
+    ships have work. Taken literally, both would have stayed active for the rest of every first-run
+    reset.
+  - "Changes state" (`ShipStuck`) means the bot updates the ship (its `LastSyncedAt`: nav, cargo,
+    fuel, cooldown), not its nav state: in the soak test a contract drone stayed in orbit with the
+    same assignment for up to 69 minutes while it extracted every 71 seconds, so the metrics' time
+    in state (2.1) would flag a working miner. The clock starts at the arrival at the earliest, and
+    the ship has to look stuck at two evaluations in a row: the fleet is loaded with arrivals
+    dead-reckoned, which drops the arrival time for the seconds until the arrival handler docks it.
+  - The contract rules judge the contract the bot works on: the contract plan's, accepted and
+    unfulfilled, while the plan is active, waits for a ship or budget, or found no asteroid for its
+    mineral. A non-mineral contract is parked by decision (D2) and left out. A contract that missed
+    its deadline is an anomaly whatever was delivered.
+  - The circuit breaker rule counts a blocked goal, or a trip in the last hour: mining and trading
+    replace a blocked goal at once, so the breaker now remembers each ship's last trip.
+  - Warnings count as errors: this codebase logs "something is wrong, carrying on" at Warning, like
+    B31's missing deliverable on every tick in the soak test, or 1.9's ship that can't find a route.
+    Journal lines don't count (their own rules watch them), nor does what startup logged. A Serilog
+    sink hands every warning and error to the rule.
+  - The API rules count the 401s and 429s that the client's innermost handler sees, over the last
+    hour. A 401 during startup is agent bootstrap trying old tokens, and a reset stops the host
+    (1.8), so `ApiUnauthorized` means a token the server rejects for another reason.
+  - Defaults: a contract may go 4 hours without a delivery (the soak test's took 23 to 69 minutes);
+    24 hours before the deadline, half delivered; a working ship 30 minutes without an update; an
+    idle ship 10 minutes while work waits; one statement 5 warnings or errors in 10 minutes (once a
+    minute is 10); credits unchanged 24 hours (the rule's own number); 10 429s an hour (none are
+    expected, and a wrong reading of the burst limit would give dozens).
+  - Noticed:
+    - Once phase 6 switches plans on, expect `ShipStuck` for B17's drones and `ShipLeftIdle` for the
+      starting probe (B25): the rules show known issues, as they should.
+    - A burst of 429s raises `RepeatingError` next to `ApiThrottled`: the 429 handler logs a warning
+      per retry.
+    - Grafana repeats the anomaly email every 12 hours (gembernodes' notification policy) for as
+      long as an anomaly lasts, such as a contract that missed its deadline.
+    - `/status/anomalies` is an older credit-growth heuristic, unrelated to these anomalies.
+      `docs/HOW_IT_WORKS.md` listed it among endpoints that read tables nothing writes, which
+      stopped being true with 2.2; corrected.
+
+**Phase 3 in short** (done 2026-10-01)
+- The bot checks itself: every minute ten health rules, and the size guard every 5 minutes, compare
+  its state with what it is meant to do, and each broken rule is an anomaly with a subject, details,
+  a metric and journal lines, which the "anomaly active" alert (2.5) turns into an email after 15
+  minutes. D12 removed the credit-drop alert; D13 keeps idle ships and unchanged credits quiet while
+  no work waits.
+- Traps it took: what "a ship changes state" means (a mining drone works for an hour in one nav
+  state); the fleet's dead-reckoned arrivals, which hide the arrival time for a moment; and two
+  rules that, read literally, the first run's own decisions would have broken.
+- To understand this phase, start with `docs/HOW_IT_WORKS.md` section 12, then
+  `HealthMonitorService.cs`, `HealthCheckContext.cs` and one rule such as `ShipStuckRule.cs` (all in
+  `SpaceTraders.Application/Health`), and `HealthRuleScenarioTests.cs`.
 
 ### Phase 4: Back on the cluster (gembernodes)
 
@@ -836,7 +919,7 @@ This cloud session can only read gembernodes. These changes are made from your P
 
 | Slice | Change |
 |---|---|
-| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (ready on branch `claude/spacetraders-dashboard`) |
-| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (same branch) |
+| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (PR #10, branch `claude/spacetraders-dashboard`) |
+| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (same PR) |
 | 4.1 | Database login and read-only login (Postgres and 1Password) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries |

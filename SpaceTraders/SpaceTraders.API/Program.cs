@@ -12,6 +12,7 @@ using SpaceTraders.API.Middleware;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
@@ -50,7 +51,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Host.UseSerilog((ctx, cfg) =>
+// Every warning and error also goes to the RepeatingError health rule.
+builder.Services.AddSingleton<ErrorLog>();
+
+builder.Host.UseSerilog((ctx, services, cfg) =>
 {
     if (ctx.HostingEnvironment.IsProduction())
     {
@@ -62,6 +66,7 @@ builder.Host.UseSerilog((ctx, cfg) =>
         cfg.WriteTo.Console();
     }
 
+    cfg.WriteTo.Sink(new ErrorLogSink(services.GetRequiredService<ErrorLog>()));
     cfg.ReadFrom.Configuration(ctx.Configuration);
     cfg.Enrich.FromLogContext();
     cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
@@ -112,6 +117,22 @@ builder.Services.AddSingleton<DataRetentionService>();
 builder.Services.AddSingleton<DatabaseSizeGuardService>();
 builder.Services.AddSingleton<ShipStateJournal>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
+
+// The health rules (phase 3): the monitor evaluates them every minute, each in the scope of one
+// evaluation. The API client's handler records the 401s and 429s they read.
+builder.Services.AddSingleton<HealthMonitorService>();
+builder.Services.AddSingleton<ApiResponseLog>();
+builder.Services.AddScoped<HealthFleet>();
+builder.Services.AddScoped<IHealthRule, ContractStalledRule>();
+builder.Services.AddScoped<IHealthRule, ContractLeftOpenRule>();
+builder.Services.AddScoped<IHealthRule, ContractDeadlineAtRiskRule>();
+builder.Services.AddScoped<IHealthRule, ShipStuckRule>();
+builder.Services.AddScoped<IHealthRule, ShipLeftIdleRule>();
+builder.Services.AddScoped<IHealthRule, CircuitBreakerTrippedRule>();
+builder.Services.AddScoped<IHealthRule, RepeatingErrorRule>();
+builder.Services.AddScoped<IHealthRule, CreditsUnchangedRule>();
+builder.Services.AddScoped<IHealthRule, ApiUnauthorizedRule>();
+builder.Services.AddScoped<IHealthRule, ApiThrottledRule>();
 
 // RunLifecycleService is both a singleton startup-managed service and the IRunLifecycleManager implementation.
 builder.Services.AddSingleton<RunLifecycleService>();

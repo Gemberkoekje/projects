@@ -12,7 +12,7 @@ decisions).
 | **Agent** | The player's in-game entity. Has credits, a fleet of ships, and a faction. Represented by the `Agent` aggregate in the domain. |
 | **Agent Id** | The short id every agent-scoped row is keyed on: the agent's symbol and the server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). The agent that takes the same symbol after a reset gets a new id. The database keeps the active agent's rows only, plus every agent's `runs`. |
 | **Agent Token** | A bearer token returned by `POST /register` and used for all `/my/*` authenticated API calls. Stored only in the `stored_credentials` table, and loaded into `IAgentTokenProvider` at startup. |
-| **Anomaly** | *Planned (PLAN.md phase 3).* A broken health rule, exposed as a metric and a journal event. |
+| **Anomaly** | A subject (a ship, a contract, the agent, the API, a log statement) that breaks a health rule. While it lasts, `spacetraders_anomaly_active{rule,subject}` is 1; the journal logs `AnomalyRaised` when it starts and `AnomalyCleared` when it ends. `docs/HOW_IT_WORKS.md` section 12 lists the rules. |
 | **Assignment** | A ship's current task in `ship_assignment_records` (`ShipAssignmentRecord`): a type such as `Scout` or `Contract`, origin, destination, cargo and progress. The contract plan works only through assignments; the scout plan writes both an assignment and a goal. |
 | **Burst Limit** | Per the API guide (https://spacetraders.io/api-guide/rate-limits): on top of the limit of 2 requests per second, up to 30 more requests within a 60-second burst duration, counted per IP address and per account. `RequestBudget` follows it. |
 | **Dead Reckoning** | Treating a ship as arrived once its cached arrival time has passed, without asking the API. The contract commands do this (`FulfillContractDeliveryCommand`, `MineResourceVolumeCommand`). `GameLoopService` no longer does, despite the name of its `DeadReckoningInterval` constant. |
@@ -24,7 +24,7 @@ decisions).
 | **GameLoopService** | The leader-only loop that runs every 5 seconds: it bootstraps the five plans, steps every ship's active goal, drives contract assignments and publishes API availability changes. |
 | **Goal** | What a ship is working towards, such as `ScoutWaypointGoal`, `DeployProbeGoal`, `MineAndSellGoal`, `TradeBetweenMarketsGoal` or `SurveyWaypointGoal`. Each ship has at most one active goal. |
 | **Goal Executor** | Code that advances one kind of goal by one step, such as `MineAndSellGoalExecutor`. `ShipGoalExecutorService` picks the executor for a ship's active goal. |
-| **Health Rule** | *Planned (PLAN.md phase 3).* An intended behaviour written down as a check the bot runs on itself, such as "a fulfilled contract has no active plan". A broken rule is an anomaly. |
+| **Health Rule** | An intended behaviour written down as a check the bot runs on itself every minute (`IHealthRule`, evaluated by `HealthMonitorService`), such as "a fulfilled contract has no active plan or assignment". A broken rule is an anomaly. |
 | **Leader Election** | A mechanism ensuring only one instance runs leader-only automation work. Implemented by `LeaderElectionService` and backed by the `leader_leases` table. |
 | **Minimal API** | The ASP.NET Core programming model used in `SpaceTraders.API` – endpoint groups defined with `MapGet`/`MapPost` rather than controllers. |
 | **Npgsql** | The official .NET PostgreSQL driver and the EF Core provider used in `SpaceTraders.Infrastructure.Persistence`. |

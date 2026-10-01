@@ -507,7 +507,8 @@ public sealed class ProbeDeploymentPlanService(
         await bus.PublishAsync(new DeployProbeCommand(purchase.PurchasedShip.Symbol, targetWaypoint));
     }
 
-    private static bool IsProbeShip(ShipModel ship)
+    /// <summary>Whether the plan treats <paramref name="ship"/> as a probe; it misses the starting probe (B25).</summary>
+    internal static bool IsProbeShip(ShipModel ship)
         => ship.ShipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase)
            || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase)
            || ship.Symbol.Contains("SATELLITE", StringComparison.OrdinalIgnoreCase);

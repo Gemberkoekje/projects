@@ -14,6 +14,12 @@ public interface IGoalStepCircuitBreaker
     /// within the last minute; its count then starts again from zero.
     /// </summary>
     bool RecordStep(string shipSymbol, int maxStepsPerMinute, DateTimeOffset now);
+
+    /// <summary>
+    /// When each ship last tripped the breaker, since the process started. A plan may replace the
+    /// blocked goal at once (mining and trading do), so the trip outlives the blocked goal here.
+    /// </summary>
+    IReadOnlyDictionary<string, DateTimeOffset> LastTrips { get; }
 }
 
 /// <summary>Sliding one-minute window per ship. Registered as a singleton, so it spans all scopes.</summary>
@@ -22,6 +28,10 @@ public sealed class GoalStepCircuitBreaker : IGoalStepCircuitBreaker
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
     private readonly ConcurrentDictionary<string, Queue<DateTimeOffset>> _stepsByShip = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastTrips = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, DateTimeOffset> LastTrips => _lastTrips;
 
     public bool RecordStep(string shipSymbol, int maxStepsPerMinute, DateTimeOffset now)
     {
@@ -41,6 +51,7 @@ public sealed class GoalStepCircuitBreaker : IGoalStepCircuitBreaker
             }
 
             steps.Clear();
+            _lastTrips[shipSymbol] = now;
             return true;
         }
     }

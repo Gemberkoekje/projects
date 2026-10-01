@@ -25,6 +25,7 @@ startup chain ─► tick every 5 s (leader only)
                   ├─ contract assignments: deliver, or mine
                   └─ publish API availability changes
 arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNavigationCompletedEvent ─► goal step
+health monitor every minute ─► health rules ─► anomalies (metric + journal)
 ```
 
 ---
@@ -90,8 +91,9 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
 | 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
+| 14 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
 
-One try/catch wraps the chain. Steps 5, 9 and 11 catch their own errors. A throw in steps 1, 4, 6,
+One try/catch wraps the chain. Steps 5, 9, 11 and 14 catch their own errors. A throw in steps 1, 4, 6,
 8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
 stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
 before any of those, so a pod that keeps failing during startup still prunes at every start.
@@ -360,7 +362,9 @@ Markets are not scouted again.
   (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
   `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
   blocks the goal with reason `runaway`, logs `ShipBlocked` at Warning and counts
-  `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
+  `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps. It
+  remembers each ship's last trip (`LastTrips`, in memory) for the `CircuitBreakerTripped` rule,
+  because mining and trading replace a blocked goal at once.
 - **Counts** every step it runs in `spacetraders_goal_steps_total{kind}`.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
@@ -521,8 +525,9 @@ other app (D8):
   an anomaly while the database is above it, with rule `DbSizeSoftLimit` or `DbSizeHardLimit` and
   subject `database`. The journal logs `AnomalyRaised` when the database crosses a limit (Warning
   for the soft one, Error for the hard one) and `AnomalyCleared` when it is back under, and
-  `spacetraders_anomaly_active` is 1 meanwhile. They are the only anomalies until phase 3 adds
-  the health rules.
+  `spacetraders_anomaly_active` is 1 meanwhile. The other anomalies come from the health rules
+  (section 12); these two stay in the guard, because the hard limit has to act before the tick
+  starts.
 - Above the hard limit it also switches `Automation.Enabled` off, and again at every check while
   the database stays above it (with an Error line each time it has to), so switching it back on
   only lasts once the database is smaller.
@@ -575,8 +580,8 @@ other app (D8):
 
 ### What each setting does
 
-The seed holds 30 settings: the 14 that change what the bot does, 4 that are read without
-changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
+The seed holds 38 settings: the 22 that change what the bot does (8 of them the health rules'
+thresholds), 4 that are read without changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
 removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
 | Setting (default) | Effect |
@@ -590,6 +595,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
 | `Alerts.WebhookUrl` (empty) | Where alerts are posted, as `{"text": …}`. Only the token-reset alert can fire. |
+| `Health.*` (8 settings) | The health rules' thresholds; see [Health rules](#12-health-rules). Changing one doesn't start a new run |
 
 **The other 16:**
 
@@ -650,7 +656,8 @@ The first three follow the API guide (https://spacetraders.io/api-guide/rate-lim
    `spacetraders_api_requests_total{method,endpoint,status}`, with the route template as
    `endpoint` (`my/ships/{shipSymbol}/navigate`, `ApiEndpointTemplate`) and `error` as status when
    no response came. A 429 is also counted in `spacetraders_api_throttled_total{source}`:
-   `rate_limiter` with the `x-ratelimit-*` headers, `infrastructure` without.
+   `rate_limiter` with the `x-ratelimit-*` headers, `infrastructure` without. Every 401 and 429
+   also goes to `ApiResponseLog` (in memory, the last hour) for the API health rules.
 
 **Other parts:**
 
@@ -687,7 +694,8 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
 | Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data |
-| Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes`, `/anomalies` | Read tables that are never written; always 204, `[]` or zeros |
+| Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes` | Read tables that are never written; always 204, `[]` or zeros |
+| Status (credit growth) | `GET /status/anomalies` | A heuristic over the credit samples: credits per hour over the last 24 hours against the last hour. Not the health rules' anomalies (section 12) |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
 | Runs and finance | `GET /runs/{id}/kpis`, `/finance/trade-routes` | KPIs is a stub; trade routes are always `[]` |
 | Fleet | `GET /fleet/assignments`, `/activity`, `/activity/{ship}`, `/activity/{ship}/history`, `/goal-chains` | 5 s cache. History is always `[]` |
@@ -762,7 +770,8 @@ The seven pages in `src/Future` are not routed.
   | `SettingChanged` | `SettingsRepository` | `Setting`, `OldValue`, `NewValue` |
   | `ResetDetected` | `ServerResetMonitor` (Critical) | `Detail` |
   | `ApiUnavailable`, `ApiAvailable` | The tick | `PausedUntil` |
-  | `AnomalyRaised`, `AnomalyCleared` | The size guard | `Rule`, `Subject` |
+  | `AnomalyRaised` | The health monitor (Warning) and the size guard | `Rule`, `Subject`; the monitor's also `Details` |
+  | `AnomalyCleared` | The health monitor and the size guard | `Rule`, `Subject`; the monitor's also `ActiveMinutes` |
 
   Mining and trading have no plan to start or complete: they are opportunity queues.
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
@@ -786,13 +795,84 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_messages_handled_total` | `type` | Messages Wolverine handled without an error (`MessageMetricsMiddleware`) | Per message |
   | `spacetraders_goal_steps_total` | `kind` | Goal steps run | Per step |
   | `spacetraders_goal_breaker_trips_total` | `ship` | Goals the circuit breaker blocked | Per trip |
-  | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the size guard's limits | Every 5 minutes |
+  | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the health rules (section 12) and the size guard's limits | Every minute (health rules), every 5 minutes (size guard) |
   | `spacetraders_db_size_bytes` | | `pg_database_size` | Every 5 minutes (size guard) |
   | `spacetraders_server_next_reset_timestamp_seconds` | | When the server resets next (Unix time), from `GET /` | At agent bootstrap |
 
 ---
 
-## 12. Code that exists but never runs
+## 12. Health rules
+
+The bot checks itself (`../PLAN.md` phase 3). `HealthMonitorService`, the last step of the startup
+chain, evaluates every health rule (`IHealthRule`, in `SpaceTraders.Application/Health`) against the
+bot's own state: at start, then every minute.
+
+- **An anomaly** is a subject that breaks a rule: a ship, a contract, the agent, `api` or a log
+  statement. When it starts, the journal logs `AnomalyRaised` at Warning, with `Rule`, `Subject`
+  and `Details` (what the rule saw, its limit and the setting that holds it), and
+  `spacetraders_anomaly_active{rule,subject}` turns 1. When the rule holds again, the journal logs
+  `AnomalyCleared` (`ActiveMinutes`) and the metric turns 0. Grafana emails once an anomaly has
+  been active for 15 minutes (gembernodes, slice 2.5).
+- **Anomalies live in memory.** After a restart the first evaluation raises the ones still there
+  again. A rule that throws is logged at Error; its anomalies stay as they are until it runs
+  again, and the other rules carry on.
+- **Clocks:** a rule that expects something within a time starts counting no earlier than when the
+  monitor saw the bot able to work on the plan concerned: automation and the plan on, and API calls
+  not paused after a 502, at every evaluation since (at most since the monitor started). Switching
+  automation off and on, or a restart, never looks like a stall; after a restart detection starts
+  over.
+- **Every instance** runs the monitor, like the size guard and the metrics: the rules read the
+  shared database.
+- **Thresholds are settings** (`Health.*`); a missing, zero or negative value means the default.
+  The defaults are Claude's, from the soak test (1.14) where there was data; they are yours to
+  change.
+
+| Rule | Subject | Intended behaviour (`PLAN.md` 3.2) | Broken when | Setting (default) |
+|---|---|---|---|---|
+| `ContractStalled` | contract | An accepted contract makes progress | The contract the bot works on gets no delivery for N hours, counted from the contract plan's last change (a delivery, or the plan starting or starting to wait). In the soak test a delivery took 23 to 69 minutes | `Health.Contract.MaxHoursWithoutProgress` (4) |
+| `ContractLeftOpen` | contract | A fulfilled contract has no active plan or assignment (B9) | 5 minutes after a contract is fulfilled, the contract plan still holds it, or a ship still has an open assignment for it. Not while the contract plan is off: then nothing closes them, on purpose | — |
+| `ContractDeadlineAtRisk` | contract | A deadline within N hours comes with at least X% delivered | From N hours before its deadline, the contract the bot works on has less than X% of its units delivered; or it missed its deadline, whatever was delivered | `Health.Contract.DeadlineHours` (24), `Health.Contract.MinDeliveredPercent` (50) |
+| `ShipStuck` | ship | A ship with a goal changes state, unless it's in transit | A ship with work, not in transit, isn't updated by the bot (nav, cargo, fuel or cooldown: its `LastSyncedAt`) for N minutes, at two evaluations in a row. Counted from its arrival at the earliest. A blocked goal is `CircuitBreakerTripped`'s | `Health.Ship.MaxMinutesWithoutChange` (30) |
+| `ShipLeftIdle` | ship | A ship without a goal is idle for at most N minutes, while work waits for it (D13) | A ship with no goal and no assignment, not in transit, stays so for N minutes while a plan that is on has work it could give that ship (below) | `Health.Ship.MaxIdleMinutes` (10) |
+| `CircuitBreakerTripped` | ship | The circuit breaker hasn't tripped (slice 1.2) | A ship's goal is blocked (`runaway`), or the ship tripped the breaker in the last hour | — |
+| `RepeatingError` | log statement | The same error repeats at most N times in 10 minutes | One statement (its class and message template) logs more than N warnings or errors in 10 minutes, since startup. Journal lines don't count: other rules watch what they report | `Health.Errors.MaxRepeatsIn10Minutes` (5) |
+| `CreditsUnchanged` | agent | Credits change at least once a day while the fleet works (D13) | Ships have had work at every evaluation for N hours, and the credits didn't change in that time (no credit sample, B7) | `Health.Credits.MaxHoursUnchanged` (24) |
+| `ApiUnauthorized` | `api` | No 401 or reset errors | The API answered a call with 401 in the last hour, since startup. A reset stops the host (slice 1.8), so this is a token the server rejects for another reason | — |
+| `ApiThrottled` | `api` | At most N 429s an hour | More than N 429s in the last hour, retries included, by source. None are expected (slice 1.10) | `Health.Api.Max429sPerHour` (10) |
+| `DbSizeSoftLimit`, `DbSizeHardLimit` | `database` | The database stays under its limits (D8) | The size guard's own checks, every 5 minutes; see [Database size guard](#database-size-guard) | `Database.*` |
+
+**Work** is a goal, or a contract assignment, of a plan that is on (`ShipStuck`,
+`CreditsUnchanged`). For `ShipLeftIdle`, the work a plan has waiting, mirroring which ships it
+treats as free (section 3):
+
+- scout: the active plan's next stop, for the plan's ship;
+- contract: the active plan's contract, for the plan's ship; while the plan waits for a ship or
+  budget, any mining-capable ship;
+- probe deployment: a target without a probe while the plan isn't waiting for credits (D4), for a
+  probe not parked at a deployed waypoint. A probe is what the plan recognises, or a ship whose
+  cached type is `SATELLITE`: the starting probe, which the plan misses (B25);
+- mining and trading: an opportunity without a ship (Pending), for a ship that plan can use.
+
+Without such work an idle ship is idle by design: in the first run (D9, D1) the starting probe,
+the command ship after scouting and the drone after its contract. Likewise an idle fleet isn't
+expected to change the credits.
+
+**The contract the bot works on** is the contract plan's, while the plan is Active, waits for a ship
+or budget (PendingBudget), or found no asteroid for its mineral; and while that contract is accepted
+and unfulfilled. A contract whose deliverable isn't a mineral is parked by decision (D2) and left
+out.
+
+**In-memory signals,** all since the process started:
+
+- `ErrorLog`: a Serilog sink (`ErrorLogSink`) hands it every warning and error without an
+  `EventKind`, by class and template, for the last 10 minutes. The 429 handler logs a warning per
+  retry, so a burst of 429s can raise `RepeatingError` next to `ApiThrottled`.
+- `ApiResponseLog`: `ApiRequestMetricsHandler` records every 401 and 429, for the last hour.
+- `GoalStepCircuitBreaker.LastTrips`: each ship's last trip.
+
+---
+
+## 13. Code that exists but never runs
 
 This makes the codebase look bigger than what actually runs:
 
@@ -812,7 +892,7 @@ This makes the codebase look bigger than what actually runs:
 
 ---
 
-## 13. Build, tests and deployment
+## 14. Build, tests and deployment
 
 **Images:**
 - `Dockerfile.api`: SDK 10 publish, then the ASP.NET 10 runtime on port 8080, and the metrics on 9090.
@@ -833,9 +913,9 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~258 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.Application.Tests` | ~395 | Plans, commands, executors, the health rules and their monitor, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Infrastructure.Tests` | ~72 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.API.Tests` | ~107 | WebApplicationFactory tests in `Testing`: DI validation, bootstrap and run lifecycle, and a broken scenario per health rule in the real host. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 The `Category=Integration` tests ask Testcontainers whether it can reach Docker, the way it starts

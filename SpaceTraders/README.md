@@ -8,9 +8,10 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 
 > **Status (2026-10-01):** not running on the cluster. It was taken off in May 2026 after it filled
 > the shared PostgreSQL database. `PLAN.md` describes the way back: phase 1 (safe to run) is done,
-> including a four-hour soak test, and so is phase 2 (visibility: metrics, the ledger and the
-> journal), apart from merging its Grafana dashboard and alerts in gembernodes. Known issues are
-> listed there under B-numbers and decisions under D-numbers.
+> including a four-hour soak test; so is phase 2 (visibility: metrics, the ledger and the journal),
+> apart from merging its Grafana dashboard and alerts in gembernodes; and so is phase 3 (health
+> rules: the bot checks itself every minute and reports anomalies). Known issues are listed there
+> under B-numbers and decisions under D-numbers.
 
 ---
 

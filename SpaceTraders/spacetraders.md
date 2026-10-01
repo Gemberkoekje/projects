@@ -10,7 +10,7 @@ This repository contains a .NET 10 solution for automating and operating a Space
 The solution is organized in a layered architecture:
 
 - **SpaceTraders.API**: ASP.NET Core API host, health/metrics/endpoints, and startup orchestration.
-- **SpaceTraders.Application**: use-cases, command handlers, orchestration, automation, and domain event handlers.
+- **SpaceTraders.Application**: use-cases, command handlers, orchestration, automation, domain event handlers, and the health rules (`Health/`).
 - **SpaceTraders.Domain**: aggregates, domain events, enums, and value objects.
 - **SpaceTraders.Infrastructure.Persistence**: Entity Framework Core persistence, repositories, scheduler, and data bootstrapping.
 - **SpaceTraders.Infrastructure.SpaceTradersAPI**: outbound SpaceTraders API client, adapters, rate limiting, and availability logic.
@@ -83,7 +83,7 @@ Notes:
   - `/spacetraders/api/health/live`
   - `/spacetraders/api/health/ready`
   - `/spacetraders/api/health/startup`
-- Prometheus metrics are mapped at `/metrics`; like every non-health endpoint, they require the `X-Api-Key` header when `SPACETRADERS_INTERNAL_API_KEY` is set (B11 in `PLAN.md`).
+- Prometheus metrics are served at `/metrics` on a port of their own (`Metrics:Port`, 9090), without the API key (B11 in `PLAN.md`, fixed in slice 2.1). The main port serves no `/metrics`.
 
 ## Running Tests
 
@@ -127,4 +127,3 @@ dotnet test tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.
 - Keep changes aligned with the existing layered architecture.
 - Prefer small, test-covered changes in `Application` and `Domain` before infrastructure updates.
 - Add or update tests under `tests/` when behavior changes.
-
