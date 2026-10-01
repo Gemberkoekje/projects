@@ -53,6 +53,10 @@
   cluster until phase 4.
 - Phase 3 is done in the code (2026-10-01): ten health rules check the bot's own state every
   minute, and each broken one is an anomaly (a metric and journal lines).
+- Phase 4 is ready to merge (2026-10-01): the manifests are on gembernodes branch
+  `ccr-4b757162-4r7t2o`, with `apps/spacetraders/README.md` for the steps by hand (the database
+  logins of 4.1, the 1Password fields, the Grafana restart). Merging it puts the bot back on the
+  cluster, at main `12443acb`; this phase's two fixes (B39, B40) follow with the next image.
 
 ## Known issues
 
@@ -85,7 +89,7 @@ the misbehaviour.
 | B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 (done) |
 | B20 | **A restart clears every ship's active goal.** Startup sync overwrites each existing ship row with `SetValues(new CachedShip { … })`, and that object doesn't carry the goal columns, so they become null.<br>• A scout ship whose assignment already matches the current route step doesn't get its goal back.<br>• Arrival wake-ups scheduled before the restart no longer match any goal (B17). | `StartupSyncService.cs:106-130` | 1.12 (done) |
 | B21 | **The app tables may never be created** (confirmed in 1.13). `EnsureCreatedAsync` does nothing when the database already holds any table. Wolverine creates its `wolverine` tables when the host starts, before the deferred initializer runs, so the initializer's `ALTER TABLE` statements would then fail. The cluster's database will be empty on redeploy. | `SpaceTradersDatabaseInitializer.cs:12`, `Program.cs:75-78`, `DeferredStartupHostedService.cs:22-30` | 1.13 (done) |
-| B22 | **The dashboard publishes the internal API key.** The WebUI container writes the key into `config.js`, which anyone who can open the dashboard can read. The old ingress served both the dashboard and the API on the public `gemberkoekje.nl`, so anyone could call `PUT /settings/*` and `POST /control/*`. | `SpaceTraders.WebUI/docker-entrypoint.sh:11-29`, `SpaceTraders.WebUI/index.html:17`; gembernodes `3f9f785^:ingress/spacetraders-ingress.yaml` | 4.2 |
+| B22 | **The dashboard publishes the internal API key.** The WebUI container writes the key into `config.js`, which anyone who can open the dashboard can read. The old ingress served both the dashboard and the API on the public `gemberkoekje.nl`, so anyone could call `PUT /settings/*` and `POST /control/*`. | `SpaceTraders.WebUI/docker-entrypoint.sh:11-29`, `SpaceTraders.WebUI/index.html:17`; gembernodes `3f9f785^:ingress/spacetraders-ingress.yaml` | 4.2 (done: LAN only, not merged) |
 | B23 | **A failed startup leaves an idle pod that looks healthy.** One try/catch wraps the startup chain. If database init, agent bootstrap, the run lifecycle, startup sync or recovery throws, the later services (the tick and pruning among them) never start, and nothing retries. `/health/live` runs no checks, and the old deployment used it for the startup and liveness probes, so Kubernetes never restarts the pod. | `DeferredStartupHostedService.cs:57-89`, `Program.cs:146` | 1.11 (done) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 | B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
@@ -102,6 +106,8 @@ the misbehaviour.
 | B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 (done) |
 | B37 | **The credit-drop alert can't fire** (found in 2.2). `AlertHandler` compares each credit change with the credits it remembers in a field from the previous one, but Wolverine creates the handler anew for every message, so the field is always empty. Until 2.2 nothing published the event anyway. The event carries the old credits, so the fix is small, but it would then warn, and post to `Alerts.WebhookUrl`, on every purchase that costs more than 10% of the credits, a ship included. | `AlertHandler.cs` (`_previousCredits`) | D12: removed |
 | B38 | **Startup recovery reports docked ships as in transit** (found in a local run during phase 2, through `spacetraders_messages_handled_total`). Its first branch takes any ship whose cached arrival time has passed for a ship that has just arrived, but that time stays on a ship after it docks: startup sync stores the last route's arrival. So every docked ship that ever travelled gets a `ShipInTransitEvent` (an "in transit" activity row) on every start: three in a run with an idle fleet. `docs/HOW_IT_WORKS.md` describes the branch as "still marked in transit", which the code doesn't check; a ship that really arrived while the bot was down comes back from `GetAllAsync` already in orbit, so the branch never sees one. | `StartupRecoveryService.cs` (`RecoverShipAsync`), `StartupSyncService.cs` (`ArrivesAt`) | 6.4 |
+| B39 | **`/health/startup` answers 200 while the startup chain runs** (found in 4.2). The check reports "still running" as Degraded, and ASP.NET Core answers Degraded with 200 unless told otherwise. The startup probe that 4.2 adds for B23 would pass as soon as the HTTP server is up, like the old probe on `/health/live`. | `Program.cs` (`MapHealthChecks("/health/startup")`), `StartupInitializationHealthCheck.cs` | 4.2 (done) |
+| B40 | **The dashboard's probes fill the bot's log budget** (found in 4.2). nginx logs every request, and the WebUI's liveness and readiness probes call `/healthz` 8 times a minute: about 11,500 lines a day in `{namespace="spacetraders"}`, which the dashboard's log-volume panel and the 50,000-a-day alert (2.4, 2.5) count as the bot's. An idle bot logs nothing, so the panel would have shown only the probes. | `SpaceTraders.WebUI/nginx.conf` (`location = /healthz`) | 4.2 (done) |
 
 ### Decisions (2026-10-01)
 
@@ -431,7 +437,7 @@ cluster (phase 4).
   - Each tick step also gets its own DI scope, so a step that fails halfway can't leave a broken
     DbContext (with unsaved changes) to every step after it.
   - A failed startup chain logs at Critical, stops the host and exits with code 1.
-  - The startup probe is still to do, in the manifests (4.2).
+  - The startup probe came with the manifests (4.2), and needed B39 fixed.
 
 **1.12 Restarts keep ship goals (B20)** (done)
 - Do: startup sync updates a ship's game state without touching its goal columns.
@@ -835,15 +841,31 @@ its own retention, so the bot's database stays small.
 
 ### Phase 4: Back on the cluster (gembernodes)
 
-**4.1 Database logins**
+**4.1 Database logins** (prepared; by hand, before 4.2 is merged)
 - Do: check the connection string in the 1Password item `spacetraders-secrets`.
   - It should use a dedicated, non-superuser login that owns only the `spacetraders` database;
     create both if they're missing.
   - Add a read-only login (for example `spacetraders_ro`) for Claude on your PC.
 - Note: a separate database on the shared server doesn't cap disk usage. That's the job of 1.6
   and the alert in 2.5.
+- Prepared: `apps/spacetraders/README.md` in gembernodes (4.2's branch) has the steps and the SQL:
+  - the login `spacetraders`: not a superuser, can't create databases or roles, and owns the
+    `spacetraders` database, which only it and the read-only login may connect to;
+  - the read-only login `spacetraders_ro`: read-only transactions, and reading rights on every
+    table the bot creates (default privileges), except `stored_credentials` after the first start,
+    because it holds the agent token;
+  - the four fields of the 1Password item, the connection string pointing at
+    `postgresql.flux-system.svc.cluster.local` like every other app's since 2026-09-26.
+- Tested against PostgreSQL 18 (the cluster runs 18.4), with the published bot:
+  - Started as `spacetraders` against the empty database, the bot created its 28 tables, with
+    `cached_ships`'s storage parameters (B32), and its second start used them. It needs no more
+    than that: it creates the database only when it's missing, and `pg_database_size` (1.6)
+    works for the owner.
+  - `spacetraders_ro` could read the tables the bot created after the grants, but not write, even
+    with read-only switched off; after the revoke it couldn't read `stored_credentials`.
+  - Another app's login couldn't connect, and `spacetraders` couldn't create a database.
 
-**4.2 Manifests**
+**4.2 Manifests** (done: gembernodes branch `ccr-4b757162-4r7t2o`, not merged)
 - Do: restore `apps/spacetraders/`, the namespace and the ingress (from `3f9f785^`), with these
   changes:
   - Prometheus annotations for the metrics port;
@@ -863,12 +885,56 @@ its own retention, so the bot's database stays small.
   Ingress objects, nginx annotations included, so the above still works; but once ingress-nginx
   is gone (its phase 4) the LAN address may be `192.168.1.231` rather than `.230`. Model the
   ingress on `grafana-internal-ingress.yaml` as it is by then.
+- Done; Flux deploys it once the branch is on `main`, which waits for 4.1.
+  - `apps/spacetraders/` (the API and the WebUI, their Services, the 1Password item, the API's
+    environment, `secret.yaml.template` and a README with the steps by hand),
+    `namespaces/spacetraders-namespace.yaml` and `ingress/spacetraders-ingress.yaml`, each in its
+    kustomization. Both images are main `12443acb`, the last build, with phases 1–3.
+  - The API runs one pod and never two (`strategy: Recreate`): the rate limit is per account, and
+    startup sync and recovery call the API before the leader lease decides which pod runs the
+    tick.
+  - Probes: startup `/health/startup`, every 10 s for up to 10 minutes; liveness `/health/live`;
+    readiness `/health/ready`, which checks the database. The startup probe only works with B39
+    fixed: with the current image it passes as soon as the HTTP server is up.
+  - The Prometheus annotations point at 9090, which the Service doesn't route. The Prometheus
+    chart's `kubernetes-pods` job (checked in 25.30.2) adds the `namespace` label that the
+    dashboard and alerts select on.
+  - The ConfigMap is `api.env`, through a `configMapGenerator`, so a change rolls the pod:
+    Production, port 8080, `Metrics__Port` 9090 next to the annotation that points at it, and
+    Serilog's default level, with how to override one. Checked with the published bot:
+    `Logging__LogLevel__Default=Warning` (the old ConfigMap's style) left Information lines in the
+    log, and `Serilog__MinimumLevel__Default=Warning` removed them.
+  - Each container reads the secret fields it needs by name, instead of the whole item: the API
+    four, the WebUI only the API key. A missing field keeps the pod in
+    `CreateContainerConfigError`, which the existing "Container crash-looping or failing to start"
+    alert reports.
+  - A wait-for-postgres init container, like armabotcs and curatool, so a node reboot doesn't
+    crash-loop the bot; and 60 s to stop, the app's own shutdown timeout.
+  - The ingress follows `grafana-internal-ingress.yaml`: no host, no certificate, the LAN
+    allowlist, `/spacetraders/api` and `/spacetraders/dashboard`. Traefik serves it on
+    192.168.1.231, where the router points since the migration's phase 3, and ingress-nginx on
+    .230 until it's removed.
+  - Checked with `kustomize build` and `kubeconform -strict`.
+  - Found on the way, and fixed, each reproduced first: B39 (`StartupProbeTests` got 200 while
+    the chain ran) and B40 (nginx with the image's configuration logged 10 lines for 10 probes,
+    and none after the fix). Both reach the cluster with the next image: once this change is on
+    `main`, CI pushes it, and both image tags in gembernodes move to that commit.
+  - Noticed:
+    - Each poll of the startup probe while the chain runs logs one Warning ("Health check
+      startup with status Degraded"): a few lines per start, before the health monitor starts,
+      so `RepeatingError` doesn't count them.
+    - Only the tick checks the leader lease: startup sync, recovery and the arrival timers
+      (`ShipEventScheduler`) run in every pod. One replica and `Recreate` make that moot; more
+      replicas would need more than the lease, although its comment says it covers them.
 
 **4.3 First-run watch**
-- Unpause the "SpaceTraders bot is down" alert (2.5).
+- Unpause the "SpaceTraders bot is down" alert (2.5). Done on 4.2's branch: it's live once that's
+  merged and Grafana has restarted (the restart 2.5 still needs). Restart Grafana once Prometheus
+  has scraped the bot, or the alert fires for its first minute without a series.
 - Only the scout and contract plans are on (D9).
 - First hour: messages per minute, database size, log lines per minute, anomalies. Then check
   again after 24 hours, then after a full reset period.
+- Also check that the count of real 429s stays at zero (1.10).
 - Phase 6 starts after a clean reset period.
 
 ### Phase 5: Claude as mechanic (on your PC)
@@ -916,11 +982,13 @@ How credits are split stays your call; Claude only fixes deviations from intende
 
 ## Changes in gembernodes
 
-This cloud session can only read gembernodes. These changes are made from your PC or by hand:
+Changes to files are made on a branch there, and Flux deploys them once merged. The rest needs
+your PC, 1Password or kubectl:
 
 | Slice | Change |
 |---|---|
 | 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (merged: PR #10) |
 | 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; the restart is pending) |
-| 4.1 | Database login and read-only login (Postgres and 1Password) |
-| 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries |
+| 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` |
+| 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (branch `ccr-4b757162-4r7t2o`, not merged) |
+| 4.3 | "SpaceTraders bot is down" unpaused (same branch), then the Grafana rollout restart |

@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `.claude/skills/st-investigate/SKILL.md`: draft of the skill Claude uses to investigate and fix misbehaviour.
 
 ### Docs – Changed (2026-10-01)
+- `PLAN.md`: phase 4 ready to merge. The manifests (4.2) and the unpaused "bot is down" alert (4.3) are on a gembernodes branch, with a README for the steps by hand; the database logins (4.1) are prepared and tested against PostgreSQL 18; and B39 and B40 were found and fixed on the way. `README.md`, `spacetraders.md` and `docs/HOW_IT_WORKS.md` describe the deployment, and the `st-investigate` skill names the read-only login and the LAN address of the internal API.
 - `PLAN.md`: phase 3 done (slices 3.1 and 3.2), with a short summary; D12 decided (the credit-drop alert is gone) and D13 added (the idle-ship and credits rules count only while work waits); the dashboard and alerts (2.4, 2.5) merged as gembernodes PR #10, with the Grafana restart still to do. `docs/HOW_IT_WORKS.md` has a section on the health rules (12), `docs/GLOSSARY.md` describes anomalies and health rules as they are, and the `st-investigate` skill says where each rule's anomaly points (and that production logs carry `@m` and `@i`, not `@mt`). `README.md` reports phase 3; `spacetraders.md` says where `/metrics` is served since slice 2.1.
 - `PLAN.md`: phase 2 done in the code (slices 2.1, 2.2, 2.3, 2.6, and 0.5), with a short summary; the dashboard and alerts (2.4, 2.5) ready on a gembernodes branch; new known issues B37 (the credit-drop alert can't fire) and B38 (startup recovery reports docked ships as in transit), open decision D12, and notes for 4.2 (metrics port annotations, the Traefik migration) and 4.3 (unpause the "bot is down" alert).
 - `PLAN.md`: the soak test's results (slice 1.14, the last of phase 1), the issues it found (B28–B36), a slice for its tidy-ups (0.5), and a short summary of phase 1.
@@ -22,6 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `CLAUDE.md`: what Claude works on in this project, and that it considers fixing build warnings in the files it touches.
 
 ### Config – Changed (2026-10-01)
+- The WebUI's nginx no longer logs requests to `/healthz`, which only Kubernetes' probes call (B40): 8 lines a minute, about 11,500 a day, which Grafana's log-volume panel and alert counted against the bot's budget of 50,000.
 - `Metrics:Port` (9090) and `Metrics:Hostname` in `appsettings.json`: where `/metrics` is served. Development listens on `localhost` only; `Dockerfile.api` exposes 9090 next to 8080.
 - `System.Net.Http` logs at Warning instead of Information (`appsettings.json`, `appsettings.Development.json`), removing about four log lines per outbound API call.
 
@@ -54,6 +56,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The credit-drop alert (D12, B37): credits only drop when the bot spends them, so it could only have reported the bot's own spending. It couldn't fire either: it compared each change with a field that Wolverine never kept.
 
 ### Code – Changed (2026-10-01)
+- `/health/startup` answers 503 until the startup chain has completed (B39). It answered 200 while the chain ran, because the check reports that as Degraded, so the Kubernetes startup probe on it would have passed at once.
 - Journal lines render their kind without quotes (`{EventKind:l}`): Serilog quotes string values in the rendered message, so a line read `"ShipIdle": ship …` in Loki.
 - The settings seed holds only settings that code which runs reads (B18, D10): 26 are gone (`Navigation.*`, `Maintenance.*`, `Outfitting.*`, and the others nothing read), 30 remain, `Runtime.*` flags included. A database seeded earlier keeps its rows; the bot ignores them, as it always did.
 - The size guard logs its limits as anomalies, `AnomalyRaised` and `AnomalyCleared` with rule `DbSizeSoftLimit` or `DbSizeHardLimit`, instead of `DbSizeSoftLimit`, `DbSizeHardLimit` and `DbSizeNormal` events.
