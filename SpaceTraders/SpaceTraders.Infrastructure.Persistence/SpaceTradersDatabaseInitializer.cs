@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 
 namespace SpaceTraders.Infrastructure.Persistence;
@@ -9,7 +11,7 @@ public static class SpaceTradersDatabaseInitializer
         SpaceTradersDbContext dbContext,
         CancellationToken cancellationToken = default)
     {
-        await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await CreateTablesIfMissingAsync(dbContext, cancellationToken);
 
         if (dbContext.Database.IsNpgsql())
         {
@@ -388,6 +390,41 @@ public static class SpaceTradersDatabaseInitializer
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))
         {
             await DefaultSettingsSeed.SeedAsync(dbContext, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Creates the database and the model's tables when they don't exist yet. <c>EnsureCreated</c>
+    /// isn't enough: it does nothing as soon as the database holds any table, even one the app
+    /// doesn't own (B21).
+    /// </summary>
+    private static async Task CreateTablesIfMissingAsync(SpaceTradersDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!dbContext.Database.IsRelational())
+        {
+            await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            return;
+        }
+
+        var creator = dbContext.GetService<IRelationalDatabaseCreator>();
+        if (!await creator.ExistsAsync(cancellationToken))
+        {
+            await creator.CreateAsync(cancellationToken);
+        }
+
+        var modelTables = dbContext.Model.GetEntityTypes()
+            .Select(entity => entity.GetTableName())
+            .OfType<string>()
+            .Distinct()
+            .ToArray();
+
+        var existingModelTables = await dbContext.Database
+            .SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ANY({modelTables})")
+            .SingleAsync(cancellationToken);
+
+        if (existingModelTables == 0)
+        {
+            await creator.CreateTablesAsync(cancellationToken);
         }
     }
 

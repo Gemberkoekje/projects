@@ -436,9 +436,11 @@ production code doesn't use the aggregates at all (B7).
 
 ### Schema
 
-- There are no EF migrations. `SpaceTradersDatabaseInitializer` runs `EnsureCreatedAsync`, then
-  idempotent raw DDL: `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE/INDEX IF NOT EXISTS`, and widening
-  of the token columns. On an empty database this order may fail (B21).
+- There are no EF migrations. `SpaceTradersDatabaseInitializer` creates the database and all
+  of the model's tables when none of them exist yet; unlike `EnsureCreated`, other tables in the
+  database don't stop it (B21). Then it runs idempotent raw DDL (`ADD COLUMN IF NOT EXISTS`,
+  `CREATE TABLE/INDEX IF NOT EXISTS`, widening of the token columns), which only upgrades schemas
+  made by older versions.
 - Settings are seeded only once an agent token is known.
 - Wolverine stores nothing in the database.
 
@@ -704,7 +706,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
 | `SpaceTraders.Application.Tests` | ~253 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.Infrastructure.Tests` | ~67 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~67 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
