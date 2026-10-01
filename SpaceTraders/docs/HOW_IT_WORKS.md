@@ -81,7 +81,7 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 6 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
 | 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
 | 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
-| 9 | `StartupSnapshotService` | once | One JSON snapshot row |
+| 9 | `StartupSnapshotService` | once | One JSON snapshot row, from the cache |
 | 10 | `StartupRecoveryService` | once | Resumes ships |
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
@@ -143,8 +143,11 @@ checks it. The lease is not released on shutdown.
   leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
 
-**Startup snapshot:** switches `Automation.Enabled` off while it runs and back on afterwards. It
-writes one `startup_snapshots` row with the agent, ships, waypoints and market and shipyard data.
+**Startup snapshot** (`StartupSnapshotService`): writes one `startup_snapshots` row from what
+startup sync has just cached: the agent, the ships with their goals, the contracts, every waypoint
+in the ships' systems, and the market and shipyard where each ship is (not in transit). It calls no
+API (B35, fixed); before, it fetched all of that again, about 11 calls on every start. The cache
+holds less than the API returns: no crew, mount details or (until B34) waypoint traits.
 
 **Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false.
 For each cached ship:
@@ -554,7 +557,7 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
-| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. Startup snapshot switches it off and on. |
+| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
@@ -781,6 +784,10 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
+
+The `Category=Integration` tests ask Testcontainers whether it can reach Docker, the way it starts
+its containers (`DOCKER_HOST`, the Unix socket, or Docker Desktop's named pipe on Windows), and skip
+only when it can't (B36, fixed).
 
 **WebUI tests:**
 - `npm test` runs Vitest.

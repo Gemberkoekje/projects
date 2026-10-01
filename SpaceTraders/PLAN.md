@@ -92,8 +92,8 @@ the misbehaviour.
 | B32 | **The ship table grows without end** (found in 1.14). `cached_ships` holds a few wide rows (about 2 kB of ship JSON each) that change every minute or so. Postgres prunes their old versions in place, which kept the table's dead-tuple count under the autovacuum trigger (50), so VACUUM never ran and every update that didn't fit its page extended the table: about 250 kB an hour with one busy ship, and in phase 6 that scales with the fleet. | soak samples: 32 pages for 3 rows, 0 autovacuums in 2 hours | 1.14 (done) |
 | B33 | **Contract payments never reach the cached credits** (found in 1.14). The accept and fulfil responses carry the agent's new credits, but only refuels, sales and purchases wrote them to the cached agent. Purchases are budgeted from the cache, so after a contract the bot thinks it has less than it does until the next restart: in the soak test 6,620 less (130,564 cached, 137,184 in the game). | `FulfillContractDeliveryCommand.cs`, `ContractPlanService.cs` (accept) | 1.14 (done) |
 | B34 | **Waypoint traits are never stored** (found in 1.14). Startup sync stores only a waypoint's market and shipyard flags, and nothing calls `WaypointRepository.UpsertRangeAsync`, the one method that writes traits (and modifiers, orbitals and charts). What reads them finds nothing:<br>• the mining plan means to pick the nearest asteroid whose deposits can yield the mineral, but always falls back to the nearest asteroid of any kind, so a drone can be sent where its mineral never comes up;<br>• the contract plan's trait score is always 0. It only breaks ties between equally near asteroids (nearest first is by design); whether a farther asteroid with the right deposits should win is a strategy question;<br>• the dashboard shows no traits. | `StartupSyncService.cs` (`EnsureSystemsForShipsAreCachedAsync`), `MiningAutomationService.cs` (`MatchesTradeSymbolAvailability`), `ContractPlanService.cs` (`ScoreTradeSymbolMatch`), `FleetStatusMapper.cs` | 6.4 |
-| B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 |
-| B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 |
+| B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 (done) |
+| B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 (done) |
 
 ### Decisions (2026-10-01)
 
@@ -143,7 +143,7 @@ cluster (phase 4).
 
 **0.4 Remove `SpaceTradersV3/`** (done)
 
-**0.5 Tidy-ups found by the soak test**
+**0.5 Tidy-ups found by the soak test** (done)
 - Do:
   - B35: build the startup snapshot from what startup sync has just cached, instead of fetching it
     again;
@@ -155,6 +155,27 @@ cluster (phase 4).
     analyzer flags (Proj3000) since the NuGet update.
 - Done when: the snapshot makes no API calls of its own; `dotnet test --filter Category=Integration`
   runs the Docker tests on Windows without `DOCKER_HOST`; and the build has no Proj3000 warning.
+- Done:
+  - B35: the snapshot reads what startup sync has just cached: the agent, the ships with their
+    goals, the contracts, every waypoint in the ships' systems, and the market and shipyard where
+    each ship is. `StartupSnapshotServiceTests` runs it against a substitute API client, which
+    receives no call (about 11 on every start before). The cache holds less than the API returns
+    (no crew, no mount names or descriptions, and no waypoint traits until B34); it does hold the
+    goals and the contracts, which the old snapshot lacked.
+  - The snapshot no longer switches `Automation.Enabled` off and back on around itself. That kept
+    the fleet still during its API calls; without them it has nothing to wait for, and switching
+    automation back on could undo a switch-off made in the meantime.
+  - B36: the four checks ask Testcontainers whether it found Docker
+    (`TestcontainersSettings.OS.DockerEndpointAuthConfig`), the same discovery it starts the
+    container with: `DOCKER_HOST`, the Unix socket, or Docker Desktop's named pipe. On Windows,
+    without `DOCKER_HOST`, all 74 integration tests now run; 6 used to skip (`IntegrationTestBase`
+    already tried the named pipe itself, the other three classes didn't).
+  - The lock file belonged to `.net.csproj`, the project-file analyzer's SDK project, which came in
+    with the same "wip" commit. No solution includes it, so nothing restores it.
+  - Noticed: where `npm ci` has run in `SpaceTraders.WebUI`, the build still reports 6 Proj3000
+    warnings, for BOMs in files under `node_modules`. The analyzer walks the project folder itself
+    and skips only `bin`, `obj`, `.vs`, `.git` and `.nuget`, so an MSBuild exclude doesn't reach it.
+    CI's .NET job has no `node_modules`, so it sees none.
 
 ### Phase 1: Safe to run
 

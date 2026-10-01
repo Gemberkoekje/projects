@@ -113,8 +113,9 @@ Vite serves the dashboard at `/spacetraders/dashboard/` and proxies `/spacetrade
 dotnet test SpaceTraders.slnx --filter "Category!=Integration"
 ```
 
-Integration tests need Docker/PostgreSQL and are tagged `Category=Integration`. On Windows they skip
-unless `DOCKER_HOST` is set: `$env:DOCKER_HOST = 'npipe://./pipe/docker_engine'`. WebUI tests run
+Integration tests are tagged `Category=Integration` and start PostgreSQL in Docker through
+Testcontainers. They find Docker the way Testcontainers does (`DOCKER_HOST`, the Unix socket, or
+Docker Desktop on Windows) and skip when no Docker is running. WebUI tests run
 with `npm test` in `SpaceTraders.WebUI`.
 
 ---

@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Configurations;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,7 +22,9 @@ public sealed class MessageStorageIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        Skip.IfNot(System.IO.File.Exists("/var/run/docker.sock") || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOCKER_HOST")), "Docker is not available – skipping integration tests.");
+        // Testcontainers finds Docker the way it will start the container: DOCKER_HOST, the Unix socket, or
+        // Docker Desktop's named pipe on Windows (B36).
+        Skip.IfNot(TestcontainersSettings.OS.DockerEndpointAuthConfig is not null, "Docker is not available – skipping integration tests.");
 
         _pg = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _pg.StartAsync();
