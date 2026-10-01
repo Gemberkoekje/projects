@@ -56,7 +56,7 @@ with a test that does.
 | # | Issue | Evidence | Slice |
 |---|---|---|---|
 | B1 | **"Already at destination" loop.** Navigating to the waypoint a ship is already at publishes `ShipNavigationCompletedEvent` without docking or orbiting. Its handler re-runs the goal executor, which asks to navigate there again. No API call is involved, so the rate limiter doesn't slow it, and the 5 s tick starts another chain every time. The survey executor hits this in its normal state right after any arrival (docked at the target). Most likely what filled the database. | `NavigateToWaypointCommand.cs:82-96`, `ShipNavigationCompletedHandler.cs:26`, `SurveyWaypointGoalExecutor.cs:52`, `ScoutWaypointGoalExecutor.cs:41`, `DeployProbeGoalExecutor.cs:48`, `MineAndSellGoalExecutor.cs:106` | 1.1 (done) |
-| B2 | **The Wolverine inbox is probably never cleaned.** Every published message is stored in Postgres. Turning the durability agent off very likely also turns off the deletion of handled messages (about 80% sure; Wolverine's source was not checked for this version). | `Program.cs:180`, `Program.cs:189-191` | 1.3 |
+| B2 | **The Wolverine inbox is never cleaned.** Every published message is stored in Postgres. Turning the durability agent off also turns off the deletion of handled messages: confirmed against Postgres in 1.3, where 50 handled messages were all still there a minute later (with the agent on they were gone). | `Program.cs:180`, `Program.cs:189-191` | 1.3 (done) |
 | B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good. | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.5 |
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 |
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
@@ -166,7 +166,7 @@ cluster (phase 4).
   - A blocked goal stays blocked until a plan replaces it. The scout plan never does, so a
     tripped scout ship waits for someone to look at it.
 
-**1.3 Stop storing in-process messages (B2)**
+**1.3 Stop storing in-process messages (B2)** (done)
 - Background: the durable queues were added on purpose, as an outbox. A message is stored in the
   same transaction as the database change, so a crash can't lose it (phase 2 of
   `docs/archive/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md`). The same document names startup
@@ -178,6 +178,19 @@ cluster (phase 4).
     `scheduled_ship_events` to resume ships after a restart. If nothing else needs Wolverine's
     Postgres storage, drop `PersistMessagesWithPostgresql` too.
 - Done when: the soak test (1.14) shows no `wolverine` tables, or flat ones.
+- Done:
+  - Chosen: no Postgres message storage at all. `UseDurableLocalQueues()`,
+    `PersistMessagesWithPostgresql`, the unused EF Core transaction middleware (no handler used
+    it, so messages were never stored in the same transaction as the data) and
+    `UseResourceSetupOnStartup` are gone, and so are the two Wolverine packages they needed.
+  - Why not the durability agent: it would clean up, but every published message would still be
+    written to Postgres and deleted again, and nothing here needs it. A crash loses the messages
+    in flight; startup sync, startup recovery and `scheduled_ship_events` already cover that.
+  - `MessageStorageIntegrationTests` starts the host as on the cluster against an empty Postgres:
+    it created 8 `wolverine` tables before, none now. The soak test still has to show it in a
+    real run.
+  - `OutboxReplayIntegrationTests` is gone: it tested Wolverine's durable scheduling, which the
+    app doesn't use.
 
 **1.4 Short agent identity, old agents cleaned up (B4, part of B3)**
 - Do: key rows on a short agent id (agent symbol plus reset date, or a small surrogate key)

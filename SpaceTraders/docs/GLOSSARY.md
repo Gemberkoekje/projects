@@ -18,7 +18,6 @@ decisions).
 | **Dead-Letter Queue** | Not used. A failed message is retried three times (after 250 ms, 500 ms and 1 s) and then discarded (`SpaceTraders.Application/DependencyInjection.cs`). |
 | **DelegatingHandler** | An ASP.NET Core `HttpMessageHandler` that wraps the inner handler to add cross-cutting behaviour (rate limiting, retries) transparently to callers. |
 | **Domain Event** | Two kinds exist. *Bus events* are published through Wolverine and handled by zero or more handlers (for example `ShipInTransitEvent`, `ShipNavigationCompletedEvent`). *Aggregate events* are raised inside domain aggregates (`AggregateRoot.RaiseDomainEvent`) but never dispatched, so nothing handles them (B7). |
-| **Durable Local Queue** | Wolverine stores every published message in the PostgreSQL `wolverine` schema before handling it, so a crash can't lose it. Configured in `SpaceTraders.API/Program.cs` with `PersistMessagesWithPostgresql(...)` and `UseDurableLocalQueues()`. Handled messages are probably never deleted, because the durability agent is off (B2). |
 | **EF Core** | Entity Framework Core – the ORM used to map C# entities to PostgreSQL tables. The schema itself is created and extended at startup by `SpaceTradersDatabaseInitializer`, not by EF migrations. |
 | **Fleet** | All ships owned by the agent. |
 | **GameLoopService** | The leader-only loop that runs every 5 seconds: it bootstraps the five plans, steps every ship's active goal, drives contract assignments and publishes API availability changes. |
@@ -34,6 +33,7 @@ decisions).
 | **State-gated command** | A ship command that checks the ship's cached state (docked, in orbit, in transit) before calling the API. When the state is wrong, it publishes `ShipStateMismatchEvent` instead. |
 | **Stateless** | A .NET state-machine library. The application project references it, but no code uses it. |
 | **Request Budget** | `RequestBudget`, the client's copy of the API guide's limit: 2 requests in any second and, once those are used, up to 30 more in any 60 seconds. Both windows slide, so the client never exceeds a fixed window the server counts in. A singleton, so it survives the HttpClient factory recreating its handlers. |
+| **Local Queue** | Wolverine's in-process queue for published messages, kept in memory. Until slice 1.3 it was a *durable* local queue that also stored every message in Postgres, and with Wolverine's durability agent off it never deleted a handled one (B2). |
 | **Tick** | One pass of `GameLoopService`. |
 | **WebUI** | The React/Vite dashboard in `SpaceTraders.WebUI`, served at `/spacetraders/dashboard`. It reads the internal API with the `X-Api-Key` header and listens to the SignalR hub for refresh hints. |
-| **Wolverine** | The in-process command/event bus used in place of MediatR. Provides convention-based handler discovery, retry policies, and PostgreSQL-backed durable local queues. |
+| **Wolverine** | The in-process command/event bus used in place of MediatR. Provides convention-based handler discovery, retry policies and in-memory local queues. |

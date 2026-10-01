@@ -39,14 +39,11 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
   `Serilog` section of `appsettings*.json`: Information by default, Warning for ASP.NET Core,
   EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
   `Application=SpaceTraders.API`.
-- **Wolverine** discovers handlers in the Application assembly. Outside the `Testing`
-  environment it adds:
-  - EF Core transactions (Eager);
-  - message storage in the PostgreSQL `wolverine` schema;
-  - durable local queues.
-
-  The durability agent is off in every environment (B2). Any handler exception is retried
-  after 250 ms, 500 ms and 1 s, then the message is discarded.
+- **Wolverine** discovers handlers in the Application assembly and keeps messages in memory:
+  nothing goes to Postgres. A crash loses the messages still in flight; after the restart,
+  startup sync and startup recovery pick the ships up again, and pending arrivals wait in
+  `scheduled_ship_events`. Any handler exception is retried after 250 ms, 500 ms and 1 s, then
+  the message is discarded.
 - **Health checks:**
   - `/health/live` runs no checks.
   - `/health/ready` checks the database.
@@ -430,7 +427,7 @@ production code doesn't use the aggregates at all (B7).
   plan that is switched off could otherwise still run from an event.
 - **`InvokeAsync`** runs a command inline, and its exceptions reach the caller. Executors and
   the tick use it.
-- **`PublishAsync`** goes through the durable local queues. All events use it, as do
+- **`PublishAsync`** goes through in-memory local queues. All events use it, as do
   `DeployProbeCommand` and `NavigateToWaypointArrivedCommand`.
 
 ---
@@ -443,8 +440,7 @@ production code doesn't use the aggregates at all (B7).
   idempotent raw DDL: `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE/INDEX IF NOT EXISTS`, and widening
   of the token columns. On an empty database this order may fail (B21).
 - Settings are seeded only once an agent token is known.
-- Wolverine creates its own tables in the `wolverine` schema when the host starts
-  (`UseResourceSetupOnStartup`).
+- Wolverine stores nothing in the database.
 
 ### Agent scoping
 
@@ -479,7 +475,6 @@ production code doesn't use the aggregates at all (B7).
 | `ship_task_records` | Task timeline | Nothing | 30 days |
 | `trade_opportunities`, `fleet_goals`, `ship_goal_history`, `cached_construction_sites`, `scheduled_runs` | — | Nothing | — |
 | `scout_plan_states` | Legacy scout plan | Nothing; copied into `plan_states` at startup | never |
-| `wolverine.*` | Stored messages | Every published message | probably never (B2) |
 
 ---
 
@@ -710,7 +705,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
 | `SpaceTraders.Application.Tests` | ~253 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~66 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.API.Tests` | ~67 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 **WebUI tests:**

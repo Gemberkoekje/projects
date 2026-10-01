@@ -1,6 +1,3 @@
-using ImTools;
-using JasperFx.MultiTenancy;
-using JasperFx.Resources;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,10 +17,6 @@ using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
-using Wolverine;
-using Wolverine.EntityFrameworkCore;
-using Wolverine.Persistence;
-using Wolverine.Postgresql;
 
 const string PathBase = "/spacetraders/api";
 
@@ -72,13 +65,11 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.Enrich.FromLogContext();
     cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
 });
-if (!builder.Environment.IsEnvironment("Testing"))
-{
-    builder.Host.UseResourceSetupOnStartup();
-}
 
+// Wolverine keeps messages in memory: nothing is stored in Postgres (B2). After a restart, startup
+// sync and startup recovery pick the ships up again, and arrivals wait in scheduled_ship_events.
 builder.Services
-    .AddApplication(opts => ConfigureWolverine(opts, builder.Configuration, builder.Environment))
+    .AddApplication()
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {
@@ -174,32 +165,6 @@ await app.RunAsync();
 if (startupState.HasFailed)
 {
     Environment.ExitCode = 1;
-}
-
-static void ConfigureWolverine(
-    WolverineOptions options,
-    IConfiguration configuration,
-    IHostEnvironment environment)
-{
-    var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-        throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
-    }
-
-    options.Durability.DurabilityAgentEnabled = false;
-
-    if (environment.IsEnvironment("Testing"))
-    {
-        // Do not connect to Postgres in test/DI-validation hosts; keep in-memory message persistence.
-        return;
-    }
-
-    options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
-    options.PersistMessagesWithPostgresql(connectionString, "wolverine")
-        .Enroll<SpaceTradersDbContext>();
-    options.Policies.UseDurableLocalQueues();
 }
 
 /// <summary>Entry point marker for the SpaceTraders API; used by WebApplicationFactory in integration tests.</summary>
