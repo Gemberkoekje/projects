@@ -8,10 +8,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using Wolverine.Runtime;
 
@@ -57,6 +59,24 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
         handlerTypes.Should().NotContain(typeof(ContractPlanService))
             .And.NotContain(typeof(MiningAutomationService))
             .And.NotContain(typeof(TradingAutomationService));
+    }
+
+    [Fact]
+    public void CreditChanges_RaiseNoCreditDropAlert()
+    {
+        // D12: credits only drop when the bot spends them (ships, cargo, fuel), so a credit-drop
+        // alert could only report the bot's own spending. It is gone (B37).
+        var runtime = (WolverineRuntime)_factory.Services.GetRequiredService<IWolverineRuntime>();
+        var chains = runtime.Handlers.Chains.SelectMany(chain => chain.ByEndpoint.Prepend(chain));
+
+        var handlerTypes = chains
+            .Where(chain => chain.MessageType == typeof(AgentCreditsChangedEvent))
+            .SelectMany(chain => chain.HandlerCalls())
+            .Select(call => call.HandlerType)
+            .ToList();
+
+        handlerTypes.Should().Contain(typeof(AgentCreditsSampleHandler))
+            .And.NotContain(typeof(AlertHandler));
     }
 
     [Fact]

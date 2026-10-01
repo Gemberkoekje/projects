@@ -26,6 +26,17 @@ public sealed class DefaultSettingsSeedTests
         "Database.SoftLimitMegabytes",
         "Database.HardLimitMegabytes",
 
+        // The health rules' thresholds (phase 3): ContractStalledRule, ContractDeadlineAtRiskRule,
+        // ShipStuckRule, ShipLeftIdleRule, RepeatingErrorRule, CreditsUnchangedRule, ApiThrottledRule.
+        "Health.Contract.MaxHoursWithoutProgress",
+        "Health.Contract.DeadlineHours",
+        "Health.Contract.MinDeliveredPercent",
+        "Health.Ship.MaxMinutesWithoutChange",
+        "Health.Ship.MaxIdleMinutes",
+        "Health.Errors.MaxRepeatsIn10Minutes",
+        "Health.Credits.MaxHoursUnchanged",
+        "Health.Api.Max429sPerHour",
+
         // BudgetPolicy, MiningAutomationService, DataRetention, WebhookAlertNotifier.
         "FleetExpansion.MinCreditReserve",
         "Mining.MaxDrones",

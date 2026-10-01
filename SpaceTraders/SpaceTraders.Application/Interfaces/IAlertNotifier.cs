@@ -1,7 +1,7 @@
 namespace SpaceTraders.Application.Interfaces;
 
 /// <summary>
-/// Sends operator notifications for significant game events (credit drop, contract failure, fleet cap).
+/// Sends operator notifications for significant game events (see <c>AlertHandler</c>).
 /// </summary>
 public interface IAlertNotifier
 {

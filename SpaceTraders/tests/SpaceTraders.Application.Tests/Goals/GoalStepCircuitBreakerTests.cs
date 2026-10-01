@@ -15,7 +15,7 @@ public sealed class GoalStepCircuitBreakerTests
 {
     private const int RecursionCap = 1_000;
 
-    private static readonly DateTimeOffset Start = new(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = new(2026, 10, 01, 12, 00, 00, TimeSpan.Zero);
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
@@ -122,6 +122,24 @@ public sealed class GoalStepCircuitBreakerTests
 
         breaker.RecordStep("SHIP-1", 3, Start).Should().BeTrue();
         breaker.RecordStep("SHIP-1", 3, Start).Should().BeFalse();
+    }
+
+    [Fact]
+    public void LastTrips_RemembersWhenEachShipLastTripped()
+    {
+        // Phase 3: a plan may replace a blocked goal at once (mining and trading do), so the
+        // CircuitBreakerTripped rule needs the trip itself, not only the blocked goal.
+        var breaker = new GoalStepCircuitBreaker();
+
+        for (var step = 0; step < 3; step++)
+        {
+            breaker.RecordStep("SHIP-1", 3, Start);
+            breaker.RecordStep("SHIP-2", 3, Start);
+        }
+
+        breaker.RecordStep("SHIP-1", 3, Start.AddSeconds(10));
+
+        breaker.LastTrips.Should().Equal(new Dictionary<string, DateTimeOffset> { ["SHIP-1"] = Start.AddSeconds(10) });
     }
 
     private ShipGoalExecutorService CreateService(IShipGoalExecutor executor) =>

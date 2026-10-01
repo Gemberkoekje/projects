@@ -1,6 +1,7 @@
 using System.Net;
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Metrics;
 
@@ -29,6 +30,7 @@ public sealed class ApiEndpointTemplateTests
 public sealed class ApiRequestMetricsHandlerTests
 {
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly ApiResponseLog _responses = new();
 
     [Fact]
     public async Task EveryResponse_IsCountedByMethodTemplateAndStatus()
@@ -51,6 +53,10 @@ public sealed class ApiRequestMetricsHandlerTests
 
         _metrics.Received(1).ApiRequest("GET", "my/agent", "429");
         _metrics.Received(1).ApiThrottled("rate_limiter");
+
+        // The ApiThrottled health rule reads the 429s from the log.
+        _responses.Since(DateTimeOffset.MinValue).Should().ContainSingle()
+            .Which.Should().Match<ApiProblemResponse>(response => response.StatusCode == 429 && response.Endpoint == "my/agent" && response.Source == "rate_limiter");
     }
 
     [Fact]
@@ -62,9 +68,28 @@ public sealed class ApiRequestMetricsHandlerTests
     }
 
     [Fact]
+    public async Task A401_GoesToTheResponseLog()
+    {
+        // The ApiUnauthorized health rule reads the 401s from the log.
+        await SendAsync(HttpMethod.Get, "https://api.spacetraders.io/v2/my/ships/AGENT-1", () => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+
+        _metrics.Received(1).ApiRequest("GET", "my/ships/{shipSymbol}", "401");
+        _responses.Since(DateTimeOffset.MinValue).Should().ContainSingle()
+            .Which.Should().Match<ApiProblemResponse>(response => response.StatusCode == 401 && response.Endpoint == "my/ships/{shipSymbol}");
+    }
+
+    [Fact]
+    public async Task OtherResponses_StayOutOfTheResponseLog()
+    {
+        await SendAsync(HttpMethod.Get, "https://api.spacetraders.io/v2/my/agent", () => new HttpResponseMessage(HttpStatusCode.BadRequest));
+
+        _responses.Since(DateTimeOffset.MinValue).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ARequestWithoutResponse_CountsAsAnError()
     {
-        using var handler = new ApiRequestMetricsHandler(_metrics)
+        using var handler = new ApiRequestMetricsHandler(_metrics, _responses)
         {
             InnerHandler = new CallbackMessageHandler(_ => throw new HttpRequestException("connection refused")),
         };
@@ -79,7 +104,7 @@ public sealed class ApiRequestMetricsHandlerTests
 
     private async Task SendAsync(HttpMethod method, string url, Func<HttpResponseMessage> respond)
     {
-        using var handler = new ApiRequestMetricsHandler(_metrics) { InnerHandler = new CallbackMessageHandler(_ => respond()) };
+        using var handler = new ApiRequestMetricsHandler(_metrics, _responses) { InnerHandler = new CallbackMessageHandler(_ => respond()) };
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(method, url);
         using var received = await invoker.SendAsync(request, CancellationToken.None);

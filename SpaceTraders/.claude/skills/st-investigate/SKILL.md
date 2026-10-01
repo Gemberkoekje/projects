@@ -5,12 +5,13 @@ description: Investigate SpaceTraders bot misbehaviour on the home cluster and f
 
 # st-investigate
 
-> Draft of 2026-10-01 (PLAN.md slice 5.1). Parts depend on later phases: metrics and journal
-> events arrive in phase 2, anomalies in phase 3, the read-only database login in slice 4.1.
-> Use whatever exists; check what does before relying on it.
+> Draft of 2026-10-01 (PLAN.md slice 5.1). Parts depend on later phases: metrics, the journal
+> (phase 2) and the anomalies (phase 3) exist once the bot is deployed (phase 4), and the read-only
+> database login comes with slice 4.1. Use whatever exists; check what does before relying on it.
 
 Arguments: `$ARGUMENTS` is one of:
-- an anomaly (`<rule> <subject>`, for example `contract-no-progress CONTRACT-123`);
+- an anomaly (`<rule> <subject>`, for example `ContractStalled cmup71is3f88dt06vr7h29pbw` or
+  `ShipStuck SPECTER-3`);
 - a ship symbol or contract id;
 - a short description of the symptom;
 - `week`, for a review of the last 7 days.
@@ -49,15 +50,15 @@ read-only and also fine for pod status and events.
 | Internal API | LAN only (D11): `curl -H "X-Api-Key: $KEY" http://192.168.1.230/spacetraders/api/...`. Fallback: `kubectl -n spacetraders port-forward svc/spacetraders-api-service 8080:80` and `http://localhost:8080/spacetraders/api/...` | The bot's own views: `/status/agent`, `/status/ships`, `/status/ships/{symbol}/diagnostics`, `/status/contracts`, `/status/activity`, `/fleet/assignments`, `/health/automation` | When deployed (needs the internal API key) |
 | Prometheus | Grafana, or `kubectl -n monitoring port-forward svc/prometheus-server 9090:80` | `spacetraders_*` metrics (scraped from the pod's port 9090): credits, credits earned and spent, ships by role and state, each ship's state with goal and blocked reason, contract units, API requests by endpoint and status, 429s, rate-limit waits, messages by type, goal steps, breaker trips, anomalies, DB size, next reset. `docs/HOW_IT_WORKS.md` section 11 lists them | Since phase 2, once deployed |
 | Journal events | Loki: `{namespace="spacetraders"} \| json \| EventKind != ""` | Timeline of contracts, purchases and sales, plans, idle and blocked ships, setting changes, resets and anomalies (`JournalEvents`) | Since phase 2, once deployed |
-| Anomalies | Prometheus `spacetraders_anomaly_active == 1`; Loki events `AnomalyRaised` and `AnomalyCleared` | Which intended behaviour is broken, and since when | After phase 3 |
+| Anomalies | Prometheus `spacetraders_anomaly_active == 1`; Loki events `AnomalyRaised` (with `Details`) and `AnomalyCleared` | Which intended behaviour is broken, for which subject, and since when. `docs/HOW_IT_WORKS.md` section 12 lists the rules | Since phase 3, once deployed |
 
 Check what exists before relying on it. In Grafana Explore, a Prometheus query of
 `{__name__=~"spacetraders_.*"}` lists the bot's metrics.
 
 ### Useful queries
 
-Production logs are compact JSON (CLEF): `@mt` is the message template, and `@l` is present only
-for levels other than Information.
+Production logs are compact JSON with the rendered message (CLEF): `@m` is the message, `@i` an id
+of its template, and `@l` is present only for levels other than Information.
 
 ```logql
 # Errors and warnings, newest first
@@ -69,6 +70,9 @@ sum(count_over_time({namespace="spacetraders"} |= "\"@l\":\"Error\"" [1h]))
 
 # Everything about one ship (always ShipSymbol since slice 1.9)
 {namespace="spacetraders"} | json | ShipSymbol="SHIP-SYMBOL-HERE"
+
+# Anomalies raised and cleared, with what was wrong
+{namespace="spacetraders"} | json | EventKind=~"Anomaly.*" | line_format "{{.EventKind}} {{.Rule}} {{.Subject}}: {{.Details}}"
 
 # The journal: a timeline of the run
 {namespace="spacetraders"} | json | EventKind != "" | line_format "{{.EventKind}} {{.ShipSymbol}}{{.ContractId}} {{.Reason}}"
@@ -90,6 +94,23 @@ WHERE c.relkind IN ('r','p') ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 1
 ```
 
 `docs/HOW_IT_WORKS.md` lists every table and what writes it.
+
+### Where an anomaly points
+
+Each rule writes down an intended behaviour (`docs/HOW_IT_WORKS.md` section 12); its `Details` say
+what it saw. Where to start:
+
+| Rule | Start with |
+|---|---|
+| `ContractStalled`, `ContractDeadlineAtRisk` | The contract plan's state and its ship: the contract's journal (`ContractDelivered`, `PlanBlocked`), then `ShipStuck` or `ShipLeftIdle` for the plan's ship |
+| `ContractLeftOpen` | `ContractPlanService.AdvanceActivePlanAsync` (B9's fix) and errors from the contract plan's bootstrap |
+| `ShipStuck` | Everything about the ship (`ShipSymbol`), its goal step's errors, and B17 (ships that stay "in transit") |
+| `ShipLeftIdle` | The plan named in `Details`: why it doesn't take the ship (B25 for the starting probe) |
+| `CircuitBreakerTripped` | The ship's goal steps just before the trip: a loop like B1 |
+| `RepeatingError` | The statement in the subject: find it in the code, then its `@i` in Loki for every occurrence |
+| `CreditsUnchanged` | The ships with work (in `Details`) and the ledger: is anything spending or earning? |
+| `ApiUnauthorized`, `ApiThrottled` | API requests by endpoint and status; a 401 that isn't a reset (`ResetDetected`) means a rejected token |
+| `DbSizeSoftLimit`, `DbSizeHardLimit` | The biggest tables (query above) and their retention (`docs/HOW_IT_WORKS.md` section 6) |
 
 ## Procedure for one symptom
 
@@ -119,8 +140,8 @@ WHERE c.relkind IN ('r','p') ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 1
 
 1. Collect the last 7 days:
    - restarts and crash loops;
-   - errors grouped by `@mt` (count, first and last seen);
-   - anomalies opened and cleared (after phase 3);
+   - errors and warnings grouped by `@i` (count, first and last seen);
+   - anomalies raised and cleared;
    - ships idle or stuck;
    - contract progress;
    - table sizes;

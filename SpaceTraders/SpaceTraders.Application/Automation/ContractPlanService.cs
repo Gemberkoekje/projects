@@ -725,7 +725,8 @@ public sealed class ContractPlanService(
         // An existing assignment's remaining units are kept current by AdvanceActivePlanAsync.
     }
 
-    private static bool IsMineralSymbol(string tradeSymbol)
+    /// <summary>Whether the plan mines <paramref name="tradeSymbol"/>; other deliverables are parked (D2).</summary>
+    internal static bool IsMineralSymbol(string tradeSymbol)
     {
         if (string.IsNullOrWhiteSpace(tradeSymbol))
         {
