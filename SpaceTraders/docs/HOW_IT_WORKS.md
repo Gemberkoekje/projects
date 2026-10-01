@@ -74,17 +74,18 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 2 | `ShipEventScheduler` | keeps running | Arrival timers. Skipped in `Testing` |
 | 3 | `DataRetentionService` | at start, then daily | Prunes every table by its policy; see [Retention](#retention) |
 | 4 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
-| 5 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
-| 6 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
-| 7 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
-| 8 | `StartupSnapshotService` | once | One JSON snapshot row |
-| 9 | `StartupRecoveryService` | once | Resumes ships |
-| 10 | `SettingsStartupLoggingService` | once | Logs every setting |
-| 11 | `GameLoopService` | every 5 s | The tick |
-| 12 | `PrometheusMetricsService` | every 10 s | |
+| 5 | `DatabaseSizeGuardService` | at start, then every 5 min | See [Database size guard](#database-size-guard) |
+| 6 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
+| 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
+| 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
+| 9 | `StartupSnapshotService` | once | One JSON snapshot row |
+| 10 | `StartupRecoveryService` | once | Resumes ships |
+| 11 | `SettingsStartupLoggingService` | once | Logs every setting |
+| 12 | `GameLoopService` | every 5 s | The tick |
+| 13 | `PrometheusMetricsService` | every 10 s | |
 
-One try/catch wraps the chain. Steps 8 and 10 catch their own errors. A throw in steps 1, 4, 5, 7
-or 9 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
+One try/catch wraps the chain. Steps 5, 9 and 11 catch their own errors. A throw in steps 1, 4, 6,
+8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
 stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
 before any of those, so a pod that keeps failing during startup still prunes at every start.
 
@@ -474,6 +475,20 @@ production code doesn't use the aggregates at all (B7).
   20 goods, 90 days), the `NOT IN` it replaces didn't finish within 3 minutes; this takes about 5
   seconds, within the 30 s command timeout.
 
+### Database size guard
+
+`DatabaseSizeGuardService` keeps the bot from filling the Postgres volume it shares with every
+other app (D8):
+- It reads `pg_database_size` at start, before the rest of startup goes on, and then every 5
+  minutes, and exports it as `spacetraders_db_size_bytes`.
+- Above `Database.SoftLimitMegabytes` (1024) it logs `DbSizeSoftLimit` at Warning, once per
+  crossing.
+- Above `Database.HardLimitMegabytes` (3072) it switches `Automation.Enabled` off and logs
+  `DbSizeHardLimit` at Error. It switches automation off again at every check while the
+  database stays above the limit, so switching it back on only lasts once the database is smaller.
+- Back under the soft limit it logs `DbSizeNormal`.
+- Until there are anomalies (phase 3), these logs and the metric are how it shows.
+
 ### Tables
 
 | Table | Holds | Written by | Retention |
@@ -518,7 +533,7 @@ production code doesn't use the aggregates at all (B7).
 
 ### What each setting does
 
-Only 12 of the 54 seeded settings change what the bot does (B18):
+Only 14 of the 56 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
@@ -526,6 +541,7 @@ Only 12 of the 54 seeded settings change what the bot does (B18):
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
+| `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
@@ -687,6 +703,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_api_throttled_total` | Yes, one per 429 response |
   | `spacetraders_agent_credits` | Never (B7) |
   | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
+  | `spacetraders_db_size_bytes` | Yes, every 5 minutes (size guard) |
 
   `/metrics` requires the API key (B11), so Prometheus can't scrape it as deployed.
 
@@ -733,8 +750,8 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~249 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~70 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.Application.Tests` | ~255 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 

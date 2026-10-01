@@ -246,12 +246,22 @@ cluster (phase 4).
     markets, 20 goods, 90 days), the old `NOT IN` was cancelled after 3 minutes, still running:
     Postgres compared every row with a list too big to hash in `work_mem`. The new one took 5 s.
 
-**1.6 Database size guard**
+**1.6 Database size guard** (done)
 - Goal: the bot can't fill the shared Postgres volume or the NAS share.
 - Do: every few minutes, read `pg_database_size(current_database())` and export it as
   `spacetraders_db_size_bytes`. Above the soft limit, raise an anomaly; above the hard limit,
   pause automation (this needs 1.7). The limits are settings, starting at 1 GB and 3 GB (D8).
 - Done when: tests with a fake size source cover both limits.
+- Done:
+  - `DatabaseSizeGuardService` reads the size every 5 minutes and exports it. The limits are
+    `Database.SoftLimitMegabytes` (1024) and `Database.HardLimitMegabytes` (3072).
+  - Until phase 3, the "anomaly" for the soft limit is a `DbSizeSoftLimit` warning, logged once
+    per crossing. Above the hard limit it switches `Automation.Enabled` off and logs
+    `DbSizeHardLimit`; while the database stays above it, every check switches automation off
+    again.
+  - Its first check runs before the rest of startup goes on, so a database already above the
+    hard limit has automation off before the tick starts (and before the startup snapshot reads
+    the switch, which would otherwise switch it back on).
 
 **1.7 A kill switch that works (B5), and one switch per plan (D9)** (done)
 - Do:

@@ -66,6 +66,10 @@ public sealed class DeferredStartupHostedService(
             // from running.
             await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
+
+            // Needs the agent: its limits are settings, and over the hard limit it switches the
+            // agent's automation off.
+            await StartServiceAsync<DatabaseSizeGuardService>(cancellationToken);
             await StartServiceAsync<RunLifecycleService>(cancellationToken);
             await StartServiceAsync<LeaderElectionService>(cancellationToken);
             await StartServiceAsync<StartupSyncService>(cancellationToken);

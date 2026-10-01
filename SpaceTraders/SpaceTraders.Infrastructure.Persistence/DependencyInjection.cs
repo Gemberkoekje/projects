@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IContractMineralPlanRepository, ContractMineralPlanRepository>();
         services.AddScoped<IProbeDeploymentPlanRepository, ProbeDeploymentPlanRepository>();
         services.AddScoped<IDataRetention, DataRetention>();
+        services.AddScoped<IDatabaseSize, PostgresDatabaseSize>();
 
         // Phase 14b: scheduler fires ShipArrivedEvent / ShipCooldownExpiredEvent at the correct time.
         // It is started by DeferredStartupHostedService after database initialization completes.
