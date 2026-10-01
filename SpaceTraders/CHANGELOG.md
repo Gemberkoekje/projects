@@ -8,7 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Docs – Added (2026-10-01)
-- `PLAN.md`: the plan for getting the bot safely back on the cluster, with the known issues (B1–B13) and the decisions taken (D1–D8).
+- `PLAN.md`: the plan for getting the bot safely back on the cluster, with the known issues found by reading the code (B1–B25) and the decisions (D1–D11, three still open).
 - `docs/HOW_IT_WORKS.md`: what the code does today, written from the code.
 - `docs/archive/README.md`: an index of the archived documents.
 - `.claude/skills/st-investigate/SKILL.md`: draft of the skill Claude uses to investigate and fix misbehaviour.

@@ -67,7 +67,19 @@ with a test that does.
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 6.2 |
 | B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. Separately, `spacetraders_api_throttled_total` counts every 25 ms local wait as a throttle. | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 |
-| B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second. | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 |
+| B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 |
+| B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 |
+| B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
+| B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | 6.2, 6.4 |
+| B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 |
+| B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 |
+| B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 |
+| B20 | **A restart clears every ship's active goal.** Startup sync overwrites each existing ship row with `SetValues(new CachedShip { … })`, and that object doesn't carry the goal columns, so they become null.<br>• A scout ship whose assignment already matches the current route step doesn't get its goal back.<br>• Arrival wake-ups scheduled before the restart no longer match any goal (B17). | `StartupSyncService.cs:106-130` | 1.12 |
+| B21 | **On an empty database the app tables may never be created** (to verify). `EnsureCreatedAsync` does nothing when the database already holds any table. Wolverine creates its `wolverine` tables when the host starts, before the deferred initializer runs, so the initializer's `ALTER TABLE` statements would then fail. The cluster's database will be empty on redeploy. | `SpaceTradersDatabaseInitializer.cs:12`, `Program.cs:75-78`, `DeferredStartupHostedService.cs:22-30` | 1.13 |
+| B22 | **The dashboard publishes the internal API key.** The WebUI container writes the key into `config.js`, which anyone who can open the dashboard can read. The old ingress served both the dashboard and the API on the public `gemberkoekje.nl`, so anyone could call `PUT /settings/*` and `POST /control/*`. | `SpaceTraders.WebUI/docker-entrypoint.sh:11-29`, `SpaceTraders.WebUI/index.html:17`; gembernodes `3f9f785^:ingress/spacetraders-ingress.yaml` | 4.2 |
+| B23 | **A failed startup leaves an idle pod that looks healthy.** One try/catch wraps the startup chain. If database init, agent bootstrap, the run lifecycle, startup sync or recovery throws, the later services (the tick and pruning among them) never start, and nothing retries. `/health/live` runs no checks, and the old deployment used it for the startup and liveness probes, so Kubernetes never restarts the pod. | `DeferredStartupHostedService.cs:57-89`, `Program.cs:146` | 1.11 |
+| B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
+| B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
 
 ### Decisions (2026-10-01)
 
@@ -84,6 +96,9 @@ get the next D-number.
 | D6 | Exclude the `spacetraders` database from the nightly `pg_dumpall`? | **No change.** The size guard (1.6) keeps the database small, and the dump stays the consistent copy. A file-level copy of a running Postgres can only be restored reliably if the NAS snapshot is atomic. |
 | D7 | Delete `SpaceTradersV3/`? | **Done 2026-10-01.** |
 | D8 | Size guard limits (slice 1.6). | **Soft limit 1 GB** (anomaly), **hard limit 3 GB** (pause automation). |
+| D9 | Which plans run in the first run after the redeploy? All five run on every tick today, and nothing can switch one off; slice 1.7 adds the switches. | **Open.** Suggestion: scout and contract only. Probes, mining and trading come on one at a time in phase 6, after their known issues (B15–B17, B25) are fixed. |
+| D10 | Remove the settings that nothing reads (B18), or keep them as placeholders? | **Open.** Suggestion: remove them from the seed, so the settings page shows only settings that work. A feature that needs one adds it back. |
+| D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **Open.** Suggestion: LAN only, like Grafana (`whitelist-source-range` on the ingress). That also keeps the key in `config.js` off the internet. |
 
 ## Phases
 
@@ -102,7 +117,7 @@ cluster (phase 4).
   `spacetraders.md` (solution overview: stack, configuration, conventions), `CONTRIBUTING.md` and
   `CHANGELOG.md`.
 
-**0.3 `docs/HOW_IT_WORKS.md`**
+**0.3 `docs/HOW_IT_WORKS.md`** (done; kept current by every PR that changes behaviour)
 - Do: describe the current runtime from the code:
   - the startup chain;
   - the 5 s tick and the plans it bootstraps;
@@ -143,7 +158,7 @@ cluster (phase 4).
   - **Remove `UseDurableLocalQueues()`** and rely on `StartupRecoveryService` and
     `scheduled_ship_events` to resume ships after a restart. If nothing else needs Wolverine's
     Postgres storage, drop `PersistMessagesWithPostgresql` too.
-- Done when: the soak test (1.11) shows no `wolverine` tables, or flat ones.
+- Done when: the soak test (1.14) shows no `wolverine` tables, or flat ones.
 
 **1.4 Short agent identity, old agents cleaned up (B4, part of B3)**
 - Do: key rows on a short agent id (agent symbol plus reset date, or a small surrogate key)
@@ -169,10 +184,15 @@ cluster (phase 4).
   pause automation (this needs 1.7). The limits are settings, starting at 1 GB and 3 GB (D8).
 - Done when: tests with a fake size source cover both limits.
 
-**1.7 A kill switch that works (B5)**
-- Do: the tick, the plan bootstraps and scheduler-triggered goal steps all respect
-  `Automation.Enabled`.
-- Done when: a test shows a tick with automation disabled issues no ship commands.
+**1.7 A kill switch that works (B5), and one switch per plan (D9)**
+- Do:
+  - make the tick, the plan bootstraps and scheduler-triggered goal steps all respect
+    `Automation.Enabled`;
+  - add one setting per plan (`Automation.Plan.Scout.Enabled`, `.Contract`,
+    `.ProbeDeployment`, `.Mining`, `.Trading`). The tick skips a disabled plan's bootstrap.
+    Defaults follow D9.
+- Done when: tests show that a tick with automation disabled issues no ship commands, and that a
+  disabled plan neither bootstraps nor buys anything.
 
 **1.8 Server reset during a run (B6)**
 - Do: a 401 with the reset-date error pauses automation, logs `ResetDetected`, and stops the
@@ -210,10 +230,30 @@ cluster (phase 4).
   - after redeploy, the count of real 429s stays at zero, which confirms the burst reading (the
     429 rule in 3.2 watches this).
 
-**1.11 Soak test**
-- Do: run locally (Postgres in Docker) against the live API for a few hours with all of phase 1
-  in, while the cluster bot is off. Every 15 minutes, record table sizes and message counts.
-- Done when: tables grow only with real game activity (market samples, ledger), nothing in
+**1.11 Failures don't silently stop work (B14, B23)**
+- Do:
+  - run each tick step (each plan bootstrap, each ship's goal step, each contract assignment)
+    in its own try/catch that logs the step and the ship;
+  - make a failing startup chain stop the host, so Kubernetes restarts the pod with back-off;
+  - use `/health/startup` for the startup probe (4.2).
+- Done when: tests show that a throwing plan doesn't stop the other plans or the ship steps, and
+  that a throwing startup step stops the host.
+
+**1.12 Restarts keep ship goals (B20)**
+- Do: startup sync updates a ship's game state without touching its goal columns.
+- Done when: a test syncs a ship that has an active goal, and the goal is still there afterwards.
+
+**1.13 An empty database gets every table (B21)**
+- Do: check against an empty Postgres. If B21 is confirmed, create the app tables explicitly, or
+  initialise them before Wolverine sets up its storage.
+- Done when: starting against an empty database creates every app table, and an integration test
+  covers it.
+
+**1.14 Soak test**
+- Do: start from an empty local database (Postgres in Docker), and run against the live API for a
+  few hours with all of phase 1 in, while the cluster bot is off. Every 15 minutes, record table
+  sizes and message counts.
+- Done when: tables grow only with real game activity (ledger, activity log), nothing in
   `wolverine` grows, and the breaker never trips.
 
 ### Phase 2: Visibility
@@ -244,11 +284,15 @@ its own retention, so the bot's database stays small.
     - next reset time.
 - Done when: a local scrape returns all of them without an API key.
 
-**2.2 Publish the missing events (B7)**
-- Do: dispatch aggregate domain events, or publish where the change happens, so that credit
-  changes, sales, purchases, contract payments and ship purchases reach the ledger and the
-  metrics.
-- Done when: tests show each of those four producing a ledger row and moving its counter.
+**2.2 Record what happens (B7, B19)**
+- Do:
+  - dispatch aggregate domain events, or publish where the change happens, so that credit
+    changes, sales, purchases, contract payments and ship purchases reach the ledger and the
+    metrics;
+  - read the trade-goods JSON case-insensitively in `MarketPriceSampleRepository`, like
+    `MarketRepository` does, so price history gets recorded.
+- Done when: tests show each of those four producing a ledger row and moving its counter, and a
+  market refresh writing price samples.
 
 **2.3 Journal events**
 - Do: write one Information event per meaningful thing, each with an `EventKind` and the standard
@@ -285,6 +329,11 @@ its own retention, so the bot's database stays small.
   - log volume is over budget;
   - add `spacetraders` to the existing error-log rule.
 - Grafana only reads this file at startup, so it needs a rollout restart.
+
+**2.6 Only settings that do something (B18, D10)**
+- Do: per D10, remove (or clearly mark) the seeded settings that nothing reads, and keep the
+  settings table in `docs/HOW_IT_WORKS.md` current.
+- Done when: every setting on the settings page changes what the bot does.
 
 ### Phase 3: Health rules (the bot checks itself)
 
@@ -328,7 +377,9 @@ its own retention, so the bot's database stays small.
   - a ConfigMap with Serilog overrides;
   - TLS secret `spacetraders-tls` (per-app names since 2026-09-26);
   - no route to the old `spacetraders-app-service`, because that project no longer exists;
-  - the WebUI deployment comes back too (D5).
+  - the WebUI deployment comes back too (D5);
+  - an ingress restricted to the LAN, per D11 (B22);
+  - `/health/startup` as the startup probe (B23).
 
 **4.3 First-run watch**
 - First hour: messages per minute, database size, log lines per minute, anomalies. Then check
@@ -368,11 +419,13 @@ How credits are split stays your call; Claude only fixes deviations from intende
 
 - **6.1 The first contract, end to end:** B8 and B9. Per D1 and D2 the bot takes one mineral
   contract per reset; taking the next contract is a later addition.
-- **6.2 The command ship after scouting:** B10. The ship moves on to its next job instead of
-  holding on to the finished scout goal.
-- **6.3 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`).
-- **6.4 Trading** (`TradingAutomationService`).
-- **6.5 Jump gate construction.**
+- **6.2 The command ship after scouting:** B10, and the scout part of B16. The ship moves on to
+  its next job instead of holding on to the finished scout goal.
+- **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
+- **6.4 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`): the
+  survey part of B16, and B17.
+- **6.5 Trading** (`TradingAutomationService`).
+- **6.6 Jump gate construction.**
 
 ## Changes in gembernodes
 
