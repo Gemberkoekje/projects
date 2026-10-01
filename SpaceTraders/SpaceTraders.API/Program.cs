@@ -55,23 +55,28 @@ builder.Services.AddCors(options =>
 // Every warning and error also goes to the RepeatingError health rule.
 builder.Services.AddSingleton<ErrorLog>();
 
-builder.Host.UseSerilog((ctx, services, cfg) =>
-{
-    if (ctx.HostingEnvironment.IsProduction())
+// The host logs through its own logger, not the process-wide Log.Logger (preserveStaticLogger),
+// which every host replaces when it starts and closes when it stops: tests run hosts side by side,
+// and a host's lines reached another host's sinks, or none (B41). Nothing here uses the static Log.
+builder.Host.UseSerilog(
+    (ctx, services, cfg) =>
     {
-        // JSON for Loki, with the rendered message, so a line reads without its template.
-        cfg.WriteTo.Console(new RenderedCompactJsonFormatter());
-    }
-    else
-    {
-        cfg.WriteTo.Console();
-    }
+        if (ctx.HostingEnvironment.IsProduction())
+        {
+            // JSON for Loki, with the rendered message, so a line reads without its template.
+            cfg.WriteTo.Console(new RenderedCompactJsonFormatter());
+        }
+        else
+        {
+            cfg.WriteTo.Console();
+        }
 
-    cfg.WriteTo.Sink(new ErrorLogSink(services.GetRequiredService<ErrorLog>()));
-    cfg.ReadFrom.Configuration(ctx.Configuration);
-    cfg.Enrich.FromLogContext();
-    cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
-});
+        cfg.WriteTo.Sink(new ErrorLogSink(services.GetRequiredService<ErrorLog>()));
+        cfg.ReadFrom.Configuration(ctx.Configuration);
+        cfg.Enrich.FromLogContext();
+        cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
+    },
+    preserveStaticLogger: true);
 
 // Wolverine keeps messages in memory: nothing is stored in Postgres (B2). After a restart, startup
 // sync and startup recovery pick the ships up again, and arrivals wait in scheduled_ship_events.

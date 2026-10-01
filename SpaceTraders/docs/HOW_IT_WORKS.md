@@ -39,7 +39,8 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
   (CLEF: `@t`, `@m`, `@i`, and `@l` for levels above Information); other environments use plain
   text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
   Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
-  `Application=SpaceTraders.API`.
+  `Application=SpaceTraders.API`. The host logs through its own logger and leaves Serilog's static
+  `Log.Logger` alone, so test hosts running side by side don't share one (B41).
 - **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
   nothing goes to Postgres. It compiles the handler code at startup (`WolverineFx.RuntimeCompilation`).
   Its generated code resolves the DbContext from the scope (`AlwaysUseServiceLocationFor`), because
