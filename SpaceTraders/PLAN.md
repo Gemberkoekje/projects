@@ -48,8 +48,9 @@
 - Phase 1 is done (2026-10-01): the soak test (1.14) ran the bot for four hours against the live
   API from an empty local database.
 - Phase 2 is done in the code (2026-10-01): metrics, the ledger and the journal. Its Grafana
-  dashboard and alerts (2.4, 2.5) are up for review as gembernodes PR #10, not yet merged. The bot
-  stays off the cluster until phase 4.
+  dashboard and alerts (2.4, 2.5) were merged in gembernodes (PR #10) and applied by Flux on
+  2026-10-01; Grafana still needs a rollout restart to read the alert rules. The bot stays off the
+  cluster until phase 4.
 - Phase 3 is done in the code (2026-10-01): ten health rules check the bot's own state every
   minute, and each broken one is an anomaly (a metric and journal lines).
 
@@ -636,7 +637,7 @@ its own retention, so the bot's database stays small.
   - `.claude/skills/st-investigate/SKILL.md`: the journal and metrics rows and queries now name
     what exists; the stale B2 and B12 queries are gone.
 
-**2.4 Grafana dashboard** (gembernodes PR #10; not merged)
+**2.4 Grafana dashboard** (done: gembernodes PR #10, merged 2026-10-01)
 - Location: `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`, added to the
   monitoring `configMapGenerator`.
 - Panels:
@@ -651,8 +652,8 @@ its own retention, so the bot's database stays small.
   - the journal (from Loki).
 - `SettingChanged` and `ResetDetected` appear as annotations, so you can see what changed when.
 - Done, on gembernodes branch `claude/spacetraders-dashboard` (commit `3df654a`), not merged: it
-  deploys through Flux once it is on `main`. Up for review as PR Gemberkoekje/gembernodes#10
-  (2026-10-01).
+  deploys through Flux once it is on `main`. Merged as PR Gemberkoekje/gembernodes#10 on
+  2026-10-01, and applied by Flux (`2cd1e32`).
   - Every panel above, plus a row of numbers (credits, credits in the last hour, next reset,
     database size, active anomalies, whether Prometheus reaches the bot), goal steps and breaker
     trips, and log lines per hour against the 50,000-a-day budget. Series are aggregated with
@@ -662,7 +663,7 @@ its own retention, so the bot's database stays small.
     JSON log from a local run, and returned the journal lines and the annotation fields.
   - It can't be checked against real data until the bot runs on the cluster (phase 4).
 
-**2.5 Grafana alerts** (gembernodes `grafana-alerting-provisioning.yaml`, PR #10; not merged)
+**2.5 Grafana alerts** (done: gembernodes PR #10, merged 2026-10-01; the Grafana restart is pending)
 - Rules:
   - the bot is down (no scrape for 10 minutes);
   - an anomaly has been active for more than 15 minutes;
@@ -704,7 +705,7 @@ its own retention, so the bot's database stays small.
     `Outfitting.` and so on as a strategy change that starts a new run. Those prefixes are now
     only reachable through `PUT /settings/{key}`, which accepts any key.
 
-**Phase 2 in short** (done 2026-10-01 in the code; the dashboard and alerts await their merge, gembernodes PR #10)
+**Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
   metric: credits, the ledger by category, each ship's state, contracts, the API by endpoint,
   messages, goal steps, anomalies, the database and the next reset (2.1). Sales, purchases and
@@ -919,7 +920,7 @@ This cloud session can only read gembernodes. These changes are made from your P
 
 | Slice | Change |
 |---|---|
-| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (PR #10, branch `claude/spacetraders-dashboard`) |
-| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (same PR) |
+| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (merged: PR #10) |
+| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; the restart is pending) |
 | 4.1 | Database login and read-only login (Postgres and 1Password) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries |
