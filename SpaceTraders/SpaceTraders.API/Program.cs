@@ -164,7 +164,16 @@ app.MapMarketsEndpoints();
 app.MapShipyardsEndpoints();
 app.MapHub<DashboardHub>("/hubs/dashboard");
 
+var startupState = app.Services.GetRequiredService<StartupInitializationState>();
+
 await app.RunAsync();
+
+// A failed startup chain stops the host (DeferredStartupHostedService). Exit non-zero, so the
+// restart shows up as a failure.
+if (startupState.HasFailed)
+{
+    Environment.ExitCode = 1;
+}
 
 static void ConfigureWolverine(
     WolverineOptions options,

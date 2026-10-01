@@ -55,19 +55,7 @@ public sealed class GameLoopServiceTests : IDisposable
         ]);
         _ships.FindAsync("SPECTER-DEBUG-5", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SPECTER-DEBUG-5", "X1-PT96", "X1-PT96-D42", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 40));
-        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
-            new ShipAssignmentDto(
-                ShipSymbol: "SPECTER-DEBUG-5",
-                AssignmentType: "Contract",
-                OriginWaypoint: "X1-PT96-AST",
-                DestWaypoint: "X1-PT96-D42",
-                CargoSymbol: "IRON_ORE",
-                ContractId: "CONTRACT-1",
-                StepIndex: 0,
-                AssignedAt: DateTimeOffset.UnixEpoch,
-                CompletedAt: null,
-                RequiredUnits: 40),
-        ]);
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([ContractAssignment("SPECTER-DEBUG-5")]);
     }
 
     public void Dispose() => _serviceProvider.Dispose();
@@ -126,6 +114,65 @@ public sealed class GameLoopServiceTests : IDisposable
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<FulfillContractDeliveryCommand>(), Arg.Any<CancellationToken>());
         await _goalExecutor.Received().ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Tick_AThrowingPlan_DoesNotStopTheOtherPlansOrTheShips()
+    {
+        SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
+        _scoutPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("No ship with fuel.")));
+
+        await TickAsync();
+
+        await _contractPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _goalExecutor.Received().ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>());
+        await _goalExecutor.Received().ExecuteAsync("SPECTER-DEBUG-5", Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Tick_AThrowingShipStep_DoesNotStopTheOtherShipsOrTheContractWork()
+    {
+        SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
+        _goalExecutor.ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<GoalExecutionResult?>(new InvalidOperationException("API error.")));
+
+        await TickAsync();
+
+        await _goalExecutor.Received().ExecuteAsync("SPECTER-DEBUG-5", Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Tick_AThrowingContractCommand_DoesNotStopTheNextAssignment()
+    {
+        SwitchOn("Automation.Enabled", "Automation.Plan.Contract.Enabled");
+        _ships.FindAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SPECTER-DEBUG-3", "X1-PT96", "X1-PT96-H53", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 15));
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            ContractAssignment("SPECTER-DEBUG-3"),
+            ContractAssignment("SPECTER-DEBUG-5"),
+        ]);
+        _bus.InvokeAsync(Arg.Is<MineResourceVolumeCommand>(c => c.ShipSymbol == "SPECTER-DEBUG-3"), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("API error.")));
+
+        await TickAsync();
+
+        await _bus.Received(1).InvokeAsync(Arg.Is<MineResourceVolumeCommand>(c => c.ShipSymbol == "SPECTER-DEBUG-5"), Arg.Any<CancellationToken>());
+    }
+
+    private static ShipAssignmentDto ContractAssignment(string shipSymbol) =>
+        new(
+            ShipSymbol: shipSymbol,
+            AssignmentType: "Contract",
+            OriginWaypoint: "X1-PT96-AST",
+            DestWaypoint: "X1-PT96-D42",
+            CargoSymbol: "IRON_ORE",
+            ContractId: "CONTRACT-1",
+            StepIndex: 0,
+            AssignedAt: DateTimeOffset.UnixEpoch,
+            CompletedAt: null,
+            RequiredUnits: 40);
 
     private void SwitchOn(params string[] keys)
     {

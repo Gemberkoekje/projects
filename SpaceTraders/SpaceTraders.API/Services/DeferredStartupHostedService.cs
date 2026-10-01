@@ -77,15 +77,18 @@ public sealed class DeferredStartupHostedService(
             startupState.MarkCompleted();
             logger.LogInformation("Deferred startup initialization completed.");
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
             startupState.MarkFailed(new OperationCanceledException("Deferred startup initialization was canceled."));
-            logger.LogInformation("Deferred startup initialization canceled.");
+            logger.LogInformation(exception, "Deferred startup initialization canceled.");
         }
         catch (Exception exception)
         {
+            // Without the later services (the tick among them) the pod would only look healthy.
+            // Stop the host, so Kubernetes restarts it with back-off; Program exits with code 1.
             startupState.MarkFailed(exception);
-            logger.LogError(exception, "Deferred startup initialization failed.");
+            logger.LogCritical(exception, "Deferred startup initialization failed; stopping the host.");
+            applicationLifetime.StopApplication();
         }
     }
 

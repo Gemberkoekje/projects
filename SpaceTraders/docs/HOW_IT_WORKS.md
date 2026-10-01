@@ -87,8 +87,9 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 12 | `DataRetentionService` | 60 s after start, then daily | |
 | 13 | `PrometheusMetricsService` | every 10 s | |
 
-One try/catch wraps the chain. A throw in steps 1, 3, 4, 6 or 8 ends it: later services never
-start and nothing retries, but the process stays up (B23). Steps 7 and 9 catch their own errors.
+One try/catch wraps the chain. Steps 7 and 9 catch their own errors. A throw in steps 1, 3, 4, 6
+or 8 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
+stops. The process exits with code 1, so Kubernetes restarts it with back-off.
 
 **Agent bootstrap** (`AgentBootstrapService`):
 - Candidate tokens, in order:
@@ -158,7 +159,12 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
      handles them.
 
   With `Automation.Enabled` off, it skips steps 1 to 3.
-- A single try/catch wraps the tick, so an exception skips the rest of it (B14).
+- Each plan bootstrap, each ship's goal step and each contract assignment runs in its own DI
+  scope and try/catch. A failure is logged at Error with the plan or the ship, and the rest of the
+  tick carries on. Its own scope means a step can't leave a broken DbContext to the steps after
+  it.
+- A failure outside those steps (reading the switches, listing the ships or assignments) ends
+  the tick; the next one starts 5 s later.
 
 ---
 
@@ -683,7 +689,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~241 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Application.Tests` | ~244 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |

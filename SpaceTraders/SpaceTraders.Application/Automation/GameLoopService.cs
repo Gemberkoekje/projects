@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Contracts;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -62,7 +63,7 @@ public sealed class GameLoopService(
 
         if (await settings.IsAutomationEnabledAsync(cancellationToken))
         {
-            await RunAutomationAsync(services, settings, bus, cancellationToken);
+            await RunAutomationAsync(settings, cancellationToken);
         }
         else
         {
@@ -72,59 +73,79 @@ public sealed class GameLoopService(
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
     }
 
-    private static async Task RunAutomationAsync(
-        IServiceProvider services,
-        ISettingsRepository settings,
-        Wolverine.IMessageBus bus,
-        CancellationToken cancellationToken)
+    private async Task RunAutomationAsync(ISettingsRepository settings, CancellationToken cancellationToken)
     {
         // A plan that is switched off is not bootstrapped, so it doesn't buy anything either.
-        (AutomationPlan Plan, Func<Task> Bootstrap)[] bootstraps =
-        [
-            (AutomationPlan.Scout, () => services.GetRequiredService<IScoutAllMarketplacesPlanService>().EnsureBootstrappedAsync(cancellationToken)),
-            (AutomationPlan.Contract, () => services.GetRequiredService<IContractPlanService>().EnsureBootstrappedAsync(cancellationToken)),
-            (AutomationPlan.ProbeDeployment, () => services.GetRequiredService<IProbeDeploymentPlanService>().EnsureBootstrappedAsync(cancellationToken)),
-            (AutomationPlan.Mining, () => services.GetRequiredService<IMiningAutomationService>().EnsureBootstrappedAsync(cancellationToken)),
-            (AutomationPlan.Trading, () => services.GetRequiredService<ITradingAutomationService>().EnsureBootstrappedAsync(cancellationToken)),
-        ];
-
-        foreach (var (plan, bootstrap) in bootstraps)
+        foreach (var plan in Enum.GetValues<AutomationPlan>())
         {
             if (await settings.IsPlanEnabledAsync(plan, cancellationToken))
             {
-                await bootstrap();
+                await RunStepAsync(
+                    services => BootstrapAsync(plan, services, cancellationToken),
+                    exception => logger.LogError(exception, "GameLoopService: bootstrapping the {Plan} plan failed; the rest of the tick carries on.", plan),
+                    cancellationToken);
             }
         }
 
-        var ships = services.GetRequiredService<IShipRepository>();
-        await ExecuteAllShipGoalsAsync(ships, services.GetRequiredService<IShipGoalExecutorService>(), cancellationToken);
+        await using (var scope = serviceScopeFactory.CreateAsyncScope())
+        {
+            var ships = await scope.ServiceProvider.GetRequiredService<IShipRepository>().GetAllAsync(cancellationToken);
+            foreach (var ship in ships)
+            {
+                await RunStepAsync(
+                    async services =>
+                    {
+                        await services.GetRequiredService<IShipGoalExecutorService>().ExecuteAsync(ship.Symbol, cancellationToken);
+                    },
+                    exception => logger.LogError(exception, "GameLoopService: the goal step for ship {ShipSymbol} failed; the rest of the tick carries on.", ship.Symbol),
+                    cancellationToken);
+            }
+        }
 
         if (await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken))
         {
-            await ExecuteActiveContractAssignmentsAsync(services.GetRequiredService<IShipAssignmentRepository>(), ships, bus, cancellationToken);
+            await RunContractAssignmentsAsync(cancellationToken);
         }
     }
 
-    private static async Task ExecuteAllShipGoalsAsync(
-        IShipRepository ships,
-        IShipGoalExecutorService goalExecutor,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Runs one step of the tick in its own scope and try/catch, so that a step that throws, or
+    /// leaves its DbContext unusable, doesn't stop the steps after it.
+    /// </summary>
+    private async Task RunStepAsync(Func<IServiceProvider, Task> step, Action<Exception> logFailure, CancellationToken cancellationToken)
     {
-        var allShips = await ships.GetAllAsync(cancellationToken);
-
-        foreach (var ship in allShips)
+        try
         {
-            await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
+            await using var scope = serviceScopeFactory.CreateAsyncScope();
+            await step(scope.ServiceProvider);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logFailure(exception);
         }
     }
 
-    private static async Task ExecuteActiveContractAssignmentsAsync(
-        IShipAssignmentRepository assignments,
-        IShipRepository ships,
-        Wolverine.IMessageBus bus,
-        CancellationToken cancellationToken)
+    private static Task BootstrapAsync(AutomationPlan plan, IServiceProvider services, CancellationToken cancellationToken) => plan switch
     {
-        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
+        AutomationPlan.Scout => services.GetRequiredService<IScoutAllMarketplacesPlanService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.Contract => services.GetRequiredService<IContractPlanService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.ProbeDeployment => services.GetRequiredService<IProbeDeploymentPlanService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.Mining => services.GetRequiredService<IMiningAutomationService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.Trading => services.GetRequiredService<ITradingAutomationService>().EnsureBootstrappedAsync(cancellationToken),
+        _ => throw new ArgumentOutOfRangeException(nameof(plan), plan, "Unknown plan."),
+    };
+
+    private async Task RunContractAssignmentsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ShipAssignmentDto> activeAssignments;
+        await using (var scope = serviceScopeFactory.CreateAsyncScope())
+        {
+            activeAssignments = await scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>().GetAllActiveAsync(cancellationToken);
+        }
 
         foreach (var assignment in activeAssignments)
         {
@@ -138,34 +159,50 @@ public sealed class GameLoopService(
                 continue;
             }
 
-            var ship = await ships.FindAsync(assignment.ShipSymbol, cancellationToken);
-            if (ship is null)
-            {
-                continue;
-            }
-
-            var cargoUnits = ship.CargoInventory?
-                .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
-                .Units ?? 0;
-
-            if (cargoUnits > 0)
-            {
-                await bus.InvokeAsync(new FulfillContractDeliveryCommand(
+            await RunStepAsync(
+                services => RunContractAssignmentAsync(assignment, services, cancellationToken),
+                exception => logger.LogError(
+                    exception,
+                    "GameLoopService: contract work for ship {ShipSymbol} on contract {ContractId} failed; the rest of the tick carries on.",
                     assignment.ShipSymbol,
-                    assignment.ContractId,
-                    assignment.CargoSymbol,
-                    assignment.DestWaypoint),
-                    cancellationToken);
-            }
-            else
-            {
-                await bus.InvokeAsync(new MineResourceVolumeCommand(
-                    assignment.ShipSymbol,
-                    assignment.CargoSymbol,
-                    assignment.OriginWaypoint,
-                    assignment.RequiredUnits),
-                    cancellationToken);
-            }
+                    assignment.ContractId),
+                cancellationToken);
+        }
+    }
+
+    private static async Task RunContractAssignmentAsync(
+        ShipAssignmentDto assignment,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        var ship = await services.GetRequiredService<IShipRepository>().FindAsync(assignment.ShipSymbol, cancellationToken);
+        if (ship is null)
+        {
+            return;
+        }
+
+        var cargoUnits = ship.CargoInventory?
+            .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
+            .Units ?? 0;
+
+        var bus = services.GetRequiredService<Wolverine.IMessageBus>();
+        if (cargoUnits > 0)
+        {
+            await bus.InvokeAsync(new FulfillContractDeliveryCommand(
+                assignment.ShipSymbol,
+                assignment.ContractId!,
+                assignment.CargoSymbol!,
+                assignment.DestWaypoint!),
+                cancellationToken);
+        }
+        else
+        {
+            await bus.InvokeAsync(new MineResourceVolumeCommand(
+                assignment.ShipSymbol,
+                assignment.CargoSymbol!,
+                assignment.OriginWaypoint!,
+                assignment.RequiredUnits),
+                cancellationToken);
         }
     }
 
