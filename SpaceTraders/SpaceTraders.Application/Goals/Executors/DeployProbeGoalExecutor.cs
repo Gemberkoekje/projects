@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -17,6 +18,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 public sealed class DeployProbeGoalExecutor(
     IShipGoalRepository goals,
     IProbeDeploymentPlanService probeDeploymentPlan,
+    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<DeployProbeGoalExecutor> logger) : IShipGoalExecutor
 {
@@ -45,7 +47,7 @@ public sealed class DeployProbeGoalExecutor(
             // Ensure the probe is docked before setting DRIFT mode.
             if (ship.LocalStatus == ShipLocalStatus.InOrbit)
             {
-                await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, deployGoal.TargetWaypointSymbol), ct);
+                await dock.ExecuteAsync(ship.Symbol, ct);
                 return GoalExecutionResult.Progressing("Docking probe at deployment target.");
             }
 

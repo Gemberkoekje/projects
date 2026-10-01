@@ -311,20 +311,25 @@ Markets are not scouted again.
 In this table, *[cmd]* means an inline command (`InvokeAsync`) and *[API]* a direct call to the
 game API. Every executor first returns "waiting for arrival" while the ship is in transit.
 
+No executor navigates to the waypoint it is already at. At its target, an executor that needs the
+ship docked docks it, and one that needs it in orbit orbits it; that is the whole step, and the next
+step does the work.
+
 | Executor | Behaviour |
 |---|---|
-| `ScoutWaypoint` | Docked at the target: mark it visited and complete. Otherwise: [cmd] navigate. In orbit at the target this loops (B1). |
-| `DeployProbe` | At the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: [cmd] navigate, which loops (B1). Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
-| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, then [API] sell. It never completes. |
+| `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
+| `DeployProbe` | Docked at the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: dock. Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
+| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell. It never completes. |
 | `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount), then navigate to the sell market and dock, [API] sell, clear the goal, complete. |
-| `SurveyWaypoint` | [cmd] navigate to the target. Docked there: [cmd] navigate again (B1). In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
+| `SurveyWaypoint` | [cmd] navigate to the target. Docked there: orbit. In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
 | `Idle` | Unreachable. |
 
 ### Commands
 
 - **`NavigateToWaypointCommand`:**
-  - Already at the destination: it publishes `ShipNavigationCompletedEvent` without docking or
-    orbiting (B1).
+  - Already at the destination: it does nothing and logs a warning. It publishes no
+    `ShipNavigationCompletedEvent`, because that would run the caller's goal step again without
+    progress (B1, fixed).
   - Docked: it refuels if the waypoint sells fuel, then orbits.
   - Then it navigates. Navigate tries DRIFT mode and intermediate markets when fuel is short,
     then schedules the arrival and publishes `ShipInTransitEvent`.
@@ -362,7 +367,7 @@ wait for a cooldown simply run again on a later tick.
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
 | `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods probably aren't discovered (see below) |
-| `ShipNavigationCompletedEvent` | `NavigateToWaypointCommand` | `ShipNavigationCompletedHandler` → one goal step |
+| `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
 | `DeployProbeCommand` | Probe plan | `DeployProbeHandler` |
@@ -653,8 +658,8 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 
 | Project | Tests | Covers |
 |---|---|---|
-| `SpaceTraders.Domain.Tests` | ~51 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~203 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
+| `SpaceTraders.Application.Tests` | ~223 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~62 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |

@@ -1,4 +1,5 @@
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -10,11 +11,12 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="ScoutWaypointGoal"/>.
-/// Navigates to the target waypoint via <see cref="NavigateToWaypointCommand"/>, 
+/// Navigates to the target waypoint via <see cref="NavigateToWaypointCommand"/>,
 /// then marks the waypoint visited once docked.
 /// </summary>
 public sealed class ScoutWaypointGoalExecutor(
     IWaypointVisitService waypointVisit,
+    IDockSubCommand dock,
     IMessageBus bus) : IShipGoalExecutor
 {
     public bool CanExecute(ShipGoal goal) => goal is ScoutWaypointGoal;
@@ -38,8 +40,8 @@ public sealed class ScoutWaypointGoalExecutor(
 
         if (atTarget && ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
-            await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, scoutGoal.TargetWaypointSymbol), ct);
-            return GoalExecutionResult.WaitingForArrival($"Docking at scout target {scoutGoal.TargetWaypointSymbol}.");
+            await dock.ExecuteAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Progressing($"Docking at scout target {scoutGoal.TargetWaypointSymbol}.");
         }
 
         await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, scoutGoal.TargetWaypointSymbol), ct);

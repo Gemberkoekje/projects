@@ -54,7 +54,8 @@ public sealed record NavigateToWaypointArrivedCommand
 /// <summary>
 /// Handles <see cref="NavigateToWaypointCommand"/>: the pre-flight phase.
 /// Steps:
-/// 1. Check if ship is already at destination — emit completed and return.
+/// 1. Check if ship is already at destination — nothing to do; return without publishing anything.
+///    Callers dock or orbit at their target themselves.
 /// 2. If docked: refuel (if at fuel market), then orbit.
 /// 3. If in orbit: navigate.
 /// 4. If neither: publish mismatch and return.
@@ -79,20 +80,15 @@ public sealed class NavigateToWaypointHandler(
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         var status = ship?.LocalStatus ?? ShipLocalStatus.None;
 
-        // Step 1: already at destination.
+        // Step 1: already at destination. No ShipNavigationCompletedEvent: it would re-run the
+        // caller's goal step, which would navigate here again, without any progress.
         if (string.Equals(ship?.WaypointSymbol, command.DestinationWaypoint, StringComparison.OrdinalIgnoreCase)
             && status != ShipLocalStatus.InTransit)
         {
-            logger.LogInformation(
-                "NavigateToWaypointHandler: ship {Symbol} is already at {Destination}; emitting completed.",
+            logger.LogWarning(
+                "NavigateToWaypointHandler: ship {Symbol} is already at {Destination}; nothing to do.",
                 command.ShipSymbol,
                 command.DestinationWaypoint);
-
-            var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
-            await bus.PublishAsync(new ShipNavigationCompletedEvent(
-                command.ShipSymbol,
-                command.DestinationWaypoint,
-                activeGoal?.GoalId ?? Guid.Empty));
             return;
         }
 

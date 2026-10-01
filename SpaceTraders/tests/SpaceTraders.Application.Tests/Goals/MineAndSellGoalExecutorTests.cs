@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -18,19 +19,20 @@ public sealed class MineAndSellGoalExecutorTests
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
+    private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
 
     private MineAndSellGoalExecutor CreateExecutor()
     {
-        // Default survey repository to return null (no survey available).
+        // Default: no survey available. The repository then returns an empty survey, not null.
         _surveys.GetBestActiveSurveyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((SurveyModel)null);
+            .Returns(new SurveyModel(string.Empty, string.Empty, [], DateTimeOffset.MinValue, string.Empty));
 
         _goals.GetActiveSurveyTargetsAsync(Arg.Any<CancellationToken>())
             .Returns(new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>());
 
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((ShipGoal)null);
+            .Returns((ShipGoal?)null);
 
         _ships.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<ShipModel>());
@@ -41,6 +43,7 @@ public sealed class MineAndSellGoalExecutorTests
             _agents,
             _surveys,
             _port,
+            _dock,
             _bus,
             NullLogger<MineAndSellGoalExecutor>.Instance);
     }
@@ -119,7 +122,7 @@ public sealed class MineAndSellGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_NavigatesToSellWaypoint_WhenCargoPresentAndNotDockedAtSellMarket()
+    public async Task ExecuteStepAsync_NavigatesToSellWaypoint_WhenCargoPresentAndElsewhere()
     {
         var ship = new ShipModel(
             "MINER-1",
@@ -139,6 +142,30 @@ public sealed class MineAndSellGoalExecutorTests
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "MINER-1" && c.DestinationWaypoint == "X1-AB-MKT"),
             Arg.Any<CancellationToken>());
+        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_Docks_WhenCargoPresentAndInOrbitAtSellMarket()
+    {
+        var ship = new ShipModel(
+            "MINER-1",
+            "X1-AB",
+            "X1-AB-MKT",
+            "IN_ORBIT",
+            "CRUISE",
+            10,
+            40,
+            CargoCurrent: 10,
+            CargoCapacity: 40,
+            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _dock.Received(1).ExecuteAsync("MINER-1", Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().SellCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -287,5 +314,7 @@ public sealed class MineAndSellGoalExecutorTests
         await _port.Received(1).SellCargoAsync("MINER-1", "IRON_ORE", 10, Arg.Any<CancellationToken>());
         await _ships.Received(1).UpdateCargoAsync("MINER-1", Arg.Any<CargoModel>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync("MINER-1", Arg.Any<MineAndSellGoal>(), Arg.Any<CancellationToken>());
+        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
     }
 }

@@ -55,7 +55,7 @@ with a test that does.
 
 | # | Issue | Evidence | Slice |
 |---|---|---|---|
-| B1 | **"Already at destination" loop.** Navigating to the waypoint a ship is already at publishes `ShipNavigationCompletedEvent` without docking or orbiting. Its handler re-runs the goal executor, which asks to navigate there again. No API call is involved, so the rate limiter doesn't slow it, and the 5 s tick starts another chain every time. The survey executor hits this in its normal state right after any arrival (docked at the target). Most likely what filled the database. | `NavigateToWaypointCommand.cs:82-96`, `ShipNavigationCompletedHandler.cs:26`, `SurveyWaypointGoalExecutor.cs:52`, `ScoutWaypointGoalExecutor.cs:41`, `DeployProbeGoalExecutor.cs:48`, `MineAndSellGoalExecutor.cs:106` | 1.1 |
+| B1 | **"Already at destination" loop.** Navigating to the waypoint a ship is already at publishes `ShipNavigationCompletedEvent` without docking or orbiting. Its handler re-runs the goal executor, which asks to navigate there again. No API call is involved, so the rate limiter doesn't slow it, and the 5 s tick starts another chain every time. The survey executor hits this in its normal state right after any arrival (docked at the target). Most likely what filled the database. | `NavigateToWaypointCommand.cs:82-96`, `ShipNavigationCompletedHandler.cs:26`, `SurveyWaypointGoalExecutor.cs:52`, `ScoutWaypointGoalExecutor.cs:41`, `DeployProbeGoalExecutor.cs:48`, `MineAndSellGoalExecutor.cs:106` | 1.1 (done) |
 | B2 | **The Wolverine inbox is probably never cleaned.** Every published message is stored in Postgres. Turning the durability agent off very likely also turns off the deletion of handled messages (about 80% sure; Wolverine's source was not checked for this version). | `Program.cs:180`, `Program.cs:189-191` | 1.3 |
 | B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good. | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.5 |
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 |
@@ -131,7 +131,7 @@ cluster (phase 4).
 
 ### Phase 1: Safe to run
 
-**1.1 Fix the "already at destination" loop (B1)**
+**1.1 Fix the "already at destination" loop (B1)** (done)
 - Goal: navigating to the waypoint a ship is already at ends in the state the caller needs, and
   never re-triggers the executor without progress.
 - Do: either have `NavigateToWaypointHandler`'s step 1 dock before emitting the completed event,
@@ -139,6 +139,16 @@ cluster (phase 4).
   keeps a single obvious path.
 - Done when: for every executor, tests cover both "docked at target" and "in orbit at target",
   and each case finishes in one step without publishing `ShipNavigationCompletedEvent` again.
+- Done:
+  - The executors handle "at target" themselves. Docking first would not have fixed the survey
+    executor, which needs orbit. In orbit at the target, the scout, probe and mining executors
+    now dock, like the trade executor already did; docked at the target, the survey executor
+    orbits. That is the whole step; the next one does the work.
+  - Navigating to the waypoint a ship is already at does nothing and logs a warning. It no
+    longer publishes `ShipNavigationCompletedEvent`, so that event only follows a real arrival.
+  - `AlreadyAtDestinationLoopTests` reproduces the loop through the real navigate and
+    navigation-completed handlers: before the fix, each of the four cases ran until the test's
+    limit of 10 steps.
 
 **1.2 Per-ship circuit breaker**
 - Goal: any future loop is contained to one ship, and it shows up.
