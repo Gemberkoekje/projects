@@ -3,7 +3,8 @@ namespace SpaceTraders.Application;
 /// <summary>
 /// The journal: one log line per meaningful thing, each with an <c>EventKind</c> property, so that
 /// <c>{namespace="spacetraders"} | json | EventKind != ""</c> in Loki reads as a timeline of the run.
-/// Every journal line starts with its kind (<c>"{EventKind}: ..."</c>) and carries the standard
+/// Every journal line starts with its kind (<c>"{EventKind:l}: ..."</c>; <c>:l</c> keeps Serilog from
+/// quoting it in the rendered message) and carries the standard
 /// properties of what it is about: <c>ShipSymbol</c>, <c>ContractId</c>, <c>WaypointSymbol</c>,
 /// <c>TradeSymbol</c>, <c>Plan</c>, and a <c>Reason</c> for anything blocked or idle.
 /// </summary>

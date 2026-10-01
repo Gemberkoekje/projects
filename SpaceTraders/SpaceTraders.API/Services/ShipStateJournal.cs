@@ -37,7 +37,7 @@ public sealed class ShipStateJournal(ILogger<ShipStateJournal> logger)
                 if (!known)
                 {
                     logger.LogInformation(
-                        "{EventKind}: ship {ShipSymbol} is idle ({Reason}): no goal and no assignment.",
+                        "{EventKind:l}: ship {ShipSymbol} is idle ({Reason}): no goal and no assignment.",
                         JournalEvents.ShipIdle,
                         ship.Ship,
                         _observedBefore ? "new_ship" : "idle_at_start");
@@ -45,7 +45,7 @@ public sealed class ShipStateJournal(ILogger<ShipStateJournal> logger)
                 else if (previousGoal != NoGoal)
                 {
                     logger.LogInformation(
-                        "{EventKind}: ship {ShipSymbol} is idle ({Reason}): its {PreviousGoal} ended.",
+                        "{EventKind:l}: ship {ShipSymbol} is idle ({Reason}): its {PreviousGoal} ended.",
                         JournalEvents.ShipIdle,
                         ship.Ship,
                         "goal_ended",

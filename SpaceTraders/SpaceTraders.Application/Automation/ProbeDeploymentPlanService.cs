@@ -127,7 +127,7 @@ public sealed class ProbeDeploymentPlanService(
         await probeDeploymentPlans.UpsertAsync(plan, cancellationToken);
 
         logger.LogInformation(
-            "{EventKind}: {Plan} plan for system {System} with {Count} target waypoints.",
+            "{EventKind:l}: {Plan} plan for system {System} with {Count} target waypoints.",
             JournalEvents.PlanStarted,
             AutomationPlan.ProbeDeployment,
             systemSymbol,
@@ -184,7 +184,7 @@ public sealed class ProbeDeploymentPlanService(
         if (allDeployed)
         {
             logger.LogInformation(
-                "{EventKind}: {Plan} plan: all {Count} waypoints in system {System} are covered.",
+                "{EventKind:l}: {Plan} plan: all {Count} waypoints in system {System} are covered.",
                 JournalEvents.PlanCompleted,
                 AutomationPlan.ProbeDeployment,
                 plan.TargetWaypointSymbols.Count,
@@ -417,7 +417,7 @@ public sealed class ProbeDeploymentPlanService(
             if (!plan.WaitingForPhase1Credits)
             {
                 logger.LogInformation(
-                    "{EventKind}: {Plan} plan waits ({Reason}): market probes wait for {Threshold} credits, the agent has {Credits}.",
+                    "{EventKind:l}: {Plan} plan waits ({Reason}): market probes wait for {Threshold} credits, the agent has {Credits}.",
                     JournalEvents.PlanBlocked,
                     AutomationPlan.ProbeDeployment,
                     "waiting_for_credits",

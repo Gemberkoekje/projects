@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `.claude/skills/st-investigate/SKILL.md`: draft of the skill Claude uses to investigate and fix misbehaviour.
 
 ### Docs – Changed (2026-10-01)
+- `PLAN.md`: phase 2 done in the code (slices 2.1, 2.2, 2.3, 2.6, and 0.5), with a short summary; the dashboard and alerts (2.4, 2.5) ready on a gembernodes branch; new known issues B37 (the credit-drop alert can't fire) and B38 (startup recovery reports docked ships as in transit), open decision D12, and notes for 4.2 (metrics port annotations, the Traefik migration) and 4.3 (unpause the "bot is down" alert).
 - `PLAN.md`: the soak test's results (slice 1.14, the last of phase 1), the issues it found (B28–B36), a slice for its tidy-ups (0.5), and a short summary of phase 1.
 - Moved the old plans, designs, progress logs, strategy notes and the `docs/implementation/` and `docs/operations/` documents to `docs/archive/`.
 - `README.md`, `CONTRIBUTING.md`, `docs/GLOSSARY.md` and `spacetraders.md` now match the code: no `SpaceTraders.App`, no `k8s/` folder, no `/control/sync` or `/control/ships/{symbol}/reassign`, and the burst limit as the API guide defines it.
@@ -22,6 +23,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Config – Changed (2026-10-01)
 - `Metrics:Port` (9090) and `Metrics:Hostname` in `appsettings.json`: where `/metrics` is served. Development listens on `localhost` only; `Dockerfile.api` exposes 9090 next to 8080.
 - `System.Net.Http` logs at Warning instead of Information (`appsettings.json`, `appsettings.Development.json`), removing about four log lines per outbound API call.
+
+### Tools – Changed (2026-10-01)
+- `tools/soak/` reads `/metrics` from the metrics port (`--metrics-url`, default `http://127.0.0.1:9090/metrics`) and counts API calls with `spacetraders_api_requests_total`; `launch.py` keeps the metrics on loopback.
 
 ### Tools – Added (2026-10-01)
 - `tools/soak/`: runs the bot like the cluster against a local database, and samples every table, `/metrics` and the log every 15 minutes (slice 1.14). See its README.
@@ -45,6 +49,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Per-ship circuit breaker: a ship that takes more than `Automation.CircuitBreaker.MaxGoalStepsPerMinute` goal steps in a minute (default 60) gets its goal blocked as `runaway`, with a warning and the `spacetraders_goal_breaker_trips_total` metric. Blocked goals are not stepped again.
 
 ### Code – Changed (2026-10-01)
+- Journal lines render their kind without quotes (`{EventKind:l}`): Serilog quotes string values in the rendered message, so a line read `"ShipIdle": ship …` in Loki.
 - The settings seed holds only settings that code which runs reads (B18, D10): 26 are gone (`Navigation.*`, `Maintenance.*`, `Outfitting.*`, and the others nothing read), 30 remain, `Runtime.*` flags included. A database seeded earlier keeps its rows; the bot ignores them, as it always did.
 - The size guard logs its limits as anomalies, `AnomalyRaised` and `AnomalyCleared` with rule `DbSizeSoftLimit` or `DbSizeHardLimit`, instead of `DbSizeSoftLimit`, `DbSizeHardLimit` and `DbSizeNormal` events.
 - Rows are keyed on a short agent id instead of the agent token (B4): the agent's symbol and the server's reset date, such as `GEMBER@2026-09-27`. The token, a JWT of about 1 KB, is stored only in `stored_credentials`. **A database from before this change has to be dropped**: the schema initializer no longer upgrades old schemas, and the unused `scout_plan_states` table is gone.

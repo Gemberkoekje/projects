@@ -158,7 +158,7 @@ For each cached ship:
 
 | Ship state | Recovery action |
 |---|---|
-| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step |
+| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step. The code doesn't check "still in transit", and a docked ship keeps its last arrival time, so every docked ship that ever travelled lands here (B38) |
 | Still in transit | Publish `ShipInTransitEvent` only |
 | Docked or in orbit | Run one goal step |
 

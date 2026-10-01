@@ -147,7 +147,7 @@ public sealed class FulfillContractDeliveryHandler(
             await contracts.UpsertAsync(MapToDto(deliverResult), cancellationToken);
 
             logger.LogInformation(
-                "{EventKind}: ship {ShipSymbol} delivered {Units} {TradeSymbol} to {WaypointSymbol} for contract {ContractId}.",
+                "{EventKind:l}: ship {ShipSymbol} delivered {Units} {TradeSymbol} to {WaypointSymbol} for contract {ContractId}.",
                 JournalEvents.ContractDelivered,
                 command.ShipSymbol,
                 units,
@@ -172,7 +172,7 @@ public sealed class FulfillContractDeliveryHandler(
             await bus.PublishAsync(new ContractFulfilledEvent(command.ContractId, fulfilled.PaymentOnFulfilled));
 
             logger.LogInformation(
-                "{EventKind}: contract {ContractId} fulfilled; it paid {Payment} credits.",
+                "{EventKind:l}: contract {ContractId} fulfilled; it paid {Payment} credits.",
                 JournalEvents.ContractFulfilled,
                 command.ContractId,
                 fulfilled.PaymentOnFulfilled);

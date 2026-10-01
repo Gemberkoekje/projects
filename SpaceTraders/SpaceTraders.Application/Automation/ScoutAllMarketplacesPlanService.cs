@@ -82,7 +82,7 @@ public sealed class ScoutAllMarketplacesPlanService(
         if (activeAssignment is not null && !activeAssignment.CompletedAt.HasValue)
         {
             logger.LogInformation(
-                "{EventKind}: {Plan} plan for ship {ShipSymbol} with {WaypointCount} route waypoints; active assignment already exists, so no new assignment created.",
+                "{EventKind:l}: {Plan} plan for ship {ShipSymbol} with {WaypointCount} route waypoints; active assignment already exists, so no new assignment created.",
                 JournalEvents.PlanStarted,
                 AutomationPlan.Scout,
                 scoutShip.Symbol,
@@ -100,7 +100,7 @@ public sealed class ScoutAllMarketplacesPlanService(
         await SetScoutGoalAsync(firstAssignment, cancellationToken);
 
         logger.LogInformation(
-            "{EventKind}: {Plan} plan for ship {ShipSymbol} with {WaypointCount} route waypoints; first assignment targets {Destination}.",
+            "{EventKind:l}: {Plan} plan for ship {ShipSymbol} with {WaypointCount} route waypoints; first assignment targets {Destination}.",
             JournalEvents.PlanStarted,
             AutomationPlan.Scout,
             scoutShip.Symbol,
@@ -173,7 +173,7 @@ public sealed class ScoutAllMarketplacesPlanService(
             await goals.ClearActiveGoalAsync(shipSymbol, cancellationToken);
 
             logger.LogInformation(
-                "{EventKind}: {Plan} plan for ship {ShipSymbol}: all {WaypointCount} waypoints visited.",
+                "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: all {WaypointCount} waypoints visited.",
                 JournalEvents.PlanCompleted,
                 AutomationPlan.Scout,
                 shipSymbol,

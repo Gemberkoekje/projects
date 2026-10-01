@@ -65,7 +65,7 @@ public sealed class DatabaseSizeGuardService(
         if (aboveSoftLimit && !_aboveSoftLimit)
         {
             logger.LogWarning(
-                "{EventKind}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, above the soft limit of {LimitMegabytes} MB ({Setting}).",
+                "{EventKind:l}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, above the soft limit of {LimitMegabytes} MB ({Setting}).",
                 JournalEvents.AnomalyRaised,
                 SoftLimitRule,
                 AnomalySubject,
@@ -85,7 +85,7 @@ public sealed class DatabaseSizeGuardService(
             if (!_aboveHardLimit)
             {
                 logger.LogError(
-                    "{EventKind}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, above the hard limit of {LimitMegabytes} MB ({Setting}). Automation is off until someone switches it back on.",
+                    "{EventKind:l}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, above the hard limit of {LimitMegabytes} MB ({Setting}). Automation is off until someone switches it back on.",
                     JournalEvents.AnomalyRaised,
                     HardLimitRule,
                     AnomalySubject,
@@ -119,7 +119,7 @@ public sealed class DatabaseSizeGuardService(
 
     private void LogCleared(string rule, long megabytes)
         => logger.LogInformation(
-            "{EventKind}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, under that limit again.",
+            "{EventKind:l}: {Rule} on {Subject}: the database is {SizeMegabytes} MB, under that limit again.",
             JournalEvents.AnomalyCleared,
             rule,
             AnomalySubject,

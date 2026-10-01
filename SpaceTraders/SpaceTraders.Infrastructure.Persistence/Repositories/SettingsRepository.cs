@@ -127,7 +127,7 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
 
         var secret = MayHoldASecret(key);
         logger.LogInformation(
-            "{EventKind}: {Setting} changed from {OldValue} to {NewValue}.",
+            "{EventKind:l}: {Setting} changed from {OldValue} to {NewValue}.",
             JournalEvents.SettingChanged,
             key,
             Shown(oldValue, secret),

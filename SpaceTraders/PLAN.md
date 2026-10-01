@@ -46,7 +46,10 @@
 - `SpaceTradersV3/` was deleted on 2026-10-01 (D7). It was an unbuilt copy of this project's API
   client and interfaces; git history still has it.
 - Phase 1 is done (2026-10-01): the soak test (1.14) ran the bot for four hours against the live
-  API from an empty local database. Phase 2 is next; the bot stays off the cluster until phase 4.
+  API from an empty local database.
+- Phase 2 is done in the code (2026-10-01): metrics, the ledger and the journal. Its Grafana
+  dashboard and alerts (2.4, 2.5) are ready on gembernodes branch `claude/spacetraders-dashboard`,
+  not yet merged. The bot stays off the cluster until phase 4.
 
 ## Known issues
 
@@ -95,6 +98,7 @@ the misbehaviour.
 | B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 (done) |
 | B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 (done) |
 | B37 | **The credit-drop alert can't fire** (found in 2.2). `AlertHandler` compares each credit change with the credits it remembers in a field from the previous one, but Wolverine creates the handler anew for every message, so the field is always empty. Until 2.2 nothing published the event anyway. The event carries the old credits, so the fix is small, but it would then warn, and post to `Alerts.WebhookUrl`, on every purchase that costs more than 10% of the credits, a ship included. | `AlertHandler.cs` (`_previousCredits`) | D12 |
+| B38 | **Startup recovery reports docked ships as in transit** (found in a local run during phase 2, through `spacetraders_messages_handled_total`). Its first branch takes any ship whose cached arrival time has passed for a ship that has just arrived, but that time stays on a ship after it docks: startup sync stores the last route's arrival. So every docked ship that ever travelled gets a `ShipInTransitEvent` (an "in transit" activity row) on every start: three in a run with an idle fleet. `docs/HOW_IT_WORKS.md` describes the branch as "still marked in transit", which the code doesn't check; a ship that really arrived while the bot was down comes back from `GetAllAsync` already in orbit, so the branch never sees one. | `StartupRecoveryService.cs` (`RecoverShipAsync`), `StartupSyncService.cs` (`ArrivesAt`) | 6.4 |
 
 ### Decisions (2026-10-01)
 
@@ -629,7 +633,7 @@ its own retention, so the bot's database stays small.
   - `.claude/skills/st-investigate/SKILL.md`: the journal and metrics rows and queries now name
     what exists; the stale B2 and B12 queries are gone.
 
-**2.4 Grafana dashboard** (gembernodes)
+**2.4 Grafana dashboard** (gembernodes; ready, not merged)
 - Location: `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`, added to the
   monitoring `configMapGenerator`.
 - Panels:
@@ -643,8 +647,18 @@ its own retention, so the bot's database stays small.
   - active anomalies;
   - the journal (from Loki).
 - `SettingChanged` and `ResetDetected` appear as annotations, so you can see what changed when.
+- Done, on gembernodes branch `claude/spacetraders-dashboard` (commit `3df654a`), not merged: it
+  deploys through Flux once it is on `main`.
+  - Every panel above, plus a row of numbers (credits, credits in the last hour, next reset,
+    database size, active anomalies, whether Prometheus reaches the bot), goal steps and breaker
+    trips, and log lines per hour against the 50,000-a-day budget. Series are aggregated with
+    `max` or `sum`, so a pod restart doesn't split a line in two.
+  - Checked without the cluster: every PromQL expression passed `promtool check rules`, and every
+    LogQL query (journal, annotations, log volume) ran against a local Loki fed with the bot's own
+    JSON log from a local run, and returned the journal lines and the annotation fields.
+  - It can't be checked against real data until the bot runs on the cluster (phase 4).
 
-**2.5 Grafana alerts** (gembernodes `grafana-alerting-provisioning.yaml`)
+**2.5 Grafana alerts** (gembernodes `grafana-alerting-provisioning.yaml`; ready, not merged)
 - Rules:
   - the bot is down (no scrape for 10 minutes);
   - an anomaly has been active for more than 15 minutes;
@@ -652,6 +666,15 @@ its own retention, so the bot's database stays small.
   - log volume is over budget;
   - add `spacetraders` to the existing error-log rule.
 - Grafana only reads this file at startup, so it needs a rollout restart.
+- Done, in the same gembernodes commit, not merged:
+  - Group `spacetraders` (every minute): the bot is down (`max_over_time(up[10m])` under 1, or no
+    series at all), an anomaly active for 15 minutes (the size limits excepted), and the database
+    over its soft limit for 5 minutes (from `spacetraders_anomaly_active`, so it follows the
+    setting). Group `spacetraders-logs` (every 10 minutes): more than 50,000 lines in 24 hours.
+    `spacetraders` joined the error-log rule's namespaces.
+  - "Bot is down" starts paused (`isPaused: true`): with the bot off the cluster it would fire at
+    once. Unpause it in 4.3. The other rules can't fire without the bot's data.
+  - After the merge: a Grafana rollout restart, so it reads the rules.
 
 **2.6 Only settings that do something (B18, D10)** (done)
 - Do: remove from the seed every setting that nothing reads at runtime:
@@ -676,6 +699,30 @@ its own retention, so the bot's database stays small.
   - `RunLifecycleService` still treats a change under `Navigation.`, `Maintenance.`,
     `Outfitting.` and so on as a strategy change that starts a new run. Those prefixes are now
     only reachable through `PUT /settings/{key}`, which accepts any key.
+
+**Phase 2 in short** (done 2026-10-01 in the code; the dashboard and alerts await their merge)
+- Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
+  metric: credits, the ledger by category, each ship's state, contracts, the API by endpoint,
+  messages, goal steps, anomalies, the database and the next reset (2.1). Sales, purchases and
+  contract payments reach the ledger and the credit samples, and price history is recorded (2.2).
+  One journal line per meaningful thing makes the log read as a timeline (2.3). Only settings
+  that do something are seeded (2.6). Slice 0.5 cleaned up after the soak test.
+- Verified with a local run against the live API (2026-10-01, the debug agent, an idle fleet):
+  the scrape on 9090 without a key, no `/metrics` on the main port, API requests by route
+  template, no API call from the startup snapshot (B35), and the journal's `ShipIdle` and
+  `SettingChanged` lines in the JSON log. Then the dashboard's and alerts' queries, against
+  `promtool` and a local Loki.
+- Traps it took: the domain events had handlers but no publisher, so publishing them woke
+  handlers that had never run (the probe plan's, which ignored the plan switches; the credit-drop
+  alert, B37); Serilog quotes strings in the rendered message, hence `{EventKind:l}`; and the
+  project-file analyzer walks folders itself, so an MSBuild exclude can't keep `node_modules` from
+  it.
+- Found and recorded: B37 (with D12, open) and B38. Noticed: mined and traded sales share
+  `TradeSell`; Wolverine retries every handler of an event when one fails.
+- To understand this phase, start with `docs/HOW_IT_WORKS.md` section 11 (metrics and the
+  journal), then `PrometheusAutomationMetrics.cs`, `PrometheusMetricsService.cs`,
+  `JournalEvents.cs` and `AgentCreditsUpdates.cs`; in gembernodes,
+  `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
 ### Phase 3: Health rules (the bot checks itself)
 
@@ -725,8 +772,16 @@ its own retention, so the bot's database stays small.
     - `/spacetraders/api` and `/spacetraders/dashboard` on http://192.168.1.230;
     - no certificate needed;
   - `/health/startup` as the startup probe (B23).
+- The Prometheus annotations are `prometheus.io/scrape: "true"`, `prometheus.io/port: "9090"` and
+  `prometheus.io/path: /metrics` (2.1). Don't add 9090 to the Service.
+- Noticed (2026-10-01): gembernodes is replacing ingress-nginx with Traefik
+  (`docs/ingress-nginx-migration-plan.md`; phases 0 to 3 done). Traefik serves the existing
+  Ingress objects, nginx annotations included, so the above still works; but once ingress-nginx
+  is gone (its phase 4) the LAN address may be `192.168.1.231` rather than `.230`. Model the
+  ingress on `grafana-internal-ingress.yaml` as it is by then.
 
 **4.3 First-run watch**
+- Unpause the "SpaceTraders bot is down" alert (2.5).
 - Only the scout and contract plans are on (D9).
 - First hour: messages per minute, database size, log lines per minute, anomalies. Then check
   again after 24 hours, then after a full reset period.
@@ -781,7 +836,7 @@ This cloud session can only read gembernodes. These changes are made from your P
 
 | Slice | Change |
 |---|---|
-| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry |
-| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart |
+| 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (ready on branch `claude/spacetraders-dashboard`) |
+| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (same branch) |
 | 4.1 | Database login and read-only login (Postgres and 1Password) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries |
