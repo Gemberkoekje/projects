@@ -75,7 +75,7 @@ the misbehaviour.
 | B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
 | B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); 6.4 |
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 |
-| B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 |
+| B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 (done) |
 | B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 (done) |
 | B20 | **A restart clears every ship's active goal.** Startup sync overwrites each existing ship row with `SetValues(new CachedShip { … })`, and that object doesn't carry the goal columns, so they become null.<br>• A scout ship whose assignment already matches the current route step doesn't get its goal back.<br>• Arrival wake-ups scheduled before the restart no longer match any goal (B17). | `StartupSyncService.cs:106-130` | 1.12 (done) |
 | B21 | **The app tables may never be created** (confirmed in 1.13). `EnsureCreatedAsync` does nothing when the database already holds any table. Wolverine creates its `wolverine` tables when the host starts, before the deferred initializer runs, so the initializer's `ALTER TABLE` statements would then fail. The cluster's database will be empty on redeploy. | `SpaceTradersDatabaseInitializer.cs:12`, `Program.cs:75-78`, `DeferredStartupHostedService.cs:22-30` | 1.13 (done) |
@@ -653,7 +653,7 @@ its own retention, so the bot's database stays small.
   - add `spacetraders` to the existing error-log rule.
 - Grafana only reads this file at startup, so it needs a rollout restart.
 
-**2.6 Only settings that do something (B18, D10)**
+**2.6 Only settings that do something (B18, D10)** (done)
 - Do: remove from the seed every setting that nothing reads at runtime:
   - the 21 keys that no code reads;
   - the `Navigation.*` and `Maintenance.*` keys, which only code that never runs reads.
@@ -662,6 +662,20 @@ its own retention, so the bot's database stays small.
   for now; moving them out of the settings is a separate cleanup. The database starts empty, so
   no old rows need removing.
 - Done when: apart from the `Runtime.*` flags, every seeded setting is read by code that runs.
+- Done:
+  - 26 settings left the seed, after checking each key against the code again: the 18 non-runtime
+    keys that nothing read (`Maintenance.LongRouteJumpThreshold` among them), and the four
+    `Navigation.*` and four other `Maintenance.*` keys that only code that never runs reads. 30
+    remain: the 14 that work, 4 that are read without changing what the bot does (the run's
+    strategy label and the market views), and the 12 `Runtime.*` flags, three of which nothing
+    reads.
+  - `DefaultSettingsSeedTests` lists the non-runtime settings with who reads each; it failed with
+    the 26 before. A new setting has to be added there, with its reader.
+  - `NavigationPlanningService` and `FleetMaintenancePlanner` still read their settings; they
+    don't run, and per D10 a feature that needs a setting adds it back.
+  - `RunLifecycleService` still treats a change under `Navigation.`, `Maintenance.`,
+    `Outfitting.` and so on as a strategy change that starts a new run. Those prefixes are now
+    only reachable through `PUT /settings/{key}`, which accepts any key.
 
 ### Phase 3: Health rules (the bot checks itself)
 

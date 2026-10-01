@@ -575,7 +575,9 @@ other app (D8):
 
 ### What each setting does
 
-Only 14 of the 56 seeded settings change what the bot does (B18):
+The seed holds 30 settings: the 14 that change what the bot does, 4 that are read without
+changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
+removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
 | Setting (default) | Effect |
 |---|---|
@@ -589,35 +591,25 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
 | `Alerts.WebhookUrl` (empty) | Where alerts are posted, as `{"text": …}`. Only the token-reset alert can fire. |
 
-**The other 42:**
+**The other 16:**
 
-- **Run label only:** `FleetExpansion.PreferredShipType`, `Automation.MiningShipPercentage`.
-- **Market views only:** `Trade.MinProfitPerUnit`, `Trade.MaxHaulDistance`. They are read by
-  queries over the never-written `trade_opportunities`.
-- **Read only by code that never runs:**
-  - `Navigation.CriticalFuelRatio`, `LowFuelRatioForDrift`, `BurnFuelRatioMinimum` and
-    `BurnDistanceThreshold` (`NavigationPlanningService` is never called);
-  - `Maintenance.RepairConditionThreshold`, `MinIntegrityForLongRoutes`, `ScrapIntegrityThreshold`
-    and `MinScrapValue` (`FleetMaintenancePlanner` isn't registered).
-- **Status flags, not settings to tune:**
+- **Read without changing what the bot does:**
+  - the run's strategy label: `FleetExpansion.PreferredShipType`, `Automation.MiningShipPercentage`;
+  - the market views: `Trade.MinProfitPerUnit`, `Trade.MaxHaulDistance`. They are read by
+    queries over the never-written `trade_opportunities`.
+- **Status flags, not settings to tune** (moving them out of the settings is a separate cleanup):
   - Read by the endpoints but never written: `Runtime.Reset.Next`, `Runtime.Alert.ApiUnavailable`,
     `CacheDivergence`, `ContractDeadlinesApproaching`, `ResetUpcoming`.
   - Written by bootstrap: `Runtime.Alert.TokenResetMismatch`.
   - Written but never read: `Runtime.TokenResetMismatchDetected`, `Runtime.AutomationPausedByReset`,
     `Runtime.Alert.AutomationDisabled`.
-- **Read by nothing:**
-  - `FleetExpansion.MinCreditRatioForShip`, `FleetExpansion.MaxShips`
-  - `Contract.AutoAccept`
-  - `Scout.MarketRefreshIntervalMinutes`, `Scout.ShipyardRefreshIntervalMinutes`
-  - `Automation.Trade.MaxLossPerUnitBeforeReroute`
-  - `Mining.SurveyMinimumCooldownSeconds`, `JettisonLowValueWhenFull`,
-    `MinimumSellPriceToKeepCargo`, `ReserveHydrocarbonUnits`
-  - `Maintenance.LongRouteJumpThreshold`
-  - all six `Outfitting.*` keys
-  - `Reliability.PauseAutomationBeforeReset`
-  - `Runtime.Reset.Warning`, `Runtime.ApiUnavailable`, `Runtime.CacheDivergenceDetected`
+  - Read by nothing: `Runtime.Reset.Warning`, `Runtime.ApiUnavailable`,
+    `Runtime.CacheDivergenceDetected`.
 - **Read but not seeded:** `BudgetPolicy` reads `Construction.FabMatsBuyThreshold`,
-  `FabMatsTransactionSize` and `HourlyBudgetCapEnabled`, and nothing uses the result.
+  `FabMatsTransactionSize` and `HourlyBudgetCapEnabled`, and nothing uses the result. Code that
+  never runs reads `Navigation.*` (`NavigationPlanningService`, never called) and
+  `Maintenance.*` (`FleetMaintenancePlanner`, not registered); without a seeded value they read
+  as 0 or false.
 
 ### Configuration (appsettings, user secrets, environment)
 
