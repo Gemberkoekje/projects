@@ -533,4 +533,30 @@ public sealed class ProbeDeploymentPlanServiceTests
         await _bus.Received(1).PublishAsync(
             Arg.Is<object>(o => IsDeployCommand(o, "PROBE-2", "X1-AB-SY2")));
     }
+
+    [Fact]
+    public async Task OnCreditsChangedAsync_KeepsWaiting_WhileTheCreditsAreBelowTheThreshold()
+    {
+        // Every credit change wakes the plan since slice 2.2 (B7). Below 200,000 it switched its
+        // waiting flag off and straight back on: two plan writes and a log line per sale or refuel.
+        _plans.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(ActivePlan(["X1-AB-M1"], [], []) with { WaitingForPhase1Credits = true });
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(Agent(credits: 150_000));
+
+        await CreateService().OnCreditsChangedAsync();
+
+        await _plans.DidNotReceive().UpsertAsync(Arg.Any<ProbeDeploymentPlanState>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OnCreditsChangedAsync_StopsWaiting_OnceTheCreditsReachTheThreshold()
+    {
+        _plans.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(ActivePlan(["X1-AB-M1"], [], []) with { WaitingForPhase1Credits = true });
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(Agent(credits: 250_000));
+
+        await CreateService().OnCreditsChangedAsync();
+
+        await _plans.Received().UpsertAsync(Arg.Is<ProbeDeploymentPlanState>(p => !p.WaitingForPhase1Credits), Arg.Any<CancellationToken>());
+    }
 }

@@ -207,6 +207,14 @@ public sealed class ProbeDeploymentPlanService(
             return;
         }
 
+        // Every credit change gets here: below the threshold the plan keeps waiting, instead of
+        // waking up only to go back to waiting.
+        var agent = await agents.GetAsync(cancellationToken);
+        if (agent is null || agent.Credits < Phase1CapitalThreshold)
+        {
+            return;
+        }
+
         var resumedPlan = plan with
         {
             WaitingForPhase1Credits = false,

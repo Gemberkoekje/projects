@@ -579,7 +579,10 @@ its own retention, so the bot's database stays small.
     finds a sample per good (none before).
   - Found on the way: the probe plan's credits handler would have run the plan, and bought
     probes, while it or automation was off; nothing published its event until now. It checks
-    both switches now (1.7, D9). And B37 (the credit-drop alert can't fire), with D12.
+    both switches now (1.7, D9). Below 200,000 credits every change would also have woken the
+    plan only to send it back to waiting (two plan writes and a log line per sale or refuel); it
+    now stays asleep until the credits are there. And B37 (the credit-drop alert can't fire), with
+    D12.
   - `NewShipPurchasedEvent` takes the ship type as the `ShipType` enum, which has no
     `SHIP_MINING_DRONE`: the service maps the API's name (`ShipMiningDrone`), so the ledger row
     reads that.

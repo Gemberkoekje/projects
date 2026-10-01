@@ -262,9 +262,9 @@ Markets are not scouted again.
 - **Targets:** the waypoints with a market or shipyard in the HQ system.
   - Shipyards come first.
   - Market-only waypoints wait until credits reach 200,000, a hard-coded threshold (D4). Below
-    that the plan sets `WaitingForPhase1Credits`, which the next `AgentCreditsChangedEvent` clears
-    while automation and the plan are on (B7, fixed); the handler stays out while either is off,
-    since waking the plan can buy probes.
+    that the plan sets `WaitingForPhase1Credits`. A credit change (`AgentCreditsChangedEvent`, B7,
+    fixed) that brings the credits to 200,000 clears it, while automation and the plan are on; the
+    handler stays out while either is off, since waking the plan can buy probes.
 - **Probes** are recognised by ship type `SHIP_PROBE`, or by a symbol containing `PROBE` or
   `SATELLITE`. Startup sync stores a ship's *registration role* as its type (for example
   `COMMAND` or `SATELLITE`). Only purchased ships get the shipyard type (for example
