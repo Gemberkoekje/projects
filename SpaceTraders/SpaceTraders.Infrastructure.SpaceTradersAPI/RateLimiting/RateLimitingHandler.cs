@@ -1,10 +1,13 @@
+using SpaceTraders.Application.Interfaces;
+
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
 /// <summary>
 /// Keeps outbound requests within the API guide's limit (<see cref="RequestBudget"/>). Requests
-/// that change something (anything but GET) go before reads.
+/// that change something (anything but GET) go before reads. The time a request waits is counted
+/// in <c>spacetraders_api_rate_limit_wait_seconds_total</c>.
 /// </summary>
-public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus status) : DelegatingHandler
+public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus status, IAutomationMetrics metrics) : DelegatingHandler
 {
     private static readonly TimeSpan PriorityWait = TimeSpan.FromMilliseconds(25);
     private static int s_pendingPriorityRequests;
@@ -20,7 +23,12 @@ public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus st
 
         try
         {
-            await WaitForBudgetAsync(isPriorityRequest, cancellationToken);
+            var waited = await WaitForBudgetAsync(isPriorityRequest, cancellationToken);
+            if (waited > TimeSpan.Zero)
+            {
+                metrics.RateLimitWait(waited);
+            }
+
             status.TotalRequests++;
             return await base.SendAsync(request, cancellationToken);
         }
@@ -33,14 +41,18 @@ public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus st
         }
     }
 
-    private async Task WaitForBudgetAsync(bool isPriorityRequest, CancellationToken cancellationToken)
+    /// <summary>Waits until the budget lets the request go; returns how long that took (zero without a wait).</summary>
+    private async Task<TimeSpan> WaitForBudgetAsync(bool isPriorityRequest, CancellationToken cancellationToken)
     {
+        var started = TimeProvider.System.GetTimestamp();
+        var hasWaited = false;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!isPriorityRequest && Volatile.Read(ref s_pendingPriorityRequests) > 0)
             {
+                hasWaited = true;
                 await Task.Delay(PriorityWait, cancellationToken);
                 continue;
             }
@@ -51,9 +63,10 @@ public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus st
             {
                 status.BurstLimit = RequestBudget.Burst;
                 status.BurstRemaining = budget.BurstRemaining(now);
-                return;
+                return hasWaited ? TimeProvider.System.GetElapsedTime(started) : TimeSpan.Zero;
             }
 
+            hasWaited = true;
             await Task.Delay(wait, cancellationToken);
         }
     }

@@ -83,7 +83,22 @@ builder.Services
     });
 
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistoryService, SpaceTraders.Application.Services.CreditHistoryService>();
+builder.Services.AddSingleton(Metrics.DefaultRegistry);
 builder.Services.AddSingleton<IAutomationMetrics, PrometheusAutomationMetrics>();
+
+// /metrics has a port of its own, which the Service and the ingress don't route: Prometheus scrapes
+// the pod there, without the API key that guards everything on the main port (B11). Unset or 0:
+// no metrics server (the tests).
+var metricsPort = builder.Configuration.GetValue("Metrics:Port", 0);
+if (metricsPort > 0)
+{
+    builder.Services.AddMetricServer(options =>
+    {
+        options.Port = checked((ushort)metricsPort);
+        options.Hostname = builder.Configuration["Metrics:Hostname"] is { Length: > 0 } hostname ? hostname : "+";
+    });
+}
+
 builder.Services.AddSingleton<IServerResetMonitor, ServerResetMonitor>();
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
@@ -126,6 +141,9 @@ builder.Services.AddHostedService<DeferredStartupHostedService>();
 
 var app = builder.Build();
 
+// Defines every spacetraders_* metric, so the first scrape lists them all.
+app.Services.GetRequiredService<IAutomationMetrics>();
+
 app.UsePathBase(PathBase);
 app.UseCors("Dashboard");
 
@@ -149,7 +167,6 @@ app.MapHealthChecks("/health/startup", new HealthCheckOptions
     Predicate = registration => registration.Tags.Contains("startup"),
 });
 
-app.MapMetrics();
 app.MapStatusEndpoints();
 app.MapSettingsEndpoints();
 app.MapControlEndpoints();

@@ -68,7 +68,7 @@ the misbehaviour.
 | B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 1.14 (done) |
 | B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 1.14 (done) |
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick (Debug since 1.9), and every tick it marks its last waypoint visited again: in 1.14, 178 updates of `cached_waypoints` in 15 minutes. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 1.14 (done) |
-| B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. (`spacetraders_api_throttled_total` also counted every 25 ms local wait as a throttle; since 1.10 it counts 429 responses only.) | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
+| B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. (`spacetraders_api_throttled_total` also counted every 25 ms local wait as a throttle; since 1.10 it counts 429 responses only.) | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 (done) |
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 (done) |
 | B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
@@ -497,7 +497,7 @@ Prometheus holds the numbers, Loki holds the events, and Grafana shows both. The
 Grafana-to-Postgres datasource and no new journal table: Loki already keeps 31 days and handles
 its own retention, so the bot's database stays small.
 
-**2.1 Metrics Prometheus can scrape (B11)**
+**2.1 Metrics Prometheus can scrape (B11)** (done)
 - Do: serve `/metrics` on a separate port that the Service and ingress don't route. It then needs
   no API key and isn't public (the API itself is on the public ingress).
   - Fix the credits gauge.
@@ -518,6 +518,35 @@ its own retention, so the bot's database stays small.
     - database size;
     - next reset time.
 - Done when: a local scrape returns all of them without an API key.
+- Done:
+  - `/metrics` is served by a second, minimal Kestrel server on `Metrics:Port` (9090), which
+    needs no API key; the main port serves no `/metrics` any more. `MetricsEndpointTests` scrapes
+    it without a key and finds every metric below (it fails with the metrics server switched off);
+    the deployment's Prometheus annotations point at 9090 (4.2).
+  - `PrometheusAutomationMetrics` defines every metric when the host starts, so a scrape lists
+    them all, also before they have a value. The names are in `docs/HOW_IT_WORKS.md` section 11:
+    - credits (`spacetraders_agent_credits`): read from the cached agent every 10 s, so it shows
+      the credits from the first sample on. It was fed by an event nothing publishes (B7);
+    - credits earned by source and spent by category: counted with each ledger row, by ledger
+      category. Until 2.2 only fuel purchases reach the ledger;
+    - ships by role and state, and one series per ship with its role, state, goal and blocked
+      reason as labels and, as value, when it entered that combination: Grafana's "time in
+      state" is `time()` minus it;
+    - contract units required and fulfilled, and the deadline, per accepted contract;
+    - API requests by method, route template (`my/ships/{shipSymbol}/navigate`) and status,
+      counted by a new innermost handler, so every attempt counts, retries included;
+    - 429s by source (`rate_limiter` or `infrastructure`), in `spacetraders_api_throttled_total`,
+      which since 1.10 counts real 429s only; and the time requests waited for the local budget;
+    - handled messages by type (Wolverine middleware), goal steps by kind, breaker trips,
+      active anomalies, the database size, and when the server resets next (from `GET /` at
+      bootstrap).
+  - "Active anomalies" has two rules until phase 3: the size guard's soft and hard limits
+    (`spacetraders_anomaly_active{rule="DbSizeSoftLimit"|"DbSizeHardLimit"}`), which 1.6 already
+    called anomalies.
+  - Ship roles are the cached ship types: the registration role after a start, the shipyard type
+    for a ship bought since (B25), so one kind of ship can show under two roles until the next
+    restart.
+  - `tools/soak/` reads the metrics from the new port and the new request counter.
 
 **2.2 Record what happens (B7, B19)**
 - Do:

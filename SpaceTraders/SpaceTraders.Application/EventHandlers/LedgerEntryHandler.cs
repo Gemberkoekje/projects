@@ -6,10 +6,10 @@ using SpaceTraders.Domain.Events;
 namespace SpaceTraders.Application.EventHandlers;
 
 /// <summary>
-/// Records credit-affecting domain events into the ledger for financial analytics
-/// and notifies dashboard clients via SignalR.
+/// Records credit-affecting domain events into the ledger for financial analytics, counts them in
+/// the credits earned and spent metrics, and notifies dashboard clients via SignalR.
 /// </summary>
-public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotifier notifier)
+public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetrics metrics, IDashboardNotifier notifier)
 {
     public async Task Handle(ShipCargoSoldEvent @event, CancellationToken cancellationToken)
     {
@@ -20,6 +20,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             goodSymbol: @event.Good.Value,
             units: @event.Units,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.TradeSell, @event.Revenue);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -34,6 +35,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             units: @event.Units,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.TradeBuy, -@event.Cost);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -45,6 +47,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             -@event.Cost,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.FuelPurchase, -@event.Cost);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -56,6 +59,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             -@event.Cost,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.Repair, -@event.Cost);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -68,6 +72,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             goodSymbol: @event.MountSymbol,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.MountPurchase, -@event.Cost);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -80,6 +85,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             goodSymbol: @event.ModuleSymbol,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.ModulePurchase, -@event.Cost);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -91,6 +97,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             -@event.CostPaid,
             goodSymbol: @event.Type.ToString(),
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.ShipPurchase, -@event.CostPaid);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -102,6 +109,19 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotif
             @event.Payment,
             sourceEventId: @event.ContractId,
             cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.ContractPayout, @event.Payment);
         notifier.Notify("contract", @event.ContractId);
+    }
+
+    private void CountCredits(LedgerCategory category, long amount)
+    {
+        if (amount > 0)
+        {
+            metrics.CreditsEarned(category.ToString(), amount);
+        }
+        else if (amount < 0)
+        {
+            metrics.CreditsSpent(category.ToString(), -amount);
+        }
     }
 }

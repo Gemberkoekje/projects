@@ -62,6 +62,7 @@ public sealed class MessageStorageIntegrationTests : IAsyncLifetime
         {
             builder.UseEnvironment("Production");
             builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
+            builder.UseSetting("Metrics:Port", "0");
             builder.ConfigureTestServices(services =>
             {
                 // Only the framework's own hosted services run: no startup chain, no game API calls.

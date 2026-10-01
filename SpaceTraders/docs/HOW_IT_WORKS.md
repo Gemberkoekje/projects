@@ -61,11 +61,15 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
   4. API key
   5. HTTP metrics
   6. health endpoints
-  7. `/metrics`
-  8. endpoint groups
-  9. SignalR hub `/hubs/dashboard`
-- **Hosted services:** the app registers exactly one, `DeferredStartupHostedService`. Every other
-  service is a singleton that it starts.
+  7. endpoint groups
+  8. SignalR hub `/hubs/dashboard`
+- **Metrics:** `/metrics` has a port of its own, `Metrics:Port` (9090; 0 means no metrics
+  server), served by a second, minimal Kestrel server (prometheus-net's `AddMetricServer`). It
+  needs no API key: the Service and the ingress don't route that port, so only something that can
+  reach the pod, such as Prometheus, can scrape it (B11, fixed). `Metrics:Hostname` is `+` (all
+  interfaces) unless set; Development sets `localhost`. The main port serves no `/metrics`.
+- **Hosted services:** the app registers `DeferredStartupHostedService` and the metrics server.
+  Every other service is a singleton that the deferred startup starts.
 
 ### The startup chain (`DeferredStartupHostedService`)
 
@@ -85,7 +89,7 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 10 | `StartupRecoveryService` | once | Resumes ships |
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
-| 13 | `PrometheusMetricsService` | every 10 s | |
+| 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
 
 One try/catch wraps the chain. Steps 5, 9 and 11 catch their own errors. A throw in steps 1, 4, 6,
 8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
@@ -355,6 +359,7 @@ Markets are not scouted again.
   `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
   blocks the goal with reason `runaway`, logs a warning and counts
   `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
+- **Counts** every step it runs in `spacetraders_goal_steps_total{kind}`.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
 - **Called by:**
@@ -507,7 +512,9 @@ other app (D8):
   `DbSizeHardLimit` at Error. It switches automation off again at every check while the
   database stays above the limit, so switching it back on only lasts once the database is smaller.
 - Back under the soft limit it logs `DbSizeNormal`.
-- Until there are anomalies (phase 3), these logs and the metric are how it shows.
+- Each limit is an anomaly while the database is above it:
+  `spacetraders_anomaly_active{rule="DbSizeSoftLimit"|"DbSizeHardLimit",subject="database"}` is 1,
+  and 0 once it is back under. They are the only anomalies until phase 3 adds the health rules.
 
 ### Tables
 
@@ -607,6 +614,7 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 | `SPACETRADERS_AGENT_TOKEN` | Initial agent data scope |
 | `SPACETRADERS_INTERNAL_API_KEY` | Required `X-Api-Key` for the internal API when set |
 | `WebUI:Origin` | CORS origin for the dashboard |
+| `Metrics:Port`, `Metrics:Hostname` | Where `/metrics` is served: 9090 on all interfaces; 0 means no metrics server. Development uses `localhost` |
 | `Serilog:*` | Log levels |
 | `ASPNETCORE_ENVIRONMENT` | `Development`: user secrets and Swagger. `Production`: JSON logs. `Testing`: no database work. |
 
@@ -616,7 +624,7 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 
 **Handler pipeline,** outermost first:
 
-All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
+The first three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
 
 1. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
    wait a few minutes. So after a 502 no call goes out for `Api.BadGatewayPauseMinutes`
@@ -629,7 +637,13 @@ All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D
    Warning, and the headers are recorded for `/status/rate-limit`.
 3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
-   both are used. Non-GET requests go first.
+   both are used. Non-GET requests go first. Time spent waiting is counted in
+   `spacetraders_api_rate_limit_wait_seconds_total`.
+4. **`ApiRequestMetricsHandler`:** counts every request that goes out, retries included, in
+   `spacetraders_api_requests_total{method,endpoint,status}`, with the route template as
+   `endpoint` (`my/ships/{shipSymbol}/navigate`, `ApiEndpointTemplate`) and `error` as status when
+   no response came. A 429 is also counted in `spacetraders_api_throttled_total{source}`:
+   `rate_limiter` with the `x-ratelimit-*` headers, `infrastructure` without.
 
 **Other parts:**
 
@@ -659,8 +673,8 @@ All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D
 ## 9. Internal HTTP API (`/spacetraders/api`)
 
 **Authentication:** everything except `/health/*` needs `X-Api-Key` when
-`SPACETRADERS_INTERNAL_API_KEY` is set. That includes `/metrics` (B11) and the SignalR hub. When
-the key is unset, everything is open.
+`SPACETRADERS_INTERNAL_API_KEY` is set, the SignalR hub included. When the key is unset,
+everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacetradersapiprogramcs).
 
 | Group | Endpoints | Notes |
 |---|---|---|
@@ -674,7 +688,6 @@ the key is unset, everything is open.
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
 | Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
 | Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
-| Metrics | `GET /metrics` | See below |
 
 **SignalR** (`/hubs/dashboard`): the server broadcasts `ReceiveInvalidation({Kind, Id, OccurredAt})`
 for ships, activity, assignments, goal chains, contracts and markets. Clients can't call
@@ -725,17 +738,30 @@ The seven pages in `src/Future` are not routed.
   - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
     `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
     Serilog turns into properties.
-- **Metrics** (`PrometheusMetricsService`, every 10 s), plus the prometheus-net defaults:
+- **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
+  `PrometheusAutomationMetrics` defines them all at startup, so a scrape lists every one, also
+  before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the
+  .NET meters, Wolverine's among them). Labels stay low-cardinality: a few per ship or contract
+  at most.
 
-  | Metric | Updated? |
-  |---|---|
-  | `spacetraders_api_calls_total` | Yes, one per outbound request |
-  | `spacetraders_api_throttled_total` | Yes, one per 429 response |
-  | `spacetraders_agent_credits` | Never (B7) |
-  | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
-  | `spacetraders_db_size_bytes` | Yes, every 5 minutes (size guard) |
-
-  `/metrics` requires the API key (B11), so Prometheus can't scrape it as deployed.
+  | Metric | Labels | What it counts or shows | Updated |
+  |---|---|---|---|
+  | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
+  | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
+  | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
+  | `spacetraders_contract_units_required`, `_units_fulfilled` | `contract`, `trade_symbol` | The accepted contracts' deliverables | Every 10 s |
+  | `spacetraders_contract_deadline_timestamp_seconds` | `contract` | An accepted contract's deadline (Unix time) | Every 10 s |
+  | `spacetraders_credits_earned_total` | `source` | Credits earned, by ledger category | With each ledger row (`LedgerEntryHandler`) |
+  | `spacetraders_credits_spent_total` | `category` | Credits spent, by ledger category | With each ledger row |
+  | `spacetraders_api_requests_total` | `method`, `endpoint`, `status` | Requests to the game API by route template, retries included | Per request |
+  | `spacetraders_api_throttled_total` | `source` | 429s: `rate_limiter` or `infrastructure` | Per 429 |
+  | `spacetraders_api_rate_limit_wait_seconds_total` | | Time requests waited for the local budget | Per request that waited |
+  | `spacetraders_messages_handled_total` | `type` | Messages Wolverine handled without an error (`MessageMetricsMiddleware`) | Per message |
+  | `spacetraders_goal_steps_total` | `kind` | Goal steps run | Per step |
+  | `spacetraders_goal_breaker_trips_total` | `ship` | Goals the circuit breaker blocked | Per trip |
+  | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the size guard's limits | Every 5 minutes |
+  | `spacetraders_db_size_bytes` | | `pg_database_size` | Every 5 minutes (size guard) |
+  | `spacetraders_server_next_reset_timestamp_seconds` | | When the server resets next (Unix time), from `GET /` | At agent bootstrap |
 
 ---
 
@@ -762,7 +788,7 @@ This makes the codebase look bigger than what actually runs:
 ## 13. Build, tests and deployment
 
 **Images:**
-- `Dockerfile.api`: SDK 10 publish, then the ASP.NET 10 runtime on port 8080.
+- `Dockerfile.api`: SDK 10 publish, then the ASP.NET 10 runtime on port 8080, and the metrics on 9090.
 - `Dockerfile.webui`: Node 22 build, then nginx 1.27 on port 80 with the runtime-config
   entrypoint.
 

@@ -47,6 +47,24 @@ public sealed class DatabaseSizeGuardServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EachLimit_IsAnAnomaly_WhileTheDatabaseIsAboveIt()
+    {
+        // B11: the size guard's limits show as anomalies (spacetraders_anomaly_active).
+        await SeedDefaultSettingsAsync();
+
+        SizeIs(1025 * Megabyte);
+        await _guard.CheckAsync(CancellationToken.None);
+        _metrics.Received(1).Anomaly("DbSizeSoftLimit", "database", true);
+        _metrics.Received(1).Anomaly("DbSizeHardLimit", "database", false);
+
+        _metrics.ClearReceivedCalls();
+        SizeIs(10 * Megabyte);
+        await _guard.CheckAsync(CancellationToken.None);
+        _metrics.Received(1).Anomaly("DbSizeSoftLimit", "database", false);
+        _metrics.Received(1).Anomaly("DbSizeHardLimit", "database", false);
+    }
+
+    [Fact]
     public async Task AboveTheHardLimit_LeavesAutomationAlone_OnceItIsOff()
     {
         await SeedDefaultSettingsAsync();

@@ -8,6 +8,7 @@ using Npgsql;
 using NSubstitute;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence;
@@ -120,6 +121,7 @@ public sealed class AgentCleanupIntegrationTests : IAsyncLifetime
             AgentFaction = "COSMIC",
             AccountToken = "account-token",
         }));
+        services.AddSingleton(Substitute.For<IAutomationMetrics>());
         services.AddSingleton<AgentBootstrapService>();
         return services.BuildServiceProvider();
     }

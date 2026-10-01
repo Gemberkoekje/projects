@@ -1,7 +1,8 @@
 """Runs a published SpaceTraders API host for a soak test (PLAN.md slice 1.14).
 
 Configured like the cluster (Production: JSON logs, the same Serilog levels), but against a local
-soak database and on loopback only, without an internal API key. The account token, agent name and
+soak database and on loopback only (the API on 49306, the metrics on 9090), without an internal
+API key. The account token, agent name and
 faction come from the API project's user secrets; they reach the child process through its
 environment and are never printed. The user secrets' own connection string points at the cluster's
 shared Postgres, so the soak database's connection string always replaces it.
@@ -18,6 +19,7 @@ import sys
 
 CONNECTION = "Host=127.0.0.1;Port=55432;Database=spacetraders;Username=postgres;Password=soak"
 URLS = "http://127.0.0.1:49306"
+METRICS_PORT = "9090"
 
 
 def main() -> int:
@@ -37,6 +39,8 @@ def main() -> int:
     env.update({
         "ASPNETCORE_ENVIRONMENT": "Production",
         "ASPNETCORE_URLS": URLS,
+        "Metrics__Port": METRICS_PORT,
+        "Metrics__Hostname": "127.0.0.1",
         "ConnectionStrings__DefaultConnection": CONNECTION,
         "SpaceTraders__AccountToken": secrets["AccountToken"],
         "SpaceTraders__AgentName": secrets["AgentName"],

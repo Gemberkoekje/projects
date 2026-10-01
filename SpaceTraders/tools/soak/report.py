@@ -114,7 +114,7 @@ def main() -> None:
         writes = sum(t["ins"] + t["upd"] + t["del"] for t in s["tables"])
         ws = s["metrics"].get("process_working_set_bytes", 0) / 1e6
         w(f"| {s['n']} | {s['t'][11:16]} | {s.get('db', {}).get('bytes', 0) / 1e6:.2f} | {rows} | {writes:,} | "
-          f"{s['log']['lines']:,} | {metric_sum(s, 'spacetraders_api_calls_total'):,.0f} | {s.get('credits')} | {ws:.0f} |")
+          f"{s['log']['lines']:,} | {metric_sum(s, 'spacetraders_api_requests_total') or metric_sum(s, 'spacetraders_api_calls_total'):,.0f} | {s.get('credits')} | {ws:.0f} |")
     w("")
 
     # --- Log volume per bucket

@@ -63,6 +63,8 @@ FLAGS = {
     "tick_step_failed": re.compile(r"failed; the rest of the tick carries on"),
 }
 
+# Every response from the game API; before slice 2.1 this was spacetraders_api_calls_total.
+API_REQUESTS_METRIC = "spacetraders_api_requests_total"
 KEPT_METRIC_PREFIXES = ("spacetraders_", "process_", "dotnet_total_memory_bytes", "dotnet_collection_count_total")
 
 
@@ -192,7 +194,7 @@ def take_sample(args, number: int, started: dt.datetime, previous: dict | None) 
 
     # The bot
     base = args.base_url.rstrip("/")
-    status, metrics_text = http_get(base + "/metrics")
+    status, metrics_text = http_get(args.metrics_url)
     sample["metrics_status"] = status
     (SOAK / "metrics").mkdir(exist_ok=True)
     (SOAK / "metrics" / f"{number:02d}.txt").write_text(metrics_text, encoding="utf-8")
@@ -252,9 +254,9 @@ def write_summary(sample: dict, previous: dict | None) -> None:
                  if "wolverine" in (t["schema"] + t["table"]).lower()]
     wolverine_text = "none" if not wolverine and "wolverine" not in sample.get("schemas", []) else ",".join(wolverine) or "schema"
     m = sample["metrics"]
-    api = sum(v for k, v in m.items() if k.startswith("spacetraders_api_calls_total"))
+    api = sum(v for k, v in m.items() if k.startswith(API_REQUESTS_METRIC))
     prev_api = sum(v for k, v in (previous or {}).get("metrics", {}).items()
-                   if k.startswith("spacetraders_api_calls_total")) if previous else None
+                   if k.startswith(API_REQUESTS_METRIC)) if previous else None
     throttled = sum(v for k, v in m.items() if k.startswith("spacetraders_api_throttled_total"))
     trips = sum(v for k, v in m.items() if k.startswith("spacetraders_goal_breaker_trips_total"))
     levels = sample["log"]["levels"]
@@ -285,6 +287,8 @@ def main() -> int:
     parser.add_argument("--container", default="spacetraders-soak-pg")
     parser.add_argument("--database", default="spacetraders")
     parser.add_argument("--base-url", default="http://127.0.0.1:49306/spacetraders/api")
+    parser.add_argument("--metrics-url", default="http://127.0.0.1:9090/metrics",
+                        help="the bot's metrics port (Metrics:Port), which needs no API key")
     parser.add_argument("--out", default="soak-output", help="folder that launch.py writes the bot's log to")
     args = parser.parse_args()
 

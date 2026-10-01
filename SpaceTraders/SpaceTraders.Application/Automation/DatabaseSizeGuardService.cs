@@ -10,8 +10,9 @@ namespace SpaceTraders.Application.Automation;
 /// Keeps the bot from filling the Postgres volume it shares with every other app (D8). Every 5
 /// minutes it reads the database size and exports it as <c>spacetraders_db_size_bytes</c>. Above
 /// <c>Database.SoftLimitMegabytes</c> it logs a warning; above <c>Database.HardLimitMegabytes</c>
-/// it switches automation off. Until there are anomalies (phase 3), the logs and the metric are
-/// how this shows.
+/// it switches automation off. Each limit is an anomaly while the database is above it
+/// (<c>spacetraders_anomaly_active{rule="DbSizeSoftLimit"|"DbSizeHardLimit",subject="database"}</c>),
+/// next to the logs and the size metric.
 /// </summary>
 public sealed class DatabaseSizeGuardService(
     IServiceScopeFactory serviceScopeFactory,
@@ -22,6 +23,8 @@ public sealed class DatabaseSizeGuardService(
     public const string HardLimitSetting = "Database.HardLimitMegabytes";
     public const int DefaultSoftLimitMegabytes = 1024;
     public const int DefaultHardLimitMegabytes = 3072;
+
+    private const string AnomalySubject = "database";
 
     internal static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
 
@@ -56,6 +59,9 @@ public sealed class DatabaseSizeGuardService(
         var softLimit = await LimitAsync(settings, SoftLimitSetting, DefaultSoftLimitMegabytes, cancellationToken);
         var hardLimit = await LimitAsync(settings, HardLimitSetting, DefaultHardLimitMegabytes, cancellationToken);
         var megabytes = bytes / Megabyte;
+
+        metrics.Anomaly("DbSizeSoftLimit", AnomalySubject, bytes > softLimit * Megabyte);
+        metrics.Anomaly("DbSizeHardLimit", AnomalySubject, bytes > hardLimit * Megabyte);
 
         if (bytes > hardLimit * Megabyte)
         {

@@ -202,13 +202,6 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
-    public async Task Metrics_WithoutApiKeyWithPathBase_ReturnsUnauthorizedWhenApiKeyConfigured()
-    {
-        using var response = await _client.GetAsync($"{ApiPathBase}/metrics");
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
     // ── Run KPIs endpoint ────────────────────────────────────────────────────
 
     [Fact]
@@ -813,6 +806,7 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;Username=test;Password=test");
         builder.UseSetting("SPACETRADERS_INTERNAL_API_KEY", TestApiKey);
+        builder.UseSetting("Metrics:Port", "0");
 
         builder.ConfigureTestServices(services =>
         {

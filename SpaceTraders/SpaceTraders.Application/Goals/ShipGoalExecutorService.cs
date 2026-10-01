@@ -84,6 +84,7 @@ public sealed class ShipGoalExecutorService(
             return GoalExecutionResult.Blocked($"{RunawayReason}: more than {maxStepsPerMinute} goal steps in a minute.");
         }
 
+        metrics.GoalStep(activeGoal.Kind.ToString());
         var result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)

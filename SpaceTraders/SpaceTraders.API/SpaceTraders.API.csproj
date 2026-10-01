@@ -9,6 +9,10 @@
     <IsPublishable>true</IsPublishable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="SpaceTraders.API.Tests" />
+  </ItemGroup>
+
   <ItemGroup Label="Exclude future code from build">
     <Compile Remove="Future/**/*.cs" />
   </ItemGroup>
