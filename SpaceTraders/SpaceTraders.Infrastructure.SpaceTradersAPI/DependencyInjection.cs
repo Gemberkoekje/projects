@@ -41,9 +41,10 @@ public static class DependencyInjection
         services.AddSingleton<IRateLimitStatus>(sp => sp.GetRequiredService<RateLimitStatus>());
         services.AddSingleton<ApiAvailabilityState>();
         services.AddSingleton<IApiAvailabilityState>(sp => sp.GetRequiredService<ApiAvailabilityState>());
+        services.AddSingleton<RequestBudget>();
         services.AddTransient<RateLimitingHandler>();
         services.AddTransient<RateLimitResponseHandler>();
-        services.AddTransient<RetryHandler>();
+        services.AddTransient<OutagePauseHandler>();
 
         services.AddHttpClient<ISpaceTradersApiClient, SpaceTradersApiClient>((serviceProvider, client) =>
         {
@@ -52,7 +53,7 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         })
-        .AddHttpMessageHandler<RetryHandler>()
+        .AddHttpMessageHandler<OutagePauseHandler>()
         .AddHttpMessageHandler<RateLimitResponseHandler>()
         .AddHttpMessageHandler<RateLimitingHandler>();
 

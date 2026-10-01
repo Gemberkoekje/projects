@@ -61,7 +61,13 @@ public sealed class GameLoopService(
         var bus = services.GetRequiredService<Wolverine.IMessageBus>();
         var settings = services.GetRequiredService<ISettingsRepository>();
 
-        if (await settings.IsAutomationEnabledAsync(cancellationToken))
+        if (TimeProvider.System.GetUtcNow() < apiAvailability.PausedUntil)
+        {
+            logger.LogDebug(
+                "GameLoopService: API calls are paused until {PausedUntil} after a 502; no plans, goal steps or contract work this tick.",
+                apiAvailability.PausedUntil);
+        }
+        else if (await settings.IsAutomationEnabledAsync(cancellationToken))
         {
             await RunAutomationAsync(settings, cancellationToken);
         }
@@ -212,13 +218,16 @@ public sealed class GameLoopService(
     {
         if (apiAvailability.ConsumeUnavailableTransition())
         {
-            logger.LogWarning("SpaceTraders API became unavailable; publishing ApiUnavailableEvent.");
+            logger.LogWarning(
+                "{EventKind}: the SpaceTraders API answered 502 (DDoS protection); no API calls until {PausedUntil}.",
+                "ApiUnavailable",
+                apiAvailability.PausedUntil);
             await bus.PublishAsync(new ApiUnavailableEvent(TimeProvider.System.GetUtcNow()));
         }
 
         if (apiAvailability.ConsumeAvailableTransition())
         {
-            logger.LogInformation("SpaceTraders API became available again; publishing ApiAvailableEvent.");
+            logger.LogInformation("{EventKind}: the SpaceTraders API answers again.", "ApiAvailable");
             await bus.PublishAsync(new ApiAvailableEvent(TimeProvider.System.GetUtcNow()));
         }
     }

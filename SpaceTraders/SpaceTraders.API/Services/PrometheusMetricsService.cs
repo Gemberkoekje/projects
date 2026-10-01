@@ -16,7 +16,7 @@ namespace SpaceTraders.API.Services;
 /// <list type="bullet">
 ///   <item><c>spacetraders_agent_credits</c> – current agent credit balance (Gauge)</item>
 ///   <item><c>spacetraders_api_calls_total</c> – cumulative API calls (Counter)</item>
-///   <item><c>spacetraders_api_throttled_total</c> – cumulative throttled requests (Counter)</item>
+///   <item><c>spacetraders_api_throttled_total</c> – cumulative 429 responses (Counter)</item>
 /// </list>
 /// </summary>
 public sealed class PrometheusMetricsService(
@@ -36,7 +36,7 @@ public sealed class PrometheusMetricsService(
         .CreateCounter("spacetraders_api_calls_total", "Total SpaceTraders API calls made.");
 
     private static readonly Counter ApiThrottledCounter = Metrics
-        .CreateCounter("spacetraders_api_throttled_total", "Total SpaceTraders API requests throttled by rate limiter.");
+        .CreateCounter("spacetraders_api_throttled_total", "SpaceTraders API responses with status 429, from its rate limiter or its cloud infrastructure.");
 
     private int _lastTotalRequests;
     private int _lastThrottledCount;

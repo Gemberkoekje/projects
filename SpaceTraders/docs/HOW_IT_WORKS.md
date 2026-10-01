@@ -159,10 +159,11 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
   3. If the contract plan is switched on, for every active `Contract` assignment:
      `FulfillContractDeliveryCommand` if the ship holds any of the contract good, otherwise
      `MineResourceVolumeCommand` (B8).
-  4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed. Nothing
-     handles them.
+  4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
+     it (`ApiUnavailable`, `ApiAvailable`). Nothing handles the events.
 
-  With `Automation.Enabled` off, it skips steps 1 to 3.
+  With `Automation.Enabled` off, or while API calls are paused after a 502, it skips steps 1
+  to 3.
 - Each plan bootstrap, each ship's goal step and each contract assignment runs in its own DI
   scope and try/catch. A failure is logged at Error with the plan or the ship, and the rest of the
   tick carries on. Its own scope means a step can't leave a broken DbContext to the steps after
@@ -493,13 +494,14 @@ production code doesn't use the aggregates at all (B7).
 
 ### What each setting does
 
-Only 11 of the 53 seeded settings change what the bot does (B18):
+Only 12 of the 54 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
 | `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. Startup snapshot switches it off and on. |
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
+| `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
@@ -554,16 +556,25 @@ Only 11 of the 53 seeded settings change what the bot does (B18):
 
 **Handler pipeline,** outermost first:
 
-1. **`RetryHandler`:** retries a 502 after 1, 2 and 4 s, then marks the API unavailable.
-2. **`RateLimitResponseHandler`:** on a 429, waits until `x-ratelimit-reset` (or 1 s) and resends
-   once. It records the remaining requests, the limit and the reset time from the headers.
-3. **`RateLimitingHandler`:** every request needs a token from a 2/s bucket *and* a 30-per-60 s
-   bucket, which allows 30 requests a minute. Non-GET requests go first. This deviates from the
-   API guide (B13).
+All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
+
+1. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
+   wait a few minutes. So after a 502 no call goes out for `Api.BadGatewayPauseMinutes`
+   (default 3): calls in that time fail at once with `ApiPausedException`. The first call after
+   the pause goes out as usual; a success marks the API available, another 502 pauses again.
+2. **`RateLimitResponseHandler`:** a 429 with `x-ratelimit-*` headers comes from the API's rate
+   limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute)
+   and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
+   and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
+   Warning, and the headers are recorded for `/status/rate-limit`.
+3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
+   in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
+   both are used. Non-GET requests go first.
 
 **Other parts:**
 
-- **Availability:** `ApiAvailabilityState` tracks availability. Nothing pauses on it (B13).
+- **Availability:** `ApiAvailabilityState` tracks availability and the pause after a 502. The
+  tick does no work during the pause.
 - **Alerts:** `WebhookAlertNotifier` posts alerts to `Alerts.WebhookUrl` and ignores errors.
 - **Server reset:** every failed call goes through one place in `SpaceTradersApiClient`. A 401
   with "Token reset_date does not match the server" goes to `ServerResetMonitor`, which switches
@@ -593,7 +604,7 @@ the key is unset, everything is open.
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data. Burst fields in `/rate-limit` are never set. |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes`, `/anomalies` | Read tables that are never written; always 204, `[]` or zeros |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
 | Runs and finance | `GET /runs/{id}/kpis`, `/finance/trade-routes` | KPIs is a stub; trade routes are always `[]` |
@@ -648,7 +659,7 @@ The seven pages in `src/Future` are not routed.
   | Metric | Updated? |
   |---|---|
   | `spacetraders_api_calls_total` | Yes, one per outbound request |
-  | `spacetraders_api_throttled_total` | Yes, but it counts local limiter waits as well as real 429s |
+  | `spacetraders_api_throttled_total` | Yes, one per 429 response |
   | `spacetraders_agent_credits` | Never (B7) |
   | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
 
@@ -697,7 +708,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~244 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Application.Tests` | ~253 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~66 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |

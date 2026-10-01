@@ -1,42 +1,13 @@
-using System.Net;
-using System.Threading;
-using System.Threading.RateLimiting;
-
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
-public sealed class RateLimitingHandler : DelegatingHandler
+/// <summary>
+/// Keeps outbound requests within the API guide's limit (<see cref="RequestBudget"/>). Requests
+/// that change something (anything but GET) go before reads.
+/// </summary>
+public sealed class RateLimitingHandler(RequestBudget budget, RateLimitStatus status) : DelegatingHandler
 {
-    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan PriorityWait = TimeSpan.FromMilliseconds(25);
     private static int s_pendingPriorityRequests;
-
-    // PerSecond: 2 tokens, refills 2/s
-    private readonly RateLimiter _perSecondLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
-    {
-        TokenLimit = 2,
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = 0,
-        ReplenishmentPeriod = TimeSpan.FromSeconds(1),
-        TokensPerPeriod = 2,
-        AutoReplenishment = true,
-    });
-
-    // Burst: 30 tokens over 60 s (0.5/s)
-    private readonly RateLimiter _burstLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
-    {
-        TokenLimit = 30,
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = 0,
-        ReplenishmentPeriod = TimeSpan.FromSeconds(60),
-        TokensPerPeriod = 30,
-        AutoReplenishment = true,
-    });
-
-    private readonly RateLimitStatus _status;
-
-    public RateLimitingHandler(RateLimitStatus status)
-    {
-        _status = status;
-    }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -49,13 +20,9 @@ public sealed class RateLimitingHandler : DelegatingHandler
 
         try
         {
-            var (perSecondLease, burstLease) = await AcquireRateLimitAsync(isPriorityRequest, cancellationToken);
-            using (perSecondLease)
-            using (burstLease)
-            {
-                _status.TotalRequests++;
-                return await base.SendAsync(request, cancellationToken);
-            }
+            await WaitForBudgetAsync(isPriorityRequest, cancellationToken);
+            status.TotalRequests++;
+            return await base.SendAsync(request, cancellationToken);
         }
         finally
         {
@@ -66,7 +33,7 @@ public sealed class RateLimitingHandler : DelegatingHandler
         }
     }
 
-    private async Task<(RateLimitLease PerSecondLease, RateLimitLease BurstLease)> AcquireRateLimitAsync(bool isPriorityRequest, CancellationToken cancellationToken)
+    private async Task WaitForBudgetAsync(bool isPriorityRequest, CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -74,40 +41,20 @@ public sealed class RateLimitingHandler : DelegatingHandler
 
             if (!isPriorityRequest && Volatile.Read(ref s_pendingPriorityRequests) > 0)
             {
-                await Task.Delay(RetryDelay, cancellationToken);
+                await Task.Delay(PriorityWait, cancellationToken);
                 continue;
             }
 
-            var perSecondLease = _perSecondLimiter.AttemptAcquire(permitCount: 1);
-            if (!perSecondLease.IsAcquired)
+            var now = TimeProvider.System.GetUtcNow();
+            var wait = budget.TryTake(now);
+            if (wait == TimeSpan.Zero)
             {
-                perSecondLease.Dispose();
-                _status.ThrottledCount++;
-                await Task.Delay(RetryDelay, cancellationToken);
-                continue;
+                status.BurstLimit = RequestBudget.Burst;
+                status.BurstRemaining = budget.BurstRemaining(now);
+                return;
             }
 
-            var burstLease = _burstLimiter.AttemptAcquire(permitCount: 1);
-            if (!burstLease.IsAcquired)
-            {
-                burstLease.Dispose();
-                perSecondLease.Dispose();
-                _status.ThrottledCount++;
-                await Task.Delay(RetryDelay, cancellationToken);
-                continue;
-            }
-
-            return (perSecondLease, burstLease);
+            await Task.Delay(wait, cancellationToken);
         }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _perSecondLimiter.Dispose();
-            _burstLimiter.Dispose();
-        }
-        base.Dispose(disposing);
     }
 }

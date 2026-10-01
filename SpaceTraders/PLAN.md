@@ -65,9 +65,9 @@ with a test that does.
 | B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 6.1 |
 | B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 6.1 |
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 6.2 |
-| B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. Separately, `spacetraders_api_throttled_total` counts every 25 ms local wait as a throttle. | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
+| B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. (`spacetraders_api_throttled_total` also counted every 25 ms local wait as a throttle; since 1.10 it counts 429 responses only.) | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 |
-| B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 |
+| B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
 | B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
 | B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | 6.2, 6.4 |
@@ -249,7 +249,7 @@ cluster (phase 4).
 - Done when: an idle bot writes less than one line a minute, and a normal day stays within a
   budget of 50k lines. Loki's 31 days on 10Gi are shared with every app.
 
-**1.10 Follow the API guide for limits and errors (B13)**
+**1.10 Follow the API guide for limits and errors (B13)** (done, apart from the check after the redeploy)
 - Do: make the client do what https://spacetraders.io/api-guide/rate-limits says:
   - **Limit:** 2 requests per second sustained. When that's used up, a request may draw from a
     burst pool of 30 that refills over 60 seconds. Only when both are empty does it wait.
@@ -267,6 +267,20 @@ cluster (phase 4).
   - tests cover each of the four behaviours above;
   - after redeploy, the count of real 429s stays at zero, which confirms the burst reading (the
     429 rule in 3.2 watches this).
+- Done:
+  - `RequestBudget` (a singleton, so the buckets no longer reset) counts in sliding windows: 2
+    requests in any second, then up to 30 more in any 60 seconds. A sliding window is at least
+    as strict as any fixed window the server might count in.
+  - 429: with the headers it waits until the reset (at most a minute), without them it backs off
+    1, 2, 4, 8 and 16 s. It gives up after five retries. Every 429 is logged at Warning and
+    counted in `spacetraders_api_throttled_total`, which no longer counts local waits.
+  - 502: `OutagePauseHandler` pauses all calls for `Api.BadGatewayPauseMinutes` (default 3).
+    Calls during the pause fail at once (`ApiPausedException`); the tick skips its work and
+    logs `ApiUnavailable`, then `ApiAvailable` after the first successful call.
+  - Still to check after the redeploy (phase 4): the count of 429s stays at zero.
+  - Noticed: an arrival that falls in a 502 pause can't dock, and its message is dropped after
+    Wolverine's three retries. The ship then looks in transit until the next restart; that is
+    B17's territory (6.4).
 
 **1.11 Failures don't silently stop work (B14, B23)** (done)
 - Do:

@@ -31,6 +31,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
+    private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
 
     public GameLoopServiceTests()
     {
@@ -161,6 +162,20 @@ public sealed class GameLoopServiceTests : IDisposable
         await _bus.Received(1).InvokeAsync(Arg.Is<MineResourceVolumeCommand>(c => c.ShipSymbol == "SPECTER-DEBUG-5"), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Tick_WhileApiCallsArePausedAfterA502_SkipsTheWork()
+    {
+        SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
+        _apiAvailability.PausedUntil.Returns(TimeProvider.System.GetUtcNow().AddMinutes(2));
+
+        await TickAsync();
+
+        await _scoutPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _contractPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
     private static ShipAssignmentDto ContractAssignment(string shipSymbol) =>
         new(
             ShipSymbol: shipSymbol,
@@ -184,13 +199,12 @@ public sealed class GameLoopServiceTests : IDisposable
 
     private async Task TickAsync()
     {
-        var apiAvailability = Substitute.For<IApiAvailabilityState>();
         var leaderElection = Substitute.For<ILeaderElection>();
         leaderElection.IsLeader.Returns(true);
 
         using var sut = new GameLoopService(
             _serviceScopeFactory,
-            apiAvailability,
+            _apiAvailability,
             leaderElection,
             NullLogger<GameLoopService>.Instance);
 
