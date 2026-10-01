@@ -17,10 +17,11 @@ public sealed record MineResourceVolumeCommand
 
     public required int RequiredUnitsTotal { get; init; }
 
-    public SurveyModel Survey { get; init; }
+    /// <summary>The survey to extract with; without one, extraction is unguided.</summary>
+    public SurveyModel? Survey { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal, SurveyModel Survey = null)
+    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal, SurveyModel? Survey = null)
     {
         this.ShipSymbol = ShipSymbol;
         this.TradeSymbol = TradeSymbol;
@@ -42,6 +43,18 @@ public sealed class MineResourceVolumeHandler(
 {
     public Task<ShipCommandResult> Handle(MineResourceVolumeCommand command, CancellationToken cancellationToken)
         => ExecuteAsync(command, cancellationToken);
+
+    /// <summary>
+    /// The units of the contract good one trip carries: what the contract still needs, at most a
+    /// full hold. Mining stops there, and the tick sends the ship to deliver no sooner (B8).
+    /// </summary>
+    /// <param name="requiredUnitsTotal">The units the contract still needs.</param>
+    /// <param name="cargoCapacity">The ship's cargo capacity; 0 when unknown.</param>
+    /// <returns>The units to have aboard before delivering.</returns>
+    public static int UnitsPerTrip(int requiredUnitsTotal, int cargoCapacity)
+        => cargoCapacity > 0
+            ? Math.Min(Math.Max(requiredUnitsTotal, 0), cargoCapacity)
+            : Math.Max(requiredUnitsTotal, 0);
 
     public async Task<ShipCommandResult> ExecuteAsync(MineResourceVolumeCommand command, CancellationToken cancellationToken)
     {
@@ -142,9 +155,7 @@ public sealed class MineResourceVolumeHandler(
             .FirstOrDefault(i => i.Symbol.Equals(command.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
             .Units ?? 0;
 
-        var maxTargetForTrip = ship.CargoCapacity > 0
-            ? Math.Min(Math.Max(command.RequiredUnitsTotal, 0), ship.CargoCapacity)
-            : Math.Max(command.RequiredUnitsTotal, 0);
+        var maxTargetForTrip = UnitsPerTrip(command.RequiredUnitsTotal, ship.CargoCapacity);
 
         if (targetUnitsInCargo >= maxTargetForTrip || ship.CargoCurrent >= ship.CargoCapacity)
         {
@@ -262,7 +273,7 @@ public sealed class MineResourceVolumeHandler(
         }
     }
 
-    private static bool IsUsableSurvey(SurveyModel survey)
+    private static bool IsUsableSurvey([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] SurveyModel? survey)
         => survey is not null
             && !string.IsNullOrWhiteSpace(survey.Signature)
             && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)

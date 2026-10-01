@@ -24,6 +24,7 @@ public sealed class ContractPlanService(
     IWaypointRepository waypoints,
     ISpaceTradersPort port,
     IShipPurchaseService shipPurchases,
+    IAgentRepository agents,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
     private const string ContractAssignmentType = "Contract";
@@ -52,7 +53,14 @@ public sealed class ContractPlanService(
         {
             if (existing.Status == ContractMineralPlanStatus.Active)
             {
-                await EnsureActivePlanAssignmentAsync(existing, cancellationToken);
+                // The tick advances the plan from the cached contract, which deliveries keep current.
+                // The events it used to wait for are never published (B9).
+                var advanced = await AdvanceActivePlanAsync(existing, cancellationToken);
+                if (advanced.Status == ContractMineralPlanStatus.Active)
+                {
+                    await EnsureActivePlanAssignmentAsync(advanced, cancellationToken);
+                }
+
                 return;
             }
 
@@ -65,8 +73,12 @@ public sealed class ContractPlanService(
                 "Contract plan bootstrap: retrying pending-budget plan for contract {ContractId}.",
                 existing.ContractId);
         }
-
-        await RefreshContractsCacheOnceAsync(cancellationToken);
+        else
+        {
+            // Only before the first plan: a plan waiting for budget is retried on every tick, and the
+            // contract it waits for is cached already (B27).
+            await RefreshContractsCacheOnceAsync(cancellationToken);
+        }
 
         var activeContracts = await contracts.GetActiveAsync(cancellationToken);
         if (activeContracts.Count == 0)
@@ -85,6 +97,13 @@ public sealed class ContractPlanService(
         {
             var accepted = await port.AcceptContractAsync(pending.ContractId, cancellationToken);
             await contracts.UpsertAsync(MapToDto(accepted), cancellationToken);
+
+            // The acceptance payment: purchases, this plan's drone among them, are budgeted from the
+            // cached credits (B33).
+            if (accepted.AgentCredits is { } credits && await agents.GetAsync(cancellationToken) is { } agent)
+            {
+                await agents.UpsertAsync(agent with { Credits = credits }, cancellationToken);
+            }
             activeContracts = await contracts.GetActiveAsync(cancellationToken);
             pending = SelectPendingDeliverable(activeContracts);
             if (pending is null)
@@ -133,6 +152,16 @@ public sealed class ContractPlanService(
 
         if (selectedShip is null)
         {
+            // Retried on every tick: only starting to wait is news, and only that is stored.
+            if (existing?.Status == ContractMineralPlanStatus.PendingBudget
+                && string.Equals(existing.ContractId, pending.ContractId, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogDebug(
+                    "Contract plan still pending for contract {ContractId}: no miner available and purchase was not possible.",
+                    pending.ContractId);
+                return;
+            }
+
             await contractPlans.UpsertAsync(new ContractMineralPlanState
             {
                 PlanId = Guid.NewGuid(),
@@ -149,9 +178,7 @@ public sealed class ContractPlanService(
                 StopReason = "No idle mining ship available and unable to purchase SHIP_MINING_DRONE.",
             }, cancellationToken);
 
-            // Retried on every tick: only starting to wait is news.
-            logger.Log(
-                existing?.Status == ContractMineralPlanStatus.PendingBudget ? LogLevel.Debug : LogLevel.Information,
+            logger.LogInformation(
                 "Contract plan pending for contract {ContractId}: no miner available and purchase was not possible.",
                 pending.ContractId);
             return;
@@ -274,20 +301,32 @@ public sealed class ContractPlanService(
             return;
         }
 
+        await AdvanceActivePlanAsync(plan, cancellationToken);
+    }
+
+    /// <summary>
+    /// Brings an active plan up to date with the cached contract, and returns the plan as stored.
+    /// It completes, and releases its ship, once the contract is fulfilled. This runs on every tick,
+    /// so it writes only what changed.
+    /// </summary>
+    private async Task<ContractMineralPlanState> AdvanceActivePlanAsync(
+        ContractMineralPlanState plan,
+        CancellationToken cancellationToken)
+    {
         var contract = await contracts.FindAsync(plan.ContractId, cancellationToken);
         if (contract is null)
         {
             logger.LogWarning(
                 "Contract plan advance: contract {ContractId} no longer exists in cache.",
                 plan.ContractId);
-            return;
+            return plan;
         }
 
         var now = TimeProvider.System.GetUtcNow();
 
         if (contract.IsFulfilled)
         {
-            var fulfilledPlan = plan with
+            var completed = plan with
             {
                 Status = ContractMineralPlanStatus.Completed,
                 UnitsFulfilled = Math.Max(plan.UnitsFulfilled, plan.UnitsRequired),
@@ -295,9 +334,17 @@ public sealed class ContractPlanService(
                 StopReason = null,
             };
 
-            await contractPlans.UpsertAsync(fulfilledPlan, cancellationToken);
+            await contractPlans.UpsertAsync(completed, cancellationToken);
             await CompleteAssignmentIfActiveAsync(plan, now, cancellationToken);
-            return;
+
+            logger.LogInformation(
+                "Contract plan completed: contract {ContractId} fulfilled, {Fulfilled}/{Required} {TradeSymbol} delivered; ship {ShipSymbol} released.",
+                completed.ContractId,
+                completed.UnitsFulfilled,
+                completed.UnitsRequired,
+                completed.TradeSymbol,
+                completed.ShipSymbol);
+            return completed;
         }
 
         var deliverable = DeserializeDeliverables(contract.DeliverablesJson)
@@ -312,16 +359,12 @@ public sealed class ContractPlanService(
                 plan.TradeSymbol,
                 plan.DestinationWaypoint,
                 plan.ContractId);
-            return;
+            return plan;
         }
 
-        var advanced = plan with
-        {
-            UnitsRequired = deliverable.UnitsRequired,
-            UnitsFulfilled = deliverable.UnitsFulfilled,
-            UpdatedAt = now,
-        };
-
+        // Every unit delivered doesn't complete the plan: the fulfil call, which pays, still has to
+        // go out, and the ship's assignment is what sends the ship to make it. Its remaining units
+        // drop to 0.
         var remainingUnits = Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled);
 
         var assignment = await assignments.FindAsync(plan.ShipSymbol, cancellationToken);
@@ -334,31 +377,20 @@ public sealed class ContractPlanService(
             await assignments.UpsertAsync(assignment with { RequiredUnits = remainingUnits }, cancellationToken);
         }
 
-        var isDone = deliverable.UnitsFulfilled >= deliverable.UnitsRequired;
-
-        if (!isDone)
+        if (plan.UnitsRequired == deliverable.UnitsRequired && plan.UnitsFulfilled == deliverable.UnitsFulfilled)
         {
-            await contractPlans.UpsertAsync(advanced, cancellationToken);
-            return;
+            return plan;
         }
 
-        var completed = advanced with
+        var advanced = plan with
         {
-            Status = ContractMineralPlanStatus.Completed,
+            UnitsRequired = deliverable.UnitsRequired,
+            UnitsFulfilled = deliverable.UnitsFulfilled,
             UpdatedAt = now,
-            StopReason = null,
         };
 
-        await contractPlans.UpsertAsync(completed, cancellationToken);
-        await CompleteAssignmentIfActiveAsync(plan, now, cancellationToken);
-
-        logger.LogInformation(
-            "Contract plan completed: contract {ContractId}, ship {ShipSymbol}, delivered {Fulfilled}/{Required} {TradeSymbol}.",
-            completed.ContractId,
-            completed.ShipSymbol,
-            completed.UnitsFulfilled,
-            completed.UnitsRequired,
-            completed.TradeSymbol);
+        await contractPlans.UpsertAsync(advanced, cancellationToken);
+        return advanced;
     }
 
     private async Task RefreshContractsCacheOnceAsync(CancellationToken cancellationToken)
@@ -664,13 +696,9 @@ public sealed class ContractPlanService(
                 "Contract plan bootstrap: restored missing active assignment for contract {ContractId} on ship {ShipSymbol}.",
                 plan.ContractId,
                 plan.ShipSymbol);
-            return;
         }
 
-        if (assignment is { } current && current.RequiredUnits != remainingUnits)
-        {
-            await assignments.UpsertAsync(current with { RequiredUnits = remainingUnits }, cancellationToken);
-        }
+        // An existing assignment's remaining units are kept current by AdvanceActivePlanAsync.
     }
 
     private static bool IsMineralSymbol(string tradeSymbol)

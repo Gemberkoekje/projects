@@ -94,6 +94,14 @@ public sealed class SpaceTradersDbContext(
         modelBuilder.Entity<CachedShip>(entity =>
         {
             entity.ToTable("cached_ships");
+
+            // A few wide rows (about 2 kB of ship JSON each), each updated every minute or so. Room on
+            // every page keeps those updates in place, and the low threshold lets autovacuum run on a
+            // table this small. Without them it never did, and the table grew by every update that
+            // didn't fit its page: about 250 kB an hour with one busy ship in the soak test (B32).
+            entity.HasStorageParameter("fillfactor", 50);
+            entity.HasStorageParameter("autovacuum_vacuum_threshold", 10);
+
             entity.HasKey(x => new { x.AgentId, x.Symbol });
             entity.Property(x => x.AgentId).HasMaxLength(AgentIdentity.MaxLength);
             entity.Property(x => x.Symbol).HasMaxLength(100);

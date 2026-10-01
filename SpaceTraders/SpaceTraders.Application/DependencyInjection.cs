@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.EventHandlers;
@@ -75,6 +76,11 @@ public static class DependencyInjection
 
             // Add retry logging middleware to all message handlers
             opts.Policies.AddMiddleware(typeof(WolverineRetryLoggingMiddleware));
+
+            // Wolverine logs each handled message under the message type's name, which the
+            // "Wolverine" level override doesn't reach; at its default (Information) that is one line
+            // per message. The handlers log what happened themselves.
+            opts.Policies.MessageSuccessLogLevel(LogLevel.Debug);
 
             opts.OnException<Exception>()
                 .RetryWithCooldown(

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Events.Handlers.Ships;
@@ -56,6 +57,18 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
         handlerTypes.Should().NotContain(typeof(ContractPlanService))
             .And.NotContain(typeof(MiningAutomationService))
             .And.NotContain(typeof(TradingAutomationService));
+    }
+
+    [Fact]
+    public void HandledMessages_AreNotLoggedAtInformation()
+    {
+        // Wolverine logs every handled message ("Successfully processed message ...") under the
+        // message type's name rather than its own, so the "Wolverine": "Warning" override in
+        // appsettings doesn't reach it. At Information that is one line per message (B12).
+        var runtime = (WolverineRuntime)_factory.Services.GetRequiredService<IWolverineRuntime>();
+
+        runtime.Handlers.Chains.Should().NotBeEmpty()
+            .And.OnlyContain(chain => chain.SuccessLogLevel < LogLevel.Information);
     }
 }
 

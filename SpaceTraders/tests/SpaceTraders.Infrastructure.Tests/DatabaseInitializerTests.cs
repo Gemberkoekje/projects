@@ -69,6 +69,31 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
         (await MissingTablesAsync(second)).Should().BeEmpty();
     }
 
+    [SkippableFact]
+    public async Task InitializeAsync_LeavesRoomForInPlaceUpdates_InTheShipTable()
+    {
+        // B32, seen in the soak test (1.14): cached_ships holds a few wide rows (about 2 kB of ship
+        // JSON each) that change every minute or so. Postgres pruned their old versions in place,
+        // which kept the dead-tuple count under the autovacuum trigger, so VACUUM never ran, and every
+        // update that didn't fit its page extended the table: about 250 kB an hour with one busy
+        // ship, without end. The growth itself needs concurrent snapshots and autovacuum's timing to
+        // show; this checks the table is created with the remedy.
+        await using var db = CreateContext();
+
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        (await TableOptionsAsync("cached_ships")).Should().BeEquivalentTo("fillfactor=50", "autovacuum_vacuum_threshold=10");
+    }
+
+    private async Task<string[]> TableOptionsAsync(string table)
+    {
+        await using var connection = new NpgsqlConnection(_pg.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("select coalesce(reloptions, '{}') from pg_class where relname = @table", connection);
+        command.Parameters.AddWithValue("table", table);
+        return (string[])(await command.ExecuteScalarAsync())!;
+    }
+
     private SpaceTradersDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<SpaceTradersDbContext>()

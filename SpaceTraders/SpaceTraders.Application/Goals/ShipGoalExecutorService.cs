@@ -88,8 +88,7 @@ public sealed class ShipGoalExecutorService(
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)
         {
-            // Debug: the scout plan logs what advancing does, and after the last waypoint this
-            // repeats on every tick (B10).
+            // Debug: the scout plan logs what advancing does.
             logger.LogDebug(
                 "ShipGoalExecutorService: ship {ShipSymbol} completed goal {GoalKind}; advancing scout plan.",
                 shipSymbol,

@@ -160,6 +160,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             waypoints,
             port,
             shipPurchases,
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
