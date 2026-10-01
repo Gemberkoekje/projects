@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
@@ -74,60 +75,33 @@ public sealed class StartupSyncService(
                 ? existingShip?.CargoJson
                 : JsonSerializer.Serialize(ship.Cargo.Inventory.Select(i => new { i.Symbol, i.Units }).ToList());
 
+            var cachedShip = existingShip ?? new CachedShip { AgentToken = dbContext.AgentToken, Symbol = ship.Symbol };
             if (existingShip is null)
             {
-                dbContext.Ships.Add(new CachedShip
-                {
-                    AgentToken = dbContext.AgentToken,
-                    Symbol = ship.Symbol,
-                    SystemSymbol = ship.Nav?.SystemSymbol,
-                    WaypointSymbol = ship.Nav?.WaypointSymbol,
-                    DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol,
-                    Status = ship.Nav?.Status,
-                    FlightMode = ship.Nav?.FlightMode,
-                    ShipType = shipType,
-                    MountsJson = mountsJson,
-                    ModulesJson = modulesJson,
-                    FrameJson = frameJson,
-                    ReactorJson = reactorJson,
-                    EngineJson = engineJson,
-                    CooldownExpiresAt = cooldownExpiresAt,
-                    FuelCurrent = ship.Fuel?.Current ?? 0,
-                    FuelCapacity = ship.Fuel?.Capacity ?? 0,
-                    CargoCurrent = ship.Cargo?.Units ?? 0,
-                    CargoCapacity = ship.Cargo?.Capacity ?? 0,
-                    CargoJson = cargoJson,
-                    ArrivesAt = ship.Nav?.Route?.Arrival,
-                    LastSyncedAt = now,
-                });
+                dbContext.Ships.Add(cachedShip);
             }
-            else
-            {
-                dbContext.Entry(existingShip).CurrentValues.SetValues(new CachedShip
-                {
-                    AgentToken = dbContext.AgentToken,
-                    Symbol = ship.Symbol,
-                    SystemSymbol = ship.Nav?.SystemSymbol,
-                    WaypointSymbol = ship.Nav?.WaypointSymbol,
-                    DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol,
-                    Status = ship.Nav?.Status,
-                    FlightMode = ship.Nav?.FlightMode,
-                    ShipType = shipType,
-                    MountsJson = mountsJson,
-                    ModulesJson = modulesJson,
-                    FrameJson = frameJson,
-                    ReactorJson = reactorJson,
-                    EngineJson = engineJson,
-                    CooldownExpiresAt = cooldownExpiresAt,
-                    FuelCurrent = ship.Fuel?.Current ?? 0,
-                    FuelCapacity = ship.Fuel?.Capacity ?? 0,
-                    CargoCurrent = ship.Cargo?.Units ?? existingShip.CargoCurrent,
-                    CargoCapacity = ship.Cargo?.Capacity ?? existingShip.CargoCapacity,
-                    CargoJson = cargoJson,
-                    ArrivesAt = ship.Nav?.Route?.Arrival,
-                    LastSyncedAt = now,
-                });
-            }
+
+            // Game state only. The goal columns belong to the bot, and a restart must not clear them.
+            cachedShip.SystemSymbol = ship.Nav?.SystemSymbol;
+            cachedShip.WaypointSymbol = ship.Nav?.WaypointSymbol;
+            cachedShip.DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol;
+            cachedShip.Status = ship.Nav?.Status;
+            cachedShip.LocalStatus = ShipLocalStatusMapper.FromApiStatus(ship.Nav?.Status);
+            cachedShip.FlightMode = ship.Nav?.FlightMode;
+            cachedShip.ShipType = shipType;
+            cachedShip.MountsJson = mountsJson;
+            cachedShip.ModulesJson = modulesJson;
+            cachedShip.FrameJson = frameJson;
+            cachedShip.ReactorJson = reactorJson;
+            cachedShip.EngineJson = engineJson;
+            cachedShip.CooldownExpiresAt = cooldownExpiresAt;
+            cachedShip.FuelCurrent = ship.Fuel?.Current ?? 0;
+            cachedShip.FuelCapacity = ship.Fuel?.Capacity ?? 0;
+            cachedShip.CargoCurrent = ship.Cargo?.Units ?? cachedShip.CargoCurrent;
+            cachedShip.CargoCapacity = ship.Cargo?.Capacity ?? cachedShip.CargoCapacity;
+            cachedShip.CargoJson = cargoJson;
+            cachedShip.ArrivesAt = ship.Nav?.Route?.Arrival;
+            cachedShip.LastSyncedAt = now;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

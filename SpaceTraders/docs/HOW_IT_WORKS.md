@@ -125,7 +125,8 @@ checks it. The lease is not released on shutdown.
 - **Fetches:** the agent, all ships, and for each system that has a ship, the system and its
   waypoints if they aren't cached yet. It also fetches market and shipyard data at waypoints where
   a ship is not in transit, and the first page of contracts (20).
-- **Overwrites** existing ship rows, including their goal columns (B20).
+- **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It
+  leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
 
 **Startup snapshot:** switches `Automation.Enabled` off while it runs and back on afterwards. It
@@ -454,7 +455,7 @@ production code doesn't use the aggregates at all (B7).
 |---|---|---|---|
 | `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | never |
 | `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | never |
-| `cached_ships` | Ship state and the active goal | Sync (B20), ship commands, goal repository | never |
+| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | never |
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | never |
 | `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | never |
 | `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | never |
