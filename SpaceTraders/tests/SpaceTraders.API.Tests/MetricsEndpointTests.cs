@@ -46,7 +46,7 @@ public sealed class MetricsEndpointTests
             .UseSetting("Metrics:Hostname", "127.0.0.1"));
         _ = factory.Server;
 
-        using var response = await Http.GetAsync(new Uri($"http://127.0.0.1:{port}/metrics"));
+        using var response = await GetOnceListeningAsync(new Uri($"http://127.0.0.1:{port}/metrics"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var text = await response.Content.ReadAsStringAsync();
@@ -66,6 +66,26 @@ public sealed class MetricsEndpointTests
         using var response = await client.GetAsync(new Uri("/spacetraders/api/metrics", UriKind.Relative));
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// prometheus-net starts the metrics server in a background service, so the host can be up
+    /// before the port listens (on CI the first request was refused).
+    /// </summary>
+    private static async Task<HttpResponseMessage> GetOnceListeningAsync(Uri uri)
+    {
+        var deadline = TimeProvider.System.GetUtcNow().AddSeconds(10);
+        while (true)
+        {
+            try
+            {
+                return await Http.GetAsync(uri);
+            }
+            catch (HttpRequestException) when (TimeProvider.System.GetUtcNow() < deadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+            }
+        }
     }
 
     private static int FreePort()
