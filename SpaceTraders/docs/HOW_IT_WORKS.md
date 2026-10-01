@@ -61,11 +61,15 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
   4. API key
   5. HTTP metrics
   6. health endpoints
-  7. `/metrics`
-  8. endpoint groups
-  9. SignalR hub `/hubs/dashboard`
-- **Hosted services:** the app registers exactly one, `DeferredStartupHostedService`. Every other
-  service is a singleton that it starts.
+  7. endpoint groups
+  8. SignalR hub `/hubs/dashboard`
+- **Metrics:** `/metrics` has a port of its own, `Metrics:Port` (9090; 0 means no metrics
+  server), served by a second, minimal Kestrel server (prometheus-net's `AddMetricServer`). It
+  needs no API key: the Service and the ingress don't route that port, so only something that can
+  reach the pod, such as Prometheus, can scrape it (B11, fixed). `Metrics:Hostname` is `+` (all
+  interfaces) unless set; Development sets `localhost`. The main port serves no `/metrics`.
+- **Hosted services:** the app registers `DeferredStartupHostedService` and the metrics server.
+  Every other service is a singleton that the deferred startup starts.
 
 ### The startup chain (`DeferredStartupHostedService`)
 
@@ -81,11 +85,11 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 6 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
 | 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
 | 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
-| 9 | `StartupSnapshotService` | once | One JSON snapshot row |
+| 9 | `StartupSnapshotService` | once | One JSON snapshot row, from the cache |
 | 10 | `StartupRecoveryService` | once | Resumes ships |
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
-| 13 | `PrometheusMetricsService` | every 10 s | |
+| 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
 
 One try/catch wraps the chain. Steps 5, 9 and 11 catch their own errors. A throw in steps 1, 4, 6,
 8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
@@ -143,15 +147,18 @@ checks it. The lease is not released on shutdown.
   leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
 
-**Startup snapshot:** switches `Automation.Enabled` off while it runs and back on afterwards. It
-writes one `startup_snapshots` row with the agent, ships, waypoints and market and shipyard data.
+**Startup snapshot** (`StartupSnapshotService`): writes one `startup_snapshots` row from what
+startup sync has just cached: the agent, the ships with their goals, the contracts, every waypoint
+in the ships' systems, and the market and shipyard where each ship is (not in transit). It calls no
+API (B35, fixed); before, it fetched all of that again, about 11 calls on every start. The cache
+holds less than the API returns: no crew, mount details or (until B34) waypoint traits.
 
 **Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false.
 For each cached ship:
 
 | Ship state | Recovery action |
 |---|---|
-| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step |
+| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step. The code doesn't check "still in transit", and a docked ship keeps its last arrival time, so every docked ship that ever travelled lands here (B38) |
 | Still in transit | Publish `ShipInTransitEvent` only |
 | Docked or in orbit | Run one goal step |
 
@@ -229,7 +236,8 @@ Markets are not scouted again.
   1. refreshes contracts from the API, ignoring errors, but only while there is no plan yet;
   2. negotiates a contract if none is open, using the first ship that has a waypoint;
   3. takes the unfulfilled contract with the earliest deadline;
-  4. accepts it, and records the acceptance payment in the cached credits (B33, fixed);
+  4. accepts it, records the acceptance payment in the cached credits (B33, fixed) and publishes
+     `ContractAcceptedEvent` with it, for the ledger (B7, fixed);
   5. parks a non-mineral deliverable as DeferredUnsupported (D2);
   6. picks an idle mining-capable ship, or buys a drone. If neither works, the plan becomes
      PendingBudget and is retried every tick. A retry works from the cached contract and only
@@ -242,7 +250,8 @@ Markets are not scouted again.
     and jettisons other goods.
   - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination, docks, delivers
     what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
-    nothing is pending, recording the payment in the cached credits.
+    nothing is pending, recording the payment in the cached credits and publishing
+    `ContractFulfilledEvent` with it.
 - **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes the
   assignment, which releases the ship (B9, fixed). Every unit delivered isn't enough: until the
   fulfil call has gone out, the assignment stays open with 0 units left, so the ship goes back
@@ -253,8 +262,9 @@ Markets are not scouted again.
 - **Targets:** the waypoints with a market or shipyard in the HQ system.
   - Shipyards come first.
   - Market-only waypoints wait until credits reach 200,000, a hard-coded threshold (D4). Below
-    that the plan sets `WaitingForPhase1Credits`, which only an event that is never published
-    clears (B7).
+    that the plan sets `WaitingForPhase1Credits`. A credit change (`AgentCreditsChangedEvent`, B7,
+    fixed) that brings the credits to 200,000 clears it, while automation and the plan are on; the
+    handler stays out while either is off, since waking the plan can buy probes.
 - **Probes** are recognised by ship type `SHIP_PROBE`, or by a symbol containing `PROBE` or
   `SATELLITE`. Startup sync stores a ship's *registration role* as its type (for example
   `COMMAND` or `SATELLITE`). Only purchased ships get the shipyard type (for example
@@ -291,8 +301,7 @@ Markets are not scouted again.
   3. It buys the ship and saves the new credits and the ship. Mounts are not recorded until the
      next startup sync. Mining capability also follows from the ship type, so a purchased
      `SHIP_MINING_DRONE` still counts as a miner.
-
-  It publishes nothing.
+  4. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus
   `FleetExpansion.MinCreditReserve`.
 - **Buying order within a tick:** contract, probe, mining, trading. There is no other priority.
@@ -350,8 +359,9 @@ Markets are not scouted again.
 - **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
   (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
   `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
-  blocks the goal with reason `runaway`, logs a warning and counts
+  blocks the goal with reason `runaway`, logs `ShipBlocked` at Warning and counts
   `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
+- **Counts** every step it runs in `spacetraders_goal_steps_total{kind}`.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
 - **Called by:**
@@ -373,8 +383,8 @@ step does the work.
 |---|---|
 | `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
 | `DeployProbe` | Docked at the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: dock. Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
-| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell. It never completes. |
-| `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount), then navigate to the sell market and dock, [API] sell, clear the goal, complete. |
+| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell and publish `ShipCargoSoldEvent`. It never completes. |
+| `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount) and publish `CargoPurchasedEvent`, then navigate to the sell market and dock, [API] sell and publish `ShipCargoSoldEvent`, clear the goal, complete. |
 | `SurveyWaypoint` | [cmd] navigate to the target. Docked there: orbit. In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
 | `Idle` | Unreachable. |
 
@@ -391,11 +401,15 @@ step does the work.
   `MarketDataRefreshedEvent`) and the shipyard, docks, and publishes
   `ShipNavigationCompletedEvent`.
 - **Orbit, Navigate, Dock and Refuel** are DI sub-commands, not bus messages. Refuel publishes
-  `ShipRefueledEvent`, the only source of ledger rows.
+  `ShipRefueledEvent`.
 - **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`** dead-reckon arrival
   themselves and navigate without a goal id (B17).
 - **`PatchShipNavCommand`** changes the flight mode.
-- **Selling and buying** are direct API calls from the executors. No events are published.
+- **Selling and buying** are direct API calls from the executors, which publish what they did.
+- **Credits:** whatever changes the credits stores them in the cached agent and publishes
+  `AgentCreditsChangedEvent` (`AgentCreditsUpdates`): refuels, sales, cargo and ship purchases,
+  and contract payments (B7, fixed). Startup sync and agent registration write the credits
+  without the event.
 - **A ship in the wrong state** for a command (for example not in orbit) leads to a
   `ShipStateMismatchEvent`, which only writes the activity log.
 
@@ -420,9 +434,15 @@ wait for a cooldown simply run again on a later tick.
 |---|---|---|
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
-| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods aren't discovered (see below) |
+| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed); the mining and trading `Handle` methods aren't discovered (see below) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
+| `ShipCargoSoldEvent` | Mining and trade executors | `LedgerEntryHandler` (TradeSell); `activity_logs` row |
+| `CargoPurchasedEvent` | Trade executor | `LedgerEntryHandler` (TradeBuy) |
+| `NewShipPurchasedEvent` | `ShipPurchaseService` | `LedgerEntryHandler` (ShipPurchase); `activity_logs` row |
+| `ContractAcceptedEvent` | Contract plan | `LedgerEntryHandler` (ContractDeposit, unless it paid nothing); `activity_logs` row |
+| `ContractFulfilledEvent` | `FulfillContractDeliveryCommand` | `LedgerEntryHandler` (ContractPayout); `activity_logs` row |
+| `AgentCreditsChangedEvent` | Every credit change but sync and registration | `AgentCreditsSampleHandler` → `agent_credits_samples`; `CreditHistoryHandler` (in memory); `AlertHandler` (credit drop, B37); `ProbeDeploymentCreditsChangedHandler`, while automation and the probe plan are on |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
 | `DeployProbeCommand` | Probe plan | `DeployProbeHandler` |
 | `TokenResetMismatchDetectedEvent` | Agent bootstrap | `AlertHandler` (webhook); `activity_logs` row |
@@ -430,10 +450,8 @@ wait for a cooldown simply run again on a later tick.
 
 ### Handled but never published
 
-- **Ledger and activity events:** sales, purchases, repairs, mounts and modules, ship purchases,
-  contract fulfilment.
-- **`AgentCreditsChangedEvent`:** credit samples, the credits metric, alerts, the probe plan's
-  waiting flag.
+- **Ledger and activity events:** repairs, mounts and modules (nothing calls those API
+  operations).
 - **Alerts:** contract deadlines, reset warnings, cache divergence.
 - **Activity-log-only events:** arrivals, idle ships, assignments, low fuel, construction,
   contract negotiation, acceptance and delivery, automation paused and resumed.
@@ -442,7 +460,8 @@ wait for a cooldown simply run again on a later tick.
 ### Never dispatched
 
 Domain aggregates (`Agent`, `Ship`, `Contract`) raise events into a list that nothing reads, and
-production code doesn't use the aggregates at all (B7).
+production code doesn't use the aggregates at all. The events are published where the change
+happens instead (B7, fixed).
 
 ### Wolverine details
 
@@ -498,13 +517,15 @@ production code doesn't use the aggregates at all (B7).
 other app (D8):
 - It reads `pg_database_size` at start, before the rest of startup goes on, and then every 5
   minutes, and exports it as `spacetraders_db_size_bytes`.
-- Above `Database.SoftLimitMegabytes` (1024) it logs `DbSizeSoftLimit` at Warning, once per
-  crossing.
-- Above `Database.HardLimitMegabytes` (3072) it switches `Automation.Enabled` off and logs
-  `DbSizeHardLimit` at Error. It switches automation off again at every check while the
-  database stays above the limit, so switching it back on only lasts once the database is smaller.
-- Back under the soft limit it logs `DbSizeNormal`.
-- Until there are anomalies (phase 3), these logs and the metric are how it shows.
+- Each limit, `Database.SoftLimitMegabytes` (1024) and `Database.HardLimitMegabytes` (3072), is
+  an anomaly while the database is above it, with rule `DbSizeSoftLimit` or `DbSizeHardLimit` and
+  subject `database`. The journal logs `AnomalyRaised` when the database crosses a limit (Warning
+  for the soft one, Error for the hard one) and `AnomalyCleared` when it is back under, and
+  `spacetraders_anomaly_active` is 1 meanwhile. They are the only anomalies until phase 3 adds
+  the health rules.
+- Above the hard limit it also switches `Automation.Enabled` off, and again at every check while
+  the database stays above it (with an Error line each time it has to), so switching it back on
+  only lasts once the database is smaller.
 
 ### Tables
 
@@ -521,15 +542,15 @@ other app (D8):
 | `plan_states` | Plan JSON per plan type | All five plans | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
-| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: fuel purchases only (B7) | 30 days |
+| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments | 30 days |
 | `cached_surveys` | Surveys | Survey executor | bounded: expired rows removed when new surveys are saved |
 | `leader_leases` | Leader lease | Leader election | bounded: one row |
 | `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
 | `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
 | `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
 | `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | the agent's first and the last 10 |
-| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, first per hour to 90 days |
-| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, first per hour to 90 days |
+| `market_price_samples` | Price history | `MarketPriceSampleHandler`, one row per good on every market refresh | 7 days raw, first per hour to 90 days |
+| `agent_credits_samples` | Credits over time | `AgentCreditsSampleHandler`, on every credit change | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
 | `ship_goal_history` | Ended goals | Nothing | 30 days |
 | `fleet_goals` | Fleet goals | Nothing | completed ones 30 days |
@@ -547,14 +568,20 @@ other app (D8):
   change applies on the next read.
 - `PUT /settings/{key}` with `{"value": "…"}` writes any key, even an unknown one.
 - `POST /settings/reset` restores the defaults.
+- Every change, whoever makes it (these endpoints, the control endpoints, the size guard, the
+  reset monitor), is a `SettingChanged` journal line with `Setting`, `OldValue` and `NewValue`
+  (`SettingsRepository`). A key that may hold a secret (ending in `Url`, or naming a secret,
+  password or API key) shows `(hidden)` instead of its value.
 
 ### What each setting does
 
-Only 14 of the 56 seeded settings change what the bot does (B18):
+The seed holds 30 settings: the 14 that change what the bot does, 4 that are read without
+changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
+removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
 | Setting (default) | Effect |
 |---|---|
-| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. Startup snapshot switches it off and on. |
+| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
@@ -564,35 +591,25 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
 | `Alerts.WebhookUrl` (empty) | Where alerts are posted, as `{"text": …}`. Only the token-reset alert can fire. |
 
-**The other 42:**
+**The other 16:**
 
-- **Run label only:** `FleetExpansion.PreferredShipType`, `Automation.MiningShipPercentage`.
-- **Market views only:** `Trade.MinProfitPerUnit`, `Trade.MaxHaulDistance`. They are read by
-  queries over the never-written `trade_opportunities`.
-- **Read only by code that never runs:**
-  - `Navigation.CriticalFuelRatio`, `LowFuelRatioForDrift`, `BurnFuelRatioMinimum` and
-    `BurnDistanceThreshold` (`NavigationPlanningService` is never called);
-  - `Maintenance.RepairConditionThreshold`, `MinIntegrityForLongRoutes`, `ScrapIntegrityThreshold`
-    and `MinScrapValue` (`FleetMaintenancePlanner` isn't registered).
-- **Status flags, not settings to tune:**
+- **Read without changing what the bot does:**
+  - the run's strategy label: `FleetExpansion.PreferredShipType`, `Automation.MiningShipPercentage`;
+  - the market views: `Trade.MinProfitPerUnit`, `Trade.MaxHaulDistance`. They are read by
+    queries over the never-written `trade_opportunities`.
+- **Status flags, not settings to tune** (moving them out of the settings is a separate cleanup):
   - Read by the endpoints but never written: `Runtime.Reset.Next`, `Runtime.Alert.ApiUnavailable`,
     `CacheDivergence`, `ContractDeadlinesApproaching`, `ResetUpcoming`.
   - Written by bootstrap: `Runtime.Alert.TokenResetMismatch`.
   - Written but never read: `Runtime.TokenResetMismatchDetected`, `Runtime.AutomationPausedByReset`,
     `Runtime.Alert.AutomationDisabled`.
-- **Read by nothing:**
-  - `FleetExpansion.MinCreditRatioForShip`, `FleetExpansion.MaxShips`
-  - `Contract.AutoAccept`
-  - `Scout.MarketRefreshIntervalMinutes`, `Scout.ShipyardRefreshIntervalMinutes`
-  - `Automation.Trade.MaxLossPerUnitBeforeReroute`
-  - `Mining.SurveyMinimumCooldownSeconds`, `JettisonLowValueWhenFull`,
-    `MinimumSellPriceToKeepCargo`, `ReserveHydrocarbonUnits`
-  - `Maintenance.LongRouteJumpThreshold`
-  - all six `Outfitting.*` keys
-  - `Reliability.PauseAutomationBeforeReset`
-  - `Runtime.Reset.Warning`, `Runtime.ApiUnavailable`, `Runtime.CacheDivergenceDetected`
+  - Read by nothing: `Runtime.Reset.Warning`, `Runtime.ApiUnavailable`,
+    `Runtime.CacheDivergenceDetected`.
 - **Read but not seeded:** `BudgetPolicy` reads `Construction.FabMatsBuyThreshold`,
-  `FabMatsTransactionSize` and `HourlyBudgetCapEnabled`, and nothing uses the result.
+  `FabMatsTransactionSize` and `HourlyBudgetCapEnabled`, and nothing uses the result. Code that
+  never runs reads `Navigation.*` (`NavigationPlanningService`, never called) and
+  `Maintenance.*` (`FleetMaintenancePlanner`, not registered); without a seeded value they read
+  as 0 or false.
 
 ### Configuration (appsettings, user secrets, environment)
 
@@ -604,6 +621,7 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 | `SPACETRADERS_AGENT_TOKEN` | Initial agent data scope |
 | `SPACETRADERS_INTERNAL_API_KEY` | Required `X-Api-Key` for the internal API when set |
 | `WebUI:Origin` | CORS origin for the dashboard |
+| `Metrics:Port`, `Metrics:Hostname` | Where `/metrics` is served: 9090 on all interfaces; 0 means no metrics server. Development uses `localhost` |
 | `Serilog:*` | Log levels |
 | `ASPNETCORE_ENVIRONMENT` | `Development`: user secrets and Swagger. `Production`: JSON logs. `Testing`: no database work. |
 
@@ -613,7 +631,7 @@ Only 14 of the 56 seeded settings change what the bot does (B18):
 
 **Handler pipeline,** outermost first:
 
-All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
+The first three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
 
 1. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
    wait a few minutes. So after a 502 no call goes out for `Api.BadGatewayPauseMinutes`
@@ -626,7 +644,13 @@ All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D
    Warning, and the headers are recorded for `/status/rate-limit`.
 3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
-   both are used. Non-GET requests go first.
+   both are used. Non-GET requests go first. Time spent waiting is counted in
+   `spacetraders_api_rate_limit_wait_seconds_total`.
+4. **`ApiRequestMetricsHandler`:** counts every request that goes out, retries included, in
+   `spacetraders_api_requests_total{method,endpoint,status}`, with the route template as
+   `endpoint` (`my/ships/{shipSymbol}/navigate`, `ApiEndpointTemplate`) and `error` as status when
+   no response came. A 429 is also counted in `spacetraders_api_throttled_total{source}`:
+   `rate_limiter` with the `x-ratelimit-*` headers, `infrastructure` without.
 
 **Other parts:**
 
@@ -656,8 +680,8 @@ All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D
 ## 9. Internal HTTP API (`/spacetraders/api`)
 
 **Authentication:** everything except `/health/*` needs `X-Api-Key` when
-`SPACETRADERS_INTERNAL_API_KEY` is set. That includes `/metrics` (B11) and the SignalR hub. When
-the key is unset, everything is open.
+`SPACETRADERS_INTERNAL_API_KEY` is set, the SignalR hub included. When the key is unset,
+everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacetradersapiprogramcs).
 
 | Group | Endpoints | Notes |
 |---|---|---|
@@ -667,11 +691,10 @@ the key is unset, everything is open.
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
 | Runs and finance | `GET /runs/{id}/kpis`, `/finance/trade-routes` | KPIs is a stub; trade routes are always `[]` |
 | Fleet | `GET /fleet/assignments`, `/activity`, `/activity/{ship}`, `/activity/{ship}/history`, `/goal-chains` | 5 s cache. History is always `[]` |
-| Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Prices are empty (B19); best routes always 204 |
+| Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Best routes always 204 |
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
 | Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
 | Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
-| Metrics | `GET /metrics` | See below |
 
 **SignalR** (`/hubs/dashboard`): the server broadcasts `ReceiveInvalidation({Kind, Id, OccurredAt})`
 for ships, activity, assignments, goal chains, contracts and markets. Clients can't call
@@ -722,17 +745,50 @@ The seven pages in `src/Future` are not routed.
   - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
     `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
     Serilog turns into properties.
-- **Metrics** (`PrometheusMetricsService`, every 10 s), plus the prometheus-net defaults:
+- **The journal:** one line per meaningful thing, with an `EventKind` property and a message that
+  starts with it (`CargoSold: ship …`), so `{namespace="spacetraders"} | json | EventKind != ""`
+  in Loki reads as a timeline of the run. `JournalEvents` names every kind:
 
-  | Metric | Updated? |
-  |---|---|
-  | `spacetraders_api_calls_total` | Yes, one per outbound request |
-  | `spacetraders_api_throttled_total` | Yes, one per 429 response |
-  | `spacetraders_agent_credits` | Never (B7) |
-  | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
-  | `spacetraders_db_size_bytes` | Yes, every 5 minutes (size guard) |
+  | Kind | Logged by | Properties |
+  |---|---|---|
+  | `ContractAccepted` | Contract plan | `ContractId`, `TradeSymbol`, `WaypointSymbol`, `Payment` |
+  | `ContractDelivered`, `ContractFulfilled` | `FulfillContractDeliveryCommand` | `ContractId`, `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`; `Payment` |
+  | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost` |
+  | `CargoBought`, `CargoSold` | Trade and mining executors | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
+  | `PlanStarted`, `PlanCompleted` | Scout, contract and probe plans | `Plan`, and the plan's ship, contract or system |
+  | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`) | `Plan`, `Reason` |
+  | `ShipIdle` | `ShipStateJournal`, from the 10 s sample: `idle_at_start`, `new_ship`, `goal_ended` (with `PreviousGoal`) | `ShipSymbol`, `Reason` |
+  | `ShipBlocked` | The circuit breaker (Warning) | `ShipSymbol`, `GoalKind`, `Reason` |
+  | `SettingChanged` | `SettingsRepository` | `Setting`, `OldValue`, `NewValue` |
+  | `ResetDetected` | `ServerResetMonitor` (Critical) | `Detail` |
+  | `ApiUnavailable`, `ApiAvailable` | The tick | `PausedUntil` |
+  | `AnomalyRaised`, `AnomalyCleared` | The size guard | `Rule`, `Subject` |
 
-  `/metrics` requires the API key (B11), so Prometheus can't scrape it as deployed.
+  Mining and trading have no plan to start or complete: they are opportunity queues.
+- **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
+  `PrometheusAutomationMetrics` defines them all at startup, so a scrape lists every one, also
+  before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the
+  .NET meters, Wolverine's among them). Labels stay low-cardinality: a few per ship or contract
+  at most.
+
+  | Metric | Labels | What it counts or shows | Updated |
+  |---|---|---|---|
+  | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
+  | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
+  | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
+  | `spacetraders_contract_units_required`, `_units_fulfilled` | `contract`, `trade_symbol` | The accepted contracts' deliverables | Every 10 s |
+  | `spacetraders_contract_deadline_timestamp_seconds` | `contract` | An accepted contract's deadline (Unix time) | Every 10 s |
+  | `spacetraders_credits_earned_total` | `source` | Credits earned, by ledger category | With each ledger row (`LedgerEntryHandler`) |
+  | `spacetraders_credits_spent_total` | `category` | Credits spent, by ledger category | With each ledger row |
+  | `spacetraders_api_requests_total` | `method`, `endpoint`, `status` | Requests to the game API by route template, retries included | Per request |
+  | `spacetraders_api_throttled_total` | `source` | 429s: `rate_limiter` or `infrastructure` | Per 429 |
+  | `spacetraders_api_rate_limit_wait_seconds_total` | | Time requests waited for the local budget | Per request that waited |
+  | `spacetraders_messages_handled_total` | `type` | Messages Wolverine handled without an error (`MessageMetricsMiddleware`) | Per message |
+  | `spacetraders_goal_steps_total` | `kind` | Goal steps run | Per step |
+  | `spacetraders_goal_breaker_trips_total` | `ship` | Goals the circuit breaker blocked | Per trip |
+  | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the size guard's limits | Every 5 minutes |
+  | `spacetraders_db_size_bytes` | | `pg_database_size` | Every 5 minutes (size guard) |
+  | `spacetraders_server_next_reset_timestamp_seconds` | | When the server resets next (Unix time), from `GET /` | At agent bootstrap |
 
 ---
 
@@ -759,7 +815,7 @@ This makes the codebase look bigger than what actually runs:
 ## 13. Build, tests and deployment
 
 **Images:**
-- `Dockerfile.api`: SDK 10 publish, then the ASP.NET 10 runtime on port 8080.
+- `Dockerfile.api`: SDK 10 publish, then the ASP.NET 10 runtime on port 8080, and the metrics on 9090.
 - `Dockerfile.webui`: Node 22 build, then nginx 1.27 on port 80 with the runtime-config
   entrypoint.
 
@@ -781,6 +837,10 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
+
+The `Category=Integration` tests ask Testcontainers whether it can reach Docker, the way it starts
+its containers (`DOCKER_HOST`, the Unix socket, or Docker Desktop's named pipe on Windows), and skip
+only when it can't (B36, fixed).
 
 **WebUI tests:**
 - `npm test` runs Vitest.

@@ -243,15 +243,15 @@ public sealed class GameLoopService(
         if (apiAvailability.ConsumeUnavailableTransition())
         {
             logger.LogWarning(
-                "{EventKind}: the SpaceTraders API answered 502 (DDoS protection); no API calls until {PausedUntil}.",
-                "ApiUnavailable",
+                "{EventKind:l}: the SpaceTraders API answered 502 (DDoS protection); no API calls until {PausedUntil}.",
+                JournalEvents.ApiUnavailable,
                 apiAvailability.PausedUntil);
             await bus.PublishAsync(new ApiUnavailableEvent(TimeProvider.System.GetUtcNow()));
         }
 
         if (apiAvailability.ConsumeAvailableTransition())
         {
-            logger.LogInformation("{EventKind}: the SpaceTraders API answers again.", "ApiAvailable");
+            logger.LogInformation("{EventKind:l}: the SpaceTraders API answers again.", JournalEvents.ApiAvailable);
             await bus.PublishAsync(new ApiAvailableEvent(TimeProvider.System.GetUtcNow()));
         }
     }

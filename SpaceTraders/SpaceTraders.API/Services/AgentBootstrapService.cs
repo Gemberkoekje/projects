@@ -1,6 +1,8 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SpaceTraders.API.Configuration;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Infrastructure.Persistence;
@@ -24,6 +26,7 @@ public sealed class AgentBootstrapService(
     IAgentTokenProvider agentTokenProvider,
     IAgentDataScope agentDataScope,
     IOptions<SpaceTradersBootstrapOptions> options,
+    IAutomationMetrics metrics,
     ILogger<AgentBootstrapService> logger) : IHostedService
 {
     private const string AgentTokenKey = "AgentToken";
@@ -176,6 +179,11 @@ public sealed class AgentBootstrapService(
     {
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         var status = await scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().GetStatusAsync(cancellationToken);
+
+        if (DateTimeOffset.TryParse(status.ServerResets?.Next, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var nextReset))
+        {
+            metrics.NextServerReset(nextReset);
+        }
 
         return string.IsNullOrWhiteSpace(status.ResetDate)
             ? throw new InvalidOperationException("The SpaceTraders server status has no reset date.")

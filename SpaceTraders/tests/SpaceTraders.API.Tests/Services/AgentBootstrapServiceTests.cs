@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Infrastructure.Persistence;
@@ -139,6 +140,43 @@ public sealed class AgentBootstrapServiceTests
 
         await apiClient.DidNotReceive().RegisterAsync(Arg.Any<RegisterRequest>(), Arg.Any<CancellationToken>());
         agentTokenProvider.Token.Should().Be("matching-token");
+    }
+
+    [Fact]
+    public async Task StartAsync_RecordsWhenTheServerResetsNext()
+    {
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        var metrics = Substitute.For<IAutomationMetrics>();
+        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new Agent { Symbol = "MATCHING-AGENT", StartingFaction = "COSMIC" }));
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ServerStatus
+            {
+                Status = "SpaceTraders is currently online",
+                Version = "v2.3.0",
+                ResetDate = "2026-09-27",
+                Description = "SpaceTraders",
+                ServerResets = new ServerResetInfo { Next = "2026-10-04T16:00:00.000Z", Frequency = "weekly" },
+            }));
+
+        using var provider = await BuildProvider(
+            databaseName: Guid.NewGuid().ToString("N"),
+            initialAgentId: null,
+            configureDb: db => SeedActiveTokenCredential(db, "MATCHING-AGENT@2026-09-27", "matching-token"),
+            configureServices: services =>
+            {
+                services.AddSingleton<IAgentTokenProvider>(new AgentTokenProvider());
+                services.AddSingleton(apiClient);
+                services.AddSingleton(Substitute.For<ISettingsRepository>());
+                services.AddSingleton(Substitute.For<IMessageBus>());
+                services.AddSingleton(metrics);
+                services.AddSingleton<IOptions<SpaceTradersBootstrapOptions>>(
+                    Options.Create(new SpaceTradersBootstrapOptions { AgentName = "MATCHING-AGENT", AgentFaction = "COSMIC" }));
+            });
+
+        await provider.GetRequiredService<AgentBootstrapService>().StartAsync(CancellationToken.None);
+
+        metrics.Received(1).NextServerReset(new DateTimeOffset(2026, 10, 04, 16, 00, 00, TimeSpan.Zero));
     }
 
     [Fact]
@@ -611,6 +649,7 @@ public sealed class AgentBootstrapServiceTests
             return scope;
         });
         services.AddDbContext<SpaceTradersDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        services.AddSingleton(Substitute.For<IAutomationMetrics>());
         services.AddSingleton<AgentBootstrapService>();
 
         configureServices(services);

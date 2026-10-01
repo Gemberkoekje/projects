@@ -8,8 +8,9 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 
 > **Status (2026-10-01):** not running on the cluster. It was taken off in May 2026 after it filled
 > the shared PostgreSQL database. `PLAN.md` describes the way back: phase 1 (safe to run) is done,
-> including a four-hour soak test. Known issues are listed there under B-numbers and decisions
-> under D-numbers.
+> including a four-hour soak test, and so is phase 2 (visibility: metrics, the ledger and the
+> journal), apart from merging its Grafana dashboard and alerts in gembernodes. Known issues are
+> listed there under B-numbers and decisions under D-numbers.
 
 ---
 
@@ -113,8 +114,9 @@ Vite serves the dashboard at `/spacetraders/dashboard/` and proxies `/spacetrade
 dotnet test SpaceTraders.slnx --filter "Category!=Integration"
 ```
 
-Integration tests need Docker/PostgreSQL and are tagged `Category=Integration`. On Windows they skip
-unless `DOCKER_HOST` is set: `$env:DOCKER_HOST = 'npipe://./pipe/docker_engine'`. WebUI tests run
+Integration tests are tagged `Category=Integration` and start PostgreSQL in Docker through
+Testcontainers. They find Docker the way Testcontainers does (`DOCKER_HOST`, the Unix socket, or
+Docker Desktop on Windows) and skip when no Docker is running. WebUI tests run
 with `npm test` in `SpaceTraders.WebUI`.
 
 ---

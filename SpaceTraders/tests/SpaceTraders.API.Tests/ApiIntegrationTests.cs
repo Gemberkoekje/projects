@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
-using ApiDtos = SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
@@ -17,6 +16,7 @@ using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using ApiDtos = SpaceTraders.API.Dtos;
 
 namespace SpaceTraders.API.Tests;
 
@@ -200,13 +200,6 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/system-alerts");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task Metrics_WithoutApiKeyWithPathBase_ReturnsUnauthorizedWhenApiKeyConfigured()
-    {
-        using var response = await _client.GetAsync($"{ApiPathBase}/metrics");
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ── Run KPIs endpoint ────────────────────────────────────────────────────
@@ -485,7 +478,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         var chains = await response.Content.ReadFromJsonAsync<List<ApiDtos.FleetGoalChainDto>>();
         chains.Should().HaveCount(1);
 
-        var chain = chains![0];
+        var chain = chains[0];
         chain.FleetGoalId.Should().Be(goalId);
         chain.FleetGoalKind.Should().Be("Construction");
         chain.Priority.Should().Be(1);
@@ -504,7 +497,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     public async Task GetAssignments_MapsAllActiveShipGoalsToDto()
     {
         var fleetGoalId = Guid.NewGuid();
-        var assignedAt = new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var assignedAt = new DateTimeOffset(2024, 01, 01, 12, 00, 00, TimeSpan.Zero);
         _factory.FleetStatusQueryService
             .GetAssignmentsAsync(Arg.Any<CancellationToken>())
             .Returns(new[]
@@ -530,7 +523,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         var assignments = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipAssignmentDto>>();
         assignments.Should().HaveCount(2);
 
-        var miner = assignments!.Single(a => a.ShipSymbol == "X1-TD7-2");
+        var miner = assignments.Single(a => a.ShipSymbol == "X1-TD7-2");
         miner.GoalKind.Should().Be("MineResource");
         miner.GoalDescription.Should().Be("Mining BAUXITE at X1-TD7-A3");
         miner.SourceWaypoint.Should().Be("X1-TD7-A3");
@@ -546,7 +539,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     [Fact]
     public async Task GetActivity_ReturnsSnapshotPerShipWithCorrectActivityDescription()
     {
-        var arrival = new DateTimeOffset(2024, 6, 1, 14, 23, 0, TimeSpan.Zero);
+        var arrival = new DateTimeOffset(2024, 06, 01, 14, 23, 00, TimeSpan.Zero);
         _factory.FleetStatusQueryService
             .GetShipActivitiesAsync(Arg.Any<CancellationToken>())
             .Returns(new[]
@@ -572,7 +565,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         var activities = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipActivityDto>>();
         activities.Should().HaveCount(2);
 
-        var inTransit = activities!.Single(a => a.ShipSymbol == "X1-TD7-4");
+        var inTransit = activities.Single(a => a.ShipSymbol == "X1-TD7-4");
         inTransit.LocalStatus.Should().Be("InTransit");
         inTransit.ActivityDescription.Should().Be("Moving to X1-TD7-A3 (arrives 14:23 UTC)");
         inTransit.DestinationWaypoint.Should().Be("X1-TD7-A3");
@@ -592,7 +585,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/goal-chains");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Headers.CacheControl.Should().NotBeNull();
-        response.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromSeconds(5));
+        response.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -641,7 +634,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
         var entries = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipGoalHistoryDto>>();
         entries.Should().HaveCount(1);
-        entries![0].Id.Should().Be(entryId);
+        entries[0].Id.Should().Be(entryId);
         entries[0].GoalKind.Should().Be("MineResource");
         entries[0].Outcome.Should().Be("Completed");
         entries[0].Reason.Should().BeNull();
@@ -689,7 +682,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
         var chains = await response.Content.ReadFromJsonAsync<List<ApiDtos.FleetGoalChainDto>>();
         chains.Should().HaveCount(1);
-        chains![0].FleetGoalId.Should().Be(fleetGoalId);
+        chains[0].FleetGoalId.Should().Be(fleetGoalId);
         chains[0].FleetGoalKind.Should().Be("Contract");
         chains[0].FleetGoalDescription.Should().Be("Contract C-1");
         chains[0].ResourceNeeds.Should().HaveCount(1);
@@ -813,6 +806,7 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;Username=test;Password=test");
         builder.UseSetting("SPACETRADERS_INTERNAL_API_KEY", TestApiKey);
+        builder.UseSetting("Metrics:Port", "0");
 
         builder.ConfigureTestServices(services =>
         {

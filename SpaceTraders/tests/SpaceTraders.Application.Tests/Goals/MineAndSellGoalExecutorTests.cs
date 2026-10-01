@@ -7,6 +7,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -21,6 +22,7 @@ public sealed class MineAndSellGoalExecutorTests
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly LogRecorder _log = new();
 
     private MineAndSellGoalExecutor CreateExecutor()
     {
@@ -45,7 +47,7 @@ public sealed class MineAndSellGoalExecutorTests
             _port,
             _dock,
             _bus,
-            NullLogger<MineAndSellGoalExecutor>.Instance);
+            _log.For<MineAndSellGoalExecutor>());
     }
 
     private static SurveyModel ActiveSurvey(string waypointSymbol, string depositSymbol) =>
@@ -316,5 +318,45 @@ public sealed class MineAndSellGoalExecutorTests
         await _goals.Received(1).SetActiveGoalAsync("MINER-1", Arg.Any<MineAndSellGoal>(), Arg.Any<CancellationToken>());
         await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_ASale_IsPublished_ForTheLedgerAndTheCredits()
+    {
+        // B7: a sale changed the cached credits, but nothing published it, so the ledger, the credit
+        // samples and the credits-earned metric never saw it.
+        var ship = new ShipModel(
+            "MINER-1",
+            "X1-AB",
+            "X1-AB-MKT",
+            "DOCKED",
+            "CRUISE",
+            10,
+            40,
+            CargoCurrent: 10,
+            CargoCapacity: 40,
+            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+        _port.SellCargoAsync("MINER-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult(AgentSymbol: "AGENT", AgentCredits: 220_000, Cargo: new CargoModel(0, 40, []), Revenue: 15_000));
+        _agents.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 205_000, "FACTION", 1));
+
+        await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "MINER-1" && e.Good.Value == "IRON_ORE" && e.Units == 10 && e.Revenue == 15_000 && e.NewAgentCredits == 220_000),
+            Arg.Any<DeliveryOptions>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 205_000 && e.NewCredits == 220_000),
+            Arg.Any<DeliveryOptions>());
+
+        // The journal (slice 2.3).
+        var sold = _log.Journal.Should().ContainSingle().Subject;
+        sold.EventKind.Should().Be("CargoSold");
+        sold.Properties.Should().Contain(new KeyValuePair<string, object?>("ShipSymbol", "MINER-1"))
+            .And.Contain(new KeyValuePair<string, object?>("TradeSymbol", "IRON_ORE"))
+            .And.Contain(new KeyValuePair<string, object?>("Units", 10))
+            .And.Contain(new KeyValuePair<string, object?>("WaypointSymbol", "X1-AB-MKT"))
+            .And.Contain(new KeyValuePair<string, object?>("Revenue", 15_000L));
     }
 }

@@ -86,6 +86,7 @@ public sealed class DiValidationFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;Username=test;Password=test");
         builder.UseSetting("SPACETRADERS_INTERNAL_API_KEY", "test-key-validation");
+        builder.UseSetting("Metrics:Port", "0");
 
         // Fail immediately at host build if any registration is missing or has a
         // scope violation (singleton consuming scoped, etc.).

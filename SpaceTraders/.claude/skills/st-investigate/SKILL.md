@@ -47,8 +47,8 @@ read-only and also fine for pod status and events.
 | Loki logs (31 days) | Grafana Explore at http://192.168.1.230/grafana, or `kubectl -n monitoring port-forward svc/grafana-loki 3100:3100` and query `http://localhost:3100/loki/api/v1/query_range` | Everything the bot logged, by time | When deployed |
 | Postgres | `psql -h 192.168.1.232 -U <read-only login> spacetraders` | Current state: ships, goals, assignments, plans, contracts, ledger | After slice 4.1 (read-only login) |
 | Internal API | LAN only (D11): `curl -H "X-Api-Key: $KEY" http://192.168.1.230/spacetraders/api/...`. Fallback: `kubectl -n spacetraders port-forward svc/spacetraders-api-service 8080:80` and `http://localhost:8080/spacetraders/api/...` | The bot's own views: `/status/agent`, `/status/ships`, `/status/ships/{symbol}/diagnostics`, `/status/contracts`, `/status/activity`, `/fleet/assignments`, `/health/automation` | When deployed (needs the internal API key) |
-| Prometheus | Grafana, or `kubectl -n monitoring port-forward svc/prometheus-server 9090:80` | `spacetraders_*` metrics: credits, ships by state, API calls and 429s, messages by type, DB size | After phase 2 |
-| Journal events | Loki: `{namespace="spacetraders"} \|= "EventKind"` | Timeline of contracts, purchases, plans, idle and blocked ships, setting changes | After phase 2 |
+| Prometheus | Grafana, or `kubectl -n monitoring port-forward svc/prometheus-server 9090:80` | `spacetraders_*` metrics (scraped from the pod's port 9090): credits, credits earned and spent, ships by role and state, each ship's state with goal and blocked reason, contract units, API requests by endpoint and status, 429s, rate-limit waits, messages by type, goal steps, breaker trips, anomalies, DB size, next reset. `docs/HOW_IT_WORKS.md` section 11 lists them | Since phase 2, once deployed |
+| Journal events | Loki: `{namespace="spacetraders"} \| json \| EventKind != ""` | Timeline of contracts, purchases and sales, plans, idle and blocked ships, setting changes, resets and anomalies (`JournalEvents`) | Since phase 2, once deployed |
 | Anomalies | Prometheus `spacetraders_anomaly_active == 1`; Loki events `AnomalyRaised` and `AnomalyCleared` | Which intended behaviour is broken, and since when | After phase 3 |
 
 Check what exists before relying on it. In Grafana Explore, a Prometheus query of
@@ -67,8 +67,19 @@ for levels other than Information.
 # Error volume per hour (spot bursts and loops)
 sum(count_over_time({namespace="spacetraders"} |= "\"@l\":\"Error\"" [1h]))
 
-# Everything about one ship (B12: the property may be ShipSymbol, Symbol or Ship)
-{namespace="spacetraders"} |= "SHIP-SYMBOL-HERE"
+# Everything about one ship (always ShipSymbol since slice 1.9)
+{namespace="spacetraders"} | json | ShipSymbol="SHIP-SYMBOL-HERE"
+
+# The journal: a timeline of the run
+{namespace="spacetraders"} | json | EventKind != "" | line_format "{{.EventKind}} {{.ShipSymbol}}{{.ContractId}} {{.Reason}}"
+```
+
+```promql
+# Message volume by type (a loop shows up here; messages aren't stored since slice 1.3)
+sum by (type) (rate(spacetraders_messages_handled_total[5m]))
+
+# Ships and how long they have been in their state
+time() - spacetraders_ship_status_since_timestamp_seconds
 ```
 
 ```sql
@@ -76,10 +87,6 @@ sum(count_over_time({namespace="spacetraders"} |= "\"@l\":\"Error\"" [1h]))
 SELECT n.nspname||'.'||c.relname AS tbl, pg_size_pretty(pg_total_relation_size(c.oid)) AS size, c.reltuples::bigint AS approx_rows
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE c.relkind IN ('r','p') ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 15;
-
--- Message volume by type (loops show up here, as long as Wolverine stores messages: B2)
-SELECT message_type, status, count(*) FROM wolverine.wolverine_incoming_envelopes
-GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 10;
 ```
 
 `docs/HOW_IT_WORKS.md` lists every table and what writes it.

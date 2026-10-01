@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Configurations;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
@@ -86,23 +87,9 @@ public abstract class IntegrationTestBase : IAsyncLifetime, IAsyncDisposable
         return new SpaceTradersDbContext(options, scope);
     }
 
-    private static bool IsDockerAvailable()
-    {
-        if (System.OperatingSystem.IsWindows())
-        {
-            try
-            {
-                using var pipe = new System.IO.Pipes.NamedPipeClientStream(".", "docker_engine", System.IO.Pipes.PipeDirection.InOut);
-                pipe.Connect(200);
-                return pipe.IsConnected;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        return System.IO.File.Exists("/var/run/docker.sock")
-            || !string.IsNullOrWhiteSpace(System.Environment.GetEnvironmentVariable("DOCKER_HOST"));
-    }
+    /// <summary>
+    /// Asks Testcontainers, which finds Docker the way it will start the container: DOCKER_HOST, the
+    /// Unix socket, or Docker Desktop's named pipe on Windows (B36).
+    /// </summary>
+    private static bool IsDockerAvailable() => TestcontainersSettings.OS.DockerEndpointAuthConfig is not null;
 }

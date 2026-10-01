@@ -7,6 +7,7 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI.Adapters;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Availability;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Metrics;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Notifications;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddTransient<RateLimitingHandler>();
         services.AddTransient<RateLimitResponseHandler>();
         services.AddTransient<OutagePauseHandler>();
+        services.AddTransient<ApiRequestMetricsHandler>();
 
         services.AddHttpClient<ISpaceTradersApiClient, SpaceTradersApiClient>((serviceProvider, client) =>
         {
@@ -55,7 +57,8 @@ public static class DependencyInjection
         })
         .AddHttpMessageHandler<OutagePauseHandler>()
         .AddHttpMessageHandler<RateLimitResponseHandler>()
-        .AddHttpMessageHandler<RateLimitingHandler>();
+        .AddHttpMessageHandler<RateLimitingHandler>()
+        .AddHttpMessageHandler<ApiRequestMetricsHandler>();
 
         services.AddScoped<ISpaceTradersPort, SpaceTradersPortAdapter>();
 

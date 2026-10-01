@@ -14,7 +14,7 @@ namespace SpaceTraders.Application.Tests.RateLimiting;
 /// <summary>The limit from the API guide: 2 requests per second, plus a burst of 30 per 60 seconds.</summary>
 public sealed class RequestBudgetTests
 {
-    private static readonly DateTimeOffset Start = new(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = new(2026, 10, 01, 12, 00, 00, TimeSpan.Zero);
 
     [Fact]
     public void TryTake_LetsTwoGo_ThenUsesTheBurst_ThenWaits()
@@ -75,10 +75,12 @@ public sealed class RequestBudgetTests
 
 public sealed class RateLimitingHandlerTests
 {
+    private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+
     [Fact]
     public async Task TenRequestsAtOnce_GoOutWithoutWaiting()
     {
-        using var handler = new RateLimitingHandler(new RequestBudget(), new RateLimitStatus()) { InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)) };
+        using var handler = new RateLimitingHandler(new RequestBudget(), new RateLimitStatus(), _metrics) { InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)) };
         using var invoker = new HttpMessageInvoker(handler);
 
         var stopwatch = Stopwatch.StartNew();
@@ -89,6 +91,22 @@ public sealed class RateLimitingHandlerTests
         }
 
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+        _metrics.DidNotReceive().RateLimitWait(Arg.Any<TimeSpan>());
+    }
+
+    [Fact]
+    public async Task ARequestThatWaitsForTheBudget_CountsTheWait()
+    {
+        var budget = new RequestBudget();
+        var now = TimeProvider.System.GetUtcNow();
+        for (var request = 0; request < RequestBudget.PerSecond + RequestBudget.Burst; request++)
+        {
+            budget.TryTake(now);
+        }
+
+        await SendAsync(new RateLimitingHandler(budget, new RateLimitStatus(), _metrics), requests: 1);
+
+        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait > TimeSpan.FromMilliseconds(500)));
     }
 
     [Fact]
@@ -98,8 +116,8 @@ public sealed class RateLimitingHandlerTests
         var budget = new RequestBudget();
         var status = new RateLimitStatus();
 
-        await SendAsync(new RateLimitingHandler(budget, status), requests: 3);
-        await SendAsync(new RateLimitingHandler(budget, status), requests: 1);
+        await SendAsync(new RateLimitingHandler(budget, status, _metrics), requests: 3);
+        await SendAsync(new RateLimitingHandler(budget, status, _metrics), requests: 1);
 
         budget.BurstRemaining(TimeProvider.System.GetUtcNow()).Should().Be(28);
         status.TotalRequests.Should().Be(4);
@@ -174,7 +192,7 @@ public sealed class RateLimitResponseHandlerTests
     [Fact]
     public void RateLimiterWait_UsesTheReset_ThenRetryAfter_ThenOneSecond()
     {
-        var now = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2026, 10, 01, 12, 00, 00, TimeSpan.Zero);
 
         using var withReset = RateLimiter429(now.AddMilliseconds(950));
         RateLimitResponseHandler.RateLimiterWait(withReset, now).Should().Be(TimeSpan.FromMilliseconds(1000));

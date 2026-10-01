@@ -54,7 +54,8 @@ Per sample, in `samples.jsonl`, `tables.csv`, `summary.log`, `metrics/NN.txt` an
 - every table: rows, bytes, and its inserts, updates and deletes, so a small table that is
   rewritten in a loop shows up too; and the schemas, where a `wolverine` schema must not appear;
 - the database size and its transaction counts;
-- `/metrics`, the health endpoints, and the status endpoints (credits, ships, contracts);
+- `/metrics` (from the metrics port, 9090, since slice 2.1), the health endpoints, and the status
+  endpoints (credits, ships, contracts);
 - the log: lines by level and by message template, plus the lines slice 1.14 is about (circuit
   breaker trips, 429s, reset detection, errors).
 

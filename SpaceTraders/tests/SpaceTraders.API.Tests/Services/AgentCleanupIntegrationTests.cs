@@ -1,4 +1,5 @@
 using System.Net;
+using DotNet.Testcontainers.Configurations;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,7 @@ using Npgsql;
 using NSubstitute;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence;
@@ -42,7 +44,9 @@ public sealed class AgentCleanupIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        Skip.IfNot(System.IO.File.Exists("/var/run/docker.sock") || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOCKER_HOST")), "Docker is not available – skipping integration tests.");
+        // Testcontainers finds Docker the way it will start the container: DOCKER_HOST, the Unix socket, or
+        // Docker Desktop's named pipe on Windows (B36).
+        Skip.IfNot(TestcontainersSettings.OS.DockerEndpointAuthConfig is not null, "Docker is not available – skipping integration tests.");
 
         _pg = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await _pg.StartAsync();
@@ -117,6 +121,7 @@ public sealed class AgentCleanupIntegrationTests : IAsyncLifetime
             AgentFaction = "COSMIC",
             AccountToken = "account-token",
         }));
+        services.AddSingleton(Substitute.For<IAutomationMetrics>());
         services.AddSingleton<AgentBootstrapService>();
         return services.BuildServiceProvider();
     }

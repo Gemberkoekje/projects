@@ -146,7 +146,11 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             MapDeliverables(result.Contract),
             result.Agent.Symbol,
             result.Agent.Credits,
-            null);
+            null)
+        {
+            PaymentOnAccepted = result.Contract.Terms?.Payment?.OnAccepted ?? 0,
+            PaymentOnFulfilled = result.Contract.Terms?.Payment?.OnFulfilled ?? 0,
+        };
     }
 
     public async Task<ContractActionResult> DeliverContractAsync(string contractId, string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
@@ -190,7 +194,11 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             MapDeliverables(result.Contract),
             result.Agent.Symbol,
             result.Agent.Credits,
-            null);
+            null)
+        {
+            PaymentOnAccepted = result.Contract.Terms?.Payment?.OnAccepted ?? 0,
+            PaymentOnFulfilled = result.Contract.Terms?.Payment?.OnFulfilled ?? 0,
+        };
     }
 
     public async Task<MarketDataModel> GetMarketAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)

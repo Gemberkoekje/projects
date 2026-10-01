@@ -76,7 +76,8 @@ public sealed class ShipGoalExecutorService(
             await goals.BlockGoalAsync(shipSymbol, activeGoal.GoalId, RunawayReason, ct);
             metrics.GoalBreakerTripped(shipSymbol);
             logger.LogWarning(
-                "ShipGoalExecutorService: ship {ShipSymbol} took more than {MaxSteps} goal steps in a minute; goal {GoalKind} blocked ({Reason}).",
+                "{EventKind:l}: ship {ShipSymbol} took more than {MaxSteps} goal steps in a minute; goal {GoalKind} blocked ({Reason}).",
+                JournalEvents.ShipBlocked,
                 shipSymbol,
                 maxStepsPerMinute,
                 activeGoal.Kind,
@@ -84,6 +85,7 @@ public sealed class ShipGoalExecutorService(
             return GoalExecutionResult.Blocked($"{RunawayReason}: more than {maxStepsPerMinute} goal steps in a minute.");
         }
 
+        metrics.GoalStep(activeGoal.Kind.ToString());
         var result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)

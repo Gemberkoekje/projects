@@ -8,6 +8,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
+using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Automation;
 
@@ -46,6 +47,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -116,6 +118,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -210,6 +213,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             shipPurchases,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -267,6 +271,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             shipPurchases,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             log.For<ContractPlanService>());
 
         for (var tick = 0; tick < 12; tick++)
@@ -276,6 +281,7 @@ public sealed class ContractPlanServiceTests
 
         stored!.Status.Should().Be(ContractMineralPlanStatus.PendingBudget);
         log.Kept.Should().ContainSingle().Which.Should().Contain("C-3");
+        log.Journal.Should().ContainSingle(e => e.EventKind == "PlanBlocked" && Equals(e.Properties["Reason"], "no_ship_or_budget"));
     }
 
     [Fact]
@@ -321,6 +327,7 @@ public sealed class ContractPlanServiceTests
             port,
             shipPurchases,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -372,6 +379,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -464,6 +472,7 @@ public sealed class ContractPlanServiceTests
             port,
             shipPurchases,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -559,6 +568,7 @@ public sealed class ContractPlanServiceTests
             port,
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -633,6 +643,7 @@ public sealed class ContractPlanServiceTests
             port,
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -650,6 +661,8 @@ public sealed class ContractPlanServiceTests
         var ships = Substitute.For<IShipRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var port = Substitute.For<ISpaceTradersPort>();
+        var bus = Substitute.For<IMessageBus>();
+        var log = new LogRecorder();
         var agents = Substitute.For<IAgentRepository>();
         agents.GetAsync(Arg.Any<CancellationToken>())
             .Returns(new AgentModel(Symbol: "AGENT", AccountId: null, HeadquartersSymbol: null, Credits: 175_000, StartingFaction: "COSMIC", ShipCount: 2));
@@ -719,7 +732,10 @@ public sealed class ContractPlanServiceTests
                 Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 20, 0)],
                 AgentSymbol: "AGENT",
                 AgentCredits: 176_136,
-                ShipCargo: null));
+                ShipCargo: null)
+            {
+                PaymentOnAccepted = 1_136,
+            });
 
         var idleMiner = new ShipModel(
             Symbol: "SHIP-MINER-1",
@@ -752,12 +768,24 @@ public sealed class ContractPlanServiceTests
             port,
             Substitute.For<IShipPurchaseService>(),
             agents,
-            NullLogger<ContractPlanService>.Instance);
+            bus,
+            log.For<ContractPlanService>());
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
 
+        // The journal (slice 2.3): the contract accepted, then the plan started.
+        log.Journal.Select(e => e.EventKind).Should().Equal("ContractAccepted", "PlanStarted");
+        log.Journal[0].Message.Should().Be("ContractAccepted: contract C-ACC-1 accepted (IRON_ORE to X1-AB-MKT); it paid 1136 credits.");
         await port.Received(1).AcceptContractAsync("C-ACC-1", Arg.Any<CancellationToken>());
         await agents.Received(1).UpsertAsync(Arg.Is<AgentModel>(a => a.Credits == 176_136), Arg.Any<CancellationToken>());
+
+        // B7: and the ledger and the metrics hear of it.
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ContractAcceptedEvent>(e => e.ContractId == "C-ACC-1" && e.Payment == 1_136),
+            Arg.Any<DeliveryOptions>());
+        await bus.Received(1).PublishAsync(
+            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 175_000 && e.NewCredits == 176_136),
+            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -806,6 +834,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -884,6 +913,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1011,6 +1041,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1085,6 +1116,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1138,6 +1170,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1191,6 +1224,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(evnt, CancellationToken.None);
@@ -1234,6 +1268,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(new DeliverableObtainedEvent("SHIP-MINER-1", "IRON_ORE", 4), CancellationToken.None);
@@ -1303,6 +1338,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1364,6 +1400,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1444,6 +1481,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1517,9 +1555,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
         return (sut, plans, assignments);
     }
 }
-
-

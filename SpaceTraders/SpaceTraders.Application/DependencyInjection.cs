@@ -87,6 +87,7 @@ public static class DependencyInjection
 
             // Add retry logging middleware to all message handlers
             opts.Policies.AddMiddleware(typeof(WolverineRetryLoggingMiddleware));
+            opts.Policies.AddMiddleware(typeof(MessageMetricsMiddleware));
 
             // Wolverine logs each handled message under the message type's name, which the
             // "Wolverine" level override doesn't reach; at its default (Information) that is one line

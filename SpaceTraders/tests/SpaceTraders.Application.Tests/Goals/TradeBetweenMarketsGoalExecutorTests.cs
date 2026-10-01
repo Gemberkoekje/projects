@@ -7,6 +7,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -20,6 +21,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly LogRecorder _log = new();
 
     private TradeBetweenMarketsGoalExecutor CreateExecutor() =>
         new(
@@ -29,7 +31,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             _port,
             _dock,
             _bus,
-            NullLogger<TradeBetweenMarketsGoalExecutor>.Instance);
+            _log.For<TradeBetweenMarketsGoalExecutor>());
 
     private static TradeBetweenMarketsGoal Goal() =>
         new()
@@ -220,5 +222,48 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await _dock.Received(1).ExecuteAsync("TRADER-1", Arg.Any<CancellationToken>());
         await _port.DidNotReceive().SellCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_APurchase_IsPublished_ForTheLedgerAndTheCredits()
+    {
+        // B7: nothing published a cargo purchase, so the ledger and the credits-spent metric missed it.
+        var ship = new ShipModel("TRADER-1", "X1-AB", "X1-AB-BUY", "DOCKED", "CRUISE", 20, 40, CargoCurrent: 0, CargoCapacity: 40, CargoInventory: []);
+        _port.GetMarketAsync("X1-AB", "X1-AB-BUY", Arg.Any<CancellationToken>())
+            .Returns(new MarketDataModel("X1-AB-BUY", "X1-AB", null, null, null, null));
+        _port.BuyCargoAsync("TRADER-1", "FOOD", 40, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult(AgentSymbol: "AGENT", AgentCredits: 180_000, Cargo: new CargoModel(40, 40, [new CargoItemModel("FOOD", 40)]), Revenue: 8_000));
+        _agents.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 188_000, "FACTION", 1));
+
+        await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<CargoPurchasedEvent>(e => e.ShipSymbol == "TRADER-1" && e.Good.Value == "FOOD" && e.Units == 40 && e.Cost == 8_000 && e.NewAgentCredits == 180_000 && e.WaypointSymbol == "X1-AB-BUY"),
+            Arg.Any<DeliveryOptions>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 188_000 && e.NewCredits == 180_000),
+            Arg.Any<DeliveryOptions>());
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoBought" && Equals(e.Properties["Cost"], 8_000L) && Equals(e.Properties["WaypointSymbol"], "X1-AB-BUY"));
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_ASale_IsPublished_ForTheLedgerAndTheCredits()
+    {
+        var ship = new ShipModel("TRADER-1", "X1-AB", "X1-AB-SELL", "DOCKED", "CRUISE", 20, 40, CargoCurrent: 15, CargoCapacity: 40, CargoInventory: [new CargoItemModel("FOOD", 15)]);
+        _port.SellCargoAsync("TRADER-1", "FOOD", 15, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult(AgentSymbol: "AGENT", AgentCredits: 205_000, Cargo: new CargoModel(0, 40, []), Revenue: 12_000));
+        _agents.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 193_000, "FACTION", 1));
+
+        await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "TRADER-1" && e.Good.Value == "FOOD" && e.Units == 15 && e.Revenue == 12_000),
+            Arg.Any<DeliveryOptions>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 193_000 && e.NewCredits == 205_000),
+            Arg.Any<DeliveryOptions>());
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoSold" && Equals(e.Properties["Revenue"], 12_000L));
     }
 }

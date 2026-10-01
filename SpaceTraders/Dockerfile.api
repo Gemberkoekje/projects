@@ -12,5 +12,5 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /app/publish .
-EXPOSE 8080
+EXPOSE 8080 9090
 ENTRYPOINT ["dotnet", "SpaceTraders.API.dll"]

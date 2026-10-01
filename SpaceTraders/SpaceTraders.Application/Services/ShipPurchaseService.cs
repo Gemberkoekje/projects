@@ -3,6 +3,9 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
+using Wolverine;
 
 namespace SpaceTraders.Application.Services;
 
@@ -12,6 +15,7 @@ public sealed class ShipPurchaseService(
     IShipRepository ships,
     IShipyardRepository shipyards,
     IBudgetPolicy budget,
+    IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
     public async Task<ShipPurchaseResult> TryPurchaseAsync(
@@ -54,7 +58,7 @@ public sealed class ShipPurchaseService(
 
         var result = await port.PurchaseShipAsync(shipType, shipyardWaypoint, cancellationToken);
 
-        await agents.UpsertAsync(result.Agent, cancellationToken);
+        await agents.SetAgentAsync(bus, result.Agent, cancellationToken);
 
         var newShip = new ShipModel(
             result.ShipSymbol,
@@ -73,8 +77,12 @@ public sealed class ShipPurchaseService(
 
         await ships.UpsertAsync(newShip, cancellationToken);
 
+        // The ledger and the credits-spent metric (B7).
+        await bus.PublishAsync(new NewShipPurchasedEvent(result.ShipSymbol, ToShipType(shipType), result.Cost));
+
         logger.LogInformation(
-            "ShipPurchaseService: purchased {ShipSymbol} ({Type}) at {Shipyard} for {Cost} credits.",
+            "{EventKind:l}: ship {ShipSymbol} ({ShipType}) bought at {WaypointSymbol} for {Cost} credits.",
+            JournalEvents.ShipPurchased,
             result.ShipSymbol,
             shipType,
             shipyardWaypoint,
@@ -88,6 +96,12 @@ public sealed class ShipPurchaseService(
             PurchasedShip = newShip,
         };
     }
+
+    /// <summary>The API's <c>SHIP_MINING_DRONE</c> as <see cref="ShipType.ShipMiningDrone"/>; <see cref="ShipType.None"/> if unknown.</summary>
+    internal static ShipType ToShipType(string shipType)
+        => Enum.TryParse<ShipType>(shipType.Replace("_", string.Empty, StringComparison.Ordinal), ignoreCase: true, out var type)
+            ? type
+            : ShipType.None;
 
     private static long ResolveShipPurchasePrice(ShipyardWaypointDto? dto, string shipType)
     {
