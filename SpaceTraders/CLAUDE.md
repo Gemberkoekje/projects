@@ -11,6 +11,8 @@ Claude fixes things that don't work the way they are intended to. It does not tu
   At most, mention an observation under "Noticed" and change nothing.
 - Not sure whether something is intended? Ask, with the evidence. Don't guess.
 - Every fix starts with a test that reproduces the misbehaviour.
+- Touching a file that has build warnings? Consider fixing them in the same change.
+  Mention any you leave, and why.
 
 The current plan, known issues and open decisions are in `PLAN.md`.
 
