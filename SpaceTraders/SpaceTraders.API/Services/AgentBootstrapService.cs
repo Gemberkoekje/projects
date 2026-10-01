@@ -1,4 +1,3 @@
-using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SpaceTraders.API.Configuration;
@@ -116,15 +115,11 @@ public sealed class AgentBootstrapService(
 
             return TokenValidationResult.Valid(agent.Symbol);
         }
-        catch (SpaceTradersApiException exception) when (IsTokenResetDateMismatch(exception))
+        catch (SpaceTradersApiException exception) when (exception.IsServerReset)
         {
             return TokenValidationResult.ResetMismatch();
         }
     }
-
-    private static bool IsTokenResetDateMismatch(SpaceTradersApiException exception)
-        => exception.StatusCode == HttpStatusCode.Unauthorized
-            && exception.Message.Contains("Token reset_date does not match the server", StringComparison.OrdinalIgnoreCase);
 
     private async Task BootstrapWithTokenAsync(string token, CancellationToken cancellationToken)
     {

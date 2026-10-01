@@ -60,7 +60,7 @@ with a test that does.
 | B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good. | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.5 |
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 |
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
-| B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 |
+| B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 (done) |
 | B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 |
 | B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 6.1 |
 | B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 6.1 |
@@ -223,11 +223,20 @@ cluster (phase 4).
   - An arriving ship still docks and refreshes its market while automation is off: that finishes
     a command issued before. Only the goal step after it is skipped.
 
-**1.8 Server reset during a run (B6)**
+**1.8 Server reset during a run (B6)** (done)
 - Do: a 401 with the reset-date error pauses automation, logs `ResetDetected`, and stops the
   host. Kubernetes restarts the pod, and startup already registers the new agent through the
   account token. Simpler than re-bootstrapping in-process.
 - Done when: a test with a fake port returning the reset error stops the host.
+- Done:
+  - The API client notices it, not the callers: every failed call goes through one method, so
+    no caller can swallow the error first (the contract plan, for one, ignores API errors). The
+    test therefore fakes the server's HTTP response rather than the port.
+  - `ServerResetMonitor` switches `Automation.Enabled` off (for the old agent), logs
+    `ResetDetected` at Critical and stops the host, once.
+  - It ignores reports until startup has completed, because agent bootstrap tries old tokens on
+    purpose. A reset in the middle of startup makes that step fail, which stops the host (1.11).
+  - The new agent starts with the default settings, because settings are stored per agent.
 
 **1.9 Log diet (B12)**
 - Do:

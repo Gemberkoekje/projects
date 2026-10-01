@@ -90,6 +90,7 @@ builder.Services
 
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistoryService, SpaceTraders.Application.Services.CreditHistoryService>();
 builder.Services.AddSingleton<IAutomationMetrics, PrometheusAutomationMetrics>();
+builder.Services.AddSingleton<IServerResetMonitor, ServerResetMonitor>();
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
 builder.Services.AddSingleton<AgentBootstrapService>();

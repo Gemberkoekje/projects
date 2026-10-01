@@ -108,7 +108,10 @@ stops. The process exits with code 1, so Kubernetes restarts it with back-off.
   - sets the agent data scope, which every later database query filters on;
   - seeds any missing settings;
   - records the active token.
-- This only happens at startup. A reset during a run is not noticed (B6).
+- This only happens at startup. A reset during a run is noticed by the API client (see
+  [Outbound API client](#8-outbound-api-client-spacetradersinfrastructurespacetradersapi)): the
+  host stops, and after the restart this registers the new agent. Its settings start from the
+  defaults, because settings are stored per agent.
 
 **Run lifecycle** (`RunLifecycleService`):
 - Opens a run, or resumes the open one, with a name, a strategy label, a settings snapshot and
@@ -562,6 +565,10 @@ Only 11 of the 53 seeded settings change what the bot does (B18):
 
 - **Availability:** `ApiAvailabilityState` tracks availability. Nothing pauses on it (B13).
 - **Alerts:** `WebhookAlertNotifier` posts alerts to `Alerts.WebhookUrl` and ignores errors.
+- **Server reset:** every failed call goes through one place in `SpaceTradersApiClient`. A 401
+  with "Token reset_date does not match the server" goes to `ServerResetMonitor`, which switches
+  `Automation.Enabled` off, logs `ResetDetected` at Critical and stops the host. It ignores
+  reports until startup has completed: agent bootstrap tries old tokens on purpose.
 - **Tokens:** status, systems and waypoints calls go without a token, `register` uses the account
   token, and everything else uses the agent token.
 - **Usage counts:** every call increments `api_endpoint_usages`.
@@ -692,7 +699,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
 | `SpaceTraders.Application.Tests` | ~244 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.API.Tests` | ~66 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 **WebUI tests:**
