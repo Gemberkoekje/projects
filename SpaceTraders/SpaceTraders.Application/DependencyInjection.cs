@@ -72,6 +72,17 @@ public static class DependencyInjection
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
+
+            // Wolverine 6 compiles the handler code at startup only with WolverineFx.RuntimeCompilation,
+            // and with ManualOnly discovery the package doesn't register itself.
+            opts.UseRuntimeCompilation();
+
+            // Wolverine 6 refuses service location by default. The host allows it for the DbContext,
+            // whose options EF Core registers through a factory. 5.x's AllowedButWarn covers anything
+            // else registered through a lambda (and every test substitute): a handler that needs it
+            // logs a warning instead of failing on its first message.
+            opts.RestoreV5Defaults();
+
             configureWolverine(opts);
 
             // Add retry logging middleware to all message handlers

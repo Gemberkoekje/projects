@@ -69,8 +69,10 @@ builder.Host.UseSerilog((ctx, cfg) =>
 
 // Wolverine keeps messages in memory: nothing is stored in Postgres (B2). After a restart, startup
 // sync and startup recovery pick the ships up again, and arrivals wait in scheduled_ship_events.
+// EF Core registers the DbContext's options through a factory, so Wolverine 6's generated handler
+// code can't construct the DbContext itself; resolving it from the scope is the intended way.
 builder.Services
-    .AddApplication()
+    .AddApplication(opts => opts.CodeGeneration.AlwaysUseServiceLocationFor<SpaceTradersDbContext>())
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {

@@ -39,8 +39,11 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
   text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
   Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
   `Application=SpaceTraders.API`.
-- **Wolverine** discovers handlers in the Application assembly and keeps messages in memory:
-  nothing goes to Postgres. A crash loses the messages still in flight; after the restart,
+- **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
+  nothing goes to Postgres. It compiles the handler code at startup (`WolverineFx.RuntimeCompilation`).
+  Its generated code resolves the DbContext from the scope (`AlwaysUseServiceLocationFor`), because
+  EF Core registers the DbContext's options through a factory; anything else that needs service
+  location logs a warning, as in 5.x (`RestoreV5Defaults()`), instead of failing the handler. A crash loses the messages still in flight; after the restart,
   startup sync and startup recovery pick the ships up again, and pending arrivals wait in
   `scheduled_ship_events`. Any handler exception is retried after 250 ms, 500 ms and 1 s, then
   the message is discarded.

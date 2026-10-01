@@ -464,7 +464,8 @@ cluster (phase 4).
   stop the tick (1.11), and restarts and server resets keep its state (1.8, 1.12, 1.13, B31).
 - Traps it took: startup sync rebuilt rows from one API call and dropped what the other paths
   store, three times (B20, B28, B31); Wolverine logs under the message type's name (B29); a small,
-  wide, often-updated table outgrows the autovacuum trigger's reach (B32).
+  wide, often-updated table outgrows the autovacuum trigger's reach (B32); and Wolverine 6 needs
+  runtime compilation and service location for the DbContext (see `CHANGELOG.md`).
 - To understand this phase, start with `docs/HOW_IT_WORKS.md` (sections 1, 2 and 6), then
   `GameLoopService.cs`, `ShipGoalExecutorService.cs`, `DeferredStartupHostedService.cs` and
   `DataRetention.cs`.
