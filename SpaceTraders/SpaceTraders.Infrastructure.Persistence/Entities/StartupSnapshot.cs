@@ -2,13 +2,13 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class StartupSnapshot
 {
-    public int Id { get; set; }
+    public int Id { get; init; }
 
-    public string AgentToken { get; set; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
-    public string SnapshotJson { get; set; } = string.Empty;
+    public string SnapshotJson { get; init; } = string.Empty;
 
-    public DateTimeOffset CapturedAt { get; set; }
+    public DateTimeOffset CapturedAt { get; init; }
 
-    public bool IsInitialSnapshot { get; set; }
+    public bool IsInitialSnapshot { get; init; }
 }

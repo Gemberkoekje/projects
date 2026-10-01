@@ -351,11 +351,7 @@ public sealed class SpaceTradersApiClient(
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        var currentAgentToken = _agentTokenProvider.Token ?? _options.AgentToken;
-        if (!string.IsNullOrWhiteSpace(currentAgentToken))
-        {
-            await _endpointUsageRecorder.RecordAsync(method.Method, endpoint, currentAgentToken, cancellationToken);
-        }
+        await _endpointUsageRecorder.RecordAsync(method.Method, endpoint, cancellationToken);
 
         if (body is not null)
         {

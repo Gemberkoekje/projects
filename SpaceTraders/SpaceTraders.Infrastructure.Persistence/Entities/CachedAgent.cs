@@ -2,7 +2,7 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedAgent
 {
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string Symbol { get; init; }
 

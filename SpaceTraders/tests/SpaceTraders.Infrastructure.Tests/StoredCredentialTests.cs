@@ -19,7 +19,7 @@ public sealed class StoredCredentialTests : IntegrationTestBase
 
         Db.Credentials.Add(new StoredCredential
         {
-            AgentToken = Db.AgentToken,
+            AgentId = Db.AgentId,
             Key = "AgentToken",
             Value = "test-token-abc",
             StoredAt = now,
@@ -27,7 +27,7 @@ public sealed class StoredCredentialTests : IntegrationTestBase
         await Db.SaveChangesAsync();
 
         await using var fresh = CreateFreshContext();
-        var credential = await fresh.Credentials.FindAsync(fresh.AgentToken, "AgentToken");
+        var credential = await fresh.Credentials.FindAsync(fresh.AgentId, "AgentToken");
 
         credential.Should().NotBeNull();
         credential!.Value.Should().Be("test-token-abc");
@@ -39,7 +39,7 @@ public sealed class StoredCredentialTests : IntegrationTestBase
     {
         Db.Credentials.Add(new StoredCredential
         {
-            AgentToken = Db.AgentToken,
+            AgentId = Db.AgentId,
             Key = "AgentToken",
             Value = "first-value",
             StoredAt = DateTimeOffset.UtcNow,
@@ -48,12 +48,12 @@ public sealed class StoredCredentialTests : IntegrationTestBase
 
         // Simulate second run: read, then update
         await using var second = CreateFreshContext();
-        var existing = await second.Credentials.FindAsync(second.AgentToken, "AgentToken");
+        var existing = await second.Credentials.FindAsync(second.AgentId, "AgentToken");
         existing.Should().NotBeNull();
 
         second.Entry(existing!).CurrentValues.SetValues(new StoredCredential
         {
-            AgentToken = second.AgentToken,
+            AgentId = second.AgentId,
             Key = "AgentToken",
             Value = "updated-value",
             StoredAt = existing.StoredAt,
@@ -61,7 +61,7 @@ public sealed class StoredCredentialTests : IntegrationTestBase
         await second.SaveChangesAsync();
 
         await using var third = CreateFreshContext();
-        var result = await third.Credentials.FindAsync(third.AgentToken, "AgentToken");
+        var result = await third.Credentials.FindAsync(third.AgentId, "AgentToken");
         result!.Value.Should().Be("updated-value");
     }
 
@@ -69,13 +69,13 @@ public sealed class StoredCredentialTests : IntegrationTestBase
     public async Task FirstRun_NoCredential_Exists_SecondRun_CanReadBack()
     {
         // First run: nothing in DB yet
-        var before = await Db.Credentials.FindAsync(Db.AgentToken, "AgentToken");
+        var before = await Db.Credentials.FindAsync(Db.AgentId, "AgentToken");
         before.Should().BeNull();
 
         // Bootstrap inserts the token
         Db.Credentials.Add(new StoredCredential
         {
-            AgentToken = Db.AgentToken,
+            AgentId = Db.AgentId,
             Key = "AgentToken",
             Value = "bootstrap-token",
             StoredAt = DateTimeOffset.UtcNow,
@@ -84,7 +84,7 @@ public sealed class StoredCredentialTests : IntegrationTestBase
 
         // Second run: reads back the stored token
         await using var secondRun = CreateFreshContext();
-        var stored = await secondRun.Credentials.FindAsync(secondRun.AgentToken, "AgentToken");
+        var stored = await secondRun.Credentials.FindAsync(secondRun.AgentId, "AgentToken");
         stored.Should().NotBeNull();
         stored!.Value.Should().Be("bootstrap-token");
     }

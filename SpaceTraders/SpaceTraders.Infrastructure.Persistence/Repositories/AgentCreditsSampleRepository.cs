@@ -10,7 +10,7 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
     {
         var sample = new AgentCreditsSample
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             ObservedAt = TimeProvider.System.GetUtcNow(),
             Credits = credits,
         };
@@ -39,13 +39,13 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
         var downsampledDeleted = await db.Database.ExecuteSqlAsync(
             $"""
             DELETE FROM agent_credits_samples
-            WHERE "AgentToken" = {db.AgentToken}
+            WHERE "AgentId" = {db.AgentId}
               AND "ObservedAt" < {rawRetentionCutoff}
               AND "ObservedAt" >= {aggregateRetentionCutoff}
               AND "Id" NOT IN (
                 SELECT MIN("Id")
                 FROM agent_credits_samples
-                WHERE "AgentToken" = {db.AgentToken}
+                WHERE "AgentId" = {db.AgentId}
                   AND "ObservedAt" < {rawRetentionCutoff}
                   AND "ObservedAt" >= {aggregateRetentionCutoff}
                 GROUP BY date_trunc('hour', "ObservedAt")
@@ -56,7 +56,7 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
         // Note: AgentCreditsSample has no global query filter (unlike MarketPriceSample),
         // so agent_token must be filtered explicitly here.
         var purgedDeleted = await db.AgentCreditsSamples
-            .Where(s => s.AgentToken == db.AgentToken && s.ObservedAt < aggregateRetentionCutoff)
+            .Where(s => s.AgentId == db.AgentId && s.ObservedAt < aggregateRetentionCutoff)
             .ExecuteDeleteAsync(cancellationToken);
 
         return downsampledDeleted + purgedDeleted;

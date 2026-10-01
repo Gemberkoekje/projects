@@ -92,7 +92,7 @@ public sealed class RunRepository(SpaceTradersDbContext db) : IRunRepository
         db.Runs.Add(new Run
         {
             Id = id,
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             Name = name,
             StrategyLabel = strategyLabel,
             StartedAt = TimeProvider.System.GetUtcNow(),
@@ -145,7 +145,7 @@ public sealed class RunRepository(SpaceTradersDbContext db) : IRunRepository
         db.ScheduledRuns.Add(new ScheduledRun
         {
             Id = id,
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             Name = name,
             StrategyLabel = strategyLabel,
             ScheduledSettingsJson = scheduledSettingsJson,
@@ -190,7 +190,7 @@ public sealed class RunRepository(SpaceTradersDbContext db) : IRunRepository
     {
         db.RunCreditHighlights.Add(new RunCreditHighlight
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             RunId = runId,
             OccurredAt = TimeProvider.System.GetUtcNow(),
             Credits = credits,

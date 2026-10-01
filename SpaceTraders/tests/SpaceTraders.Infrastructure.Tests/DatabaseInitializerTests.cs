@@ -75,7 +75,7 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
             .UseNpgsql(_pg.GetConnectionString())
             .Options;
         var scope = new AgentDataScope();
-        scope.Set("initializer-test-token");
+        scope.Set("INITIALIZER-TEST@2026-09-27");
         return new SpaceTradersDbContext(options, scope);
     }
 

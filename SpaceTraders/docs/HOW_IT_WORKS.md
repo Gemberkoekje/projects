@@ -72,7 +72,7 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 |---|---|---|---|
 | 1 | Database initialisation | once | Skipped in `Testing`; see [Data](#6-data) |
 | 2 | `ShipEventScheduler` | keeps running | Arrival timers. Skipped in `Testing` |
-| 3 | `AgentBootstrapService` | once | Picks or registers the agent |
+| 3 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
 | 4 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
 | 5 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
 | 6 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
@@ -89,6 +89,7 @@ or 8 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy
 stops. The process exits with code 1, so Kubernetes restarts it with back-off.
 
 **Agent bootstrap** (`AgentBootstrapService`):
+- First it reads the server's reset date (`GET /`).
 - Candidate tokens, in order:
   1. the active stored token;
   2. the configured `SpaceTraders:AgentToken`;
@@ -100,15 +101,21 @@ stops. The process exits with code 1, so Kubernetes restarts it with back-off.
   publishes `TokenResetMismatchDetectedEvent` and tries the next candidate. Any other API error
   throws.
 - Registration needs `SpaceTraders:AccountToken` and `AgentName`; the faction defaults to
-  `COSMIC`.
+  `COSMIC`. It refuses (and so stops the host) when an agent with the new agent's id is stored
+  already: the server must have reset after its reset date was read, and the new agent would
+  share the old one's rows. The next start reads the date again.
 - On success it:
-  - sets the agent data scope, which every later database query filters on;
+  - sets the agent data scope to the agent's id, which every later database query filters on
+    (see [Agent scoping](#agent-scoping));
   - seeds any missing settings;
   - records the active token.
+- Then it deletes the rows of every other agent, table by table, except their `runs`. A table
+  that fails is logged and left for the next start.
 - This only happens at startup. A reset during a run is noticed by the API client (see
   [Outbound API client](#8-outbound-api-client-spacetradersinfrastructurespacetradersapi)): the
-  host stops, and after the restart this registers the new agent. Its settings start from the
-  defaults, because settings are stored per agent.
+  host stops, and after the restart this registers the new agent and deletes the old one's rows.
+  The new agent's settings start from the defaults, because settings are stored per agent; the
+  old values survive only in the settings snapshot of the old agent's runs.
 
 **Run lifecycle** (`RunLifecycleService`):
 - Opens a run, or resumes the open one, with a name, a strategy label, a settings snapshot and
@@ -438,20 +445,27 @@ production code doesn't use the aggregates at all (B7).
 
 - There are no EF migrations. `SpaceTradersDatabaseInitializer` creates the database and all
   of the model's tables when none of them exist yet; unlike `EnsureCreated`, other tables in the
-  database don't stop it (B21). Then it runs idempotent raw DDL (`ADD COLUMN IF NOT EXISTS`,
-  `CREATE TABLE/INDEX IF NOT EXISTS`, widening of the token columns), which only upgrades schemas
-  made by older versions.
-- Settings are seeded only once an agent token is known.
+  database don't stop it (B21). It doesn't upgrade an existing schema: a database from before
+  slice 1.4 has to be dropped.
+- Agent bootstrap seeds the settings of the agent it picks.
 - Wolverine stores nothing in the database.
 
 ### Agent scoping
 
-- Most tables include the agent token in their key, and EF filters every query on the current
-  token (B4).
-- Pruning only touches the current token's rows, so rows from earlier resets stay (B3).
-- `startup_snapshots`, `agent_credits_samples` and `scheduled_ship_events` have no filter.
+- Every table but `scheduled_ship_events` has an `AgentId` column: the agent's symbol and the
+  server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). A token keeps the id it
+  was first stored under. Where a table has a natural key, the id is part of it.
+- EF filters every query on the active agent's id. `startup_snapshots`, `agent_credits_samples`
+  and `scheduled_ship_events` have no filter.
+- The token itself is stored only in `stored_credentials`.
+- The database keeps one agent: at startup, agent bootstrap deletes every other agent's rows,
+  except their `runs` (`AgentDataCleanup`). Pruning then only has the active agent's rows to deal
+  with.
 
 ### Tables
+
+On top of the retention below, every other agent's rows are deleted at startup, except their
+`runs`.
 
 | Table | Holds | Written by | Retention |
 |---|---|---|---|
@@ -469,14 +483,13 @@ production code doesn't use the aggregates at all (B7).
 | `ledger_entries` | Credit ledger | `LedgerEntryHandler`: fuel purchases only (B7) | 30 days |
 | `cached_surveys` | Surveys | Survey executor | expired rows removed when new surveys are saved |
 | `leader_leases` | Leader lease | Leader election | never (one row) |
-| `api_endpoint_usages` | Call count per endpoint string | Every outbound call | never (counters) |
+| `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | never (counters) |
 | `runs`, `run_credit_highlights` | Runs and start/end credits | Run lifecycle | never |
 | `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | never |
 | `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, hourly to 90 days |
 | `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, hourly to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
 | `trade_opportunities`, `fleet_goals`, `ship_goal_history`, `cached_construction_sites`, `scheduled_runs` | — | Nothing | — |
-| `scout_plan_states` | Legacy scout plan | Nothing; copied into `plan_states` at startup | never |
 
 ---
 
@@ -579,7 +592,8 @@ All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D
   reports until startup has completed: agent bootstrap tries old tokens on purpose.
 - **Tokens:** status, systems and waypoints calls go without a token, `register` uses the account
   token, and everything else uses the agent token.
-- **Usage counts:** every call increments `api_endpoint_usages`.
+- **Usage counts:** every call increments `api_endpoint_usages`, except the calls agent bootstrap
+  makes before it knows the agent.
 - **`ISpaceTradersPort`** has 41 operations:
   - status, agent and registration;
   - ships and cargo;
@@ -706,8 +720,8 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
 | `SpaceTraders.Application.Tests` | ~253 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~67 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~67 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.Infrastructure.Tests` | ~65 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.API.Tests` | ~74 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 **WebUI tests:**

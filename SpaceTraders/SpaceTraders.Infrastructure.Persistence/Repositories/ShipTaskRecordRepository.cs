@@ -29,7 +29,7 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
 
         var record = new ShipTaskRecord
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             ShipSymbol = shipSymbol,
             StartedAt = now,
             TaskKind = taskKind,

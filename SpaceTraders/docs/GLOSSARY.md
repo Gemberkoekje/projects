@@ -10,7 +10,8 @@ decisions).
 |------|------------|
 | **Account Token** | A long-lived token issued by `my.spacetraders.io` that authorises agent registration (`POST /register`). Used by bootstrap when a new agent must be registered. |
 | **Agent** | The player's in-game entity. Has credits, a fleet of ships, and a faction. Represented by the `Agent` aggregate in the domain. |
-| **Agent Token** | A bearer token returned by `POST /register` and used for all `/my/*` authenticated API calls. Stored in the `stored_credentials` table and loaded into `IAgentTokenProvider` at startup. Agent-scoped tables also use it as part of their key (B4). |
+| **Agent Id** | The short id every agent-scoped row is keyed on: the agent's symbol and the server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). The agent that takes the same symbol after a reset gets a new id. The database keeps the active agent's rows only, plus every agent's `runs`. |
+| **Agent Token** | A bearer token returned by `POST /register` and used for all `/my/*` authenticated API calls. Stored only in the `stored_credentials` table, and loaded into `IAgentTokenProvider` at startup. |
 | **Anomaly** | *Planned (PLAN.md phase 3).* A broken health rule, exposed as a metric and a journal event. |
 | **Assignment** | A ship's current task in `ship_assignment_records` (`ShipAssignmentRecord`): a type such as `Scout` or `Contract`, origin, destination, cargo and progress. The contract plan works only through assignments; the scout plan writes both an assignment and a goal. |
 | **Burst Limit** | Per the API guide (https://spacetraders.io/api-guide/rate-limits): on top of the limit of 2 requests per second, up to 30 more requests within a 60-second burst duration, counted per IP address and per account. `RequestBudget` follows it. |

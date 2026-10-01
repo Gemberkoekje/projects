@@ -4,7 +4,7 @@ public sealed class TradeOpportunity
 {
     public int Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string TradeSymbol { get; init; }
 

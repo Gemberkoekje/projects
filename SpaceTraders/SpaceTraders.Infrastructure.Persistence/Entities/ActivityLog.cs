@@ -4,7 +4,7 @@ public sealed class ActivityLog
 {
     public long Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     public DateTimeOffset Timestamp { get; init; }
 

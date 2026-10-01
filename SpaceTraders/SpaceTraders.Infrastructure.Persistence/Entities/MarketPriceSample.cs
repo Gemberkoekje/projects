@@ -4,7 +4,7 @@ public sealed class MarketPriceSample
 {
     public long Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string WaypointSymbol { get; init; }
 

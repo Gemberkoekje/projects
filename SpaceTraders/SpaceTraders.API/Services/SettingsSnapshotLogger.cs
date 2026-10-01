@@ -4,7 +4,7 @@ using SpaceTraders.Infrastructure.Persistence;
 namespace SpaceTraders.API.Services;
 
 /// <summary>
-/// Logs the current settings snapshot for the active agent token.
+/// Logs the current settings snapshot for the active agent.
 /// </summary>
 public sealed class SettingsSnapshotLogger(
     IServiceScopeFactory serviceScopeFactory,
@@ -17,12 +17,11 @@ public sealed class SettingsSnapshotLogger(
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
 
         var settings = await settingsRepository.GetAllAsync(cancellationToken);
-        var token = MaskToken(dbContext.AgentToken);
 
         logger.LogInformation(
-            "Settings snapshot ({Reason}) for agent token {AgentToken}: {Count} setting(s).",
+            "Settings snapshot ({Reason}) for agent {AgentId}: {Count} setting(s).",
             reason,
-            token,
+            dbContext.AgentId,
             settings.Count);
 
         foreach (var setting in settings)
@@ -34,20 +33,5 @@ public sealed class SettingsSnapshotLogger(
                 setting.Type,
                 setting.Description);
         }
-    }
-
-    private static string MaskToken(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return "(empty)";
-        }
-
-        if (token.Length <= 8)
-        {
-            return "[redacted]";
-        }
-
-        return $"{token[..4]}[...]{token[^4..]}";
     }
 }

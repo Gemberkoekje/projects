@@ -1,8 +1,9 @@
 namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
+[Mutable]
 public sealed class PlanStateRecord
 {
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string PlanType { get; init; }
 

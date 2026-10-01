@@ -21,20 +21,8 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
         }
 
-        var initialToken = configuration["SpaceTraders:AgentToken"]
-            ?? configuration["SpaceTradersApi:AgentToken"]
-            ?? configuration["SPACETRADERS_AGENT_TOKEN"]
-            ?? string.Empty;
-
-        services.AddSingleton<IAgentDataScope>(_ =>
-        {
-            var scope = new AgentDataScope();
-            if (!string.IsNullOrWhiteSpace(initialToken))
-            {
-                scope.Set(initialToken);
-            }
-            return scope;
-        });
+        // Empty until agent bootstrap has picked the agent (AgentBootstrapService).
+        services.AddSingleton<IAgentDataScope, AgentDataScope>();
 
         // Singleton: tracks current active run ID in memory so LedgerRepository can tag entries.
         services.AddSingleton<ActiveRunIdProvider>();

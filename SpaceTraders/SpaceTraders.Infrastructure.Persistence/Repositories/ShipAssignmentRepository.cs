@@ -11,7 +11,7 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
     {
         var entity = await db.ShipAssignments
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.AgentToken == db.AgentToken && x.ShipSymbol == shipSymbol, cancellationToken);
+            .FirstOrDefaultAsync(x => x.AgentId == db.AgentId && x.ShipSymbol == shipSymbol, cancellationToken);
         return entity is null ? null : MapToDto(entity);
     }
 
@@ -19,7 +19,7 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
     {
         var entities = await db.ShipAssignments
             .AsNoTracking()
-            .Where(x => x.AgentToken == db.AgentToken && x.CompletedAt == null)
+            .Where(x => x.AgentId == db.AgentId && x.CompletedAt == null)
             .ToListAsync(cancellationToken);
 
         return entities.Select(MapToDto).ToList();
@@ -29,12 +29,12 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
     {
         var existing = await db.ShipAssignments
             .FirstOrDefaultAsync(
-                x => x.AgentToken == db.AgentToken && x.ShipSymbol == assignment.ShipSymbol,
+                x => x.AgentId == db.AgentId && x.ShipSymbol == assignment.ShipSymbol,
                 cancellationToken);
 
         var values = new ShipAssignmentRecord
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             ShipSymbol = assignment.ShipSymbol,
             Type = assignment.AssignmentType,
             OriginWaypoint = assignment.OriginWaypoint,

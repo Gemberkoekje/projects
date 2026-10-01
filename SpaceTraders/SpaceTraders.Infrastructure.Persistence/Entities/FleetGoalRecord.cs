@@ -4,11 +4,12 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 /// Persistent record for a fleet-level goal stored in the <c>fleet_goals</c> table.
 /// </summary>
 /// <remarks>Phase 11e: introduced as part of the goal-driven architecture migration.</remarks>
+[Mutable]
 public sealed class FleetGoalRecord
 {
     public Guid Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string Kind { get; set; }
 

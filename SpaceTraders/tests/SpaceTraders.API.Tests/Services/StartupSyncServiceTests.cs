@@ -20,7 +20,7 @@ namespace SpaceTraders.API.Tests.Services;
 
 public sealed class StartupSyncServiceTests
 {
-    private const string AgentToken = "startup-sync-test-token";
+    private const string AgentId = "AGENT@2026-09-27";
 
     private readonly ISpaceTradersApiClient _apiClient = Substitute.For<ISpaceTradersApiClient>();
 
@@ -57,12 +57,12 @@ public sealed class StartupSyncServiceTests
         await using (var seedScope = provider.CreateAsyncScope())
         {
             var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-            db.Systems.Add(new CachedSystem { AgentToken = AgentToken, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
-            db.Waypoints.Add(new CachedWaypoint { AgentToken = AgentToken, Symbol = "X1-AB-1", SystemSymbol = "X1-AB", Type = "PLANET" });
-            db.Waypoints.Add(new CachedWaypoint { AgentToken = AgentToken, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON" });
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-1", SystemSymbol = "X1-AB", Type = "PLANET" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON" });
             db.Ships.Add(new CachedShip
             {
-                AgentToken = AgentToken,
+                AgentId = AgentId,
                 Symbol = "AGENT-1",
                 SystemSymbol = "X1-AB",
                 WaypointSymbol = "X1-AB-1",
@@ -98,7 +98,7 @@ public sealed class StartupSyncServiceTests
         services.AddSingleton<IAgentDataScope>(_ =>
         {
             var scope = new AgentDataScope();
-            scope.Set(AgentToken);
+            scope.Set(AgentId);
             return scope;
         });
         services.AddDbContext<SpaceTradersDbContext>(options => options.UseInMemoryDatabase(databaseName));

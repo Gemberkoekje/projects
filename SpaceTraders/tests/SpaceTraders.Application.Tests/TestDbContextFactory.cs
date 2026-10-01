@@ -6,7 +6,7 @@ namespace SpaceTraders.Application.Tests;
 
 internal static class TestDbContextFactory
 {
-    public const string AgentToken = "application-test-token";
+    public const string AgentId = "APPLICATION-TEST@2026-09-27";
 
     public static SpaceTradersDbContext Create(string? dbName = null)
     {
@@ -15,7 +15,7 @@ internal static class TestDbContextFactory
             .Options;
 
         var scope = new AgentDataScope();
-        scope.Set(AgentToken);
+        scope.Set(AgentId);
 
         return new SpaceTradersDbContext(options, scope);
     }

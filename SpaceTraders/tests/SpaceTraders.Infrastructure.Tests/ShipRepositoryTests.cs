@@ -119,7 +119,7 @@ public sealed class ShipRepositoryTests : IntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task GetAllAsync_IgnoresShipsFromOtherAgentTokens()
+    public async Task GetAllAsync_IgnoresShipsFromOtherAgents()
     {
         var repo = new ShipRepository(Db);
         await repo.UpsertAsync(new ShipModel(
@@ -135,7 +135,7 @@ public sealed class ShipRepositoryTests : IntegrationTestBase
 
         Db.Ships.Add(new CachedShip
         {
-            AgentToken = "other-agent-token",
+            AgentId = "OTHER-AGENT@2026-09-27",
             Symbol = "SHIP-OTHER",
             SystemSymbol = "X1-OTHER",
             WaypointSymbol = "X1-OTHER-A1",

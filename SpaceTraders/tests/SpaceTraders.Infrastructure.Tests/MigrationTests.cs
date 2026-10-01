@@ -1,7 +1,5 @@
-using System.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using SpaceTraders.Infrastructure.Persistence;
 
 namespace SpaceTraders.Infrastructure.Tests;
 
@@ -54,67 +52,5 @@ public sealed class MigrationTests : IntegrationTestBase
         creditSampleCount.Should().Be(0);
         marketSampleCount.Should().Be(0);
         shipTaskCount.Should().Be(0);
-    }
-
-    [SkippableFact]
-    public async Task InitializeAsync_AddsMissingCachedShipColumns_WhenDatabaseSchemaIsOutdated()
-    {
-        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"MountsJson\";");
-        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"ShipType\";");
-
-        await SpaceTradersDatabaseInitializer.InitializeAsync(Db);
-
-        await using var command = Db.Database.GetDbConnection().CreateCommand();
-        command.CommandText = @"
-SELECT column_name
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'cached_ships'
-  AND column_name IN ('MountsJson', 'ShipType')
-ORDER BY column_name;";
-
-        if (command.Connection is not null && command.Connection.State != ConnectionState.Open)
-        {
-            await command.Connection.OpenAsync();
-        }
-
-        var columns = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            columns.Add(reader.GetString(0));
-        }
-
-        columns.Should().BeEquivalentTo(["MountsJson", "ShipType"]);
-    }
-
-    [SkippableFact]
-    public async Task InitializeAsync_AddsLocalStatusColumn_WhenMissing()
-    {
-        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"LocalStatus\";");
-
-        await SpaceTradersDatabaseInitializer.InitializeAsync(Db);
-
-        await using var command = Db.Database.GetDbConnection().CreateCommand();
-        command.CommandText = @"
-SELECT column_name
-FROM information_schema.columns
-WHERE table_schema = 'public'
-  AND table_name = 'cached_ships'
-  AND column_name = 'LocalStatus';";
-
-        if (command.Connection is not null && command.Connection.State != System.Data.ConnectionState.Open)
-        {
-            await command.Connection.OpenAsync();
-        }
-
-        var columns = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            columns.Add(reader.GetString(0));
-        }
-
-        columns.Should().BeEquivalentTo(["LocalStatus"]);
     }
 }

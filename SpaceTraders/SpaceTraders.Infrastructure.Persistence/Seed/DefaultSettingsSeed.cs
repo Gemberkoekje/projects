@@ -79,7 +79,7 @@ public static class DefaultSettingsSeed
             {
                 db.Settings.Add(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = setting.Key,
                     Value = setting.Value,
                     Type = setting.Type,
@@ -105,7 +105,7 @@ public static class DefaultSettingsSeed
             {
                 db.Settings.Add(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = defaultSetting.Key,
                     Value = defaultSetting.Value,
                     Type = defaultSetting.Type,
@@ -116,7 +116,7 @@ public static class DefaultSettingsSeed
             {
                 db.Entry(existing).CurrentValues.SetValues(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = existing.Key,
                     Value = defaultSetting.Value,
                     Type = existing.Type,

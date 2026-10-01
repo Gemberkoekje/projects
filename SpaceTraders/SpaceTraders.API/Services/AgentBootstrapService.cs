@@ -16,11 +16,13 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Bootstraps the SpaceTraders agent on startup by loading a stored or configured token,
-/// or registering a new agent when none is available.
+/// or registering a new agent when none is available. Then it deletes the rows of every other
+/// agent, such as the one from before a server reset (<see cref="AgentDataCleanup"/>).
 /// </summary>
 public sealed class AgentBootstrapService(
     IServiceScopeFactory serviceScopeFactory,
     IAgentTokenProvider agentTokenProvider,
+    IAgentDataScope agentDataScope,
     IOptions<SpaceTradersBootstrapOptions> options,
     ILogger<AgentBootstrapService> logger) : IHostedService
 {
@@ -28,37 +30,47 @@ public sealed class AgentBootstrapService(
 
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
     private readonly IAgentTokenProvider _agentTokenProvider = agentTokenProvider;
+    private readonly IAgentDataScope _agentDataScope = agentDataScope;
     private readonly SpaceTradersBootstrapOptions _options = options.Value;
     private readonly ILogger<AgentBootstrapService> _logger = logger;
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var activeToken = await LoadActiveTokenAsync(cancellationToken);
-        if (await TryBootstrapWithTokenAsync(activeToken, "active", cancellationToken))
+        // Read before any token is tried: a token that the server accepts after this was
+        // registered in this reset.
+        var resetDate = await GetServerResetDateAsync(cancellationToken);
+
+        if (!await TryBootstrapWithKnownTokenAsync(resetDate, cancellationToken))
         {
-            return;
+            await RegisterNewAgentAsync(resetDate, cancellationToken);
         }
 
-        var configuredToken = _options.AgentToken ?? string.Empty;
-        if (await TryBootstrapWithTokenAsync(configuredToken, "configured", cancellationToken))
-        {
-            return;
-        }
-
-        var storedToken = await LoadLatestStoredTokenAsync(cancellationToken);
-        if (await TryBootstrapWithTokenAsync(storedToken, "stored", cancellationToken))
-        {
-            return;
-        }
-
-        await RegisterNewAgentAsync(cancellationToken);
+        await DeleteOtherAgentsAsync(cancellationToken);
     }
 
     /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task<bool> TryBootstrapWithTokenAsync(string token, string source, CancellationToken cancellationToken)
+    private async Task<bool> TryBootstrapWithKnownTokenAsync(string resetDate, CancellationToken cancellationToken)
+    {
+        var activeToken = await LoadActiveTokenAsync(cancellationToken);
+        if (await TryBootstrapWithTokenAsync(activeToken, "active", resetDate, cancellationToken))
+        {
+            return true;
+        }
+
+        var configuredToken = _options.AgentToken ?? string.Empty;
+        if (await TryBootstrapWithTokenAsync(configuredToken, "configured", resetDate, cancellationToken))
+        {
+            return true;
+        }
+
+        var storedToken = await LoadLatestStoredTokenAsync(cancellationToken);
+        return await TryBootstrapWithTokenAsync(storedToken, "stored", resetDate, cancellationToken);
+    }
+
+    private async Task<bool> TryBootstrapWithTokenAsync(string token, string source, string resetDate, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -90,8 +102,11 @@ public sealed class AgentBootstrapService(
             return false;
         }
 
-        await BootstrapWithTokenAsync(token, cancellationToken);
-        _logger.LogInformation("Loaded {Source} agent token for agent {AgentSymbol}.", source, validation.AgentSymbol);
+        // A token keeps the id it was first stored under.
+        var agentId = await FindAgentIdAsync(token, cancellationToken)
+            ?? AgentIdentity.For(validation.AgentSymbol, resetDate);
+        await BootstrapWithTokenAsync(agentId, token, cancellationToken);
+        _logger.LogInformation("Loaded {Source} agent token for agent {AgentId}.", source, agentId);
         return true;
     }
 
@@ -121,18 +136,17 @@ public sealed class AgentBootstrapService(
         }
     }
 
-    private async Task BootstrapWithTokenAsync(string token, CancellationToken cancellationToken)
+    private async Task BootstrapWithTokenAsync(string agentId, string token, CancellationToken cancellationToken)
     {
+        // Before the scope: its DbContext takes the agent from the data scope when it's created.
+        _agentDataScope.Set(agentId);
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
-        var dataScope = scope.ServiceProvider.GetRequiredService<IAgentDataScope>();
-        dataScope.Set(token);
-
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-        var credential = await dbContext.Credentials.FindAsync([dbContext.AgentToken, AgentTokenKey], cancellationToken);
+        var credential = await dbContext.Credentials.FindAsync([dbContext.AgentId, AgentTokenKey], cancellationToken);
 
         var credentialValues = new StoredCredential
         {
-            AgentToken = dbContext.AgentToken,
+            AgentId = dbContext.AgentId,
             Key = AgentTokenKey,
             Value = token,
             StoredAt = TimeProvider.System.GetUtcNow(),
@@ -156,6 +170,40 @@ public sealed class AgentBootstrapService(
 
         await AgentTokenSelection.SetActiveTokenAsync(dbContext, token, cancellationToken);
         _agentTokenProvider.Set(token);
+    }
+
+    private async Task<string> GetServerResetDateAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var status = await scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().GetStatusAsync(cancellationToken);
+
+        return string.IsNullOrWhiteSpace(status.ResetDate)
+            ? throw new InvalidOperationException("The SpaceTraders server status has no reset date.")
+            : status.ResetDate;
+    }
+
+    private async Task<string?> FindAgentIdAsync(string token, CancellationToken cancellationToken)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+
+        return await AgentTokenSelection.FindAgentIdAsync(dbContext, token, cancellationToken);
+    }
+
+    private async Task<bool> IsKnownAgentAsync(string agentId, CancellationToken cancellationToken)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+
+        return await AgentTokenSelection.IsKnownAgentAsync(dbContext, agentId, cancellationToken);
+    }
+
+    private async Task DeleteOtherAgentsAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+
+        await AgentDataCleanup.DeleteOtherAgentsAsync(dbContext, _logger, cancellationToken);
     }
 
     private async Task<string> LoadActiveTokenAsync(CancellationToken cancellationToken)
@@ -182,7 +230,7 @@ public sealed class AgentBootstrapService(
         await settings.SetAsync("Runtime.Alert.TokenResetMismatch", "true", cancellationToken);
     }
 
-    private async Task RegisterNewAgentAsync(CancellationToken cancellationToken)
+    private async Task RegisterNewAgentAsync(string resetDate, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_options.AccountToken))
         {
@@ -194,26 +242,39 @@ public sealed class AgentBootstrapService(
             throw new InvalidOperationException("SpaceTraders:AgentName must be configured when no stored agent token exists.");
         }
 
+        // An agent with this id is stored already. Registered under the same id, the new agent
+        // would share the old agent's rows, and the cleanup would never remove them. This happens
+        // when the server resets between reading its reset date and registering.
+        var newAgentId = AgentIdentity.For(_options.AgentName, resetDate);
+        if (await IsKnownAgentAsync(newAgentId, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                $"Not registering agent {newAgentId}: an agent with that id is stored already. The server's reset date ({resetDate}) is probably out of date; the next start reads it again.");
+        }
+
+        RegisterResponseData registration;
+        await using (var apiScope = _serviceScopeFactory.CreateAsyncScope())
+        {
+            registration = await apiScope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().RegisterAsync(
+                new RegisterRequest
+                {
+                    Symbol = _options.AgentName,
+                    Faction = _options.AgentFaction,
+                },
+                cancellationToken);
+        }
+
+        // Only now the scope for the new agent's rows: its DbContext takes the agent from the data
+        // scope when it's created. Created any earlier (resolving the API client does that), it
+        // stored the new agent's rows and settings under the previous agent.
+        _agentDataScope.Set(AgentIdentity.For(registration.Agent.Symbol, resetDate));
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
-        var apiClient = scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>();
-
-        var registration = await apiClient.RegisterAsync(
-            new RegisterRequest
-            {
-                Symbol = _options.AgentName,
-                Faction = _options.AgentFaction,
-            },
-            cancellationToken);
-
-        var dataScope = scope.ServiceProvider.GetRequiredService<IAgentDataScope>();
-        dataScope.Set(registration.Token);
-
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
 
-        var credential = await dbContext.Credentials.FindAsync([dbContext.AgentToken, AgentTokenKey], cancellationToken);
+        var credential = await dbContext.Credentials.FindAsync([dbContext.AgentId, AgentTokenKey], cancellationToken);
         var credentialValues = new StoredCredential
         {
-            AgentToken = dbContext.AgentToken,
+            AgentId = dbContext.AgentId,
             Key = AgentTokenKey,
             Value = registration.Token,
             StoredAt = TimeProvider.System.GetUtcNow(),
@@ -228,10 +289,10 @@ public sealed class AgentBootstrapService(
             dbContext.Entry(credential).CurrentValues.SetValues(credentialValues);
         }
 
-        var agent = await dbContext.Agents.FindAsync(new object[] { dbContext.AgentToken, registration.Agent.Symbol }, cancellationToken);
+        var agent = await dbContext.Agents.FindAsync(new object[] { dbContext.AgentId, registration.Agent.Symbol }, cancellationToken);
         var agentValues = new CachedAgent
         {
-            AgentToken = dbContext.AgentToken,
+            AgentId = dbContext.AgentId,
             Symbol = registration.Agent.Symbol,
             AccountId = registration.Agent.AccountId,
             HeadquartersSymbol = registration.Agent.Headquarters,
@@ -252,12 +313,12 @@ public sealed class AgentBootstrapService(
 
         foreach (var ship in registration.Ships)
         {
-            var cachedShip = await dbContext.Ships.FindAsync(new object[] { dbContext.AgentToken, ship.Symbol }, cancellationToken);
+            var cachedShip = await dbContext.Ships.FindAsync(new object[] { dbContext.AgentId, ship.Symbol }, cancellationToken);
             if (cachedShip is null)
             {
                 dbContext.Ships.Add(new CachedShip
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     Symbol = ship.Symbol,
                     SystemSymbol = ship.Nav?.SystemSymbol,
                     WaypointSymbol = ship.Nav?.WaypointSymbol,
@@ -280,10 +341,10 @@ public sealed class AgentBootstrapService(
             }
         }
 
-        var contract = await dbContext.Contracts.FindAsync(new object[] { dbContext.AgentToken, registration.Contract.Id }, cancellationToken);
+        var contract = await dbContext.Contracts.FindAsync(new object[] { dbContext.AgentId, registration.Contract.Id }, cancellationToken);
         var contractValues = new CachedContract
         {
-            AgentToken = dbContext.AgentToken,
+            AgentId = dbContext.AgentId,
             Id = registration.Contract.Id,
             FactionSymbol = registration.Contract.FactionSymbol,
             Type = registration.Contract.Type,

@@ -1,10 +1,11 @@
 namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
+[Mutable]
 public sealed class Run
 {
     public Guid Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string Name { get; init; }
 

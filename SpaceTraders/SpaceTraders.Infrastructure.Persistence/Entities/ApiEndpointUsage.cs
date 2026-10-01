@@ -4,13 +4,13 @@ public sealed class ApiEndpointUsage
 {
     public long Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     public required string HttpMethod { get; init; }
 
     public required string Endpoint { get; init; }
 
-    public int Calls { get; set; }
+    public int Calls { get; init; }
 
-    public DateTimeOffset LastCalledAt { get; set; }
+    public DateTimeOffset LastCalledAt { get; init; }
 }

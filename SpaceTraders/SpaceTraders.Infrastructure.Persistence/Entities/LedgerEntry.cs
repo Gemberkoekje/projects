@@ -6,7 +6,7 @@ public sealed class LedgerEntry
 {
     public long Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     public DateTimeOffset OccurredAt { get; init; }
 

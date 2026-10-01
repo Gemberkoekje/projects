@@ -28,12 +28,12 @@ public sealed class StartupSyncService(
         var now = TimeProvider.System.GetUtcNow();
 
         var agent = await apiClient.GetMyAgentAsync(cancellationToken);
-        var existingAgent = await dbContext.Agents.FindAsync([dbContext.AgentToken, agent.Symbol], cancellationToken);
+        var existingAgent = await dbContext.Agents.FindAsync([dbContext.AgentId, agent.Symbol], cancellationToken);
         if (existingAgent is null)
         {
             dbContext.Agents.Add(new CachedAgent
             {
-                AgentToken = dbContext.AgentToken,
+                AgentId = dbContext.AgentId,
                 Symbol = agent.Symbol,
                 AccountId = agent.AccountId,
                 HeadquartersSymbol = agent.Headquarters,
@@ -47,7 +47,7 @@ public sealed class StartupSyncService(
         {
             dbContext.Entry(existingAgent).CurrentValues.SetValues(new CachedAgent
             {
-                AgentToken = dbContext.AgentToken,
+                AgentId = dbContext.AgentId,
                 Symbol = agent.Symbol,
                 AccountId = agent.AccountId,
                 HeadquartersSymbol = agent.Headquarters,
@@ -61,7 +61,7 @@ public sealed class StartupSyncService(
         var ships = await GetAllShipsAsync(apiClient, cancellationToken);
         foreach (var ship in ships)
         {
-            var existingShip = await dbContext.Ships.FindAsync([dbContext.AgentToken, ship.Symbol], cancellationToken);
+            var existingShip = await dbContext.Ships.FindAsync([dbContext.AgentId, ship.Symbol], cancellationToken);
             var shipType = ship.Registration?.Role ?? string.Empty;
             var mountsJson = ship.Mounts is null
                 ? null
@@ -75,7 +75,7 @@ public sealed class StartupSyncService(
                 ? existingShip?.CargoJson
                 : JsonSerializer.Serialize(ship.Cargo.Inventory.Select(i => new { i.Symbol, i.Units }).ToList());
 
-            var cachedShip = existingShip ?? new CachedShip { AgentToken = dbContext.AgentToken, Symbol = ship.Symbol };
+            var cachedShip = existingShip ?? new CachedShip { AgentId = dbContext.AgentId, Symbol = ship.Symbol };
             if (existingShip is null)
             {
                 dbContext.Ships.Add(cachedShip);
@@ -113,12 +113,12 @@ public sealed class StartupSyncService(
         var contracts = await apiClient.GetMyContractsAsync(cancellationToken: cancellationToken);
         foreach (var contract in contracts.Data)
         {
-            var existingContract = await dbContext.Contracts.FindAsync([dbContext.AgentToken, contract.Id], cancellationToken);
+            var existingContract = await dbContext.Contracts.FindAsync([dbContext.AgentId, contract.Id], cancellationToken);
             if (existingContract is null)
             {
                 dbContext.Contracts.Add(new CachedContract
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     Id = contract.Id,
                     FactionSymbol = contract.FactionSymbol,
                     Type = contract.Type,
@@ -133,7 +133,7 @@ public sealed class StartupSyncService(
             {
                 dbContext.Entry(existingContract).CurrentValues.SetValues(new CachedContract
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     Id = contract.Id,
                     FactionSymbol = contract.FactionSymbol,
                     Type = contract.Type,
@@ -199,18 +199,18 @@ public sealed class StartupSyncService(
         {
             var isSystemCached = await dbContext.Systems
                 .AsNoTracking()
-                .AnyAsync(s => s.AgentToken == dbContext.AgentToken && s.Symbol == systemSymbol, cancellationToken);
+                .AnyAsync(s => s.AgentId == dbContext.AgentId && s.Symbol == systemSymbol, cancellationToken);
 
             var hasWaypointsCached = await dbContext.Waypoints
                 .AsNoTracking()
-                .AnyAsync(w => w.AgentToken == dbContext.AgentToken && w.SystemSymbol == systemSymbol, cancellationToken);
+                .AnyAsync(w => w.AgentId == dbContext.AgentId && w.SystemSymbol == systemSymbol, cancellationToken);
 
             if (!isSystemCached)
             {
                 var system = await apiClient.GetSystemAsync(systemSymbol, cancellationToken);
                 dbContext.Systems.Add(new CachedSystem
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     Symbol = system.Symbol,
                     SectorSymbol = system.SectorSymbol,
                     Type = system.Type,
@@ -243,7 +243,7 @@ public sealed class StartupSyncService(
 
                     dbContext.Waypoints.Add(new CachedWaypoint
                     {
-                        AgentToken = dbContext.AgentToken,
+                        AgentId = dbContext.AgentId,
                         Symbol = waypoint.Symbol,
                         SystemSymbol = waypoint.SystemSymbol,
                         Type = waypoint.Type,
@@ -290,7 +290,7 @@ public sealed class StartupSyncService(
             var systemSymbol = location.SystemSymbol;
             var waypointSymbol = location.WaypointSymbol;
 
-            var waypoint = await dbContext.Waypoints.FindAsync([dbContext.AgentToken, waypointSymbol], cancellationToken);
+            var waypoint = await dbContext.Waypoints.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
 
             if (waypoint is null)
             {
@@ -300,7 +300,7 @@ public sealed class StartupSyncService(
 
                 waypoint = new CachedWaypoint
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     Symbol = remoteWaypoint.Symbol,
                     SystemSymbol = remoteWaypoint.SystemSymbol,
                     Type = remoteWaypoint.Type,
@@ -317,10 +317,10 @@ public sealed class StartupSyncService(
             if (waypoint.HasMarket)
             {
                 var market = await apiClient.GetMarketAsync(systemSymbol, waypointSymbol, cancellationToken);
-                var cachedMarket = await dbContext.Markets.FindAsync([dbContext.AgentToken, waypointSymbol], cancellationToken);
+                var cachedMarket = await dbContext.Markets.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
                 var marketValues = new CachedMarket
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     WaypointSymbol = waypointSymbol,
                     SystemSymbol = systemSymbol,
                     TradeGoodsJson = market.TradeGoods is not null ? JsonSerializer.Serialize(market.TradeGoods) : null,
@@ -343,10 +343,10 @@ public sealed class StartupSyncService(
             if (waypoint.HasShipyard)
             {
                 var shipyard = await apiClient.GetShipyardAsync(systemSymbol, waypointSymbol, cancellationToken);
-                var cachedShipyard = await dbContext.Shipyards.FindAsync([dbContext.AgentToken, waypointSymbol], cancellationToken);
+                var cachedShipyard = await dbContext.Shipyards.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
                 var shipyardValues = new CachedShipyard
                 {
-                    AgentToken = dbContext.AgentToken,
+                    AgentId = dbContext.AgentId,
                     WaypointSymbol = waypointSymbol,
                     SystemSymbol = systemSymbol,
                     ShipTypesJson = shipyard.Ships is not null ? JsonSerializer.Serialize(shipyard.Ships) : null,

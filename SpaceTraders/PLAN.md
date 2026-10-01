@@ -57,8 +57,8 @@ with a test that does.
 |---|---|---|---|
 | B1 | **"Already at destination" loop.** Navigating to the waypoint a ship is already at publishes `ShipNavigationCompletedEvent` without docking or orbiting. Its handler re-runs the goal executor, which asks to navigate there again. No API call is involved, so the rate limiter doesn't slow it, and the 5 s tick starts another chain every time. The survey executor hits this in its normal state right after any arrival (docked at the target). Most likely what filled the database. | `NavigateToWaypointCommand.cs:82-96`, `ShipNavigationCompletedHandler.cs:26`, `SurveyWaypointGoalExecutor.cs:52`, `ScoutWaypointGoalExecutor.cs:41`, `DeployProbeGoalExecutor.cs:48`, `MineAndSellGoalExecutor.cs:106` | 1.1 (done) |
 | B2 | **The Wolverine inbox is never cleaned.** Every published message is stored in Postgres. Turning the durability agent off also turns off the deletion of handled messages: confirmed against Postgres in 1.3, where 50 handled messages were all still there a minute later (with the agent on they were gone). | `Program.cs:180`, `Program.cs:189-191` | 1.3 (done) |
-| B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good. | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.5 |
-| B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 |
+| B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good (fixed in 1.4: agent bootstrap deletes them). | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.4 (done: earlier agents), 1.5 |
+| B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 (done) |
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
 | B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 (done) |
 | B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 |
@@ -80,6 +80,7 @@ with a test that does.
 | B23 | **A failed startup leaves an idle pod that looks healthy.** One try/catch wraps the startup chain. If database init, agent bootstrap, the run lifecycle, startup sync or recovery throws, the later services (the tick and pruning among them) never start, and nothing retries. `/health/live` runs no checks, and the old deployment used it for the startup and liveness probes, so Kubernetes never restarts the pod. | `DeferredStartupHostedService.cs:57-89`, `Program.cs:146` | 1.11 (done) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 | B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
+| B26 | **A newly registered agent had no settings until the pod restarted** (found and confirmed in 1.4). Registration wrote the new agent's rows and default settings through a DbContext that was created before the new agent was set: resolving the API client creates it, for the endpoint-usage counter. So all of it was stored under the previous agent. With every setting missing, `Automation.Enabled` read as off, and after a server reset the bot sat idle until its next restart. | `AgentBootstrapService.cs` (`RegisterNewAgentAsync`), `ApiEndpointUsageRecorder.cs` | 1.4 (done) |
 
 ### Decisions (2026-10-01)
 
@@ -192,12 +193,31 @@ cluster (phase 4).
   - `OutboxReplayIntegrationTests` is gone: it tested Wolverine's durable scheduling, which the
     app doesn't use.
 
-**1.4 Short agent identity, old agents cleaned up (B4, part of B3)**
+**1.4 Short agent identity, old agents cleaned up (B4, part of B3)** (done)
 - Do: key rows on a short agent id (agent symbol plus reset date, or a small surrogate key)
   instead of the JWT; the token itself is stored only in the credentials table. When a new agent
   is registered after a reset, delete the previous agents' rows and keep only their run summary
   (`runs`).
 - Done when: no table other than credentials stores the token, and the cleanup has a test.
+- Done:
+  - Rows are keyed on `AgentId`: the agent's symbol and the server's reset date, such as
+    `GEMBER@2026-09-27`. Bootstrap reads the reset date from `GET /` before it tries any token, so
+    a token the server accepts was registered in that reset. A token keeps the id it was first
+    stored under. The token sits only in `stored_credentials`; before, a test found it in four
+    more tables after one registration.
+  - At every start, once it has picked the agent, bootstrap deletes every other agent's rows,
+    table by table, except `runs`. At every start rather than only after a registration, so a
+    table that fails (a timeout on a big table, say) is retried at the next start, and an agent
+    switched to through configuration is covered too. Against Postgres, the old agent's rows
+    stayed in seven tables before.
+  - Registration refuses when an agent with the new id is stored already. That only happens when
+    the server resets between reading its reset date and registering; the restart reads it again.
+  - Found on the way, and fixed: B26, a newly registered agent had no settings until the pod
+    restarted.
+  - The schema initializer only creates the model's tables now. Its upgrades for old schemas
+    would have added a token column back to every table, and the database starts empty anyway. A
+    database from before this slice has to be dropped. The unused `scout_plan_states` table is
+    gone.
 
 **1.5 Retention for every table that grows (B3)**
 - Do:

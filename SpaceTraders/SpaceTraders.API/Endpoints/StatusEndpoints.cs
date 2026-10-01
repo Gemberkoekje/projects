@@ -116,7 +116,7 @@ public static class StatusEndpoints
         {
             var snapshots = await db.StartupSnapshots
                 .AsNoTracking()
-                .Where(s => s.AgentToken == db.AgentToken)
+                .Where(s => s.AgentId == db.AgentId)
                 .OrderByDescending(s => s.CapturedAt)
                 .Select(s => new
                 {
@@ -133,7 +133,7 @@ public static class StatusEndpoints
         {
             var snapshot = await db.StartupSnapshots
                 .AsNoTracking()
-                .Where(s => s.AgentToken == db.AgentToken && s.Id == id)
+                .Where(s => s.AgentId == db.AgentId && s.Id == id)
                 .Select(s => new
                 {
                     s.SnapshotJson,
@@ -175,7 +175,7 @@ public static class StatusEndpoints
             IAgentCreditsSampleRepository creditRepo,
             CancellationToken ct) =>
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = TimeProvider.System.GetUtcNow();
             var samples = await creditRepo.GetRangeAsync(now.AddHours(-25), now, ct);
 
             var sample24hAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-25) && s.ObservedAt <= now.AddHours(-24)).OrderBy(s => s.ObservedAt).LastOrDefault();

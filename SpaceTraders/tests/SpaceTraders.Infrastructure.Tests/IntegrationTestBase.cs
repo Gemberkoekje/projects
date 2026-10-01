@@ -82,7 +82,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime, IAsyncDisposable
             .Options;
 
         var scope = new AgentDataScope();
-        scope.Set("integration-test-token");
+        scope.Set("INTEGRATION-TEST@2026-09-27");
         return new SpaceTradersDbContext(options, scope);
     }
 

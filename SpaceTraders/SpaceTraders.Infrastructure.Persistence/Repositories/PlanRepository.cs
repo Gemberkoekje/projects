@@ -32,16 +32,16 @@ public sealed class PlanRepository(SpaceTradersDbContext db) : IPlanRepository
         {
             db.PlanStates.Add(new PlanStateRecord
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 PlanType = planType,
                 StateJson = JsonSerializer.Serialize(state),
-                UpdatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = TimeProvider.System.GetUtcNow(),
             });
         }
         else
         {
             entity.StateJson = JsonSerializer.Serialize(state);
-            entity.UpdatedAt = DateTimeOffset.UtcNow;
+            entity.UpdatedAt = TimeProvider.System.GetUtcNow();
         }
 
         await db.SaveChangesAsync(cancellationToken);

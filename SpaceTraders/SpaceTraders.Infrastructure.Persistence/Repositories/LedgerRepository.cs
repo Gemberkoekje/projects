@@ -22,7 +22,7 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
     {
         var entry = new LedgerEntry
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             OccurredAt = TimeProvider.System.GetUtcNow(),
             ShipSymbol = shipSymbol,
             RunId = runId ?? activeRunIdProvider.ActiveRunId,
