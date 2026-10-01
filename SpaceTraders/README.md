@@ -10,8 +10,9 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 > the shared PostgreSQL database. `PLAN.md` describes the way back: phase 1 (safe to run) is done,
 > including a four-hour soak test; so is phase 2 (visibility: metrics, the ledger, the journal, and
 > a Grafana dashboard and alerts in gembernodes); and so is phase 3 (health rules: the bot checks
-> itself every minute and reports anomalies). Known issues are listed there under B-numbers and
-> decisions under D-numbers.
+> itself every minute and reports anomalies). Phase 4 (back on the cluster) is ready to merge in
+> gembernodes, after the database logins are set up by hand. Known issues are listed there under
+> B-numbers and decisions under D-numbers.
 
 ---
 
@@ -135,4 +136,8 @@ with `npm test` in `SpaceTraders.WebUI`.
   ```
 
 - The Kubernetes manifests live in the cluster's GitOps repository (gembernodes), deployed by
-  Flux. They were removed there while the bot is off; bringing them back is phase 4 of `PLAN.md`.
+  Flux: `apps/spacetraders/`, whose README has the steps by hand. They came back with phase 4 of
+  `PLAN.md` (slice 4.2, not merged yet). A new image reaches the cluster when its commit SHA
+  goes into both deployments there.
+- The dashboard and the internal API are on the LAN only:
+  http://192.168.1.231/spacetraders/dashboard/ (D11).

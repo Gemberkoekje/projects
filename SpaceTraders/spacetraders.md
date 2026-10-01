@@ -113,8 +113,10 @@ dotnet test tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.
 - On every push to `main` that touches `SpaceTraders/**`, CI (`.github/workflows/ci-spacetraders.yml`
   in the parent repository) builds, tests, and pushes `ghcr.io/gemberkoekje/spacetraders-api` and
   `ghcr.io/gemberkoekje/spacetraders-webui`, tagged `latest` and with the commit SHA.
-- The Kubernetes manifests live in the cluster's GitOps repository (gembernodes), not here. They
-  were removed there on 2026-09-26 while the bot is off; bringing them back is phase 4 of `PLAN.md`.
+- The Kubernetes manifests live in the cluster's GitOps repository (gembernodes), not here:
+  `apps/spacetraders/`, back with phase 4 of `PLAN.md` (slice 4.2) after their removal on
+  2026-09-26. Its README has the steps by hand: the database logins, the 1Password fields, and the
+  Grafana restart.
 
 ## Troubleshooting
 

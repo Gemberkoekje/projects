@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Prometheus;
@@ -187,6 +188,10 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapHealthChecks("/health/startup", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("startup"),
+
+    // Kubernetes' startup probe reads this (B23). "Still running" is Degraded, which answers 200 by
+    // default: the probe would pass before the startup chain has completed (B39).
+    ResultStatusCodes = { [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable },
 });
 
 app.MapStatusEndpoints();

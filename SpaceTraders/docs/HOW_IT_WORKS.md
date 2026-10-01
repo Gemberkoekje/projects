@@ -52,7 +52,8 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
   - `/health/live` runs no checks.
   - `/health/ready` checks the database.
   - `/health/startup` is Healthy when the startup chain completed, Unhealthy if it failed, and
-    Degraded before or while it runs.
+    Degraded before or while it runs. Only Healthy answers 200; Degraded and Unhealthy answer 503,
+    so Kubernetes' startup probe holds the pod back until the chain has completed (B39).
 - **CORS** (`Dashboard` policy): GET only. With `WebUI:Origin` set, only that origin is allowed;
   otherwise any origin is.
 - **Middleware order:**
@@ -906,7 +907,15 @@ This makes the codebase look bigger than what actually runs:
 4. On `main`, pushes `ghcr.io/gemberkoekje/spacetraders-api` and `-webui`, tagged `latest` and
    with the commit SHA.
 
-There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 4).
+**Deployment:** there is no deploy step here. Flux deploys `apps/spacetraders/` from gembernodes
+(slice 4.2), and an image reaches the cluster when its commit SHA goes into both deployments there.
+- `spacetraders-api`: one pod, replaced with `Recreate`, so there are never two. Its startup probe
+  is `/health/startup` (503 until the startup chain has completed), its liveness probe
+  `/health/live` and its readiness probe `/health/ready`. Prometheus scrapes port 9090 through
+  pod annotations; the Service only routes 8080.
+- `spacetraders-webui`: nginx, probed on `/healthz`, which it doesn't log (B40).
+- An ingress on the LAN only (D11): `/spacetraders/api` and `/spacetraders/dashboard` on
+  http://192.168.1.231.
 
 **Tests:**
 
