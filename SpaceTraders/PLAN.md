@@ -59,7 +59,7 @@ with a test that does.
 | B2 | **The Wolverine inbox is probably never cleaned.** Every published message is stored in Postgres. Turning the durability agent off very likely also turns off the deletion of handled messages (about 80% sure; Wolverine's source was not checked for this version). | `Program.cs:180`, `Program.cs:189-191` | 1.3 |
 | B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good. | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.5 |
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 |
-| B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 |
+| B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
 | B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 |
 | B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 |
 | B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 6.1 |
@@ -203,7 +203,7 @@ cluster (phase 4).
   pause automation (this needs 1.7). The limits are settings, starting at 1 GB and 3 GB (D8).
 - Done when: tests with a fake size source cover both limits.
 
-**1.7 A kill switch that works (B5), and one switch per plan (D9)**
+**1.7 A kill switch that works (B5), and one switch per plan (D9)** (done)
 - Do:
   - make the tick, the plan bootstraps and scheduler-triggered goal steps all respect
     `Automation.Enabled`;
@@ -212,6 +212,16 @@ cluster (phase 4).
     Per D9, Scout and Contract default to on, the other three to off.
 - Done when: tests show that a tick with automation disabled issues no ship commands, and that a
   disabled plan neither bootstraps nor buys anything.
+- Done:
+  - The tick checks `Automation.Enabled` first. So does `ShipGoalExecutorService`, which every
+    goal step goes through (the tick, arrivals, the probe handler, startup recovery).
+  - A plan that is off isn't bootstrapped, which is where all buying happens. A test checks that
+    Wolverine doesn't wire the plan services' `Handle` methods, so no event can run a plan either.
+  - One step further than the "Do": a plan that is off also doesn't move its ships. Their goals
+    are skipped (they wait, they aren't cleared), and the tick's contract work is skipped when the
+    contract plan is off. Otherwise switching mining off mid-run would leave its drones mining.
+  - An arriving ship still docks and refreshes its market while automation is off: that finishes
+    a command issued before. Only the goal step after it is skipped.
 
 **1.8 Server reset during a run (B6)**
 - Do: a 401 with the reset-date error pauses automation, logs `ResetDetected`, and stops the

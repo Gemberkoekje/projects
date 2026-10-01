@@ -115,12 +115,15 @@ public sealed class AlreadyAtDestinationLoopTests
         _ships.FindAsync(ship.Symbol, Arg.Any<CancellationToken>()).Returns(ship);
         _goals.GetActiveGoalAsync(ship.Symbol, Arg.Any<CancellationToken>()).Returns(goal);
 
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+
         var goalExecutor = new ShipGoalExecutorService(
             [new CountingExecutor(executor, () => _steps++)],
             _goals,
             _ships,
             Substitute.For<IScoutAllMarketplacesPlanService>(),
-            Substitute.For<ISettingsRepository>(),
+            settings,
             Substitute.For<IGoalStepCircuitBreaker>(),
             Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);

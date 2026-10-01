@@ -14,8 +14,8 @@ namespace SpaceTraders.Application.Automation;
 /// Background service.
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
-///  - Ensures the single scout-all-marketplaces plan exists.
-///  - Executes active scout and contract assignments.
+///  - With automation switched on (<see cref="AutomationSwitches"/>): bootstraps each plan that is
+///    switched on, runs one goal step per ship, and runs the contract plan's assignments.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
 public sealed class GameLoopService(
@@ -56,24 +56,53 @@ public sealed class GameLoopService(
         }
 
         await using var scope = serviceScopeFactory.CreateAsyncScope();
-        var bus = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
-        var scoutPlanBootstrap = scope.ServiceProvider.GetRequiredService<IScoutAllMarketplacesPlanService>();
-        var contractPlanBootstrap = scope.ServiceProvider.GetRequiredService<IContractPlanService>();
-        var probeDeploymentPlanBootstrap = scope.ServiceProvider.GetRequiredService<IProbeDeploymentPlanService>();
-        var miningAutomation = scope.ServiceProvider.GetRequiredService<IMiningAutomationService>();
-        var tradingAutomation = scope.ServiceProvider.GetRequiredService<ITradingAutomationService>();
-        var assignments = scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>();
-        var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
-        var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
+        var services = scope.ServiceProvider;
+        var bus = services.GetRequiredService<Wolverine.IMessageBus>();
+        var settings = services.GetRequiredService<ISettingsRepository>();
 
-        await scoutPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
-        await contractPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
-        await probeDeploymentPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
-        await miningAutomation.EnsureBootstrappedAsync(cancellationToken);
-        await tradingAutomation.EnsureBootstrappedAsync(cancellationToken);
-        await ExecuteAllShipGoalsAsync(ships, goalExecutor, cancellationToken);
-        await ExecuteActiveContractAssignmentsAsync(assignments, ships, bus, cancellationToken);
+        if (await settings.IsAutomationEnabledAsync(cancellationToken))
+        {
+            await RunAutomationAsync(services, settings, bus, cancellationToken);
+        }
+        else
+        {
+            logger.LogDebug("GameLoopService: automation is switched off; no plans, goal steps or contract work this tick.");
+        }
+
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
+    }
+
+    private static async Task RunAutomationAsync(
+        IServiceProvider services,
+        ISettingsRepository settings,
+        Wolverine.IMessageBus bus,
+        CancellationToken cancellationToken)
+    {
+        // A plan that is switched off is not bootstrapped, so it doesn't buy anything either.
+        (AutomationPlan Plan, Func<Task> Bootstrap)[] bootstraps =
+        [
+            (AutomationPlan.Scout, () => services.GetRequiredService<IScoutAllMarketplacesPlanService>().EnsureBootstrappedAsync(cancellationToken)),
+            (AutomationPlan.Contract, () => services.GetRequiredService<IContractPlanService>().EnsureBootstrappedAsync(cancellationToken)),
+            (AutomationPlan.ProbeDeployment, () => services.GetRequiredService<IProbeDeploymentPlanService>().EnsureBootstrappedAsync(cancellationToken)),
+            (AutomationPlan.Mining, () => services.GetRequiredService<IMiningAutomationService>().EnsureBootstrappedAsync(cancellationToken)),
+            (AutomationPlan.Trading, () => services.GetRequiredService<ITradingAutomationService>().EnsureBootstrappedAsync(cancellationToken)),
+        ];
+
+        foreach (var (plan, bootstrap) in bootstraps)
+        {
+            if (await settings.IsPlanEnabledAsync(plan, cancellationToken))
+            {
+                await bootstrap();
+            }
+        }
+
+        var ships = services.GetRequiredService<IShipRepository>();
+        await ExecuteAllShipGoalsAsync(ships, services.GetRequiredService<IShipGoalExecutorService>(), cancellationToken);
+
+        if (await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken))
+        {
+            await ExecuteActiveContractAssignmentsAsync(services.GetRequiredService<IShipAssignmentRepository>(), ships, bus, cancellationToken);
+        }
     }
 
     private static async Task ExecuteAllShipGoalsAsync(

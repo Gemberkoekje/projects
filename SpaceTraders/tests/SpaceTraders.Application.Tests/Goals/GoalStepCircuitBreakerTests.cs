@@ -21,6 +21,11 @@ public sealed class GoalStepCircuitBreakerTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
 
+    public GoalStepCircuitBreakerTests()
+    {
+        _settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+    }
+
     [Fact]
     public async Task LoopingExecutor_TripsTheBreaker_AndItsGoalIsBlocked()
     {

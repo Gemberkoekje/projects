@@ -1,0 +1,41 @@
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Domain.Goals;
+
+namespace SpaceTraders.Application.Automation;
+
+/// <summary>The plans the tick runs. Each has its own on/off setting.</summary>
+public enum AutomationPlan
+{
+    Scout,
+    Contract,
+    ProbeDeployment,
+    Mining,
+    Trading,
+}
+
+/// <summary>
+/// The automation switches: the master switch <c>Automation.Enabled</c>, and one
+/// <c>Automation.Plan.{Plan}.Enabled</c> per plan. A missing setting counts as off.
+/// </summary>
+public static class AutomationSwitches
+{
+    public const string EnabledSetting = "Automation.Enabled";
+
+    public static string PlanEnabledSetting(AutomationPlan plan) => $"Automation.Plan.{plan}.Enabled";
+
+    public static Task<bool> IsAutomationEnabledAsync(this ISettingsRepository settings, CancellationToken cancellationToken) =>
+        settings.GetAsync<bool>(EnabledSetting, cancellationToken);
+
+    public static Task<bool> IsPlanEnabledAsync(this ISettingsRepository settings, AutomationPlan plan, CancellationToken cancellationToken) =>
+        settings.GetAsync<bool>(PlanEnabledSetting(plan), cancellationToken);
+
+    /// <summary>The plan that gives ships this kind of goal, or <c>null</c> for goals no plan gives.</summary>
+    public static AutomationPlan? PlanFor(ShipGoal goal) => goal switch
+    {
+        ScoutWaypointGoal => AutomationPlan.Scout,
+        DeployProbeGoal => AutomationPlan.ProbeDeployment,
+        MineAndSellGoal or SurveyWaypointGoal => AutomationPlan.Mining,
+        TradeBetweenMarketsGoal => AutomationPlan.Trading,
+        _ => null,
+    };
+}

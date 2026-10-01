@@ -11,7 +11,8 @@ One process, `SpaceTraders.API`, hosts everything.
 
 - It serves an internal HTTP API under `/spacetraders/api`.
 - Once its startup chain has finished, a loop runs every 5 seconds on the leader instance (the
-  "tick"). The tick bootstraps five *plans*, steps every ship's *goal*, and drives contract work.
+  "tick"). The tick bootstraps the *plans* that are switched on, steps every ship's *goal*, and
+  drives contract work.
 - Ships act through in-process Wolverine commands and events, which call the SpaceTraders API
   through a rate-limited client.
 - State lives in PostgreSQL.
@@ -19,7 +20,7 @@ One process, `SpaceTraders.API`, hosts everything.
 
 ```text
 startup chain ─► tick every 5 s (leader only)
-                  ├─ bootstrap plans: Scout, Contract, ProbeDeployment, Mining, Trading
+                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Mining, Trading
                   ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
                   ├─ contract assignments: deliver, or mine
                   └─ publish API availability changes
@@ -145,16 +146,18 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 
 ## 2. The tick (`GameLoopService`)
 
-- Runs 5 s after the previous tick ends, on the leader only. It never reads `Automation.Enabled`
-  (B5).
+- Runs 5 s after the previous tick ends, on the leader only.
 - Each tick:
-  1. `EnsureBootstrappedAsync` for Scout, Contract, ProbeDeployment, Mining and Trading, in that
-     order.
+  1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Contract,
+     ProbeDeployment, Mining and Trading.
   2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
-  3. For every active `Contract` assignment: `FulfillContractDeliveryCommand` if the ship holds
-     any of the contract good, otherwise `MineResourceVolumeCommand` (B8).
+  3. If the contract plan is switched on, for every active `Contract` assignment:
+     `FulfillContractDeliveryCommand` if the ship holds any of the contract good, otherwise
+     `MineResourceVolumeCommand` (B8).
   4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed. Nothing
      handles them.
+
+  With `Automation.Enabled` off, it skips steps 1 to 3.
 - A single try/catch wraps the tick, so an exception skips the rest of it (B14).
 
 ---
@@ -162,6 +165,13 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 ## 3. Plans
 
 All plan state is JSON in `plan_states`, one row per plan type.
+
+Each plan has a switch, `Automation.Plan.{Plan}.Enabled` (`AutomationSwitches`). Per D9 only
+Scout and Contract are on by default. A plan that is switched off:
+- isn't bootstrapped, so it doesn't buy anything;
+- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe,
+  mine-and-sell and survey, trade). They resume when it is switched back on;
+- for the contract plan: the tick's contract work (step 3) is skipped too.
 
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
@@ -300,6 +310,8 @@ Markets are not scouted again.
   applies (B17).
 - **Runs** one step of the executor for the active goal. Only the five kinds above are
   dispatched, so `IdleGoalExecutor` is unreachable.
+- **Skips** every goal step while `Automation.Enabled` is off, whatever triggered it, and the
+  goals of a plan that is switched off.
 - **Skips** a goal that is `Blocked`. It stays blocked until a plan replaces it; mining and
   trading treat its ship as free, but the scout plan never replaces its goal.
 - **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
@@ -375,7 +387,7 @@ wait for a cooldown simply run again on a later tick.
 |---|---|---|
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
-| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods probably aren't discovered (see below) |
+| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods aren't discovered (see below) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
@@ -403,7 +415,8 @@ production code doesn't use the aggregates at all (B7).
 
 - **Discovery:** Wolverine finds handlers by convention (class names ending in `Handler` or
   `Consumer`). The `Handle` methods on `ContractPlanService`, `MiningAutomationService` and
-  `TradingAutomationService` are therefore probably never wired (unverified).
+  `TradingAutomationService` are therefore not wired. `DiValidationTests` checks this, because a
+  plan that is switched off could otherwise still run from an event.
 - **`InvokeAsync`** runs a command inline, and its exceptions reach the caller. Executors and
   the tick use it.
 - **`PublishAsync`** goes through the durable local queues. All events use it, as do
@@ -470,11 +483,12 @@ production code doesn't use the aggregates at all (B7).
 
 ### What each setting does
 
-Only six of the 48 seeded settings change what the bot does (B18):
+Only 11 of the 53 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
-| `Automation.Enabled` (true) | Startup recovery skips when false. The tick ignores it (B5). Startup snapshot switches it off and on. |
+| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. Startup snapshot switches it off and on. |
+| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
@@ -573,7 +587,7 @@ the key is unset, everything is open.
 | Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Prices are empty (B19); best routes always 204 |
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
 | Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
-| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled`, which the tick ignores (B5) |
+| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
 | Metrics | `GET /metrics` | See below |
 
 **SignalR** (`/hubs/dashboard`): the server broadcasts `ReceiveInvalidation({Kind, Id, OccurredAt})`
@@ -669,7 +683,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~229 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Application.Tests` | ~241 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |

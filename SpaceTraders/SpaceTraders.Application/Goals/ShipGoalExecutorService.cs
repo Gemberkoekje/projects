@@ -23,6 +23,13 @@ public sealed class ShipGoalExecutorService(
 
     public async Task<GoalExecutionResult?> ExecuteAsync(string shipSymbol, CancellationToken ct)
     {
+        // Every goal step comes through here, whatever triggered it (the tick, an arrival, the
+        // probe handler, startup recovery), so this is where the kill switch stops them all.
+        if (!await settings.IsAutomationEnabledAsync(ct))
+        {
+            return null;
+        }
+
         var ship = await ships.FindAsync(shipSymbol, ct);
         if (ship is null)
         {
@@ -42,6 +49,13 @@ public sealed class ShipGoalExecutorService(
 
         // A blocked goal stays blocked until its plan replaces it.
         if (activeGoal.Status == GoalStatus.Blocked)
+        {
+            return null;
+        }
+
+        // A plan that is switched off doesn't move its ships. Their goals wait until it is back on.
+        var plan = AutomationSwitches.PlanFor(activeGoal);
+        if (plan is not null && !await settings.IsPlanEnabledAsync(plan.Value, ct))
         {
             return null;
         }

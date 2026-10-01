@@ -6,10 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
+using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using Wolverine.Runtime;
 
 namespace SpaceTraders.API.Tests;
 
@@ -35,6 +38,24 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
         // if any dependency is missing or a scope violation exists.
         var act = () => _ = _factory.Services;
         act.Should().NotThrow("all dependencies must be registered and lifetime rules must be satisfied");
+    }
+
+    [Fact]
+    public void PlanServices_AreNotMessageHandlers()
+    {
+        // The plan services have Handle methods, but Wolverine only picks up classes named *Handler or
+        // *Consumer. If it did pick them up, a plan that is switched off could still run (and buy
+        // ships) from an event.
+        var runtime = (WolverineRuntime)_factory.Services.GetRequiredService<IWolverineRuntime>();
+        var handlerTypes = runtime.Handlers.Chains
+            .SelectMany(chain => chain.HandlerCalls())
+            .Select(call => call.HandlerType)
+            .ToList();
+
+        handlerTypes.Should().Contain(typeof(ShipNavigationCompletedHandler));
+        handlerTypes.Should().NotContain(typeof(ContractPlanService))
+            .And.NotContain(typeof(MiningAutomationService))
+            .And.NotContain(typeof(TradingAutomationService));
     }
 }
 
