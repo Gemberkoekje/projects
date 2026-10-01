@@ -22,6 +22,7 @@ public sealed class MineAndSellGoalExecutorTests
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly LogRecorder _log = new();
 
     private MineAndSellGoalExecutor CreateExecutor()
     {
@@ -46,7 +47,7 @@ public sealed class MineAndSellGoalExecutorTests
             _port,
             _dock,
             _bus,
-            NullLogger<MineAndSellGoalExecutor>.Instance);
+            _log.For<MineAndSellGoalExecutor>());
     }
 
     private static SurveyModel ActiveSurvey(string waypointSymbol, string depositSymbol) =>
@@ -348,5 +349,14 @@ public sealed class MineAndSellGoalExecutorTests
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 205_000 && e.NewCredits == 220_000),
             Arg.Any<DeliveryOptions>());
+
+        // The journal (slice 2.3).
+        var sold = _log.Journal.Should().ContainSingle().Subject;
+        sold.EventKind.Should().Be("CargoSold");
+        sold.Properties.Should().Contain(new KeyValuePair<string, object?>("ShipSymbol", "MINER-1"))
+            .And.Contain(new KeyValuePair<string, object?>("TradeSymbol", "IRON_ORE"))
+            .And.Contain(new KeyValuePair<string, object?>("Units", 10))
+            .And.Contain(new KeyValuePair<string, object?>("WaypointSymbol", "X1-AB-MKT"))
+            .And.Contain(new KeyValuePair<string, object?>("Revenue", 15_000L));
     }
 }

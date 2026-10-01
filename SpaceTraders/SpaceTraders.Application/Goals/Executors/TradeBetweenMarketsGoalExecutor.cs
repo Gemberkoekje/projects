@@ -96,7 +96,8 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 tradeGoal.BuyWaypointSymbol));
 
             logger.LogInformation(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
+                "{EventKind}: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
+                JournalEvents.CargoBought,
                 ship.Symbol,
                 unitsToBuy,
                 tradeGoal.TradeSymbol,
@@ -140,7 +141,8 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             sellResult.AgentCredits));
 
         logger.LogInformation(
-            "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+            "{EventKind}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+            JournalEvents.CargoSold,
             ship.Symbol,
             targetUnits,
             tradeGoal.TradeSymbol,

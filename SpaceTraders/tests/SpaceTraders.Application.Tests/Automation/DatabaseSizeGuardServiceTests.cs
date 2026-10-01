@@ -43,7 +43,7 @@ public sealed class DatabaseSizeGuardServiceTests : IDisposable
         await _guard.CheckAsync(CancellationToken.None);
 
         (await SettingAsync("Automation.Enabled")).Should().Be("false");
-        _logger.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Error && entry.Message.StartsWith("DbSizeHardLimit", StringComparison.Ordinal));
+        _logger.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Error && entry.Message.StartsWith("AnomalyRaised: DbSizeHardLimit on database", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -62,6 +62,11 @@ public sealed class DatabaseSizeGuardServiceTests : IDisposable
         await _guard.CheckAsync(CancellationToken.None);
         _metrics.Received(1).Anomaly("DbSizeSoftLimit", "database", false);
         _metrics.Received(1).Anomaly("DbSizeHardLimit", "database", false);
+
+        // The journal (slice 2.3): raised once, cleared once.
+        _logger.Entries.Select(entry => entry.Message).Should().Equal(
+            "AnomalyRaised: DbSizeSoftLimit on database: the database is 1025 MB, above the soft limit of 1024 MB (Database.SoftLimitMegabytes).",
+            "AnomalyCleared: DbSizeSoftLimit on database: the database is 10 MB, under that limit again.");
     }
 
     [Fact]
@@ -86,7 +91,7 @@ public sealed class DatabaseSizeGuardServiceTests : IDisposable
         await _guard.CheckAsync(CancellationToken.None);
 
         (await SettingAsync("Automation.Enabled")).Should().Be("true");
-        _logger.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Warning && entry.Message.StartsWith("DbSizeSoftLimit", StringComparison.Ordinal));
+        _logger.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Warning && entry.Message.StartsWith("AnomalyRaised: DbSizeSoftLimit on database", StringComparison.Ordinal));
     }
 
     [Fact]

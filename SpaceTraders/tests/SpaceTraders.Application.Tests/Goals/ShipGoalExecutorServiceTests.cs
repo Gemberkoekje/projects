@@ -19,6 +19,7 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IGoalStepCircuitBreaker _circuitBreaker = Substitute.For<IGoalStepCircuitBreaker>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly LogRecorder _log = new();
 
     private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
     private static readonly ShipModel NotFullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100);
@@ -38,7 +39,24 @@ public sealed class ShipGoalExecutorServiceTests
             _settings,
             _circuitBreaker,
             _metrics,
-            NullLogger<ShipGoalExecutorService>.Instance);
+            _log.For<ShipGoalExecutorService>());
+
+    [Fact]
+    public async Task ExecuteAsync_WhenTheBreakerTrips_JournalsTheShipAsBlocked()
+    {
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+        _circuitBreaker.RecordStep("SHIP-1", Arg.Any<int>(), Arg.Any<DateTimeOffset>()).Returns(true);
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        var blocked = _log.Journal.Should().ContainSingle().Subject;
+        blocked.EventKind.Should().Be("ShipBlocked");
+        blocked.Properties["ShipSymbol"].Should().Be("SHIP-1");
+        blocked.Properties["Reason"].Should().Be("runaway");
+    }
 
     [Fact]
     public async Task ExecuteAsync_CountsTheStep_ByGoalKind()

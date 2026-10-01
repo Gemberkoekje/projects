@@ -593,7 +593,7 @@ its own retention, so the bot's database stays small.
       one fails, so a failing handler can probably write the others' rows twice (ledger, credit
       samples, activity log). Not seen; `MultipleHandlerBehavior.Separated` would isolate them.
 
-**2.3 Journal events**
+**2.3 Journal events** (done)
 - Do: write one Information event per meaningful thing, each with an `EventKind` and the standard
   properties:
   - contracts: ContractAccepted, ContractDelivered, ContractFulfilled;
@@ -604,6 +604,30 @@ its own retention, so the bot's database stays small.
   - ResetDetected, AnomalyRaised and AnomalyCleared.
 - Done when: `{namespace="spacetraders"} | json | EventKind != ""` in Grafana reads as a timeline
   of the run.
+- Done:
+  - `JournalEvents` names every kind, and `docs/HOW_IT_WORKS.md` section 11 lists who logs each
+    and with which properties. Every journal line starts with its kind (`CargoSold: ship …`), so
+    the rendered message reads as a timeline too.
+  - Where a line already said what happened, that line became the journal entry, so the log
+    doesn't grow: the contract delivery and fulfilment, the purchases and sales, the plans
+    starting, completing and waiting, the circuit breaker (`ShipBlocked`), the reset and the API
+    pauses. New lines: `ContractAccepted`, `SettingChanged` and `ShipIdle`.
+  - `SettingChanged` comes from `SettingsRepository`, so it covers every change, whoever makes
+    it (the endpoints, the control switches, the size guard, the reset monitor), and only real
+    changes. A key that may hold a secret (`Alerts.WebhookUrl`) shows `(hidden)`.
+  - `ShipIdle` comes from the 10 s metrics sample (`ShipStateJournal`): once for each idle ship
+    after a start, and once when a ship's goal or assignment ends, so it covers every way a ship
+    turns idle without a line in each.
+  - The size guard's limits log `AnomalyRaised` and `AnomalyCleared`, with `Rule` and `Subject`,
+    in place of `DbSizeSoftLimit`, `DbSizeHardLimit` and `DbSizeNormal`.
+  - Mining and trading have no plan to start or complete (they are opportunity queues), so they
+    write none of the plan kinds.
+  - Tests check the kind and properties of each new line and of the reworded ones (sales,
+    purchases, contract payments, the contract plan, the breaker, settings, idle ships, the
+    anomalies). The Loki query itself needs the bot deployed (phase 4); a local run shows the
+    same lines in the JSON log.
+  - `.claude/skills/st-investigate/SKILL.md`: the journal and metrics rows and queries now name
+    what exists; the stale B2 and B12 queries are gone.
 
 **2.4 Grafana dashboard** (gembernodes)
 - Location: `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`, added to the

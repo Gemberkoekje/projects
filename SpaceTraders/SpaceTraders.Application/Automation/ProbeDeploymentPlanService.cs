@@ -127,7 +127,9 @@ public sealed class ProbeDeploymentPlanService(
         await probeDeploymentPlans.UpsertAsync(plan, cancellationToken);
 
         logger.LogInformation(
-            "Probe deployment plan bootstrapped for system {System} with {Count} target waypoints.",
+            "{EventKind}: {Plan} plan for system {System} with {Count} target waypoints.",
+            JournalEvents.PlanStarted,
+            AutomationPlan.ProbeDeployment,
             systemSymbol,
             targets.Count);
 
@@ -182,7 +184,9 @@ public sealed class ProbeDeploymentPlanService(
         if (allDeployed)
         {
             logger.LogInformation(
-                "Probe deployment plan completed: all {Count} waypoints in system {System} are covered.",
+                "{EventKind}: {Plan} plan: all {Count} waypoints in system {System} are covered.",
+                JournalEvents.PlanCompleted,
+                AutomationPlan.ProbeDeployment,
                 plan.TargetWaypointSymbols.Count,
                 plan.SystemSymbol);
             return;
@@ -413,9 +417,12 @@ public sealed class ProbeDeploymentPlanService(
             if (!plan.WaitingForPhase1Credits)
             {
                 logger.LogInformation(
-                    "Probe deployment plan: Phase 1 deferred — credits {Credits} below threshold {Threshold}.",
-                    agent?.Credits ?? 0,
-                    Phase1CapitalThreshold);
+                    "{EventKind}: {Plan} plan waits ({Reason}): market probes wait for {Threshold} credits, the agent has {Credits}.",
+                    JournalEvents.PlanBlocked,
+                    AutomationPlan.ProbeDeployment,
+                    "waiting_for_credits",
+                    Phase1CapitalThreshold,
+                    agent?.Credits ?? 0);
 
                 var deferredPlan = plan with
                 {

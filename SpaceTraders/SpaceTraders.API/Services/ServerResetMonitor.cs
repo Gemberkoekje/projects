@@ -1,3 +1,4 @@
+using SpaceTraders.Application;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -31,7 +32,7 @@ public sealed class ServerResetMonitor(
 
         logger.LogCritical(
             "{EventKind}: the SpaceTraders server was reset ({Detail}). Switching automation off and stopping the host; after the restart a new agent is registered.",
-            "ResetDetected",
+            JournalEvents.ResetDetected,
             detail);
 
         try

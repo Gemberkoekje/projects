@@ -133,7 +133,8 @@ public sealed class MineAndSellGoalExecutor(
             sellResult.AgentCredits));
 
         logger.LogInformation(
-            "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+            "{EventKind}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+            JournalEvents.CargoSold,
             ship.Symbol,
             targetUnits,
             miningGoal.TradeSymbol,

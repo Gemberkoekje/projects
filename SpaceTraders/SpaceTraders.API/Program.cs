@@ -110,6 +110,7 @@ builder.Services.AddSingleton<SettingsStartupLoggingService>();
 builder.Services.AddSingleton<GameLoopService>();
 builder.Services.AddSingleton<DataRetentionService>();
 builder.Services.AddSingleton<DatabaseSizeGuardService>();
+builder.Services.AddSingleton<ShipStateJournal>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
 
 // RunLifecycleService is both a singleton startup-managed service and the IRunLifecycleManager implementation.

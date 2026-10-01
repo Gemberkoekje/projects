@@ -84,7 +84,11 @@ public sealed class PrometheusMetricsServiceTests
         _metrics.When(m => m.Contracts(Arg.Any<IReadOnlyCollection<ContractMetricsSample>>()))
             .Do(call => contracts = call.Arg<IReadOnlyCollection<ContractMetricsSample>>());
 
-        using var service = new PrometheusMetricsService(provider.GetRequiredService<IServiceScopeFactory>(), _metrics, NullLogger<PrometheusMetricsService>.Instance);
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
         _metrics.Received(1).Credits(175_000);

@@ -147,10 +147,12 @@ public sealed class FulfillContractDeliveryHandler(
             await contracts.UpsertAsync(MapToDto(deliverResult), cancellationToken);
 
             logger.LogInformation(
-                "FulfillContractDelivery: ship {ShipSymbol} delivered {Units} {TradeSymbol} for contract {ContractId}.",
+                "{EventKind}: ship {ShipSymbol} delivered {Units} {TradeSymbol} to {WaypointSymbol} for contract {ContractId}.",
+                JournalEvents.ContractDelivered,
                 command.ShipSymbol,
                 units,
                 command.TradeSymbol,
+                command.DestinationWaypoint,
                 command.ContractId);
         }
 
@@ -170,8 +172,10 @@ public sealed class FulfillContractDeliveryHandler(
             await bus.PublishAsync(new ContractFulfilledEvent(command.ContractId, fulfilled.PaymentOnFulfilled));
 
             logger.LogInformation(
-                "FulfillContractDelivery: contract {ContractId} fulfilled.",
-                command.ContractId);
+                "{EventKind}: contract {ContractId} fulfilled; it paid {Payment} credits.",
+                JournalEvents.ContractFulfilled,
+                command.ContractId,
+                fulfilled.PaymentOnFulfilled);
         }
 
         var refreshed = await ships.FindAsync(command.ShipSymbol, cancellationToken) ?? ship;

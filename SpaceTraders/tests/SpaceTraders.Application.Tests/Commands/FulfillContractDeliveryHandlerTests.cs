@@ -23,6 +23,7 @@ public sealed class FulfillContractDeliveryHandlerTests
         var contracts = Substitute.For<IContractRepository>();
         var bus = Substitute.For<IMessageBus>();
         var agents = Substitute.For<IAgentRepository>();
+        var log = new LogRecorder();
         var ship = new ShipModel("SHIP-1", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 100, CargoCurrent: 0, CargoCapacity: 40, CargoInventory: []);
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(ship);
         contracts.FindAsync("C-1", Arg.Any<CancellationToken>()).Returns(Contract("C-1", required: 10, fulfilled: 10));
@@ -54,10 +55,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             Substitute.For<INavigateSubCommand>(),
             bus,
             agents,
-            NullLogger<FulfillContractDeliveryHandler>.Instance);
+            log.For<FulfillContractDeliveryHandler>());
 
         await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-1", "C-1", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
 
+        log.Journal.Should().ContainSingle().Which.Message.Should().Be("ContractFulfilled: contract C-1 fulfilled; it paid 6620 credits.");
         await bus.Received(1).PublishAsync(
             Arg.Is<ContractFulfilledEvent>(e => e.ContractId == "C-1" && e.Payment == 6_620),
             Arg.Any<DeliveryOptions>());

@@ -359,7 +359,7 @@ Markets are not scouted again.
 - **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
   (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
   `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
-  blocks the goal with reason `runaway`, logs a warning and counts
+  blocks the goal with reason `runaway`, logs `ShipBlocked` at Warning and counts
   `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
 - **Counts** every step it runs in `spacetraders_goal_steps_total{kind}`.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
@@ -517,15 +517,15 @@ happens instead (B7, fixed).
 other app (D8):
 - It reads `pg_database_size` at start, before the rest of startup goes on, and then every 5
   minutes, and exports it as `spacetraders_db_size_bytes`.
-- Above `Database.SoftLimitMegabytes` (1024) it logs `DbSizeSoftLimit` at Warning, once per
-  crossing.
-- Above `Database.HardLimitMegabytes` (3072) it switches `Automation.Enabled` off and logs
-  `DbSizeHardLimit` at Error. It switches automation off again at every check while the
-  database stays above the limit, so switching it back on only lasts once the database is smaller.
-- Back under the soft limit it logs `DbSizeNormal`.
-- Each limit is an anomaly while the database is above it:
-  `spacetraders_anomaly_active{rule="DbSizeSoftLimit"|"DbSizeHardLimit",subject="database"}` is 1,
-  and 0 once it is back under. They are the only anomalies until phase 3 adds the health rules.
+- Each limit, `Database.SoftLimitMegabytes` (1024) and `Database.HardLimitMegabytes` (3072), is
+  an anomaly while the database is above it, with rule `DbSizeSoftLimit` or `DbSizeHardLimit` and
+  subject `database`. The journal logs `AnomalyRaised` when the database crosses a limit (Warning
+  for the soft one, Error for the hard one) and `AnomalyCleared` when it is back under, and
+  `spacetraders_anomaly_active` is 1 meanwhile. They are the only anomalies until phase 3 adds
+  the health rules.
+- Above the hard limit it also switches `Automation.Enabled` off, and again at every check while
+  the database stays above it (with an Error line each time it has to), so switching it back on
+  only lasts once the database is smaller.
 
 ### Tables
 
@@ -568,6 +568,10 @@ other app (D8):
   change applies on the next read.
 - `PUT /settings/{key}` with `{"value": "…"}` writes any key, even an unknown one.
 - `POST /settings/reset` restores the defaults.
+- Every change, whoever makes it (these endpoints, the control endpoints, the size guard, the
+  reset monitor), is a `SettingChanged` journal line with `Setting`, `OldValue` and `NewValue`
+  (`SettingsRepository`). A key that may hold a secret (ending in `Url`, or naming a secret,
+  password or API key) shows `(hidden)` instead of its value.
 
 ### What each setting does
 
@@ -749,6 +753,26 @@ The seven pages in `src/Future` are not routed.
   - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
     `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
     Serilog turns into properties.
+- **The journal:** one line per meaningful thing, with an `EventKind` property and a message that
+  starts with it (`CargoSold: ship …`), so `{namespace="spacetraders"} | json | EventKind != ""`
+  in Loki reads as a timeline of the run. `JournalEvents` names every kind:
+
+  | Kind | Logged by | Properties |
+  |---|---|---|
+  | `ContractAccepted` | Contract plan | `ContractId`, `TradeSymbol`, `WaypointSymbol`, `Payment` |
+  | `ContractDelivered`, `ContractFulfilled` | `FulfillContractDeliveryCommand` | `ContractId`, `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`; `Payment` |
+  | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost` |
+  | `CargoBought`, `CargoSold` | Trade and mining executors | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
+  | `PlanStarted`, `PlanCompleted` | Scout, contract and probe plans | `Plan`, and the plan's ship, contract or system |
+  | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`) | `Plan`, `Reason` |
+  | `ShipIdle` | `ShipStateJournal`, from the 10 s sample: `idle_at_start`, `new_ship`, `goal_ended` (with `PreviousGoal`) | `ShipSymbol`, `Reason` |
+  | `ShipBlocked` | The circuit breaker (Warning) | `ShipSymbol`, `GoalKind`, `Reason` |
+  | `SettingChanged` | `SettingsRepository` | `Setting`, `OldValue`, `NewValue` |
+  | `ResetDetected` | `ServerResetMonitor` (Critical) | `Detail` |
+  | `ApiUnavailable`, `ApiAvailable` | The tick | `PausedUntil` |
+  | `AnomalyRaised`, `AnomalyCleared` | The size guard | `Rule`, `Subject` |
+
+  Mining and trading have no plan to start or complete: they are opportunity queues.
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
   `PrometheusAutomationMetrics` defines them all at startup, so a scrape lists every one, also
   before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the

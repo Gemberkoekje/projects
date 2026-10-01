@@ -21,6 +21,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly LogRecorder _log = new();
 
     private TradeBetweenMarketsGoalExecutor CreateExecutor() =>
         new(
@@ -30,7 +31,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             _port,
             _dock,
             _bus,
-            NullLogger<TradeBetweenMarketsGoalExecutor>.Instance);
+            _log.For<TradeBetweenMarketsGoalExecutor>());
 
     private static TradeBetweenMarketsGoal Goal() =>
         new()
@@ -243,6 +244,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 188_000 && e.NewCredits == 180_000),
             Arg.Any<DeliveryOptions>());
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoBought" && Equals(e.Properties["Cost"], 8_000L) && Equals(e.Properties["WaypointSymbol"], "X1-AB-BUY"));
     }
 
     [Fact]
@@ -262,5 +264,6 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 193_000 && e.NewCredits == 205_000),
             Arg.Any<DeliveryOptions>());
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoSold" && Equals(e.Properties["Revenue"], 12_000L));
     }
 }

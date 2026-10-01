@@ -81,7 +81,8 @@ public sealed class ShipPurchaseService(
         await bus.PublishAsync(new NewShipPurchasedEvent(result.ShipSymbol, ToShipType(shipType), result.Cost));
 
         logger.LogInformation(
-            "ShipPurchaseService: purchased {ShipSymbol} ({Type}) at {Shipyard} for {Cost} credits.",
+            "{EventKind}: ship {ShipSymbol} ({ShipType}) bought at {WaypointSymbol} for {Cost} credits.",
+            JournalEvents.ShipPurchased,
             result.ShipSymbol,
             shipType,
             shipyardWaypoint,

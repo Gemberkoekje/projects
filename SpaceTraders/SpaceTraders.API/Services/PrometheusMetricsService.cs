@@ -13,11 +13,13 @@ namespace SpaceTraders.API.Services;
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
 /// every ship (role, state, goal, why its goal is blocked) and the accepted contracts'
 /// deliverables. What happens (API calls, goal steps, credits earned and spent) is counted where
-/// it happens, through <see cref="IAutomationMetrics"/>.
+/// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
+/// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
 /// </summary>
 public sealed class PrometheusMetricsService(
     IServiceScopeFactory serviceScopeFactory,
     IAutomationMetrics metrics,
+    ShipStateJournal shipJournal,
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
@@ -42,7 +44,9 @@ public sealed class PrometheusMetricsService(
         var assignmentTypes = assignments
             .GroupBy(a => a.ShipSymbol, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First().Type, StringComparer.Ordinal);
-        metrics.Fleet([.. ships.Select(ship => ToSample(ship, assignmentTypes, now))], now);
+        ShipMetricsSample[] fleet = [.. ships.Select(ship => ToSample(ship, assignmentTypes, now))];
+        metrics.Fleet(fleet, now);
+        shipJournal.Observe(fleet);
 
         var contracts = await db.Contracts.AsNoTracking()
             .Where(c => c.IsAccepted)

@@ -108,6 +108,13 @@ public sealed class ContractPlanService(
             }
 
             await bus.PublishAsync(new ContractAcceptedEvent(pending.ContractId, accepted.PaymentOnAccepted));
+            logger.LogInformation(
+                "{EventKind}: contract {ContractId} accepted ({TradeSymbol} to {WaypointSymbol}); it paid {Payment} credits.",
+                JournalEvents.ContractAccepted,
+                pending.ContractId,
+                pending.TradeSymbol,
+                pending.DestinationSymbol,
+                accepted.PaymentOnAccepted);
             activeContracts = await contracts.GetActiveAsync(cancellationToken);
             pending = SelectPendingDeliverable(activeContracts);
             if (pending is null)
@@ -142,8 +149,11 @@ public sealed class ContractPlanService(
             }, cancellationToken);
 
             logger.LogInformation(
-                "Contract plan deferred for contract {ContractId}: unsupported deliverable {TradeSymbol}.",
+                "{EventKind}: {Plan} plan for contract {ContractId} deferred ({Reason}): {TradeSymbol} is not a mineral (D2).",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.Contract,
                 pending.ContractId,
+                "unsupported_deliverable",
                 pending.TradeSymbol);
             return;
         }
@@ -183,8 +193,11 @@ public sealed class ContractPlanService(
             }, cancellationToken);
 
             logger.LogInformation(
-                "Contract plan pending for contract {ContractId}: no miner available and purchase was not possible.",
-                pending.ContractId);
+                "{EventKind}: {Plan} plan for contract {ContractId} pending ({Reason}): no miner available and purchase was not possible.",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.Contract,
+                pending.ContractId,
+                "no_ship_or_budget");
             return;
         }
 
@@ -208,8 +221,11 @@ public sealed class ContractPlanService(
             }, cancellationToken);
 
             logger.LogWarning(
-                "Contract plan deferred for contract {ContractId}: no asteroid source found for {TradeSymbol}.",
+                "{EventKind}: {Plan} plan for contract {ContractId} deferred ({Reason}): no asteroid source found for {TradeSymbol}.",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.Contract,
                 pending.ContractId,
+                "no_asteroid",
                 pending.TradeSymbol);
             return;
         }
@@ -247,7 +263,9 @@ public sealed class ContractPlanService(
             SupplyCompleted: false), cancellationToken);
 
         logger.LogInformation(
-            "Contract plan bootstrapped: contract {ContractId}, ship {ShipSymbol}, mineral {TradeSymbol}, source {Source}, destination {Destination}, remaining units {RemainingUnits}.",
+            "{EventKind}: {Plan} plan for contract {ContractId}, ship {ShipSymbol}, mineral {TradeSymbol}, source {Source}, destination {Destination}, remaining units {RemainingUnits}.",
+            JournalEvents.PlanStarted,
+            AutomationPlan.Contract,
             pending.ContractId,
             selectedShip.Symbol,
             pending.TradeSymbol,
@@ -342,7 +360,9 @@ public sealed class ContractPlanService(
             await CompleteAssignmentIfActiveAsync(plan, now, cancellationToken);
 
             logger.LogInformation(
-                "Contract plan completed: contract {ContractId} fulfilled, {Fulfilled}/{Required} {TradeSymbol} delivered; ship {ShipSymbol} released.",
+                "{EventKind}: {Plan} plan for contract {ContractId}: fulfilled, {Fulfilled}/{Required} {TradeSymbol} delivered; ship {ShipSymbol} released.",
+                JournalEvents.PlanCompleted,
+                AutomationPlan.Contract,
                 completed.ContractId,
                 completed.UnitsFulfilled,
                 completed.UnitsRequired,

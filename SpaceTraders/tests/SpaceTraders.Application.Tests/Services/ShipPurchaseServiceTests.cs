@@ -24,6 +24,7 @@ public sealed class ShipPurchaseServiceTests
         var shipyards = Substitute.For<IShipyardRepository>();
         var budget = Substitute.For<IBudgetPolicy>();
         var bus = Substitute.For<IMessageBus>();
+        var log = new LogRecorder();
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 100_000, "COSMIC", 1));
         shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>())
             .Returns(new ShipyardWaypointDto
@@ -49,7 +50,7 @@ public sealed class ShipPurchaseServiceTests
             shipyards,
             budget,
             bus,
-            NullLogger<ShipPurchaseService>.Instance);
+            log.For<ShipPurchaseService>());
 
         var result = await service.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1");
 
@@ -60,6 +61,7 @@ public sealed class ShipPurchaseServiceTests
         await bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 100_000 && e.NewCredits == 88_000),
             Arg.Any<DeliveryOptions>());
+        log.Journal.Should().ContainSingle().Which.Message.Should().Be("ShipPurchased: ship AGENT-2 (SHIP_MINING_DRONE) bought at X1-AB-SY1 for 12000 credits.");
     }
 
     [Theory]

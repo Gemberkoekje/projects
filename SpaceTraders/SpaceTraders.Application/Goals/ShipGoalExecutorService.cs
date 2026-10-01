@@ -76,7 +76,8 @@ public sealed class ShipGoalExecutorService(
             await goals.BlockGoalAsync(shipSymbol, activeGoal.GoalId, RunawayReason, ct);
             metrics.GoalBreakerTripped(shipSymbol);
             logger.LogWarning(
-                "ShipGoalExecutorService: ship {ShipSymbol} took more than {MaxSteps} goal steps in a minute; goal {GoalKind} blocked ({Reason}).",
+                "{EventKind}: ship {ShipSymbol} took more than {MaxSteps} goal steps in a minute; goal {GoalKind} blocked ({Reason}).",
+                JournalEvents.ShipBlocked,
                 shipSymbol,
                 maxStepsPerMinute,
                 activeGoal.Kind,
