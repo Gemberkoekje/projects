@@ -15,10 +15,9 @@
   </ItemGroup>
   
   <ItemGroup>
-    <None Include="docs/implementation/CURRENT_IMPLEMENTATION_OVERVIEW.md" />
-    <None Include="docs/implementation/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md" />
-    <None Include="docs/operations/LOCAL_DEVELOPMENT.md" />
-    <None Include="docs/SPACE_TRADERS_IMPLEMENTATION_PLAN.md" />
+    <None Include="PLAN.md" />
+    <None Include="docs/HOW_IT_WORKS.md" />
+    <None Include="docs/GLOSSARY.md" />
   </ItemGroup>
   
   <ItemGroup>

@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Docs – Added (2026-10-01)
+- `PLAN.md`: the plan for getting the bot safely back on the cluster, with the known issues found by reading the code (B1–B25) and the decisions taken (D1–D11).
+- `docs/HOW_IT_WORKS.md`: what the code does today, written from the code.
+- `docs/archive/README.md`: an index of the archived documents.
+- `.claude/skills/st-investigate/SKILL.md`: draft of the skill Claude uses to investigate and fix misbehaviour.
+
+### Docs – Changed (2026-10-01)
+- Moved the old plans, designs, progress logs, strategy notes and the `docs/implementation/` and `docs/operations/` documents to `docs/archive/`.
+- `README.md`, `CONTRIBUTING.md`, `docs/GLOSSARY.md` and `spacetraders.md` now match the code: no `SpaceTraders.App`, no `k8s/` folder, no `/control/sync` or `/control/ships/{symbol}/reassign`, and the burst limit as the API guide defines it.
+- `CLAUDE.md`: what Claude works on in this project.
+
+### Config – Changed (2026-10-01)
+- `System.Net.Http` logs at Warning instead of Information (`appsettings.json`, `appsettings.Development.json`), removing about four log lines per outbound API call.
+
 ### Docs – Changed
 - Removed obsolete plan-related Markdown files.
 - Renamed cleaned SpaceTraders.io reference content to `spacetraders.md`.
