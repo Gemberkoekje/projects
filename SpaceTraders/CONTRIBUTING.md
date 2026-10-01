@@ -2,22 +2,18 @@
 
 ## Welcome
 
-Contributions are welcome. This repository is currently in a **foundation phase**.
-Please keep changes small, focused, and aligned with the current implementation.
+Contributions are welcome. Please keep changes small, focused, and aligned with the current plan.
 
 ---
 
-## Current Scope
+## Where things stand
 
-Implemented today:
-- SpaceTraders typed HTTP client
-- PostgreSQL persistence with EF Core
-- API host with bootstrap, startup sync, startup recovery, game loop, contract watch, activity pruning, ship refresh, metrics, and leader election hosted services
-- Internal Minimal API endpoints for status, settings, control, metrics, and health
-- Razor Pages dashboard for agent, fleet, contracts, market, API usage, activity log, and settings views
-- Kubernetes manifests and root-level Dockerfiles for API and app deployment
-
-Current architecture and operational behavior are documented in `docs/implementation/` and `docs/operations/`.
+- `docs/HOW_IT_WORKS.md` describes what the code does today.
+- `PLAN.md` holds the plan, the known issues (B-numbers) and the decisions already taken
+  (D-numbers). Work happens in its slices, one PR per slice.
+- `CLAUDE.md` defines what Claude works on in this project: things that don't work the way they
+  are intended to, not strategy or settings.
+- `docs/archive/` holds earlier plans. They don't describe the current code.
 
 ---
 
@@ -31,8 +27,15 @@ Use `dotnet user-secrets` for local development.
 Prefer incremental PRs over large refactors.
 Do not introduce major architectural dependencies unless required.
 
+### Fixes Start With a Test
+A bug fix starts with a test that reproduces the misbehaviour, then makes it pass.
+
 ### PostgreSQL as Local Store
 Use PostgreSQL in development and production paths.
+
+### One Instance per Account
+The SpaceTraders rate limit is per IP address and per account. Don't run a local instance against
+the same account while the cluster instance is running.
 
 ---
 
@@ -48,9 +51,11 @@ Use PostgreSQL in development and production paths.
 
 ## Pull Request Checklist
 
-- [ ] `dotnet build` succeeds.
+- [ ] `dotnet build SpaceTraders.slnx` succeeds without new warnings.
+- [ ] `dotnet test SpaceTraders.slnx --filter "Category!=Integration"` passes.
 - [ ] No secrets added to source control.
-- [ ] Docs updated when behavior/configuration changes.
+- [ ] `docs/HOW_IT_WORKS.md` updated when behaviour changes.
+- [ ] `PLAN.md` updated: slice marked done, known issues and decisions current.
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` for notable changes.
 
 ---

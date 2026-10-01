@@ -94,13 +94,12 @@ cluster (phase 4).
 
 **0.1 Claude's role in `CLAUDE.md`** (done)
 
-**0.2 Archive the old plans**
-- Do: move `basics-reset-plan.md`, `REFACTOR_PLAN_ShipAutomationTickEvent_Removal.md`, the
-  `docs/*PLAN*.md` files, `docs/contract-plan-implementation.md`,
-  `docs/ship-automation-architecture-plan.md` and `docs/implementation/*` into `docs/archive/`.
-  Add a README there saying they describe past intentions, not the current code.
-- Done when: the only current docs are `README.md`, `PLAN.md`, `docs/HOW_IT_WORKS.md`,
-  `docs/GLOSSARY.md`, `spacetraders.md` (the game reference), `CONTRIBUTING.md` and
+**0.2 Archive the old plans** (done)
+- Moved the old plans, designs, progress logs, the strategy notes, `docs/implementation/*` and
+  `docs/operations/LOCAL_DEVELOPMENT.md` into `docs/archive/`. Its README says what each file is,
+  and that none of them describes the current code.
+- The current docs are `README.md`, `PLAN.md`, `docs/HOW_IT_WORKS.md`, `docs/GLOSSARY.md`,
+  `spacetraders.md` (solution overview: stack, configuration, conventions), `CONTRIBUTING.md` and
   `CHANGELOG.md`.
 
 **0.3 `docs/HOW_IT_WORKS.md`**
@@ -134,10 +133,16 @@ cluster (phase 4).
 - Done when: a test with a looping fake executor trips the breaker.
 
 **1.3 Stop storing in-process messages (B2)**
-- Do: remove `UseDurableLocalQueues()`. In-process events don't need to survive a restart:
-  `StartupRecoveryService` and `scheduled_ship_events` already resume ships. If nothing else needs
-  Wolverine's Postgres storage, drop `PersistMessagesWithPostgresql` too. The alternative is to
-  turn the durability agent back on; record the choice in `HOW_IT_WORKS.md`.
+- Background: the durable queues were added on purpose, as an outbox. A message is stored in the
+  same transaction as the database change, so a crash can't lose it (phase 2 of
+  `docs/archive/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md`). The same document names startup
+  recovery as the second line of defence.
+- Do: choose one of these and record the choice in `HOW_IT_WORKS.md`:
+  - **Turn the durability agent back on**, which keeps the outbox and should clean up handled
+    messages.
+  - **Remove `UseDurableLocalQueues()`** and rely on `StartupRecoveryService` and
+    `scheduled_ship_events` to resume ships after a restart. If nothing else needs Wolverine's
+    Postgres storage, drop `PersistMessagesWithPostgresql` too.
 - Done when: the soak test (1.11) shows no `wolverine` tables, or flat ones.
 
 **1.4 Short agent identity, old agents cleaned up (B4, part of B3)**
@@ -178,8 +183,8 @@ cluster (phase 4).
 **1.9 Log diet (B12)**
 - Do:
   - move per-tick messages to Debug, or log them only when something changes;
-  - set `System.Net.Http` to Warning in the Serilog section (the old ConfigMap's
-    `Logging__LogLevel__*` variables probably never reached Serilog);
+  - set `System.Net.Http` to Warning in the Serilog section (done in `appsettings*.json`; the old
+    ConfigMap's `Logging__LogLevel__*` variables probably never reached Serilog);
   - use `RenderedCompactJsonFormatter` in Production;
   - use one property name per concept (`ShipSymbol`, `ContractId`, `WaypointSymbol`);
   - push tick and plan context through `LogContext`.
@@ -197,7 +202,7 @@ cluster (phase 4).
   - **502** (DDoS protection): stop all outbound calls for a few minutes (a setting, default 3),
     then try one call. The tick and the plan bootstraps skip while paused. Log
     `ApiUnavailable` and `ApiAvailable` as journal events.
-  - Correct the "Burst Limit" entry in `docs/GLOSSARY.md`.
+  - Correct the "Burst Limit" entry in `docs/GLOSSARY.md` (done).
 - The limit is per IP and per account. Never run two instances against the same account at the
   same time (for example, the soak test while the bot runs on the cluster).
 - Done when:
@@ -332,7 +337,9 @@ its own retention, so the bot's database stays small.
 
 ### Phase 5: Claude as mechanic (on your PC)
 
-**5.1 The `/st-investigate` skill** (`.claude/skills/st-investigate/SKILL.md` in this repo)
+**5.1 The `/st-investigate` skill** (draft written: `SpaceTraders/.claude/skills/st-investigate/SKILL.md`)
+- The draft marks which data sources arrive with phases 2–4. Finish it once they exist, and
+  check it against a real run.
 - Input: an anomaly (rule plus subject), or `week`.
 - Reads:
   - **Prometheus and Loki:** anomalies, metrics, journal events and errors. Access through
@@ -350,6 +357,8 @@ its own retention, so the bot's database stays small.
 **5.2 Permissions**
 - Allowed without asking: `kubectl get`, `kubectl logs`, `kubectl port-forward`, `psql` with the
   read-only login, and reads from Grafana. Everything else asks.
+- Waits for 4.1, because the read-only login doesn't exist yet. These rules widen what Claude may
+  do on your cluster without asking, so they go in only with your explicit go-ahead.
 - Done when: the skill reproduces and explains one real anomaly from the first run.
 
 ### Phase 6: Make money, one loop at a time

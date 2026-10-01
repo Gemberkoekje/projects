@@ -2,33 +2,28 @@
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 
-This repository contains a .NET automation and dashboard system for the [SpaceTraders API](https://spacetraders.io/):
+An automation bot and dashboard for [SpaceTraders](https://spacetraders.io/), a headless space
+trading game played entirely through an HTTP API. The bot registers an agent, keeps a PostgreSQL
+cache of the game state, and runs its ships automatically. A React dashboard shows what it is doing.
 
-- Typed SpaceTraders API client (`SpaceTraders.Infrastructure.SpaceTradersAPI`)
-- PostgreSQL persistence for cached agent/ship/contract/token data (`SpaceTraders.Infrastructure.Persistence`)
-- API host with bootstrap + startup sync + game-loop + ship-worker automation (`SpaceTraders.API`)
-- Razor Pages dashboard for operational views (`SpaceTraders.App`)
-- React WebUI dashboard for live operational monitoring (`SpaceTraders.WebUI`)
-
-SpaceTraders is a headless, open-universe space game exposed through HTTP endpoints. Players write their own clients to control agents, ships, contracts, mining, trading, navigation, and exploration. This project uses that API as the backend for automated fleet operations and a local Razor Pages dashboard.
+> **Status (2026-10-01):** not running. It was taken off the cluster in May 2026 after it filled
+> the shared PostgreSQL database. `PLAN.md` describes the way back; known issues are listed there
+> under B-numbers and decisions under D-numbers.
 
 ---
 
-## Implemented Features
+## Documentation
 
-- Agent bootstrap flow
-- Startup sync flow (agent, ships, contracts from SpaceTraders API)
-- Startup recovery service (resumes in-flight ship automation after pod restart)
-- Typed API client for: status, factions, agents, systems, waypoints, fleet, contracts
-- Dead-reckoning game loop (detects ship arrivals, low fuel, API availability changes)
-- Ship automation services and event handlers
-- Contract watch service and fleet expansion decisions
-- Event handlers: `ContractPriorityHandler`, `ShipFuelLowHandler`, `ApiUnavailabilityHandler`
-- Internal REST API (`/status/*`, `/settings/*`, `/control/*`, `/health/*`)
-- API key authentication middleware (`X-Api-Key` header)
-- Kubernetes manifests + Dockerfiles (`k8s/`, `Dockerfile.api`, `Dockerfile.app`, `Dockerfile.webui`)
-- Razor Pages dashboard
-- React WebUI dashboard served at `/spacetraders/dashboard`
+| File | What it's for |
+|---|---|
+| `PLAN.md` | What happens next: phases and slices, known issues, decisions |
+| `docs/HOW_IT_WORKS.md` | What the code does today: startup, the tick, plans, ships, events, tables, endpoints |
+| `docs/GLOSSARY.md` | Project terms |
+| `spacetraders.md` | Solution overview: stack, configuration, conventions |
+| `CONTRIBUTING.md` | Conventions and the PR checklist |
+| `CHANGELOG.md` | Notable changes |
+| `CLAUDE.md` | What Claude works on in this project |
+| `docs/archive/` | Earlier plans and designs. They don't describe the current code. |
 
 ---
 
@@ -36,17 +31,20 @@ SpaceTraders is a headless, open-universe space game exposed through HTTP endpoi
 
 ```text
 SpaceTraders.slnx
-├── SpaceTraders.Domain
-├── SpaceTraders.Application
-├── SpaceTraders.Infrastructure.SpaceTradersAPI
-├── SpaceTraders.Infrastructure.Persistence
-├── SpaceTraders.API
-├── SpaceTraders.App
+├── SpaceTraders.Domain                        aggregates, goals, events, enums
+├── SpaceTraders.Application                   plans, goal executors, commands, event handlers
+├── SpaceTraders.Infrastructure.SpaceTradersAPI typed API client, rate limiting, retries
+├── SpaceTraders.Infrastructure.Persistence    EF Core + PostgreSQL, schema initializer, scheduler
+├── SpaceTraders.API                           host: automation services + internal HTTP API
+├── SpaceTraders.WebUI                         React/Vite dashboard
+├── SpaceTraders.Analyzers                     Roslyn analyzer ST0001: state-transition events only from command handlers
+├── docs/                                      documentation
 └── tests/
     ├── SpaceTraders.Domain.Tests
     ├── SpaceTraders.Application.Tests
     ├── SpaceTraders.Infrastructure.Tests
-    └── SpaceTraders.API.Tests          ← WebApplicationFactory integration tests
+    ├── SpaceTraders.API.Tests                 WebApplicationFactory integration tests
+    └── SpaceTraders.Integration.Test
 ```
 
 ---
@@ -55,10 +53,14 @@ SpaceTraders.slnx
 
 - .NET 10 SDK
 - PostgreSQL (local Docker is fine)
+- Node.js 22, only for the WebUI
 
 ---
 
 ## Local Run
+
+> The SpaceTraders rate limit is per IP address **and per account**. Don't run a local instance
+> against the same account while another instance (for example the cluster one) is running.
 
 ### 1) Start PostgreSQL
 
@@ -74,96 +76,58 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Da
 dotnet user-secrets set "SpaceTraders:AccountToken" "<your-account-token>"
 dotnet user-secrets set "SpaceTraders:AgentName" "<desired-callsign>"
 dotnet user-secrets set "SpaceTraders:AgentFaction" "COSMIC"
-# Optional: protect the internal REST API
+# Optional: protect the internal API (the local WebUI then needs the key in public/config.js)
 dotnet user-secrets set "SPACETRADERS_INTERNAL_API_KEY" "<random-secret>"
-
-cd ../SpaceTraders.App
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=spacetraders;Username=postgres;Password=changeme"
 ```
 
-### 3) Run
+### 3) Run the API host
 
 ```powershell
-cd SpaceTraders.API
-dotnet run
-
-cd ../SpaceTraders.App
-dotnet run
+dotnet run --project SpaceTraders.API
 ```
 
-The API host creates the DB schema with `EnsureCreated()` on startup. The dashboard (App) uses the same database.
+- It listens on `https://localhost:49305` and `http://localhost:49306` (launch profile), under the
+  path base `/spacetraders/api`. Swagger UI is available in Development.
+- On startup it creates and extends the database schema (`SpaceTradersDatabaseInitializer`).
+  If no valid agent token is stored, it registers a new agent with the account token, then
+  starts the automation services.
+- `docs/HOW_IT_WORKS.md` lists what runs and every internal endpoint.
 
-### 4) Internal REST API
-
-The API host applies the path base `/spacetraders/api`. The endpoints below are relative to that path base.
-
-| Endpoint | Auth | Description |
-|----------|------|-------------|
-| `GET /health/live` | None | Liveness probe |
-| `GET /health/ready` | None | Readiness probe (DB check) |
-| `GET /health/startup` | None | Startup probe |
-| `GET /status/agent` | `X-Api-Key` | Current agent credits + ship count |
-| `GET /status/ships` | `X-Api-Key` | All ships with assignment + nav |
-| `GET /status/contracts` | `X-Api-Key` | Active cached contracts |
-| `GET /status/rate-limit` | `X-Api-Key` | Current rate limit status |
-| `GET /status/activity` | `X-Api-Key` | Paged activity log |
-| `GET /status/trade-opportunities` | `X-Api-Key` | Best cached trade opportunity |
-| `GET /settings/` | `X-Api-Key` | All operator settings |
-| `PUT /settings/{key}` | `X-Api-Key` | Update a setting |
-| `POST /settings/reset` | `X-Api-Key` | Reset settings to defaults |
-| `POST /control/automation/enable` | `X-Api-Key` | Resume automation |
-| `POST /control/automation/disable` | `X-Api-Key` | Pause automation |
-| `POST /control/ships/{symbol}/reassign` | `X-Api-Key` | Reassign a ship |
-| `POST /control/sync` | `X-Api-Key` | Force full sync |
-
----
-
-## Kubernetes Deployment
-
-All manifests live in `k8s/`. Apply in this order:
+### 4) Run the WebUI (optional)
 
 ```powershell
-kubectl apply -f k8s/namespace.yaml
-# Copy k8s/secret.yaml.template → k8s/secret.yaml and fill in values, then:
-kubectl apply -f k8s/secret.yaml          # NEVER commit this file
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/postgres.yaml        # or use a managed service
-kubectl apply -f k8s/deployment-api.yaml
-kubectl apply -f k8s/deployment-app.yaml
-kubectl apply -f k8s/service-api.yaml
-kubectl apply -f k8s/service-app.yaml
-kubectl apply -f k8s/ingress.yaml         # optional, requires nginx ingress controller
+cd SpaceTraders.WebUI
+npm ci
+npm run dev
 ```
 
-Build and push container images:
-
-```powershell
-# From C:\git\projects, the parent directory that contains SpaceTraders:
-docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
-docker build -f SpaceTraders/Dockerfile.app -t spacetraders-app:latest .
-docker build -f SpaceTraders/Dockerfile.webui -t spacetraders-webui:latest .
-```
+Vite serves the dashboard at `/spacetraders/dashboard/` and proxies `/spacetraders/api` to
+`https://localhost:49305`.
 
 ---
 
 ## Tests
 
 ```powershell
-cd SpaceTraders
 dotnet test SpaceTraders.slnx --filter "Category!=Integration"
 ```
 
-Integration tests (require Docker / PostgreSQL) are tagged `Category=Integration` and skipped by the filter above.
+Integration tests need Docker/PostgreSQL and are tagged `Category=Integration`. WebUI tests run
+with `npm test` in `SpaceTraders.WebUI`.
 
 ---
 
-## Documentation
+## Deployment
 
-- `docs/implementation/CURRENT_IMPLEMENTATION_OVERVIEW.md` = how the solution works today (implemented behavior)
-- `docs/implementation/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md` = implemented consistency and recovery safeguards
-- `docs/operations/LOCAL_DEVELOPMENT.md` = local development, internal endpoints, and deployment notes
-- `docs/SPACE_TRADERS_IMPLEMENTATION_PLAN.md` = implementation plan based on `spacetraders.md` and current code
-- `docs/GLOSSARY.md` = project terminology
-- `spacetraders.md` = cleaned SpaceTraders.io reference content and gameplay/API explanation
-- `CHANGELOG.md` = notable changes
-- `CONTRIBUTING.md` = contribution conventions
+- CI (`.github/workflows/ci-spacetraders.yml` in the parent repository) builds and tests every
+  change. On `main` it pushes `ghcr.io/gemberkoekje/spacetraders-api` and
+  `ghcr.io/gemberkoekje/spacetraders-webui`, tagged `latest` and with the commit SHA.
+- To build the images by hand, run this from the parent directory that contains `SpaceTraders/`:
+
+  ```powershell
+  docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
+  docker build -f SpaceTraders/Dockerfile.webui -t spacetraders-webui:latest .
+  ```
+
+- The Kubernetes manifests live in the cluster's GitOps repository (gembernodes), deployed by
+  Flux. They were removed there while the bot is off; bringing them back is phase 4 of `PLAN.md`.

@@ -1,5 +1,8 @@
 ﻿# SpaceTraders Solution Documentation
 
+> Solution overview: stack, structure, configuration and conventions. Start with `README.md`. For
+> what the code does at runtime see `docs/HOW_IT_WORKS.md`; for what happens next see `PLAN.md`.
+
 ## Overview
 
 This repository contains a .NET 10 solution for automating and operating a SpaceTraders agent.
@@ -11,6 +14,7 @@ The solution is organized in a layered architecture:
 - **SpaceTraders.Domain**: aggregates, domain events, enums, and value objects.
 - **SpaceTraders.Infrastructure.Persistence**: Entity Framework Core persistence, repositories, scheduler, and data bootstrapping.
 - **SpaceTraders.Infrastructure.SpaceTradersAPI**: outbound SpaceTraders API client, adapters, rate limiting, and availability logic.
+- **SpaceTraders.WebUI**: React/Vite dashboard that reads the internal API.
 - **tests/**: unit/integration test projects.
 
 ## Tech Stack
@@ -32,7 +36,10 @@ SpaceTraders.Domain/
 SpaceTraders.Infrastructure.Persistence/
 SpaceTraders.Infrastructure.SpaceTradersAPI/
 SpaceTraders.Analyzers/
+SpaceTraders.WebUI/
 tests/
+docs/            HOW_IT_WORKS.md, GLOSSARY.md, archive/
+PLAN.md
 spacetraders.md
 ```
 
@@ -76,14 +83,14 @@ Notes:
   - `/spacetraders/api/health/live`
   - `/spacetraders/api/health/ready`
   - `/spacetraders/api/health/startup`
-- Prometheus metrics endpoint is mapped by the API host.
+- Prometheus metrics are mapped at `/metrics`; like every non-health endpoint, they require the `X-Api-Key` header when `SPACETRADERS_INTERNAL_API_KEY` is set (B11 in `PLAN.md`).
 
 ## Running Tests
 
-Run all tests:
+Run all tests except the integration tests (which need Docker/PostgreSQL):
 
 ```powershell
-dotnet test
+dotnet test SpaceTraders.slnx --filter "Category!=Integration"
 ```
 
 Run a specific test project:
@@ -101,12 +108,13 @@ dotnet test tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.
 
 ## Deployment
 
-Deployment in this repository uses the root-level files:
-
-- `dockerfile.api`
-- `dockerfile.app`
-
-Use those files as the source of truth for container builds and runtime image configuration.
+- `Dockerfile.api` and `Dockerfile.webui` build the two container images. Build them from the
+  parent directory that contains `SpaceTraders/`.
+- On every push to `main` that touches `SpaceTraders/**`, CI (`.github/workflows/ci-spacetraders.yml`
+  in the parent repository) builds, tests, and pushes `ghcr.io/gemberkoekje/spacetraders-api` and
+  `ghcr.io/gemberkoekje/spacetraders-webui`, tagged `latest` and with the commit SHA.
+- The Kubernetes manifests live in the cluster's GitOps repository (gembernodes), not here. They
+  were removed there on 2026-09-26 while the bot is off; bringing them back is phase 4 of `PLAN.md`.
 
 ## Troubleshooting
 
