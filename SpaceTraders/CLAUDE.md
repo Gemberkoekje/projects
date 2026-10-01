@@ -1,3 +1,19 @@
+## Claude's role in this project
+
+Claude fixes things that don't work the way they are intended to. It does not tune strategy.
+
+- In scope: crashes and repeating errors, loops, ships or plans stuck in a state,
+  state that never advances, events or data that are never recorded, unbounded growth
+  (database, logs), wasted API calls, and behaviour that contradicts the code's own
+  intent (comments, tests, health rules, docs).
+- Out of scope: budgets, thresholds, priorities, how credits are split between
+  building, trading and mining, which strategy to follow, and settings values.
+  At most, mention an observation under "Noticed" and change nothing.
+- Not sure whether something is intended? Ask, with the evidence. Don't guess.
+- Every fix starts with a test that reproduces the misbehaviour.
+
+The current plan, known issues and open decisions are in `PLAN.md`.
+
 ## graphify
 
 Knowledge graph at graphify-out/ (god nodes, communities, cross-file
