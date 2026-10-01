@@ -4,7 +4,9 @@ using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Contracts;
@@ -158,11 +160,14 @@ public sealed class FulfillContractDeliveryHandler(
             var fulfilled = await port.FulfillContractAsync(command.ContractId, cancellationToken);
             await contracts.UpsertAsync(MapToDto(fulfilled), cancellationToken);
 
-            // The payment: purchases are budgeted from the cached credits (B33).
-            if (fulfilled.AgentCredits is { } credits && await agents.GetAsync(cancellationToken) is { } agent)
+            // The payment: purchases are budgeted from the cached credits (B33); the ledger and the
+            // metrics record it (B7).
+            if (fulfilled.AgentCredits is { } credits)
             {
-                await agents.UpsertAsync(agent with { Credits = credits }, cancellationToken);
+                await agents.SetCreditsAsync(bus, credits, cancellationToken);
             }
+
+            await bus.PublishAsync(new ContractFulfilledEvent(command.ContractId, fulfilled.PaymentOnFulfilled));
 
             logger.LogInformation(
                 "FulfillContractDelivery: contract {ContractId} fulfilled.",

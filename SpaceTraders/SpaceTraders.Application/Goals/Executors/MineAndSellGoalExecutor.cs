@@ -3,8 +3,11 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
+using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Goals.Executors;
@@ -119,12 +122,15 @@ public sealed class MineAndSellGoalExecutor(
 
         var sellResult = await port.SellCargoAsync(ship.Symbol, miningGoal.TradeSymbol, targetUnits, ct);
         await ships.UpdateCargoAsync(ship.Symbol, sellResult.Cargo, ct);
+        await agents.SetCreditsAsync(bus, sellResult.AgentCredits, ct);
 
-        var agent = await agents.GetAsync(ct);
-        if (agent is not null)
-        {
-            await agents.UpsertAsync(agent with { Credits = sellResult.AgentCredits }, ct);
-        }
+        // The ledger and the credits-earned metric (B7).
+        await bus.PublishAsync(new ShipCargoSoldEvent(
+            ship.Symbol,
+            new TradeSymbol(miningGoal.TradeSymbol),
+            targetUnits,
+            sellResult.Revenue,
+            sellResult.AgentCredits));
 
         logger.LogInformation(
             "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",

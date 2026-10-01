@@ -5,8 +5,11 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
+using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Goals.Executors;
@@ -81,7 +84,16 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
             var buyResult = await port.BuyCargoAsync(ship.Symbol, tradeGoal.TradeSymbol, unitsToBuy, ct);
             await ships.UpdateCargoAsync(ship.Symbol, buyResult.Cargo, ct);
-            await UpdateAgentCreditsAsync(buyResult.AgentCredits, ct);
+            await agents.SetCreditsAsync(bus, buyResult.AgentCredits, ct);
+
+            // The ledger and the credits-spent metric (B7). The port's "revenue" is the transaction's total.
+            await bus.PublishAsync(new CargoPurchasedEvent(
+                ship.Symbol,
+                new TradeSymbol(tradeGoal.TradeSymbol),
+                unitsToBuy,
+                buyResult.Revenue,
+                buyResult.AgentCredits,
+                tradeGoal.BuyWaypointSymbol));
 
             logger.LogInformation(
                 "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
@@ -117,7 +129,15 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
         var sellResult = await port.SellCargoAsync(ship.Symbol, tradeGoal.TradeSymbol, targetUnits, ct);
         await ships.UpdateCargoAsync(ship.Symbol, sellResult.Cargo, ct);
-        await UpdateAgentCreditsAsync(sellResult.AgentCredits, ct);
+        await agents.SetCreditsAsync(bus, sellResult.AgentCredits, ct);
+
+        // The ledger and the credits-earned metric (B7).
+        await bus.PublishAsync(new ShipCargoSoldEvent(
+            ship.Symbol,
+            new TradeSymbol(tradeGoal.TradeSymbol),
+            targetUnits,
+            sellResult.Revenue,
+            sellResult.AgentCredits));
 
         logger.LogInformation(
             "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
@@ -225,15 +245,6 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         catch (JsonException)
         {
             return null;
-        }
-    }
-
-    private async Task UpdateAgentCreditsAsync(long credits, CancellationToken ct)
-    {
-        var agent = await agents.GetAsync(ct);
-        if (agent is not null)
-        {
-            await agents.UpsertAsync(agent with { Credits = credits }, ct);
         }
     }
 

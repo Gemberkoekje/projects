@@ -64,7 +64,7 @@ the misbehaviour.
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 (done) |
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
 | B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 (done) |
-| B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 |
+| B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 (done) |
 | B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 1.14 (done) |
 | B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 1.14 (done) |
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick (Debug since 1.9), and every tick it marks its last waypoint visited again: in 1.14, 178 updates of `cached_waypoints` in 15 minutes. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 1.14 (done) |
@@ -76,7 +76,7 @@ the misbehaviour.
 | B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); 6.4 |
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 |
 | B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 |
-| B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 |
+| B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 (done) |
 | B20 | **A restart clears every ship's active goal.** Startup sync overwrites each existing ship row with `SetValues(new CachedShip { … })`, and that object doesn't carry the goal columns, so they become null.<br>• A scout ship whose assignment already matches the current route step doesn't get its goal back.<br>• Arrival wake-ups scheduled before the restart no longer match any goal (B17). | `StartupSyncService.cs:106-130` | 1.12 (done) |
 | B21 | **The app tables may never be created** (confirmed in 1.13). `EnsureCreatedAsync` does nothing when the database already holds any table. Wolverine creates its `wolverine` tables when the host starts, before the deferred initializer runs, so the initializer's `ALTER TABLE` statements would then fail. The cluster's database will be empty on redeploy. | `SpaceTradersDatabaseInitializer.cs:12`, `Program.cs:75-78`, `DeferredStartupHostedService.cs:22-30` | 1.13 (done) |
 | B22 | **The dashboard publishes the internal API key.** The WebUI container writes the key into `config.js`, which anyone who can open the dashboard can read. The old ingress served both the dashboard and the API on the public `gemberkoekje.nl`, so anyone could call `PUT /settings/*` and `POST /control/*`. | `SpaceTraders.WebUI/docker-entrypoint.sh:11-29`, `SpaceTraders.WebUI/index.html:17`; gembernodes `3f9f785^:ingress/spacetraders-ingress.yaml` | 4.2 |
@@ -94,6 +94,7 @@ the misbehaviour.
 | B34 | **Waypoint traits are never stored** (found in 1.14). Startup sync stores only a waypoint's market and shipyard flags, and nothing calls `WaypointRepository.UpsertRangeAsync`, the one method that writes traits (and modifiers, orbitals and charts). What reads them finds nothing:<br>• the mining plan means to pick the nearest asteroid whose deposits can yield the mineral, but always falls back to the nearest asteroid of any kind, so a drone can be sent where its mineral never comes up;<br>• the contract plan's trait score is always 0. It only breaks ties between equally near asteroids (nearest first is by design); whether a farther asteroid with the right deposits should win is a strategy question;<br>• the dashboard shows no traits. | `StartupSyncService.cs` (`EnsureSystemsForShipsAreCachedAsync`), `MiningAutomationService.cs` (`MatchesTradeSymbolAvailability`), `ContractPlanService.cs` (`ScoreTradeSymbolMatch`), `FleetStatusMapper.cs` | 6.4 |
 | B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 (done) |
 | B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 (done) |
+| B37 | **The credit-drop alert can't fire** (found in 2.2). `AlertHandler` compares each credit change with the credits it remembers in a field from the previous one, but Wolverine creates the handler anew for every message, so the field is always empty. Until 2.2 nothing published the event anyway. The event carries the old credits, so the fix is small, but it would then warn, and post to `Alerts.WebhookUrl`, on every purchase that costs more than 10% of the credits, a ship included. | `AlertHandler.cs` (`_previousCredits`) | D12 |
 
 ### Decisions (2026-10-01)
 
@@ -113,6 +114,7 @@ get the next D-number.
 | D9 | Which plans run in the first run after the redeploy? All five run on every tick today, and nothing can switch one off; slice 1.7 adds the switches. | **Scout and contract only.** Probes, mining and trading come on one at a time in phase 6, after their known issues (B15–B17, B25) are fixed. |
 | D10 | Remove the settings that nothing reads (B18), or keep them as placeholders? | **Remove them**, so the settings page shows only settings that work. A feature that needs one adds it back (slice 2.6). |
 | D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **LAN only**, like Grafana (slice 4.2). |
+| D12 | The credit-drop alert (B37) would fire on every purchase above 10% of the credits. Fix it as it is meant, change what it watches, or remove it? | **Open.** It stays as it is (it can't fire) until you decide. |
 
 ## Phases
 
@@ -548,7 +550,7 @@ its own retention, so the bot's database stays small.
     restart.
   - `tools/soak/` reads the metrics from the new port and the new request counter.
 
-**2.2 Record what happens (B7, B19)**
+**2.2 Record what happens (B7, B19)** (done)
 - Do:
   - dispatch aggregate domain events, or publish where the change happens, so that credit
     changes, sales, purchases, contract payments and ship purchases reach the ledger and the
@@ -557,6 +559,36 @@ its own retention, so the bot's database stays small.
     `MarketRepository` does, so price history gets recorded.
 - Done when: tests show each of those four producing a ledger row and moving its counter, and a
   market refresh writing price samples.
+- Done:
+  - Published where the change happens: production code doesn't use the aggregates, so there
+    was nothing to dispatch from. The mining and trade executors publish `ShipCargoSoldEvent`
+    and `CargoPurchasedEvent`, `ShipPurchaseService` `NewShipPurchasedEvent`, the contract plan
+    `ContractAcceptedEvent` and the delivery command `ContractFulfilledEvent`. The contract
+    payments come from the contract's terms in the accept and fulfil responses (the port didn't
+    map them), and the acceptance payment is a ledger row too (`ContractDeposit`, which nothing
+    used).
+  - Every credit change also publishes `AgentCreditsChangedEvent` (`AgentCreditsUpdates`, one
+    helper for all the places that stored credits), so the credit samples fill and the probe
+    plan stops waiting for credits that already came (B7's third bullet).
+  - `LedgerEntryHandler` writes the row and moves `spacetraders_credits_earned_total` or
+    `_spent_total` by ledger category. `LedgerWiringTests` sends each of the four through the
+    host's own Wolverine and finds the row and the counter; the executor and service tests show
+    who publishes, and failed before.
+  - B19: `MarketPriceSampleRepository` reads the trade goods case-insensitively, with `long`
+    prices like `MarketRepository`. Its test stores a market's goods the way an arrival does and
+    finds a sample per good (none before).
+  - Found on the way: the probe plan's credits handler would have run the plan, and bought
+    probes, while it or automation was off; nothing published its event until now. It checks
+    both switches now (1.7, D9). And B37 (the credit-drop alert can't fire), with D12.
+  - `NewShipPurchasedEvent` takes the ship type as the `ShipType` enum, which has no
+    `SHIP_MINING_DRONE`: the service maps the API's name (`ShipMiningDrone`), so the ledger row
+    reads that.
+  - Noticed:
+    - `ShipCargoSoldEvent` doesn't say whether a sale was mined or traded, so both are
+      `TradeSell`; `MiningSell` stays unused. Telling them apart is up to you.
+    - Wolverine runs all handlers of an event as one chain and retries the whole chain when
+      one fails, so a failing handler can probably write the others' rows twice (ledger, credit
+      samples, activity log). Not seen; `MultipleHandlerBehavior.Separated` would isolate them.
 
 **2.3 Journal events**
 - Do: write one Information event per meaningful thing, each with an `EventKind` and the standard

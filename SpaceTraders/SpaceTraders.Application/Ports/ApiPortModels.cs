@@ -259,6 +259,12 @@ public sealed record ContractActionResult
 
     public CargoModel? ShipCargo { get; init; }
 
+    /// <summary>What the contract pays when it is accepted (its terms' <c>onAccepted</c>).</summary>
+    public long PaymentOnAccepted { get; init; }
+
+    /// <summary>What the contract pays when it is fulfilled (its terms' <c>onFulfilled</c>).</summary>
+    public long PaymentOnFulfilled { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ContractActionResult(
         string ContractId,
@@ -1063,4 +1069,3 @@ public sealed record SupplyConstructionActionResult
         this.Cargo = Cargo;
     }
 }
-

@@ -3,8 +3,6 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
-using SpaceTraders.Domain.Enums;
-using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Fleet;
@@ -26,9 +24,9 @@ public sealed record PurchaseShipCommand
     }
 }
 
+/// <summary>Buys through <see cref="ShipPurchaseService"/>, which also publishes the purchase.</summary>
 public sealed class PurchaseShipHandler(
     IShipPurchaseService shipPurchases,
-    IMessageBus bus,
     ILogger<PurchaseShipHandler> logger)
 {
     public PurchaseShipHandler(
@@ -39,7 +37,7 @@ public sealed class PurchaseShipHandler(
         IBudgetPolicy budget,
         IMessageBus bus,
         ILogger<PurchaseShipHandler> logger)
-        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), bus, logger)
+        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
     {
     }
 
@@ -54,11 +52,6 @@ public sealed class PurchaseShipHandler(
                 command.ShipyardWaypoint,
                 purchase.FailureReason ?? "Purchase failed.");
             return;
-        }
-
-        if (Enum.TryParse<ShipType>(command.ShipType, true, out var shipTypeEnum))
-        {
-            await bus.PublishAsync(new NewShipPurchasedEvent(purchase.PurchasedShip.Symbol, shipTypeEnum, purchase.ActualCost));
         }
 
         logger.LogInformation(

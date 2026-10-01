@@ -7,11 +7,65 @@ using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events;
+using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
 public sealed class FulfillContractDeliveryHandlerTests
 {
+    [Fact]
+    public async Task ExecuteAsync_AFulfilment_IsPublished_WithItsPayment()
+    {
+        // B7: the fulfilment payment reached the cached credits (B33) but not the ledger or the metrics.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var bus = Substitute.For<IMessageBus>();
+        var agents = Substitute.For<IAgentRepository>();
+        var ship = new ShipModel("SHIP-1", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 100, CargoCurrent: 0, CargoCapacity: 40, CargoInventory: []);
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(ship);
+        contracts.FindAsync("C-1", Arg.Any<CancellationToken>()).Returns(Contract("C-1", required: 10, fulfilled: 10));
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 125_000, "COSMIC", 2));
+        port.FulfillContractAsync("C-1", Arg.Any<CancellationToken>())
+            .Returns(new ContractActionResult(
+                ContractId: "C-1",
+                FactionSymbol: "COSMIC",
+                ContractType: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: true,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 10, 10)],
+                AgentSymbol: "AGENT",
+                AgentCredits: 131_620,
+                ShipCargo: null)
+            {
+                PaymentOnFulfilled = 6_620,
+            });
+
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            bus,
+            agents,
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-1", "C-1", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ContractFulfilledEvent>(e => e.ContractId == "C-1" && e.Payment == 6_620),
+            Arg.Any<DeliveryOptions>());
+        await bus.Received(1).PublishAsync(
+            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 125_000 && e.NewCredits == 131_620),
+            Arg.Any<DeliveryOptions>());
+    }
+
     [Fact]
     public async Task ExecuteAsync_DeliversCargo_AndFulfills_WhenAllDeliverablesCompleted()
     {

@@ -117,10 +117,20 @@ public sealed record ContractAcceptedEvent
 {
     public required string ContractId { get; init; }
 
+    /// <summary>What accepting paid (the terms' <c>onAccepted</c>); 0 when unknown.</summary>
+    public long Payment { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ContractAcceptedEvent(string ContractId)
     {
         this.ContractId = ContractId;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractAcceptedEvent(string ContractId, long Payment)
+    {
+        this.ContractId = ContractId;
+        this.Payment = Payment;
     }
 }
 

@@ -13,12 +13,15 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using Wolverine;
 
 namespace SpaceTraders.Integration.Test;
 
 public sealed class ContractPlanSnapshotIntegrationTests
 {
     private const string SnapshotFileName = "startup-snapshot-21-20260514-105213.json";
+
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     [Fact]
     public async Task EnsureBootstrappedAsync_UsesSnapshotShipyardAndCredits_ToPurchaseMinerAndStartPlan()
@@ -109,14 +112,14 @@ public sealed class ContractPlanSnapshotIntegrationTests
                     Symbol: snapshot.Agent.Symbol,
                     AccountId: snapshot.Agent.AccountId,
                     HeadquartersSymbol: snapshot.Agent.Headquarters,
-                    Credits: snapshot.Agent.Credits - (int)miningDrone.PurchasePrice,
+                    Credits: snapshot.Agent.Credits - miningDrone.PurchasePrice,
                     StartingFaction: snapshot.Agent.StartingFaction,
                     ShipCount: snapshot.Agent.ShipCount + 1),
                 ShipSymbol: "SPECTER-DEBUG-3",
                 ShipNav: new NavModel("DOCKED", "X1-PT96", "X1-PT96-H53", "CRUISE", null, null),
                 ShipFuel: new FuelModel(80, 80),
                 ShipCargo: new CargoModel(0, 20, []),
-                Cost: (int)miningDrone.PurchasePrice));
+                Cost: miningDrone.PurchasePrice));
 
         waypoints.GetBySystemAsync("X1-PT96", Arg.Any<CancellationToken>()).Returns([
             new WaypointCacheModel(
@@ -161,6 +164,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             port,
             shipPurchases,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -198,13 +202,10 @@ public sealed class ContractPlanSnapshotIntegrationTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, fileName);
         var json = await File.ReadAllTextAsync(path);
-        var snapshot = JsonSerializer.Deserialize<StartupSnapshot>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-        });
+        var snapshot = JsonSerializer.Deserialize<StartupSnapshot>(json, SnapshotJsonOptions);
 
         snapshot.Should().NotBeNull();
-        return snapshot!;
+        return snapshot;
     }
 
     private sealed class StartupSnapshot

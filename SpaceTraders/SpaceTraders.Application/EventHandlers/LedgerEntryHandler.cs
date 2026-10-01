@@ -101,6 +101,23 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
+    public async Task Handle(ContractAcceptedEvent @event, CancellationToken cancellationToken)
+    {
+        if (@event.Payment == 0)
+        {
+            return;
+        }
+
+        await ledger.AppendAsync(
+            "AGENT",
+            LedgerCategory.ContractDeposit,
+            @event.Payment,
+            sourceEventId: @event.ContractId,
+            cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.ContractDeposit, @event.Payment);
+        notifier.Notify("contract", @event.ContractId);
+    }
+
     public async Task Handle(ContractFulfilledEvent @event, CancellationToken cancellationToken)
     {
         await ledger.AppendAsync(

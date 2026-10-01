@@ -14,7 +14,7 @@ namespace SpaceTraders.Application.Tests.RateLimiting;
 /// <summary>The limit from the API guide: 2 requests per second, plus a burst of 30 per 60 seconds.</summary>
 public sealed class RequestBudgetTests
 {
-    private static readonly DateTimeOffset Start = new(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Start = new(2026, 10, 01, 12, 00, 00, TimeSpan.Zero);
 
     [Fact]
     public void TryTake_LetsTwoGo_ThenUsesTheBurst_ThenWaits()
@@ -192,7 +192,7 @@ public sealed class RateLimitResponseHandlerTests
     [Fact]
     public void RateLimiterWait_UsesTheReset_ThenRetryAfter_ThenOneSecond()
     {
-        var now = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2026, 10, 01, 12, 00, 00, TimeSpan.Zero);
 
         using var withReset = RateLimiter429(now.AddMilliseconds(950));
         RateLimitResponseHandler.RateLimiterWait(withReset, now).Should().Be(TimeSpan.FromMilliseconds(1000));

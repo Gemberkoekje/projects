@@ -7,12 +7,15 @@ namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
 public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMarketPriceSampleRepository
 {
+    // The trade goods are stored as the API returns them, in camelCase (B19).
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     public async Task AppendSamplesAsync(string waypointSymbol, string tradeGoodsJson, CancellationToken cancellationToken = default)
     {
         List<TradeGoodJson>? goods;
         try
         {
-            goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(tradeGoodsJson);
+            goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(tradeGoodsJson, JsonOptions);
         }
         catch (JsonException)
         {
@@ -38,8 +41,8 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
                 WaypointSymbol = waypointSymbol,
                 GoodSymbol = good.Symbol,
                 ObservedAt = now,
-                PurchasePrice = good.PurchasePrice,
-                SellPrice = good.SellPrice,
+                PurchasePrice = ToInt32(good.PurchasePrice),
+                SellPrice = ToInt32(good.SellPrice),
                 Supply = good.Supply,
                 Activity = good.Activity,
                 TradeVolume = good.TradeVolume,
@@ -89,11 +92,13 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
         return rows.Select(MapToDto).ToList();
     }
 
+    private static int ToInt32(long value) => (int)Math.Clamp(value, int.MinValue, int.MaxValue);
+
     private sealed class TradeGoodJson
     {
         public string? Symbol { get; init; }
-        public int PurchasePrice { get; init; }
-        public int SellPrice { get; init; }
+        public long PurchasePrice { get; init; }
+        public long SellPrice { get; init; }
         public string? Supply { get; init; }
         public string? Activity { get; init; }
         public int TradeVolume { get; init; }

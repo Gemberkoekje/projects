@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 using Wolverine;
 
@@ -33,12 +34,7 @@ public sealed class RefuelSubCommand(
         var result = await port.RefuelShipAsync(shipSymbol, fromCargo, cancellationToken);
 
         await ships.UpdateFuelAsync(shipSymbol, result.Fuel, cancellationToken);
-
-        var agent = await agents.GetAsync(cancellationToken);
-        if (agent is not null)
-        {
-            await agents.UpsertAsync(agent with { Credits = result.AgentCredits }, cancellationToken);
-        }
+        await agents.SetCreditsAsync(bus, result.AgentCredits, cancellationToken);
 
         await bus.PublishAsync(new ShipRefueledEvent(
             shipSymbol,

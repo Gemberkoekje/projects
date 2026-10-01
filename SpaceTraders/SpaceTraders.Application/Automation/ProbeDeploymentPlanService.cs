@@ -60,6 +60,7 @@ public sealed class ProbeDeploymentPlanService(
                 ships,
                 shipyards,
                 budget,
+                bus,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance),
             bus,
             logger)

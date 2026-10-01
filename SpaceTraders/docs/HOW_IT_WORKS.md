@@ -236,7 +236,8 @@ Markets are not scouted again.
   1. refreshes contracts from the API, ignoring errors, but only while there is no plan yet;
   2. negotiates a contract if none is open, using the first ship that has a waypoint;
   3. takes the unfulfilled contract with the earliest deadline;
-  4. accepts it, and records the acceptance payment in the cached credits (B33, fixed);
+  4. accepts it, records the acceptance payment in the cached credits (B33, fixed) and publishes
+     `ContractAcceptedEvent` with it, for the ledger (B7, fixed);
   5. parks a non-mineral deliverable as DeferredUnsupported (D2);
   6. picks an idle mining-capable ship, or buys a drone. If neither works, the plan becomes
      PendingBudget and is retried every tick. A retry works from the cached contract and only
@@ -249,7 +250,8 @@ Markets are not scouted again.
     and jettisons other goods.
   - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination, docks, delivers
     what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
-    nothing is pending, recording the payment in the cached credits.
+    nothing is pending, recording the payment in the cached credits and publishing
+    `ContractFulfilledEvent` with it.
 - **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes the
   assignment, which releases the ship (B9, fixed). Every unit delivered isn't enough: until the
   fulfil call has gone out, the assignment stays open with 0 units left, so the ship goes back
@@ -260,8 +262,9 @@ Markets are not scouted again.
 - **Targets:** the waypoints with a market or shipyard in the HQ system.
   - Shipyards come first.
   - Market-only waypoints wait until credits reach 200,000, a hard-coded threshold (D4). Below
-    that the plan sets `WaitingForPhase1Credits`, which only an event that is never published
-    clears (B7).
+    that the plan sets `WaitingForPhase1Credits`, which the next `AgentCreditsChangedEvent` clears
+    while automation and the plan are on (B7, fixed); the handler stays out while either is off,
+    since waking the plan can buy probes.
 - **Probes** are recognised by ship type `SHIP_PROBE`, or by a symbol containing `PROBE` or
   `SATELLITE`. Startup sync stores a ship's *registration role* as its type (for example
   `COMMAND` or `SATELLITE`). Only purchased ships get the shipyard type (for example
@@ -298,8 +301,7 @@ Markets are not scouted again.
   3. It buys the ship and saves the new credits and the ship. Mounts are not recorded until the
      next startup sync. Mining capability also follows from the ship type, so a purchased
      `SHIP_MINING_DRONE` still counts as a miner.
-
-  It publishes nothing.
+  4. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus
   `FleetExpansion.MinCreditReserve`.
 - **Buying order within a tick:** contract, probe, mining, trading. There is no other priority.
@@ -381,8 +383,8 @@ step does the work.
 |---|---|
 | `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
 | `DeployProbe` | Docked at the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: dock. Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
-| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell. It never completes. |
-| `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount), then navigate to the sell market and dock, [API] sell, clear the goal, complete. |
+| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell and publish `ShipCargoSoldEvent`. It never completes. |
+| `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount) and publish `CargoPurchasedEvent`, then navigate to the sell market and dock, [API] sell and publish `ShipCargoSoldEvent`, clear the goal, complete. |
 | `SurveyWaypoint` | [cmd] navigate to the target. Docked there: orbit. In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
 | `Idle` | Unreachable. |
 
@@ -399,11 +401,15 @@ step does the work.
   `MarketDataRefreshedEvent`) and the shipyard, docks, and publishes
   `ShipNavigationCompletedEvent`.
 - **Orbit, Navigate, Dock and Refuel** are DI sub-commands, not bus messages. Refuel publishes
-  `ShipRefueledEvent`, the only source of ledger rows.
+  `ShipRefueledEvent`.
 - **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`** dead-reckon arrival
   themselves and navigate without a goal id (B17).
 - **`PatchShipNavCommand`** changes the flight mode.
-- **Selling and buying** are direct API calls from the executors. No events are published.
+- **Selling and buying** are direct API calls from the executors, which publish what they did.
+- **Credits:** whatever changes the credits stores them in the cached agent and publishes
+  `AgentCreditsChangedEvent` (`AgentCreditsUpdates`): refuels, sales, cargo and ship purchases,
+  and contract payments (B7, fixed). Startup sync and agent registration write the credits
+  without the event.
 - **A ship in the wrong state** for a command (for example not in orbit) leads to a
   `ShipStateMismatchEvent`, which only writes the activity log.
 
@@ -428,9 +434,15 @@ wait for a cooldown simply run again on a later tick.
 |---|---|---|
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
-| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods aren't discovered (see below) |
+| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed); the mining and trading `Handle` methods aren't discovered (see below) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
+| `ShipCargoSoldEvent` | Mining and trade executors | `LedgerEntryHandler` (TradeSell); `activity_logs` row |
+| `CargoPurchasedEvent` | Trade executor | `LedgerEntryHandler` (TradeBuy) |
+| `NewShipPurchasedEvent` | `ShipPurchaseService` | `LedgerEntryHandler` (ShipPurchase); `activity_logs` row |
+| `ContractAcceptedEvent` | Contract plan | `LedgerEntryHandler` (ContractDeposit, unless it paid nothing); `activity_logs` row |
+| `ContractFulfilledEvent` | `FulfillContractDeliveryCommand` | `LedgerEntryHandler` (ContractPayout); `activity_logs` row |
+| `AgentCreditsChangedEvent` | Every credit change but sync and registration | `AgentCreditsSampleHandler` → `agent_credits_samples`; `CreditHistoryHandler` (in memory); `AlertHandler` (credit drop, B37); `ProbeDeploymentCreditsChangedHandler`, while automation and the probe plan are on |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
 | `DeployProbeCommand` | Probe plan | `DeployProbeHandler` |
 | `TokenResetMismatchDetectedEvent` | Agent bootstrap | `AlertHandler` (webhook); `activity_logs` row |
@@ -438,10 +450,8 @@ wait for a cooldown simply run again on a later tick.
 
 ### Handled but never published
 
-- **Ledger and activity events:** sales, purchases, repairs, mounts and modules, ship purchases,
-  contract fulfilment.
-- **`AgentCreditsChangedEvent`:** credit samples, the credits metric, alerts, the probe plan's
-  waiting flag.
+- **Ledger and activity events:** repairs, mounts and modules (nothing calls those API
+  operations).
 - **Alerts:** contract deadlines, reset warnings, cache divergence.
 - **Activity-log-only events:** arrivals, idle ships, assignments, low fuel, construction,
   contract negotiation, acceptance and delivery, automation paused and resumed.
@@ -450,7 +460,8 @@ wait for a cooldown simply run again on a later tick.
 ### Never dispatched
 
 Domain aggregates (`Agent`, `Ship`, `Contract`) raise events into a list that nothing reads, and
-production code doesn't use the aggregates at all (B7).
+production code doesn't use the aggregates at all. The events are published where the change
+happens instead (B7, fixed).
 
 ### Wolverine details
 
@@ -531,15 +542,15 @@ other app (D8):
 | `plan_states` | Plan JSON per plan type | All five plans | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
-| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: fuel purchases only (B7) | 30 days |
+| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments | 30 days |
 | `cached_surveys` | Surveys | Survey executor | bounded: expired rows removed when new surveys are saved |
 | `leader_leases` | Leader lease | Leader election | bounded: one row |
 | `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
 | `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
 | `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
 | `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | the agent's first and the last 10 |
-| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, first per hour to 90 days |
-| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, first per hour to 90 days |
+| `market_price_samples` | Price history | `MarketPriceSampleHandler`, one row per good on every market refresh | 7 days raw, first per hour to 90 days |
+| `agent_credits_samples` | Credits over time | `AgentCreditsSampleHandler`, on every credit change | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
 | `ship_goal_history` | Ended goals | Nothing | 30 days |
 | `fleet_goals` | Fleet goals | Nothing | completed ones 30 days |
@@ -684,7 +695,7 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
 | Runs and finance | `GET /runs/{id}/kpis`, `/finance/trade-routes` | KPIs is a stub; trade routes are always `[]` |
 | Fleet | `GET /fleet/assignments`, `/activity`, `/activity/{ship}`, `/activity/{ship}/history`, `/goal-chains` | 5 s cache. History is always `[]` |
-| Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Prices are empty (B19); best routes always 204 |
+| Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Best routes always 204 |
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
 | Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
 | Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
