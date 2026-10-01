@@ -11,8 +11,8 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 > including a four-hour soak test; so is phase 2 (visibility: metrics, the ledger, the journal, and
 > a Grafana dashboard and alerts in gembernodes); and so is phase 3 (health rules: the bot checks
 > itself every minute and reports anomalies). Phase 4 (back on the cluster) is ready to merge in
-> gembernodes, after the database logins are set up by hand. Known issues are listed there under
-> B-numbers and decisions under D-numbers.
+> gembernodes (PR #11), after the database logins are set up by hand. Known issues are listed
+> there under B-numbers and decisions under D-numbers.
 
 ---
 
