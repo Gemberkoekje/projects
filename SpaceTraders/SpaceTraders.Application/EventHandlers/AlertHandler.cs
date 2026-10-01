@@ -5,38 +5,20 @@ using SpaceTraders.Domain.Events;
 namespace SpaceTraders.Application.EventHandlers;
 
 /// <summary>
-/// Publishes operator alerts for critical game events:
+/// Posts operator alerts to the webhook (<see cref="IAlertNotifier"/>) for:
 /// <list type="bullet">
-///   <item>Agent credits drop by more than 10 % between two consecutive readings.</item>
-///   <item>A contract deadline is approaching (≤ 6 h remaining).</item>
-///   <item>Fleet expansion is blocked because the hard cap has been reached.</item>
+///   <item>a contract deadline that is approaching (≤ 6 h remaining);</item>
+///   <item>an upcoming server reset;</item>
+///   <item>cache divergence;</item>
+///   <item>a token whose reset date doesn't match the server's.</item>
 /// </list>
+/// Only the last one is published at runtime. There is no credit-drop alert (D12): credits only drop
+/// when the bot spends them, so it could only have reported the bot's own spending.
 /// </summary>
 public sealed class AlertHandler(
     IAlertNotifier alertNotifier,
     ILogger<AlertHandler> logger)
 {
-    private long _previousCredits = long.MinValue;
-
-    public async Task Handle(AgentCreditsChangedEvent @event, CancellationToken cancellationToken)
-    {
-        if (_previousCredits != long.MinValue && _previousCredits > 0)
-        {
-            var dropFraction = (double)(_previousCredits - @event.NewCredits) / _previousCredits;
-            if (dropFraction > 0.10)
-            {
-                var message =
-                    $"Credits dropped from {_previousCredits:N0} → {@event.NewCredits:N0} " +
-                    $"({dropFraction:P0} decrease).";
-
-                logger.LogWarning("Credit drop alert: {Message}", message);
-                await alertNotifier.NotifyAsync("Credit Drop Detected", message, cancellationToken);
-            }
-        }
-
-        _previousCredits = @event.NewCredits;
-    }
-
     public async Task Handle(ContractDeadlineApproachingEvent @event, CancellationToken cancellationToken)
     {
         if (@event.Remaining <= TimeSpan.FromHours(6))

@@ -442,7 +442,7 @@ wait for a cooldown simply run again on a later tick.
 | `NewShipPurchasedEvent` | `ShipPurchaseService` | `LedgerEntryHandler` (ShipPurchase); `activity_logs` row |
 | `ContractAcceptedEvent` | Contract plan | `LedgerEntryHandler` (ContractDeposit, unless it paid nothing); `activity_logs` row |
 | `ContractFulfilledEvent` | `FulfillContractDeliveryCommand` | `LedgerEntryHandler` (ContractPayout); `activity_logs` row |
-| `AgentCreditsChangedEvent` | Every credit change but sync and registration | `AgentCreditsSampleHandler` → `agent_credits_samples`; `CreditHistoryHandler` (in memory); `AlertHandler` (credit drop, B37); `ProbeDeploymentCreditsChangedHandler`, while automation and the probe plan are on |
+| `AgentCreditsChangedEvent` | Every credit change but sync and registration | `AgentCreditsSampleHandler` → `agent_credits_samples`; `CreditHistoryHandler` (in memory); `ProbeDeploymentCreditsChangedHandler`, while automation and the probe plan are on. There is no credit-drop alert: credits only drop when the bot spends them (D12) |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
 | `DeployProbeCommand` | Probe plan | `DeployProbeHandler` |
 | `TokenResetMismatchDetectedEvent` | Agent bootstrap | `AlertHandler` (webhook); `activity_logs` row |
