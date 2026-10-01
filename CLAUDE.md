@@ -6,7 +6,7 @@ The `## graphify` section below applies **only to the projects that actually hav
 knowledge graph** — each of these has its own graphify-out/ (graph.json + Obsidian
 vault):
 
-  RayTracer/ · SpaceTraders/ · SpaceTradersV3/ · TheCuratool/ · ByGalacticAccord/ · AdventureEngine/
+  RayTracer/ · SpaceTraders/ · TheCuratool/ · ByGalacticAccord/ · AdventureEngine/
 
 It does **not** apply anywhere else. sts2_decompiled/, DatumPrikker/,
 AiUsageMonitoring/, and HackerMinigames/ were only summarized (not graphed) and have

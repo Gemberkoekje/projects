@@ -21,7 +21,6 @@ docs folded in or its communities named.
 |---|--:|--:|--:|---|---|
 | **RayTracer** ♻️ | 3,828 | — | 255 | `RayTracer` (150 edges) | [report](../RayTracer/graphify-out/GRAPH_REPORT.md) · [html](../RayTracer/graphify-out/graph.html) · [vault](../RayTracer/graphify-out/obsidian) |
 | **SpaceTraders** | 7,514 | 13,529 | 614 | `Application.Interfaces.Repositories` (133) | [report](../SpaceTraders/graphify-out/GRAPH_REPORT.md) · [html*](../SpaceTraders/graphify-out/graph.html) · [vault](../SpaceTraders/graphify-out/obsidian) |
-| **SpaceTradersV3** | 972 | 2,145 | 67 | `SpaceTradersApiClient` (62) | [report](../SpaceTradersV3/graphify-out/GRAPH_REPORT.md) · [html](../SpaceTradersV3/graphify-out/graph.html) · [vault](../SpaceTradersV3/graphify-out/obsidian) |
 | **TheCuratool** | 939 | 2,514 | 53 | `DraftEngine` / `DraftSessionState` | [report](../TheCuratool/graphify-out/GRAPH_REPORT.md) · [html](../TheCuratool/graphify-out/graph.html) · [vault](../TheCuratool/graphify-out/obsidian) |
 | **ByGalacticAccord** | 567 | 1,514 | 16 | `SimulationContext` (131) | [report](../ByGalacticAccord/graphify-out/GRAPH_REPORT.md) · [html](../ByGalacticAccord/graphify-out/graph.html) · [vault](../ByGalacticAccord/graphify-out/obsidian) |
 | **AdventureEngine** | 354 | 468 | 27 | `GameSessionService` (22) | [report](../AdventureEngine/graphify-out/GRAPH_REPORT.md) · [html](../AdventureEngine/graphify-out/graph.html) · [vault](../AdventureEngine/graphify-out/obsidian) |
@@ -31,7 +30,6 @@ docs folded in or its communities named.
 
 ### What each full graph is about
 - **SpaceTraders** — largest project. Clean/hexagonal architecture (`Application.Interfaces.Repositories`, `Application.Ports`, `ShipModel` are the hubs) with a C# backend + TSX frontend. 614 communities — a big, layered system.
-- **SpaceTradersV3** — a leaner rewrite; the whole graph pivots on `SpaceTradersApiClient` / `SpaceTradersPortAdapter` (betweenness 0.27) — the API-port adapter is the spine.
 - **TheCuratool** — a drafting/game-setup tool; `DraftEngine`, `DraftSessionState`, `GameSession` dominate, with heavy test coverage (`DraftEngineTests` is the #1 node).
 - **ByGalacticAccord** — WPF desktop simulation game; `SimulationContext` is an extreme central hub (betweenness 0.43) wiring `ActorState`, `Contract`, `Credits` to the `MainWindow` UI.
 - **AdventureEngine** — a Blazor "narrator agent" adventure engine; `GameSessionService` + `NarratorAgent` (`Application.Agents`) are the core.

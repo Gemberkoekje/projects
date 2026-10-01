@@ -1,6 +1,6 @@
 # SpaceTraders — Plan
 
-> Draft of 2026-10-01. This is the single plan for what happens next; the older plan documents
+> Plan of 2026-10-01, with your decisions of the same day. This is the single plan for what happens next; the older plan documents
 > (`basics-reset-plan.md`, `REFACTOR_PLAN_*.md`, `docs/*PLAN*.md`) are history (see slice 0.2).
 > Mark slices `(done)` as they land, and keep the "Known issues" table current.
 
@@ -43,8 +43,8 @@
   - **Grafana** runs at http://192.168.1.230/grafana (LAN only). Its datasources are Prometheus
     and Loki. Dashboards and alert rules are provisioned from
     `gembernodes/infrastructure/monitoring/`, and alerts go out by email.
-- `SpaceTradersV3/` is an unbuilt copy of this project's API client and interfaces. It has no
-  host, persistence or automation, and it probably doesn't compile.
+- `SpaceTradersV3/` was deleted on 2026-10-01 (D7). It was an unbuilt copy of this project's API
+  client and interfaces; git history still has it.
 
 ## Known issues
 
@@ -67,19 +67,23 @@ with a test that does.
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 6.2 |
 | B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. Separately, `spacetraders_api_throttled_total` counts every 25 ms local wait as a throttle. | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 |
+| B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second. | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 |
 
-### Needs your decision (scope or strategy, not bugs)
+### Decisions (2026-10-01)
 
-| # | Question |
-|---|---|
-| D1 | **Only one contract per reset.** Bootstrap returns early once a plan is Completed or DeferredUnsupported (`ContractPlanService.cs:51-63`), so no second contract is ever taken. Was this a deliberate baseline, or should the bot move on to the next contract? |
-| D2 | **Non-mineral contracts are parked as unsupported** (`ContractPlanService.cs:104-127`), and because of D1 that blocks every later contract. Should the bot buy the goods, skip the contract, or do something else? |
-| D3 | **The rate limiter takes a token from both the 2/s and the 30-per-60 s bucket** (`RateLimitingHandler.cs:13-32`), which caps the bot at 30 requests a minute. If the API's burst pool is meant as extra capacity on top of 2/s, the bot uses a quarter of its allowance. Check the API docs, then decide. |
-| D4 | **The probe plan waits for 200k credits** (`ProbeDeploymentPlanService.cs:71`). Is that threshold what you want? |
-| D5 | **Keep the React WebUI**, or let Grafana take over the read-only views and keep the WebUI only for settings? |
-| D6 | **Exclude the `spacetraders` database from the nightly `pg_dumpall`** (gembernodes `postgresql-backup`)? Most of it is a cache that every reset wipes anyway. |
-| D7 | **Delete `SpaceTradersV3/`?** It's a copy with nothing of its own, and git history keeps it. |
-| D8 | **Size guard limits for slice 1.6.** Suggestion: a soft limit of 1 GB (anomaly) and a hard limit of 3 GB (pause automation). |
+Scope and strategy calls are yours; they are recorded here so nobody "fixes" them. New questions
+get the next D-number.
+
+| # | Question | Decision |
+|---|---|---|
+| D1 | Bootstrap stops once a contract plan is Completed or DeferredUnsupported (`ContractPlanService.cs:51-63`), so the bot never takes a second contract. | **Intended for now:** one contract per reset. Taking the next contract comes later. B9 still applies: after fulfilment the plan must complete and release the ship. |
+| D2 | Non-mineral contracts are parked as unsupported (`ContractPlanService.cs:104-127`). | **Keep it simple:** they stay unsupported. Together with D1, a reset whose first contract isn't a mineral gets no contract. |
+| D3 | Does the rate limiter follow the API's rules? | **It must follow the official guide; any difference is a bug** (B13, slice 1.10). |
+| D4 | The probe plan waits for 200k credits (`ProbeDeploymentPlanService.cs:71`). | **Keep it for now;** tune once everything runs. |
+| D5 | Keep the React WebUI, or let Grafana take over? | **Keep it for now;** decide later. |
+| D6 | Exclude the `spacetraders` database from the nightly `pg_dumpall`? | **No change.** The size guard (1.6) keeps the database small, and the dump stays the consistent copy. A file-level copy of a running Postgres can only be restored reliably if the NAS snapshot is atomic. |
+| D7 | Delete `SpaceTradersV3/`? | **Done 2026-10-01.** |
+| D8 | Size guard limits (slice 1.6). | **Soft limit 1 GB** (anomaly), **hard limit 3 GB** (pause automation). |
 
 ## Phases
 
@@ -109,7 +113,7 @@ cluster (phase 4).
   and `/control/sync` and `/reassign`, none of which exist anymore.
 - Done when: every later PR that changes behaviour updates this file.
 
-**0.4 Remove `SpaceTradersV3/`.** Waits on D7.
+**0.4 Remove `SpaceTradersV3/`** (done)
 
 ### Phase 1: Safe to run
 
@@ -134,7 +138,7 @@ cluster (phase 4).
   `StartupRecoveryService` and `scheduled_ship_events` already resume ships. If nothing else needs
   Wolverine's Postgres storage, drop `PersistMessagesWithPostgresql` too. The alternative is to
   turn the durability agent back on; record the choice in `HOW_IT_WORKS.md`.
-- Done when: the soak test (1.10) shows no `wolverine` tables, or flat ones.
+- Done when: the soak test (1.11) shows no `wolverine` tables, or flat ones.
 
 **1.4 Short agent identity, old agents cleaned up (B4, part of B3)**
 - Do: key rows on a short agent id (agent symbol plus reset date, or a small surrogate key)
@@ -157,7 +161,7 @@ cluster (phase 4).
 - Goal: the bot can't fill the shared Postgres volume or the NAS share.
 - Do: every few minutes, read `pg_database_size(current_database())` and export it as
   `spacetraders_db_size_bytes`. Above the soft limit, raise an anomaly; above the hard limit,
-  pause automation (this needs 1.7). The limits are settings (D8).
+  pause automation (this needs 1.7). The limits are settings, starting at 1 GB and 3 GB (D8).
 - Done when: tests with a fake size source cover both limits.
 
 **1.7 A kill switch that works (B5)**
@@ -182,9 +186,28 @@ cluster (phase 4).
 - Done when: an idle bot writes less than one line a minute, and a normal day stays within a
   budget of 50k lines. Loki's 31 days on 10Gi are shared with every app.
 
-**1.10 Soak test**
+**1.10 Follow the API guide for limits and errors (B13)**
+- Do: make the client do what https://spacetraders.io/api-guide/rate-limits says:
+  - **Limit:** 2 requests per second sustained. When that's used up, a request may draw from a
+    burst pool of 30 that refills over 60 seconds. Only when both are empty does it wait.
+  - **429 with `x-ratelimit-type`** (the rate limiter): wait until `x-ratelimit-reset`, or
+    `retry-after` if that's missing, then retry.
+  - **429 without those headers** (the cloud infrastructure): retry with exponential backoff,
+    up to a cap.
+  - **502** (DDoS protection): stop all outbound calls for a few minutes (a setting, default 3),
+    then try one call. The tick and the plan bootstraps skip while paused. Log
+    `ApiUnavailable` and `ApiAvailable` as journal events.
+  - Correct the "Burst Limit" entry in `docs/GLOSSARY.md`.
+- The limit is per IP and per account. Never run two instances against the same account at the
+  same time (for example, the soak test while the bot runs on the cluster).
+- Done when:
+  - tests cover each of the four behaviours above;
+  - after redeploy, the count of real 429s stays at zero, which confirms the burst reading (the
+    429 rule in 3.2 watches this).
+
+**1.11 Soak test**
 - Do: run locally (Postgres in Docker) against the live API for a few hours with all of phase 1
-  in. Every 15 minutes, record table sizes and message counts.
+  in, while the cluster bot is off. Every 15 minutes, record table sizes and message counts.
 - Done when: tables grow only with real game activity (market samples, ledger), nothing in
   `wolverine` grows, and the breaker never trips.
 
@@ -299,8 +322,8 @@ its own retention, so the bot's database stays small.
   - Prometheus annotations for the metrics port;
   - a ConfigMap with Serilog overrides;
   - TLS secret `spacetraders-tls` (per-app names since 2026-09-26);
-  - no route to the old `spacetraders-app-service`, because that project no longer exists.
-- Decide D5 first.
+  - no route to the old `spacetraders-app-service`, because that project no longer exists;
+  - the WebUI deployment comes back too (D5).
 
 **4.3 First-run watch**
 - First hour: messages per minute, database size, log lines per minute, anomalies. Then check
@@ -334,7 +357,8 @@ its own retention, so the bot's database stays small.
 A loop counts as done after a full reset period with no open anomalies for it on the dashboard.
 How credits are split stays your call; Claude only fixes deviations from intended behaviour.
 
-- **6.1 Contracts, end to end and repeatable:** B8, B9, plus decisions D1 and D2.
+- **6.1 The first contract, end to end:** B8 and B9. Per D1 and D2 the bot takes one mineral
+  contract per reset; taking the next contract is a later addition.
 - **6.2 The command ship after scouting:** B10. The ship moves on to its next job instead of
   holding on to the finished scout goal.
 - **6.3 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`).
@@ -351,4 +375,3 @@ This cloud session can only read gembernodes. These changes are made from your P
 | 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart |
 | 4.1 | Database login and read-only login (Postgres and 1Password) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries |
-| D6 | `infrastructure/postgresql-backup/backup-cronjob.yaml`: `pg_dumpall --exclude-database=spacetraders` |
