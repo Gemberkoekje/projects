@@ -45,11 +45,14 @@
     `gembernodes/infrastructure/monitoring/`, and alerts go out by email.
 - `SpaceTradersV3/` was deleted on 2026-10-01 (D7). It was an unbuilt copy of this project's API
   client and interfaces; git history still has it.
+- Phase 1 is done (2026-10-01): the soak test (1.14) ran the bot for four hours against the live
+  API from an empty local database. Phase 2 is next; the bot stays off the cluster until phase 4.
 
 ## Known issues
 
-Found by reading the code on 2026-10-01. None has been reproduced at runtime yet; each fix starts
-with a test that does.
+Found by reading the code on 2026-10-01, unless a row says where it was found. The soak test (1.14)
+saw B8, B9, B10 and B27 at runtime and found B28–B36. Each fix starts with a test that reproduces
+the misbehaviour.
 
 ### Bugs: behaviour that contradicts the code's own intent
 
@@ -62,15 +65,15 @@ with a test that does.
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
 | B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 (done) |
 | B7 | **Domain events are raised but never dispatched.** Nothing outside the domain reads `AggregateRoot.DomainEvents`. As a result:<br>• the ledger only holds fuel purchases;<br>• the credits gauge and the credit samples stay empty;<br>• below 200k credits the probe plan waits forever for an `AgentCreditsChanged` that never comes. | `Domain/Common/AggregateRoot.cs`, `ProbeDeploymentPlanService.cs:71` | 2.2 |
-| B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 6.1 |
-| B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 6.1 |
-| B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 6.2 |
+| B8 | **The contract miner leaves with a partial load.** The tick sends it to deliver as soon as any contract cargo is aboard, so the "fill up to required units or a full hold" logic never gets to run. | `GameLoopService.cs:118-139` vs `MineResourceVolumeCommand.cs:145-149` | 1.14 (done) |
+| B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 1.14 (done) |
+| B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick (Debug since 1.9), and every tick it marks its last waypoint visited again: in 1.14, 178 updates of `cached_waypoints` in 15 minutes. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 1.14 (done) |
 | B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. (`spacetraders_api_throttled_total` also counted every 25 ms local wait as a throttle; since 1.10 it counts 429 responses only.) | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 (done) |
 | B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
 | B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
-| B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | 6.2, 6.4 |
+| B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); 6.4 |
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 |
 | B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 |
 | B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 |
@@ -81,7 +84,16 @@ with a test that does.
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 | B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
 | B26 | **A newly registered agent had no settings until the pod restarted** (found and confirmed in 1.4). Registration wrote the new agent's rows and default settings through a DbContext that was created before the new agent was set: resolving the API client creates it, for the endpoint-usage counter. So all of it was stored under the previous agent. With every setting missing, `Automation.Enabled` read as off, and after a server reset the bot sat idle until its next restart. | `AgentBootstrapService.cs` (`RegisterNewAgentAsync`), `ApiEndpointUsageRecorder.cs` | 1.4 (done) |
-| B27 | **A contract plan waiting for budget calls the API on every tick** (found in 1.9). It is retried every 5 s, and each retry fetches every contract (`GET my/contracts`) and saves a new plan: 12 calls a minute while it waits, and the waiting can last as long as the credits stay short. Its log lines went to Debug in 1.9; the calls are still there. | `ContractPlanService.cs` (`EnsureBootstrappedAsync`, `RefreshContractsCacheOnceAsync`) | 6.1 |
+| B27 | **A contract plan waiting for budget calls the API on every tick** (found in 1.9, seen at runtime in 1.14: 12 calls a minute). It is retried every 5 s, and each retry fetches every contract (`GET my/contracts`) and saves a new plan: 12 calls a minute while it waits, and the waiting can last as long as the credits stay short. Its log lines went to Debug in 1.9; the calls are still there. | `ContractPlanService.cs` (`EnsureBootstrappedAsync`, `RefreshContractsCacheOnceAsync`) | 1.14 (done) |
+| B28 | **Startup sync caches a shipyard without its prices** (found in 1.14). It stored the priced ships where the ship types belong and left the prices empty, and purchases read the price from the latter. A purchase at a shipyard where a ship sat at startup then failed with "price unknown" until a ship arrived there again, and every restart did the same to each shipyard with a ship parked at it; a parked probe never leaves. In the soak test the contract plan waited 9 minutes for a drone it could afford, until the scout docked at that shipyard. | `StartupSyncService.cs` (`EnsureFacilitiesForShipsAreCachedAsync`) vs `SpaceTradersPortAdapter.GetShipyardAsync`; `ShipyardRepository.MapToDto`, `ShipPurchaseService.ResolveShipPurchasePrice` | 1.14 (done) |
+| B29 | **Wolverine logs every handled message at Information** (found in 1.14). It logs "Successfully processed message …" under the message type's name, so the `"Wolverine": "Warning"` override doesn't reach it: one line per message. | `DependencyInjection.cs` (`AddWolverine`); Wolverine's `MessageSuccessLogLevel` defaults to Information | 1.14 (done) |
+| B30 | **A contract delivery sends every unit aboard** (found in 1.14). A trip's last extraction can bring more aboard than the contract still needs; the surplus earns nothing, and whether the API refuses such a delivery outright is unconfirmed (its docs don't say). If it does, the final delivery fails on every tick. | `FulfillContractDeliveryCommand.cs` | 1.14 (done) |
+| B31 | **A restart blanks the contract's terms** (found in 1.14). Startup sync stored contracts without their deadline and deliverables, so after every restart the contract plan couldn't read its deliverable until the next delivery response wrote it back: it couldn't restore a lost assignment, and a ship that had delivered everything couldn't fulfil. | `StartupSyncService.cs` (contracts) | 1.14 (done) |
+| B32 | **The ship table grows without end** (found in 1.14). `cached_ships` holds a few wide rows (about 2 kB of ship JSON each) that change every minute or so. Postgres prunes their old versions in place, which kept the table's dead-tuple count under the autovacuum trigger (50), so VACUUM never ran and every update that didn't fit its page extended the table: about 250 kB an hour with one busy ship, and in phase 6 that scales with the fleet. | soak samples: 32 pages for 3 rows, 0 autovacuums in 2 hours | 1.14 (done) |
+| B33 | **Contract payments never reach the cached credits** (found in 1.14). The accept and fulfil responses carry the agent's new credits, but only refuels, sales and purchases wrote them to the cached agent. Purchases are budgeted from the cache, so after a contract the bot thinks it has less than it does until the next restart: in the soak test 6,620 less (130,564 cached, 137,184 in the game). | `FulfillContractDeliveryCommand.cs`, `ContractPlanService.cs` (accept) | 1.14 (done) |
+| B34 | **Waypoint traits are never stored** (found in 1.14). Startup sync stores only a waypoint's market and shipyard flags, and nothing calls `WaypointRepository.UpsertRangeAsync`, the one method that writes traits (and modifiers, orbitals and charts). What reads them finds nothing:<br>• the mining plan means to pick the nearest asteroid whose deposits can yield the mineral, but always falls back to the nearest asteroid of any kind, so a drone can be sent where its mineral never comes up;<br>• the contract plan's trait score is always 0. It only breaks ties between equally near asteroids (nearest first is by design); whether a farther asteroid with the right deposits should win is a strategy question;<br>• the dashboard shows no traits. | `StartupSyncService.cs` (`EnsureSystemsForShipsAreCachedAsync`), `MiningAutomationService.cs` (`MatchesTradeSymbolAvailability`), `ContractPlanService.cs` (`ScoreTradeSymbolMatch`), `FleetStatusMapper.cs` | 6.4 |
+| B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 |
+| B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 |
 
 ### Decisions (2026-10-01)
 
@@ -130,6 +142,19 @@ cluster (phase 4).
 - Done when: every later PR that changes behaviour updates this file.
 
 **0.4 Remove `SpaceTradersV3/`** (done)
+
+**0.5 Tidy-ups found by the soak test**
+- Do:
+  - B35: build the startup snapshot from what startup sync has just cached, instead of fetching it
+    again;
+  - B36: let the four Docker checks find Docker on Windows too (Docker Desktop's named pipe, or
+    leave it to Testcontainers), so the integration tests run there instead of skipping;
+  - delete `SpaceTraders/packages.lock.json`: no project uses it (it came in with a "wip" commit);
+  - remove the UTF-8 BOM from the `.csproj` files of `SpaceTraders.API.Tests`,
+    `SpaceTraders.Application.Tests` and `SpaceTraders.Integration.Test`, which the project-file
+    analyzer flags (Proj3000) since the NuGet update.
+- Done when: the snapshot makes no API calls of its own; `dotnet test --filter Category=Integration`
+  runs the Docker tests on Windows without `DOCKER_HOST`; and the build has no Proj3000 warning.
 
 ### Phase 1: Safe to run
 
@@ -189,8 +214,8 @@ cluster (phase 4).
     written to Postgres and deleted again, and nothing here needs it. A crash loses the messages
     in flight; startup sync, startup recovery and `scheduled_ship_events` already cover that.
   - `MessageStorageIntegrationTests` starts the host as on the cluster against an empty Postgres:
-    it created 8 `wolverine` tables before, none now. The soak test still has to show it in a
-    real run.
+    it created 8 `wolverine` tables before, none now. The soak test (1.14) showed it in a real
+    run: no `wolverine` schema or table in four hours.
   - `OutboxReplayIntegrationTests` is gone: it tested Wolverine's durable scheduling, which the
     app doesn't use.
 
@@ -323,8 +348,9 @@ cluster (phase 4).
     `GoalKind`. Every line logged during a tick carries `Tick`, and its step's `Plan`,
     `ShipSymbol` or `ContractId`, through `ILogger.BeginScope`, which Serilog turns into
     properties (checked against Serilog itself).
-  - Still open: the 50k-a-day budget can only be measured in the soak test (1.14), and for
-    probes, mining and trading once phase 6 switches them on. A ship that can't find a route logs
+  - The soak test (1.14) measured the budget: about 2,000 lines a day while a drone mines, and
+    none while the fleet is idle. Probes, mining and trading are still to measure, once phase 6
+    switches them on. A ship that can't find a route logs
     a warning on every tick; phase 3's health rules are the place for that.
   - Found on the way: B27 (the waiting contract plan's API calls).
 
@@ -356,7 +382,8 @@ cluster (phase 4).
   - 502: `OutagePauseHandler` pauses all calls for `Api.BadGatewayPauseMinutes` (default 3).
     Calls during the pause fail at once (`ApiPausedException`); the tick skips its work and
     logs `ApiUnavailable`, then `ApiAvailable` after the first successful call.
-  - Still to check after the redeploy (phase 4): the count of 429s stays at zero.
+  - Still to check after the redeploy (phase 4): the count of 429s stays at zero. It did in the
+    soak test (1.14): no 429 in four hours.
   - Noticed: an arrival that falls in a 502 pause can't dock, and its message is dropped after
     Wolverine's three retries. The ship then looks in transit until the next restart; that is
     B17's territory (6.4).
@@ -395,12 +422,53 @@ cluster (phase 4).
   - `DatabaseInitializerTests` (Postgres): an empty database, a database with an unrelated table,
     and a second run on its own schema all end with every model table.
 
-**1.14 Soak test**
+**1.14 Soak test** (done)
 - Do: start from an empty local database (Postgres in Docker), and run against the live API for a
   few hours with all of phase 1 in, while the cluster bot is off. Every 15 minutes, record table
   sizes and message counts.
 - Done when: tables grow only with real game activity (ledger, activity log), nothing in
   `wolverine` grows, and the breaker never trips.
+- Done:
+  - Ran on 2026-10-01 from 07:09 to 11:10 UTC against the live API, from an empty Postgres 16 in
+    Docker, with no SpaceTraders deployment on the cluster. Configured like the cluster:
+    Production, JSON logs, only the scout and contract plans on (D9). The bot registered
+    `SPECTER-DEBUG2`, scouted all 26 markets in 28 minutes, bought a mining drone and fulfilled
+    its IRON_ORE contract (42 units) at 10:45; after that the fleet was idle. `tools/soak/`
+    recorded every table, `/metrics` and the log every 15 minutes: 17 samples.
+  - The criteria hold. The database went from 9.25 MB to 9.76 MB and from 202 to 324 rows, all
+    game activity: the activity log (one row per navigation), the fuel ledger, the scouted
+    markets, and a startup snapshot per start. Every other table kept its size once B32 was
+    fixed. No `wolverine` schema or table appeared. The breaker never tripped: a busy ship takes
+    12 goal steps a minute.
+  - Also measured: no 429s, no errors, no exceptions, no token in the log. 625 API calls, 106 of
+    them B27's. Log lines: about 2,000 a day while a drone mines, and none at all while the fleet
+    is idle (0 lines and 0 API calls from 10:46 to 11:10), so 1.9's budget holds. Memory stayed at
+    220–330 MB. Messages handled, before B29 took their lines away: 168 in the first 70 minutes,
+    every one from a ship moving.
+  - The bot was restarted four times on fixed builds, killed like a pod each time: the stored
+    token was reused, the run resumed, ship goals were kept, and the leader lease was taken over
+    after its 30 s.
+  - Found and fixed on the way, each with a test that failed first: B28–B33, and B8, B9, B10 and
+    B27, pulled forward from phase 6 because the run showed them. B8, B9, B10, B28, B29, B31 and
+    B32 were also seen working in the run.
+  - Noticed, not fixed, and now in the plan: waypoint traits are never stored (B34, which matters
+    most for mining, 6.4); the startup snapshot repeats startup sync's API calls (B35); the Docker
+    integration tests skip on Windows unless `DOCKER_HOST` is set (B36); and a stray lock file and
+    three `.csproj` files with a BOM. Slice 0.5 collects the small ones.
+
+**Phase 1 in short** (done 2026-10-01)
+- The bot can no longer fill the shared Postgres or Loki: messages stay in memory (1.3), every
+  table has a retention policy (1.5), a size guard watches the database (1.6), the logs are on a
+  diet (1.9, B29), and the ship table no longer bloats (B32). It doesn't loop a ship (1.1, 1.2),
+  its kill switches work (1.7), it follows the API's rate rules (1.10), a failing step doesn't
+  stop the tick (1.11), and restarts and server resets keep its state (1.8, 1.12, 1.13, B31).
+- Traps it took: startup sync rebuilt rows from one API call and dropped what the other paths
+  store, three times (B20, B28, B31); Wolverine logs under the message type's name (B29); a small,
+  wide, often-updated table outgrows the autovacuum trigger's reach (B32); and Wolverine 6 needs
+  runtime compilation and service location for the DbContext (see `CHANGELOG.md`).
+- To understand this phase, start with `docs/HOW_IT_WORKS.md` (sections 1, 2 and 6), then
+  `GameLoopService.cs`, `ShipGoalExecutorService.cs`, `DeferredStartupHostedService.cs` and
+  `DataRetention.cs`.
 
 ### Phase 2: Visibility
 
@@ -572,13 +640,15 @@ its own retention, so the bot's database stays small.
 A loop counts as done after a full reset period with no open anomalies for it on the dashboard.
 How credits are split stays your call; Claude only fixes deviations from intended behaviour.
 
-- **6.1 The first contract, end to end:** B8 and B9. Per D1 and D2 the bot takes one mineral
-  contract per reset; taking the next contract is a later addition.
-- **6.2 The command ship after scouting:** B10, and the scout part of B16. The ship moves on to
-  its next job instead of holding on to the finished scout goal.
+- **6.1 The first contract, end to end:** B8 and B9 (both fixed in 1.14; what's left is a clean
+  reset period). Per D1 and D2 the bot takes one mineral contract per reset; taking the next
+  contract is a later addition.
+- **6.2 The command ship after scouting:** B10, and the scout part of B16 (both fixed in 1.14;
+  what's left is a clean reset period). The ship moves on to its next job instead of holding on to
+  the finished scout goal.
 - **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
 - **6.4 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`): the
-  survey part of B16, and B17.
+  survey part of B16, B17, and B34 (traits, so drones go where their mineral is).
 - **6.5 Trading** (`TradingAutomationService`).
 - **6.6 Jump gate construction.**
 

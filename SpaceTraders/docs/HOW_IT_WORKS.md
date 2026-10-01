@@ -34,13 +34,16 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
 ### Hosting (`SpaceTraders.API/Program.cs`)
 
 - **Path base:** `/spacetraders/api`. Paths without the prefix also route.
-- **Serilog:** writes to the console only. Production uses compact JSON (CLEF: `@t`, `@mt`, and
-  `@l` for levels above Information); other environments use plain text. Levels come from the
-  `Serilog` section of `appsettings*.json`: Information by default, Warning for ASP.NET Core,
-  EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
+- **Serilog:** writes to the console only. Production uses compact JSON with the rendered message
+  (CLEF: `@t`, `@m`, `@i`, and `@l` for levels above Information); other environments use plain
+  text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
+  Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
   `Application=SpaceTraders.API`.
-- **Wolverine** discovers handlers in the Application assembly and keeps messages in memory:
-  nothing goes to Postgres. A crash loses the messages still in flight; after the restart,
+- **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
+  nothing goes to Postgres. It compiles the handler code at startup (`WolverineFx.RuntimeCompilation`).
+  Its generated code resolves the DbContext from the scope (`AlwaysUseServiceLocationFor`), because
+  EF Core registers the DbContext's options through a factory; anything else that needs service
+  location logs a warning, as in 5.x (`RestoreV5Defaults()`), instead of failing the handler. A crash loses the messages still in flight; after the restart,
   startup sync and startup recovery pick the ships up again, and pending arrivals wait in
   `scheduled_ship_events`. Any handler exception is retried after 250 ms, 500 ms and 1 s, then
   the message is discarded.
@@ -132,7 +135,10 @@ checks it. The lease is not released on shutdown.
 **Startup sync** (`StartupSyncService`):
 - **Fetches:** the agent, all ships, and for each system that has a ship, the system and its
   waypoints if they aren't cached yet. It also fetches market and shipyard data at waypoints where
-  a ship is not in transit, and the first page of contracts (20).
+  a ship is not in transit, and the first page of contracts (20). It stores them the way the
+  other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and
+  contracts with their terms, so a restart doesn't blank the deliverables the contract plan works
+  from (B31, fixed).
 - **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It
   leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
@@ -162,8 +168,9 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
      ProbeDeployment, Mining and Trading.
   2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
   3. If the contract plan is switched on, for every active `Contract` assignment:
-     `FulfillContractDeliveryCommand` if the ship holds any of the contract good, otherwise
-     `MineResourceVolumeCommand` (B8).
+     `FulfillContractDeliveryCommand` once the ship holds a whole trip (what the contract still
+     needs, at most a full hold; with nothing left to deliver, that command fulfils the contract),
+     otherwise `MineResourceVolumeCommand` (B8, fixed).
   4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
      it (`ApiUnavailable`, `ApiAvailable`). Nothing handles the events.
 
@@ -206,31 +213,40 @@ Scout and Contract are on by default. A plan that is switched off:
    at the alphabetically first market.
 4. **For each stop** it writes a `Scout` assignment and a `ScoutWaypointGoal`. The plan advances
    when the ship is docked at the stop.
-5. **After the last stop** the plan is Completed, but the last goal stays in place (B10, B16).
+5. **After the last stop** the plan is Completed and the ship's goal is cleared, so the ship is
+   free for other work (B10, fixed). A scout goal that outlived its plan (a database from before
+   the fix) is cleared on its next step.
 
 Markets are not scouted again.
 
 ### Contract (`ContractPlanService`, plus step 3 of the tick)
 
-- **While the plan is Active,** bootstrap only restores the ship's assignment. A plan in any
-  other status except PendingBudget makes bootstrap return immediately: one contract per reset
-  (D1).
+- **While the plan is Active,** bootstrap advances it from the cached contract, which every
+  delivery updates: it records the units delivered, keeps the assignment's remaining units current,
+  and restores a missing assignment. It writes only what changed. A plan in any other status
+  except PendingBudget makes bootstrap return immediately: one contract per reset (D1).
 - **Otherwise it:**
-  1. refreshes contracts from the API, ignoring errors;
+  1. refreshes contracts from the API, ignoring errors, but only while there is no plan yet;
   2. negotiates a contract if none is open, using the first ship that has a waypoint;
   3. takes the unfulfilled contract with the earliest deadline;
-  4. accepts it;
+  4. accepts it, and records the acceptance payment in the cached credits (B33, fixed);
   5. parks a non-mineral deliverable as DeferredUnsupported (D2);
   6. picks an idle mining-capable ship, or buys a drone. If neither works, the plan becomes
-     PendingBudget and is retried every tick;
+     PendingBudget and is retried every tick. A retry works from the cached contract and only
+     tries the ship again: it calls the API only to buy, and stores nothing while the plan keeps
+     waiting (B27, fixed);
   7. picks the nearest asteroid;
   8. saves an Active plan and a `Contract` assignment.
 - **The work itself is step 3 of the tick:**
   - **Mining:** `MineResourceVolumeCommand` travels to the asteroid, extracts once per cooldown
     and jettisons other goods.
   - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination, docks, delivers
-    everything it holds, and calls fulfil once nothing is pending.
-- **Completion:** the plan only completes on two events that nothing publishes (B9).
+    what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
+    nothing is pending, recording the payment in the cached credits.
+- **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes the
+  assignment, which releases the ship (B9, fixed). Every unit delivered isn't enough: until the
+  fulfil call has gone out, the assignment stays open with 0 units left, so the ship goes back
+  to make it.
 
 ### Probe deployment (`ProbeDeploymentPlanService`)
 
@@ -294,8 +310,8 @@ Markets are not scouted again.
 **Consequences:**
 - A drone that the contract plan just bought has no goal yet, so mining or trading can also give
   it one. The ship then gets both a goal step and contract commands in the same tick.
-- After scouting, the command ship keeps its last scout goal, so mining and trading never use it
-  (B10).
+- After scouting, the command ship has no goal and no assignment. It is mining-capable, so
+  mining, trading or a new contract plan can use it.
 
 ---
 
@@ -316,9 +332,10 @@ Markets are not scouted again.
   - `MineAndSellGoalExecutor`, which assigns survey goals and can overwrite another ship's goal.
 - **Cleared by:**
   - `DeployProbeGoalExecutor` and `TradeBetweenMarketsGoalExecutor` when they finish;
+  - the scout plan, when its last stop is done;
   - mining and trading, for opportunities that have gone.
 
-  Scout and survey goals are never cleared.
+  Survey goals are never cleared.
 
 ### `ShipGoalExecutorService`
 
@@ -494,8 +511,8 @@ other app (D8):
 | Table | Holds | Written by | Retention |
 |---|---|---|---|
 | `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | bounded: the active agent's token |
-| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | bounded: one row |
-| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship |
+| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels, contract payments | bounded: one row |
+| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship. Created with `fillfactor=50` and `autovacuum_vacuum_threshold=10`, so its frequent updates stay in place and VACUUM runs (B32) |
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
 | `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
 | `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
@@ -699,6 +716,9 @@ The seven pages in `src/Future` are not routed.
     whose result line follows. An idle bot logs nothing at Information.
   - One property name per concept: `ShipSymbol`, `ContractId`, `WaypointSymbol` (unless the
     message names a role, such as `Destination` or `SellWaypoint`), `GoalKind`.
+  - Wolverine logs each handled message ("Successfully processed message …") under the message
+    type's name, which the `Wolverine` level override doesn't reach. The Wolverine setup puts
+    that line at Debug (`MessageSuccessLogLevel`, B29); the handlers log what happened themselves.
   - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
     `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
     Serilog turns into properties.

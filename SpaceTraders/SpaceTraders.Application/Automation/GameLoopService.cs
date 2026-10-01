@@ -209,8 +209,14 @@ public sealed class GameLoopService(
             .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
             .Units ?? 0;
 
+        // Deliver a whole trip, as MineResourceVolumeCommand mines it: what the contract still needs,
+        // at most a full hold (B8). With nothing left to deliver, the delivery command fulfils the
+        // contract.
+        var unitsPerTrip = MineResourceVolumeHandler.UnitsPerTrip(assignment.RequiredUnits, ship.CargoCapacity);
+        var holdIsFull = ship.CargoCapacity > 0 && ship.CargoCurrent >= ship.CargoCapacity;
+
         var bus = services.GetRequiredService<Wolverine.IMessageBus>();
-        if (cargoUnits > 0)
+        if (cargoUnits >= unitsPerTrip || (cargoUnits > 0 && holdIsFull))
         {
             await bus.InvokeAsync(new FulfillContractDeliveryCommand(
                 assignment.ShipSymbol,

@@ -6,9 +6,10 @@ An automation bot and dashboard for [SpaceTraders](https://spacetraders.io/), a 
 trading game played entirely through an HTTP API. The bot registers an agent, keeps a PostgreSQL
 cache of the game state, and runs its ships automatically. A React dashboard shows what it is doing.
 
-> **Status (2026-10-01):** not running. It was taken off the cluster in May 2026 after it filled
-> the shared PostgreSQL database. `PLAN.md` describes the way back; known issues are listed there
-> under B-numbers and decisions under D-numbers.
+> **Status (2026-10-01):** not running on the cluster. It was taken off in May 2026 after it filled
+> the shared PostgreSQL database. `PLAN.md` describes the way back: phase 1 (safe to run) is done,
+> including a four-hour soak test. Known issues are listed there under B-numbers and decisions
+> under D-numbers.
 
 ---
 
@@ -112,7 +113,8 @@ Vite serves the dashboard at `/spacetraders/dashboard/` and proxies `/spacetrade
 dotnet test SpaceTraders.slnx --filter "Category!=Integration"
 ```
 
-Integration tests need Docker/PostgreSQL and are tagged `Category=Integration`. WebUI tests run
+Integration tests need Docker/PostgreSQL and are tagged `Category=Integration`. On Windows they skip
+unless `DOCKER_HOST` is set: `$env:DOCKER_HOST = 'npipe://./pipe/docker_engine'`. WebUI tests run
 with `npm test` in `SpaceTraders.WebUI`.
 
 ---

@@ -37,6 +37,7 @@ public sealed class FulfillContractDeliveryHandler(
     IOrbitSubCommand orbit,
     INavigateSubCommand navigate,
     IMessageBus bus,
+    IAgentRepository agents,
     ILogger<FulfillContractDeliveryHandler> logger)
 {
     public Task Handle(FulfillContractDeliveryCommand command, CancellationToken cancellationToken)
@@ -123,13 +124,21 @@ public sealed class FulfillContractDeliveryHandler(
             .FirstOrDefault(i => i.Symbol.Equals(command.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
             .Units ?? 0;
 
-        if (cargoUnits > 0)
+        // At most what the contract still needs: a trip's last extraction can bring more aboard, the
+        // surplus earns nothing, and the API may refuse the whole delivery for it.
+        var units = UnitsToDeliver(
+            cargoUnits,
+            await contracts.FindAsync(command.ContractId, cancellationToken),
+            command.TradeSymbol,
+            command.DestinationWaypoint);
+
+        if (units > 0)
         {
             var deliverResult = await port.DeliverContractAsync(
                 command.ContractId,
                 command.ShipSymbol,
                 command.TradeSymbol,
-                cargoUnits,
+                units,
                 cancellationToken);
 
             await ships.UpdateCargoAsync(command.ShipSymbol, deliverResult.ShipCargo ?? new CargoModel(0, ship.CargoCapacity, []), cancellationToken);
@@ -138,7 +147,7 @@ public sealed class FulfillContractDeliveryHandler(
             logger.LogInformation(
                 "FulfillContractDelivery: ship {ShipSymbol} delivered {Units} {TradeSymbol} for contract {ContractId}.",
                 command.ShipSymbol,
-                cargoUnits,
+                units,
                 command.TradeSymbol,
                 command.ContractId);
         }
@@ -148,6 +157,12 @@ public sealed class FulfillContractDeliveryHandler(
         {
             var fulfilled = await port.FulfillContractAsync(command.ContractId, cancellationToken);
             await contracts.UpsertAsync(MapToDto(fulfilled), cancellationToken);
+
+            // The payment: purchases are budgeted from the cached credits (B33).
+            if (fulfilled.AgentCredits is { } credits && await agents.GetAsync(cancellationToken) is { } agent)
+            {
+                await agents.UpsertAsync(agent with { Credits = credits }, cancellationToken);
+            }
 
             logger.LogInformation(
                 "FulfillContractDelivery: contract {ContractId} fulfilled.",
@@ -188,6 +203,37 @@ public sealed class FulfillContractDeliveryHandler(
 
         await ships.UpdateNavAsync(ship.Symbol, nav, null, cancellationToken);
         return await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
+    }
+
+    private static int UnitsToDeliver(int cargoUnits, ContractDto? contract, string tradeSymbol, string destinationWaypoint)
+    {
+        var deliverable = contract is null
+            ? null
+            : DeserializeDeliverables(contract.DeliverablesJson).FirstOrDefault(d =>
+                d.TradeSymbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase)
+                && d.DestinationSymbol.Equals(destinationWaypoint, StringComparison.OrdinalIgnoreCase));
+
+        // Terms not cached: deliver what is aboard, and the API decides.
+        return deliverable is null
+            ? cargoUnits
+            : Math.Min(cargoUnits, Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled));
+    }
+
+    private static List<ContractDeliverableDto> DeserializeDeliverables(string? deliverablesJson)
+    {
+        if (string.IsNullOrWhiteSpace(deliverablesJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<ContractDeliverableDto>>(deliverablesJson) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
     }
 
     private static bool HasPendingDeliverables(string? deliverablesJson)

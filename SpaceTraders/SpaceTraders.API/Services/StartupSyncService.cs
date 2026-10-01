@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
@@ -114,35 +115,33 @@ public sealed class StartupSyncService(
         foreach (var contract in contracts.Data)
         {
             var existingContract = await dbContext.Contracts.FindAsync([dbContext.AgentId, contract.Id], cancellationToken);
+
+            // With its terms, as every other path stores a contract: the contract plan works from the
+            // deliverables, and without them a restart blanked them until the next delivery (B31).
+            var contractValues = new CachedContract
+            {
+                AgentId = dbContext.AgentId,
+                Id = contract.Id,
+                FactionSymbol = contract.FactionSymbol,
+                Type = contract.Type,
+                IsAccepted = contract.Accepted,
+                IsFulfilled = contract.Fulfilled,
+                Expiration = contract.Expiration,
+                DeadlineToAccept = contract.DeadlineToAccept,
+                TermsDeadline = contract.Terms?.Deadline,
+                DeliverablesJson = contract.Terms?.Deliver is { } deliver
+                    ? JsonSerializer.Serialize(deliver.Select(d => new ContractDeliverableDto(d.TradeSymbol, d.DestinationSymbol, d.UnitsRequired, d.UnitsFulfilled)).ToList())
+                    : null,
+                LastSyncedAt = now,
+            };
+
             if (existingContract is null)
             {
-                dbContext.Contracts.Add(new CachedContract
-                {
-                    AgentId = dbContext.AgentId,
-                    Id = contract.Id,
-                    FactionSymbol = contract.FactionSymbol,
-                    Type = contract.Type,
-                    IsAccepted = contract.Accepted,
-                    IsFulfilled = contract.Fulfilled,
-                    Expiration = contract.Expiration,
-                    DeadlineToAccept = contract.DeadlineToAccept,
-                    LastSyncedAt = now,
-                });
+                dbContext.Contracts.Add(contractValues);
             }
             else
             {
-                dbContext.Entry(existingContract).CurrentValues.SetValues(new CachedContract
-                {
-                    AgentId = dbContext.AgentId,
-                    Id = contract.Id,
-                    FactionSymbol = contract.FactionSymbol,
-                    Type = contract.Type,
-                    IsAccepted = contract.Accepted,
-                    IsFulfilled = contract.Fulfilled,
-                    Expiration = contract.Expiration,
-                    DeadlineToAccept = contract.DeadlineToAccept,
-                    LastSyncedAt = now,
-                });
+                dbContext.Entry(existingContract).CurrentValues.SetValues(contractValues);
             }
         }
 
@@ -344,12 +343,15 @@ public sealed class StartupSyncService(
             {
                 var shipyard = await apiClient.GetShipyardAsync(systemSymbol, waypointSymbol, cancellationToken);
                 var cachedShipyard = await dbContext.Shipyards.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
+                // The same columns an arrival writes (SpaceTradersPortAdapter): purchases read the
+                // prices from the ships.
                 var shipyardValues = new CachedShipyard
                 {
                     AgentId = dbContext.AgentId,
                     WaypointSymbol = waypointSymbol,
                     SystemSymbol = systemSymbol,
-                    ShipTypesJson = shipyard.Ships is not null ? JsonSerializer.Serialize(shipyard.Ships) : null,
+                    ShipTypesJson = shipyard.ShipTypes is not null ? JsonSerializer.Serialize(shipyard.ShipTypes) : null,
+                    ShipsDetailJson = shipyard.Ships is not null ? JsonSerializer.Serialize(shipyard.Ships) : null,
                     LastObservedAt = now,
                 };
 

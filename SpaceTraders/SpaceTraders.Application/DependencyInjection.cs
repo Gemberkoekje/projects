@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.EventHandlers;
@@ -71,10 +72,26 @@ public static class DependencyInjection
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
+
+            // Wolverine 6 compiles the handler code at startup only with WolverineFx.RuntimeCompilation,
+            // and with ManualOnly discovery the package doesn't register itself.
+            opts.UseRuntimeCompilation();
+
+            // Wolverine 6 refuses service location by default. The host allows it for the DbContext,
+            // whose options EF Core registers through a factory. 5.x's AllowedButWarn covers anything
+            // else registered through a lambda (and every test substitute): a handler that needs it
+            // logs a warning instead of failing on its first message.
+            opts.RestoreV5Defaults();
+
             configureWolverine(opts);
 
             // Add retry logging middleware to all message handlers
             opts.Policies.AddMiddleware(typeof(WolverineRetryLoggingMiddleware));
+
+            // Wolverine logs each handled message under the message type's name, which the
+            // "Wolverine" level override doesn't reach; at its default (Information) that is one line
+            // per message. The handlers log what happened themselves.
+            opts.Policies.MessageSuccessLogLevel(LogLevel.Debug);
 
             opts.OnException<Exception>()
                 .RetryWithCooldown(

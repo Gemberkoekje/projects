@@ -126,8 +126,11 @@ public sealed class ScoutAllMarketplacesPlanService(
 
         if (plan.Status != ScoutPlanStatus.Active)
         {
+            // The ship's scout goal outlived its plan (a database from before B10 was fixed). Left in
+            // place, the ship would complete it again on every tick.
+            await goals.ClearActiveGoalAsync(shipSymbol, cancellationToken);
             logger.LogDebug(
-                "Scout plan advance requested for ship {ShipSymbol} but plan status is {Status}; ignoring.",
+                "Scout plan advance requested for ship {ShipSymbol} but plan status is {Status}; cleared its scout goal.",
                 shipSymbol,
                 plan.Status);
             return;
@@ -161,6 +164,9 @@ public sealed class ScoutAllMarketplacesPlanService(
         {
             var completed = plan with { Status = ScoutPlanStatus.Completed, UpdatedAt = now };
             await scoutPlans.UpsertAsync(completed, cancellationToken);
+
+            // The last goal is done too: the ship is free for other work (B10).
+            await goals.ClearActiveGoalAsync(shipSymbol, cancellationToken);
 
             logger.LogInformation(
                 "Scout plan completed for ship {ShipSymbol}: all {WaypointCount} waypoints visited.",

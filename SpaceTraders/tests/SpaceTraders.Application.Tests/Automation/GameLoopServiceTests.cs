@@ -192,7 +192,43 @@ public sealed class GameLoopServiceTests : IDisposable
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
     }
 
-    private static ShipAssignmentDto ContractAssignment(string shipSymbol) =>
+    [Theory]
+    [InlineData(40, 1, 0, false)]
+    [InlineData(40, 39, 0, false)]
+    [InlineData(40, 40, 0, true)]
+    [InlineData(60, 40, 0, true)]
+    [InlineData(3, 3, 0, true)]
+    [InlineData(40, 0, 40, false)]
+    [InlineData(0, 0, 0, true)]
+    public async Task Tick_SendsAContractShipToDeliverOnlyWithAWholeTrip(int requiredUnits, int contractUnits, int otherUnits, bool delivers)
+    {
+        // B8: the tick sent the ship to deliver as soon as one unit was aboard, so it shuttled one to
+        // three units a trip. A trip carries what the contract still needs, at most a full hold (40
+        // here); a hold full of other goods keeps mining, which jettisons them. With nothing left to
+        // deliver, the delivery command fulfils the contract.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Contract.Enabled");
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([ContractAssignment("SPECTER-DEBUG-5", requiredUnits)]);
+        List<CargoItemModel> cargo = [new("IRON_ORE", contractUnits), new("COPPER_ORE", otherUnits)];
+        _ships.FindAsync("SPECTER-DEBUG-5", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel(
+                "SPECTER-DEBUG-5",
+                "X1-PT96",
+                "X1-PT96-AST",
+                "IN_ORBIT",
+                "CRUISE",
+                80,
+                80,
+                CargoCurrent: contractUnits + otherUnits,
+                CargoCapacity: 40,
+                CargoInventory: cargo.Where(item => item.Units > 0).ToList()));
+
+        await TickAsync();
+
+        await _bus.Received(delivers ? 1 : 0).InvokeAsync(Arg.Any<FulfillContractDeliveryCommand>(), Arg.Any<CancellationToken>());
+        await _bus.Received(delivers ? 0 : 1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    private static ShipAssignmentDto ContractAssignment(string shipSymbol, int requiredUnits = 40) =>
         new(
             ShipSymbol: shipSymbol,
             AssignmentType: "Contract",
@@ -203,7 +239,7 @@ public sealed class GameLoopServiceTests : IDisposable
             StepIndex: 0,
             AssignedAt: DateTimeOffset.UnixEpoch,
             CompletedAt: null,
-            RequiredUnits: 40);
+            RequiredUnits: requiredUnits);
 
     private void SwitchOn(params string[] keys)
     {

@@ -52,19 +52,8 @@ public sealed class FulfillContractDeliveryHandlerTests
                 AgentCredits: null,
                 ShipCargo: new CargoModel(0, 40, [])));
 
-        contracts.FindAsync("C-1", Arg.Any<CancellationToken>()).Returns(new ContractDto(
-            Id: "C-1",
-            FactionSymbol: "COSMIC",
-            Type: "PROCUREMENT",
-            IsAccepted: true,
-            IsFulfilled: false,
-            Expiration: DateTimeOffset.UtcNow.AddDays(3),
-            DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
-            TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
-            DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto>
-            {
-                new("IRON_ORE", "X1-AB-MKT", 10, 10),
-            })));
+        // The cached contract before the delivery, then after it.
+        contracts.FindAsync("C-1", Arg.Any<CancellationToken>()).Returns(Contract("C-1", required: 10, fulfilled: 0), Contract("C-1", required: 10, fulfilled: 10));
 
         port.FulfillContractAsync("C-1", Arg.Any<CancellationToken>())
             .Returns(new ContractActionResult(
@@ -89,6 +78,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             orbit,
             navigate,
             bus,
+            Substitute.For<IAgentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-1", "C-1", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -129,6 +119,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             orbit,
             navigate,
             bus,
+            Substitute.For<IAgentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-2", "C-2", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -137,4 +128,127 @@ public sealed class FulfillContractDeliveryHandlerTests
         await navigate.Received(1).ExecuteAsync("SHIP-2", "X1-AB-MKT", Guid.Empty, Arg.Any<CancellationToken>());
         await port.DidNotReceiveWithAnyArgs().DeliverContractAsync(default!, default!, default!, default, default);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_DeliversAtMostTheUnitsTheContractStillNeeds()
+    {
+        // A trip's last extraction can bring more aboard than the contract still needs. The surplus
+        // earns nothing, and the API may refuse the whole delivery for it.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ship = new ShipModel(
+            Symbol: "SHIP-3",
+            SystemSymbol: "X1-AB",
+            WaypointSymbol: "X1-AB-MKT",
+            Status: "DOCKED",
+            FlightMode: "CRUISE",
+            FuelCurrent: 80,
+            FuelCapacity: 80,
+            CargoCurrent: 5,
+            CargoCapacity: 15,
+            CargoInventory: [new CargoItemModel("IRON_ORE", 5)]);
+        ships.FindAsync("SHIP-3", Arg.Any<CancellationToken>()).Returns(ship);
+        contracts.FindAsync("C-3", Arg.Any<CancellationToken>()).Returns(Contract("C-3", required: 42, fulfilled: 39), Contract("C-3", required: 42, fulfilled: 42));
+        port.DeliverContractAsync("C-3", "SHIP-3", "IRON_ORE", Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ContractActionResult(
+                ContractId: "C-3",
+                FactionSymbol: "COSMIC",
+                ContractType: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 42, 42)],
+                AgentSymbol: null,
+                AgentCredits: null,
+                ShipCargo: new CargoModel(2, 15, [new CargoItemModel("IRON_ORE", 2)])));
+        port.FulfillContractAsync("C-3", Arg.Any<CancellationToken>())
+            .Returns(new ContractActionResult(
+                ContractId: "C-3",
+                FactionSymbol: "COSMIC",
+                ContractType: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: true,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 42, 42)],
+                AgentSymbol: null,
+                AgentCredits: 1000,
+                ShipCargo: null));
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            Substitute.For<Wolverine.IMessageBus>(),
+            Substitute.For<IAgentRepository>(),
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-3", "C-3", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await port.Received(1).DeliverContractAsync("C-3", "SHIP-3", "IRON_ORE", 3, Arg.Any<CancellationToken>());
+        await port.Received(1).FulfillContractAsync("C-3", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RecordsTheContractPaymentInTheAgentsCredits()
+    {
+        // B33: the soak test's cached credits stayed 6,620 below the game's after fulfilment, so
+        // every purchase was budgeted from too little until the next restart's sync.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        ships.FindAsync("SHIP-4", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-4", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 15));
+        contracts.FindAsync("C-4", Arg.Any<CancellationToken>()).Returns(Contract("C-4", required: 42, fulfilled: 42));
+        agents.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel(Symbol: "AGENT", AccountId: null, HeadquartersSymbol: null, Credits: 130_564, StartingFaction: "COSMIC", ShipCount: 3));
+        port.FulfillContractAsync("C-4", Arg.Any<CancellationToken>())
+            .Returns(new ContractActionResult(
+                ContractId: "C-4",
+                FactionSymbol: "COSMIC",
+                ContractType: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: true,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 42, 42)],
+                AgentSymbol: "AGENT",
+                AgentCredits: 137_184,
+                ShipCargo: null));
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            Substitute.For<Wolverine.IMessageBus>(),
+            agents,
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-4", "C-4", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await port.Received(1).FulfillContractAsync("C-4", Arg.Any<CancellationToken>());
+        await agents.Received(1).UpsertAsync(Arg.Is<AgentModel>(a => a.Credits == 137_184), Arg.Any<CancellationToken>());
+    }
+
+    private static ContractDto Contract(string id, int required, int fulfilled) =>
+        new(
+            Id: id,
+            FactionSymbol: "COSMIC",
+            Type: "PROCUREMENT",
+            IsAccepted: true,
+            IsFulfilled: false,
+            Expiration: DateTimeOffset.UtcNow.AddDays(3),
+            DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+            TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+            DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("IRON_ORE", "X1-AB-MKT", required, fulfilled) }));
 }

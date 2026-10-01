@@ -45,6 +45,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -114,6 +115,7 @@ public sealed class ContractPlanServiceTests
             waypoints,
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -207,6 +209,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             shipPurchases,
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -263,6 +266,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             shipPurchases,
+            Substitute.For<IAgentRepository>(),
             log.For<ContractPlanService>());
 
         for (var tick = 0; tick < 12; tick++)
@@ -272,6 +276,69 @@ public sealed class ContractPlanServiceTests
 
         stored!.Status.Should().Be(ContractMineralPlanStatus.PendingBudget);
         log.Kept.Should().ContainSingle().Which.Should().Contain("C-3");
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_WhileThePlanWaitsForBudget_CallsNoApiAndKeepsThePlan()
+    {
+        // B27: a plan waiting for budget is retried on every tick, and each retry fetched every
+        // contract from the API (12 calls a minute) and saved the plan again under a new id. The
+        // contract it waits for is cached already; only the ship is worth trying again.
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var shipyards = Substitute.For<IShipyardRepository>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
+        var port = Substitute.For<ISpaceTradersPort>();
+        ContractMineralPlanState? stored = null;
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns(_ => stored);
+        await plans.UpsertAsync(Arg.Do<ContractMineralPlanState>(plan => stored = plan), Arg.Any<CancellationToken>());
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-3",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("COPPER_ORE", "X1-AB-MKT", 30, 0) }))
+        ]);
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100)]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+        shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = false, FailureReason = "Insufficient credits.", EstimatedCost = 100_000 });
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            shipyards,
+            Substitute.For<IWaypointRepository>(),
+            port,
+            shipPurchases,
+            Substitute.For<IAgentRepository>(),
+            NullLogger<ContractPlanService>.Instance);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+        var waiting = stored;
+        waiting!.Status.Should().Be(ContractMineralPlanStatus.PendingBudget);
+        port.ClearReceivedCalls();
+        plans.ClearReceivedCalls();
+        shipPurchases.ClearReceivedCalls();
+
+        for (var tick = 0; tick < 12; tick++)
+        {
+            await sut.EnsureBootstrappedAsync(CancellationToken.None);
+        }
+
+        port.ReceivedCalls().Should().BeEmpty();
+        await plans.DidNotReceive().UpsertAsync(Arg.Any<ContractMineralPlanState>(), Arg.Any<CancellationToken>());
+        stored.Should().BeSameAs(waiting);
+        await shipPurchases.Received(12).TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -304,6 +371,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -395,6 +463,7 @@ public sealed class ContractPlanServiceTests
             waypoints,
             port,
             shipPurchases,
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -489,6 +558,7 @@ public sealed class ContractPlanServiceTests
             waypoints,
             port,
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -562,6 +632,7 @@ public sealed class ContractPlanServiceTests
             waypoints,
             port,
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -570,13 +641,18 @@ public sealed class ContractPlanServiceTests
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_AcceptsContract_WhenPendingContractNotAccepted()
+    public async Task EnsureBootstrappedAsync_AcceptsContract_WhenPendingContractNotAccepted_AndRecordsThePayment()
     {
+        // B33: the acceptance payment never reached the cached credits that purchases are budgeted
+        // from; only the next restart's sync brought them up to date.
         var plans = Substitute.For<IContractMineralPlanRepository>();
         var contracts = Substitute.For<IContractRepository>();
         var ships = Substitute.For<IShipRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var port = Substitute.For<ISpaceTradersPort>();
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel(Symbol: "AGENT", AccountId: null, HeadquartersSymbol: null, Credits: 175_000, StartingFaction: "COSMIC", ShipCount: 2));
 
         plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
 
@@ -641,8 +717,8 @@ public sealed class ContractPlanServiceTests
                 DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
                 TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
                 Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", 20, 0)],
-                AgentSymbol: null,
-                AgentCredits: null,
+                AgentSymbol: "AGENT",
+                AgentCredits: 176_136,
                 ShipCargo: null));
 
         var idleMiner = new ShipModel(
@@ -675,11 +751,13 @@ public sealed class ContractPlanServiceTests
             waypoints,
             port,
             Substitute.For<IShipPurchaseService>(),
+            agents,
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
 
         await port.Received(1).AcceptContractAsync("C-ACC-1", Arg.Any<CancellationToken>());
+        await agents.Received(1).UpsertAsync(Arg.Is<AgentModel>(a => a.Credits == 176_136), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -727,6 +805,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -743,8 +822,11 @@ public sealed class ContractPlanServiceTests
     }
 
     [Fact]
-    public async Task AdvanceAsync_CompletesPlanAndAssignment_WhenDeliverableIsSatisfied()
+    public async Task AdvanceAsync_KeepsThePlanActive_UntilTheContractIsFulfilled()
     {
+        // Every unit delivered isn't the end yet: the fulfil call, which pays, still has to go out,
+        // and the ship's assignment is what sends the ship there to make it (B9). Completing the plan
+        // here would leave a contract unfulfilled whenever that call failed.
         var plans = Substitute.For<IContractMineralPlanRepository>();
         var contracts = Substitute.For<IContractRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -801,13 +883,14 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
 
         await plans.Received(1).UpsertAsync(
             Arg.Is<ContractMineralPlanState>(p =>
-                p.Status == ContractMineralPlanStatus.Completed
+                p.Status == ContractMineralPlanStatus.Active
                 && p.ContractId == "C-ADV-2"
                 && p.UnitsRequired == 40
                 && p.UnitsFulfilled == 40),
@@ -818,8 +901,54 @@ public sealed class ContractPlanServiceTests
                 a.ShipSymbol == "SHIP-MINER-2"
                 && a.AssignmentType == "Contract"
                 && a.ContractId == "C-ADV-2"
-                && a.CompletedAt.HasValue),
+                && !a.CompletedAt.HasValue
+                && a.RequiredUnits == 0),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_CompletesTheActivePlanOnceItsContractIsFulfilled_AndReleasesTheShip()
+    {
+        // B9: the plan only advanced on two events that nothing publishes, so after fulfilment it
+        // stayed Active and kept the ship's assignment open, and the tick went on sending the ship to
+        // mine and deliver for a fulfilled contract. The tick now advances it from the cached contract.
+        var (sut, plans, assignments) = ActivePlanFor42Units(fulfilled: true, unitsFulfilled: 42, assignmentRequiredUnits: 3);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.Received(1).UpsertAsync(
+            Arg.Is<ContractMineralPlanState>(p => p.Status == ContractMineralPlanStatus.Completed && p.ContractId == "C-B9"),
+            Arg.Any<CancellationToken>());
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a => a.ContractId == "C-B9" && a.CompletedAt.HasValue),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_RecordsDeliveriesOnTheActivePlan()
+    {
+        var (sut, plans, assignments) = ActivePlanFor42Units(fulfilled: false, unitsFulfilled: 25, assignmentRequiredUnits: 32);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.Received(1).UpsertAsync(
+            Arg.Is<ContractMineralPlanState>(p => p.Status == ContractMineralPlanStatus.Active && p.UnitsFulfilled == 25),
+            Arg.Any<CancellationToken>());
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a => a.RequiredUnits == 17 && !a.CompletedAt.HasValue),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_OnAnActivePlanWithNoNewDeliveries_WritesNothing()
+    {
+        // This runs on every tick.
+        var (sut, plans, assignments) = ActivePlanFor42Units(fulfilled: false, unitsFulfilled: 10, assignmentRequiredUnits: 32);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.DidNotReceive().UpsertAsync(Arg.Any<ContractMineralPlanState>(), Arg.Any<CancellationToken>());
+        await assignments.DidNotReceive().UpsertAsync(Arg.Any<ShipAssignmentDto>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -881,6 +1010,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -954,6 +1084,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1006,6 +1137,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1058,6 +1190,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(evnt, CancellationToken.None);
@@ -1100,6 +1233,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(new DeliverableObtainedEvent("SHIP-MINER-1", "IRON_ORE", 4), CancellationToken.None);
@@ -1168,6 +1302,7 @@ public sealed class ContractPlanServiceTests
             waypoints,
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1228,6 +1363,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1307,6 +1443,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1321,6 +1458,67 @@ public sealed class ContractPlanServiceTests
                 && a.DestWaypoint == "X1-AB-MKT"
                 && a.RequiredUnits == 35),
             Arg.Any<CancellationToken>());
+    }
+
+    // An Active plan for 42 units, 10 of them delivered when it last advanced, and the contract as
+    // cached now.
+    private static (ContractPlanService Sut, IContractMineralPlanRepository Plans, IShipAssignmentRepository Assignments) ActivePlanFor42Units(
+        bool fulfilled,
+        int unitsFulfilled,
+        int assignmentRequiredUnits)
+    {
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ContractId = "C-B9",
+            ShipSymbol = "SHIP-MINER-9",
+            TradeSymbol = "IRON_ORE",
+            SourceWaypoint = "X1-AB-AST",
+            DestinationWaypoint = "X1-AB-MKT",
+            UnitsRequired = 42,
+            UnitsFulfilled = 10,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-2),
+            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+        });
+        contracts.FindAsync("C-B9", Arg.Any<CancellationToken>()).Returns(new ContractDto(
+            Id: "C-B9",
+            FactionSymbol: "COSMIC",
+            Type: "PROCUREMENT",
+            IsAccepted: true,
+            IsFulfilled: fulfilled,
+            Expiration: DateTimeOffset.UtcNow.AddDays(3),
+            DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+            TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+            DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("IRON_ORE", "X1-AB-MKT", 42, unitsFulfilled) })));
+        assignments.FindAsync("SHIP-MINER-9", Arg.Any<CancellationToken>()).Returns(new ShipAssignmentDto(
+            ShipSymbol: "SHIP-MINER-9",
+            AssignmentType: "Contract",
+            OriginWaypoint: "X1-AB-AST",
+            DestWaypoint: "X1-AB-MKT",
+            CargoSymbol: "IRON_ORE",
+            ContractId: "C-B9",
+            StepIndex: 0,
+            AssignedAt: DateTimeOffset.UtcNow.AddHours(-2),
+            CompletedAt: null,
+            PurchaseUnitPrice: 0,
+            RequiredUnits: assignmentRequiredUnits,
+            SupplyCompleted: false));
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            Substitute.For<IShipRepository>(),
+            assignments,
+            Substitute.For<IShipyardRepository>(),
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
+            NullLogger<ContractPlanService>.Instance);
+        return (sut, plans, assignments);
     }
 }
 
