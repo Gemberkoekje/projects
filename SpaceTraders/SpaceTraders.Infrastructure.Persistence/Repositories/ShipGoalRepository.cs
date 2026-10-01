@@ -80,6 +80,27 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task BlockGoalAsync(string shipSymbol, Guid goalId, string reason, CancellationToken cancellationToken = default)
+    {
+        var entity = await db.Ships.FindAsync([db.AgentToken, shipSymbol], cancellationToken);
+        if (entity?.GoalPayloadJson is null || entity.GoalId != goalId)
+        {
+            return;
+        }
+
+        var goal = JsonSerializer.Deserialize<ShipGoal>(entity.GoalPayloadJson, JsonOptions);
+        if (goal is null)
+        {
+            return;
+        }
+
+        var blocked = goal with { Status = GoalStatus.Blocked, StatusReason = reason };
+        entity.GoalPayloadJson = JsonSerializer.Serialize(blocked, JsonOptions);
+        entity.GoalStatus = (int)GoalStatus.Blocked;
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default)
     {
         var payloads = await db.Ships

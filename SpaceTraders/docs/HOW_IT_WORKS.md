@@ -281,7 +281,9 @@ Markets are not scouted again.
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
 - **Kinds:** 13 kinds are defined, but only five are ever created: `ScoutWaypoint`,
   `DeployProbe`, `MineAndSell`, `TradeBetweenMarkets` and `SurveyWaypoint`.
-- **Status:** always `Assigned`, because nothing updates it (B16).
+- **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
+  Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
+  (`runaway`).
 - **Set by:**
   - the scout, mining and trading plans;
   - `DeployProbeHandler`;
@@ -298,6 +300,13 @@ Markets are not scouted again.
   applies (B17).
 - **Runs** one step of the executor for the active goal. Only the five kinds above are
   dispatched, so `IdleGoalExecutor` is unreachable.
+- **Skips** a goal that is `Blocked`. It stays blocked until a plan replaces it; mining and
+  trading treat its ship as free, but the scout plan never replaces its goal.
+- **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
+  (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
+  `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
+  blocks the goal with reason `runaway`, logs a warning and counts
+  `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
 - **Called by:**
@@ -461,11 +470,12 @@ production code doesn't use the aggregates at all (B7).
 
 ### What each setting does
 
-Only five of the 47 seeded settings change what the bot does (B18):
+Only six of the 48 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
 | `Automation.Enabled` (true) | Startup recovery skips when false. The tick ignores it (B5). Startup snapshot switches it off and on. |
+| `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
@@ -612,6 +622,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_api_calls_total` | Yes, one per outbound request |
   | `spacetraders_api_throttled_total` | Yes, but it counts local limiter waits as well as real 429s |
   | `spacetraders_agent_credits` | Never (B7) |
+  | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
 
   `/metrics` requires the API key (B11), so Prometheus can't scrape it as deployed.
 
@@ -632,7 +643,6 @@ This makes the codebase look bigger than what actually runs:
 - `ShipGoalRepository.UpdateGoalStatusAsync`.
 - `ShipGoalHistoryRepository.AppendAsync`.
 - `TradeOpportunityRepository.ReplaceAllAsync`.
-- Nine unused dependencies injected into `ShipGoalExecutorService`.
 - The `Stateless` package: referenced, but never used.
 - The domain aggregates and their events.
 
@@ -659,8 +669,8 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~223 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~62 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.Application.Tests` | ~229 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Infrastructure.Tests` | ~64 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 

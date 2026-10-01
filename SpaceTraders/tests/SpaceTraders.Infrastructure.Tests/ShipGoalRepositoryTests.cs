@@ -220,4 +220,41 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
 
         result.Should().Contain(("X1-TEST-A1", "IRON_ORE"));
     }
+
+    [SkippableFact]
+    public async Task BlockGoalAsync_BlocksTheMatchingGoalWithItsReason()
+    {
+        await SeedShipAsync("SHIP-G11");
+        var goalId = Guid.NewGuid();
+        var setRepo = new ShipGoalRepository(Db);
+        await setRepo.SetActiveGoalAsync("SHIP-G11", new ScoutWaypointGoal { GoalId = goalId, TargetWaypointSymbol = "X1-TEST-WP2" });
+
+        await setRepo.BlockGoalAsync("SHIP-G11", goalId, "runaway");
+
+        await using var fresh = CreateFreshContext();
+        var getRepo = new ShipGoalRepository(fresh);
+        var result = await getRepo.GetActiveGoalAsync("SHIP-G11");
+
+        result.Should().BeOfType<ScoutWaypointGoal>();
+        result!.GoalId.Should().Be(goalId);
+        result.Status.Should().Be(GoalStatus.Blocked);
+        result.StatusReason.Should().Be("runaway");
+    }
+
+    [SkippableFact]
+    public async Task BlockGoalAsync_DoesNothing_WhenGoalIdDoesNotMatch()
+    {
+        await SeedShipAsync("SHIP-G12");
+        var setRepo = new ShipGoalRepository(Db);
+        await setRepo.SetActiveGoalAsync("SHIP-G12", new ScoutWaypointGoal { GoalId = Guid.NewGuid(), TargetWaypointSymbol = "X1-TEST-WP2" });
+
+        await setRepo.BlockGoalAsync("SHIP-G12", Guid.NewGuid(), "runaway");
+
+        await using var fresh = CreateFreshContext();
+        var getRepo = new ShipGoalRepository(fresh);
+        var result = await getRepo.GetActiveGoalAsync("SHIP-G12");
+
+        result!.Status.Should().Be(GoalStatus.Assigned);
+        result.StatusReason.Should().BeNull();
+    }
 }

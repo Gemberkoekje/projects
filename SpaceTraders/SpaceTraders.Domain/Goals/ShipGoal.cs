@@ -33,11 +33,14 @@ public abstract record ShipGoal
     /// <summary>Current lifecycle status of this goal.</summary>
     public GoalStatus Status { get; init; } = GoalStatus.Assigned;
 
+    /// <summary>Why the goal has its current status, for example <c>runaway</c> for a goal the circuit breaker blocked.</summary>
+    public string? StatusReason { get; init; }
+
     /// <summary>
     /// UTC timestamp at which this goal was created/assigned. Persisted with the goal payload so that
     /// <see cref="ShipGoalHistoryEntry"/> can record accurate start times after a process restart.
     /// </summary>
-    public DateTimeOffset StartedAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset StartedAt { get; init; } = TimeProvider.System.GetUtcNow();
 
     /// <summary>Discriminator for the goal type; derived from the concrete subtype.</summary>
     [JsonIgnore]

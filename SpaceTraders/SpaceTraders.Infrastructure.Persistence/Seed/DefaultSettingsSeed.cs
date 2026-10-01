@@ -22,6 +22,7 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Navigation.BurnDistanceThreshold",      Value = "35",                  Type = "decimal", Description = "Distance threshold for selecting BURN mode" },
         new AgentSetting { Key = "Automation.Trade.MaxLossPerUnitBeforeReroute", Value = "50",            Type = "int",     Description = "Max accepted per-unit loss before trying an alternate sell market" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
+        new AgentSetting { Key = "Automation.CircuitBreaker.MaxGoalStepsPerMinute", Value = "60",         Type = "int",     Description = "Goal steps per ship per minute above which the ship's goal is blocked as a runaway (the tick alone takes 12)" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
         new AgentSetting { Key = "Automation.MiningShipPercentage",              Value = "0.25",                Type = "decimal", Description = "Fraction of mining-capable ships assigned to resource extraction roles" },

@@ -119,16 +119,10 @@ public sealed class AlreadyAtDestinationLoopTests
             [new CountingExecutor(executor, () => _steps++)],
             _goals,
             _ships,
-            Substitute.For<IShipAssignmentRepository>(),
-            Substitute.For<ISurveyRepository>(),
-            Substitute.For<INavigationPlanningService>(),
-            Substitute.For<IWaypointRepository>(),
-            Substitute.For<IMarketRepository>(),
-            Substitute.For<IShipCapabilityRegistry>(),
-            Substitute.For<IShipEventScheduler>(),
-            Substitute.For<IShipGoalHistoryRepository>(),
             Substitute.For<IScoutAllMarketplacesPlanService>(),
-            _bus,
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IGoalStepCircuitBreaker>(),
+            Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         var navigateHandler = new NavigateToWaypointHandler(

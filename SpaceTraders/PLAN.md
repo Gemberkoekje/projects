@@ -150,12 +150,21 @@ cluster (phase 4).
     navigation-completed handlers: before the fix, each of the four cases ran until the test's
     limit of 10 steps.
 
-**1.2 Per-ship circuit breaker**
+**1.2 Per-ship circuit breaker** (done)
 - Goal: any future loop is contained to one ship, and it shows up.
 - Do: count goal steps per ship in a sliding window. Above N per minute (a setting), the ship's
   goal becomes Blocked with the reason `runaway`. Until phase 3 exists, this means a Warning log
   plus a metric; after that, an anomaly.
 - Done when: a test with a looping fake executor trips the breaker.
+- Done:
+  - `ShipGoalExecutorService` counts every goal step per ship over the last minute, whatever
+    triggered it. Above `Automation.CircuitBreaker.MaxGoalStepsPerMinute` it blocks the goal
+    (`StatusReason` = `runaway`), logs a warning and counts
+    `spacetraders_goal_breaker_trips_total{ship}`. Blocked goals are not stepped again.
+  - The default of 60 is five times what the tick takes (12 a minute); a loop like B1 takes
+    thousands. It's a setting, so it's yours to tune.
+  - A blocked goal stays blocked until a plan replaces it. The scout plan never does, so a
+    tripped scout ship waits for someone to look at it.
 
 **1.3 Stop storing in-process messages (B2)**
 - Background: the durable queues were added on purpose, as an outbox. A message is stored in the
