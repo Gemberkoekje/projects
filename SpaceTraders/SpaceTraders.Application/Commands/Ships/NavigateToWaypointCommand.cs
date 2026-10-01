@@ -73,7 +73,7 @@ public sealed class NavigateToWaypointHandler(
     public async Task Handle(NavigateToWaypointCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "NavigateToWaypointHandler: ship {Symbol} → {Destination}.",
+            "NavigateToWaypointHandler: ship {ShipSymbol} → {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
 
@@ -86,7 +86,7 @@ public sealed class NavigateToWaypointHandler(
             && status != ShipLocalStatus.InTransit)
         {
             logger.LogWarning(
-                "NavigateToWaypointHandler: ship {Symbol} is already at {Destination}; nothing to do.",
+                "NavigateToWaypointHandler: ship {ShipSymbol} is already at {Destination}; nothing to do.",
                 command.ShipSymbol,
                 command.DestinationWaypoint);
             return;
@@ -119,7 +119,7 @@ public sealed class NavigateToWaypointHandler(
                 "Ship must be in orbit before navigation.");
 
             logger.LogWarning(
-                "NavigateToWaypointHandler: ship {Symbol} is not in orbit after orbit step; status={Status}.",
+                "NavigateToWaypointHandler: ship {ShipSymbol} is not in orbit after orbit step; status={Status}.",
                 command.ShipSymbol,
                 ship?.Status ?? "UNKNOWN");
             return;
@@ -154,7 +154,7 @@ public sealed class NavigateToWaypointArrivedHandler(
     public async Task Handle(NavigateToWaypointArrivedCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "NavigateToWaypointArrivedHandler: ship {Symbol} arrived at {Destination}.",
+            "NavigateToWaypointArrivedHandler: ship {ShipSymbol} arrived at {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
 
@@ -174,12 +174,12 @@ public sealed class NavigateToWaypointArrivedHandler(
                     new WaypointSymbol(command.DestinationWaypoint),
                     market.TradeGoodsJson));
                 logger.LogInformation(
-                    "NavigateToWaypointArrivedHandler: market data updated for {Waypoint}.",
+                    "NavigateToWaypointArrivedHandler: market data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update market data for {Waypoint}.", command.DestinationWaypoint);
+                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update market data for {WaypointSymbol}.", command.DestinationWaypoint);
             }
         }
 
@@ -190,12 +190,12 @@ public sealed class NavigateToWaypointArrivedHandler(
                 var shipyard = await port.GetShipyardAsync(systemSymbol, command.DestinationWaypoint, cancellationToken);
                 await shipyards.UpsertAsync(shipyard, cancellationToken);
                 logger.LogInformation(
-                    "NavigateToWaypointArrivedHandler: shipyard data updated for {Waypoint}.",
+                    "NavigateToWaypointArrivedHandler: shipyard data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update shipyard data for {Waypoint}.", command.DestinationWaypoint);
+                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update shipyard data for {WaypointSymbol}.", command.DestinationWaypoint);
             }
         }
 
@@ -209,7 +209,7 @@ public sealed class NavigateToWaypointArrivedHandler(
             command.GoalId));
 
         logger.LogInformation(
-            "NavigateToWaypointArrivedHandler: ship {Symbol} docked at {Destination}; navigation complete.",
+            "NavigateToWaypointArrivedHandler: ship {ShipSymbol} docked at {Destination}; navigation complete.",
             command.ShipSymbol,
             command.DestinationWaypoint);
     }

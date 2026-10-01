@@ -66,7 +66,7 @@ with a test that does.
 | B9 | **The contract plan never completes.** It only advances on `DeliverableObtainedEvent` and `ContractDeliveryRecordedEvent`, and nothing publishes either. After the contract is fulfilled, the plan stays Active and the assignment stays open. | `ContractPlanService.cs:227-266` | 6.1 |
 | B10 | **The command ship idles after scouting.** When the scout plan completes, the ship's last `ScoutWaypointGoal` stays active, so mining and trading treat the ship as busy. It also writes two log lines every tick. | `ScoutAllMarketplacesPlanService.cs:162`, `MiningAutomationService.cs:388-405` | 6.2 |
 | B11 | **Prometheus can't scrape `/metrics`.** Only `/health` is exempt from the API key. (`spacetraders_api_throttled_total` also counted every 25 ms local wait as a throttle; since 1.10 it counts 429 responses only.) | `ApiKeyMiddleware.cs:17`, `RateLimitingHandler.cs` | 2.1 |
-| B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 |
+| B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 (done) |
 | B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
 | B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
@@ -81,6 +81,7 @@ with a test that does.
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 | B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
 | B26 | **A newly registered agent had no settings until the pod restarted** (found and confirmed in 1.4). Registration wrote the new agent's rows and default settings through a DbContext that was created before the new agent was set: resolving the API client creates it, for the endpoint-usage counter. So all of it was stored under the previous agent. With every setting missing, `Automation.Enabled` read as off, and after a server reset the bot sat idle until its next restart. | `AgentBootstrapService.cs` (`RegisterNewAgentAsync`), `ApiEndpointUsageRecorder.cs` | 1.4 (done) |
+| B27 | **A contract plan waiting for budget calls the API on every tick** (found in 1.9). It is retried every 5 s, and each retry fetches every contract (`GET my/contracts`) and saves a new plan: 12 calls a minute while it waits, and the waiting can last as long as the credits stay short. Its log lines went to Debug in 1.9; the calls are still there. | `ContractPlanService.cs` (`EnsureBootstrappedAsync`, `RefreshContractsCacheOnceAsync`) | 6.1 |
 
 ### Decisions (2026-10-01)
 
@@ -298,7 +299,7 @@ cluster (phase 4).
     purpose. A reset in the middle of startup makes that step fail, which stops the host (1.11).
   - The new agent starts with the default settings, because settings are stored per agent.
 
-**1.9 Log diet (B12)**
+**1.9 Log diet (B12)** (done)
 - Do:
   - move per-tick messages to Debug, or log them only when something changes;
   - set `System.Net.Http` to Warning in the Serilog section (done in `appsettings*.json`; the old
@@ -308,6 +309,24 @@ cluster (phase 4).
   - push tick and plan context through `LogContext`.
 - Done when: an idle bot writes less than one line a minute, and a normal day stays within a
   budget of 50k lines. Loki's 31 days on 10Gi are shared with every app.
+- Done:
+  - What a tick finds when nothing changed goes to Debug: a plan already complete or still
+    waiting, no idle ship, no budget, a purchase denied, the mining drone cap. Every action stays
+    at Information (docked, sold, bought, assigned), and so does the contract plan starting to
+    wait for budget, once. Ship commands log their result; the "starting" line goes to Debug.
+  - Two idle states the first run can meet now write nothing at Information: the command ship
+    after scouting (two lines every tick, 24 a minute, from B10) and a contract plan waiting for
+    budget (four every tick, 48 a minute). Tests replay a minute of ticks of each.
+  - `RenderedCompactJsonFormatter` in Production. The ship a line is about is always
+    `ShipSymbol` (no more `Symbol` or `Ship`), a waypoint `WaypointSymbol` unless the message
+    names its role (`Destination`, `SellWaypoint`), a contract `ContractId`, a goal kind
+    `GoalKind`. Every line logged during a tick carries `Tick`, and its step's `Plan`,
+    `ShipSymbol` or `ContractId`, through `ILogger.BeginScope`, which Serilog turns into
+    properties (checked against Serilog itself).
+  - Still open: the 50k-a-day budget can only be measured in the soak test (1.14), and for
+    probes, mining and trading once phase 6 switches them on. A ship that can't find a route logs
+    a warning on every tick; phase 3's health rules are the place for that.
+  - Found on the way: B27 (the waiting contract plan's API calls).
 
 **1.10 Follow the API guide for limits and errors (B13)** (done, apart from the check after the redeploy)
 - Do: make the client do what https://spacetraders.io/api-guide/rate-limits says:

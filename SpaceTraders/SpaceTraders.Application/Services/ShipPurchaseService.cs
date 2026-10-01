@@ -74,7 +74,7 @@ public sealed class ShipPurchaseService(
         await ships.UpsertAsync(newShip, cancellationToken);
 
         logger.LogInformation(
-            "ShipPurchaseService: purchased {Symbol} ({Type}) at {Shipyard} for {Cost} credits.",
+            "ShipPurchaseService: purchased {ShipSymbol} ({Type}) at {Shipyard} for {Cost} credits.",
             result.ShipSymbol,
             shipType,
             shipyardWaypoint,

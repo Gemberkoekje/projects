@@ -35,7 +35,7 @@ public sealed class JumpGateCacheService(
         }
         catch (Exception exception)
         {
-            logger.LogDebug(exception, "Skipping jump-gate cache refresh for {Waypoint} in {System}.", waypointSymbol, systemSymbol);
+            logger.LogDebug(exception, "Skipping jump-gate cache refresh for {WaypointSymbol} in {System}.", waypointSymbol, systemSymbol);
         }
     }
 

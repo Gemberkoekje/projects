@@ -3,6 +3,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
@@ -60,6 +61,21 @@ public sealed class GameLoopServiceTests : IDisposable
     }
 
     public void Dispose() => _serviceProvider.Dispose();
+
+    [Fact]
+    public async Task Tick_PutsTheTickAndThePlanOrShipOfEachStepInTheLogContext()
+    {
+        // B12: nothing told which tick, plan or ship a line logged during a tick belonged to.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
+        var logger = Substitute.For<ILogger<GameLoopService>>();
+
+        await TickAsync(logger);
+
+        logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => context.ContainsKey("Tick")));
+        logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "Plan", AutomationPlan.Scout)));
+        logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "ShipSymbol", "SPECTER-DEBUG-3")));
+        logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "ContractId", "CONTRACT-1") && Has(context, "ShipSymbol", "SPECTER-DEBUG-5")));
+    }
 
     [Fact]
     public async Task Tick_ExecutesGoalExecutor_ForAllShipsNotJustScouts()
@@ -197,7 +213,10 @@ public sealed class GameLoopServiceTests : IDisposable
         }
     }
 
-    private async Task TickAsync()
+    private static bool Has(Dictionary<string, object> context, string key, object value)
+        => context.TryGetValue(key, out var actual) && Equals(actual, value);
+
+    private async Task TickAsync(ILogger<GameLoopService>? logger = null)
     {
         var leaderElection = Substitute.For<ILeaderElection>();
         leaderElection.IsLeader.Returns(true);
@@ -206,7 +225,7 @@ public sealed class GameLoopServiceTests : IDisposable
             _serviceScopeFactory,
             _apiAvailability,
             leaderElection,
-            NullLogger<GameLoopService>.Instance);
+            logger ?? NullLogger<GameLoopService>.Instance);
 
         var tickMethod = typeof(GameLoopService)
             .GetMethod("TickAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;

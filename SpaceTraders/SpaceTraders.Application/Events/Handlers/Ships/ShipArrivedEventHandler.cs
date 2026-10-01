@@ -26,7 +26,7 @@ public sealed class ShipArrivedEventHandler(
         if (activeGoal is null || activeGoal.GoalId != @event.GoalId)
         {
             logger.LogDebug(
-                "ShipArrivedEventHandler: stale wake-up ignored for ship {Ship} (event GoalId={EventGoal}, active GoalId={ActiveGoal}).",
+                "ShipArrivedEventHandler: stale wake-up ignored for ship {ShipSymbol} (event GoalId={EventGoal}, active GoalId={ActiveGoal}).",
                 @event.ShipSymbol,
                 @event.GoalId,
                 activeGoal?.GoalId);
@@ -34,7 +34,7 @@ public sealed class ShipArrivedEventHandler(
         }
 
         logger.LogInformation(
-            "ShipArrivedEventHandler: ship {Ship} arrived; dispatching post-arrival command.",
+            "ShipArrivedEventHandler: ship {ShipSymbol} arrived; dispatching post-arrival command.",
             @event.ShipSymbol);
 
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);

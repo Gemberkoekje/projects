@@ -126,7 +126,7 @@ public sealed class ScoutAllMarketplacesPlanService(
 
         if (plan.Status != ScoutPlanStatus.Active)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Scout plan advance requested for ship {ShipSymbol} but plan status is {Status}; ignoring.",
                 shipSymbol,
                 plan.Status);
@@ -241,18 +241,18 @@ public sealed class ScoutAllMarketplacesPlanService(
     }
 
     private async Task SetScoutGoalAsync(
-        ShipAssignmentDto assignment,
+        ShipAssignmentDto scoutAssignment,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(assignment.DestWaypoint))
+        if (string.IsNullOrWhiteSpace(scoutAssignment.DestWaypoint))
         {
             throw new InvalidOperationException(
-                $"Scout assignment for ship {assignment.ShipSymbol} has no destination waypoint.");
+                $"Scout assignment for ship {scoutAssignment.ShipSymbol} has no destination waypoint.");
         }
 
         await goals.SetActiveGoalAsync(
-            assignment.ShipSymbol,
-            new ScoutWaypointGoal { TargetWaypointSymbol = assignment.DestWaypoint },
+            scoutAssignment.ShipSymbol,
+            new ScoutWaypointGoal { TargetWaypointSymbol = scoutAssignment.DestWaypoint },
             cancellationToken);
     }
 }

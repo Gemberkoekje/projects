@@ -54,7 +54,8 @@ builder.Host.UseSerilog((ctx, cfg) =>
 {
     if (ctx.HostingEnvironment.IsProduction())
     {
-        cfg.WriteTo.Console(new CompactJsonFormatter());
+        // JSON for Loki, with the rendered message, so a line reads without its template.
+        cfg.WriteTo.Console(new RenderedCompactJsonFormatter());
     }
     else
     {

@@ -692,9 +692,16 @@ The seven pages in `src/Future` are not routed.
 ## 11. Logging and metrics
 
 - **Logs:** console only. Kubernetes and Promtail pick them up, and Loki keeps them for 31 days.
-  - There are no correlation properties.
-  - Several tick paths log at Information every 5 s (B12).
-  - The ship symbol is logged under three property names: `ShipSymbol`, `Symbol` and `Ship`.
+  - Production writes JSON with the rendered message (`RenderedCompactJsonFormatter`: `@m`).
+  - Information is for what happens: a ship docks, sells, is bought; a plan starts, advances,
+    completes or starts waiting. What a tick finds when nothing changed (no idle ship, no budget,
+    a plan already complete) goes to Debug, and so does the "starting" line of a ship command
+    whose result line follows. An idle bot logs nothing at Information.
+  - One property name per concept: `ShipSymbol`, `ContractId`, `WaypointSymbol` (unless the
+    message names a role, such as `Destination` or `SellWaypoint`), `GoalKind`.
+  - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
+    `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
+    Serilog turns into properties.
 - **Metrics** (`PrometheusMetricsService`, every 10 s), plus the prometheus-net defaults:
 
   | Metric | Updated? |
@@ -750,7 +757,7 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~255 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Application.Tests` | ~258 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
 | `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
 | `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |

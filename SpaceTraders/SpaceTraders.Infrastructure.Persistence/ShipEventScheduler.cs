@@ -66,7 +66,7 @@ public sealed class ShipEventScheduler(
     {
         await UpsertDbRowAsync(shipSymbol, goalId, "Arrival", arrivalTime, ct);
         EnqueueInMemory(new ScheduleEntry(arrivalTime, shipSymbol, goalId, "Arrival"));
-        logger.LogDebug("ShipEventScheduler: queued Arrival for {Ship} / goal {Goal} at {Time}.", shipSymbol, goalId, arrivalTime);
+        logger.LogDebug("ShipEventScheduler: queued Arrival for {ShipSymbol} / goal {Goal} at {Time}.", shipSymbol, goalId, arrivalTime);
     }
 
     /// <inheritdoc/>
@@ -74,7 +74,7 @@ public sealed class ShipEventScheduler(
     {
         await UpsertDbRowAsync(shipSymbol, goalId, "CooldownExpiry", expiresAt, ct);
         EnqueueInMemory(new ScheduleEntry(expiresAt, shipSymbol, goalId, "CooldownExpiry"));
-        logger.LogDebug("ShipEventScheduler: queued CooldownExpiry for {Ship} / goal {Goal} at {Time}.", shipSymbol, goalId, expiresAt);
+        logger.LogDebug("ShipEventScheduler: queued CooldownExpiry for {ShipSymbol} / goal {Goal} at {Time}.", shipSymbol, goalId, expiresAt);
     }
 
     /// <inheritdoc/>
@@ -82,7 +82,7 @@ public sealed class ShipEventScheduler(
     {
         await DeleteDbRowAsync(shipSymbol, goalId, ct);
         RemoveFromMemory(shipSymbol, goalId);
-        logger.LogDebug("ShipEventScheduler: cancelled scheduled event for {Ship} / goal {Goal}.", shipSymbol, goalId);
+        logger.LogDebug("ShipEventScheduler: cancelled scheduled event for {ShipSymbol} / goal {Goal}.", shipSymbol, goalId);
     }
 
     // ───────────────────────────────────────────────────────────────
@@ -223,17 +223,17 @@ public sealed class ShipEventScheduler(
             if (entry.EventKind == "Arrival")
             {
                 await bus.PublishAsync(new ShipArrivedEvent(entry.ShipSymbol, entry.GoalId, now));
-                logger.LogInformation("ShipEventScheduler: fired ShipArrivedEvent for {Ship} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
+                logger.LogInformation("ShipEventScheduler: fired ShipArrivedEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
             }
             else
             {
                 await bus.PublishAsync(new ShipCooldownExpiredEvent(entry.ShipSymbol, entry.GoalId, now));
-                logger.LogInformation("ShipEventScheduler: fired ShipCooldownExpiredEvent for {Ship} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
+                logger.LogInformation("ShipEventScheduler: fired ShipCooldownExpiredEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "ShipEventScheduler: error firing event for {Ship} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
+            logger.LogError(ex, "ShipEventScheduler: error firing event for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
         }
     }
 
@@ -303,7 +303,7 @@ public sealed class ShipEventScheduler(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "ShipEventScheduler: failed to persist scheduled event for {Ship} / goal {Goal}.", shipSymbol, goalId);
+            logger.LogError(ex, "ShipEventScheduler: failed to persist scheduled event for {ShipSymbol} / goal {Goal}.", shipSymbol, goalId);
         }
     }
 
@@ -320,7 +320,7 @@ public sealed class ShipEventScheduler(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "ShipEventScheduler: failed to delete scheduled event for {Ship} / goal {Goal}.", shipSymbol, goalId);
+            logger.LogError(ex, "ShipEventScheduler: failed to delete scheduled event for {ShipSymbol} / goal {Goal}.", shipSymbol, goalId);
         }
     }
 

@@ -107,7 +107,7 @@ public sealed class StartupSnapshotService(
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning(ex, "Could not fetch market data for waypoint {Waypoint}.", waypoint.Symbol);
+                                logger.LogWarning(ex, "Could not fetch market data for waypoint {WaypointSymbol}.", waypoint.Symbol);
                             }
                         }
 
@@ -119,7 +119,7 @@ public sealed class StartupSnapshotService(
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {Waypoint}.", waypoint.Symbol);
+                                logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {WaypointSymbol}.", waypoint.Symbol);
                             }
                         }
                     }

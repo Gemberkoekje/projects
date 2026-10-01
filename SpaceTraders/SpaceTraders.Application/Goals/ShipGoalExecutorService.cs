@@ -33,7 +33,7 @@ public sealed class ShipGoalExecutorService(
         var ship = await ships.FindAsync(shipSymbol, ct);
         if (ship is null)
         {
-            logger.LogWarning("ShipGoalExecutorService: ship {Ship} not found.", shipSymbol);
+            logger.LogWarning("ShipGoalExecutorService: ship {ShipSymbol} not found.", shipSymbol);
             return null;
         }
 
@@ -64,7 +64,7 @@ public sealed class ShipGoalExecutorService(
         if (executor is null)
         {
             logger.LogWarning(
-                "ShipGoalExecutorService: no executor registered for goal kind {Kind} on ship {Ship}.",
+                "ShipGoalExecutorService: no executor registered for goal kind {GoalKind} on ship {ShipSymbol}.",
                 activeGoal.Kind,
                 shipSymbol);
             return null;
@@ -88,8 +88,10 @@ public sealed class ShipGoalExecutorService(
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)
         {
-            logger.LogInformation(
-                "ShipGoalExecutorService: ship {Ship} completed goal {Kind}; advancing scout plan.",
+            // Debug: the scout plan logs what advancing does, and after the last waypoint this
+            // repeats on every tick (B10).
+            logger.LogDebug(
+                "ShipGoalExecutorService: ship {ShipSymbol} completed goal {GoalKind}; advancing scout plan.",
                 shipSymbol,
                 activeGoal.Kind);
             await scoutPlanService.AdvanceAsync(shipSymbol, ct);

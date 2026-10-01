@@ -55,15 +55,15 @@ public sealed class DeployProbeGoalExecutor(
             if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogInformation(
-                    "DeployProbeGoalExecutor: setting DRIFT mode for probe {Symbol} at {Waypoint}.",
+                    "DeployProbeGoalExecutor: setting DRIFT mode for probe {ShipSymbol} at {WaypointSymbol}.",
                     ship.Symbol,
                     deployGoal.TargetWaypointSymbol);
 
                 await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
             }
 
-            logger.LogInformation(
-                "DeployProbeGoalExecutor: probe {Symbol} deployed at {Waypoint}; advancing deployment plan.",
+            logger.LogDebug(
+                "DeployProbeGoalExecutor: probe {ShipSymbol} deployed at {WaypointSymbol}; advancing deployment plan.",
                 ship.Symbol,
                 deployGoal.TargetWaypointSymbol);
 
@@ -78,7 +78,7 @@ public sealed class DeployProbeGoalExecutor(
             && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             logger.LogInformation(
-                "DeployProbeGoalExecutor: probe {Symbol} has no fuel; switching to DRIFT mode before navigating.",
+                "DeployProbeGoalExecutor: probe {ShipSymbol} has no fuel; switching to DRIFT mode before navigating.",
                 ship.Symbol);
 
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);

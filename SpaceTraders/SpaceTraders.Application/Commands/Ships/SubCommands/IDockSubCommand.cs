@@ -22,12 +22,12 @@ public sealed class DockSubCommand(
 {
     public async Task ExecuteAsync(string shipSymbol, CancellationToken cancellationToken)
     {
-        logger.LogInformation("DockSubCommand: docking ship {Symbol}.", shipSymbol);
+        logger.LogDebug("DockSubCommand: docking ship {ShipSymbol}.", shipSymbol);
         var nav = await port.DockShipAsync(shipSymbol, cancellationToken);
         await ships.UpdateNavAsync(shipSymbol, nav, null, cancellationToken);
         dashboardNotifier.Notify("ships", shipSymbol);
         dashboardNotifier.Notify("fleet-activity", shipSymbol);
         dashboardNotifier.Notify("activity", shipSymbol);
-        logger.LogInformation("DockSubCommand: ship {Symbol} docked at {Waypoint}.", shipSymbol, nav.WaypointSymbol);
+        logger.LogInformation("DockSubCommand: ship {ShipSymbol} docked at {WaypointSymbol}.", shipSymbol, nav.WaypointSymbol);
     }
 }

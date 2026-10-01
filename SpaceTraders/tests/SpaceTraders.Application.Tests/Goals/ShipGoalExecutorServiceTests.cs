@@ -40,6 +40,56 @@ public sealed class ShipGoalExecutorServiceTests
             NullLogger<ShipGoalExecutorService>.Instance);
 
     [Fact]
+    public async Task ExecuteAsync_ForTheCommandShipAfterScouting_KeepsNoLogLines()
+    {
+        // B12: once the scout plan has completed, the command ship keeps its last scout goal (B10),
+        // so every tick completed that goal again and wrote two lines at Information.
+        var log = new LogRecorder();
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-001" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+        _executor.ExecuteStepAsync(FullFuelShip, scoutGoal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Completed("Scout waypoint visited."));
+        var scoutPlans = Substitute.For<IScoutPlanRepository>();
+        scoutPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ScoutAllMarketplacesPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ShipSymbol = "SHIP-1",
+            StartWaypointSymbol = "X1-AB-001",
+            RouteWaypointSymbols = ["X1-AB-001"],
+            CurrentRouteIndex = 0,
+            Status = ScoutPlanStatus.Completed,
+            CreatedAt = DateTimeOffset.UnixEpoch,
+            UpdatedAt = DateTimeOffset.UnixEpoch,
+        });
+        var scoutPlanService = new ScoutAllMarketplacesPlanService(
+            scoutPlans,
+            Substitute.For<IScoutShipSelectionService>(),
+            Substitute.For<IScoutMarketplaceDiscoveryService>(),
+            Substitute.For<IMarketplaceRoutePlanner>(),
+            Substitute.For<IShipAssignmentRepository>(),
+            _goals,
+            log.For<ScoutAllMarketplacesPlanService>());
+        var service = new ShipGoalExecutorService(
+            [_executor],
+            _goals,
+            _ships,
+            scoutPlanService,
+            _settings,
+            new GoalStepCircuitBreaker(),
+            Substitute.For<IAutomationMetrics>(),
+            log.For<ShipGoalExecutorService>());
+
+        for (var tick = 0; tick < 12; tick++)
+        {
+            await service.ExecuteAsync("SHIP-1", CancellationToken.None);
+        }
+
+        log.Kept.Should().BeEmpty("a minute of ticks with nothing new to say");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenShipNotFound_ReturnsNull()
     {
         _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns((ShipModel)null!);

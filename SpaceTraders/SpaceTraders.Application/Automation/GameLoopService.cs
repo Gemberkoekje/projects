@@ -27,6 +27,8 @@ public sealed class GameLoopService(
 {
     private static readonly TimeSpan DeadReckoningInterval = TimeSpan.FromSeconds(5);
 
+    private long _tick;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -56,6 +58,8 @@ public sealed class GameLoopService(
             return;
         }
 
+        // Every line logged during the tick carries its number; each step adds its plan or ship.
+        using var tickContext = logger.BeginScope(new Dictionary<string, object> { ["Tick"] = Interlocked.Increment(ref _tick) });
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var bus = services.GetRequiredService<Wolverine.IMessageBus>();
@@ -87,6 +91,7 @@ public sealed class GameLoopService(
             if (await settings.IsPlanEnabledAsync(plan, cancellationToken))
             {
                 await RunStepAsync(
+                    new Dictionary<string, object> { ["Plan"] = plan },
                     services => BootstrapAsync(plan, services, cancellationToken),
                     exception => logger.LogError(exception, "GameLoopService: bootstrapping the {Plan} plan failed; the rest of the tick carries on.", plan),
                     cancellationToken);
@@ -99,6 +104,7 @@ public sealed class GameLoopService(
             foreach (var ship in ships)
             {
                 await RunStepAsync(
+                    new Dictionary<string, object> { ["ShipSymbol"] = ship.Symbol },
                     async services =>
                     {
                         await services.GetRequiredService<IShipGoalExecutorService>().ExecuteAsync(ship.Symbol, cancellationToken);
@@ -116,10 +122,16 @@ public sealed class GameLoopService(
 
     /// <summary>
     /// Runs one step of the tick in its own scope and try/catch, so that a step that throws, or
-    /// leaves its DbContext unusable, doesn't stop the steps after it.
+    /// leaves its DbContext unusable, doesn't stop the steps after it. Everything logged during the
+    /// step carries <paramref name="logContext"/>.
     /// </summary>
-    private async Task RunStepAsync(Func<IServiceProvider, Task> step, Action<Exception> logFailure, CancellationToken cancellationToken)
+    private async Task RunStepAsync(
+        Dictionary<string, object> logContext,
+        Func<IServiceProvider, Task> step,
+        Action<Exception> logFailure,
+        CancellationToken cancellationToken)
     {
+        using var stepContext = logger.BeginScope(logContext);
         try
         {
             await using var scope = serviceScopeFactory.CreateAsyncScope();
@@ -166,6 +178,12 @@ public sealed class GameLoopService(
             }
 
             await RunStepAsync(
+                new Dictionary<string, object>
+                {
+                    ["Plan"] = AutomationPlan.Contract,
+                    ["ShipSymbol"] = assignment.ShipSymbol,
+                    ["ContractId"] = assignment.ContractId!,
+                },
                 services => RunContractAssignmentAsync(assignment, services, cancellationToken),
                 exception => logger.LogError(
                     exception,

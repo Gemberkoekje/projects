@@ -127,7 +127,7 @@ public sealed class MineAndSellGoalExecutor(
         }
 
         logger.LogInformation(
-            "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {Waypoint} for {Revenue} credits.",
+            "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
             ship.Symbol,
             targetUnits,
             miningGoal.TradeSymbol,
@@ -221,7 +221,7 @@ public sealed class MineAndSellGoalExecutor(
 
         await goals.SetActiveGoalAsync(surveyShipSymbol, surveyGoal, ct);
         logger.LogInformation(
-            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {SurveyShip} for {TradeSymbol} at {Waypoint}.",
+            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {ShipSymbol} for {TradeSymbol} at {WaypointSymbol}.",
             surveyShipSymbol,
             miningGoal.TradeSymbol,
             miningGoal.SourceWaypointSymbol);

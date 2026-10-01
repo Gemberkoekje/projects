@@ -26,7 +26,6 @@ public sealed class ContractPlanService(
     IShipPurchaseService shipPurchases,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
-
     private const string ContractAssignmentType = "Contract";
     private const string MinerShipType = "SHIP_MINING_DRONE";
 
@@ -62,7 +61,7 @@ public sealed class ContractPlanService(
                 return;
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Contract plan bootstrap: retrying pending-budget plan for contract {ContractId}.",
                 existing.ContractId);
         }
@@ -150,7 +149,9 @@ public sealed class ContractPlanService(
                 StopReason = "No idle mining ship available and unable to purchase SHIP_MINING_DRONE.",
             }, cancellationToken);
 
-            logger.LogInformation(
+            // Retried on every tick: only starting to wait is news.
+            logger.Log(
+                existing?.Status == ContractMineralPlanStatus.PendingBudget ? LogLevel.Debug : LogLevel.Information,
                 "Contract plan pending for contract {ContractId}: no miner available and purchase was not possible.",
                 pending.ContractId);
             return;
@@ -458,13 +459,13 @@ public sealed class ContractPlanService(
                 continue;
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Contract plan ship selection: selected idle mining-capable ship {ShipSymbol}.",
                 ship.Symbol);
             return ship;
         }
 
-        logger.LogInformation(
+        logger.LogDebug(
             "Contract plan ship selection: no eligible idle mining-capable ship found after evaluating {ShipCount} ships.",
             allShips.Count);
 
@@ -485,8 +486,8 @@ public sealed class ContractPlanService(
         var purchased = await shipPurchases.TryPurchaseAsync(MinerShipType, shipyardWaypoint, cancellationToken);
         if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
-            logger.LogInformation(
-                "Contract plan purchase fallback: purchase denied for {ShipType} at {Waypoint} - {Reason}",
+            logger.LogDebug(
+                "Contract plan purchase fallback: purchase denied for {ShipType} at {WaypointSymbol} - {Reason}",
                 MinerShipType,
                 shipyardWaypoint,
                 purchased.FailureReason ?? "Purchase failed.");
@@ -666,9 +667,9 @@ public sealed class ContractPlanService(
             return;
         }
 
-        if (assignment.RequiredUnits != remainingUnits)
+        if (assignment is { } current && current.RequiredUnits != remainingUnits)
         {
-            await assignments.UpsertAsync(assignment with { RequiredUnits = remainingUnits }, cancellationToken);
+            await assignments.UpsertAsync(current with { RequiredUnits = remainingUnits }, cancellationToken);
         }
     }
 

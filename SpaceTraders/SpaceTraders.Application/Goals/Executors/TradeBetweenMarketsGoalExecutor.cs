@@ -84,7 +84,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             await UpdateAgentCreditsAsync(buyResult.AgentCredits, ct);
 
             logger.LogInformation(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} bought {Units} {TradeSymbol} at {Waypoint} for {Cost} credits.",
+                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
                 ship.Symbol,
                 unitsToBuy,
                 tradeGoal.TradeSymbol,
@@ -120,7 +120,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         await UpdateAgentCreditsAsync(sellResult.AgentCredits, ct);
 
         logger.LogInformation(
-            "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {Waypoint} for {Revenue} credits.",
+            "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
             ship.Symbol,
             targetUnits,
             tradeGoal.TradeSymbol,
@@ -149,7 +149,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         if (tradeVolume > 0 && unitsToBuy < availableCapacity)
         {
             logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {Waypoint} from {RequestedUnits} to market trade volume {TradeVolume}.",
+                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {WaypointSymbol} from {RequestedUnits} to market trade volume {TradeVolume}.",
                 ship.Symbol,
                 tradeGoal.TradeSymbol,
                 tradeGoal.BuyWaypointSymbol,
@@ -167,7 +167,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         if (agent is null || agent.Credits <= 0)
         {
             logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot buy {TradeSymbol} at {Waypoint}; agent credits are unavailable or zero.",
+                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot buy {TradeSymbol} at {WaypointSymbol}; agent credits are unavailable or zero.",
                 ship.Symbol,
                 tradeGoal.TradeSymbol,
                 tradeGoal.BuyWaypointSymbol);
@@ -178,7 +178,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         if (affordableUnitsLong <= 0)
         {
             logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot afford any {TradeSymbol} at {Waypoint}; credits {Credits}, purchase price {PurchasePrice}.",
+                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot afford any {TradeSymbol} at {WaypointSymbol}; credits {Credits}, purchase price {PurchasePrice}.",
                 ship.Symbol,
                 tradeGoal.TradeSymbol,
                 tradeGoal.BuyWaypointSymbol,
@@ -191,7 +191,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         if (affordableUnits < unitsToBuy)
         {
             logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {Waypoint} from {RequestedUnits} to affordable units {AffordableUnits} (credits {Credits}, purchase price {PurchasePrice}).",
+                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {WaypointSymbol} from {RequestedUnits} to affordable units {AffordableUnits} (credits {Credits}, purchase price {PurchasePrice}).",
                 ship.Symbol,
                 tradeGoal.TradeSymbol,
                 tradeGoal.BuyWaypointSymbol,

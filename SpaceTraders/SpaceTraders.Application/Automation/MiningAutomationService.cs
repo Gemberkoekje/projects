@@ -57,7 +57,7 @@ public sealed class MiningAutomationService(
         var now = TimeProvider.System.GetUtcNow();
         var opportunities = await GetScarceMineralBuyOpportunitiesAsync(cancellationToken);
 
-        logger.LogInformation(
+        logger.LogDebug(
             "Mining automation: found {OpportunityCount} scarce market opportunity(s) in cached market data.",
             opportunities.Count);
 
@@ -130,7 +130,7 @@ public sealed class MiningAutomationService(
             && !shipsWithGoals.Contains(ship.Symbol));
         var hasIdleMinerAtStart = idleMinerCount > 0;
 
-        logger.LogInformation(
+        logger.LogDebug(
             "Mining automation: {IdleMinerCount} idle mining drone(s) available before assignment.",
             idleMinerCount);
 
@@ -183,7 +183,7 @@ public sealed class MiningAutomationService(
                 cancellationToken);
             if (string.IsNullOrWhiteSpace(sourceWaypoint))
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no asteroid source found.",
                     opportunity.TradeSymbol,
                     opportunity.SellWaypointSymbol);
@@ -247,7 +247,7 @@ public sealed class MiningAutomationService(
         }
         else if (unassignedOpportunities.Count > 0)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Mining automation: skipping miner purchase for {OpportunityCount} unassigned opportunity(s) because idle mining drone(s) already exist.",
                 unassignedOpportunities.Count);
         }
@@ -295,7 +295,7 @@ public sealed class MiningAutomationService(
             var idleDrone = await TryPurchaseMiningDroneAsync(opportunity.SellWaypointSymbol, updatedFleet, cancellationToken);
             if (idleDrone is null)
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no idle drone and purchase unavailable.",
                     opportunity.TradeSymbol,
                     opportunity.SellWaypointSymbol);
@@ -414,7 +414,7 @@ public sealed class MiningAutomationService(
 
         if (miningDroneCount >= maxMiningDrones)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Mining automation: mining drone cap reached ({Current}/{Max}); purchase skipped.",
                 miningDroneCount,
                 maxMiningDrones);
@@ -445,7 +445,7 @@ public sealed class MiningAutomationService(
             cancellationToken);
         if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Mining automation: mining drone purchase denied at {Shipyard} — {Reason}.",
                 shipyard.WaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");

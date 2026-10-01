@@ -223,6 +223,58 @@ public sealed class ContractPlanServiceTests
     }
 
     [Fact]
+    public async Task EnsureBootstrappedAsync_WhileThePlanWaitsForBudget_KeepsALogLineOnlyWhenItStartsWaiting()
+    {
+        // B12: a plan waiting for budget is retried on every tick, which wrote four lines at
+        // Information each time.
+        var log = new LogRecorder();
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var shipyards = Substitute.For<IShipyardRepository>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
+        ContractMineralPlanState? stored = null;
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns(_ => stored);
+        await plans.UpsertAsync(Arg.Do<ContractMineralPlanState>(plan => stored = plan), Arg.Any<CancellationToken>());
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-3",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("COPPER_ORE", "X1-AB-MKT", 30, 0) }))
+        ]);
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100)]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+        shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = false, FailureReason = "Insufficient credits.", EstimatedCost = 100_000 });
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            shipyards,
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            shipPurchases,
+            log.For<ContractPlanService>());
+
+        for (var tick = 0; tick < 12; tick++)
+        {
+            await sut.EnsureBootstrappedAsync(CancellationToken.None);
+        }
+
+        stored!.Status.Should().Be(ContractMineralPlanStatus.PendingBudget);
+        log.Kept.Should().ContainSingle().Which.Should().Contain("C-3");
+    }
+
+    [Fact]
     public async Task EnsureBootstrappedAsync_DoesNothing_WhenPlanAlreadyExists()
     {
         var plans = Substitute.For<IContractMineralPlanRepository>();

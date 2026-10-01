@@ -70,7 +70,7 @@ public sealed class StartupRecoveryService(
 
             var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} arrived at {Waypoint}; executed goal step (outcome={Outcome}).",
+                "StartupRecovery: Ship {ShipSymbol} arrived at {WaypointSymbol}; executed goal step (outcome={Outcome}).",
                 ship.Symbol, arrivedWaypoint, result?.Outcome);
         }
         else if (ship.ArrivesAt.HasValue)
@@ -89,20 +89,20 @@ public sealed class StartupRecoveryService(
             await bus.PublishAsync(transitEvent);
 
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule arrival.",
+                "StartupRecovery: Ship {ShipSymbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule arrival.",
                 ship.Symbol, ship.ArrivesAt.Value);
         }
         else if (ship.LocalStatus == ShipLocalStatus.Docked || ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
             var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} is {Status}; executed goal step (outcome={Outcome}).",
+                "StartupRecovery: Ship {ShipSymbol} is {Status}; executed goal step (outcome={Outcome}).",
                 ship.Symbol, ship.LocalStatus, result?.Outcome);
         }
         else
         {
             logger.LogWarning(
-                "StartupRecovery: Ship {Symbol} has unrecognised status '{Status}'; skipping.",
+                "StartupRecovery: Ship {ShipSymbol} has unrecognised status '{Status}'; skipping.",
                 ship.Symbol, ship.Status);
         }
     }
