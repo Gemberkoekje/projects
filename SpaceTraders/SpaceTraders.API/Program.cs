@@ -90,7 +90,6 @@ builder.Services.AddSingleton<StartupSnapshotService>();
 builder.Services.AddSingleton<StartupRecoveryService>();
 builder.Services.AddSingleton<SettingsStartupLoggingService>();
 builder.Services.AddSingleton<GameLoopService>();
-builder.Services.AddSingleton<ActivityLogPruningService>();
 builder.Services.AddSingleton<DataRetentionService>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
 

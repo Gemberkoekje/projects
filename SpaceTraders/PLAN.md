@@ -57,7 +57,7 @@ with a test that does.
 |---|---|---|---|
 | B1 | **"Already at destination" loop.** Navigating to the waypoint a ship is already at publishes `ShipNavigationCompletedEvent` without docking or orbiting. Its handler re-runs the goal executor, which asks to navigate there again. No API call is involved, so the rate limiter doesn't slow it, and the 5 s tick starts another chain every time. The survey executor hits this in its normal state right after any arrival (docked at the target). Most likely what filled the database. | `NavigateToWaypointCommand.cs:82-96`, `ShipNavigationCompletedHandler.cs:26`, `SurveyWaypointGoalExecutor.cs:52`, `ScoutWaypointGoalExecutor.cs:41`, `DeployProbeGoalExecutor.cs:48`, `MineAndSellGoalExecutor.cs:106` | 1.1 (done) |
 | B2 | **The Wolverine inbox is never cleaned.** Every published message is stored in Postgres. Turning the durability agent off also turns off the deletion of handled messages: confirmed against Postgres in 1.3, where 50 handled messages were all still there a minute later (with the agent on they were gone). | `Program.cs:180`, `Program.cs:189-191` | 1.3 (done) |
-| B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good (fixed in 1.4: agent bootstrap deletes them). | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.4 (done: earlier agents), 1.5 |
+| B3 | **Retention gaps.** Pruning only starts if every earlier startup step succeeded, and one failing table stops the tables after it. `startup_snapshots` (full JSON on every pod start), `runs` and `wolverine.*` are never pruned. All pruning is scoped to the current agent, so each server reset leaves the previous agent's rows behind for good (fixed in 1.4: agent bootstrap deletes them). | `DeferredStartupHostedService.cs:57-76`, `DataRetentionService.cs:55-64` | 1.4 (done: earlier agents), 1.5 (done) |
 | B4 | **The agent JWT (about 1 KB) is part of every table's key**, and of its indexes. | `SpaceTradersDbContext.cs` (`AgentToken`, `HasMaxLength(1024)`) | 1.4 (done) |
 | B5 | **The automation kill switch doesn't stop the game loop.** Nothing in `Application/Automation/` reads `Automation.Enabled`. | `GameLoopService.cs:69-76` | 1.7 (done) |
 | B6 | **A server reset during a run isn't detected.** Every call fails with 401 until the pod restarts, and the liveness check keeps passing. | `AgentBootstrapService` (runs only at startup) | 1.8 (done) |
@@ -219,7 +219,7 @@ cluster (phase 4).
     database from before this slice has to be dropped. The unused `scout_plan_states` table is
     gone.
 
-**1.5 Retention for every table that grows (B3)**
+**1.5 Retention for every table that grows (B3)** (done)
 - Do:
   - give each table a policy: by age, by row count, or explicitly bounded;
   - add `startup_snapshots` (keep the last N) and `runs`;
@@ -228,6 +228,23 @@ cluster (phase 4).
   - rewrite the `NOT IN` downsampling delete so it fits the 30 s command timeout.
 - Done when: a test fails for any `DbSet` without a retention policy or an explicit "bounded"
   mark, so a new table can't slip through.
+- Done:
+  - `DataRetention` lists every table: 10 with a policy that prunes them, 18 bounded, each with
+    the reason. `DataRetentionTests` fails for a table that isn't listed; before, 23 tables had
+    no policy, `startup_snapshots` and `runs` among them.
+  - New policies: `startup_snapshots` keeps the agent's first snapshot and the last 10; `runs`
+    and `run_credit_highlights` keep 365 days (runs of every agent, since 1.4 keeps those);
+    `ship_goal_history` and completed `fleet_goals` keep 30 days. Claude picked these numbers;
+    they're yours to change. The existing ones (7 and 90 days for samples, 30 for the ledger and
+    ship tasks, `ActivityLog.RetentionDays` for the activity log) are as they were.
+  - `DataRetentionService` prunes each table in its own scope and try/catch, and has taken over
+    from `ActivityLogPruningService`. It starts right after database initialisation, before any
+    step that can fail, and prunes at once, then daily. Pruning covers every agent's rows, so it
+    doesn't need agent bootstrap; the activity log takes the longest `ActivityLog.RetentionDays`
+    any stored agent has.
+  - The downsampling deletes rank the rows once (`row_number()`). On 2.6 million samples (30
+    markets, 20 goods, 90 days), the old `NOT IN` was cancelled after 3 minutes, still running:
+    Postgres compared every row with a list too big to hash in `work_mem`. The new one took 5 s.
 
 **1.6 Database size guard**
 - Goal: the bot can't fill the shared Postgres volume or the NAS share.

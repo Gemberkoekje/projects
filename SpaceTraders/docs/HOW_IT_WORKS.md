@@ -72,21 +72,21 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 |---|---|---|---|
 | 1 | Database initialisation | once | Skipped in `Testing`; see [Data](#6-data) |
 | 2 | `ShipEventScheduler` | keeps running | Arrival timers. Skipped in `Testing` |
-| 3 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
-| 4 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
-| 5 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
-| 6 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
-| 7 | `StartupSnapshotService` | once | One JSON snapshot row |
-| 8 | `StartupRecoveryService` | once | Resumes ships |
-| 9 | `SettingsStartupLoggingService` | once | Logs every setting |
-| 10 | `GameLoopService` | every 5 s | The tick |
-| 11 | `ActivityLogPruningService` | 30 s after start, then daily | |
-| 12 | `DataRetentionService` | 60 s after start, then daily | |
-| 13 | `PrometheusMetricsService` | every 10 s | |
+| 3 | `DataRetentionService` | at start, then daily | Prunes every table by its policy; see [Retention](#retention) |
+| 4 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
+| 5 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
+| 6 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
+| 7 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
+| 8 | `StartupSnapshotService` | once | One JSON snapshot row |
+| 9 | `StartupRecoveryService` | once | Resumes ships |
+| 10 | `SettingsStartupLoggingService` | once | Logs every setting |
+| 11 | `GameLoopService` | every 5 s | The tick |
+| 12 | `PrometheusMetricsService` | every 10 s | |
 
-One try/catch wraps the chain. Steps 7 and 9 catch their own errors. A throw in steps 1, 3, 4, 6
-or 8 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
-stops. The process exits with code 1, so Kubernetes restarts it with back-off.
+One try/catch wraps the chain. Steps 8 and 10 catch their own errors. A throw in steps 1, 4, 5, 7
+or 9 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
+stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
+before any of those, so a pod that keeps failing during startup still prunes at every start.
 
 **Agent bootstrap** (`AgentBootstrapService`):
 - First it reads the server's reset date (`GET /`).
@@ -462,34 +462,48 @@ production code doesn't use the aggregates at all (B7).
   except their `runs` (`AgentDataCleanup`). Pruning then only has the active agent's rows to deal
   with.
 
-### Tables
+### Retention
 
-On top of the retention below, every other agent's rows are deleted at startup, except their
-`runs`.
+- `DataRetention` lists every table, with a policy that prunes it or the reason it can't grow
+  without bound ("bounded"). `DataRetentionTests` fails for a table that isn't listed.
+- `DataRetentionService` prunes each table in its own scope at start and then every 24 hours. A
+  table that fails is logged and the others carry on.
+- Pruning covers every agent's rows, so it doesn't wait for agent bootstrap. Next to it, agent
+  bootstrap deletes every other agent's rows at startup, except their `runs`.
+- Downsampling ranks the rows in one pass (`row_number()`). On 2.6 million samples (30 markets,
+  20 goods, 90 days), the `NOT IN` it replaces didn't finish within 3 minutes; this takes about 5
+  seconds, within the 30 s command timeout.
+
+### Tables
 
 | Table | Holds | Written by | Retention |
 |---|---|---|---|
-| `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | never |
-| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | never |
-| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | never |
-| `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | never |
-| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | never |
-| `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | never |
-| `agent_settings` | Settings | Seed, `PUT /settings` | never |
-| `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | never |
-| `plan_states` | Plan JSON per plan type | All five plans | never |
-| `scheduled_ship_events` | Arrival timers | Navigate | deleted when fired |
+| `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | bounded: the active agent's token |
+| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | bounded: one row |
+| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship |
+| `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
+| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
+| `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
+| `agent_settings` | Settings | Seed, `PUT /settings` | bounded: one row per setting |
+| `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | bounded: one row per ship |
+| `plan_states` | Plan JSON per plan type | All five plans | bounded: one row per plan |
+| `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
 | `ledger_entries` | Credit ledger | `LedgerEntryHandler`: fuel purchases only (B7) | 30 days |
-| `cached_surveys` | Surveys | Survey executor | expired rows removed when new surveys are saved |
-| `leader_leases` | Leader lease | Leader election | never (one row) |
-| `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | never (counters) |
-| `runs`, `run_credit_highlights` | Runs and start/end credits | Run lifecycle | never |
-| `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | never |
-| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, hourly to 90 days |
-| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, hourly to 90 days |
+| `cached_surveys` | Surveys | Survey executor | bounded: expired rows removed when new surveys are saved |
+| `leader_leases` | Leader lease | Leader election | bounded: one row |
+| `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
+| `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
+| `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
+| `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | the agent's first and the last 10 |
+| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, first per hour to 90 days |
+| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
-| `trade_opportunities`, `fleet_goals`, `ship_goal_history`, `cached_construction_sites`, `scheduled_runs` | — | Nothing | — |
+| `ship_goal_history` | Ended goals | Nothing | 30 days |
+| `fleet_goals` | Fleet goals | Nothing | completed ones 30 days |
+| `trade_opportunities` | Trade routes | Nothing | bounded: replaced as a whole |
+| `cached_construction_sites` | Construction sites | Nothing | bounded: one row per site |
+| `scheduled_runs` | Runs to start later | Nothing | bounded: deleted when promoted |
 
 ---
 
@@ -719,9 +733,9 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 | Project | Tests | Covers |
 |---|---|---|
 | `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~253 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~65 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~74 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.Application.Tests` | ~249 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Infrastructure.Tests` | ~70 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 **WebUI tests:**

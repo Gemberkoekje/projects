@@ -44,10 +44,6 @@ public interface ILedgerRepository
 
     /// <summary>Returns the number of distinct ship symbols that have ledger entries for the given run.</summary>
     Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default);
-
-    /// <summary>Deletes all ledger entries with <c>OccurredAt</c> older than <paramref name="olderThan"/>.</summary>
-    /// <returns>Number of rows deleted.</returns>
-    Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
 }
 
 public sealed record LedgerEntryDto(

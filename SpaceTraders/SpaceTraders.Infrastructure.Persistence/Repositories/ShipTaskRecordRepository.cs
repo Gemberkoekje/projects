@@ -94,11 +94,4 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
                 r.TaskKind, r.TargetWaypoint, r.PayloadJson))
             .ToList();
     }
-
-    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
-    {
-        return await db.ShipTaskRecords
-            .Where(r => r.StartedAt < olderThan)
-            .ExecuteDeleteAsync(cancellationToken);
-    }
 }

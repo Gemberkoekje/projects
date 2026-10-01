@@ -128,11 +128,4 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
             .Distinct()
             .CountAsync(cancellationToken);
     }
-
-    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
-    {
-        return await db.LedgerEntries
-            .Where(e => e.OccurredAt < olderThan)
-            .ExecuteDeleteAsync(cancellationToken);
-    }
 }

@@ -39,11 +39,4 @@ public sealed class ActivityLogRepository(SpaceTradersDbContext db) : IActivityL
             l.Id, l.Timestamp, l.ShipSymbol, l.EventType, l.Message, l.JsonDetails))
             .ToList();
     }
-
-    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
-    {
-        return await db.ActivityLogs
-            .Where(l => l.Timestamp < olderThan)
-            .ExecuteDeleteAsync(cancellationToken);
-    }
 }

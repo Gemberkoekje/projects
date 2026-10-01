@@ -1,38 +1,24 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Interfaces;
 
 namespace SpaceTraders.Application.Automation;
 
 /// <summary>
-/// Background service that runs nightly data retention jobs:
-/// <list type="bullet">
-///   <item>Prunes <c>MarketPriceSample</c> rows older than 7 days, keeping hourly aggregates for 90 days.</item>
-///   <item>Prunes <c>AgentCreditsSample</c> rows older than 7 days, keeping one row per hour for 90 days.</item>
-///   <item>Prunes <c>LedgerEntry</c> rows older than 30 days.</item>
-///   <item>Prunes <c>ShipTaskRecord</c> rows older than 30 days.</item>
-/// </list>
-/// Runs once at startup (after a short delay), then every 24 hours.
+/// Prunes every table that grows, by the policy <see cref="IDataRetention"/> has for it: once
+/// when started, then every 24 hours. It only needs the database, so the startup chain starts it
+/// right after initialising the database, before any step that could fail. Each table is pruned
+/// in its own scope; one that fails is logged and the others carry on.
 /// </summary>
 public sealed class DataRetentionService(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<DataRetentionService> logger) : BackgroundService
 {
     internal static readonly TimeSpan PruneInterval = TimeSpan.FromHours(24);
-    private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(60);
-
-    internal const int MarketSampleRawRetentionDays = 7;
-    internal const int MarketSampleAggregateRetentionDays = 90;
-    internal const int CreditSampleRawRetentionDays = 7;
-    internal const int CreditSampleAggregateRetentionDays = 90;
-    internal const int LedgerEntryRetentionDays = 30;
-    internal const int ShipTaskRecordRetentionDays = 30;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(StartupDelay, stoppingToken);
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -54,70 +40,37 @@ public sealed class DataRetentionService(
 
     internal async Task PruneAllAsync(CancellationToken cancellationToken)
     {
-        await using var scope = serviceScopeFactory.CreateAsyncScope();
         var now = TimeProvider.System.GetUtcNow();
-
-        await PruneMarketPriceSamplesAsync(scope, now, cancellationToken);
-        await PruneAgentCreditsSamplesAsync(scope, now, cancellationToken);
-        await PruneLedgerEntriesAsync(scope, now, cancellationToken);
-        await PruneShipTaskRecordsAsync(scope, now, cancellationToken);
-    }
-
-    private async Task PruneMarketPriceSamplesAsync(IServiceScope scope, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var repo = scope.ServiceProvider.GetRequiredService<IMarketPriceSampleRepository>();
-        var rawCutoff = now.AddDays(-MarketSampleRawRetentionDays);
-        var aggregateCutoff = now.AddDays(-MarketSampleAggregateRetentionDays);
-
-        var deleted = await repo.PruneAsync(rawCutoff, aggregateCutoff, cancellationToken);
-        if (deleted > 0)
+        IReadOnlyList<string> tables;
+        await using (var scope = serviceScopeFactory.CreateAsyncScope())
         {
-            logger.LogInformation(
-                "Pruned {Count} market price sample rows (raw >{RawDays}d; aggregates >{AggDays}d).",
-                deleted, MarketSampleRawRetentionDays, MarketSampleAggregateRetentionDays);
+            tables = scope.ServiceProvider.GetRequiredService<IDataRetention>().PrunedTables;
+        }
+
+        foreach (var table in tables)
+        {
+            await PruneAsync(table, now, cancellationToken);
         }
     }
 
-    private async Task PruneAgentCreditsSamplesAsync(IServiceScope scope, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task PruneAsync(string table, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var repo = scope.ServiceProvider.GetRequiredService<IAgentCreditsSampleRepository>();
-        var rawCutoff = now.AddDays(-CreditSampleRawRetentionDays);
-        var aggregateCutoff = now.AddDays(-CreditSampleAggregateRetentionDays);
-
-        var deleted = await repo.PruneAsync(rawCutoff, aggregateCutoff, cancellationToken);
-        if (deleted > 0)
+        try
         {
-            logger.LogInformation(
-                "Pruned {Count} agent credits sample rows (raw >{RawDays}d; aggregates >{AggDays}d).",
-                deleted, CreditSampleRawRetentionDays, CreditSampleAggregateRetentionDays);
+            await using var scope = serviceScopeFactory.CreateAsyncScope();
+            var deleted = await scope.ServiceProvider.GetRequiredService<IDataRetention>().PruneAsync(table, now, cancellationToken);
+            if (deleted > 0)
+            {
+                logger.LogInformation("Pruned {Rows} row(s) from {Table}.", deleted, table);
+            }
         }
-    }
-
-    private async Task PruneLedgerEntriesAsync(IServiceScope scope, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var repo = scope.ServiceProvider.GetRequiredService<ILedgerRepository>();
-        var cutoff = now.AddDays(-LedgerEntryRetentionDays);
-
-        var deleted = await repo.PruneAsync(cutoff, cancellationToken);
-        if (deleted > 0)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogInformation(
-                "Pruned {Count} ledger entries older than {Days} days.",
-                deleted, LedgerEntryRetentionDays);
+            throw;
         }
-    }
-
-    private async Task PruneShipTaskRecordsAsync(IServiceScope scope, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var repo = scope.ServiceProvider.GetRequiredService<IShipTaskRecordRepository>();
-        var cutoff = now.AddDays(-ShipTaskRecordRetentionDays);
-
-        var deleted = await repo.PruneAsync(cutoff, cancellationToken);
-        if (deleted > 0)
+        catch (Exception exception)
         {
-            logger.LogInformation(
-                "Pruned {Count} ship task records older than {Days} days.",
-                deleted, ShipTaskRecordRetentionDays);
+            logger.LogError(exception, "Pruning {Table} failed; the other tables carry on.", table);
         }
     }
 }

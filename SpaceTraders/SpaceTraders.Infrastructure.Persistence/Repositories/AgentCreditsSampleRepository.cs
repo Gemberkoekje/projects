@@ -32,33 +32,4 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
 
         return rows.Select(s => new CreditsSampleDto(s.ObservedAt, s.Credits)).ToList();
     }
-
-    public async Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default)
-    {
-        // Step 1: Downsample the 7–90 day window — keep one row per hour (lowest id), delete duplicates.
-        var downsampledDeleted = await db.Database.ExecuteSqlAsync(
-            $"""
-            DELETE FROM agent_credits_samples
-            WHERE "AgentId" = {db.AgentId}
-              AND "ObservedAt" < {rawRetentionCutoff}
-              AND "ObservedAt" >= {aggregateRetentionCutoff}
-              AND "Id" NOT IN (
-                SELECT MIN("Id")
-                FROM agent_credits_samples
-                WHERE "AgentId" = {db.AgentId}
-                  AND "ObservedAt" < {rawRetentionCutoff}
-                  AND "ObservedAt" >= {aggregateRetentionCutoff}
-                GROUP BY date_trunc('hour', "ObservedAt")
-              )
-            """, cancellationToken);
-
-        // Step 2: Delete all rows older than the 90-day aggregate retention cutoff.
-        // Note: AgentCreditsSample has no global query filter (unlike MarketPriceSample),
-        // so agent_token must be filtered explicitly here.
-        var purgedDeleted = await db.AgentCreditsSamples
-            .Where(s => s.AgentId == db.AgentId && s.ObservedAt < aggregateRetentionCutoff)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return downsampledDeleted + purgedDeleted;
-    }
 }

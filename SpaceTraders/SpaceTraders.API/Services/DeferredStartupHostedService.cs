@@ -62,6 +62,9 @@ public sealed class DeferredStartupHostedService(
                 await StartServiceAsync<ShipEventScheduler>(cancellationToken);
             }
 
+            // Pruning only needs the database: started first, a later step that fails can't keep it
+            // from running.
+            await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
             await StartServiceAsync<RunLifecycleService>(cancellationToken);
             await StartServiceAsync<LeaderElectionService>(cancellationToken);
@@ -70,8 +73,6 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<StartupRecoveryService>(cancellationToken);
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);
-            await StartServiceAsync<ActivityLogPruningService>(cancellationToken);
-            await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<PrometheusMetricsService>(cancellationToken);
 
             startupState.MarkCompleted();
