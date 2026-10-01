@@ -34,7 +34,7 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
 
             var sample = new MarketPriceSample
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 WaypointSymbol = waypointSymbol,
                 GoodSymbol = good.Symbol,
                 ObservedAt = now,
@@ -87,33 +87,6 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
             .ToListAsync(cancellationToken);
 
         return rows.Select(MapToDto).ToList();
-    }
-
-    public async Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default)
-    {
-        // Step 1: Downsample the 7–90 day window — keep one row per (waypoint, good, hour), delete duplicates.
-        var downsampledDeleted = await db.Database.ExecuteSqlAsync(
-            $"""
-            DELETE FROM market_price_samples
-            WHERE "AgentToken" = {db.AgentToken}
-              AND "ObservedAt" < {rawRetentionCutoff}
-              AND "ObservedAt" >= {aggregateRetentionCutoff}
-              AND "Id" NOT IN (
-                SELECT MIN("Id")
-                FROM market_price_samples
-                WHERE "AgentToken" = {db.AgentToken}
-                  AND "ObservedAt" < {rawRetentionCutoff}
-                  AND "ObservedAt" >= {aggregateRetentionCutoff}
-                GROUP BY "WaypointSymbol", "GoodSymbol", date_trunc('hour', "ObservedAt")
-              )
-            """, cancellationToken);
-
-        // Step 2: Delete all rows older than the 90-day aggregate retention cutoff (query filter applies automatically).
-        var purgedDeleted = await db.MarketPriceSamples
-            .Where(s => s.ObservedAt < aggregateRetentionCutoff)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        return downsampledDeleted + purgedDeleted;
     }
 
     private sealed class TradeGoodJson

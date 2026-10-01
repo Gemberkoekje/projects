@@ -32,12 +32,12 @@ public sealed class ProbeDeploymentPlanService(
     IAgentRepository agents,
     IShipyardRepository shipyards,
     IBudgetPolicy budget,
-    ISpaceTradersPort port,
     IShipPurchaseService shipPurchases,
     IMessageBus bus,
     ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
 {
-    public ProbeDeploymentPlanService(
+    /// <summary>For tests: buys ships through a real <see cref="ShipPurchaseService"/> over <paramref name="port"/>.</summary>
+    internal ProbeDeploymentPlanService(
         IProbeDeploymentPlanRepository probeDeploymentPlans,
         IShipRepository ships,
         IWaypointRepository waypoints,
@@ -54,7 +54,6 @@ public sealed class ProbeDeploymentPlanService(
             agents,
             shipyards,
             budget,
-            port,
             new ShipPurchaseService(
                 port,
                 agents,
@@ -140,15 +139,15 @@ public sealed class ProbeDeploymentPlanService(
         if (plan is null)
         {
             logger.LogWarning(
-                "Probe deployment plan advance requested for waypoint {Waypoint} but no active plan found.",
+                "Probe deployment plan advance requested for waypoint {WaypointSymbol} but no active plan found.",
                 waypointSymbol);
             return;
         }
 
         if (plan.Status != ProbeDeploymentPlanStatus.Active)
         {
-            logger.LogInformation(
-                "Probe deployment plan advance requested for waypoint {Waypoint} but plan status is {Status}; ignoring.",
+            logger.LogDebug(
+                "Probe deployment plan advance requested for waypoint {WaypointSymbol} but plan status is {Status}; ignoring.",
                 waypointSymbol,
                 plan.Status);
             return;
@@ -157,7 +156,7 @@ public sealed class ProbeDeploymentPlanService(
         if (plan.DeployedWaypointSymbols.Contains(waypointSymbol, StringComparer.OrdinalIgnoreCase))
         {
             logger.LogDebug(
-                "Probe deployment plan advance skipped: waypoint {Waypoint} is already marked deployed.",
+                "Probe deployment plan advance skipped: waypoint {WaypointSymbol} is already marked deployed.",
                 waypointSymbol);
             return;
         }
@@ -189,7 +188,7 @@ public sealed class ProbeDeploymentPlanService(
         }
 
         logger.LogInformation(
-            "Probe deployment plan advanced: {Waypoint} marked deployed ({Deployed}/{Total}).",
+            "Probe deployment plan advanced: {WaypointSymbol} marked deployed ({Deployed}/{Total}).",
             waypointSymbol,
             deployed.Count,
             plan.TargetWaypointSymbols.Count);
@@ -335,8 +334,8 @@ public sealed class ProbeDeploymentPlanService(
         var availableProbe = await FindAvailableProbeAsync(plan, inFlight, cancellationToken);
         if (availableProbe is null)
         {
-            logger.LogInformation(
-                "Probe deployment plan: no available probe for {Waypoint}; attempting to purchase one.",
+            logger.LogDebug(
+                "Probe deployment plan: no available probe for {WaypointSymbol}; attempting to purchase one.",
                 nextTarget);
             await TryPurchaseProbeAsync(plan.SystemSymbol, nextTarget, cancellationToken);
             // Mark this target as in-flight for the current resume pass so we do not
@@ -349,7 +348,7 @@ public sealed class ProbeDeploymentPlanService(
         inFlight.Add(nextTarget);
 
         logger.LogInformation(
-            "Probe deployment plan: dispatching probe {Symbol} to {Waypoint}.",
+            "Probe deployment plan: dispatching probe {ShipSymbol} to {WaypointSymbol}.",
             availableProbe.Symbol,
             nextTarget);
 
@@ -447,7 +446,7 @@ public sealed class ProbeDeploymentPlanService(
 
         if (shipyard is null)
         {
-            logger.LogWarning(
+            logger.LogDebug(
                 "Probe deployment plan: no known shipyard in system {System} sells {Type}; will retry.",
                 systemSymbol,
                 ProbeShipType);
@@ -461,7 +460,7 @@ public sealed class ProbeDeploymentPlanService(
         var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
         if (!decision.CanAfford)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Probe deployment plan: cannot afford probe at {Shipyard} — {Reason}",
                 shipyard.WaypointSymbol,
                 decision.Reason);
@@ -477,7 +476,7 @@ public sealed class ProbeDeploymentPlanService(
         var purchase = await shipPurchases.TryPurchaseAsync(ProbeShipType, shipyard.WaypointSymbol, cancellationToken);
         if (!purchase.IsSuccess || purchase.PurchasedShip is null)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Probe deployment plan: probe purchase denied at {Shipyard} — {Reason}",
                 shipyard.WaypointSymbol,
                 purchase.FailureReason ?? "Purchase failed.");
@@ -485,7 +484,7 @@ public sealed class ProbeDeploymentPlanService(
         }
 
         logger.LogInformation(
-            "Probe deployment plan: purchased {Symbol}; dispatching to {Waypoint}.",
+            "Probe deployment plan: purchased {ShipSymbol}; dispatching to {WaypointSymbol}.",
             purchase.PurchasedShip.Symbol,
             targetWaypoint);
 

@@ -26,6 +26,13 @@ public interface IShipGoalRepository
     Task UpdateGoalStatusAsync(string shipSymbol, Guid goalId, GoalStatus status, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Marks the active goal identified by <paramref name="goalId"/> as <see cref="GoalStatus.Blocked"/>
+    /// and records <paramref name="reason"/> as its <see cref="ShipGoal.StatusReason"/>.
+    /// No-op if the ship has no active goal or if the active goal id does not match.
+    /// </summary>
+    Task BlockGoalAsync(string shipSymbol, Guid goalId, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the set of waypoint symbols currently targeted by active <see cref="ScoutWaypointGoal"/> goals
     /// across all ships.
     /// </summary>

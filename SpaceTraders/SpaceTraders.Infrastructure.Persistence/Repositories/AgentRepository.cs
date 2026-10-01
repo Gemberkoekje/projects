@@ -15,12 +15,12 @@ public sealed class AgentRepository(SpaceTradersDbContext db) : IAgentRepository
 
     public async Task UpsertAsync(AgentModel agent, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Agents.FindAsync([db.AgentToken, agent.Symbol], cancellationToken);
+        var existing = await db.Agents.FindAsync([db.AgentId, agent.Symbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedAgent
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             Symbol = agent.Symbol,
             AccountId = agent.AccountId,
             HeadquartersSymbol = agent.HeadquartersSymbol,

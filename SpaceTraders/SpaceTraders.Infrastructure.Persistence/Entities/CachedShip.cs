@@ -5,7 +5,7 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 [Mutable]
 public sealed class CachedShip
 {
-    public string AgentToken { get; set; } = string.Empty;
+    public string AgentId { get; set; } = string.Empty;
 
     required public string Symbol { get; set; }
 

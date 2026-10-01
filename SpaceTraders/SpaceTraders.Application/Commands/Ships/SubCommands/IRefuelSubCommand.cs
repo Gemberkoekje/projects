@@ -24,8 +24,8 @@ public sealed class RefuelSubCommand(
 {
     public async Task ExecuteAsync(string shipSymbol, bool fromCargo, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
-            "RefuelSubCommand: refueling ship {Symbol} (fromCargo={FromCargo}).",
+        logger.LogDebug(
+            "RefuelSubCommand: refueling ship {ShipSymbol} (fromCargo={FromCargo}).",
             shipSymbol,
             fromCargo);
 
@@ -47,7 +47,7 @@ public sealed class RefuelSubCommand(
             ship?.WaypointSymbol ?? string.Empty));
 
         logger.LogInformation(
-            "RefuelSubCommand: ship {Symbol} refueled to {Current}/{Capacity}, cost {Cost}.",
+            "RefuelSubCommand: ship {ShipSymbol} refueled to {Current}/{Capacity}, cost {Cost}.",
             shipSymbol,
             result.Fuel.Current,
             result.Fuel.Capacity,

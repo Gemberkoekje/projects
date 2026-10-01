@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -16,6 +17,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 public sealed class SurveyWaypointGoalExecutor(
     ISpaceTradersPort port,
     ISurveyRepository surveys,
+    IOrbitSubCommand orbit,
     IMessageBus bus,
     ILogger<SurveyWaypointGoalExecutor> logger) : IShipGoalExecutor
 {
@@ -49,8 +51,8 @@ public sealed class SurveyWaypointGoalExecutor(
         // At target; ensure we're in orbit
         if (atTarget && ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, surveyGoal.TargetWaypointSymbol), ct);
-            return GoalExecutionResult.WaitingForArrival(
+            await orbit.ExecuteAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Progressing(
                 $"Entering orbit at survey waypoint {surveyGoal.TargetWaypointSymbol}.");
         }
 

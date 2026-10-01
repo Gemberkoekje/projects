@@ -79,7 +79,7 @@ public sealed class ShipAssignmentRepositoryTests : IntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task GetAllActiveAsync_IgnoresAssignmentsFromOtherAgentTokens()
+    public async Task GetAllActiveAsync_IgnoresAssignmentsFromOtherAgents()
     {
         var repo = new ShipAssignmentRepository(Db);
         var now = DateTimeOffset.UtcNow;
@@ -97,7 +97,7 @@ public sealed class ShipAssignmentRepositoryTests : IntegrationTestBase
 
         Db.ShipAssignments.Add(new Infrastructure.Persistence.Entities.ShipAssignmentRecord
         {
-            AgentToken = "other-agent-token",
+            AgentId = "OTHER-AGENT@2026-09-27",
             ShipSymbol = "SHIP-OTHER",
             Type = "Scout",
             OriginWaypoint = null,

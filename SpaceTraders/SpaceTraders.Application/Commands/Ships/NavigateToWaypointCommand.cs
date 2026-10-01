@@ -54,7 +54,8 @@ public sealed record NavigateToWaypointArrivedCommand
 /// <summary>
 /// Handles <see cref="NavigateToWaypointCommand"/>: the pre-flight phase.
 /// Steps:
-/// 1. Check if ship is already at destination — emit completed and return.
+/// 1. Check if ship is already at destination — nothing to do; return without publishing anything.
+///    Callers dock or orbit at their target themselves.
 /// 2. If docked: refuel (if at fuel market), then orbit.
 /// 3. If in orbit: navigate.
 /// 4. If neither: publish mismatch and return.
@@ -72,27 +73,22 @@ public sealed class NavigateToWaypointHandler(
     public async Task Handle(NavigateToWaypointCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "NavigateToWaypointHandler: ship {Symbol} → {Destination}.",
+            "NavigateToWaypointHandler: ship {ShipSymbol} → {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
 
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         var status = ship?.LocalStatus ?? ShipLocalStatus.None;
 
-        // Step 1: already at destination.
+        // Step 1: already at destination. No ShipNavigationCompletedEvent: it would re-run the
+        // caller's goal step, which would navigate here again, without any progress.
         if (string.Equals(ship?.WaypointSymbol, command.DestinationWaypoint, StringComparison.OrdinalIgnoreCase)
             && status != ShipLocalStatus.InTransit)
         {
-            logger.LogInformation(
-                "NavigateToWaypointHandler: ship {Symbol} is already at {Destination}; emitting completed.",
+            logger.LogWarning(
+                "NavigateToWaypointHandler: ship {ShipSymbol} is already at {Destination}; nothing to do.",
                 command.ShipSymbol,
                 command.DestinationWaypoint);
-
-            var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
-            await bus.PublishAsync(new ShipNavigationCompletedEvent(
-                command.ShipSymbol,
-                command.DestinationWaypoint,
-                activeGoal?.GoalId ?? Guid.Empty));
             return;
         }
 
@@ -123,7 +119,7 @@ public sealed class NavigateToWaypointHandler(
                 "Ship must be in orbit before navigation.");
 
             logger.LogWarning(
-                "NavigateToWaypointHandler: ship {Symbol} is not in orbit after orbit step; status={Status}.",
+                "NavigateToWaypointHandler: ship {ShipSymbol} is not in orbit after orbit step; status={Status}.",
                 command.ShipSymbol,
                 ship?.Status ?? "UNKNOWN");
             return;
@@ -158,7 +154,7 @@ public sealed class NavigateToWaypointArrivedHandler(
     public async Task Handle(NavigateToWaypointArrivedCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "NavigateToWaypointArrivedHandler: ship {Symbol} arrived at {Destination}.",
+            "NavigateToWaypointArrivedHandler: ship {ShipSymbol} arrived at {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
 
@@ -178,12 +174,12 @@ public sealed class NavigateToWaypointArrivedHandler(
                     new WaypointSymbol(command.DestinationWaypoint),
                     market.TradeGoodsJson));
                 logger.LogInformation(
-                    "NavigateToWaypointArrivedHandler: market data updated for {Waypoint}.",
+                    "NavigateToWaypointArrivedHandler: market data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update market data for {Waypoint}.", command.DestinationWaypoint);
+                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update market data for {WaypointSymbol}.", command.DestinationWaypoint);
             }
         }
 
@@ -194,12 +190,12 @@ public sealed class NavigateToWaypointArrivedHandler(
                 var shipyard = await port.GetShipyardAsync(systemSymbol, command.DestinationWaypoint, cancellationToken);
                 await shipyards.UpsertAsync(shipyard, cancellationToken);
                 logger.LogInformation(
-                    "NavigateToWaypointArrivedHandler: shipyard data updated for {Waypoint}.",
+                    "NavigateToWaypointArrivedHandler: shipyard data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update shipyard data for {Waypoint}.", command.DestinationWaypoint);
+                logger.LogWarning(ex, "NavigateToWaypointArrivedHandler: failed to update shipyard data for {WaypointSymbol}.", command.DestinationWaypoint);
             }
         }
 
@@ -213,7 +209,7 @@ public sealed class NavigateToWaypointArrivedHandler(
             command.GoalId));
 
         logger.LogInformation(
-            "NavigateToWaypointArrivedHandler: ship {Symbol} docked at {Destination}; navigation complete.",
+            "NavigateToWaypointArrivedHandler: ship {ShipSymbol} docked at {Destination}; navigation complete.",
             command.ShipSymbol,
             command.DestinationWaypoint);
     }

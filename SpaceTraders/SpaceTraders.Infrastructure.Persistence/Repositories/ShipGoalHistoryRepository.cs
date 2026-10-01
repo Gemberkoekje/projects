@@ -16,7 +16,7 @@ public sealed class ShipGoalHistoryRepository(SpaceTradersDbContext db) : IShipG
         db.ShipGoalHistory.Add(new ShipGoalHistoryRecord
         {
             Id = entry.Id,
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             ShipSymbol = entry.ShipSymbol,
             GoalKind = entry.GoalKind,
             GoalId = entry.GoalId,

@@ -46,7 +46,7 @@ public sealed class ConstructionRepository(SpaceTradersDbContext db) : IConstruc
         {
             db.ConstructionSites.Add(new CachedConstruction
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 WaypointSymbol = site.WaypointSymbol,
                 SystemSymbol = systemSymbol,
                 IsComplete = site.IsComplete,

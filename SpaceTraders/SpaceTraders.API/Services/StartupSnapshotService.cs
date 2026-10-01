@@ -52,7 +52,7 @@ public sealed class StartupSnapshotService(
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
         var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
 
-        var wasAutomationEnabled = await settings.GetAsync<bool>("Automation.Enabled", cancellationToken) == true;
+        var wasAutomationEnabled = await settings.GetAsync<bool>("Automation.Enabled", cancellationToken);
         if (wasAutomationEnabled)
         {
             await settings.SetAsync("Automation.Enabled", "false", cancellationToken);
@@ -63,7 +63,7 @@ public sealed class StartupSnapshotService(
         {
             var isInitial = !await dbContext.StartupSnapshots
                 .AsNoTracking()
-                .AnyAsync(s => s.AgentToken == dbContext.AgentToken, cancellationToken);
+                .AnyAsync(s => s.AgentId == dbContext.AgentId, cancellationToken);
 
             var agent = await apiClient.GetMyAgentAsync(cancellationToken);
             var ships = await FetchAllShipsAsync(apiClient, cancellationToken);
@@ -107,7 +107,7 @@ public sealed class StartupSnapshotService(
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning(ex, "Could not fetch market data for waypoint {Waypoint}.", waypoint.Symbol);
+                                logger.LogWarning(ex, "Could not fetch market data for waypoint {WaypointSymbol}.", waypoint.Symbol);
                             }
                         }
 
@@ -119,7 +119,7 @@ public sealed class StartupSnapshotService(
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {Waypoint}.", waypoint.Symbol);
+                                logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {WaypointSymbol}.", waypoint.Symbol);
                             }
                         }
                     }
@@ -140,7 +140,7 @@ public sealed class StartupSnapshotService(
 
             dbContext.StartupSnapshots.Add(new StartupSnapshot
             {
-                AgentToken = dbContext.AgentToken,
+                AgentId = dbContext.AgentId,
                 SnapshotJson = json,
                 CapturedAt = snapshot.CapturedAt,
                 IsInitialSnapshot = isInitial,

@@ -22,6 +22,15 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Navigation.BurnDistanceThreshold",      Value = "35",                  Type = "decimal", Description = "Distance threshold for selecting BURN mode" },
         new AgentSetting { Key = "Automation.Trade.MaxLossPerUnitBeforeReroute", Value = "50",            Type = "int",     Description = "Max accepted per-unit loss before trying an alternate sell market" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
+        new AgentSetting { Key = "Automation.Plan.Scout.Enabled",           Value = "true",                Type = "bool",    Description = "Run the scout plan: visit every marketplace in the starting system once" },
+        new AgentSetting { Key = "Automation.Plan.Contract.Enabled",        Value = "true",                Type = "bool",    Description = "Run the contract plan: take one mineral contract and fulfil it (may buy a mining drone)" },
+        new AgentSetting { Key = "Automation.Plan.ProbeDeployment.Enabled", Value = "false",               Type = "bool",    Description = "Run the probe plan: park a probe at every market and shipyard in the HQ system (buys probes)" },
+        new AgentSetting { Key = "Automation.Plan.Mining.Enabled",          Value = "false",               Type = "bool",    Description = "Run the mining plan: mine minerals and sell them where they are scarce (buys mining drones)" },
+        new AgentSetting { Key = "Automation.Plan.Trading.Enabled",         Value = "false",               Type = "bool",    Description = "Run the trading plan: haul goods from abundant to scarce markets (buys light haulers)" },
+        new AgentSetting { Key = "Automation.CircuitBreaker.MaxGoalStepsPerMinute", Value = "60",         Type = "int",     Description = "Goal steps per ship per minute above which the ship's goal is blocked as a runaway (the tick alone takes 12)" },
+        new AgentSetting { Key = "Database.SoftLimitMegabytes",             Value = "1024",                Type = "int",     Description = "Database size (MB) above which the bot logs a warning (D8)" },
+        new AgentSetting { Key = "Database.HardLimitMegabytes",             Value = "3072",                Type = "int",     Description = "Database size (MB) above which the bot switches automation off (D8)" },
+        new AgentSetting { Key = "Api.BadGatewayPauseMinutes",              Value = "3",                   Type = "int",     Description = "Minutes without any API call after a 502 (the API's DDoS protection), as the API guide asks" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
         new AgentSetting { Key = "Automation.MiningShipPercentage",              Value = "0.25",                Type = "decimal", Description = "Fraction of mining-capable ships assigned to resource extraction roles" },
@@ -72,7 +81,7 @@ public static class DefaultSettingsSeed
             {
                 db.Settings.Add(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = setting.Key,
                     Value = setting.Value,
                     Type = setting.Type,
@@ -98,7 +107,7 @@ public static class DefaultSettingsSeed
             {
                 db.Settings.Add(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = defaultSetting.Key,
                     Value = defaultSetting.Value,
                     Type = defaultSetting.Type,
@@ -109,7 +118,7 @@ public static class DefaultSettingsSeed
             {
                 db.Entry(existing).CurrentValues.SetValues(new AgentSetting
                 {
-                    AgentToken = db.AgentToken,
+                    AgentId = db.AgentId,
                     Key = existing.Key,
                     Value = defaultSetting.Value,
                     Type = existing.Type,

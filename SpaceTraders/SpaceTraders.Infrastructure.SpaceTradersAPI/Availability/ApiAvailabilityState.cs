@@ -16,11 +16,16 @@ public sealed class ApiAvailabilityState : IApiAvailabilityState
     // 1 = pending, 0 = consumed/no transition
     private int _pendingUnavailableTransition;
     private int _pendingAvailableTransition;
+    private long _pausedUntilTicks = DateTimeOffset.MinValue.UtcTicks;
 
     public bool IsAvailable => Interlocked.CompareExchange(ref _isAvailable, 1, 1) == 1;
 
-    public void MarkUnavailable()
+    public DateTimeOffset PausedUntil => new(Interlocked.Read(ref _pausedUntilTicks), TimeSpan.Zero);
+
+    public void PauseUntil(DateTimeOffset until)
     {
+        Interlocked.Exchange(ref _pausedUntilTicks, until.UtcTicks);
+
         if (Interlocked.CompareExchange(ref _isAvailable, 0, 1) == 1)
         {
             // Transitioned from available → unavailable

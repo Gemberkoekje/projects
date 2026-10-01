@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
+        services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {

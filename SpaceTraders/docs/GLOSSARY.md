@@ -10,15 +10,15 @@ decisions).
 |------|------------|
 | **Account Token** | A long-lived token issued by `my.spacetraders.io` that authorises agent registration (`POST /register`). Used by bootstrap when a new agent must be registered. |
 | **Agent** | The player's in-game entity. Has credits, a fleet of ships, and a faction. Represented by the `Agent` aggregate in the domain. |
-| **Agent Token** | A bearer token returned by `POST /register` and used for all `/my/*` authenticated API calls. Stored in the `stored_credentials` table and loaded into `IAgentTokenProvider` at startup. Agent-scoped tables also use it as part of their key (B4). |
+| **Agent Id** | The short id every agent-scoped row is keyed on: the agent's symbol and the server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). The agent that takes the same symbol after a reset gets a new id. The database keeps the active agent's rows only, plus every agent's `runs`. |
+| **Agent Token** | A bearer token returned by `POST /register` and used for all `/my/*` authenticated API calls. Stored only in the `stored_credentials` table, and loaded into `IAgentTokenProvider` at startup. |
 | **Anomaly** | *Planned (PLAN.md phase 3).* A broken health rule, exposed as a metric and a journal event. |
 | **Assignment** | A ship's current task in `ship_assignment_records` (`ShipAssignmentRecord`): a type such as `Scout` or `Contract`, origin, destination, cargo and progress. The contract plan works only through assignments; the scout plan writes both an assignment and a goal. |
-| **Burst Limit** | Per the API guide (https://spacetraders.io/api-guide/rate-limits): on top of the limit of 2 requests per second, up to 30 more requests within a 60-second burst duration, counted per IP address and per account. `RateLimitingHandler` currently makes every request fit both a 2/s and a 30-per-60 s bucket, which caps the bot at 30 requests a minute (B13). |
+| **Burst Limit** | Per the API guide (https://spacetraders.io/api-guide/rate-limits): on top of the limit of 2 requests per second, up to 30 more requests within a 60-second burst duration, counted per IP address and per account. `RequestBudget` follows it. |
 | **Dead Reckoning** | Treating a ship as arrived once its cached arrival time has passed, without asking the API. The contract commands do this (`FulfillContractDeliveryCommand`, `MineResourceVolumeCommand`). `GameLoopService` no longer does, despite the name of its `DeadReckoningInterval` constant. |
 | **Dead-Letter Queue** | Not used. A failed message is retried three times (after 250 ms, 500 ms and 1 s) and then discarded (`SpaceTraders.Application/DependencyInjection.cs`). |
 | **DelegatingHandler** | An ASP.NET Core `HttpMessageHandler` that wraps the inner handler to add cross-cutting behaviour (rate limiting, retries) transparently to callers. |
 | **Domain Event** | Two kinds exist. *Bus events* are published through Wolverine and handled by zero or more handlers (for example `ShipInTransitEvent`, `ShipNavigationCompletedEvent`). *Aggregate events* are raised inside domain aggregates (`AggregateRoot.RaiseDomainEvent`) but never dispatched, so nothing handles them (B7). |
-| **Durable Local Queue** | Wolverine stores every published message in the PostgreSQL `wolverine` schema before handling it, so a crash can't lose it. Configured in `SpaceTraders.API/Program.cs` with `PersistMessagesWithPostgresql(...)` and `UseDurableLocalQueues()`. Handled messages are probably never deleted, because the durability agent is off (B2). |
 | **EF Core** | Entity Framework Core – the ORM used to map C# entities to PostgreSQL tables. The schema itself is created and extended at startup by `SpaceTradersDatabaseInitializer`, not by EF migrations. |
 | **Fleet** | All ships owned by the agent. |
 | **GameLoopService** | The leader-only loop that runs every 5 seconds: it bootstraps the five plans, steps every ship's active goal, drives contract assignments and publishes API availability changes. |
@@ -33,7 +33,8 @@ decisions).
 | **SpaceTradersApiClient** | The typed `HttpClient` wrapper in `SpaceTraders.Infrastructure.SpaceTradersAPI` that abstracts all calls to the SpaceTraders v2 REST API. |
 | **State-gated command** | A ship command that checks the ship's cached state (docked, in orbit, in transit) before calling the API. When the state is wrong, it publishes `ShipStateMismatchEvent` instead. |
 | **Stateless** | A .NET state-machine library. The application project references it, but no code uses it. |
+| **Request Budget** | `RequestBudget`, the client's copy of the API guide's limit: 2 requests in any second and, once those are used, up to 30 more in any 60 seconds. Both windows slide, so the client never exceeds a fixed window the server counts in. A singleton, so it survives the HttpClient factory recreating its handlers. |
+| **Local Queue** | Wolverine's in-process queue for published messages, kept in memory. Until slice 1.3 it was a *durable* local queue that also stored every message in Postgres, and with Wolverine's durability agent off it never deleted a handled one (B2). |
 | **Tick** | One pass of `GameLoopService`. |
-| **Token Bucket** | A rate-limiting algorithm that grants a fixed number of request tokens per time window. `RateLimitingHandler` uses per-second and burst token buckets. |
 | **WebUI** | The React/Vite dashboard in `SpaceTraders.WebUI`, served at `/spacetraders/dashboard`. It reads the internal API with the `X-Api-Key` header and listens to the SignalR hub for refresh hints. |
-| **Wolverine** | The in-process command/event bus used in place of MediatR. Provides convention-based handler discovery, retry policies, and PostgreSQL-backed durable local queues. |
+| **Wolverine** | The in-process command/event bus used in place of MediatR. Provides convention-based handler discovery, retry policies and in-memory local queues. |

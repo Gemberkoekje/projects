@@ -28,6 +28,14 @@ public sealed class SpaceTradersApiException : Exception
 
     public int? ErrorCode { get; }
 
+    /// <summary>
+    /// True when the call failed because the server was reset since the agent token was issued
+    /// (401, "Token reset_date does not match the server"). Every call with that token fails now.
+    /// </summary>
+    public bool IsServerReset =>
+        StatusCode == HttpStatusCode.Unauthorized
+        && Message.Contains("Token reset_date does not match the server", StringComparison.OrdinalIgnoreCase);
+
     internal static async Task<SpaceTradersApiException> CreateAsync(
         HttpResponseMessage response,
         string endpoint,

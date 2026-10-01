@@ -62,7 +62,14 @@ public sealed class DeferredStartupHostedService(
                 await StartServiceAsync<ShipEventScheduler>(cancellationToken);
             }
 
+            // Pruning only needs the database: started first, a later step that fails can't keep it
+            // from running.
+            await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
+
+            // Needs the agent: its limits are settings, and over the hard limit it switches the
+            // agent's automation off.
+            await StartServiceAsync<DatabaseSizeGuardService>(cancellationToken);
             await StartServiceAsync<RunLifecycleService>(cancellationToken);
             await StartServiceAsync<LeaderElectionService>(cancellationToken);
             await StartServiceAsync<StartupSyncService>(cancellationToken);
@@ -70,22 +77,23 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<StartupRecoveryService>(cancellationToken);
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);
-            await StartServiceAsync<ActivityLogPruningService>(cancellationToken);
-            await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<PrometheusMetricsService>(cancellationToken);
 
             startupState.MarkCompleted();
             logger.LogInformation("Deferred startup initialization completed.");
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
             startupState.MarkFailed(new OperationCanceledException("Deferred startup initialization was canceled."));
-            logger.LogInformation("Deferred startup initialization canceled.");
+            logger.LogInformation(exception, "Deferred startup initialization canceled.");
         }
         catch (Exception exception)
         {
+            // Without the later services (the tick among them) the pod would only look healthy.
+            // Stop the host, so Kubernetes restarts it with back-off; Program exits with code 1.
             startupState.MarkFailed(exception);
-            logger.LogError(exception, "Deferred startup initialization failed.");
+            logger.LogCritical(exception, "Deferred startup initialization failed; stopping the host.");
+            applicationLifetime.StopApplication();
         }
     }
 

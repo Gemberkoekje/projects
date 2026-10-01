@@ -8,7 +8,7 @@ public sealed class ShipGoalHistoryRecord
 {
     public Guid Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string ShipSymbol { get; init; }
 

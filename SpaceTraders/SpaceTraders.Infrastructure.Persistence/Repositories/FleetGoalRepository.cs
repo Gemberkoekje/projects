@@ -26,12 +26,12 @@ public sealed class FleetGoalRepository(SpaceTradersDbContext db) : IFleetGoalRe
             db.FleetGoals.Add(new FleetGoalRecord
             {
                 Id = goal.Id,
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 Kind = goal.Kind.ToString(),
                 Priority = goal.Priority,
                 Description = goal.Description,
                 PayloadJson = payloadJson,
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = TimeProvider.System.GetUtcNow(),
             });
         }
         else
@@ -55,7 +55,7 @@ public sealed class FleetGoalRepository(SpaceTradersDbContext db) : IFleetGoalRe
             return;
         }
 
-        entity.CompletedAt = DateTimeOffset.UtcNow;
+        entity.CompletedAt = TimeProvider.System.GetUtcNow();
         await db.SaveChangesAsync(ct);
     }
 

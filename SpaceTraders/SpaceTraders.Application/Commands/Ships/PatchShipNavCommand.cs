@@ -33,7 +33,7 @@ public sealed class PatchShipNavHandler(
         var nav = await port.PatchShipNavAsync(command.ShipSymbol, command.FlightMode, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, nav, null, cancellationToken);
         logger.LogInformation(
-            "PatchShipNavHandler: ship {Symbol} flight mode set to {FlightMode}.",
+            "PatchShipNavHandler: ship {ShipSymbol} flight mode set to {FlightMode}.",
             command.ShipSymbol,
             command.FlightMode);
     }

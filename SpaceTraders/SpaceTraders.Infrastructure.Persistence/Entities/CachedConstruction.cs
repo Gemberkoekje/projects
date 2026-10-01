@@ -1,8 +1,9 @@
 namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
+[Mutable]
 public sealed class CachedConstruction
 {
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     required public string WaypointSymbol { get; init; }
 

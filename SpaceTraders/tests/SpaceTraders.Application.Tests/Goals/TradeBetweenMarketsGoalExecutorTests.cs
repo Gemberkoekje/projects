@@ -96,6 +96,31 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await _port.Received(1).BuyCargoAsync("TRADER-1", "FOOD", 40, Arg.Any<CancellationToken>());
         await _ships.Received(1).UpdateCargoAsync("TRADER-1", Arg.Any<CargoModel>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync("TRADER-1", Arg.Any<TradeBetweenMarketsGoal>(), Arg.Any<CancellationToken>());
+        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_Docks_WhenNoCargoAndInOrbitAtSource()
+    {
+        var ship = new ShipModel(
+            "TRADER-1",
+            "X1-AB",
+            "X1-AB-BUY",
+            "IN_ORBIT",
+            "CRUISE",
+            20,
+            40,
+            CargoCurrent: 0,
+            CargoCapacity: 40,
+            CargoInventory: []);
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _dock.Received(1).ExecuteAsync("TRADER-1", Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().BuyCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -170,5 +195,30 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await _port.Received(1).SellCargoAsync("TRADER-1", "FOOD", 15, Arg.Any<CancellationToken>());
         await _ships.Received(1).UpdateCargoAsync("TRADER-1", Arg.Any<CargoModel>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).ClearActiveGoalAsync("TRADER-1", Arg.Any<CancellationToken>());
+        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_Docks_WhenCargoPresentAndInOrbitAtDestination()
+    {
+        var ship = new ShipModel(
+            "TRADER-1",
+            "X1-AB",
+            "X1-AB-SELL",
+            "IN_ORBIT",
+            "CRUISE",
+            20,
+            40,
+            CargoCurrent: 15,
+            CargoCapacity: 40,
+            CargoInventory: [new CargoItemModel("FOOD", 15)]);
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _dock.Received(1).ExecuteAsync("TRADER-1", Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().SellCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
     }
 }

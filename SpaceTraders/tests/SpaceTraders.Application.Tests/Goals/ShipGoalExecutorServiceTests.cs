@@ -2,14 +2,11 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
-using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Goals;
 
@@ -17,37 +14,80 @@ public sealed class ShipGoalExecutorServiceTests
 {
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
-    private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
-    private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
-    private readonly INavigationPlanningService _navigationPlanning = Substitute.For<INavigationPlanningService>();
-    private readonly IWaypointRepository _waypoints = Substitute.For<IWaypointRepository>();
-    private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
-    private readonly IShipCapabilityRegistry _capabilityRegistry = Substitute.For<IShipCapabilityRegistry>();
-    private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
-    private readonly IShipGoalHistoryRepository _goalHistory = Substitute.For<IShipGoalHistoryRepository>();
-    private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly IShipGoalExecutor _executor = Substitute.For<IShipGoalExecutor>();
     private readonly IScoutAllMarketplacesPlanService _scoutPlanService = Substitute.For<IScoutAllMarketplacesPlanService>();
+    private readonly IGoalStepCircuitBreaker _circuitBreaker = Substitute.For<IGoalStepCircuitBreaker>();
+    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
 
     private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
     private static readonly ShipModel NotFullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100);
+
+    public ShipGoalExecutorServiceTests()
+    {
+        // Automation and every plan switched on, unless a test says otherwise.
+        _settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+    }
 
     private ShipGoalExecutorService CreateService() =>
         new(
             [_executor],
             _goals,
             _ships,
-            _assignments,
-            _surveys,
-            _navigationPlanning,
-            _waypoints,
-            _markets,
-            _capabilityRegistry,
-            _scheduler,
-            _goalHistory,
             _scoutPlanService,
-            _bus,
+            _settings,
+            _circuitBreaker,
+            Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);
+
+    [Fact]
+    public async Task ExecuteAsync_ForTheCommandShipAfterScouting_KeepsNoLogLines()
+    {
+        // B12: once the scout plan has completed, the command ship keeps its last scout goal (B10),
+        // so every tick completed that goal again and wrote two lines at Information.
+        var log = new LogRecorder();
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-001" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+        _executor.ExecuteStepAsync(FullFuelShip, scoutGoal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Completed("Scout waypoint visited."));
+        var scoutPlans = Substitute.For<IScoutPlanRepository>();
+        scoutPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ScoutAllMarketplacesPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ShipSymbol = "SHIP-1",
+            StartWaypointSymbol = "X1-AB-001",
+            RouteWaypointSymbols = ["X1-AB-001"],
+            CurrentRouteIndex = 0,
+            Status = ScoutPlanStatus.Completed,
+            CreatedAt = DateTimeOffset.UnixEpoch,
+            UpdatedAt = DateTimeOffset.UnixEpoch,
+        });
+        var scoutPlanService = new ScoutAllMarketplacesPlanService(
+            scoutPlans,
+            Substitute.For<IScoutShipSelectionService>(),
+            Substitute.For<IScoutMarketplaceDiscoveryService>(),
+            Substitute.For<IMarketplaceRoutePlanner>(),
+            Substitute.For<IShipAssignmentRepository>(),
+            _goals,
+            log.For<ScoutAllMarketplacesPlanService>());
+        var service = new ShipGoalExecutorService(
+            [_executor],
+            _goals,
+            _ships,
+            scoutPlanService,
+            _settings,
+            new GoalStepCircuitBreaker(),
+            Substitute.For<IAutomationMetrics>(),
+            log.For<ShipGoalExecutorService>());
+
+        for (var tick = 0; tick < 12; tick++)
+        {
+            await service.ExecuteAsync("SHIP-1", CancellationToken.None);
+        }
+
+        log.Kept.Should().BeEmpty("a minute of ticks with nothing new to say");
+    }
 
     [Fact]
     public async Task ExecuteAsync_WhenShipNotFound_ReturnsNull()
@@ -131,7 +171,61 @@ public sealed class ShipGoalExecutorServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenGoalExecutes_DoesNotPublishOrScheduleOrMutateState()
+    public async Task ExecuteAsync_WhenAutomationIsSwitchedOff_DoesNotStep()
+    {
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
+        _settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>()).Returns(false);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().BeNull();
+        await _executor.DidNotReceive().ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("Scout")]
+    [InlineData("ProbeDeployment")]
+    [InlineData("Mining")]
+    [InlineData("Trading")]
+    public async Task ExecuteAsync_WhenTheGoalsPlanIsSwitchedOff_DoesNotStep(string plan)
+    {
+        ShipGoal goal = plan switch
+        {
+            "Scout" => new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" },
+            "ProbeDeployment" => new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-009" },
+            "Mining" => new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-009" },
+            _ => new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-001", SellWaypointSymbol = "X1-AB-009" },
+        };
+        _settings.GetAsync<bool>($"Automation.Plan.{plan}.Enabled", Arg.Any<CancellationToken>()).Returns(false);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(goal);
+        _executor.CanExecute(goal).Returns(true);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().BeNull();
+        await _executor.DidNotReceive().ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenTheGoalIsBlocked_DoesNotStep()
+    {
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009", Status = Domain.Enums.GoalStatus.Blocked, StatusReason = "runaway" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().BeNull();
+        await _executor.DidNotReceive().ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGoalProgresses_DoesNotClearGoalOrAdvancePlan()
     {
         var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
 
@@ -143,10 +237,6 @@ public sealed class ShipGoalExecutorServiceTests
 
         _ = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
-        await _scheduler.DidNotReceive().ScheduleArrivalAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
-        await _scheduler.DidNotReceive().ScheduleCooldownExpiryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
-        await _goalHistory.DidNotReceive().AppendAsync(Arg.Any<ShipGoalHistoryEntry>(), Arg.Any<CancellationToken>());
         await _goals.DidNotReceive().ClearActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _scoutPlanService.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

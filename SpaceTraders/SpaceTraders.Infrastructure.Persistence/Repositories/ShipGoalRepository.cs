@@ -18,7 +18,7 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
     public async Task<ShipGoal?> GetActiveGoalAsync(string shipSymbol, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, shipSymbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, shipSymbol], cancellationToken);
         if (entity?.GoalPayloadJson is null)
         {
             return null;
@@ -37,7 +37,7 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
     public async Task SetActiveGoalAsync(string shipSymbol, ShipGoal goal, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, shipSymbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, shipSymbol], cancellationToken);
         if (entity is null)
         {
             return;
@@ -53,7 +53,7 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
     public async Task ClearActiveGoalAsync(string shipSymbol, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, shipSymbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, shipSymbol], cancellationToken);
         if (entity is null)
         {
             return;
@@ -69,13 +69,34 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
     public async Task UpdateGoalStatusAsync(string shipSymbol, Guid goalId, GoalStatus status, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, shipSymbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, shipSymbol], cancellationToken);
         if (entity is null || entity.GoalId != goalId)
         {
             return;
         }
 
         entity.GoalStatus = (int)status;
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task BlockGoalAsync(string shipSymbol, Guid goalId, string reason, CancellationToken cancellationToken = default)
+    {
+        var entity = await db.Ships.FindAsync([db.AgentId, shipSymbol], cancellationToken);
+        if (entity?.GoalPayloadJson is null || entity.GoalId != goalId)
+        {
+            return;
+        }
+
+        var goal = JsonSerializer.Deserialize<ShipGoal>(entity.GoalPayloadJson, JsonOptions);
+        if (goal is null)
+        {
+            return;
+        }
+
+        var blocked = goal with { Status = GoalStatus.Blocked, StatusReason = reason };
+        entity.GoalPayloadJson = JsonSerializer.Serialize(blocked, JsonOptions);
+        entity.GoalStatus = (int)GoalStatus.Blocked;
 
         await db.SaveChangesAsync(cancellationToken);
     }

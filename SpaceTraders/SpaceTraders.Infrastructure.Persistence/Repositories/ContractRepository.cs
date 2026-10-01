@@ -10,7 +10,7 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
 {
     public async Task<ContractDto?> FindAsync(string id, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Contracts.FindAsync([db.AgentToken, id], cancellationToken);
+        var entity = await db.Contracts.FindAsync([db.AgentId, id], cancellationToken);
         return entity is null ? null : MapToDto(entity);
     }
 
@@ -27,12 +27,12 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
 
     public async Task UpsertAsync(ContractDto contract, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Contracts.FindAsync([db.AgentToken, contract.Id], cancellationToken);
+        var existing = await db.Contracts.FindAsync([db.AgentId, contract.Id], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedContract
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             Id = contract.Id,
             FactionSymbol = contract.FactionSymbol,
             Type = contract.Type,
@@ -60,7 +60,7 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
     public async Task UpdateStatusAsync(string id, bool isAccepted, bool isFulfilled, CancellationToken cancellationToken = default)
     {
         await db.Contracts
-            .Where(c => c.AgentToken == db.AgentToken && c.Id == id)
+            .Where(c => c.AgentId == db.AgentId && c.Id == id)
             .ExecuteUpdateAsync(
                 updates => updates
                     .SetProperty(c => c.IsAccepted, isAccepted)

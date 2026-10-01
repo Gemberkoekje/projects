@@ -24,7 +24,7 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
         {
             db.LeaderLeases.Add(new LeaderLease
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 Key = leaseKey,
                 HolderId = holderId,
                 ExpiresAt = now + leaseDuration
@@ -47,7 +47,7 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
         {
             // We already hold the lease – renew it.
             await db.LeaderLeases
-                .Where(l => l.AgentToken == db.AgentToken && l.Key == leaseKey && l.HolderId == holderId)
+                .Where(l => l.AgentId == db.AgentId && l.Key == leaseKey && l.HolderId == holderId)
                 .ExecuteUpdateAsync(
                     s => s.SetProperty(l => l.ExpiresAt, now + leaseDuration),
                     cancellationToken);

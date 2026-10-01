@@ -6,7 +6,7 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 /// </summary>
 public sealed class LeaderLease
 {
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     /// <summary>Logical name of the lease (e.g. <c>"game-loop"</c>).</summary>
     required public string Key { get; init; }

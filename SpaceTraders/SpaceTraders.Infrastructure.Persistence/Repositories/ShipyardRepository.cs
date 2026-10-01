@@ -20,7 +20,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
     {
         var shipyards = await db.Shipyards
             .AsNoTracking()
-            .Where(s => s.AgentToken == db.AgentToken)
+            .Where(s => s.AgentId == db.AgentId)
             .Where(s => s.ShipTypesJson != null && s.ShipTypesJson.Contains(shipType))
             .OrderByDescending(s => s.LastObservedAt)
             .FirstOrDefaultAsync(cancellationToken);
@@ -30,12 +30,12 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
 
     public async Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Shipyards.FindAsync([db.AgentToken, shipyard.WaypointSymbol], cancellationToken);
+        var existing = await db.Shipyards.FindAsync([db.AgentId, shipyard.WaypointSymbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedShipyard
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             WaypointSymbol = shipyard.WaypointSymbol,
             SystemSymbol = shipyard.SystemSymbol,
             ShipTypesJson = shipyard.ShipTypesJson,
@@ -59,7 +59,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
     {
         var shipyards = await db.Shipyards
             .AsNoTracking()
-            .Where(s => s.AgentToken == db.AgentToken)
+            .Where(s => s.AgentId == db.AgentId)
             .ToListAsync(cancellationToken);
 
         return shipyards.Select(s => MapToDto(s)).ToList();
@@ -69,7 +69,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
     {
         var entity = await db.Shipyards
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.WaypointSymbol == waypointSymbol && s.AgentToken == db.AgentToken, cancellationToken);
+            .FirstOrDefaultAsync(s => s.WaypointSymbol == waypointSymbol && s.AgentId == db.AgentId, cancellationToken);
 
         return entity is null ? null : MapToDto(entity);
     }
@@ -78,7 +78,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
     {
         var shipyards = await db.Shipyards
             .AsNoTracking()
-            .Where(s => s.AgentToken == db.AgentToken)
+            .Where(s => s.AgentId == db.AgentId)
             .Select(s => new ShipyardFreshnessDto
             {
                 WaypointSymbol = s.WaypointSymbol,

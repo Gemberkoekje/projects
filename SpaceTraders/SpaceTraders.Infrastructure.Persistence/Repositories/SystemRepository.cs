@@ -29,10 +29,10 @@ public sealed class SystemRepository(SpaceTradersDbContext db) : ISystemReposito
 
     public async Task UpsertAsync(SystemCacheModel system, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Systems.FindAsync([db.AgentToken, system.Symbol], cancellationToken);
+        var existing = await db.Systems.FindAsync([db.AgentId, system.Symbol], cancellationToken);
         var values = new CachedSystem
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             Symbol = system.Symbol,
             SectorSymbol = system.SectorSymbol,
             Type = system.Type,

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -17,6 +18,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 public sealed class DeployProbeGoalExecutor(
     IShipGoalRepository goals,
     IProbeDeploymentPlanService probeDeploymentPlan,
+    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<DeployProbeGoalExecutor> logger) : IShipGoalExecutor
 {
@@ -45,7 +47,7 @@ public sealed class DeployProbeGoalExecutor(
             // Ensure the probe is docked before setting DRIFT mode.
             if (ship.LocalStatus == ShipLocalStatus.InOrbit)
             {
-                await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, deployGoal.TargetWaypointSymbol), ct);
+                await dock.ExecuteAsync(ship.Symbol, ct);
                 return GoalExecutionResult.Progressing("Docking probe at deployment target.");
             }
 
@@ -53,15 +55,15 @@ public sealed class DeployProbeGoalExecutor(
             if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogInformation(
-                    "DeployProbeGoalExecutor: setting DRIFT mode for probe {Symbol} at {Waypoint}.",
+                    "DeployProbeGoalExecutor: setting DRIFT mode for probe {ShipSymbol} at {WaypointSymbol}.",
                     ship.Symbol,
                     deployGoal.TargetWaypointSymbol);
 
                 await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
             }
 
-            logger.LogInformation(
-                "DeployProbeGoalExecutor: probe {Symbol} deployed at {Waypoint}; advancing deployment plan.",
+            logger.LogDebug(
+                "DeployProbeGoalExecutor: probe {ShipSymbol} deployed at {WaypointSymbol}; advancing deployment plan.",
                 ship.Symbol,
                 deployGoal.TargetWaypointSymbol);
 
@@ -76,7 +78,7 @@ public sealed class DeployProbeGoalExecutor(
             && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             logger.LogInformation(
-                "DeployProbeGoalExecutor: probe {Symbol} has no fuel; switching to DRIFT mode before navigating.",
+                "DeployProbeGoalExecutor: probe {ShipSymbol} has no fuel; switching to DRIFT mode before navigating.",
                 ship.Symbol);
 
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);

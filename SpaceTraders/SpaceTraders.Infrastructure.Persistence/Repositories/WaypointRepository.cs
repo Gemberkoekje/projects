@@ -59,7 +59,7 @@ public sealed class WaypointRepository(SpaceTradersDbContext db) : IWaypointRepo
         {
             var values = new CachedWaypoint
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 Symbol = waypoint.Symbol,
                 SystemSymbol = waypoint.SystemSymbol,
                 Type = waypoint.Type,
@@ -92,7 +92,7 @@ public sealed class WaypointRepository(SpaceTradersDbContext db) : IWaypointRepo
     public async Task MarkVisitedAsync(string waypointSymbol, CancellationToken cancellationToken = default)
     {
         await db.Waypoints
-            .Where(w => w.AgentToken == db.AgentToken && w.Symbol == waypointSymbol)
+            .Where(w => w.AgentId == db.AgentId && w.Symbol == waypointSymbol)
             .ExecuteUpdateAsync(
                 updates => updates.SetProperty(w => w.LastObservedAt, TimeProvider.System.GetUtcNow()),
                 cancellationToken);

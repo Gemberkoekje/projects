@@ -29,8 +29,8 @@ public sealed class NavigateSubCommand(
 {
     public async Task ExecuteAsync(string shipSymbol, string destinationWaypoint, Guid goalId, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
-            "NavigateSubCommand: navigating ship {Symbol} to {Destination}.",
+        logger.LogDebug(
+            "NavigateSubCommand: navigating ship {ShipSymbol} to {Destination}.",
             shipSymbol,
             destinationWaypoint);
 
@@ -46,7 +46,7 @@ public sealed class NavigateSubCommand(
         if (navigation is null)
         {
             logger.LogWarning(
-                "NavigateSubCommand: no reachable navigation leg found for ship {Symbol} toward {Destination}; skipping navigate call for this tick.",
+                "NavigateSubCommand: no reachable navigation leg found for ship {ShipSymbol} toward {Destination}; skipping navigate call for this tick.",
                 shipSymbol,
                 destinationWaypoint);
             return;
@@ -74,7 +74,7 @@ public sealed class NavigateSubCommand(
         await scheduler.ScheduleArrivalAsync(shipSymbol, goalId, arrivalTime, cancellationToken);
 
         logger.LogInformation(
-            "NavigateSubCommand: ship {Symbol} in transit to {Destination}, arrives at {Arrival}.",
+            "NavigateSubCommand: ship {ShipSymbol} in transit to {Destination}, arrives at {Arrival}.",
             shipSymbol,
             actualDestination,
             arrivalTime);
@@ -94,7 +94,8 @@ public sealed class NavigateSubCommand(
         catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
         {
             logger.LogInformation(
-                "NavigateSubCommand: insufficient fuel for direct navigation of ship {Symbol} to {Destination}; attempting fallback routing.",
+                ex,
+                "NavigateSubCommand: insufficient fuel for direct navigation of ship {ShipSymbol} to {Destination}; attempting fallback routing.",
                 shipSymbol,
                 destinationWaypoint);
         }
@@ -109,7 +110,8 @@ public sealed class NavigateSubCommand(
         catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
         {
             logger.LogInformation(
-                "NavigateSubCommand: ship {Symbol} still lacks fuel for {Destination} after DRIFT fallback; trying intermediate markets.",
+                ex,
+                "NavigateSubCommand: ship {ShipSymbol} still lacks fuel for {Destination} after DRIFT fallback; trying intermediate markets.",
                 shipSymbol,
                 destinationWaypoint);
         }
@@ -122,7 +124,7 @@ public sealed class NavigateSubCommand(
             {
                 var reroute = await port.NavigateShipAsync(shipSymbol, market, cancellationToken);
                 logger.LogInformation(
-                    "NavigateSubCommand: rerouting ship {Symbol} to intermediate market {FuelMarket} before {Destination}.",
+                    "NavigateSubCommand: rerouting ship {ShipSymbol} to intermediate market {FuelMarket} before {Destination}.",
                     shipSymbol,
                     market,
                     destinationWaypoint);
@@ -131,7 +133,8 @@ public sealed class NavigateSubCommand(
             catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
             {
                 logger.LogDebug(
-                    "NavigateSubCommand: intermediate market {FuelMarket} is not reachable for ship {Symbol}; trying next candidate.",
+                    ex,
+                    "NavigateSubCommand: intermediate market {FuelMarket} is not reachable for ship {ShipSymbol}; trying next candidate.",
                     market,
                     shipSymbol);
             }
@@ -158,7 +161,7 @@ public sealed class NavigateSubCommand(
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "NavigateSubCommand: unable to switch ship {Symbol} to DRIFT for fuel fallback.", shipSymbol);
+            logger.LogDebug(ex, "NavigateSubCommand: unable to switch ship {ShipSymbol} to DRIFT for fuel fallback.", shipSymbol);
             return ship;
         }
     }

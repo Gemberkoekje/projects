@@ -19,7 +19,7 @@ public sealed class ShipNavigationCompletedHandler(
     public async Task Handle(ShipNavigationCompletedEvent @event, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "ShipNavigationCompletedHandler: navigation complete for ship {Ship} at {Destination}; resuming goal.",
+            "ShipNavigationCompletedHandler: navigation complete for ship {ShipSymbol} at {Destination}; resuming goal.",
             @event.ShipSymbol,
             @event.DestinationWaypoint);
 
@@ -34,7 +34,7 @@ public sealed class ShipNavigationCompletedHandler(
         if (result is not null)
         {
             logger.LogInformation(
-                "ShipNavigationCompletedHandler: ship {Ship} goal resumed; outcome={Outcome} reason={Reason}.",
+                "ShipNavigationCompletedHandler: ship {ShipSymbol} goal resumed; outcome={Outcome} reason={Reason}.",
                 @event.ShipSymbol,
                 result.Outcome,
                 result.Reason);

@@ -24,12 +24,12 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
 
     public async Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Markets.FindAsync([db.AgentToken, market.WaypointSymbol], cancellationToken);
+        var existing = await db.Markets.FindAsync([db.AgentId, market.WaypointSymbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedMarket
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             WaypointSymbol = market.WaypointSymbol,
             SystemSymbol = market.SystemSymbol,
             TradeGoodsJson = market.TradeGoodsJson,

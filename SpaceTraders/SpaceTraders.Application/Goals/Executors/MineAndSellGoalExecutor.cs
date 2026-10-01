@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -19,6 +20,7 @@ public sealed class MineAndSellGoalExecutor(
     IAgentRepository agents,
     ISurveyRepository surveys,
     ISpaceTradersPort port,
+    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<MineAndSellGoalExecutor> logger) : IShipGoalExecutor
 {
@@ -101,11 +103,18 @@ public sealed class MineAndSellGoalExecutor(
             miningGoal.SellWaypointSymbol,
             StringComparison.OrdinalIgnoreCase);
 
-        if (!atSellWaypoint || ship.LocalStatus == ShipLocalStatus.InOrbit)
+        if (!atSellWaypoint)
         {
             await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, miningGoal.SellWaypointSymbol), ct);
             return GoalExecutionResult.WaitingForArrival(
                 $"Navigating to sell waypoint {miningGoal.SellWaypointSymbol}.");
+        }
+
+        if (ship.LocalStatus == ShipLocalStatus.InOrbit)
+        {
+            await dock.ExecuteAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Progressing(
+                $"Docking at sell waypoint {miningGoal.SellWaypointSymbol}.");
         }
 
         var sellResult = await port.SellCargoAsync(ship.Symbol, miningGoal.TradeSymbol, targetUnits, ct);
@@ -118,7 +127,7 @@ public sealed class MineAndSellGoalExecutor(
         }
 
         logger.LogInformation(
-            "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {Waypoint} for {Revenue} credits.",
+            "MineAndSellGoalExecutor: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
             ship.Symbol,
             targetUnits,
             miningGoal.TradeSymbol,
@@ -212,7 +221,7 @@ public sealed class MineAndSellGoalExecutor(
 
         await goals.SetActiveGoalAsync(surveyShipSymbol, surveyGoal, ct);
         logger.LogInformation(
-            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {SurveyShip} for {TradeSymbol} at {Waypoint}.",
+            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {ShipSymbol} for {TradeSymbol} at {WaypointSymbol}.",
             surveyShipSymbol,
             miningGoal.TradeSymbol,
             miningGoal.SourceWaypointSymbol);

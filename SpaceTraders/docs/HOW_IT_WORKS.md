@@ -11,7 +11,8 @@ One process, `SpaceTraders.API`, hosts everything.
 
 - It serves an internal HTTP API under `/spacetraders/api`.
 - Once its startup chain has finished, a loop runs every 5 seconds on the leader instance (the
-  "tick"). The tick bootstraps five *plans*, steps every ship's *goal*, and drives contract work.
+  "tick"). The tick bootstraps the *plans* that are switched on, steps every ship's *goal*, and
+  drives contract work.
 - Ships act through in-process Wolverine commands and events, which call the SpaceTraders API
   through a rate-limited client.
 - State lives in PostgreSQL.
@@ -19,7 +20,7 @@ One process, `SpaceTraders.API`, hosts everything.
 
 ```text
 startup chain ─► tick every 5 s (leader only)
-                  ├─ bootstrap plans: Scout, Contract, ProbeDeployment, Mining, Trading
+                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Mining, Trading
                   ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
                   ├─ contract assignments: deliver, or mine
                   └─ publish API availability changes
@@ -38,14 +39,11 @@ arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNa
   `Serilog` section of `appsettings*.json`: Information by default, Warning for ASP.NET Core,
   EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
   `Application=SpaceTraders.API`.
-- **Wolverine** discovers handlers in the Application assembly. Outside the `Testing`
-  environment it adds:
-  - EF Core transactions (Eager);
-  - message storage in the PostgreSQL `wolverine` schema;
-  - durable local queues.
-
-  The durability agent is off in every environment (B2). Any handler exception is retried
-  after 250 ms, 500 ms and 1 s, then the message is discarded.
+- **Wolverine** discovers handlers in the Application assembly and keeps messages in memory:
+  nothing goes to Postgres. A crash loses the messages still in flight; after the restart,
+  startup sync and startup recovery pick the ships up again, and pending arrivals wait in
+  `scheduled_ship_events`. Any handler exception is retried after 250 ms, 500 ms and 1 s, then
+  the message is discarded.
 - **Health checks:**
   - `/health/live` runs no checks.
   - `/health/ready` checks the database.
@@ -74,22 +72,25 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 |---|---|---|---|
 | 1 | Database initialisation | once | Skipped in `Testing`; see [Data](#6-data) |
 | 2 | `ShipEventScheduler` | keeps running | Arrival timers. Skipped in `Testing` |
-| 3 | `AgentBootstrapService` | once | Picks or registers the agent |
-| 4 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
-| 5 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
-| 6 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
-| 7 | `StartupSnapshotService` | once | One JSON snapshot row |
-| 8 | `StartupRecoveryService` | once | Resumes ships |
-| 9 | `SettingsStartupLoggingService` | once | Logs every setting |
-| 10 | `GameLoopService` | every 5 s | The tick |
-| 11 | `ActivityLogPruningService` | 30 s after start, then daily | |
-| 12 | `DataRetentionService` | 60 s after start, then daily | |
+| 3 | `DataRetentionService` | at start, then daily | Prunes every table by its policy; see [Retention](#retention) |
+| 4 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
+| 5 | `DatabaseSizeGuardService` | at start, then every 5 min | See [Database size guard](#database-size-guard) |
+| 6 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
+| 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
+| 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
+| 9 | `StartupSnapshotService` | once | One JSON snapshot row |
+| 10 | `StartupRecoveryService` | once | Resumes ships |
+| 11 | `SettingsStartupLoggingService` | once | Logs every setting |
+| 12 | `GameLoopService` | every 5 s | The tick |
 | 13 | `PrometheusMetricsService` | every 10 s | |
 
-One try/catch wraps the chain. A throw in steps 1, 3, 4, 6 or 8 ends it: later services never
-start and nothing retries, but the process stays up (B23). Steps 7 and 9 catch their own errors.
+One try/catch wraps the chain. Steps 5, 9 and 11 catch their own errors. A throw in steps 1, 4, 6,
+8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
+stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
+before any of those, so a pod that keeps failing during startup still prunes at every start.
 
 **Agent bootstrap** (`AgentBootstrapService`):
+- First it reads the server's reset date (`GET /`).
 - Candidate tokens, in order:
   1. the active stored token;
   2. the configured `SpaceTraders:AgentToken`;
@@ -101,12 +102,21 @@ start and nothing retries, but the process stays up (B23). Steps 7 and 9 catch t
   publishes `TokenResetMismatchDetectedEvent` and tries the next candidate. Any other API error
   throws.
 - Registration needs `SpaceTraders:AccountToken` and `AgentName`; the faction defaults to
-  `COSMIC`.
+  `COSMIC`. It refuses (and so stops the host) when an agent with the new agent's id is stored
+  already: the server must have reset after its reset date was read, and the new agent would
+  share the old one's rows. The next start reads the date again.
 - On success it:
-  - sets the agent data scope, which every later database query filters on;
+  - sets the agent data scope to the agent's id, which every later database query filters on
+    (see [Agent scoping](#agent-scoping));
   - seeds any missing settings;
   - records the active token.
-- This only happens at startup. A reset during a run is not noticed (B6).
+- Then it deletes the rows of every other agent, table by table, except their `runs`. A table
+  that fails is logged and left for the next start.
+- This only happens at startup. A reset during a run is noticed by the API client (see
+  [Outbound API client](#8-outbound-api-client-spacetradersinfrastructurespacetradersapi)): the
+  host stops, and after the restart this registers the new agent and deletes the old one's rows.
+  The new agent's settings start from the defaults, because settings are stored per agent; the
+  old values survive only in the settings snapshot of the old agent's runs.
 
 **Run lifecycle** (`RunLifecycleService`):
 - Opens a run, or resumes the open one, with a name, a strategy label, a settings snapshot and
@@ -123,7 +133,8 @@ checks it. The lease is not released on shutdown.
 - **Fetches:** the agent, all ships, and for each system that has a ship, the system and its
   waypoints if they aren't cached yet. It also fetches market and shipyard data at waypoints where
   a ship is not in transit, and the first page of contracts (20).
-- **Overwrites** existing ship rows, including their goal columns (B20).
+- **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It
+  leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
 
 **Startup snapshot:** switches `Automation.Enabled` off while it runs and back on afterwards. It
@@ -145,23 +156,38 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 
 ## 2. The tick (`GameLoopService`)
 
-- Runs 5 s after the previous tick ends, on the leader only. It never reads `Automation.Enabled`
-  (B5).
+- Runs 5 s after the previous tick ends, on the leader only.
 - Each tick:
-  1. `EnsureBootstrappedAsync` for Scout, Contract, ProbeDeployment, Mining and Trading, in that
-     order.
+  1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Contract,
+     ProbeDeployment, Mining and Trading.
   2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
-  3. For every active `Contract` assignment: `FulfillContractDeliveryCommand` if the ship holds
-     any of the contract good, otherwise `MineResourceVolumeCommand` (B8).
-  4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed. Nothing
-     handles them.
-- A single try/catch wraps the tick, so an exception skips the rest of it (B14).
+  3. If the contract plan is switched on, for every active `Contract` assignment:
+     `FulfillContractDeliveryCommand` if the ship holds any of the contract good, otherwise
+     `MineResourceVolumeCommand` (B8).
+  4. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
+     it (`ApiUnavailable`, `ApiAvailable`). Nothing handles the events.
+
+  With `Automation.Enabled` off, or while API calls are paused after a 502, it skips steps 1
+  to 3.
+- Each plan bootstrap, each ship's goal step and each contract assignment runs in its own DI
+  scope and try/catch. A failure is logged at Error with the plan or the ship, and the rest of the
+  tick carries on. Its own scope means a step can't leave a broken DbContext to the steps after
+  it.
+- A failure outside those steps (reading the switches, listing the ships or assignments) ends
+  the tick; the next one starts 5 s later.
 
 ---
 
 ## 3. Plans
 
 All plan state is JSON in `plan_states`, one row per plan type.
+
+Each plan has a switch, `Automation.Plan.{Plan}.Enabled` (`AutomationSwitches`). Per D9 only
+Scout and Contract are on by default. A plan that is switched off:
+- isn't bootstrapped, so it doesn't buy anything;
+- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe,
+  mine-and-sell and survey, trade). They resume when it is switched back on;
+- for the contract plan: the tick's contract work (step 3) is skipped too.
 
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
@@ -281,7 +307,9 @@ Markets are not scouted again.
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
 - **Kinds:** 13 kinds are defined, but only five are ever created: `ScoutWaypoint`,
   `DeployProbe`, `MineAndSell`, `TradeBetweenMarkets` and `SurveyWaypoint`.
-- **Status:** always `Assigned`, because nothing updates it (B16).
+- **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
+  Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
+  (`runaway`).
 - **Set by:**
   - the scout, mining and trading plans;
   - `DeployProbeHandler`;
@@ -298,6 +326,15 @@ Markets are not scouted again.
   applies (B17).
 - **Runs** one step of the executor for the active goal. Only the five kinds above are
   dispatched, so `IdleGoalExecutor` is unreachable.
+- **Skips** every goal step while `Automation.Enabled` is off, whatever triggered it, and the
+  goals of a plan that is switched off.
+- **Skips** a goal that is `Blocked`. It stays blocked until a plan replaces it; mining and
+  trading treat its ship as free, but the scout plan never replaces its goal.
+- **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
+  (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
+  `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
+  blocks the goal with reason `runaway`, logs a warning and counts
+  `spacetraders_goal_breaker_trips_total{ship}`. A loop like B1 is stopped after 60 steps.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
 - **Called by:**
@@ -311,20 +348,25 @@ Markets are not scouted again.
 In this table, *[cmd]* means an inline command (`InvokeAsync`) and *[API]* a direct call to the
 game API. Every executor first returns "waiting for arrival" while the ship is in transit.
 
+No executor navigates to the waypoint it is already at. At its target, an executor that needs the
+ship docked docks it, and one that needs it in orbit orbits it; that is the whole step, and the next
+step does the work.
+
 | Executor | Behaviour |
 |---|---|
-| `ScoutWaypoint` | Docked at the target: mark it visited and complete. Otherwise: [cmd] navigate. In orbit at the target this loops (B1). |
-| `DeployProbe` | At the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: [cmd] navigate, which loops (B1). Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
-| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, then [API] sell. It never completes. |
+| `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
+| `DeployProbe` | Docked at the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: dock. Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
+| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell. It never completes. |
 | `TradeBetweenMarkets` | [cmd] navigate to the buy market and dock, [API] buy (free cargo, trade volume and credits limit the amount), then navigate to the sell market and dock, [API] sell, clear the goal, complete. |
-| `SurveyWaypoint` | [cmd] navigate to the target. Docked there: [cmd] navigate again (B1). In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
+| `SurveyWaypoint` | [cmd] navigate to the target. Docked there: orbit. In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
 | `Idle` | Unreachable. |
 
 ### Commands
 
 - **`NavigateToWaypointCommand`:**
-  - Already at the destination: it publishes `ShipNavigationCompletedEvent` without docking or
-    orbiting (B1).
+  - Already at the destination: it does nothing and logs a warning. It publishes no
+    `ShipNavigationCompletedEvent`, because that would run the caller's goal step again without
+    progress (B1, fixed).
   - Docked: it refuels if the waypoint sells fuel, then orbits.
   - Then it navigates. Navigate tries DRIFT mode and intermediate markets when fuel is short,
     then schedules the arrival and publishes `ShipInTransitEvent`.
@@ -361,8 +403,8 @@ wait for a cooldown simply run again on a later tick.
 |---|---|---|
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
-| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods probably aren't discovered (see below) |
-| `ShipNavigationCompletedEvent` | `NavigateToWaypointCommand` | `ShipNavigationCompletedHandler` → one goal step |
+| `MarketDataRefreshedEvent` | Arrival at a market | `MarketPriceSampleHandler` (writes nothing, B19); the mining and trading `Handle` methods aren't discovered (see below) |
+| `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
 | `ShipStateMismatchEvent` | State-gated commands | `activity_logs` row |
 | `DeployProbeCommand` | Probe plan | `DeployProbeHandler` |
@@ -389,10 +431,11 @@ production code doesn't use the aggregates at all (B7).
 
 - **Discovery:** Wolverine finds handlers by convention (class names ending in `Handler` or
   `Consumer`). The `Handle` methods on `ContractPlanService`, `MiningAutomationService` and
-  `TradingAutomationService` are therefore probably never wired (unverified).
+  `TradingAutomationService` are therefore not wired. `DiValidationTests` checks this, because a
+  plan that is switched off could otherwise still run from an event.
 - **`InvokeAsync`** runs a command inline, and its exceptions reach the caller. Executors and
   the tick use it.
-- **`PublishAsync`** goes through the durable local queues. All events use it, as do
+- **`PublishAsync`** goes through in-memory local queues. All events use it, as do
   `DeployProbeCommand` and `NavigateToWaypointArrivedCommand`.
 
 ---
@@ -401,47 +444,81 @@ production code doesn't use the aggregates at all (B7).
 
 ### Schema
 
-- There are no EF migrations. `SpaceTradersDatabaseInitializer` runs `EnsureCreatedAsync`, then
-  idempotent raw DDL: `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE/INDEX IF NOT EXISTS`, and widening
-  of the token columns. On an empty database this order may fail (B21).
-- Settings are seeded only once an agent token is known.
-- Wolverine creates its own tables in the `wolverine` schema when the host starts
-  (`UseResourceSetupOnStartup`).
+- There are no EF migrations. `SpaceTradersDatabaseInitializer` creates the database and all
+  of the model's tables when none of them exist yet; unlike `EnsureCreated`, other tables in the
+  database don't stop it (B21). It doesn't upgrade an existing schema: a database from before
+  slice 1.4 has to be dropped.
+- Agent bootstrap seeds the settings of the agent it picks.
+- Wolverine stores nothing in the database.
 
 ### Agent scoping
 
-- Most tables include the agent token in their key, and EF filters every query on the current
-  token (B4).
-- Pruning only touches the current token's rows, so rows from earlier resets stay (B3).
-- `startup_snapshots`, `agent_credits_samples` and `scheduled_ship_events` have no filter.
+- Every table but `scheduled_ship_events` has an `AgentId` column: the agent's symbol and the
+  server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). A token keeps the id it
+  was first stored under. Where a table has a natural key, the id is part of it.
+- EF filters every query on the active agent's id. `startup_snapshots`, `agent_credits_samples`
+  and `scheduled_ship_events` have no filter.
+- The token itself is stored only in `stored_credentials`.
+- The database keeps one agent: at startup, agent bootstrap deletes every other agent's rows,
+  except their `runs` (`AgentDataCleanup`). Pruning then only has the active agent's rows to deal
+  with.
+
+### Retention
+
+- `DataRetention` lists every table, with a policy that prunes it or the reason it can't grow
+  without bound ("bounded"). `DataRetentionTests` fails for a table that isn't listed.
+- `DataRetentionService` prunes each table in its own scope at start and then every 24 hours. A
+  table that fails is logged and the others carry on.
+- Pruning covers every agent's rows, so it doesn't wait for agent bootstrap. Next to it, agent
+  bootstrap deletes every other agent's rows at startup, except their `runs`.
+- Downsampling ranks the rows in one pass (`row_number()`). On 2.6 million samples (30 markets,
+  20 goods, 90 days), the `NOT IN` it replaces didn't finish within 3 minutes; this takes about 5
+  seconds, within the 30 s command timeout.
+
+### Database size guard
+
+`DatabaseSizeGuardService` keeps the bot from filling the Postgres volume it shares with every
+other app (D8):
+- It reads `pg_database_size` at start, before the rest of startup goes on, and then every 5
+  minutes, and exports it as `spacetraders_db_size_bytes`.
+- Above `Database.SoftLimitMegabytes` (1024) it logs `DbSizeSoftLimit` at Warning, once per
+  crossing.
+- Above `Database.HardLimitMegabytes` (3072) it switches `Automation.Enabled` off and logs
+  `DbSizeHardLimit` at Error. It switches automation off again at every check while the
+  database stays above the limit, so switching it back on only lasts once the database is smaller.
+- Back under the soft limit it logs `DbSizeNormal`.
+- Until there are anomalies (phase 3), these logs and the metric are how it shows.
 
 ### Tables
 
 | Table | Holds | Written by | Retention |
 |---|---|---|---|
-| `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | never |
-| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | never |
-| `cached_ships` | Ship state and the active goal | Sync (B20), ship commands, goal repository | never |
-| `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | never |
-| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | never |
-| `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | never |
-| `agent_settings` | Settings | Seed, `PUT /settings` | never |
-| `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | never |
-| `plan_states` | Plan JSON per plan type | All five plans | never |
-| `scheduled_ship_events` | Arrival timers | Navigate | deleted when fired |
+| `stored_credentials` | Agent tokens, active token marker | Agent bootstrap | bounded: the active agent's token |
+| `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels | bounded: one row |
+| `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship |
+| `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
+| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
+| `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
+| `agent_settings` | Settings | Seed, `PUT /settings` | bounded: one row per setting |
+| `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | bounded: one row per ship |
+| `plan_states` | Plan JSON per plan type | All five plans | bounded: one row per plan |
+| `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
 | `ledger_entries` | Credit ledger | `LedgerEntryHandler`: fuel purchases only (B7) | 30 days |
-| `cached_surveys` | Surveys | Survey executor | expired rows removed when new surveys are saved |
-| `leader_leases` | Leader lease | Leader election | never (one row) |
-| `api_endpoint_usages` | Call count per endpoint string | Every outbound call | never (counters) |
-| `runs`, `run_credit_highlights` | Runs and start/end credits | Run lifecycle | never |
-| `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | never |
-| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, hourly to 90 days |
-| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, hourly to 90 days |
+| `cached_surveys` | Surveys | Survey executor | bounded: expired rows removed when new surveys are saved |
+| `leader_leases` | Leader lease | Leader election | bounded: one row |
+| `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
+| `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
+| `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
+| `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | the agent's first and the last 10 |
+| `market_price_samples` | Price history | Nothing, in practice (B19) | 7 days raw, first per hour to 90 days |
+| `agent_credits_samples` | Credits over time | Nothing (B7) | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
-| `trade_opportunities`, `fleet_goals`, `ship_goal_history`, `cached_construction_sites`, `scheduled_runs` | — | Nothing | — |
-| `scout_plan_states` | Legacy scout plan | Nothing; copied into `plan_states` at startup | never |
-| `wolverine.*` | Stored messages | Every published message | probably never (B2) |
+| `ship_goal_history` | Ended goals | Nothing | 30 days |
+| `fleet_goals` | Fleet goals | Nothing | completed ones 30 days |
+| `trade_opportunities` | Trade routes | Nothing | bounded: replaced as a whole |
+| `cached_construction_sites` | Construction sites | Nothing | bounded: one row per site |
+| `scheduled_runs` | Runs to start later | Nothing | bounded: deleted when promoted |
 
 ---
 
@@ -456,11 +533,15 @@ production code doesn't use the aggregates at all (B7).
 
 ### What each setting does
 
-Only five of the 47 seeded settings change what the bot does (B18):
+Only 14 of the 56 seeded settings change what the bot does (B18):
 
 | Setting (default) | Effect |
 |---|---|
-| `Automation.Enabled` (true) | Startup recovery skips when false. The tick ignores it (B5). Startup snapshot switches it off and on. |
+| `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. Startup snapshot switches it off and on. |
+| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
+| `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
+| `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
+| `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
@@ -515,20 +596,34 @@ Only five of the 47 seeded settings change what the bot does (B18):
 
 **Handler pipeline,** outermost first:
 
-1. **`RetryHandler`:** retries a 502 after 1, 2 and 4 s, then marks the API unavailable.
-2. **`RateLimitResponseHandler`:** on a 429, waits until `x-ratelimit-reset` (or 1 s) and resends
-   once. It records the remaining requests, the limit and the reset time from the headers.
-3. **`RateLimitingHandler`:** every request needs a token from a 2/s bucket *and* a 30-per-60 s
-   bucket, which allows 30 requests a minute. Non-GET requests go first. This deviates from the
-   API guide (B13).
+All three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
+
+1. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
+   wait a few minutes. So after a 502 no call goes out for `Api.BadGatewayPauseMinutes`
+   (default 3): calls in that time fail at once with `ApiPausedException`. The first call after
+   the pause goes out as usual; a success marks the API available, another 502 pauses again.
+2. **`RateLimitResponseHandler`:** a 429 with `x-ratelimit-*` headers comes from the API's rate
+   limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute)
+   and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
+   and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
+   Warning, and the headers are recorded for `/status/rate-limit`.
+3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
+   in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
+   both are used. Non-GET requests go first.
 
 **Other parts:**
 
-- **Availability:** `ApiAvailabilityState` tracks availability. Nothing pauses on it (B13).
+- **Availability:** `ApiAvailabilityState` tracks availability and the pause after a 502. The
+  tick does no work during the pause.
 - **Alerts:** `WebhookAlertNotifier` posts alerts to `Alerts.WebhookUrl` and ignores errors.
+- **Server reset:** every failed call goes through one place in `SpaceTradersApiClient`. A 401
+  with "Token reset_date does not match the server" goes to `ServerResetMonitor`, which switches
+  `Automation.Enabled` off, logs `ResetDetected` at Critical and stops the host. It ignores
+  reports until startup has completed: agent bootstrap tries old tokens on purpose.
 - **Tokens:** status, systems and waypoints calls go without a token, `register` uses the account
   token, and everything else uses the agent token.
-- **Usage counts:** every call increments `api_endpoint_usages`.
+- **Usage counts:** every call increments `api_endpoint_usages`, except the calls agent bootstrap
+  makes before it knows the agent.
 - **`ISpaceTradersPort`** has 41 operations:
   - status, agent and registration;
   - ships and cargo;
@@ -550,7 +645,7 @@ the key is unset, everything is open.
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data. Burst fields in `/rate-limit` are never set. |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes`, `/anomalies` | Read tables that are never written; always 204, `[]` or zeros |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
 | Runs and finance | `GET /runs/{id}/kpis`, `/finance/trade-routes` | KPIs is a stub; trade routes are always `[]` |
@@ -558,7 +653,7 @@ the key is unset, everything is open.
 | Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Prices are empty (B19); best routes always 204 |
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
 | Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
-| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled`, which the tick ignores (B5) |
+| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
 | Metrics | `GET /metrics` | See below |
 
 **SignalR** (`/hubs/dashboard`): the server broadcasts `ReceiveInvalidation({Kind, Id, OccurredAt})`
@@ -597,16 +692,25 @@ The seven pages in `src/Future` are not routed.
 ## 11. Logging and metrics
 
 - **Logs:** console only. Kubernetes and Promtail pick them up, and Loki keeps them for 31 days.
-  - There are no correlation properties.
-  - Several tick paths log at Information every 5 s (B12).
-  - The ship symbol is logged under three property names: `ShipSymbol`, `Symbol` and `Ship`.
+  - Production writes JSON with the rendered message (`RenderedCompactJsonFormatter`: `@m`).
+  - Information is for what happens: a ship docks, sells, is bought; a plan starts, advances,
+    completes or starts waiting. What a tick finds when nothing changed (no idle ship, no budget,
+    a plan already complete) goes to Debug, and so does the "starting" line of a ship command
+    whose result line follows. An idle bot logs nothing at Information.
+  - One property name per concept: `ShipSymbol`, `ContractId`, `WaypointSymbol` (unless the
+    message names a role, such as `Destination` or `SellWaypoint`), `GoalKind`.
+  - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
+    `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
+    Serilog turns into properties.
 - **Metrics** (`PrometheusMetricsService`, every 10 s), plus the prometheus-net defaults:
 
   | Metric | Updated? |
   |---|---|
   | `spacetraders_api_calls_total` | Yes, one per outbound request |
-  | `spacetraders_api_throttled_total` | Yes, but it counts local limiter waits as well as real 429s |
+  | `spacetraders_api_throttled_total` | Yes, one per 429 response |
   | `spacetraders_agent_credits` | Never (B7) |
+  | `spacetraders_goal_breaker_trips_total{ship}` | Yes, when the circuit breaker blocks a goal |
+  | `spacetraders_db_size_bytes` | Yes, every 5 minutes (size guard) |
 
   `/metrics` requires the API key (B11), so Prometheus can't scrape it as deployed.
 
@@ -627,7 +731,6 @@ This makes the codebase look bigger than what actually runs:
 - `ShipGoalRepository.UpdateGoalStatusAsync`.
 - `ShipGoalHistoryRepository.AppendAsync`.
 - `TradeOpportunityRepository.ReplaceAllAsync`.
-- Nine unused dependencies injected into `ShipGoalExecutorService`.
 - The `Stateless` package: referenced, but never used.
 - The domain aggregates and their events.
 
@@ -653,10 +756,10 @@ There is no deploy step. The manifests live in gembernodes (`../PLAN.md`, phase 
 
 | Project | Tests | Covers |
 |---|---|---|
-| `SpaceTraders.Domain.Tests` | ~51 | Aggregates, events, goal serialization, value objects |
-| `SpaceTraders.Application.Tests` | ~203 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
-| `SpaceTraders.Infrastructure.Tests` | ~62 | Repositories and the initializer against Testcontainers PostgreSQL (`Category=Integration`) |
-| `SpaceTraders.API.Tests` | ~60 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also outbox replay (needs Docker) and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
+| `SpaceTraders.Domain.Tests` | ~61 | Aggregates, events, goal serialization, value objects |
+| `SpaceTraders.Application.Tests` | ~258 | Plans, commands, executors, budget policy, retry and 429 handlers (NSubstitute, EF in-memory) |
+| `SpaceTraders.Infrastructure.Tests` | ~71 | Repositories, the initializer and retention against Testcontainers PostgreSQL (`Category=Integration`) |
+| `SpaceTraders.API.Tests` | ~76 | WebApplicationFactory tests in `Testing`, DI validation, bootstrap and run lifecycle. Also message storage and the agent cleanup against Testcontainers PostgreSQL (`Category=Integration`), and sandbox tests against the live API (`Category=Sandbox`, need `SPACETRADERS_AGENT_TOKEN`). |
 | `SpaceTraders.Integration.Test` | 1 | Replays the contract plan from a captured snapshot. No category, so CI runs it. |
 
 **WebUI tests:**

@@ -9,7 +9,7 @@ namespace SpaceTraders.Infrastructure.Tests;
 public sealed class ShipyardRepositoryTests : IntegrationTestBase
 {
     [SkippableFact]
-    public async Task FindShipyardForTypeAsync_OnlyReturnsShipyardForCurrentAgentToken()
+    public async Task FindShipyardForTypeAsync_OnlyReturnsShipyardForCurrentAgent()
     {
         var repo = new ShipyardRepository(Db);
 
@@ -21,7 +21,7 @@ public sealed class ShipyardRepositoryTests : IntegrationTestBase
 
         Db.Shipyards.Add(new CachedShipyard
         {
-            AgentToken = "other-agent-token",
+            AgentId = "OTHER-AGENT@2026-09-27",
             WaypointSymbol = "X1-OTHER-H53",
             SystemSymbol = "X1-OTHER",
             ShipTypesJson = "[\"SHIP_MINING_DRONE\"]",

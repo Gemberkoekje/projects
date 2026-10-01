@@ -62,7 +62,7 @@ public sealed class PurchaseShipHandler(
         }
 
         logger.LogInformation(
-            "PurchaseShipHandler: purchased {Symbol} ({Type}) for {Cost} credits.",
+            "PurchaseShipHandler: purchased {ShipSymbol} ({Type}) for {Cost} credits.",
             purchase.PurchasedShip.Symbol,
             command.ShipType,
             purchase.ActualCost);

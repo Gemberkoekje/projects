@@ -29,7 +29,6 @@ public sealed class TradingAutomationService(
     IBudgetPolicy budget,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
-
     private const string ScarceSupply = "SCARCE";
     private const string AbundantSupply = "ABUNDANT";
     private const string ImportType = "IMPORT";
@@ -138,7 +137,7 @@ public sealed class TradingAutomationService(
                 var purchaseDecision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
                 if (!purchaseDecision.CanAfford)
                 {
-                    logger.LogInformation(
+                    logger.LogDebug(
                         "Trading automation: deferred goal for {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}; purchase skipped because budget is unavailable.",
                         opportunity.TradeSymbol,
                         opportunity.BuyWaypointSymbol,
@@ -160,7 +159,7 @@ public sealed class TradingAutomationService(
                 idleTrader = await TryPurchaseTradeShipAsync(opportunity.BuyWaypointSymbol, cancellationToken);
                 if (idleTrader is null)
                 {
-                    logger.LogInformation(
+                    logger.LogDebug(
                         "Trading automation: deferred goal for {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}; no idle trade ship and purchase unavailable.",
                         opportunity.TradeSymbol,
                         opportunity.BuyWaypointSymbol,
@@ -276,7 +275,7 @@ public sealed class TradingAutomationService(
             cancellationToken);
         if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Trading automation: trade ship purchase denied at {Shipyard} — {Reason}.",
                 shipyard.WaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");

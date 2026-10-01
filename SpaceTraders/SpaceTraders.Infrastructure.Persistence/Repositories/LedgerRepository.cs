@@ -22,7 +22,7 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
     {
         var entry = new LedgerEntry
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             OccurredAt = TimeProvider.System.GetUtcNow(),
             ShipSymbol = shipSymbol,
             RunId = runId ?? activeRunIdProvider.ActiveRunId,
@@ -127,12 +127,5 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
             .Select(e => e.ShipSymbol)
             .Distinct()
             .CountAsync(cancellationToken);
-    }
-
-    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
-    {
-        return await db.LedgerEntries
-            .Where(e => e.OccurredAt < olderThan)
-            .ExecuteDeleteAsync(cancellationToken);
     }
 }

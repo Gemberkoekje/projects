@@ -1,12 +1,16 @@
 namespace SpaceTraders.Application.Interfaces;
 
 /// <summary>
-/// Tracks whether the SpaceTraders API is currently reachable.
-/// Set by the HTTP retry handler; read by the GameLoopService to publish domain events.
+/// Tracks whether the SpaceTraders API is currently reachable, and the pause after a 502.
+/// Set by the HTTP outage handler; read by the GameLoopService, which skips its work during a pause
+/// and publishes the availability transitions.
 /// </summary>
 public interface IApiAvailabilityState
 {
     bool IsAvailable { get; }
+
+    /// <summary>No API call goes out before this time. <see cref="DateTimeOffset.MinValue"/> when there is no pause.</summary>
+    DateTimeOffset PausedUntil { get; }
 
     /// <summary>
     /// Returns true if the availability state changed from available to unavailable
@@ -20,7 +24,8 @@ public interface IApiAvailabilityState
     /// </summary>
     bool ConsumeAvailableTransition();
 
-    void MarkUnavailable();
+    /// <summary>Marks the API unavailable and pauses all API calls until <paramref name="until"/>.</summary>
+    void PauseUntil(DateTimeOffset until);
 
     void MarkAvailable();
 }

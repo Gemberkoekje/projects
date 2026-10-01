@@ -4,7 +4,7 @@ public sealed class RunCreditHighlight
 {
     public long Id { get; init; }
 
-    public string AgentToken { get; init; } = string.Empty;
+    public string AgentId { get; init; } = string.Empty;
 
     public Guid RunId { get; init; }
 

@@ -10,7 +10,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 {
     public async Task<ShipModel?> FindAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         return entity is null ? null : MapToModel(entity);
     }
 
@@ -18,7 +18,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
     {
         var entities = await db.Ships
             .AsNoTracking()
-            .Where(s => s.AgentToken == db.AgentToken)
+            .Where(s => s.AgentId == db.AgentId)
             .OrderBy(s => s.Symbol)
             .ToListAsync(cancellationToken);
         foreach (var e in entities)
@@ -29,7 +29,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
     public async Task<IReadOnlyList<ShipModel>> GetInTransitAsync(CancellationToken cancellationToken = default)
     {
         var entities = await db.Ships
-            .Where(s => s.AgentToken == db.AgentToken && s.ArrivesAt.HasValue)
+            .Where(s => s.AgentId == db.AgentId && s.ArrivesAt.HasValue)
             .ToListAsync(cancellationToken);
         return entities.Select(MapToModel).ToList();
     }
@@ -37,12 +37,12 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
     public async Task<bool> IsShipAtWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
     {
         return await db.Ships.AsNoTracking()
-            .AnyAsync(s => s.AgentToken == db.AgentToken && s.WaypointSymbol == waypointSymbol && s.Status != "IN_TRANSIT", cancellationToken);
+            .AnyAsync(s => s.AgentId == db.AgentId && s.WaypointSymbol == waypointSymbol && s.Status != "IN_TRANSIT", cancellationToken);
     }
 
     public async Task UpsertAsync(ShipModel ship, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Ships.FindAsync([db.AgentToken, ship.Symbol], cancellationToken);
+        var existing = await db.Ships.FindAsync([db.AgentId, ship.Symbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
         var mountsJson = JsonSerializer.Serialize(ship.MountSymbols ?? []);
         var cargoJson = JsonSerializer.Serialize(ship.CargoInventory ?? []);
@@ -51,7 +51,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         {
             db.Ships.Add(new CachedShip
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 Symbol = ship.Symbol,
                 SystemSymbol = ship.SystemSymbol,
                 WaypointSymbol = ship.WaypointSymbol,
@@ -104,7 +104,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateNavAsync(string symbol, NavModel nav, FuelModel? fuel, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.Status = nav.Status;
@@ -127,7 +127,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateCargoAsync(string symbol, CargoModel cargo, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.CargoCurrent = cargo.Units;
@@ -140,7 +140,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateCooldownAsync(string symbol, DateTimeOffset? cooldownExpiresAt, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.CooldownExpiresAt = cooldownExpiresAt;
@@ -151,7 +151,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateFuelAsync(string symbol, FuelModel fuel, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.FuelCurrent = fuel.Current;
@@ -163,7 +163,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task RemoveAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentId, symbol], cancellationToken);
         if (entity is null)
         {
             return;

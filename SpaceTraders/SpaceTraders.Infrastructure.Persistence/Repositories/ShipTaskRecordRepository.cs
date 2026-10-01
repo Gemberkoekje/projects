@@ -29,7 +29,7 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
 
         var record = new ShipTaskRecord
         {
-            AgentToken = db.AgentToken,
+            AgentId = db.AgentId,
             ShipSymbol = shipSymbol,
             StartedAt = now,
             TaskKind = taskKind,
@@ -93,12 +93,5 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
                 r.Id, r.ShipSymbol, r.StartedAt, r.EndedAt,
                 r.TaskKind, r.TargetWaypoint, r.PayloadJson))
             .ToList();
-    }
-
-    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
-    {
-        return await db.ShipTaskRecords
-            .Where(r => r.StartedAt < olderThan)
-            .ExecuteDeleteAsync(cancellationToken);
     }
 }

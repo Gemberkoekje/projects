@@ -23,7 +23,8 @@ public sealed class SpaceTradersApiClient(
     HttpClient httpClient,
     IOptions<SpaceTradersApiOptions> options,
     IAgentTokenProvider agentTokenProvider,
-    IApiEndpointUsageRecorder endpointUsageRecorder) : ISpaceTradersApiClient
+    IApiEndpointUsageRecorder endpointUsageRecorder,
+    IServerResetMonitor serverResetMonitor) : ISpaceTradersApiClient
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -35,6 +36,7 @@ public sealed class SpaceTradersApiClient(
     private readonly SpaceTradersApiOptions _options = options.Value;
     private readonly IAgentTokenProvider _agentTokenProvider = agentTokenProvider;
     private readonly IApiEndpointUsageRecorder _endpointUsageRecorder = endpointUsageRecorder;
+    private readonly IServerResetMonitor _serverResetMonitor = serverResetMonitor;
 
     public Task<ServerStatus> GetStatusAsync(CancellationToken cancellationToken = default)
         => GetAsync<ServerStatus>(string.Empty, AuthMode.None, cancellationToken);
@@ -349,11 +351,7 @@ public sealed class SpaceTradersApiClient(
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        var currentAgentToken = _agentTokenProvider.Token ?? _options.AgentToken;
-        if (!string.IsNullOrWhiteSpace(currentAgentToken))
-        {
-            await _endpointUsageRecorder.RecordAsync(method.Method, endpoint, currentAgentToken, cancellationToken);
-        }
+        await _endpointUsageRecorder.RecordAsync(method.Method, endpoint, cancellationToken);
 
         if (body is not null)
         {
@@ -363,7 +361,13 @@ public sealed class SpaceTradersApiClient(
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw await SpaceTradersApiException.CreateAsync(response, endpoint, cancellationToken);
+            var exception = await SpaceTradersApiException.CreateAsync(response, endpoint, cancellationToken);
+            if (exception.IsServerReset)
+            {
+                await _serverResetMonitor.ReportAsync(exception.Message, cancellationToken);
+            }
+
+            throw exception;
         }
 
         try

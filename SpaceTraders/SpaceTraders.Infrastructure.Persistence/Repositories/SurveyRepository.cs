@@ -17,19 +17,19 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
 
         var now = TimeProvider.System.GetUtcNow();
         await db.Surveys
-            .Where(s => s.AgentToken == db.AgentToken && s.Expiration <= now)
+            .Where(s => s.AgentId == db.AgentId && s.Expiration <= now)
             .ExecuteDeleteAsync(cancellationToken);
 
         var signatures = surveys.Select(s => s.Signature).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var existing = await db.Surveys
-            .Where(s => s.AgentToken == db.AgentToken && signatures.Contains(s.Signature))
+            .Where(s => s.AgentId == db.AgentId && signatures.Contains(s.Signature))
             .ToDictionaryAsync(s => s.Signature, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
         foreach (var survey in surveys)
         {
             var values = new CachedSurvey
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 Signature = survey.Signature,
                 ShipSymbol = shipSymbol,
                 WaypointSymbol = survey.WaypointSymbol,

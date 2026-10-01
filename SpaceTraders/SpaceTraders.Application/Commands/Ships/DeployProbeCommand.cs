@@ -33,14 +33,14 @@ public sealed class DeployProbeHandler(
     public async Task Handle(DeployProbeCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "DeployProbeHandler: assigning deploy goal to probe {Symbol} → {Destination}.",
+            "DeployProbeHandler: assigning deploy goal to probe {ShipSymbol} → {Destination}.",
             command.ProbeSymbol,
             command.DestinationWaypoint);
 
         var probe = await ships.FindAsync(command.ProbeSymbol, cancellationToken);
         if (probe is null)
         {
-            logger.LogWarning("DeployProbeHandler: probe {Symbol} not found.", command.ProbeSymbol);
+            logger.LogWarning("DeployProbeHandler: probe {ShipSymbol} not found.", command.ProbeSymbol);
             return;
         }
 
@@ -49,7 +49,7 @@ public sealed class DeployProbeHandler(
             && string.Equals(existing.TargetWaypointSymbol, command.DestinationWaypoint, StringComparison.OrdinalIgnoreCase))
         {
             logger.LogDebug(
-                "DeployProbeHandler: probe {Symbol} already has deploy goal for {Destination}; skipping re-assignment.",
+                "DeployProbeHandler: probe {ShipSymbol} already has deploy goal for {Destination}; skipping re-assignment.",
                 command.ProbeSymbol,
                 command.DestinationWaypoint);
             return;
@@ -63,7 +63,7 @@ public sealed class DeployProbeHandler(
         await goals.SetActiveGoalAsync(command.ProbeSymbol, deployGoal, cancellationToken);
 
         logger.LogInformation(
-            "DeployProbeHandler: probe {Symbol} goal set; executing first step toward {Destination}.",
+            "DeployProbeHandler: probe {ShipSymbol} goal set; executing first step toward {Destination}.",
             command.ProbeSymbol,
             command.DestinationWaypoint);
 

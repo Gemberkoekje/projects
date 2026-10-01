@@ -46,7 +46,7 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
         {
             db.TradeOpportunities.Add(new TradeOpportunity
             {
-                AgentToken = db.AgentToken,
+                AgentId = db.AgentId,
                 TradeSymbol = dto.TradeSymbol,
                 BuyWaypoint = dto.BuyWaypoint,
                 SellWaypoint = dto.SellWaypoint,

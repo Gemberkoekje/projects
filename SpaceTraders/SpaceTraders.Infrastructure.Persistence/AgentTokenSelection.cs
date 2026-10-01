@@ -38,6 +38,31 @@ public static class AgentTokenSelection
         return token ?? string.Empty;
     }
 
+    /// <summary>The <see cref="Scoping.AgentIdentity"/> the token was stored under, or <c>null</c> for a new token.</summary>
+    public static async Task<string?> FindAgentIdAsync(
+        SpaceTradersDbContext db,
+        string token,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.Credentials
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => c.Value == token)
+            .OrderByDescending(c => c.StoredAt)
+            .Select(c => c.AgentId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>Whether credentials are stored for this <see cref="Scoping.AgentIdentity"/>.</summary>
+    public static Task<bool> IsKnownAgentAsync(
+        SpaceTradersDbContext db,
+        string agentId,
+        CancellationToken cancellationToken = default)
+        => db.Credentials
+            .IgnoreQueryFilters()
+            .AnyAsync(c => c.AgentId == agentId, cancellationToken);
+
+    /// <summary>Marks the token as the active one, for the agent of <paramref name="db"/>.</summary>
     public static async Task SetActiveTokenAsync(
         SpaceTradersDbContext db,
         string token,
@@ -57,7 +82,7 @@ public static class AgentTokenSelection
 
         db.Credentials.Add(new StoredCredential
         {
-            AgentToken = token,
+            AgentId = db.AgentId,
             Key = ActiveAgentTokenKey,
             Value = token,
             StoredAt = TimeProvider.System.GetUtcNow(),

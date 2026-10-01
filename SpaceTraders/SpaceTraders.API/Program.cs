@@ -1,6 +1,3 @@
-using ImTools;
-using JasperFx.MultiTenancy;
-using JasperFx.Resources;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,10 +17,6 @@ using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
-using Wolverine;
-using Wolverine.EntityFrameworkCore;
-using Wolverine.Persistence;
-using Wolverine.Postgresql;
 
 const string PathBase = "/spacetraders/api";
 
@@ -61,7 +54,8 @@ builder.Host.UseSerilog((ctx, cfg) =>
 {
     if (ctx.HostingEnvironment.IsProduction())
     {
-        cfg.WriteTo.Console(new CompactJsonFormatter());
+        // JSON for Loki, with the rendered message, so a line reads without its template.
+        cfg.WriteTo.Console(new RenderedCompactJsonFormatter());
     }
     else
     {
@@ -72,13 +66,11 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.Enrich.FromLogContext();
     cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
 });
-if (!builder.Environment.IsEnvironment("Testing"))
-{
-    builder.Host.UseResourceSetupOnStartup();
-}
 
+// Wolverine keeps messages in memory: nothing is stored in Postgres (B2). After a restart, startup
+// sync and startup recovery pick the ships up again, and arrivals wait in scheduled_ship_events.
 builder.Services
-    .AddApplication(opts => ConfigureWolverine(opts, builder.Configuration, builder.Environment))
+    .AddApplication()
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {
@@ -89,6 +81,8 @@ builder.Services
     });
 
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistoryService, SpaceTraders.Application.Services.CreditHistoryService>();
+builder.Services.AddSingleton<IAutomationMetrics, PrometheusAutomationMetrics>();
+builder.Services.AddSingleton<IServerResetMonitor, ServerResetMonitor>();
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
 builder.Services.AddSingleton<AgentBootstrapService>();
@@ -97,8 +91,8 @@ builder.Services.AddSingleton<StartupSnapshotService>();
 builder.Services.AddSingleton<StartupRecoveryService>();
 builder.Services.AddSingleton<SettingsStartupLoggingService>();
 builder.Services.AddSingleton<GameLoopService>();
-builder.Services.AddSingleton<ActivityLogPruningService>();
 builder.Services.AddSingleton<DataRetentionService>();
+builder.Services.AddSingleton<DatabaseSizeGuardService>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
 
 // RunLifecycleService is both a singleton startup-managed service and the IRunLifecycleManager implementation.
@@ -163,32 +157,15 @@ app.MapMarketsEndpoints();
 app.MapShipyardsEndpoints();
 app.MapHub<DashboardHub>("/hubs/dashboard");
 
+var startupState = app.Services.GetRequiredService<StartupInitializationState>();
+
 await app.RunAsync();
 
-static void ConfigureWolverine(
-    WolverineOptions options,
-    IConfiguration configuration,
-    IHostEnvironment environment)
+// A failed startup chain stops the host (DeferredStartupHostedService). Exit non-zero, so the
+// restart shows up as a failure.
+if (startupState.HasFailed)
 {
-    var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-        throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
-    }
-
-    options.Durability.DurabilityAgentEnabled = false;
-
-    if (environment.IsEnvironment("Testing"))
-    {
-        // Do not connect to Postgres in test/DI-validation hosts; keep in-memory message persistence.
-        return;
-    }
-
-    options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
-    options.PersistMessagesWithPostgresql(connectionString, "wolverine")
-        .Enroll<SpaceTradersDbContext>();
-    options.Policies.UseDurableLocalQueues();
+    Environment.ExitCode = 1;
 }
 
 /// <summary>Entry point marker for the SpaceTraders API; used by WebApplicationFactory in integration tests.</summary>
