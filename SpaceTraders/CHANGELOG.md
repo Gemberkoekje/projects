@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-02, D27 refined)
+- Survey targets are per ore and asteroid: every market that buys an ore gets the reachable asteroid nearest it, not only the market that pays most, so surveys lie close to wherever the ore is sold; each keeps its own stock of usable surveys.
+
 ### Code – Changed (2026-10-02, D27)
 - The survey plan keeps a stock of usable surveys per ore instead of surveying the contract's ore without end: `Survey.StockPerOre` (new, 2). The contract's ore comes first only while it has fewer; then the ore with the fewest usable surveys, then the best paid. With the stock for every ore, the surveyor waits until one runs out, and `ShipLeftIdle` doesn't count that as idle.
 

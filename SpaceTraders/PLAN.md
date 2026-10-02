@@ -166,7 +166,7 @@ get the next D-number.
 | D24 | Slice 6.4 (asked during the work): how do traders keep money for fuel? | **A trading bar** (2026-10-02): "a trading bar of, say 5.000 credits, under which only fuel can be bought", so the bot never holds expensive cargo without the fuel to move it. Cargo leaves `Trade.FuelReserveCredits` (5,000) untouched, on top of the trip's own fuel. |
 | D25 | Slice 6.4 (asked during the work): when are prices fetched again after a trade? | **Right after each purchase or sale** (2026-10-02), "while the ship is still there". Cargo purchases and sales, by traders and miners; refuels aren't counted as purchases here (they happen at almost every departure and move only FUEL's price). |
 | D26 | Slice 6.4's first watch (asked on 2026-10-02): when does a ship on the contract reconsider its work? | **After each round trip, and once at every restart:** "Any ship should probably have a release and re-assign after each mining round trip. Just to determine if there's something more important to do at that point", and it "explicitly reconsiders once whenever the pod restarts". A delivery closes the ship's contract assignment, and the plans assign it again on the next tick, in their order; at startup, every ship on the contract that isn't in flight is released. Mining, trading and survey trips already ended with each trip. |
-| D27 | Slice 6.4's first watch (asked on 2026-10-02): how much does a surveyor survey? SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused, because the contract's ore always came first. | **A small stock per ore:** "I'd expect him to make 1 copper ore survey and then move to the next ore type"; of the options, keep a stock of 2 usable surveys of each ore (`Survey.StockPerOre`), the contract's ore first, then the ore with the fewest. With the stock for every ore, the surveyor waits until one runs out. |
+| D27 | Slice 6.4's first watch (asked on 2026-10-02): how much does a surveyor survey? SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused, because the contract's ore always came first. | **A small stock per ore:** "I'd expect him to make 1 copper ore survey and then move to the next ore type"; of the options, keep a stock of 2 usable surveys of each ore (`Survey.StockPerOre`), the contract's ore first, then the ore with the fewest. With the stock for every ore, the surveyor waits until one runs out. Refined the same day: "Stock per ore per asteroid. I'd like the surveys to be close to wherever the mineral can be sold": every market that buys an ore gets the reachable asteroid nearest it, each keeping its own stock. |
 
 ## Phases
 
@@ -1255,11 +1255,19 @@ How credits are split stays your call; Claude only fixes deviations from intende
       ore, the surveyor waits until a survey expires or is used up.
     - The plan's state shows each target's usable surveys and whether it needs one; `ShipLeftIdle`
       counts only those that need one, so a surveyor that waits is not an anomaly.
+    - **Deployed** by gembernodes#26 at 15:34Z: every ore at XB5C had 17 to 24 usable surveys left over,
+      so SPECTER-1 waits until they expire.
+    - **Refined the same day** ("Stock per ore per asteroid. I'd like the surveys to be close to
+      wherever the mineral can be sold"; branch `claude/spacetraders-survey-per-market`): every market
+      that buys an ore gets the reachable asteroid nearest it, not only the market that pays most; one
+      target per ore and asteroid, each with its own stock. With only drones as miners nothing changes
+      yet: the one asteroid they reach is XB5C, nearest every buyer they can reach. It shows once
+      miners reach further.
     - Files: `Mining/MiningPlanner.cs` (`SurveyTargets`, `SurveyTarget`), `Mining/SurveySelection.cs`
       (`CountUsable`), `Automation/SurveyPlanService.cs`, `SurveyPlanState.cs`,
       `Health/ShipLeftIdleRule.cs`, `DefaultSettingsSeed.cs` (Persistence); tests:
-      `MiningPlannerTests` (the contract-first test replaced, two new), `SurveyPlanServiceTests` (three
-      new), `ShipRuleTests` (one new), `DefaultSettingsSeedTests`.
+      `MiningPlannerTests` (the contract-first test replaced, two new; two more for the refinement),
+      `SurveyPlanServiceTests` (three new), `ShipRuleTests` (one new), `DefaultSettingsSeedTests`.
   - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
     `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
   - Done when: a full reset period with these plans on and no open anomaly for them.

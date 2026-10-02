@@ -38,6 +38,29 @@ public sealed class MiningPlannerTests
     }
 
     [Fact]
+    public void EveryMarketThatBuysAnOre_GetsTheAsteroidNearestIt()
+    {
+        // D27, refined on 2026-10-02: "Stock per ore per asteroid. I'd like the surveys to be close to
+        // wherever the mineral can be sold." COPPER sells at H51 and at B7: near H51 that is XB5C, near B7
+        // it is B14, for a miner that can get there.
+        var targets = MiningPlanner.SurveyTargets(Context(), [], [CommandShip()], stock: 2);
+
+        targets.Where(target => target.Ore == "COPPER_ORE").Select(target => (target.AsteroidSymbol, target.BuyerSymbol))
+            .Should().BeEquivalentTo([(XB5C, H51), (B14, B7)]);
+    }
+
+    [Fact]
+    public void TheStock_IsKeptPerAsteroid()
+    {
+        var context = Context(Survey("S-1", XB5C, "COPPER_ORE"), Survey("S-2", XB5C, "COPPER_ORE"));
+
+        var targets = MiningPlanner.SurveyTargets(context, [], [CommandShip()], stock: 2);
+
+        targets.Single(target => target.Ore == "COPPER_ORE" && target.AsteroidSymbol == XB5C).NeedsSurvey.Should().BeFalse();
+        targets.Single(target => target.Ore == "COPPER_ORE" && target.AsteroidSymbol == B14).NeedsSurvey.Should().BeTrue();
+    }
+
+    [Fact]
     public void OnceEveryOreHasItsStock_NothingNeedsASurvey()
     {
         var context = Context(
