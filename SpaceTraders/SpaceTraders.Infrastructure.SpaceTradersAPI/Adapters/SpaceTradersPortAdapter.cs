@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
@@ -298,6 +299,14 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         {
             // The survey can't be used again (slice 6.4): the caller drops it.
             throw new SurveyRefusedException(survey.Signature, code, exception);
+        }
+        catch (SpaceTradersApiException exception) when (exception.StatusCode == HttpStatusCode.UnprocessableEntity
+            && exception.ErrorCode is null or SurveyRefusedException.RejectedErrorCode)
+        {
+            // The API couldn't read the survey (B51): sent again, it fails again, on every step. Dropped,
+            // it costs one call, and its body says what the API couldn't read. A 422 with a game error
+            // code is about the ship, and stays the API's.
+            throw new SurveyRefusedException(survey.Signature, SurveyRefusedException.RejectedErrorCode, exception, exception.ResponseBody ?? string.Empty);
         }
 
         return new ExtractionActionResult(

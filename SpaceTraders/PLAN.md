@@ -66,8 +66,9 @@
   2026-10-02 (its dashboard section as gembernodes#21), with your decisions D20–D25, and deployed by
   gembernodes#22 at 14:13Z. It fixed B34 first, at your request, then the survey part of B16, B17
   for the mining and survey trips, B48 and B49. Trading was switched on at 13:08Z, surveying and
-  mining at 14:14Z. Its first watch found B50, fixed with your decision D26 on branch
-  `claude/spacetraders-trip-release`.
+  mining at 14:14Z. Its first watch found B50, fixed with your decision D26 (projects#123, deployed
+  by gembernodes#23 at 14:47Z). That deploy's first surveys found B51, fixed on branch
+  `claude/spacetraders-b51`.
 
 ## Known issues
 
@@ -129,6 +130,7 @@ the misbehaviour.
 | B48 | **Only two of three asteroid types can be mined** (found in 6.4, from the code and the live waypoints). `MineResourceVolumeCommand` accepted only `ASTEROID_FIELD` and `ENGINEERED_ASTEROID`; 56 of X1-DC53's 57 asteroids are of type `ASTEROID`, so a drone sent to any of them got a state mismatch instead of ore, on every step. | `MineResourceVolumeCommand.cs` (`IsValidExtractionWaypoint`) | 6.4 (done) |
 | B49 | **A used-up survey is tried again and again** (found in 6.4, from the code). An extraction with a survey that is exhausted, expired or doesn't verify fails with 4224, 4221 or 4220, and nothing removed the survey from the cache, so the miner picked it again on every step; only its expiry ended that. | `MineAndSellGoalExecutor.cs` (`GetBestActiveSurveyAsync`), `SurveyRepository.cs` | 6.4 (done) |
 | B50 | **The command ship stays on the contract after the survey plan is switched on** (found in 6.4's first watch, on the cluster). The contract plan gave SPECTER-1 a contract assignment at 14:14:29Z, 23 s before the survey switch, and a contract assignment lasted until the contract was fulfilled. The survey plan takes only free ships, so SPECTER-1 went on mining copper (7 units in its first 22 minutes) instead of surveying (D20). The plan also gave its first ship its assignment back on every tick, whatever that ship did or had become. | `ContractPlanService.cs` (`EnsureActivePlanAssignmentAsync`), `FulfillContractDeliveryCommand.cs` | 6.4 (fixed with D26) |
+| B51 | **The API can't read the surveys the bot sends back** (found on the cluster on 2026-10-02, with the first surveys, right after the D26 deploy). Every extraction with a survey was answered 422 "invalid payload": the bot sent the survey's expiry as .NET writes a `DateTimeOffset` (`2026-10-02T15:44:51.937+00:00`), not as the API gave it out (`…51.937Z`). The refusal isn't one of B49's codes, so the step failed, Wolverine tried it 4 more times, and the next tick did it all again: 364 failed calls in the first 12 minutes, and SPECTER-3 extracted nothing. | `SpaceTradersApiClient.cs` (`ExtractWithSurveyAsync`), `SpaceTradersPortAdapter.cs` | 6.4 (fixed) |
 
 ### Decisions (2026-10-01)
 
@@ -1227,6 +1229,21 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `StartupRecoveryService.cs` (API); tests: `ContractMinersTests` (four new),
       `FulfillContractDeliveryHandlerTests` (two new, one extended), `StartupRecoveryServiceTests`
       (new, API), and the two restore tests removed from `ContractPlanServiceTests`.
+  - Second follow-up (2026-10-02, fixes B51; built on branch `claude/spacetraders-b51`). To understand
+    it, start with `ExtractWithSurveyAsync` in `SpaceTradersPortAdapter.cs`.
+    - **A survey goes back as the API gave it out:** its expiry is written as the API writes it (UTC,
+      milliseconds, `Z`, `ExtractWithSurveyRequest.FormatExpiration`).
+    - **A survey the API can't read is dropped** (a 422 without a game error code, reason
+      `rejected`): one call per survey instead of five a tick for as long as the survey lasts. The
+      warning carries the API's response body, whose `data` names what it couldn't read. A 422 with a
+      game error code (a full hold, say) stays the API's.
+    - Noticed (not changed): Wolverine retries every failed command 4 times (`RetryWithCooldown` in
+      `DependencyInjection.cs`), whatever the error, so any API call that fails for good costs five
+      calls a tick. Retrying makes sense for 429s and 5xx, not for a 4xx that will fail the same way.
+    - Files: `SpaceTradersPortAdapter.cs`, `SpaceTradersApiClient.cs`, `Phase1ActionModels.cs`
+      (Infrastructure.SpaceTradersAPI), `Ports/SurveyRefusedException.cs`,
+      `Commands/Ships/MineResourceVolumeCommand.cs`; tests: `SurveyRequestTests` (new),
+      `SurveyRefusalTests` (two new), `MineResourceVolumeHandlerTests` (one new).
   - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
     `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
   - Done when: a full reset period with these plans on and no open anomaly for them.

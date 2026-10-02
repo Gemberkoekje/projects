@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
@@ -64,11 +65,21 @@ public sealed class ExtractWithSurveyRequest
     [JsonPropertyName("deposits")]
     required public IReadOnlyList<SurveyDeposit> Deposits { get; init; }
 
+    /// <summary>
+    /// The expiry as the API wrote it: UTC, milliseconds and a <c>Z</c>. A <see cref="DateTimeOffset"/>
+    /// goes out with an offset (<c>+00:00</c>) instead (B51).
+    /// </summary>
     [JsonPropertyName("expiration")]
-    public DateTimeOffset Expiration { get; init; }
+    required public string Expiration { get; init; }
 
     [JsonPropertyName("size")]
     required public string Size { get; init; }
+
+    /// <summary>Writes an expiry as the API does (JavaScript's <c>toISOString</c>).</summary>
+    /// <param name="expiration">The survey's expiry.</param>
+    /// <returns>For example <c>2026-10-02T15:44:51.937Z</c>.</returns>
+    public static string FormatExpiration(DateTimeOffset expiration)
+        => expiration.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 }
 
 public sealed class SiphonResult
