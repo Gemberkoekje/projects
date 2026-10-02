@@ -23,6 +23,7 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(PatrolMarketGoal), "PatrolMarket")]
 [JsonDerivedType(typeof(DeployProbeGoal), "DeployProbe")]
 [JsonDerivedType(typeof(MineAndSellGoal), "MineAndSell")]
+[JsonDerivedType(typeof(SiphonAndSellGoal), "SiphonAndSell")]
 [JsonDerivedType(typeof(TradeBetweenMarketsGoal), "TradeBetweenMarkets")]
 [JsonDerivedType(typeof(SurveyWaypointGoal), "SurveyWaypoint")]
 public abstract record ShipGoal
@@ -178,6 +179,33 @@ public sealed record MineAndSellGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.MineAndSell;
+}
+
+/// <summary>
+/// One siphon trip (PLAN.md slice 6.7), as a mining trip: the ship siphons at the gas giant
+/// <see cref="SourceWaypointSymbol"/> until its hold is full, keeping every gas a market buys (D33), then
+/// sells <see cref="TradeSymbol"/> at <see cref="SellWaypointSymbol"/>; then the goal ends, and the siphon
+/// plan sells the other gases and chooses the next trip. A siphon takes no survey: the API's siphon call
+/// has none.
+/// </summary>
+public sealed record SiphonAndSellGoal : ShipGoal
+{
+    /// <summary>The gas the trip is for; the other gases it siphons are kept too (D33).</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>The gas giant it siphons at.</summary>
+    public required string SourceWaypointSymbol { get; init; }
+
+    /// <summary>Where it sells <see cref="TradeSymbol"/>.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True once the trip sells: its hold is full, or it was given gas the ship already held to sell.
+    /// </summary>
+    public bool Selling { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.SiphonAndSell;
 }
 
 /// <summary>

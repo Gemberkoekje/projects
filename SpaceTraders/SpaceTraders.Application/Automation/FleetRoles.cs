@@ -11,6 +11,9 @@ namespace SpaceTraders.Application.Automation;
 ///   ship's mining laser stays unused;</item>
 ///   <item>a ship that can mine, and doesn't survey, mines: the contract first, every free miner (D23), then
 ///   the mining plan's trips. Only a miner neither has work for may trade;</item>
+///   <item>a ship that can siphon, and can neither mine nor survey, siphons (slice 6.7): the siphon plan's
+///   trips. Only a siphoner the siphon plan has no work for may trade. The command ship's siphon stays
+///   unused: it mines, or surveys;</item>
 ///   <item>any other ship with a hold and a tank trades.</item>
 /// </list>
 /// </summary>
@@ -34,6 +37,21 @@ public static class FleetRoles
     {
         ArgumentNullException.ThrowIfNull(ship);
         return ship.IsMiningCapable && !IsSurveyor(ship, surveyPlanOn);
+    }
+
+    /// <summary>
+    /// Whether the ship siphons (slice 6.7): a gas siphon, a hold and a tank, and nothing to mine or survey with,
+    /// whichever plans are on. That is a siphon drone: a ship that can also mine mines, or surveys (D20).
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship the siphon plan may give work.</returns>
+    public static bool IsSiphoner(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.HasGasSiphonEquipment
+            && ship.IsTradingCapable
+            && !ship.HasMiningEquipment
+            && !ship.HasSurveyEquipment;
     }
 
     /// <summary>

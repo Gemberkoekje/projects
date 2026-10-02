@@ -11,6 +11,7 @@ public enum AutomationPlan
     ProbeDeployment,
     Survey,
     Mining,
+    Siphon,
     Trading,
 }
 
@@ -37,6 +38,7 @@ public static class AutomationSwitches
         DeployProbeGoal => AutomationPlan.ProbeDeployment,
         SurveyWaypointGoal => AutomationPlan.Survey,
         MineAndSellGoal => AutomationPlan.Mining,
+        SiphonAndSellGoal => AutomationPlan.Siphon,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
         _ => null,
     };

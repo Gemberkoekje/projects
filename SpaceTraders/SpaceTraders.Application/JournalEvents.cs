@@ -77,6 +77,19 @@ public static class JournalEvents
     public const string MiningStarted = nameof(MiningStarted);
 
     /// <summary>
+    /// A ship siphoned at a gas giant (slice 6.7: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>TradeSymbol</c> it
+    /// got, <c>Units</c>, <c>Target</c>: the gas its trip is for). A siphon takes no survey.
+    /// </summary>
+    public const string Siphoned = nameof(Siphoned);
+
+    /// <summary>
+    /// A siphoner took a siphon trip (slice 6.7: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it
+    /// siphons at, <c>SellWaypoint</c>, <c>Reason</c>: <c>low_supply</c>, <c>lowest_supply</c> (no market is short
+    /// of a gas, D28) or <c>held_cargo</c>).
+    /// </summary>
+    public const string SiphonStarted = nameof(SiphonStarted);
+
+    /// <summary>
     /// A probe was sent to a shipyard where a purchase waits for one of our ships, which the API requires
     /// (slice 6.3, D30: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>ShipType</c> the purchase is for).
     /// </summary>

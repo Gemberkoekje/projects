@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IContractPlanService, ContractPlanService>();
         services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();
+        services.AddScoped<ISiphonAutomationService, SiphonAutomationService>();
         services.AddScoped<ITradingAutomationService, TradingAutomationService>();
 
         // Surveying and mining (slice 6.4): the survey plan, the surveys' bookkeeping, and what a survey or
@@ -85,6 +86,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, ScoutWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MineAndSellGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SiphonAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();

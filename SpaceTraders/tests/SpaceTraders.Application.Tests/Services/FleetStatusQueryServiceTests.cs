@@ -635,6 +635,29 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     }
 
     [Fact]
+    public async Task GetAssignmentsAsync_SiphonAndSellGoal_UsesSiphonSnapshot()
+    {
+        // Slice 6.7: a siphon trip, as a mining trip.
+        var svc = Build(
+            shipRepo: ShipsWith("SIPHON-1"),
+            shipGoalRepo: ShipGoalsWith(
+                ("SIPHON-1", new SiphonAndSellGoal
+                {
+                    TradeSymbol = "LIQUID_HYDROGEN",
+                    SourceWaypointSymbol = "X1-DC53-C38",
+                    SellWaypointSymbol = "X1-DC53-G50",
+                })));
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Should().ContainSingle().Which.Should().Match<ShipAssignmentSnapshot>(snapshot =>
+            snapshot.GoalKind == ShipGoalKind.SiphonResource
+            && snapshot.GoalDescription == "Siphoning at X1-DC53-C38 for LIQUID_HYDROGEN and selling at X1-DC53-G50"
+            && snapshot.SourceWaypoint == "X1-DC53-C38"
+            && snapshot.DestinationWaypoint == "X1-DC53-G50");
+    }
+
+    [Fact]
     public async Task GetAssignmentsAsync_TradeBetweenMarketsGoal_UsesTradingSnapshot()
     {
         var svc = Build(

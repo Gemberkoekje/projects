@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
@@ -59,7 +60,21 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
         handlerTypes.Should().NotContain(typeof(ContractPlanService))
             .And.NotContain(typeof(SurveyPlanService))
             .And.NotContain(typeof(MiningAutomationService))
+            .And.NotContain(typeof(SiphonAutomationService))
             .And.NotContain(typeof(TradingAutomationService));
+    }
+
+    [Fact]
+    public void TheSiphonCommand_HasItsHandler()
+    {
+        // Slice 6.7: the siphon executor sends SiphonResourcesCommand through the bus; without a handler every
+        // siphon would fail.
+        var runtime = (WolverineRuntime)_factory.Services.GetRequiredService<IWolverineRuntime>();
+
+        runtime.Handlers.Chains
+            .SelectMany(chain => chain.HandlerCalls())
+            .Select(call => call.HandlerType)
+            .Should().Contain(typeof(SiphonResourcesHandler));
     }
 
     [Fact]

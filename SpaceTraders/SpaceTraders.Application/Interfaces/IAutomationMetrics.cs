@@ -47,7 +47,11 @@ public interface IAutomationMetrics
     /// <summary>Adds credits spent (<c>spacetraders_credits_spent_total{category}</c>), by ledger category.</summary>
     void CreditsSpent(string category, long amount);
 
-    /// <summary>Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>).</summary>
+    /// <summary>
+    /// Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>): a mining laser's yield,
+    /// or a gas siphon's (slice 6.7). A siphon isn't counted by <see cref="Extraction"/>, which the survey
+    /// statistics read.
+    /// </summary>
     void Extracted(string shipSymbol, string tradeSymbol, int units);
 
     /// <summary>Adds units a ship jettisoned (<c>spacetraders_jettisoned_units_total{ship,good}</c>).</summary>

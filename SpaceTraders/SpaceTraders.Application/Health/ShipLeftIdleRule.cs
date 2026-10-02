@@ -23,6 +23,8 @@ namespace SpaceTraders.Application.Health;
 ///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4);</item>
 ///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
 ///   to reach it (slice 6.4);</item>
+///   <item>siphon: likewise, a gas in low supply without a ship, for a siphoner the plan lists as able to
+///   reach its gas giant (slice 6.7);</item>
 ///   <item>trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to
 ///   take it (slice 6.5).</item>
 /// </list>
@@ -145,6 +147,22 @@ public sealed class ShipLeftIdleRule(
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Mining,
                     string.Create(CultureInfo.InvariantCulture, $"{open.Count} mining opportunities without a ship"),
+                    ship => open.Any(opportunity => opportunity.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
+            }
+        }
+
+        if (context.IsOn(AutomationPlan.Siphon)
+            && await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken) is { } siphon)
+        {
+            // As for the miners: an opening is work only for a siphoner that can reach its gas giant (slice 6.7).
+            var open = siphon.Opportunities
+                .Where(opportunity => opportunity.Status == MarketAutomationOpportunityStatus.Pending)
+                .ToList();
+            if (open.Count > 0)
+            {
+                waiting.Add(new WaitingWork(
+                    AutomationPlan.Siphon,
+                    string.Create(CultureInfo.InvariantCulture, $"{open.Count} siphon opportunities without a ship"),
                     ship => open.Any(opportunity => opportunity.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
             }
         }

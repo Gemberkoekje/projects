@@ -417,6 +417,7 @@ internal sealed class FleetStatusQueryService(
             MineResourceGoal mine => (ShipGoalKind.MineResource, $"Mining {mine.TradeSymbol} at {mine.SourceWaypointSymbol}", mine.SourceWaypointSymbol, (string?)null),
             MineAndSellGoal mineAndSell => (ShipGoalKind.MineResource, $"Mining {mineAndSell.TradeSymbol} at {mineAndSell.SourceWaypointSymbol} and selling at {mineAndSell.SellWaypointSymbol}", mineAndSell.SourceWaypointSymbol, mineAndSell.SellWaypointSymbol),
             SiphonResourceGoal siphon => (ShipGoalKind.SiphonResource, $"Siphoning {siphon.TradeSymbol} at {siphon.SourceWaypointSymbol}", siphon.SourceWaypointSymbol, (string?)null),
+            SiphonAndSellGoal siphonAndSell => (ShipGoalKind.SiphonResource, $"Siphoning at {siphonAndSell.SourceWaypointSymbol} for {siphonAndSell.TradeSymbol} and selling at {siphonAndSell.SellWaypointSymbol}", siphonAndSell.SourceWaypointSymbol, siphonAndSell.SellWaypointSymbol),
             SellCargoGoal sell => (ShipGoalKind.SellCargo, $"Selling cargo at {sell.DestinationWaypointSymbol}", null, sell.DestinationWaypointSymbol),
             TradeBetweenMarketsGoal trade => (ShipGoalKind.SellCargo, $"Trading {trade.TradeSymbol} from {trade.BuyWaypointSymbol} to {trade.SellWaypointSymbol}", trade.BuyWaypointSymbol, trade.SellWaypointSymbol),
             DeliverCargoGoal dlv => (ShipGoalKind.DeliverCargo, $"Delivering {dlv.TradeSymbol} to {dlv.DeliveryWaypointSymbol}", null, dlv.DeliveryWaypointSymbol),

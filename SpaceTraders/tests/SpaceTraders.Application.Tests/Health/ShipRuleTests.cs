@@ -325,6 +325,45 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
+    public async Task ASiphoner_LeftIdleWhileASiphonOpportunityHasNoShip_IsAnAnomaly()
+    {
+        // Slice 6.7: as for the miners, an opening is work for the siphoners the plan lists as able to reach its
+        // gas giant.
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities =
+            [
+                new MiningAutomationOpportunityState
+                {
+                    OpportunityKey = "X1-AB-G50|LIQUID_HYDROGEN",
+                    TradeSymbol = "LIQUID_HYDROGEN",
+                    SellWaypointSymbol = "X1-AB-G50",
+                    SourceWaypointSymbol = "X1-AB-C38",
+                    Status = MarketAutomationOpportunityStatus.Pending,
+                    CandidateShipSymbols = ["SHIP-5"],
+                    FirstObservedAt = Start,
+                    LastObservedAt = Start,
+                },
+            ],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-5", Start) with { ShipType = "SHIP_SIPHON_DRONE" }, FleetFixture.Drone("SHIP-3", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        var violation = violations.Should().ContainSingle().Which;
+        violation.Subject.Should().Be("SHIP-5");
+        violation.Details.Should().Contain("the Siphon plan has work it could do: 1 siphon opportunities without a ship");
+
+        // With the siphon plan off, the opening waits for nobody.
+        _harness.PlansOn.Remove(AutomationPlan.Siphon);
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(12))).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task AMiner_LeftIdleWhileTheContractStillNeedsUnits_IsAnAnomaly()
     {
         // D23: every free miner joins the contract, not only the plan's first ship.
