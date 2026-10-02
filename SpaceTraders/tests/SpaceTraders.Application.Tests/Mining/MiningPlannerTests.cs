@@ -6,8 +6,8 @@ namespace SpaceTraders.Application.Tests.Mining;
 
 /// <summary>
 /// Slice 6.4: what a surveyor surveys (the contract's ore first, then sellable ores near the market that
-/// buys them, each until it has a stock of usable surveys, D27) and what a miner mines (surveyed ores
-/// first, then ores in low supply, D22).
+/// buys them, each until it has a stock of usable surveys, D27) and what a miner mines (the markets shortest
+/// of an ore first, D28; within a supply level, surveyed ores first).
 /// </summary>
 public sealed class MiningPlannerTests
 {
@@ -106,41 +106,66 @@ public sealed class MiningPlannerTests
     }
 
     [Fact]
-    public void AMiner_MinesASurveyedOreFirst_TheOneASingleExtractionFetchesMostFor()
+    public void WithinASupplyLevel_ASurveyedOreComesFirst_TheOneASingleExtractionFetchesMostFor()
     {
-        // Copper is two of three deposits: 2/3 x 67 beats iron's 1/3 x 58.
+        // Copper is two of three deposits: 2/3 x 67 beats iron's 1/3 x 58, both LIMITED at H51.
         var context = Context(Survey("S-1", XB5C, "COPPER_ORE", "COPPER_ORE", "IRON_ORE"));
 
         var targets = MiningPlanner.MiningTargets(context, Drone(), new HashSet<string>());
 
-        targets[0].Should().BeEquivalentTo(new MiningTarget("COPPER_ORE", XB5C, H51, 67, 2 / 3.0, Surveyed: true, LowSupply: true));
-        targets[1].Ore.Should().Be("IRON_ORE");
-        targets[1].Surveyed.Should().BeTrue();
-        targets.Skip(2).Should().OnlyContain(target => !target.Surveyed);
+        var limited = targets.Where(target => target.Supply == "LIMITED").ToList();
+        limited[0].Should().BeEquivalentTo(new MiningTarget("COPPER_ORE", XB5C, H51, 67, 2 / 3.0, Surveyed: true, Supply: "LIMITED"));
+        limited[1].Ore.Should().Be("IRON_ORE");
+        limited[1].Surveyed.Should().BeTrue();
+        targets.Where(target => target.Supply == "SCARCE").Should().OnlyContain(target => !target.Surveyed);
     }
 
     [Fact]
-    public void WithoutSurveys_AMiner_MinesAnOreInLowSupply_AtTheAsteroidNearestItsMarket_AndSellsItThere()
+    public void AMiner_ServesTheMarketsShortestOfAnOreFirst_SurveyedOrNot()
     {
-        // SCARCE and LIMITED count (D22); ALUMINUM at H51 is MODERATE. B7's openings are beyond a drone's tank.
+        // D28, seen on the cluster on 2026-10-02: the mining plan bought SPECTER-4 for A3's scarce silicon, and
+        // the drone mined surveyed iron for H51, where iron was MODERATE, so the opening that paid for it stayed
+        // open, ready to pay for the next drone. "Mine for scarce first, but once all ores are no longer SCARCE,
+        // keep mining for whatever the lowest supply ore is, even if it's not that profitable." A survey that is
+        // mostly aluminum doesn't put H51's aluminum (MODERATE) before the scarce and limited markets.
+        var context = Context(Survey("S-1", XB5C, "ALUMINUM_ORE", "ALUMINUM_ORE", "ALUMINUM_ORE", "COPPER_ORE"));
+
+        var targets = MiningPlanner.MiningTargets(context, Drone(), new HashSet<string>());
+
+        targets.Select(target => (target.Ore, target.SellWaypointSymbol, target.Supply)).Should().Equal(
+            ("SILICON_CRYSTALS", F49, "SCARCE"),
+            ("QUARTZ_SAND", F49, "SCARCE"),
+            ("COPPER_ORE", H51, "LIMITED"),
+            ("IRON_ORE", H51, "LIMITED"),
+            ("ALUMINUM_ORE", H51, "MODERATE"));
+        targets.Select(target => target.LowSupply).Should().Equal(true, true, true, true, false);
+    }
+
+    [Fact]
+    public void WithoutSurveys_AMiner_MinesAtTheAsteroidNearestEachMarket_TheLowestSupplyFirst_AndSellsItThere()
+    {
+        // F49 is SCARCE of silicon and quartz, H51 LIMITED of copper and iron and MODERATE of aluminum (D28).
+        // B7's markets are beyond a drone's tank.
         var targets = MiningPlanner.MiningTargets(Context(), Drone(), new HashSet<string>());
 
         targets.Select(target => (target.Ore, target.AsteroidSymbol, target.SellWaypointSymbol)).Should().Equal(
+            ("SILICON_CRYSTALS", XB5C, F49),
+            ("QUARTZ_SAND", XB5C, F49),
             ("COPPER_ORE", XB5C, H51),
             ("IRON_ORE", XB5C, H51),
-            ("SILICON_CRYSTALS", XB5C, F49),
-            ("QUARTZ_SAND", XB5C, F49));
+            ("ALUMINUM_ORE", XB5C, H51));
         targets[0].Share.Should().BeApproximately(1 / 6.0, 1e-9, "XB5C yields six ores");
     }
 
     [Fact]
     public void AnOpeningAnotherMinerHolds_IsNotOffered()
     {
-        var held = new HashSet<string> { MiningPlanner.OpportunityKey(H51, "COPPER_ORE") };
+        var held = new HashSet<string> { MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS") };
 
         var targets = MiningPlanner.MiningTargets(Context(), Drone(), held);
 
-        targets[0].Ore.Should().Be("IRON_ORE");
+        targets.Should().NotContain(target => target.Key == MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS"));
+        targets[0].Ore.Should().Be("QUARTZ_SAND");
     }
 
     [Fact]

@@ -13,9 +13,10 @@ using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 namespace SpaceTraders.Application.Tests.Automation;
 
 /// <summary>
-/// Slice 6.4: every free miner takes one trip at a time, a surveyed ore first, then an ore in low supply
-/// (D22); ore it holds is sold first. A ship that can survey doesn't mine while the survey plan is on (D20),
-/// and no drone is bought while the contract takes the miners (D23).
+/// Slice 6.4: every free miner takes one trip at a time, for the market shortest of an ore first (D28;
+/// within a supply level, a surveyed ore first); ore it holds is sold first. A ship that can survey doesn't
+/// mine while the survey plan is on (D20), no drone is bought while the contract takes the miners (D23), and
+/// a drone is bought only when its first trip would serve a market short of an ore (D22, D28).
 /// </summary>
 public sealed class MiningAutomationServiceTests
 {
@@ -59,16 +60,17 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
-    public async Task AFreeMiner_MinesTheOreInLowSupplyThatPaysMost_AndSellsItWhereItIsShort()
+    public async Task AFreeMiner_ServesTheScarcestMarketFirst_AndSellsItThere()
     {
+        // D28: F49 is SCARCE of silicon; H51's copper (LIMITED) pays more, but comes after.
         Fleet(Drone());
 
         await RunAsync();
 
         var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
-        trip.TradeSymbol.Should().Be("COPPER_ORE");
+        trip.TradeSymbol.Should().Be("SILICON_CRYSTALS");
         trip.SourceWaypointSymbol.Should().Be(XB5C);
-        trip.SellWaypointSymbol.Should().Be(H51);
+        trip.SellWaypointSymbol.Should().Be(F49);
         trip.Selling.Should().BeFalse();
 
         var started = _log.Journal.Should().ContainSingle().Subject;
@@ -93,6 +95,56 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task AFreeMiner_TakesAScarceMarket_BeforeASurveyedOreForAMarketThatIsntShort()
+    {
+        // D28, seen on the cluster on 2026-10-02: SPECTER-4, bought for A3's scarce silicon, mined surveyed iron
+        // for H51, where iron was MODERATE. Here the survey is mostly aluminum, MODERATE at H51.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
+            .Returns(Context(Survey("S-1", XB5C, "ALUMINUM_ORE", "ALUMINUM_ORE", "ALUMINUM_ORE", "COPPER_ORE")));
+        Fleet(Drone());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        trip.TradeSymbol.Should().Be("SILICON_CRYSTALS");
+        trip.SellWaypointSymbol.Should().Be(F49);
+    }
+
+    [Fact]
+    public async Task OnceEveryMarketShortOfAnOreHasAMiner_AFreeMinerServesTheLowestSupplyLeft()
+    {
+        // D28: "keep mining for whatever the lowest supply ore is, even if it's not that profitable".
+        HeldBy("SHIP-4", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-5", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-6", H51, "COPPER_ORE");
+        HeldBy("SHIP-7", H51, "IRON_ORE");
+        Fleet(Drone(), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("ALUMINUM_ORE", H51));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("lowest_supply");
+    }
+
+    [Fact]
+    public async Task WithEveryMarketShortOfAnOreServed_NoDroneIsBought_ThoughThereIsMoreToMine()
+    {
+        // D28: a new drone would mine H51's aluminum, which is MODERATE: it would not serve a market that is
+        // short, so nothing would stop the next one being bought for the same reason.
+        HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-4", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-5", H51, "COPPER_ORE");
+        HeldBy("SHIP-6", H51, "IRON_ORE");
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"));
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task TwoMiners_NeverShareASellMarketAndOre()
     {
         Fleet(Drone("SHIP-3"), Drone("SHIP-4"));
@@ -101,7 +153,7 @@ public sealed class MiningAutomationServiceTests
 
         _activeGoals.Values.Cast<MineAndSellGoal>()
             .Select(trip => (trip.SellWaypointSymbol, trip.TradeSymbol))
-            .Should().BeEquivalentTo([(H51, "COPPER_ORE"), (H51, "IRON_ORE")]);
+            .Should().BeEquivalentTo([(F49, "SILICON_CRYSTALS"), (F49, "QUARTZ_SAND")]);
     }
 
     [Fact]
@@ -148,15 +200,16 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
-    public async Task WithNoMinerFree_ItBuysADroneForEachOpeningADroneCanReach()
+    public async Task WithNoMinerFree_ItBuysOneDrone_WhoseFirstTripServesAMarketShortOfAnOre()
     {
-        // Every miner works; four openings near the middle wait, and B7's two are beyond a drone's tank.
-        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        // Every miner works, and three openings near the middle wait (B7's are beyond a drone's tank). One a
+        // pass: it used to buy one for each, and the next pass counts the new drone's trip (D28).
+        HeldBy("SHIP-3", H51, "COPPER_ORE");
         Fleet(Drone());
 
         await RunAsync();
 
-        await _purchases.Received(3).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -189,7 +242,7 @@ public sealed class MiningAutomationServiceTests
     [Fact]
     public async Task TheState_ListsTheOpenings_WithTheMinersThatCouldTakeThem()
     {
-        // The drone takes copper; iron, silicon and quartz stay open, and so do B7's, which it can't reach.
+        // The drone takes silicon; quartz, copper and iron stay open, and so do B7's, which it can't reach.
         Fleet(Drone(), Drone("SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(1) });
 
         await RunAsync();
@@ -216,6 +269,9 @@ public sealed class MiningAutomationServiceTests
     }
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    private void HeldBy(string ship, string market, string ore)
+        => _activeGoals[ship] = new MineAndSellGoal { TradeSymbol = ore, SourceWaypointSymbol = XB5C, SellWaypointSymbol = market };
 
     private void SurveyPlanIs(bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(on);

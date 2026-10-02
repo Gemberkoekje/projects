@@ -13,9 +13,10 @@ namespace SpaceTraders.Application.Mining;
 ///   <item>a surveyor surveys the contract's ore at the contract's asteroid first; otherwise an ore a market
 ///   in the system buys, at the asteroid nearest the market that pays most for it. Ores without a usable
 ///   survey there come first, then the best paid;</item>
-///   <item>a miner mines a surveyed ore first: one a usable survey holds, sold where it fetches most;
-///   otherwise an ore a market has in low supply (SCARCE or LIMITED, D22), mined at the asteroid nearest
-///   that market and sold there. Among either, the most a single extraction is expected to fetch;</item>
+///   <item>a miner serves the market shortest of an ore first (D28): SCARCE, then LIMITED (low supply, D22),
+///   and once no market is short, the lowest supply there is. It mines at an asteroid with a usable survey
+///   holding the ore, else at the asteroid nearest the market, and sells there. Within a supply level,
+///   surveyed ores first, then the most a single extraction is expected to fetch;</item>
 ///   <item>only asteroids a ship can reach count, through refuelling stops (the drones' 80-unit tanks keep
 ///   them near the markets that sell fuel).</item>
 /// </list>
@@ -24,6 +25,9 @@ public static class MiningPlanner
 {
     private static readonly IReadOnlySet<string> LowSupplyLevels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SCARCE", "LIMITED" };
     private static readonly IReadOnlySet<string> DemandTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "IMPORT", "EXCHANGE" };
+
+    /// <summary>A market's supply of a good, from the shortest: the order miners serve markets in (D28).</summary>
+    private static readonly string[] SupplyLevels = ["SCARCE", "LIMITED", "MODERATE", "HIGH", "ABUNDANT"];
 
     /// <summary>The key of a mining opportunity: one miner per sell market and ore.</summary>
     /// <param name="sellWaypointSymbol">Where the ore is sold.</param>
@@ -38,7 +42,21 @@ public static class MiningPlanner
     public static bool IsLowSupply(TradeGoodSnapshot good)
     {
         ArgumentNullException.ThrowIfNull(good);
-        return good.SellPrice > 0 && DemandTypes.Contains(good.Type) && LowSupplyLevels.Contains(good.Supply);
+        return IsDemanded(good) && IsLowSupply(good.Supply);
+    }
+
+    /// <summary>Whether a supply level is low (D22): SCARCE or LIMITED.</summary>
+    /// <param name="supply">The supply level, as the API gives it.</param>
+    /// <returns>True for SCARCE and LIMITED.</returns>
+    public static bool IsLowSupply(string supply) => LowSupplyLevels.Contains(supply ?? string.Empty);
+
+    /// <summary>Where a supply level stands, from the shortest: SCARCE is 0, an unknown level comes last (D28).</summary>
+    /// <param name="supply">The supply level, as the API gives it.</param>
+    /// <returns>The rank.</returns>
+    public static int SupplyRank(string supply)
+    {
+        var rank = Array.FindIndex(SupplyLevels, level => level.Equals(supply, StringComparison.OrdinalIgnoreCase));
+        return rank < 0 ? SupplyLevels.Length : rank;
     }
 
     /// <summary>Where a ship is, or, in transit, where it is going.</summary>
@@ -139,9 +157,13 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// What a miner can mine, best first: surveyed ores, then ores in low supply (D22); among either, the
-    /// most a single extraction is expected to fetch (the ore's share of the deposits times its price), then
-    /// the nearest asteroid. Opportunities other miners hold are left out: one miner per sell market and ore.
+    /// What a miner can mine, best first (D28): for every market that buys an ore, mined at an asteroid with a
+    /// usable survey holding it, or else at the asteroid nearest the market, and sold there. The markets shortest
+    /// of their ore come first, so a miner serves a SCARCE market before a LIMITED one, and once no market is
+    /// short, the one with the lowest supply, even when it pays less. Within a supply level, surveyed ores first,
+    /// then the most a single extraction is expected to fetch (the ore's share of the deposits times its price),
+    /// then the nearest asteroid. Opportunities other miners hold are left out: one miner per sell market and ore.
+    /// The mining plan buys a drone only when its first trip here would serve a market short of its ore.
     /// </summary>
     /// <param name="context">The miner's system.</param>
     /// <param name="miner">The miner.</param>
@@ -168,42 +190,42 @@ public static class MiningPlanner
             }
         }
 
-        // Surveyed: every ore a usable survey holds at an asteroid the miner can reach, sold where it fetches most.
-        foreach (var asteroid in context.Surveys.Select(survey => survey.WaypointSymbol).Distinct(StringComparer.OrdinalIgnoreCase))
+        var reaches = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        bool Reaches(string asteroid)
         {
-            if (!IsExtractable(map, asteroid) || !CanReach(map, miner, asteroid))
+            if (!reaches.TryGetValue(asteroid, out var reachable))
             {
-                continue;
+                reachable = CanReach(map, miner, asteroid);
+                reaches[asteroid] = reachable;
             }
 
-            var ores = context.Surveys
-                .Where(survey => survey.WaypointSymbol.Equals(asteroid, StringComparison.OrdinalIgnoreCase))
-                .SelectMany(survey => survey.Deposits.Select(deposit => deposit.Symbol))
-                .Where(AsteroidDeposits.Ores.Contains)
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-            foreach (var ore in ores)
-            {
-                if (SurveySelection.TryPickBest(context.Surveys, asteroid, ore, context.Now, out var best)
-                    && TryFindBestBuyer(map, ore, out var buyer, out var price, from: asteroid, miner))
-                {
-                    Offer(new MiningTarget(ore, asteroid, buyer, price, SurveySelection.Share(best, ore), Surveyed: true, LowSupply: IsLowSupplyAt(map, buyer, ore)));
-                }
-            }
+            return reachable;
         }
 
-        // Low supply: mined at the asteroid nearest the market, and sold there.
+        var surveyed = context.Surveys
+            .Select(survey => survey.WaypointSymbol)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(asteroid => IsExtractable(map, asteroid) && Reaches(asteroid))
+            .ToList();
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
-            foreach (var good in map.GoodsAt(market).Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsLowSupply(good)))
+            foreach (var good in map.GoodsAt(market).Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good)))
             {
-                if (!TryFindNearestAsteroid(map, good.Symbol, market, asteroid => CanReach(map, miner, asteroid) && CanSellFrom(map, miner, asteroid, market), out var asteroid))
+                foreach (var asteroid in surveyed)
                 {
-                    continue;
+                    if (SurveySelection.TryPickBest(context.Surveys, asteroid, good.Symbol, context.Now, out var best)
+                        && CanSellFrom(map, miner, asteroid, market))
+                    {
+                        Offer(new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, SurveySelection.Share(best, good.Symbol), Surveyed: true, good.Supply));
+                    }
                 }
 
-                var surveyed = SurveySelection.TryPickBest(context.Surveys, asteroid, good.Symbol, context.Now, out var best);
-                var share = surveyed ? SurveySelection.Share(best, good.Symbol) : UnguidedShare(map, asteroid);
-                Offer(new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, share, surveyed, LowSupply: true));
+                if (TryFindNearestAsteroid(map, good.Symbol, market, asteroid => Reaches(asteroid) && CanSellFrom(map, miner, asteroid, market), out var nearest))
+                {
+                    var isSurveyed = SurveySelection.TryPickBest(context.Surveys, nearest, good.Symbol, context.Now, out var best);
+                    var share = isSurveyed ? SurveySelection.Share(best, good.Symbol) : UnguidedShare(map, nearest);
+                    Offer(new MiningTarget(good.Symbol, nearest, market, good.SellPrice, share, isSurveyed, good.Supply));
+                }
             }
         }
 
@@ -251,6 +273,12 @@ public static class MiningPlanner
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
 
+        var supply = SupplyRank(x.Supply).CompareTo(SupplyRank(y.Supply));
+        if (supply != 0)
+        {
+            return supply;
+        }
+
         var surveyed = y.Surveyed.CompareTo(x.Surveyed);
         if (surveyed != 0)
         {
@@ -273,33 +301,6 @@ public static class MiningPlanner
         }
     }
 
-    /// <summary>The market a miner gets most at for an ore, from the asteroid, after the fuel to get there.</summary>
-    private static bool TryFindBestBuyer(TradeMarketMap map, string ore, out string buyer, out long price, string from, ShipModel miner)
-    {
-        buyer = string.Empty;
-        price = 0;
-        var best = long.MinValue;
-        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
-        {
-            if (!map.TryGetGood(market, ore, out var good)
-                || good.SellPrice <= 0
-                || !TradeRoutePlanner.TryPlanFlight(map, from, market, miner.FuelCapacity, miner.FuelCapacity, out var flight))
-            {
-                continue;
-            }
-
-            var net = ((long)good.SellPrice * Math.Max(1, miner.CargoCapacity)) - flight.FuelCost;
-            if (net > best)
-            {
-                best = net;
-                buyer = market;
-                price = good.SellPrice;
-            }
-        }
-
-        return price > 0;
-    }
-
     /// <summary>The extractable asteroid nearest a waypoint whose traits yield the ore, among those <paramref name="allowed"/> lets through.</summary>
     private static bool TryFindNearestAsteroid(TradeMarketMap map, string ore, string near, Func<string, bool> allowed, out string asteroid)
     {
@@ -318,12 +319,13 @@ public static class MiningPlanner
     private static bool CanSellFrom(TradeMarketMap map, ShipModel miner, string asteroid, string market)
         => TradeRoutePlanner.TryPlanFlight(map, asteroid, market, miner.FuelCapacity, miner.FuelCapacity, out _);
 
+    /// <summary>Whether a market takes a good: it imports or exchanges it, at a price.</summary>
+    private static bool IsDemanded(TradeGoodSnapshot good)
+        => good.SellPrice > 0 && DemandTypes.Contains(good.Type);
+
     private static bool IsExtractable(TradeMarketMap map, string waypointSymbol)
         => map.Waypoints.Any(waypoint => waypoint.Symbol.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase)
             && AsteroidDeposits.IsExtractable(waypoint.Type));
-
-    private static bool IsLowSupplyAt(TradeMarketMap map, string market, string ore)
-        => map.TryGetGood(market, ore, out var good) && IsLowSupply(good);
 
     /// <summary>Without a survey, an extraction yields any of the asteroid's ores, about equally often.</summary>
     private static double UnguidedShare(TradeMarketMap map, string asteroid)
@@ -417,9 +419,9 @@ public sealed record MiningTarget
     /// <param name="SellPrice">What that market pays per unit, as last seen.</param>
     /// <param name="Share">The share of extractions expected to yield the ore: the best survey's, or one ore of the asteroid's without one.</param>
     /// <param name="Surveyed">Whether a usable survey of the asteroid holds the ore.</param>
-    /// <param name="LowSupply">Whether the sell market has the ore in low supply (D22).</param>
+    /// <param name="Supply">The sell market's supply of the ore, as last seen (SCARCE to ABUNDANT).</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MiningTarget(string Ore, string AsteroidSymbol, string SellWaypointSymbol, long SellPrice, double Share, bool Surveyed, bool LowSupply)
+    public MiningTarget(string Ore, string AsteroidSymbol, string SellWaypointSymbol, long SellPrice, double Share, bool Surveyed, string Supply)
     {
         this.Ore = Ore;
         this.AsteroidSymbol = AsteroidSymbol;
@@ -427,7 +429,7 @@ public sealed record MiningTarget
         this.SellPrice = SellPrice;
         this.Share = Share;
         this.Surveyed = Surveyed;
-        this.LowSupply = LowSupply;
+        this.Supply = Supply;
     }
 
     /// <summary>The ore.</summary>
@@ -448,8 +450,11 @@ public sealed record MiningTarget
     /// <summary>Whether a usable survey of the asteroid holds the ore.</summary>
     public required bool Surveyed { get; init; }
 
-    /// <summary>Whether the sell market has the ore in low supply (D22).</summary>
-    public required bool LowSupply { get; init; }
+    /// <summary>The sell market's supply of the ore, as last seen (SCARCE to ABUNDANT).</summary>
+    public required string Supply { get; init; }
+
+    /// <summary>Whether the sell market has the ore in low supply (D22): SCARCE or LIMITED.</summary>
+    public bool LowSupply => MiningPlanner.IsLowSupply(Supply);
 
     /// <summary>What one extraction is expected to fetch per unit: the share times the price.</summary>
     public double ExpectedValue => Share * SellPrice;

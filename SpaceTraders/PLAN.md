@@ -69,7 +69,9 @@
   mining at 14:14Z. Its first watch found B50, fixed with your decision D26 (projects#123, deployed
   by gembernodes#23 at 14:47Z). That deploy's first surveys found B51, fixed by projects#125
   (deployed by gembernodes#25 at 15:08Z). Your decision D27, a stock of surveys per ore instead of
-  surveying the contract's ore without end, is built on branch `claude/spacetraders-survey-stock`.
+  surveying the contract's ore without end, is live (projects#126 and #127, deployed by gembernodes#26
+  and #27). The contract was fulfilled at 15:49Z (23,076 credits). Your decision D28, one rule for
+  what miners mine and when a drone is bought, is built on branch `claude/spacetraders-mining-rules`.
 
 ## Known issues
 
@@ -167,6 +169,7 @@ get the next D-number.
 | D25 | Slice 6.4 (asked during the work): when are prices fetched again after a trade? | **Right after each purchase or sale** (2026-10-02), "while the ship is still there". Cargo purchases and sales, by traders and miners; refuels aren't counted as purchases here (they happen at almost every departure and move only FUEL's price). |
 | D26 | Slice 6.4's first watch (asked on 2026-10-02): when does a ship on the contract reconsider its work? | **After each round trip, and once at every restart:** "Any ship should probably have a release and re-assign after each mining round trip. Just to determine if there's something more important to do at that point", and it "explicitly reconsiders once whenever the pod restarts". A delivery closes the ship's contract assignment, and the plans assign it again on the next tick, in their order; at startup, every ship on the contract that isn't in flight is released. Mining, trading and survey trips already ended with each trip. |
 | D27 | Slice 6.4's first watch (asked on 2026-10-02): how much does a surveyor survey? SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused, because the contract's ore always came first. | **A small stock per ore:** "I'd expect him to make 1 copper ore survey and then move to the next ore type"; of the options, keep a stock of 2 usable surveys of each ore (`Survey.StockPerOre`), the contract's ore first, then the ore with the fewest. With the stock for every ore, the surveyor waits until one runs out. Refined the same day: "Stock per ore per asteroid. I'd like the surveys to be close to wherever the mineral can be sold": every market that buys an ore gets the reachable asteroid nearest it, each keeping its own stock. |
+| D28 | Slice 6.4's first watch (asked on 2026-10-02): what do miners mine, and when is a drone bought? After the contract, the mining plan bought SPECTER-4 for A3's scarce silicon, and the drone mined surveyed iron for H51, where iron was MODERATE: the opening that paid for it stayed open, ready to pay for the next drone. | **One rule for both:** "The buying logic and the mining logic should follow the same rules. I do not mind if the buying logic buys a drone for silicon and the drone mines iron if they are both SCARCE. I do mind if the iron is not SCARCE, because at that point, endless drones are going to be bought." And: "Mine for scarce first, but once all ores are no longer SCARCE, keep mining for whatever the lowest supply ore is, even if it's not that profitable (as it will improve the amount and prices of higher-valued goods such as the metals that's made from the ores)." Miners serve the markets that buy an ore by supply, shortest first (SCARCE, LIMITED, then the lowest there is); within a level surveyed first, then value. A drone is bought, one a tick, only when its first trip by that ranking would be in low supply (SCARCE or LIMITED, D22). |
 
 ## Phases
 
@@ -1268,6 +1271,23 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `Health/ShipLeftIdleRule.cs`, `DefaultSettingsSeed.cs` (Persistence); tests:
       `MiningPlannerTests` (the contract-first test replaced, two new; two more for the refinement),
       `SurveyPlanServiceTests` (three new), `ShipRuleTests` (one new), `DefaultSettingsSeedTests`.
+  - Fourth follow-up (2026-10-02, your decision D28; built on branch `claude/spacetraders-mining-rules`).
+    To understand it, start with `MiningTargets` and `CompareBestFirst` in `Mining/MiningPlanner.cs`,
+    then `BuyDroneAsync` in `Automation/MiningAutomationService.cs`.
+    - **What a miner mines:** every market that buys an ore is a target, mined at an asteroid with a
+      usable survey holding it or else the asteroid nearest the market. They rank by the market's
+      supply first: SCARCE, LIMITED, MODERATE, HIGH, ABUNDANT; within a level, surveyed first, then
+      the most an extraction is expected to fetch. So miners serve the scarce markets first, and once
+      none is short, keep mining the lowest supply there is, even when it pays less. A trip for a
+      market that isn't short logs reason `lowest_supply`.
+    - **When a drone is bought:** with every miner working, the plan asks the same ranking what a new
+      drone would mine (the trips under way held), and buys it only if that is in low supply (SCARCE or
+      LIMITED, D22). One a tick: it used to buy one for every opening at once, and a drone could then
+      go to a market that wasn't short, leaving its opening to pay for the next.
+    - Files: `Mining/MiningPlanner.cs` (`MiningTargets`, `CompareBestFirst`, `SupplyRank`,
+      `MiningTarget.Supply`), `Automation/MiningAutomationService.cs` (`BuyDroneAsync`),
+      `JournalEvents.cs`; tests: `MiningPlannerTests` and `MiningAutomationServiceTests` (the
+      expectations that assumed surveyed-first rewritten, four new).
   - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
     `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
   - Done when: a full reset period with these plans on and no open anomaly for them.

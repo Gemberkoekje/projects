@@ -71,7 +71,8 @@ public static class JournalEvents
     /// <summary>
     /// A miner took mining work (slice 6.4): a trip to mine and sell, or a place in the contract's work
     /// (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it mines at, <c>SellWaypoint</c>,
-    /// <c>Reason</c>: <c>contract</c>, <c>surveyed</c>, <c>low_supply</c> or <c>held_cargo</c>).
+    /// <c>Reason</c>: <c>contract</c>, <c>surveyed</c>, <c>low_supply</c>, <c>lowest_supply</c> (no market is
+    /// short of an ore, D28) or <c>held_cargo</c>).
     /// </summary>
     public const string MiningStarted = nameof(MiningStarted);
 

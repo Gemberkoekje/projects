@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-02, D28)
+- Miners serve the markets that buy an ore by supply, shortest first: SCARCE, LIMITED, and once none is short, the lowest supply there is, even when it pays less; within a supply level, surveyed ores first. A trip for a market that isn't short logs reason `lowest_supply`.
+- A drone is bought only when its first trip, by the miners' own ranking, would serve a market in low supply (SCARCE or LIMITED), and one a tick. It used to buy one for every low-supply opening at once, and a drone bought for a scarce market could then mine surveyed ore for a market that wasn't short, leaving the opening to pay for the next drone.
+
+### Docs – Changed (2026-10-02, D28)
+- `PLAN.md`: D28 and the fourth 6.4 follow-up; `docs/HOW_IT_WORKS.md`: the mining plan's ranking and its drone purchases.
+
 ### Code – Changed (2026-10-02, D27 refined)
 - Survey targets are per ore and asteroid: every market that buys an ore gets the reachable asteroid nearest it, not only the market that pays most, so surveys lie close to wherever the ore is sold; each keeps its own stock of usable surveys.
 

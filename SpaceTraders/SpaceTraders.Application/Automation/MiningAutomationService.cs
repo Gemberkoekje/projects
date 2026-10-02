@@ -13,7 +13,7 @@ namespace SpaceTraders.Application.Automation;
 /// <summary>The mining plan (PLAN.md slice 6.4).</summary>
 public interface IMiningAutomationService
 {
-    /// <summary>One pass of the plan: gives every free miner a trip, and buys drones for openings no miner can take.</summary>
+    /// <summary>One pass of the plan: gives every free miner a trip, and buys a drone when one would serve a market short of an ore.</summary>
     /// <param name="cancellationToken">Stops the pass.</param>
     /// <returns>A task that completes when the pass is done.</returns>
     Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default);
@@ -27,12 +27,14 @@ public interface IMiningAutomationService
 ///   <see cref="FleetRoles"/>);</item>
 ///   <item>a miner that holds ore a market buys sells it first, where it fetches most after fuel: the ore
 ///   left over from a contract, for one;</item>
-///   <item>otherwise it takes the best of <see cref="MiningPlanner.MiningTargets"/>: a surveyed ore first,
-///   sold where it fetches most, then an ore a market has in low supply (D22), sold there. One miner per
-///   sell market and ore;</item>
-///   <item>when no miner was free and an opening in low supply waits that a new drone could reach, it buys
-///   a drone per opening, up to <c>Mining.MaxDrones</c> and within the credit reserve; not while the
-///   contract plan mines, which would take the drone (D23).</item>
+///   <item>otherwise it takes the best of <see cref="MiningPlanner.MiningTargets"/>: the market shortest of
+///   an ore first (D28), SCARCE, then LIMITED, and once none is short, the lowest supply there is; within a
+///   supply level, a surveyed ore first. One miner per sell market and ore;</item>
+///   <item>when no miner was free, it buys a drone when the drone's first trip, by the same ranking, would
+///   serve a market short of its ore (D22, D28): one a pass, so the next pass counts its trip, up to
+///   <c>Mining.MaxDrones</c> and within the credit reserve; not while the contract plan mines, which would
+///   take the drone (D23). A drone that would mine for a market that isn't short is not bought: the
+///   opening that paid for it would stay open and pay for the next.</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -85,7 +87,6 @@ public sealed class MiningAutomationService(
 
         var freeAtStart = free.Count > 0;
         var opportunities = new List<MiningAutomationOpportunityState>();
-        var pending = new List<(MiningOpportunity Opportunity, string SystemSymbol)>();
         foreach (var system in fleet
             .Where(ship => FleetRoles.IsMiner(ship, surveyOn) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
@@ -121,17 +122,12 @@ public sealed class MiningAutomationService(
                     FirstObservedAt = default,
                     LastObservedAt = default,
                 });
-
-                if (!held)
-                {
-                    pending.Add((opportunity, system.Key));
-                }
             }
         }
 
-        if (pending.Count > 0 && !freeAtStart && !await ContractTakesMinersAsync(cancellationToken))
+        if (!freeAtStart && !await ContractTakesMinersAsync(cancellationToken))
         {
-            await BuyDronesAsync(fleet, pending, cancellationToken);
+            await BuyDroneAsync(fleet, surveyOn, heldKeys, cancellationToken);
         }
 
         await SaveStateAsync(opportunities, cancellationToken);
@@ -173,7 +169,7 @@ public sealed class MiningAutomationService(
             TradeSymbol = target.Ore,
             SourceWaypointSymbol = target.AsteroidSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
-        }, target.Surveyed ? "surveyed" : "low_supply", cancellationToken);
+        }, target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply", cancellationToken);
         return true;
     }
 
@@ -221,12 +217,15 @@ public sealed class MiningAutomationService(
             && contract.UnitsFulfilled < contract.UnitsRequired;
 
     /// <summary>
-    /// Buys a drone for each low-supply opening no miner took, as long as a drone from the shipyard could
-    /// reach its asteroid, up to <c>Mining.MaxDrones</c> and within the credit reserve.
+    /// Buys a drone when every miner works and the drone's first trip, by the miners' own ranking
+    /// (<see cref="MiningPlanner.MiningTargets"/>, the trips under way held), would serve a market short of its
+    /// ore (D22, D28). One a pass: the next pass counts its trip. Up to <c>Mining.MaxDrones</c> and within the
+    /// credit reserve.
     /// </summary>
-    private async Task BuyDronesAsync(
+    private async Task BuyDroneAsync(
         IReadOnlyList<ShipModel> fleet,
-        IReadOnlyList<(MiningOpportunity Opportunity, string SystemSymbol)> pending,
+        bool surveyOn,
+        IReadOnlySet<string> heldKeys,
         CancellationToken cancellationToken)
     {
         var maxDrones = await settings.GetAsync<int>(MaxMiningDronesSettingKey, cancellationToken);
@@ -236,15 +235,19 @@ public sealed class MiningAutomationService(
         }
 
         var drones = fleet.Count(ship => ship.IsMiningCapable);
-        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
-        foreach (var (opportunity, systemSymbol) in pending)
+        if (drones >= maxDrones)
         {
-            if (drones >= maxDrones)
-            {
-                logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
-                return;
-            }
+            logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
+            return;
+        }
 
+        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        foreach (var systemSymbol in fleet
+            .Where(ship => FleetRoles.IsMiner(ship, surveyOn) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .Select(ship => ship.SystemSymbol!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal))
+        {
             var shipyard = shipyardList
                 .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
                     && candidate.Ships.Any(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0))
@@ -254,7 +257,7 @@ public sealed class MiningAutomationService(
             if (shipyard is null)
             {
                 logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, MiningDroneShipType);
-                return;
+                continue;
             }
 
             var context = await miningContexts.ReadAsync(systemSymbol, cancellationToken);
@@ -268,13 +271,13 @@ public sealed class MiningAutomationService(
                 forSale.FuelCapacity,
                 forSale.FuelCapacity,
                 CargoCapacity: forSale.CargoCapacity);
-            if (forSale.FuelCapacity > 0 && !MiningPlanner.CanReach(context.Map, newDrone, opportunity.AsteroidSymbol))
+            var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys);
+            if (targets.Count == 0 || !targets[0].LowSupply)
             {
                 logger.LogDebug(
-                    "Mining plan: a drone from {Shipyard} can't reach {WaypointSymbol} to mine {TradeSymbol}; no purchase for it.",
-                    shipyard.WaypointSymbol,
-                    opportunity.AsteroidSymbol,
-                    opportunity.Ore);
+                    "Mining plan: no drone bought in {SystemSymbol}: its first trip would not serve a market short of its ore ({Trip}).",
+                    systemSymbol,
+                    targets.Count == 0 ? "nothing it can reach" : $"{targets[0].Ore} for {targets[0].SellWaypointSymbol}, {targets[0].Supply}");
                 continue;
             }
 
@@ -285,10 +288,9 @@ public sealed class MiningAutomationService(
                     "Mining plan: mining drone purchase denied at {Shipyard} — {Reason}.",
                     shipyard.WaypointSymbol,
                     purchased.FailureReason ?? "Purchase failed.");
-                return;
             }
 
-            drones++;
+            return;
         }
     }
 
