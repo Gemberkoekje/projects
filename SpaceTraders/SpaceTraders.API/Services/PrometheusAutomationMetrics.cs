@@ -38,6 +38,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipArrival;
     private readonly Gauge _shipCargoUnits;
     private readonly Gauge _shipCargoCapacity;
+    private readonly Gauge _shipValue;
     private readonly Gauge _marketObserved;
     private readonly Gauge _marketPurchasePrice;
     private readonly Gauge _marketSellPrice;
@@ -194,6 +195,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _shipCargoCapacity = metrics.CreateGauge(
             "spacetraders_ship_cargo_capacity_units",
             "Units a ship's hold takes.",
+            "ship");
+        _shipValue = metrics.CreateGauge(
+            "spacetraders_ship_value_credits",
+            "What was paid for a ship and for the mounts and modules installed on it; 0 for a starting ship.",
             "ship");
         _marketObserved = metrics.CreateGauge(
             "spacetraders_market_observed_timestamp_seconds",
@@ -619,6 +624,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
         _shipGoods[ship.Ship] = new HashSet<string>(goods.Keys, StringComparer.Ordinal);
         _shipCargoCapacity.WithLabels(ship.Ship).Set(ship.CargoCapacity);
+        _shipValue.WithLabels(ship.Ship).Set(ship.Value);
     }
 
     /// <summary>Removes a ship's details once it is gone. Under the lock.</summary>
@@ -628,6 +634,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         {
             _shipInfo.RemoveLabelled(ship, info.Location, info.Activity);
             _shipCargoCapacity.RemoveLabelled(ship);
+            _shipValue.RemoveLabelled(ship);
         }
 
         if (_shipsInTransit.Remove(ship))

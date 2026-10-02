@@ -195,6 +195,49 @@ public sealed class PrometheusMetricsServiceTests
         ships.Single(s => s.Ship == "AGENT-1").ArrivesAt.Should().BeCloseTo(now.AddMinutes(2), TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>
+    /// A ship is worth what was paid for it and for the mounts and modules installed on it, as the
+    /// ledger has it; a starting ship cost nothing. Feeds the total value graph.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_ValuesEachShipAtWhatWasPaidForItAndItsEquipment()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-1", ShipType = "COMMAND", Status = "DOCKED" });
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-3", ShipType = "SHIP_MINING_DRONE", Status = "DOCKED" });
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.ShipPurchase, -45_000));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.MountPurchase, -3_000));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.ModulePurchase, -2_000));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.FuelPurchase, -100));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.TradeBuy, -900));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.TradeSell, 700));
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        ships.Select(s => (s.Ship, s.Value)).Should().BeEquivalentTo(new[]
+        {
+            ("AGENT-1", 0L),
+            ("AGENT-3", 50_000L),
+        });
+    }
+
+    private static LedgerEntry Ledger(string ship, LedgerCategory category, long amount)
+        => new() { AgentId = AgentId, ShipSymbol = ship, Category = category, Amount = amount, OccurredAt = TimeProvider.System.GetUtcNow() };
+
     private static CachedWaypoint Waypoint(string symbol, string type)
         => new() { AgentId = AgentId, Symbol = symbol, SystemSymbol = "X1-AB", Type = type };
 
@@ -351,6 +394,7 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"COPPER_ORE\"} 9\n");
         text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} 2\n");
         text.Should().Contain("spacetraders_ship_cargo_capacity_units{ship=\"AGENT-3\"} 15\n");
+        text.Should().Contain("spacetraders_ship_value_credits{ship=\"AGENT-3\"} 50000\n");
         text.Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
 
         // It jettisoned the crystals, filled up, and is on its way to deliver.
@@ -478,6 +522,7 @@ public sealed class PrometheusAutomationMetricsTests
             ArrivesAt = arrivesAt,
             CargoCapacity = 15,
             Cargo = cargo,
+            Value = 50_000,
         };
 
     private static string StatusLine(string ship, string role, string state, string goal, string reason, DateTimeOffset since)
