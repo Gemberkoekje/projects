@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python tools/investigate/st.py *)",
+      "Bash(kubectl -n spacetraders logs *)"
+    ]
+  }
+}
