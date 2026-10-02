@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -23,15 +24,16 @@ public interface ISurveyPlanService
 /// <summary>
 /// The survey plan (PLAN.md slice 6.4). Every ship that can survey surveys, and does nothing else (D20):
 /// each tick a free surveyor gets one survey to take (<see cref="SurveyWaypointGoal"/>), chosen by
-/// <see cref="MiningPlanner.SurveyTargets"/>:
+/// <see cref="MiningPlanner.SurveyTargets"/> among the ores with fewer usable surveys than the stock,
+/// <see cref="StockPerOreSetting"/> (D27):
 /// <list type="bullet">
 ///   <item>the contract's ore, at the contract's asteroid, while the contract plan mines it;</item>
-///   <item>otherwise an ore a market in the system buys, at the asteroid nearest the market that pays most
-///   for it, among those the miners can reach; ores without a usable survey first, then the best paid.</item>
+///   <item>then an ore a market in the system buys, at the asteroid nearest the market that pays most
+///   for it, among those the miners can reach; the fewest usable surveys first, then the best paid.</item>
 /// </list>
-/// A surveyor takes the best target no other surveyor works on, or the best one when all are taken. The
-/// plan also ends the surveys that expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey
-/// dashboard.
+/// With the stock for every ore, a surveyor waits until a survey runs out. A surveyor takes the best target
+/// no other surveyor works on, or the best one when all are taken. The plan also ends the surveys that
+/// expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey dashboard.
 /// </summary>
 public sealed class SurveyPlanService(
     IShipRepository ships,
@@ -41,8 +43,15 @@ public sealed class SurveyPlanService(
     IMiningContextReader miningContexts,
     ISurveyKeeper surveyKeeper,
     IPlanRepository plans,
+    ISettingsRepository settings,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
+    /// <summary>The setting that holds the usable surveys to keep of each ore (D27).</summary>
+    public const string StockPerOreSetting = "Survey.StockPerOre";
+
+    /// <summary>The stock when the setting gives none: two, so a miner has a choice (D27).</summary>
+    internal const int DefaultStockPerOre = 2;
+
     private static readonly JsonSerializerOptions CompareOptions = new();
 
     /// <inheritdoc />
@@ -73,6 +82,7 @@ public sealed class SurveyPlanService(
         }
 
         var contract = await contractPlans.GetAsync(cancellationToken);
+        var stock = await settings.ThresholdAsync(StockPerOreSetting, DefaultStockPerOre, cancellationToken);
         var targets = new List<SurveyPlanTarget>();
         foreach (var system in fleet
             .Where(ship => FleetRoles.IsSurveyor(ship, surveyPlanOn: true) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
@@ -83,14 +93,19 @@ public sealed class SurveyPlanService(
                 .Where(ship => FleetRoles.IsMiner(ship, surveyPlanOn: true)
                     && string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase))
                 .ToList();
-            var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners);
+            var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);
 
             foreach (var surveyor in free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)))
             {
-                var reachable = systemTargets.Where(target => MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol)).ToList();
+                var reachable = systemTargets
+                    .Where(target => target.NeedsSurvey && MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
+                    .ToList();
                 if (reachable.Count == 0)
                 {
-                    logger.LogDebug("Survey plan: nothing to survey that ship {ShipSymbol} can reach.", surveyor.Symbol);
+                    logger.LogDebug(
+                        "Survey plan: ship {ShipSymbol} waits: every ore it can reach has {Stock} usable surveys.",
+                        surveyor.Symbol,
+                        stock);
                     continue;
                 }
 
@@ -113,6 +128,8 @@ public sealed class SurveyPlanService(
                 BuyerWaypointSymbol = target.BuyerSymbol,
                 ForContract = target.ForContract,
                 HasUsableSurvey = target.HasUsableSurvey,
+                UsableSurveys = target.UsableSurveys,
+                NeedsSurvey = target.NeedsSurvey,
                 SurveyorShipSymbols = [.. surveying.Where(entry => Targets(entry.Value, target)).Select(entry => entry.Key).Order(StringComparer.Ordinal)],
             }));
         }

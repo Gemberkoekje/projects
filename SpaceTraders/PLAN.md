@@ -67,8 +67,9 @@
   gembernodes#22 at 14:13Z. It fixed B34 first, at your request, then the survey part of B16, B17
   for the mining and survey trips, B48 and B49. Trading was switched on at 13:08Z, surveying and
   mining at 14:14Z. Its first watch found B50, fixed with your decision D26 (projects#123, deployed
-  by gembernodes#23 at 14:47Z). That deploy's first surveys found B51, fixed on branch
-  `claude/spacetraders-b51`.
+  by gembernodes#23 at 14:47Z). That deploy's first surveys found B51, fixed by projects#125
+  (deployed by gembernodes#25 at 15:08Z). Your decision D27, a stock of surveys per ore instead of
+  surveying the contract's ore without end, is built on branch `claude/spacetraders-survey-stock`.
 
 ## Known issues
 
@@ -165,6 +166,7 @@ get the next D-number.
 | D24 | Slice 6.4 (asked during the work): how do traders keep money for fuel? | **A trading bar** (2026-10-02): "a trading bar of, say 5.000 credits, under which only fuel can be bought", so the bot never holds expensive cargo without the fuel to move it. Cargo leaves `Trade.FuelReserveCredits` (5,000) untouched, on top of the trip's own fuel. |
 | D25 | Slice 6.4 (asked during the work): when are prices fetched again after a trade? | **Right after each purchase or sale** (2026-10-02), "while the ship is still there". Cargo purchases and sales, by traders and miners; refuels aren't counted as purchases here (they happen at almost every departure and move only FUEL's price). |
 | D26 | Slice 6.4's first watch (asked on 2026-10-02): when does a ship on the contract reconsider its work? | **After each round trip, and once at every restart:** "Any ship should probably have a release and re-assign after each mining round trip. Just to determine if there's something more important to do at that point", and it "explicitly reconsiders once whenever the pod restarts". A delivery closes the ship's contract assignment, and the plans assign it again on the next tick, in their order; at startup, every ship on the contract that isn't in flight is released. Mining, trading and survey trips already ended with each trip. |
+| D27 | Slice 6.4's first watch (asked on 2026-10-02): how much does a surveyor survey? SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused, because the contract's ore always came first. | **A small stock per ore:** "I'd expect him to make 1 copper ore survey and then move to the next ore type"; of the options, keep a stock of 2 usable surveys of each ore (`Survey.StockPerOre`), the contract's ore first, then the ore with the fewest. With the stock for every ore, the surveyor waits until one runs out. |
 
 ## Phases
 
@@ -1244,6 +1246,20 @@ How credits are split stays your call; Claude only fixes deviations from intende
       (Infrastructure.SpaceTradersAPI), `Ports/SurveyRefusedException.cs`,
       `Commands/Ships/MineResourceVolumeCommand.cs`; tests: `SurveyRequestTests` (new),
       `SurveyRefusalTests` (two new), `MineResourceVolumeHandlerTests` (one new).
+  - Third follow-up (2026-10-02, your decision D27; built on branch
+    `claude/spacetraders-survey-stock`). To understand it, start with `SurveyTargets` in
+    `Mining/MiningPlanner.cs`, then `EnsureBootstrappedAsync` in `Automation/SurveyPlanService.cs`.
+    - **A stock of surveys per ore:** a target needs a survey while fewer usable surveys hold its ore
+      than `Survey.StockPerOre` (new setting, 2). The contract's ore comes first only while it needs
+      one; then the ore with the fewest usable surveys, then the best paid. With the stock for every
+      ore, the surveyor waits until a survey expires or is used up.
+    - The plan's state shows each target's usable surveys and whether it needs one; `ShipLeftIdle`
+      counts only those that need one, so a surveyor that waits is not an anomaly.
+    - Files: `Mining/MiningPlanner.cs` (`SurveyTargets`, `SurveyTarget`), `Mining/SurveySelection.cs`
+      (`CountUsable`), `Automation/SurveyPlanService.cs`, `SurveyPlanState.cs`,
+      `Health/ShipLeftIdleRule.cs`, `DefaultSettingsSeed.cs` (Persistence); tests:
+      `MiningPlannerTests` (the contract-first test replaced, two new), `SurveyPlanServiceTests` (three
+      new), `ShipRuleTests` (one new), `DefaultSettingsSeedTests`.
   - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
     `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
   - Done when: a full reset period with these plans on and no open anomaly for them.

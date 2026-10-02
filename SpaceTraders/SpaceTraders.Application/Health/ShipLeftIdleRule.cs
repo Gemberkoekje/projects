@@ -116,12 +116,14 @@ public sealed class ShipLeftIdleRule(
             }
         }
 
+        // Only the targets short of their stock of surveys: with the stock for every ore, a surveyor waits (D27).
         if (surveyOn
-            && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { Targets.Count: > 0 } survey)
+            && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { } survey
+            && survey.Targets.Count(target => target.NeedsSurvey) is > 0 and var toSurvey)
         {
             waiting.Add(new WaitingWork(
                 AutomationPlan.Survey,
-                string.Create(CultureInfo.InvariantCulture, $"{survey.Targets.Count} targets to survey"),
+                string.Create(CultureInfo.InvariantCulture, $"{toSurvey} targets to survey"),
                 ship => FleetRoles.IsSurveyor(ship.Ship, surveyOn)));
         }
 

@@ -13,7 +13,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 
 /// <summary>
 /// Slice 6.4: every ship that can survey surveys (D20): the contract's ore at the contract's asteroid
-/// first, otherwise ores the markets buy, at the asteroid nearest their buyer that the miners can reach.
+/// first, otherwise ores the markets buy, at the asteroid nearest their buyer that the miners can reach;
+/// each until it has a stock of usable surveys, and then nothing (D27).
 /// </summary>
 public sealed class SurveyPlanServiceTests
 {
@@ -24,6 +25,7 @@ public sealed class SurveyPlanServiceTests
     private readonly IMiningContextReader _contexts = Substitute.For<IMiningContextReader>();
     private readonly ISurveyKeeper _surveyKeeper = Substitute.For<ISurveyKeeper>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
+    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -91,6 +93,49 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task OnceTheContractsOreHasItsStock_TheCommandShipSurveysForTheNextOre()
+    {
+        // D27 (2026-10-02): "I'd expect him to make 1 copper ore survey and then move to the next ore
+        // type". The stock is two usable surveys per ore, unless the setting says otherwise.
+        ContractMines("COPPER_ORE", XB5C, H51);
+        SurveysAre(Survey("S-1", XB5C, "COPPER_ORE"), Survey("S-2", XB5C, "COPPER_ORE"));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>().Which.TargetDepositSymbol.Should().Be("ALUMINUM_ORE");
+    }
+
+    [Fact]
+    public async Task TheStock_IsASetting()
+    {
+        _settings.GetAsync<int>(SurveyPlanService.StockPerOreSetting, Arg.Any<CancellationToken>()).Returns(1);
+        ContractMines("COPPER_ORE", XB5C, H51);
+        SurveysAre(Survey("S-1", XB5C, "COPPER_ORE"));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>().Which.TargetDepositSymbol.Should().Be("ALUMINUM_ORE");
+    }
+
+    [Fact]
+    public async Task WithEveryOreStocked_TheSurveyorWaits()
+    {
+        ContractMines("COPPER_ORE", XB5C, H51);
+        SurveysAre(
+            Survey("S-1", XB5C, "COPPER_ORE", "ALUMINUM_ORE", "IRON_ORE"),
+            Survey("S-2", XB5C, "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE"),
+            Survey("S-3", XB5C, "ALUMINUM_ORE", "IRON_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND"));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _state!.Targets.Should().HaveCount(6).And.OnlyContain(target => !target.NeedsSurvey && target.UsableSurveys == 2);
+    }
+
+    [Fact]
     public async Task EachPass_EndsTheSurveysThatExpired()
     {
         Fleet(Drone());
@@ -135,6 +180,9 @@ public sealed class SurveyPlanServiceTests
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
+    private void SurveysAre(params SurveyModel[] surveys)
+        => _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(surveys));
+
     private Task RunAsync()
         => new SurveyPlanService(
                 _ships,
@@ -144,6 +192,7 @@ public sealed class SurveyPlanServiceTests
                 _contexts,
                 _surveyKeeper,
                 _plans,
+                _settings,
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }

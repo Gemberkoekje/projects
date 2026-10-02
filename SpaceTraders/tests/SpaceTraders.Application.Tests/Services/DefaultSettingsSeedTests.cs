@@ -51,6 +51,9 @@ public sealed class DefaultSettingsSeedTests
         "Trade.FuelReserveCredits",
         "Trade.ShipPurchases",
 
+        // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
+        "Survey.StockPerOre",
+
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).
         "FleetExpansion.PreferredShipType",

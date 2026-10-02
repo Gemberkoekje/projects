@@ -6,25 +6,55 @@ namespace SpaceTraders.Application.Tests.Mining;
 
 /// <summary>
 /// Slice 6.4: what a surveyor surveys (the contract's ore first, then sellable ores near the market that
-/// buys them) and what a miner mines (surveyed ores first, then ores in low supply, D22).
+/// buys them, each until it has a stock of usable surveys, D27) and what a miner mines (surveyed ores
+/// first, then ores in low supply, D22).
 /// </summary>
 public sealed class MiningPlannerTests
 {
     [Fact]
-    public void TheContractsOre_IsSurveyedFirst_EvenWithAUsableSurvey()
+    public void TheContractsOre_IsSurveyedFirst_UntilItHasItsStock()
     {
         var context = Context(Survey("S-1", XB5C, "COPPER_ORE"));
 
-        var targets = MiningPlanner.SurveyTargets(context, [new ContractOre("COPPER_ORE", XB5C, H51)], [Drone()]);
+        var targets = MiningPlanner.SurveyTargets(context, [new ContractOre("COPPER_ORE", XB5C, H51)], [Drone()], stock: 2);
 
-        targets[0].Should().BeEquivalentTo(new SurveyTarget("COPPER_ORE", XB5C, H51, 0, ForContract: true, HasUsableSurvey: true));
+        targets[0].Should().BeEquivalentTo(new SurveyTarget("COPPER_ORE", XB5C, H51, 0, ForContract: true, UsableSurveys: 1, NeedsSurvey: true));
+    }
+
+    [Fact]
+    public void OnceTheContractsOreHasItsStock_TheOresStillShortOfSurveysComeFirst()
+    {
+        // D27, seen on the cluster on 2026-10-02: the contract's ore came first whatever surveys there
+        // were, so SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused.
+        // "I'd expect him to make 1 copper ore survey and then move to the next ore type", with a stock of
+        // two usable surveys per ore.
+        var context = Context(Survey("S-1", XB5C, "COPPER_ORE"), Survey("S-2", XB5C, "COPPER_ORE", "IRON_ORE"));
+
+        var targets = MiningPlanner.SurveyTargets(context, [new ContractOre("COPPER_ORE", XB5C, H51)], [Drone()], stock: 2);
+
+        targets.Where(target => target.NeedsSurvey).Select(target => target.Ore)
+            .Should().Equal("ALUMINUM_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND", "IRON_ORE");
+        targets.Single(target => target.ForContract).NeedsSurvey.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OnceEveryOreHasItsStock_NothingNeedsASurvey()
+    {
+        var context = Context(
+            Survey("S-1", XB5C, "COPPER_ORE", "ALUMINUM_ORE", "IRON_ORE"),
+            Survey("S-2", XB5C, "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE"),
+            Survey("S-3", XB5C, "ALUMINUM_ORE", "IRON_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND"));
+
+        var targets = MiningPlanner.SurveyTargets(context, [new ContractOre("COPPER_ORE", XB5C, H51)], [Drone()], stock: 2);
+
+        targets.Should().HaveCount(6).And.OnlyContain(target => !target.NeedsSurvey);
     }
 
     [Fact]
     public void WithoutAContract_SellableOres_AreSurveyedAtTheAsteroidNearestTheirBuyer_ThatTheMinersCanReach()
     {
         // GOLD pays best, at B7, but the drone can't reach B14 next to it.
-        var targets = MiningPlanner.SurveyTargets(Context(), [], [Drone()]);
+        var targets = MiningPlanner.SurveyTargets(Context(), [], [Drone()], stock: 2);
 
         targets.Select(target => (target.Ore, target.AsteroidSymbol, target.BuyerSymbol)).Should().Equal(
             ("COPPER_ORE", XB5C, H51),
@@ -35,11 +65,11 @@ public sealed class MiningPlannerTests
     }
 
     [Fact]
-    public void OresWithoutAUsableSurvey_AreSurveyedFirst()
+    public void OresWithFewerUsableSurveys_AreSurveyedFirst()
     {
         var context = Context(Survey("S-1", XB5C, "COPPER_ORE", "IRON_ORE"));
 
-        var targets = MiningPlanner.SurveyTargets(context, [], [Drone()]);
+        var targets = MiningPlanner.SurveyTargets(context, [], [Drone()], stock: 2);
 
         targets.Select(target => target.Ore).Should().Equal("ALUMINUM_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE", "IRON_ORE");
     }
@@ -47,9 +77,9 @@ public sealed class MiningPlannerTests
     [Fact]
     public void WithoutMiners_EveryAsteroidCounts()
     {
-        var targets = MiningPlanner.SurveyTargets(Context(), [], []);
+        var targets = MiningPlanner.SurveyTargets(Context(), [], [], stock: 2);
 
-        targets[0].Should().BeEquivalentTo(new SurveyTarget("GOLD_ORE", B14, B7, 114, ForContract: false, HasUsableSurvey: false));
+        targets[0].Should().BeEquivalentTo(new SurveyTarget("GOLD_ORE", B14, B7, 114, ForContract: false, UsableSurveys: 0, NeedsSurvey: true));
     }
 
     [Fact]

@@ -77,6 +77,21 @@ public static class SurveySelection
     public static bool HasUsable(IEnumerable<SurveyModel> surveys, string waypointSymbol, string ore, DateTimeOffset now)
         => TryPickBest(surveys, waypointSymbol, ore, now, out _);
 
+    /// <summary>How many usable surveys of a waypoint hold an ore (D27).</summary>
+    /// <param name="surveys">The cached surveys.</param>
+    /// <param name="waypointSymbol">The waypoint.</param>
+    /// <param name="ore">The ore.</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <returns>The number of surveys a miner could extract the ore there with.</returns>
+    public static int CountUsable(IEnumerable<SurveyModel> surveys, string waypointSymbol, string ore, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(surveys);
+
+        return surveys.Count(survey => IsUsable(survey, now)
+            && survey.WaypointSymbol.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase)
+            && Share(survey, ore) > 0);
+    }
+
     /// <summary>LARGE deposits last the most extractions, SMALL ones the fewest.</summary>
     private static int SizeRank(string size) => size.ToUpperInvariant() switch
     {

@@ -71,19 +71,22 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// What surveyors survey, best first: the contract's ore first, then each ore a market in the system buys,
-    /// at the asteroid nearest the market that pays most for it, among those whose traits yield it and that
-    /// one of the miners can reach (any asteroid while there are no miners). Ores without a usable survey
-    /// there come before those with one, then the best paid.
+    /// What surveyors survey: the contract's ore, and each ore a market in the system buys, at the asteroid
+    /// nearest the market that pays most for it, among those whose traits yield it and that one of the miners
+    /// can reach (any asteroid while there are no miners). An ore needs a survey while it has fewer usable
+    /// surveys there than <paramref name="stock"/> (D27). Those come first: the contract's ore, then the ore
+    /// with the fewest usable surveys, then the best paid. The ores with their stock follow, for the plan's view.
     /// </summary>
     /// <param name="context">The system.</param>
     /// <param name="contracts">The contract's ore and asteroid, while the contract plan mines; else none.</param>
     /// <param name="miners">The ships that mine with the surveys.</param>
+    /// <param name="stock">The usable surveys to keep of each ore.</param>
     /// <returns>The targets, best first.</returns>
     public static IReadOnlyList<SurveyTarget> SurveyTargets(
         MiningContext context,
         IReadOnlyList<ContractOre> contracts,
-        IReadOnlyList<ShipModel> miners)
+        IReadOnlyList<ShipModel> miners,
+        int stock)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(contracts);
@@ -93,16 +96,17 @@ public static class MiningPlanner
         var targets = new List<SurveyTarget>();
         foreach (var contract in contracts)
         {
+            var usable = SurveySelection.CountUsable(context.Surveys, contract.AsteroidSymbol, contract.Ore, context.Now);
             targets.Add(new SurveyTarget(
                 contract.Ore,
                 contract.AsteroidSymbol,
                 contract.DestinationSymbol,
                 0,
                 ForContract: true,
-                SurveySelection.HasUsable(context.Surveys, contract.AsteroidSymbol, contract.Ore, context.Now)));
+                usable,
+                NeedsSurvey: usable < stock));
         }
 
-        var sellable = new List<SurveyTarget>();
         foreach (var ore in AsteroidDeposits.Ores.Order(StringComparer.Ordinal))
         {
             if (!TryFindBestBuyer(map, ore, out var buyer, out var price)
@@ -111,14 +115,18 @@ public static class MiningPlanner
                 continue;
             }
 
-            sellable.Add(new SurveyTarget(ore, asteroid, buyer, price, ForContract: false, SurveySelection.HasUsable(context.Surveys, asteroid, ore, context.Now)));
+            var usable = SurveySelection.CountUsable(context.Surveys, asteroid, ore, context.Now);
+            targets.Add(new SurveyTarget(ore, asteroid, buyer, price, ForContract: false, usable, NeedsSurvey: usable < stock));
         }
 
-        targets.AddRange(sellable
-            .OrderBy(target => target.HasUsableSurvey)
+        // The contract's ore came first whatever surveys there were, so the only surveyor surveyed for it
+        // without end (D27).
+        return [.. targets
+            .OrderByDescending(target => target.NeedsSurvey)
+            .ThenByDescending(target => target.ForContract)
+            .ThenBy(target => target.UsableSurveys)
             .ThenByDescending(target => target.SellPrice)
-            .ThenBy(target => target.Ore, StringComparer.Ordinal));
-        return targets;
+            .ThenBy(target => target.Ore, StringComparer.Ordinal)];
     }
 
     /// <summary>
@@ -356,16 +364,18 @@ public sealed record SurveyTarget
     /// <param name="BuyerSymbol">The market the ore goes to: the contract's destination, or the market that pays most.</param>
     /// <param name="SellPrice">What that market pays per unit; 0 for the contract.</param>
     /// <param name="ForContract">Whether the contract wants the ore.</param>
-    /// <param name="HasUsableSurvey">Whether a usable survey of the asteroid holds the ore already.</param>
+    /// <param name="UsableSurveys">How many usable surveys of the asteroid hold the ore already.</param>
+    /// <param name="NeedsSurvey">Whether that is fewer than the stock to keep (D27).</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public SurveyTarget(string Ore, string AsteroidSymbol, string BuyerSymbol, long SellPrice, bool ForContract, bool HasUsableSurvey)
+    public SurveyTarget(string Ore, string AsteroidSymbol, string BuyerSymbol, long SellPrice, bool ForContract, int UsableSurveys, bool NeedsSurvey)
     {
         this.Ore = Ore;
         this.AsteroidSymbol = AsteroidSymbol;
         this.BuyerSymbol = BuyerSymbol;
         this.SellPrice = SellPrice;
         this.ForContract = ForContract;
-        this.HasUsableSurvey = HasUsableSurvey;
+        this.UsableSurveys = UsableSurveys;
+        this.NeedsSurvey = NeedsSurvey;
     }
 
     /// <summary>The ore surveyed for.</summary>
@@ -383,8 +393,14 @@ public sealed record SurveyTarget
     /// <summary>Whether the contract wants the ore.</summary>
     public required bool ForContract { get; init; }
 
+    /// <summary>How many usable surveys of the asteroid hold the ore already.</summary>
+    public required int UsableSurveys { get; init; }
+
+    /// <summary>Whether that is fewer than the stock to keep: the ore needs a survey (D27).</summary>
+    public required bool NeedsSurvey { get; init; }
+
     /// <summary>Whether a usable survey of the asteroid holds the ore already.</summary>
-    public required bool HasUsableSurvey { get; init; }
+    public bool HasUsableSurvey => UsableSurveys > 0;
 }
 
 /// <summary>A mining trip a miner could take: where it mines which ore, and where it sells it.</summary>
