@@ -5,20 +5,21 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Exports <see cref="IAutomationMetrics"/> to Prometheus. It defines every <c>spacetraders_*</c>
-/// metric when it is created, so a scrape lists them all, also before they have a value.
+/// metric when it is created, so a scrape lists them all, also before they have a value. Every
+/// counter series reaches Prometheus at 0 before it counts (<see cref="ZeroFirstCounter"/>, B43).
 /// </summary>
 /// <remarks>Thread-safe: the per-ship and per-contract series it tracks are guarded by a lock.</remarks>
 public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 {
-    private readonly Counter _goalBreakerTrips;
+    private readonly ZeroFirstCounter _goalBreakerTrips;
     private readonly Gauge _databaseSizeBytes;
-    private readonly Counter _goalSteps;
-    private readonly Counter _apiRequests;
-    private readonly Counter _apiThrottled;
-    private readonly Counter _rateLimitWaitSeconds;
-    private readonly Counter _messagesHandled;
-    private readonly Counter _creditsEarned;
-    private readonly Counter _creditsSpent;
+    private readonly ZeroFirstCounter _goalSteps;
+    private readonly ZeroFirstCounter _apiRequests;
+    private readonly ZeroFirstCounter _apiThrottled;
+    private readonly ZeroFirstCounter _rateLimitWaitSeconds;
+    private readonly ZeroFirstCounter _messagesHandled;
+    private readonly ZeroFirstCounter _creditsEarned;
+    private readonly ZeroFirstCounter _creditsSpent;
     private readonly Gauge _anomalyActive;
     private readonly Gauge _nextServerReset;
     private readonly Gauge _credits;
@@ -39,39 +40,39 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     {
         var metrics = Metrics.WithCustomRegistry(registry);
 
-        _goalBreakerTrips = metrics.CreateCounter(
+        _goalBreakerTrips = ZeroFirst(
             "spacetraders_goal_breaker_trips_total",
             "Goals blocked by the per-ship circuit breaker for taking too many steps in a minute.",
             "ship");
         _databaseSizeBytes = metrics.CreateGauge(
             "spacetraders_db_size_bytes",
             "Size of the bot's Postgres database (pg_database_size), read every 5 minutes.");
-        _goalSteps = metrics.CreateCounter(
+        _goalSteps = ZeroFirst(
             "spacetraders_goal_steps_total",
             "Goal steps run, by goal kind.",
             "kind");
-        _apiRequests = metrics.CreateCounter(
+        _apiRequests = ZeroFirst(
             "spacetraders_api_requests_total",
             "Responses from the SpaceTraders API, by method, route template and status code ('error' when none came). Every attempt counts, retries included.",
             "method",
             "endpoint",
             "status");
-        _apiThrottled = metrics.CreateCounter(
+        _apiThrottled = ZeroFirst(
             "spacetraders_api_throttled_total",
             "429 responses from the SpaceTraders API: from its rate limiter (with x-ratelimit headers) or its cloud infrastructure (without).",
             "source");
-        _rateLimitWaitSeconds = metrics.CreateCounter(
+        _rateLimitWaitSeconds = ZeroFirst(
             "spacetraders_api_rate_limit_wait_seconds_total",
             "Seconds that requests waited for the local request budget (2 per second plus a burst of 30 per minute).");
-        _messagesHandled = metrics.CreateCounter(
+        _messagesHandled = ZeroFirst(
             "spacetraders_messages_handled_total",
             "Messages Wolverine handled without an error, by message type.",
             "type");
-        _creditsEarned = metrics.CreateCounter(
+        _creditsEarned = ZeroFirst(
             "spacetraders_credits_earned_total",
             "Credits earned, by ledger category.",
             "source");
-        _creditsSpent = metrics.CreateCounter(
+        _creditsSpent = ZeroFirst(
             "spacetraders_credits_spent_total",
             "Credits spent, by ledger category.",
             "category");
@@ -113,34 +114,38 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_contract_deadline_timestamp_seconds",
             "Deadline of an accepted contract (Unix time).",
             "contract");
+
+        // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
+        ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
+            => new(metrics.CreateCounter(name, help, labelNames), registry);
     }
 
     /// <inheritdoc />
-    public void GoalBreakerTripped(string shipSymbol) => _goalBreakerTrips.WithLabels(shipSymbol).Inc();
+    public void GoalBreakerTripped(string shipSymbol) => _goalBreakerTrips.Inc(1, shipSymbol);
 
     /// <inheritdoc />
     public void DatabaseSize(long bytes) => _databaseSizeBytes.Set(bytes);
 
     /// <inheritdoc />
-    public void GoalStep(string goalKind) => _goalSteps.WithLabels(goalKind).Inc();
+    public void GoalStep(string goalKind) => _goalSteps.Inc(1, goalKind);
 
     /// <inheritdoc />
-    public void ApiRequest(string method, string endpoint, string status) => _apiRequests.WithLabels(method, endpoint, status).Inc();
+    public void ApiRequest(string method, string endpoint, string status) => _apiRequests.Inc(1, method, endpoint, status);
 
     /// <inheritdoc />
-    public void ApiThrottled(string source) => _apiThrottled.WithLabels(source).Inc();
+    public void ApiThrottled(string source) => _apiThrottled.Inc(1, source);
 
     /// <inheritdoc />
     public void RateLimitWait(TimeSpan wait) => _rateLimitWaitSeconds.Inc(wait.TotalSeconds);
 
     /// <inheritdoc />
-    public void MessageHandled(string messageType) => _messagesHandled.WithLabels(messageType).Inc();
+    public void MessageHandled(string messageType) => _messagesHandled.Inc(1, messageType);
 
     /// <inheritdoc />
-    public void CreditsEarned(string source, long amount) => _creditsEarned.WithLabels(source).Inc(amount);
+    public void CreditsEarned(string source, long amount) => _creditsEarned.Inc(amount, source);
 
     /// <inheritdoc />
-    public void CreditsSpent(string category, long amount) => _creditsSpent.WithLabels(category).Inc(amount);
+    public void CreditsSpent(string category, long amount) => _creditsSpent.Inc(amount, category);
 
     /// <inheritdoc />
     public void Anomaly(string rule, string subject, bool active) => _anomalyActive.WithLabels(rule, subject).Set(active ? 1 : 0);
