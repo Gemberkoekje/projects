@@ -32,6 +32,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     IAgentRepository agents,
     ISpaceTradersPort port,
     ITradeContextReader tradeContexts,
+    IMarketRefresher marketRefresher,
     IDockSubCommand dock,
     IMessageBus bus,
     ILogger<TradeBetweenMarketsGoalExecutor> logger) : IShipGoalExecutor
@@ -82,7 +83,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 trade.TradeSymbol,
                 trade.BuyWaypointSymbol,
                 trade.SellWaypointSymbol,
-                context.Credits,
+                context.CreditsForCargo,
                 out var route))
         {
             return await DropAsync(ship, trade, NotPossible, ct);
@@ -128,6 +129,9 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             trade.TradeSymbol,
             trade.BuyWaypointSymbol,
             result.Revenue);
+
+        // The purchase moved the price: the market again, while the ship is still there (D25).
+        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.BuyWaypointSymbol, ship.Symbol, ct);
 
         await goals.SetActiveGoalAsync(
             ship.Symbol,
@@ -209,6 +213,9 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 result.Revenue);
             left -= batch;
         }
+
+        // The sale moved the price: the market again, while the ship is still there (D25).
+        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.SellWaypointSymbol, ship.Symbol, ct);
 
         await goals.ClearActiveGoalAsync(ship.Symbol, ct);
         return GoalExecutionResult.Completed(

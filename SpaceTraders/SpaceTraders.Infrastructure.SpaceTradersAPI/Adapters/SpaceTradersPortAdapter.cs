@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Contracts;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
@@ -287,7 +288,18 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             Expiration = survey.Expiration,
             Size = survey.Size,
         };
-        var result = await client.ExtractWithSurveyAsync(shipSymbol, apiSurvey, cancellationToken);
+
+        ExtractResult result;
+        try
+        {
+            result = await client.ExtractWithSurveyAsync(shipSymbol, apiSurvey, cancellationToken);
+        }
+        catch (SpaceTradersApiException exception) when (exception.ErrorCode is { } code && SurveyRefusedException.IsSurveyRefusal(code))
+        {
+            // The survey can't be used again (slice 6.4): the caller drops it.
+            throw new SurveyRefusedException(survey.Signature, code, exception);
+        }
+
         return new ExtractionActionResult(
             result.Extraction.Yield.Symbol,
             result.Extraction.Yield.Units,

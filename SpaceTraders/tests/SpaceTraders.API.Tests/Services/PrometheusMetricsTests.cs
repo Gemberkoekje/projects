@@ -264,6 +264,9 @@ public sealed class PrometheusAutomationMetricsTests
         { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3), "read"), "spacetraders_api_rate_limit_wait_seconds_total{kind=\"read\"} " },
         { "units extracted", metrics => metrics.Extracted("AGENT-3", "COPPER_ORE", 2), "spacetraders_extracted_units_total{ship=\"AGENT-3\",good=\"COPPER_ORE\"} " },
         { "units jettisoned", metrics => metrics.Jettisoned("AGENT-3", "SILICON_CRYSTALS", 2), "spacetraders_jettisoned_units_total{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} " },
+        { "extractions", metrics => metrics.Extraction("AGENT-3", surveyed: true), "spacetraders_extractions_total{ship=\"AGENT-3\",surveyed=\"true\"} " },
+        { "surveys taken", metrics => metrics.SurveyTaken("X1-AB-XB5C", "MODERATE"), "spacetraders_surveys_taken_total{waypoint=\"X1-AB-XB5C\",size=\"MODERATE\"} " },
+        { "surveys ended", metrics => metrics.SurveyEnded("X1-AB-XB5C", "expired", used: false), "spacetraders_surveys_ended_total{waypoint=\"X1-AB-XB5C\",reason=\"expired\",used=\"false\"} " },
     };
 
     /// <summary>
@@ -433,6 +436,21 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().Contain("spacetraders_good_supply_chain{good=\"FAB_MATS\",made_from=\"IRON, QUARTZ_SAND\",used_for=\"\"} 1\n");
         text.Should().Contain("spacetraders_good_supply_chain{good=\"IRON_ORE\",made_from=\"\",used_for=\"IRON\"} 1\n");
         text.Should().Contain("spacetraders_good_supply_chain{good=\"QUARTZ_SAND\",made_from=\"\",used_for=\"FAB_MATS\"} 1\n");
+    }
+
+    [Fact]
+    public async Task TheUsableSurveys_AreCountedPerWaypoint_UsedOrNot_AndAWaypointWithoutAnyLosesItsSeries()
+    {
+        // Slice 6.4, the survey dashboard: surveys piling up unused mean surveying runs ahead of the miners.
+        _metrics.Surveys([new SurveyMetricsSample("X1-AB-XB5C", false, 2), new SurveyMetricsSample("X1-AB-XB5C", true, 1)]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_surveys_active{waypoint=\"X1-AB-XB5C\",used=\"false\"} 2\n");
+        text.Should().Contain("spacetraders_surveys_active{waypoint=\"X1-AB-XB5C\",used=\"true\"} 1\n");
+
+        _metrics.Surveys([]);
+
+        (await ExportAsync()).Should().NotContain("spacetraders_surveys_active{");
     }
 
     [Fact]

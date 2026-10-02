@@ -2,12 +2,18 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
+/// <summary>
+/// Mines <see cref="TradeSymbol"/> at <see cref="SourceWaypoint"/> until the trip holds
+/// <see cref="RequiredUnitsTotal"/> of it (at most a full hold): one extraction per call, with the best
+/// survey of the waypoint for the good when there is one (slice 6.4), and other goods jettisoned.
+/// </summary>
 public sealed record MineResourceVolumeCommand
 {
     public required string ShipSymbol { get; init; }
@@ -18,17 +24,13 @@ public sealed record MineResourceVolumeCommand
 
     public required int RequiredUnitsTotal { get; init; }
 
-    /// <summary>The survey to extract with; without one, extraction is unguided.</summary>
-    public SurveyModel? Survey { get; init; }
-
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal, SurveyModel? Survey = null)
+    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal)
     {
         this.ShipSymbol = ShipSymbol;
         this.TradeSymbol = TradeSymbol;
         this.SourceWaypoint = SourceWaypoint;
         this.RequiredUnitsTotal = RequiredUnitsTotal;
-        this.Survey = Survey;
     }
 }
 
@@ -36,6 +38,8 @@ public sealed class MineResourceVolumeHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IWaypointRepository waypoints,
+    ISurveyRepository surveys,
+    ISurveyKeeper surveyKeeper,
     IRefuelSubCommand refuel,
     IOrbitSubCommand orbit,
     INavigateSubCommand navigate,
@@ -176,12 +180,12 @@ public sealed class MineResourceVolumeHandler(
         }
 
         var waypoint = await waypoints.FindAsync(command.SourceWaypoint, cancellationToken);
-        if (waypoint is not null && !IsValidExtractionWaypoint(waypoint.Type))
+        if (waypoint is not null && !AsteroidDeposits.IsExtractable(waypoint.Type))
         {
             await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(MineResourceVolumeCommand),
-                "ASTEROID_FIELD or ENGINEERED_ASTEROID",
+                "ASTEROID, ASTEROID_FIELD or ENGINEERED_ASTEROID",
                 waypoint.Type,
                 $"Waypoint {command.SourceWaypoint} is type {waypoint.Type} which does not support resource extraction.");
 
@@ -192,11 +196,41 @@ public sealed class MineResourceVolumeHandler(
                 ship.WaypointSymbol ?? string.Empty);
         }
 
-        var extractResult = IsUsableSurvey(command.Survey)
-            ? await port.ExtractWithSurveyAsync(ship.Symbol, command.Survey, cancellationToken)
-            : await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
+        // The best survey of the waypoint for the good, when there is one (slice 6.4).
+        var stored = await surveys.GetActiveAsync(cancellationToken);
+        var surveyed = SurveySelection.TryPickBest(stored.Select(s => s.Survey), command.SourceWaypoint, command.TradeSymbol, now, out var survey);
+
+        ExtractionActionResult extractResult;
+        try
+        {
+            extractResult = surveyed
+                ? await port.ExtractWithSurveyAsync(ship.Symbol, survey, cancellationToken)
+                : await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
+        }
+        catch (SurveyRefusedException refused)
+        {
+            // Exhausted, expired or not taken: the survey is dropped, and the next step extracts with
+            // the next best one, or without.
+            await surveyKeeper.RefusedAsync(refused, cancellationToken);
+            return new ShipCommandResult(
+                ship.Symbol,
+                ship.LocalStatus,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol ?? string.Empty,
+                FuelCurrent: ship.FuelCurrent,
+                FuelCapacity: ship.FuelCapacity,
+                CargoCurrent: ship.CargoCurrent,
+                CargoCapacity: ship.CargoCapacity,
+                Accepted: true);
+        }
+
         await ships.UpdateCargoAsync(ship.Symbol, extractResult.Cargo, cancellationToken);
         metrics.Extracted(ship.Symbol, extractResult.YieldSymbol, extractResult.YieldUnits);
+        metrics.Extraction(ship.Symbol, surveyed);
+        if (surveyed)
+        {
+            await surveyKeeper.UsedAsync(survey.Signature, cancellationToken);
+        }
 
         var cooldownAt = extractResult.CooldownExpiresAt ?? now.AddSeconds(extractResult.CooldownSeconds);
         await ships.UpdateCooldownAsync(ship.Symbol, cooldownAt, cancellationToken);
@@ -205,11 +239,14 @@ public sealed class MineResourceVolumeHandler(
         await JettisonNonTargetCargoAsync(ship.Symbol, updatedShip.CargoInventory ?? [], command.TradeSymbol, cancellationToken);
 
         logger.LogInformation(
-            "MineResourceVolume: ship {ShipSymbol} extracted {Units} {YieldSymbol} while targeting {TradeSymbol}.",
+            "{EventKind:l}: ship {ShipSymbol} extracted {Units} {TradeSymbol} at {WaypointSymbol}, mining for {Target}, with survey {Signature}.",
+            JournalEvents.Extracted,
             ship.Symbol,
             extractResult.YieldUnits,
             extractResult.YieldSymbol,
-            command.TradeSymbol);
+            command.SourceWaypoint,
+            command.TradeSymbol,
+            surveyed ? survey.Signature : string.Empty);
 
         return new ShipCommandResult(
             ship.Symbol,
@@ -276,15 +313,4 @@ public sealed class MineResourceVolumeHandler(
             metrics.Jettisoned(shipSymbol, item.Symbol, item.Units);
         }
     }
-
-    private static bool IsUsableSurvey([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] SurveyModel? survey)
-        => survey is not null
-            && !string.IsNullOrWhiteSpace(survey.Signature)
-            && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)
-            && !string.IsNullOrWhiteSpace(survey.Size)
-            && survey.Expiration > TimeProvider.System.GetUtcNow();
-
-    private static bool IsValidExtractionWaypoint(string waypointType)
-        => waypointType.Equals("ASTEROID_FIELD", StringComparison.OrdinalIgnoreCase)
-            || waypointType.Equals("ENGINEERED_ASTEROID", StringComparison.OrdinalIgnoreCase);
 }

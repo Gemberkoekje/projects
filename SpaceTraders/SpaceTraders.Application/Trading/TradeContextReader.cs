@@ -11,12 +11,14 @@ public sealed record TradeContext
     /// <param name="Map">The ship's system: positions, markets and production chains.</param>
     /// <param name="Credits">The credits on hand, as cached.</param>
     /// <param name="MinProfitPerUnit">The profit per unit, after fuel, a trip must earn (D14).</param>
+    /// <param name="FuelReserveCredits">The credits cargo must leave, so that fuel can always be bought (D24).</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public TradeContext(TradeMarketMap Map, long Credits, int MinProfitPerUnit)
+    public TradeContext(TradeMarketMap Map, long Credits, int MinProfitPerUnit, long FuelReserveCredits = 0)
     {
         this.Map = Map;
         this.Credits = Credits;
         this.MinProfitPerUnit = MinProfitPerUnit;
+        this.FuelReserveCredits = FuelReserveCredits;
     }
 
     /// <summary>The ship's system: positions, markets and production chains.</summary>
@@ -27,6 +29,15 @@ public sealed record TradeContext
 
     /// <summary>The profit per unit, after fuel, a trip must earn (D14).</summary>
     public required int MinProfitPerUnit { get; init; }
+
+    /// <summary>
+    /// The credits cargo must leave (D24, <c>Trade.FuelReserveCredits</c>): below them only fuel is bought,
+    /// so a ship never holds cargo it can't afford to fly to its buyer.
+    /// </summary>
+    public required long FuelReserveCredits { get; init; }
+
+    /// <summary>The credits a cargo purchase may use: those on hand above <see cref="FuelReserveCredits"/>.</summary>
+    public long CreditsForCargo => Math.Max(0, Credits - FuelReserveCredits);
 }
 
 /// <summary>Reads the <see cref="TradeContext"/> for a system from the cache.</summary>
@@ -56,6 +67,9 @@ public sealed class TradeContextReader(
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
 
+    /// <summary>The setting that holds the credits cargo must leave, so fuel can always be bought (D24).</summary>
+    public const string FuelReserveCreditsSetting = "Trade.FuelReserveCredits";
+
     /// <inheritdoc />
     public async Task<TradeContext> ReadAsync(string systemSymbol, CancellationToken cancellationToken)
     {
@@ -65,10 +79,12 @@ public sealed class TradeContextReader(
         var chains = await supplyChain.GetAsync(port, TimeProvider.System.GetUtcNow(), cancellationToken);
         var agent = await agents.GetAsync(cancellationToken);
         var minProfitPerUnit = await settings.GetAsync<int>(MinProfitPerUnitSetting, cancellationToken);
+        var fuelReserve = await settings.GetAsync<long>(FuelReserveCreditsSetting, cancellationToken);
 
         return new TradeContext(
             new TradeMarketMap(systemWaypoints, systemMarkets, chains),
             agent?.Credits ?? 0,
-            Math.Max(0, minProfitPerUnit));
+            Math.Max(0, minProfitPerUnit),
+            Math.Max(0, fuelReserve));
     }
 }

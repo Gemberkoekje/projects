@@ -17,6 +17,7 @@ public sealed class DefaultSettingsSeedTests
         "Automation.Plan.Scout.Enabled",
         "Automation.Plan.Contract.Enabled",
         "Automation.Plan.ProbeDeployment.Enabled",
+        "Automation.Plan.Survey.Enabled",
         "Automation.Plan.Mining.Enabled",
         "Automation.Plan.Trading.Enabled",
 
@@ -44,9 +45,11 @@ public sealed class DefaultSettingsSeedTests
         "Alerts.WebhookUrl",
 
         // Trading (slice 6.5): TradeContextReader (the trading plan and the trade executor), and
-        // MarketWatchService.
+        // MarketWatchService; slice 6.4: TradeContextReader (D24) and TradingAutomationService (D21).
         "Trade.MinProfitPerUnit",
         "Market.RefreshMinutes",
+        "Trade.FuelReserveCredits",
+        "Trade.ShipPurchases",
 
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).

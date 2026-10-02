@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -24,8 +25,8 @@ public interface ITradingAutomationService
 /// The trading plan (PLAN.md slice 6.5). Every tick it gives each free trader a trip:
 /// <list type="bullet">
 ///   <item>a trader is any ship with a cargo hold and a fuel tank that has no goal (or a blocked one),
-///   no open assignment, and isn't in transit: after scouting, the command ship; after its contract,
-///   the mining drone;</item>
+///   no open assignment, and isn't in transit, and that the survey and mining plans, which go first, left
+///   free: with the survey plan on, a ship that can survey never trades (D20, slice 6.4);</item>
 ///   <item>a trader that holds cargo first sells it where it fetches the most after fuel, when that
 ///   earns anything;</item>
 ///   <item>otherwise it gets its best lucrative route (<see cref="TradeRoutePlanner.Rank"/>) that no
@@ -35,7 +36,9 @@ public interface ITradingAutomationService
 /// </summary>
 /// <remarks>
 /// The trip itself, with its check against the newest prices at each market, is the
-/// <c>TradeBetweenMarketsGoalExecutor</c>'s. The plan buys no ships (D16).
+/// <c>TradeBetweenMarketsGoalExecutor</c>'s. The plan buys its own cargo ships (D21, which replaced D16):
+/// when no trader is left without a trip and a new ship would have a lucrative route from the shipyard, it
+/// buys the next type in <c>Trade.ShipPurchases</c>, one at a time and within the credit reserve.
 /// </remarks>
 public sealed class TradingAutomationService(
     IShipRepository ships,
@@ -43,16 +46,26 @@ public sealed class TradingAutomationService(
     IShipAssignmentRepository assignments,
     ITradeContextReader tradeContexts,
     IPlanRepository plans,
+    ISettingsRepository settings,
+    IShipyardRepository shipyards,
+    IShipPurchaseService shipPurchases,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
     internal const int MaxPendingRoutes = 20;
+
+    /// <summary>
+    /// The setting that lists the cargo ships the plan buys, in order (D21): the Nth is bought while the
+    /// fleet has fewer than N cargo ships; empty buys none.
+    /// </summary>
+    public const string ShipPurchasesSetting = "Trade.ShipPurchases";
 
     private static readonly JsonSerializerOptions CompareOptions = new();
 
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
+        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -68,7 +81,9 @@ public sealed class TradingAutomationService(
             {
                 held.Add(new HeldRoute(ship.Symbol, trade));
             }
-            else if (IsFreeTrader(ship, goal, withAssignment))
+            else if (ship.IsTradingCapable
+                && !FleetRoles.IsSurveyor(ship, surveyOn)
+                && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
                 free.Add(ship);
             }
@@ -76,6 +91,7 @@ public sealed class TradingAutomationService(
 
         var heldKeys = held.Select(route => route.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pending = new Dictionary<string, PendingRoute>(StringComparer.OrdinalIgnoreCase);
+        var idle = 0;
         foreach (var system in free.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
             var context = await tradeContexts.ReadAsync(system.Key, cancellationToken);
@@ -95,18 +111,89 @@ public sealed class TradingAutomationService(
             }
 
             await AssignRoutesAsync(context, traders, held, heldKeys, pending, cancellationToken);
+            idle += traders.Count;
+        }
+
+        // A new cargo ship only when every trader has a trip (D21).
+        if (idle == 0)
+        {
+            await BuyCargoShipAsync(fleet, heldKeys, cancellationToken);
         }
 
         await SaveStateAsync(held, pending, cancellationToken);
     }
 
-    /// <summary>A ship the plan may give a trip: a cargo hold and a fuel tank, and nothing else to do.</summary>
-    private static bool IsFreeTrader(ShipModel ship, ShipGoal? goal, IReadOnlySet<string> withAssignment)
-        => ship.IsTradingCapable
-            && ship.LocalStatus != ShipLocalStatus.InTransit
-            && !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
-            && !withAssignment.Contains(ship.Symbol)
-            && (goal is null || goal.Status is GoalStatus.Blocked or GoalStatus.Completed);
+    /// <summary>
+    /// Buys the next cargo ship in <c>Trade.ShipPurchases</c> (D21), at the shipyard that sells it for the
+    /// least, when it would have a lucrative route from there that no trader holds. The purchase keeps the
+    /// credit reserve (<c>FleetExpansion.MinCreditReserve</c>, <see cref="IShipPurchaseService"/>), and the
+    /// route is judged with the credits left after it.
+    /// </summary>
+    private async Task BuyCargoShipAsync(IReadOnlyList<ShipModel> fleet, IReadOnlySet<string> heldKeys, CancellationToken cancellationToken)
+    {
+        var purchases = (await settings.GetAsync<string>(ShipPurchasesSetting, cancellationToken) ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
+        if (cargoShips >= purchases.Length)
+        {
+            return;
+        }
+
+        var shipType = purchases[cargoShips];
+        var systems = fleet
+            .Select(ship => ship.SystemSymbol)
+            .OfType<string>()
+            .Where(system => system.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var offer = (await shipyards.GetAllAsync(cancellationToken))
+            .Where(shipyard => systems.Contains(shipyard.SystemSymbol))
+            .SelectMany(shipyard => shipyard.Ships
+                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase)
+                    && ship.PurchasePrice > 0
+                    && ship.CargoCapacity > 0
+                    && ship.FuelCapacity > 0)
+                .Select(ship => (Shipyard: shipyard, Ship: ship)))
+            .OrderBy(candidate => candidate.Ship.PurchasePrice)
+            .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
+            .ToList();
+        if (offer.Count == 0)
+        {
+            logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType}.", shipType);
+            return;
+        }
+
+        var (shipyard, forSale) = offer[0];
+        var context = await tradeContexts.ReadAsync(shipyard.SystemSymbol, cancellationToken);
+        var newShip = new ShipModel(
+            "NEW-" + shipType,
+            shipyard.SystemSymbol,
+            shipyard.WaypointSymbol,
+            "DOCKED",
+            "CRUISE",
+            forSale.FuelCapacity,
+            forSale.FuelCapacity,
+            CargoCapacity: forSale.CargoCapacity);
+        var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
+        var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys);
+        if (routes.Count == 0)
+        {
+            logger.LogDebug(
+                "Trading plan: a new {ShipType} from {Shipyard} would have no lucrative route; no purchase.",
+                shipType,
+                shipyard.WaypointSymbol);
+            return;
+        }
+
+        var purchased = await shipPurchases.TryPurchaseAsync(shipType, shipyard.WaypointSymbol, cancellationToken);
+        if (!purchased.IsSuccess)
+        {
+            logger.LogDebug(
+                "Trading plan: {ShipType} purchase denied at {Shipyard} — {Reason}.",
+                shipType,
+                shipyard.WaypointSymbol,
+                purchased.FailureReason ?? "Purchase failed.");
+        }
+    }
 
     /// <summary>
     /// For a trader that holds cargo: the good that fetches the most, after the fuel to where it sells
@@ -178,7 +265,8 @@ public sealed class TradingAutomationService(
         Dictionary<string, PendingRoute> pending,
         CancellationToken cancellationToken)
     {
-        var credits = context.Credits;
+        // Cargo leaves Trade.FuelReserveCredits for fuel (D24).
+        var credits = context.CreditsForCargo;
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
         // counts as work waiting for it (D13).

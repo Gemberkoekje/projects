@@ -25,7 +25,7 @@ namespace SpaceTraders.Application.Trading;
 /// a market that sells fuel fills its tank before it leaves (<c>NavigateToWaypointCommand</c>), in
 /// whole market units of FUEL of 100 each, so the fuel of a leg is paid for at the market it ends at.
 /// A flight longer than the tank holds stops to refuel at markets on the way
-/// (<see cref="TryPlanFlight"/>): never DRIFT, which is ten times slower, and which the navigation
+/// (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>): never DRIFT, which is ten times slower, and which the navigation
 /// would keep using after its fallback.
 /// </para>
 /// </remarks>
@@ -269,24 +269,35 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
+    /// How a ship flies from where it is to a waypoint (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>):
+    /// a ship docked where fuel is sold fills its tank before it leaves.
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="destination">Where it is going.</param>
+    /// <param name="flight">The stops, the destination last, and the fuel they cost.</param>
+    /// <returns>False when a position is unknown, or no chain of fuel markets reaches the destination.</returns>
+    public static bool TryPlanFlight(TradeMarketMap map, ShipModel ship, string destination, out TradeFlight flight)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, destination, FuelAtDeparture(map, ship), ship.FuelCapacity, out flight);
+    }
+
+    /// <summary>
     /// Where a ship flies next on its way to a waypoint: straight there when its fuel will do,
-    /// otherwise the first refuelling stop (<see cref="TryPlanFlight"/>). When no flight is found, the
-    /// waypoint itself, and the navigation does what it can.
+    /// otherwise the first refuelling stop (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).
+    /// When no flight is found, the waypoint itself, and the navigation does what it can.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
     /// <param name="destination">Where it is going.</param>
     /// <returns>The waypoint to navigate to now.</returns>
     public static string NextStop(TradeMarketMap map, ShipModel ship, string destination)
-    {
-        ArgumentNullException.ThrowIfNull(map);
-        ArgumentNullException.ThrowIfNull(ship);
-
-        return TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, destination, FuelAtDeparture(map, ship), ship.FuelCapacity, out var flight)
-            && flight.Stops.Count > 0
-                ? flight.Stops[0]
-                : destination;
-    }
+        => TryPlanFlight(map, ship, destination, out var flight) && flight.Stops.Count > 0
+            ? flight.Stops[0]
+            : destination;
 
     private static bool TryEvaluateFrom(
         TradeMarketMap map,
@@ -405,7 +416,7 @@ public static class TradeRoutePlanner
     private sealed record Hop(long Cost, int Stops, string Previous, int LastLeg);
 }
 
-/// <summary>A flight through refuelling stops (<see cref="TradeRoutePlanner.TryPlanFlight"/>).</summary>
+/// <summary>A flight through refuelling stops (<see cref="TradeRoutePlanner.TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).</summary>
 public sealed record TradeFlight
 {
     /// <summary>Creates a flight.</summary>

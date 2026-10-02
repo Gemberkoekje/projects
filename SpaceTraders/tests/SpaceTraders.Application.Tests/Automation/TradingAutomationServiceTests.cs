@@ -4,6 +4,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -12,8 +13,9 @@ using static SpaceTraders.Application.Tests.Trading.TradeFixture;
 namespace SpaceTraders.Application.Tests.Automation;
 
 /// <summary>
-/// Slice 6.5: every free ship with a cargo hold and a fuel tank trades; the command ship is the first,
-/// once it has scouted. Two traders never share a route, and the plan buys no ships (D16).
+/// Slice 6.5: every free ship with a cargo hold and a fuel tank trades. Two traders never share a route.
+/// Slice 6.4: a ship that can survey doesn't trade while the survey plan is on (D20), and the plan buys
+/// its own cargo ships (D21).
 /// </summary>
 public sealed class TradingAutomationServiceTests
 {
@@ -22,6 +24,9 @@ public sealed class TradingAutomationServiceTests
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
+    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
+    private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -38,6 +43,24 @@ public sealed class TradingAutomationServiceTests
             .Returns(_ => _state);
         _plans.When(plans => plans.UpsertAsync(PlanTypes.TradingAutomation, Arg.Any<TradingAutomationPlanState>(), Arg.Any<CancellationToken>()))
             .Do(call => _state = call.ArgAt<TradingAutomationPlanState>(1));
+        _settings.GetAsync<string>(TradingAutomationService.ShipPurchasesSetting, Arg.Any<CancellationToken>())
+            .Returns("SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER");
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = A1,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_LIGHT_SHUTTLE", "SHIP_LIGHT_HAULER"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 117_273, FuelCapacity = 300, CargoCapacity = 40 },
+                    new ShipyardShipDto { Type = "SHIP_LIGHT_HAULER", PurchasePrice = 354_210, FuelCapacity = 600, CargoCapacity = 80 },
+                ],
+            },
+        ]);
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true });
     }
 
     [Fact]
@@ -198,7 +221,88 @@ public sealed class TradingAutomationServiceTests
         await _plans.Received(1).UpsertAsync(PlanTypes.TradingAutomation, Arg.Any<TradingAutomationPlanState>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task AShipThatCanSurvey_DoesNotTrade_WhileTheSurveyPlanIsOn()
+    {
+        // D20: the command ship surveys, and only that.
+        SurveyPlanOn();
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WithNoTraderFree_ItBuysALightShuttleFirst_WhenANewShipWouldHaveALucrativeRoute()
+    {
+        // D21: the command ship surveys; a shuttle bought at A1 could fly EQUIPMENT from K85 to D41.
+        SurveyPlanOn();
+        Fleet(CommandShip());
+        CreditsAre(300_000);
+
+        await RunAsync();
+
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_UpToTwo()
+    {
+        SurveyPlanOn();
+        CreditsAre(1_000_000);
+        var shuttle = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        var hauler = Shuttle("SHIP-6") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip(), shuttle, hauler);
+
+        await RunAsync();
+
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+
+        _purchases.ClearReceivedCalls();
+        Fleet(CommandShip(), shuttle, hauler, hauler with { Symbol = "SHIP-7" });
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task WhileATraderHasNoTrip_NoShipIsBought()
+    {
+        // The drone finds no lucrative route: a new ship waits until every trader is busy.
+        CreditsAre(300_000);
+        Fleet(Drone());
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task NoShipIsBought_WhenANewOneWouldHaveNoLucrativeRoute()
+    {
+        // After the shuttle's price, 2,727 credits buy one unit of FOOD at most, at 132 a unit before fuel.
+        SurveyPlanOn();
+        Fleet(CommandShip());
+        CreditsAre(120_000);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    private void SurveyPlanOn()
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+
+    private void CreditsAre(long credits)
+        => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(), credits));
+
+    /// <summary>A cargo ship, as the trading plan buys them: a hold and a tank, nothing to mine or survey with.</summary>
+    private static ShipModel Shuttle(string symbol)
+        => new(symbol, SystemSymbol, A1, "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: ["MOUNT_TURRET_I"], CargoInventory: []);
 
     private Task RunAsync()
         => new TradingAutomationService(
@@ -207,6 +311,9 @@ public sealed class TradingAutomationServiceTests
                 _assignments,
                 _tradeContexts,
                 _plans,
+                _settings,
+                _shipyards,
+                _purchases,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

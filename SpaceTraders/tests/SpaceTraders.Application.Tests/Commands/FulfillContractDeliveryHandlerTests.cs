@@ -296,6 +296,35 @@ public sealed class FulfillContractDeliveryHandlerTests
         await agents.Received(1).UpsertAsync(Arg.Is<AgentModel>(a => a.Credits == 137_184), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ExecuteAsync_DoesNotFulfilAContractAnotherShipFulfilled()
+    {
+        // D23: several ships deliver to one contract. One that arrives after another has fulfilled it
+        // delivers nothing and leaves the fulfilment alone; the plan then releases it with its ore.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ship = new ShipModel("SHIP-4", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 80, CargoCurrent: 12, CargoCapacity: 15, CargoInventory: [new CargoItemModel("IRON_ORE", 12)]);
+        ships.FindAsync("SHIP-4", Arg.Any<CancellationToken>()).Returns(ship);
+        contracts.FindAsync("C-5", Arg.Any<CancellationToken>()).Returns(Contract("C-5", required: 42, fulfilled: 42) with { IsFulfilled = true });
+
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IAgentRepository>(),
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-4", "C-5", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await port.DidNotReceiveWithAnyArgs().DeliverContractAsync(default!, default!, default!, default, default);
+        await port.DidNotReceiveWithAnyArgs().FulfillContractAsync(default!, default);
+    }
+
     private static ContractDto Contract(string id, int required, int fulfilled) =>
         new(
             Id: id,

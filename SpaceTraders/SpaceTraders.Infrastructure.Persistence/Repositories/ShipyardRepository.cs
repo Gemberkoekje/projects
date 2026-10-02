@@ -182,10 +182,47 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
                 Description = element.TryGetProperty("description", out var desc) ? desc.GetString() : null,
                 Supply = element.TryGetProperty("supply", out var supply) ? supply.GetString() : null,
                 Activity = element.TryGetProperty("activity", out var activity) ? activity.GetString() : null,
-                PurchasePrice = element.TryGetProperty("purchasePrice", out var price) ? price.GetInt64() : 0
+                PurchasePrice = element.TryGetProperty("purchasePrice", out var price) ? price.GetInt64() : 0,
+                FuelCapacity = ReadFuelCapacity(element),
+                CargoCapacity = ReadCargoCapacity(element),
             });
         }
 
         return ships.ToArray();
+    }
+
+    /// <summary>The tank of a ship for sale: its frame's <c>fuelCapacity</c>.</summary>
+    private static int ReadFuelCapacity(JsonElement ship)
+        => ship.TryGetProperty("frame", out var frame)
+            && frame.ValueKind == JsonValueKind.Object
+            && frame.TryGetProperty("fuelCapacity", out var fuel)
+            && fuel.ValueKind == JsonValueKind.Number
+                ? fuel.GetInt32()
+                : 0;
+
+    /// <summary>The hold of a ship for sale: the capacity of its cargo hold modules (crew quarters list a capacity too).</summary>
+    private static int ReadCargoCapacity(JsonElement ship)
+    {
+        if (!ship.TryGetProperty("modules", out var modules) || modules.ValueKind != JsonValueKind.Array)
+        {
+            return 0;
+        }
+
+        var capacity = 0;
+        for (var index = 0; index < modules.GetArrayLength(); index++)
+        {
+            var module = modules[index];
+            if (module.ValueKind == JsonValueKind.Object
+                && module.TryGetProperty("symbol", out var symbol)
+                && symbol.ValueKind == JsonValueKind.String
+                && (symbol.GetString() ?? string.Empty).StartsWith("MODULE_CARGO_HOLD", StringComparison.OrdinalIgnoreCase)
+                && module.TryGetProperty("capacity", out var units)
+                && units.ValueKind == JsonValueKind.Number)
+            {
+                capacity += units.GetInt32();
+            }
+        }
+
+        return capacity;
     }
 }

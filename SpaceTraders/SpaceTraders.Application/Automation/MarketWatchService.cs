@@ -2,10 +2,9 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Domain.ValueObjects;
-using Wolverine;
 
 namespace SpaceTraders.Application.Automation;
 
@@ -38,10 +37,9 @@ public sealed class MarketWatchService(
     IShipRepository ships,
     IWaypointRepository waypoints,
     IMarketRepository markets,
-    ISpaceTradersPort port,
+    IMarketRefresher refresher,
     ISettingsRepository settings,
     MarketWatchAttempts attempts,
-    IMessageBus bus,
     ILogger<MarketWatchService> logger) : IMarketWatchService
 {
     /// <summary>The setting that holds the minutes between refreshes of one market; 0 switches the watch off.</summary>
@@ -114,11 +112,8 @@ public sealed class MarketWatchService(
 
     private async Task RefreshAsync(string systemSymbol, string waypointSymbol, string shipSymbol, CancellationToken cancellationToken)
     {
-        var market = await port.GetMarketAsync(systemSymbol, waypointSymbol, cancellationToken);
-
-        // Without a ship of ours there the API leaves the prices out. Storing that answer would wipe
-        // the prices the cache has, so it is left alone.
-        if (string.IsNullOrWhiteSpace(market.TradeGoodsJson))
+        // Without a ship of ours there the API leaves the prices out, and the refresher keeps the cached ones.
+        if (!await refresher.RefreshAsync(systemSymbol, waypointSymbol, cancellationToken))
         {
             logger.LogDebug(
                 "Market watch: the market at {WaypointSymbol} came back without prices, though ship {ShipSymbol} should be there; kept the cached prices.",
@@ -127,8 +122,6 @@ public sealed class MarketWatchService(
             return;
         }
 
-        await markets.UpsertAsync(market, cancellationToken);
-        await bus.PublishAsync(new MarketDataRefreshedEvent(new WaypointSymbol(waypointSymbol), market.TradeGoodsJson));
         logger.LogDebug(
             "Market watch: refreshed the market at {WaypointSymbol}, where ship {ShipSymbol} is.",
             waypointSymbol,

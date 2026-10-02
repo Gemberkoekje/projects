@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
@@ -7,356 +6,156 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
+using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
 namespace SpaceTraders.Application.Tests.Goals;
 
+/// <summary>
+/// Slice 6.4: a mining goal is one trip. The ship mines at the asteroid, with the best survey there (the
+/// extraction command picks it), until its hold is full, then sells at the market and the goal ends. Its
+/// flights carry the goal, so the arrival wakes it (B17); a miner no longer hands out survey goals (B16).
+/// </summary>
 public sealed class MineAndSellGoalExecutorTests
 {
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
-    private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
+    private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
+    private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly LogRecorder _log = new();
 
-    private MineAndSellGoalExecutor CreateExecutor()
+    private static readonly MineAndSellGoal Trip = new() { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+
+    public MineAndSellGoalExecutorTests()
     {
-        // Default: no survey available. The repository then returns an empty survey, not null.
-        _surveys.GetBestActiveSurveyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new SurveyModel(string.Empty, string.Empty, [], DateTimeOffset.MinValue, string.Empty));
-
-        _goals.GetActiveSurveyTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>());
-
-        _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<ShipModel>());
-
-        return new(
-            _ships,
-            _goals,
-            _agents,
-            _surveys,
-            _port,
-            _dock,
-            _bus,
-            _log.For<MineAndSellGoalExecutor>());
-    }
-
-    private static SurveyModel ActiveSurvey(string waypointSymbol, string depositSymbol) =>
-        new(
-            Signature: "SURVEY-1",
-            WaypointSymbol: waypointSymbol,
-            Deposits: [new SurveyDepositModel(depositSymbol)],
-            Expiration: TimeProvider.System.GetUtcNow().AddMinutes(10),
-            Size: "SMALL");
-
-    private static MineAndSellGoal Goal() =>
-        new()
-        {
-            TradeSymbol = "IRON_ORE",
-            SourceWaypointSymbol = "X1-AB-AST",
-            SellWaypointSymbol = "X1-AB-MKT",
-        };
-
-    [Fact]
-    public async Task ExecuteStepAsync_WaitsForSurvey_WhenNoTargetCargoPresentAndSurveyIsMissing()
-    {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: []);
-
-        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
-
-        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
-        await _bus.DidNotReceive().InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(Map(), 129_357, 200));
+        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>())
+            .Returns(new ShipCommandResult("SHIP-3", ShipLocalStatus.InOrbit, SystemSymbol, XB5C, Accepted: true));
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_Mines_WhenUsableSurveyIsAvailable()
+    public async Task AwayFromTheAsteroid_ItFliesThere_WithItsGoal()
     {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: []);
-
-        var executor = CreateExecutor();
-
-        var survey = ActiveSurvey("X1-AB-AST", "IRON_ORE");
-        _surveys.GetBestActiveSurveyAsync("X1-AB-AST", "IRON_ORE", Arg.Any<CancellationToken>())
-            .Returns(survey);
-
-        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>())
-            .Returns(new ShipCommandResult("MINER-1", Domain.Enums.ShipLocalStatus.InOrbit, "X1-AB", "X1-AB-AST"));
-
-        var result = await executor.ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
-
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        await _bus.Received(1).InvokeAsync<ShipCommandResult>(
-            Arg.Is<MineResourceVolumeCommand>(c =>
-                c.ShipSymbol == "MINER-1"
-                && c.TradeSymbol == "IRON_ORE"
-                && c.SourceWaypoint == "X1-AB-AST"
-                && c.Survey == survey),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteStepAsync_NavigatesToSellWaypoint_WhenCargoPresentAndElsewhere()
-    {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 10,
-            CargoCapacity: 40,
-            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-
-        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+        var result = await StepAsync(Drone(), Trip);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "MINER-1" && c.DestinationWaypoint == "X1-AB-MKT"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.ShipSymbol == "SHIP-3" && command.DestinationWaypoint == XB5C),
             Arg.Any<CancellationToken>());
-        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_Docks_WhenCargoPresentAndInOrbitAtSellMarket()
+    public async Task AtTheAsteroid_ItExtractsOnce_UntilTheHoldIsFull()
     {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-MKT",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 10,
-            CargoCapacity: 40,
-            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-
-        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+        var result = await StepAsync(Drone(waypoint: XB5C, status: "IN_ORBIT"), Trip);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        await _dock.Received(1).ExecuteAsync("MINER-1", Arg.Any<CancellationToken>());
-        await _port.DidNotReceive().SellCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync<ShipCommandResult>(
+            Arg.Is<MineResourceVolumeCommand>(command => command.TradeSymbol == "COPPER_ORE" && command.SourceWaypoint == XB5C && command.RequiredUnitsTotal == 15),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<TimeSpan?>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_AssignsSurveyGoal_WhenNoUsableSurveyAndSurveyShipIsAvailable()
+    public async Task OnCooldown_ItWaits()
     {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: [],
-            MountSymbols: ["MOUNT_SURVEYOR_I"]);
+        var result = await StepAsync(Drone(waypoint: XB5C, status: "IN_ORBIT") with { CooldownExpiresAt = DateTimeOffset.UtcNow.AddSeconds(40) }, Trip);
 
-        var executor = CreateExecutor();
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForCooldown);
+        await _bus.DidNotReceiveWithAnyArgs().InvokeAsync<ShipCommandResult>(default!, default, default);
+    }
 
-        _ships.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([ship]);
+    [Fact]
+    public async Task WithAFullHold_TheTripTurnsToSelling()
+    {
+        var full = Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("COPPER_ORE", 15)]);
 
-        var result = await executor.ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+        await StepAsync(full, Trip);
+
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-3", Arg.Is<MineAndSellGoal>(goal => goal.Selling), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Selling_ItFliesToTheSellMarket()
+    {
+        var full = Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("COPPER_ORE", 15)]);
+
+        var result = await StepAsync(full, Trip with { Selling = true });
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<SurveyWaypointGoal>(goal =>
-                goal.TargetWaypointSymbol == "X1-AB-AST"
-                && goal.TargetDepositSymbol == "IRON_ORE"),
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == H51),
             Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_DoesNotAssignSurveyGoal_WhenTargetAlreadyActive()
+    public async Task Selling_InOrbitAtTheMarket_ItDocks()
     {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: [],
-            MountSymbols: ["MOUNT_SURVEYOR_I"]);
-
-        var executor = CreateExecutor();
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([ship]);
-
-        _goals.GetActiveSurveyTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>
-            {
-                ("X1-AB-AST", "IRON_ORE")
-            });
-
-        var result = await executor.ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
-
-        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
-        await _goals.DidNotReceive().SetActiveGoalAsync(
-            Arg.Any<string>(),
-            Arg.Is<SurveyWaypointGoal>(_ => true),
-            Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteStepAsync_AssignsSurveyGoal_ToAnotherSurveyShip_WhenMinerLacksSurveyEquipment()
-    {
-        var minerShip = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "IN_ORBIT",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: []);
-
-        var surveyShip = new ShipModel(
-            "SURVEY-1",
-            "X1-AB",
-            "X1-AB-AST",
-            "DOCKED",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 0,
-            CargoCapacity: 40,
-            CargoInventory: [],
-            MountSymbols: ["MOUNT_SURVEYOR_I"]);
-
-        var executor = CreateExecutor();
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>())
-            .Returns([minerShip, surveyShip]);
-
-        var result = await executor.ExecuteStepAsync(minerShip, Goal(), new ShipGoalContext(), CancellationToken.None);
-
-        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
-        await _goals.Received(1).SetActiveGoalAsync(
-            "SURVEY-1",
-            Arg.Is<SurveyWaypointGoal>(goal =>
-                goal.TargetWaypointSymbol == "X1-AB-AST"
-                && goal.TargetDepositSymbol == "IRON_ORE"),
-            Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteStepAsync_SellsAtMarket_WhenCargoPresentAndDocked()
-    {
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-MKT",
-            "DOCKED",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 10,
-            CargoCapacity: 40,
-            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-
-        _port.SellCargoAsync("MINER-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult(
-                AgentSymbol: "AGENT",
-                AgentCredits: 220_000,
-                Cargo: new CargoModel(0, 40, []),
-                Revenue: 15_000));
-
-        _agents.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 205_000, "FACTION", 1));
-
-        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+        var result = await StepAsync(Drone(status: "IN_ORBIT", cargo: [new CargoItemModel("COPPER_ORE", 15)]), Trip with { Selling = true });
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        await _port.Received(1).SellCargoAsync("MINER-1", "IRON_ORE", 10, Arg.Any<CancellationToken>());
-        await _ships.Received(1).UpdateCargoAsync("MINER-1", Arg.Any<CargoModel>(), Arg.Any<CancellationToken>());
-        await _goals.Received(1).SetActiveGoalAsync("MINER-1", Arg.Any<MineAndSellGoal>(), Arg.Any<CancellationToken>());
-        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+        await _dock.Received(1).ExecuteAsync("SHIP-3", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_ASale_IsPublished_ForTheLedgerAndTheCredits()
+    public async Task Selling_DockedAtTheMarket_ItSells_FetchesTheMarketAgain_AndTheTripEnds()
     {
-        // B7: a sale changed the cached credits, but nothing published it, so the ledger, the credit
-        // samples and the credits-earned metric never saw it.
-        var ship = new ShipModel(
-            "MINER-1",
-            "X1-AB",
-            "X1-AB-MKT",
-            "DOCKED",
-            "CRUISE",
-            10,
-            40,
-            CargoCurrent: 10,
-            CargoCapacity: 40,
-            CargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-        _port.SellCargoAsync("MINER-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult(AgentSymbol: "AGENT", AgentCredits: 220_000, Cargo: new CargoModel(0, 40, []), Revenue: 15_000));
-        _agents.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 205_000, "FACTION", 1));
+        _port.SellCargoAsync("SHIP-3", "COPPER_ORE", 15, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult("AGENT", 130_362, new CargoModel(0, 15, []), 1_005));
 
-        await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+        var result = await StepAsync(Drone(cargo: [new CargoItemModel("COPPER_ORE", 15)]), Trip with { Selling = true });
 
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "MINER-1" && e.Good.Value == "IRON_ORE" && e.Units == 10 && e.Revenue == 15_000 && e.NewAgentCredits == 220_000),
+            Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-3" && sold.Units == 15 && sold.Revenue == 1_005),
             Arg.Any<DeliveryOptions>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 205_000 && e.NewCredits == 220_000),
-            Arg.Any<DeliveryOptions>());
-
-        // The journal (slice 2.3).
-        var sold = _log.Journal.Should().ContainSingle().Subject;
-        sold.EventKind.Should().Be("CargoSold");
-        sold.Properties.Should().Contain(new KeyValuePair<string, object?>("ShipSymbol", "MINER-1"))
-            .And.Contain(new KeyValuePair<string, object?>("TradeSymbol", "IRON_ORE"))
-            .And.Contain(new KeyValuePair<string, object?>("Units", 10))
-            .And.Contain(new KeyValuePair<string, object?>("WaypointSymbol", "X1-AB-MKT"))
-            .And.Contain(new KeyValuePair<string, object?>("Revenue", 15_000L));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "CargoSold");
+        await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, H51, "SHIP-3", Arg.Any<CancellationToken>());
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task AMarketThatNoLongerBuysTheOre_EndsTheTrip()
+    {
+        // The mining plan then sells the ore where it fetches most.
+        var result = await StepAsync(Drone(waypoint: F49, cargo: [new CargoItemModel("COPPER_ORE", 15)]), Trip with { SellWaypointSymbol = F49, Selling = true });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnExtractionTheCommandRejects_EndsTheTrip()
+    {
+        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>())
+            .Returns(ShipCommandResult.Rejected("SHIP-3", ShipLocalStatus.InOrbit, SystemSymbol, XB5C));
+
+        var result = await StepAsync(Drone(waypoint: XB5C, status: "IN_ORBIT"), Trip);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Blocked);
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+    }
+
+    private Task<GoalExecutionResult> StepAsync(ShipModel ship, MineAndSellGoal trip)
+        => new MineAndSellGoalExecutor(
+                _ships,
+                _goals,
+                _agents,
+                _port,
+                _tradeContexts,
+                _refresher,
+                _dock,
+                _bus,
+                _log.For<MineAndSellGoalExecutor>())
+            .ExecuteStepAsync(ship, trip, new ShipGoalContext(), CancellationToken.None);
 }

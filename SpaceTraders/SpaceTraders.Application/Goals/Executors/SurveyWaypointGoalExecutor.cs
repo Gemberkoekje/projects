@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
@@ -10,19 +11,26 @@ using Wolverine;
 namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
-/// Executor for <see cref="SurveyWaypointGoal"/>.
-/// Navigates to the target waypoint, ensures proper orbit state, performs a survey,
-/// and stores results in the survey repository for later use by mining operations.
+/// Executor for <see cref="SurveyWaypointGoal"/>: one survey (PLAN.md slice 6.4). The ship flies to the
+/// asteroid, through refuelling stops when it must, enters orbit, waits for its cooldown, surveys and
+/// stores what it found. Then the goal ends, and the survey plan gives the ship its next target, which
+/// may be the same asteroid again.
 /// </summary>
 public sealed class SurveyWaypointGoalExecutor(
     ISpaceTradersPort port,
-    ISurveyRepository surveys,
+    IShipRepository ships,
+    IShipGoalRepository goals,
+    ISurveyKeeper surveyKeeper,
+    ITradeContextReader tradeContexts,
     IOrbitSubCommand orbit,
+    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<SurveyWaypointGoalExecutor> logger) : IShipGoalExecutor
 {
+    /// <inheritdoc />
     public bool CanExecute(ShipGoal goal) => goal is SurveyWaypointGoal;
 
+    /// <inheritdoc />
     public async Task<GoalExecutionResult> ExecuteStepAsync(
         ShipModel ship,
         ShipGoal goal,
@@ -36,75 +44,54 @@ public sealed class SurveyWaypointGoalExecutor(
             return GoalExecutionResult.WaitingForArrival("Survey ship is in transit.");
         }
 
-        var atTarget = string.Equals(
-            ship.WaypointSymbol,
-            surveyGoal.TargetWaypointSymbol,
-            StringComparison.OrdinalIgnoreCase);
-
-        if (!atTarget)
+        if (!string.Equals(ship.WaypointSymbol, surveyGoal.TargetWaypointSymbol, StringComparison.OrdinalIgnoreCase))
         {
-            await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, surveyGoal.TargetWaypointSymbol), ct);
-            return GoalExecutionResult.WaitingForArrival(
-                $"Navigating to survey target {surveyGoal.TargetWaypointSymbol}.");
+            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, surveyGoal.TargetWaypointSymbol, dock, bus, ct);
         }
 
-        // At target; ensure we're in orbit
-        if (atTarget && ship.LocalStatus == ShipLocalStatus.Docked)
+        // An arrival docks the ship; a survey needs orbit.
+        if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
             await orbit.ExecuteAsync(ship.Symbol, ct);
             return GoalExecutionResult.Progressing(
                 $"Entering orbit at survey waypoint {surveyGoal.TargetWaypointSymbol}.");
         }
 
-        // Check if cooldown is active
-        if (atTarget && ship.CooldownExpiresAt.HasValue && ship.CooldownExpiresAt.Value > TimeProvider.System.GetUtcNow())
+        var now = TimeProvider.System.GetUtcNow();
+        if (ship.CooldownExpiresAt.HasValue && ship.CooldownExpiresAt.Value > now)
         {
-            return GoalExecutionResult.WaitingForCooldown(
-                "Waiting for survey cooldown.",
-                ship.CooldownExpiresAt);
+            return GoalExecutionResult.WaitingForCooldown("Waiting for survey cooldown.", ship.CooldownExpiresAt);
         }
 
-        // At target, in orbit, no cooldown; perform survey
-        if (atTarget && ship.LocalStatus == ShipLocalStatus.InOrbit)
+        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
-            try
-            {
-                var surveyResult = await port.SurveyAsync(ship.Symbol, ct);
-
-                if (surveyResult?.Surveys != null && surveyResult.Surveys.Count > 0)
-                {
-                    await surveys.UpsertAsync(ship.Symbol, surveyResult.Surveys, ct);
-
-                    logger.LogInformation(
-                        "SurveyWaypointGoalExecutor: ship {ShipSymbol} surveyed {WaypointSymbol} and found {SurveyCount} survey(s).",
-                        ship.Symbol,
-                        surveyGoal.TargetWaypointSymbol,
-                        surveyResult.Surveys.Count);
-                }
-
-                // Update cooldown if present
-                if (surveyResult?.CooldownExpiresAt.HasValue == true)
-                {
-                    return GoalExecutionResult.WaitingForCooldown(
-                        $"Survey completed at {surveyGoal.TargetWaypointSymbol}; cooldown active.",
-                        surveyResult.CooldownExpiresAt);
-                }
-
-                return GoalExecutionResult.Completed(
-                    $"Survey of {surveyGoal.TargetWaypointSymbol} completed successfully.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(
-                    ex,
-                    "SurveyWaypointGoalExecutor: survey failed for ship {ShipSymbol} at {WaypointSymbol}.",
-                    ship.Symbol,
-                    surveyGoal.TargetWaypointSymbol);
-
-                return GoalExecutionResult.Blocked($"Survey failed: {ex.Message}");
-            }
+            return GoalExecutionResult.Blocked("Unexpected ship state during survey execution.");
         }
 
-        return GoalExecutionResult.Blocked("Unexpected ship state during survey execution.");
+        SurveyActionResult result;
+        try
+        {
+            result = await port.SurveyAsync(ship.Symbol, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The survey plan gives the ship a target again on the next tick; a failure that repeats
+            // shows as RepeatingError.
+            logger.LogWarning(
+                ex,
+                "SurveyWaypointGoalExecutor: survey failed for ship {ShipSymbol} at {WaypointSymbol}.",
+                ship.Symbol,
+                surveyGoal.TargetWaypointSymbol);
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Blocked($"Survey failed: {ex.Message}");
+        }
+
+        await ships.UpdateCooldownAsync(ship.Symbol, result.CooldownExpiresAt ?? now.AddSeconds(result.CooldownSeconds), ct);
+        await surveyKeeper.TakenAsync(ship.Symbol, surveyGoal.TargetDepositSymbol, result.Surveys, ct);
+        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+
+        return GoalExecutionResult.Completed(
+            $"Surveyed {surveyGoal.TargetWaypointSymbol}: {result.Surveys.Count} survey(s).");
     }
 }

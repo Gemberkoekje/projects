@@ -4,6 +4,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using Wolverine;
 
@@ -27,6 +28,8 @@ public sealed class ContractPlanService(
     IShipPurchaseService shipPurchases,
     IAgentRepository agents,
     IMessageBus bus,
+    IShipGoalRepository goals,
+    ISettingsRepository settings,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
     private const string ContractAssignmentType = "Contract";
@@ -61,6 +64,7 @@ public sealed class ContractPlanService(
                 if (advanced.Status == ContractMineralPlanStatus.Active)
                 {
                     await EnsureActivePlanAssignmentAsync(advanced, cancellationToken);
+                    await AddFreeMinersAsync(advanced, cancellationToken);
                 }
 
                 return;
@@ -357,7 +361,12 @@ public sealed class ContractPlanService(
             };
 
             await contractPlans.UpsertAsync(completed, cancellationToken);
-            await CompleteAssignmentIfActiveAsync(plan, now, cancellationToken);
+
+            // Every ship on the contract is released (D23); ore left over is sold by the mining plan.
+            foreach (var assignment in await ContractAssignmentsAsync(plan.ContractId, cancellationToken))
+            {
+                await assignments.UpsertAsync(assignment with { CompletedAt = now }, cancellationToken);
+            }
 
             logger.LogInformation(
                 "{EventKind:l}: {Plan} plan for contract {ContractId}: fulfilled, {Fulfilled}/{Required} {TradeSymbol} delivered; ship {ShipSymbol} released.",
@@ -391,14 +400,13 @@ public sealed class ContractPlanService(
         // drop to 0.
         var remainingUnits = Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled);
 
-        var assignment = await assignments.FindAsync(plan.ShipSymbol, cancellationToken);
-        if (assignment is not null
-            && !assignment.CompletedAt.HasValue
-            && assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(assignment.ContractId, plan.ContractId, StringComparison.OrdinalIgnoreCase)
-            && assignment.RequiredUnits != remainingUnits)
+        // Every ship on the contract (D23) mines and delivers what it still needs.
+        foreach (var assignment in await ContractAssignmentsAsync(plan.ContractId, cancellationToken))
         {
-            await assignments.UpsertAsync(assignment with { RequiredUnits = remainingUnits }, cancellationToken);
+            if (assignment.RequiredUnits != remainingUnits)
+            {
+                await assignments.UpsertAsync(assignment with { RequiredUnits = remainingUnits }, cancellationToken);
+            }
         }
 
         if (plan.UnitsRequired == deliverable.UnitsRequired && plan.UnitsFulfilled == deliverable.UnitsFulfilled)
@@ -486,6 +494,7 @@ public sealed class ContractPlanService(
             return null;
         }
 
+        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
         var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
         var activeAssignmentsByShip = activeAssignments
             .Where(a => !a.CompletedAt.HasValue)
@@ -503,7 +512,7 @@ public sealed class ContractPlanService(
                 continue;
             }
 
-            if (!ship.IsMiningCapable)
+            if (!FleetRoles.IsMiner(ship, surveyOn))
             {
                 logger.LogDebug(
                     "Contract plan ship selection: skipping ship {ShipSymbol} — not mining-capable (type {ShipType}, mounts: {Mounts}, cargo: {Cargo}, fuel: {Fuel}).",
@@ -512,6 +521,15 @@ public sealed class ContractPlanService(
                     string.Join(",", ship.MountSymbols ?? []),
                     ship.CargoCapacity,
                     ship.FuelCapacity);
+                continue;
+            }
+
+            if (await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken) is { Status: not GoalStatus.Completed and not GoalStatus.Blocked } goal)
+            {
+                logger.LogDebug(
+                    "Contract plan ship selection: skipping ship {ShipSymbol}, which works on a {GoalKind} goal.",
+                    ship.Symbol,
+                    goal.Kind);
                 continue;
             }
 
@@ -774,21 +792,68 @@ public sealed class ContractPlanService(
                 new ContractDeliverableDto(d.TradeSymbol, d.DestinationSymbol, d.UnitsRequired, d.UnitsFulfilled)).ToList()));
     }
 
-    private async Task CompleteAssignmentIfActiveAsync(
-        ContractMineralPlanState plan,
-        DateTimeOffset completedAt,
-        CancellationToken cancellationToken)
+    /// <summary>The open contract assignments for a contract: every ship that mines and delivers for it (D23).</summary>
+    private async Task<IReadOnlyList<ShipAssignmentDto>> ContractAssignmentsAsync(string contractId, CancellationToken cancellationToken)
+        => [.. (await assignments.GetAllActiveAsync(cancellationToken))
+            .Where(assignment => !assignment.CompletedAt.HasValue
+                && assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(assignment.ContractId, contractId, StringComparison.OrdinalIgnoreCase))];
+
+    /// <summary>
+    /// Every free miner joins the active contract (D23): the same work as the plan's first ship, mining at
+    /// its asteroid and delivering to its destination. Several ships may bring more than the contract
+    /// still needs; what is left over is sold once the contract is fulfilled (the mining plan).
+    /// </summary>
+    private async Task AddFreeMinersAsync(ContractMineralPlanState plan, CancellationToken cancellationToken)
     {
-        var assignment = await assignments.FindAsync(plan.ShipSymbol, cancellationToken);
-        if (assignment is null
-            || assignment.CompletedAt.HasValue
-            || !assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(assignment.ContractId, plan.ContractId, StringComparison.OrdinalIgnoreCase))
+        var remainingUnits = Math.Max(0, plan.UnitsRequired - plan.UnitsFulfilled);
+        if (remainingUnits <= 0
+            || string.IsNullOrWhiteSpace(plan.SourceWaypoint)
+            || string.IsNullOrWhiteSpace(plan.DestinationWaypoint))
         {
             return;
         }
 
-        await assignments.UpsertAsync(assignment with { CompletedAt = completedAt }, cancellationToken);
+        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+            .Where(assignment => !assignment.CompletedAt.HasValue)
+            .Select(assignment => assignment.ShipSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var now = TimeProvider.System.GetUtcNow();
+
+        foreach (var ship in await ships.GetAllAsync(cancellationToken))
+        {
+            if (!FleetRoles.IsMiner(ship, surveyOn)
+                || ship.Symbol.Equals(plan.ShipSymbol, StringComparison.OrdinalIgnoreCase)
+                || !FleetRoles.IsFree(ship, await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken), withAssignment.Contains(ship.Symbol)))
+            {
+                continue;
+            }
+
+            await assignments.UpsertAsync(new ShipAssignmentDto(
+                ShipSymbol: ship.Symbol,
+                AssignmentType: ContractAssignmentType,
+                OriginWaypoint: plan.SourceWaypoint,
+                DestWaypoint: plan.DestinationWaypoint,
+                CargoSymbol: plan.TradeSymbol,
+                ContractId: plan.ContractId,
+                StepIndex: 0,
+                AssignedAt: now,
+                CompletedAt: null,
+                PurchaseUnitPrice: 0,
+                RequiredUnits: remainingUnits,
+                SupplyCompleted: false), cancellationToken);
+
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} mines {TradeSymbol} at {WaypointSymbol} and delivers it to {SellWaypoint} for contract {ContractId} ({Reason}).",
+                JournalEvents.MiningStarted,
+                ship.Symbol,
+                plan.TradeSymbol,
+                plan.SourceWaypoint,
+                plan.DestinationWaypoint,
+                plan.ContractId,
+                "contract");
+        }
     }
 
     private sealed record PendingDeliverable(

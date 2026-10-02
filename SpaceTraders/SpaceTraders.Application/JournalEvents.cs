@@ -49,6 +49,32 @@ public static class JournalEvents
     /// </summary>
     public const string TradeDropped = nameof(TradeDropped);
 
+    /// <summary>
+    /// A ship surveyed a waypoint (slice 6.4); one line per survey it found (<c>ShipSymbol</c>,
+    /// <c>WaypointSymbol</c>, <c>TradeSymbol</c> it surveyed for, <c>Signature</c>, <c>Size</c>,
+    /// <c>Deposits</c>, <c>Expiration</c>).
+    /// </summary>
+    public const string Surveyed = nameof(Surveyed);
+
+    /// <summary>
+    /// A survey ended: it expired, or the API refused it as exhausted or not verified (<c>Signature</c>,
+    /// <c>WaypointSymbol</c>, <c>Size</c>, <c>Reason</c>, <c>Extractions</c> made with it, <c>SurveyedAt</c>).
+    /// </summary>
+    public const string SurveyEnded = nameof(SurveyEnded);
+
+    /// <summary>
+    /// A ship extracted (<c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>TradeSymbol</c> it got, <c>Units</c>,
+    /// <c>Target</c> it mines for, and the survey's <c>Signature</c>, empty without one).
+    /// </summary>
+    public const string Extracted = nameof(Extracted);
+
+    /// <summary>
+    /// A miner took mining work (slice 6.4): a trip to mine and sell, or a place in the contract's work
+    /// (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it mines at, <c>SellWaypoint</c>,
+    /// <c>Reason</c>: <c>contract</c>, <c>surveyed</c>, <c>low_supply</c> or <c>held_cargo</c>).
+    /// </summary>
+    public const string MiningStarted = nameof(MiningStarted);
+
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);
 

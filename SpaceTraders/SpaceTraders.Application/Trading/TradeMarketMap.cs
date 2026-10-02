@@ -32,9 +32,8 @@ public sealed class TradeMarketMap
         ArgumentNullException.ThrowIfNull(markets);
         ArgumentNullException.ThrowIfNull(madeFrom);
 
-        _positions = waypoints
-            .GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => (group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase);
+        Waypoints = [.. waypoints.GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase).Select(group => group.First())];
+        _positions = Waypoints.ToDictionary(waypoint => waypoint.Symbol, waypoint => (waypoint.X, waypoint.Y), StringComparer.OrdinalIgnoreCase);
         _goods = markets
             .GroupBy(market => market.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -51,6 +50,9 @@ public sealed class TradeMarketMap
             .ToList();
         _averageFuelPrice = fuelPrices.Count == 0 ? 0 : (long)Math.Ceiling(fuelPrices.Average());
     }
+
+    /// <summary>The system's waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
+    public IReadOnlyList<WaypointCacheModel> Waypoints { get; }
 
     /// <summary>The waypoints that have a market with known prices.</summary>
     public IReadOnlyCollection<string> MarketWaypoints => _goods.Keys;

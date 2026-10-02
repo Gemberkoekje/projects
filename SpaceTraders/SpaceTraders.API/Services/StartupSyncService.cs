@@ -200,9 +200,9 @@ public sealed class StartupSyncService(
                 .AsNoTracking()
                 .AnyAsync(s => s.AgentId == dbContext.AgentId && s.Symbol == systemSymbol, cancellationToken);
 
-            var hasWaypointsCached = await dbContext.Waypoints
-                .AsNoTracking()
-                .AnyAsync(w => w.AgentId == dbContext.AgentId && w.SystemSymbol == systemSymbol, cancellationToken);
+            var cachedWaypoints = await dbContext.Waypoints
+                .Where(w => w.AgentId == dbContext.AgentId && w.SystemSymbol == systemSymbol)
+                .ToDictionaryAsync(w => w.Symbol, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
             if (!isSystemCached)
             {
@@ -219,7 +219,9 @@ public sealed class StartupSyncService(
                 });
             }
 
-            if (hasWaypointsCached)
+            // Waypoints cached before sync stored traits have none (B34): the system is fetched again
+            // for them, once; a waypoint without traits is stored with an empty list.
+            if (cachedWaypoints.Count > 0 && cachedWaypoints.Values.All(w => w.TraitsJson is not null))
             {
                 continue;
             }
@@ -237,21 +239,15 @@ public sealed class StartupSyncService(
 
                 foreach (var waypoint in waypoints.Data)
                 {
-                    var hasMarket = waypoint.Traits?.Any(t => t.Symbol == "MARKETPLACE") == true;
-                    var hasShipyard = waypoint.Traits?.Any(t => t.Symbol == "SHIPYARD") == true;
-
-                    dbContext.Waypoints.Add(new CachedWaypoint
+                    if (cachedWaypoints.TryGetValue(waypoint.Symbol, out var cached))
                     {
-                        AgentId = dbContext.AgentId,
-                        Symbol = waypoint.Symbol,
-                        SystemSymbol = waypoint.SystemSymbol,
-                        Type = waypoint.Type,
-                        X = waypoint.X,
-                        Y = waypoint.Y,
-                        HasMarket = hasMarket,
-                        HasShipyard = hasShipyard,
-                        LastObservedAt = now,
-                    });
+                        // When it was last observed is the scout plan's, so it stays.
+                        dbContext.Entry(cached).CurrentValues.SetValues(ToCachedWaypoint(dbContext.AgentId, waypoint, cached.LastObservedAt));
+                    }
+                    else
+                    {
+                        dbContext.Waypoints.Add(ToCachedWaypoint(dbContext.AgentId, waypoint, now));
+                    }
                 }
 
                 if (waypoints.Data.Count < limit)
@@ -263,6 +259,33 @@ public sealed class StartupSyncService(
             }
         }
     }
+
+    /// <summary>
+    /// A waypoint as the cache stores it: with its traits and modifiers, which tell what an asteroid
+    /// yields (B34), in the shape <c>SpaceTradersPortAdapter</c> writes them (<c>[{"symbol":…}]</c>).
+    /// </summary>
+    private static CachedWaypoint ToCachedWaypoint(
+        string agentId,
+        SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Systems.Waypoint waypoint,
+        DateTimeOffset lastObservedAt)
+        => new()
+        {
+            AgentId = agentId,
+            Symbol = waypoint.Symbol,
+            SystemSymbol = waypoint.SystemSymbol,
+            Type = waypoint.Type,
+            X = waypoint.X,
+            Y = waypoint.Y,
+            HasMarket = waypoint.Traits?.Any(t => t.Symbol == "MARKETPLACE") == true,
+            HasShipyard = waypoint.Traits?.Any(t => t.Symbol == "SHIPYARD") == true,
+            TraitsJson = JsonSerializer.Serialize(waypoint.Traits ?? []),
+            ModifiersJson = JsonSerializer.Serialize(waypoint.Modifiers ?? []),
+            OrbitalsJson = waypoint.Orbitals is null ? null : JsonSerializer.Serialize(waypoint.Orbitals),
+            ParentSymbol = waypoint.Orbits,
+            IsUnderConstruction = waypoint.IsUnderConstruction,
+            ChartJson = waypoint.Chart is null ? null : JsonSerializer.Serialize(waypoint.Chart),
+            LastObservedAt = lastObservedAt,
+        };
 
     private static async Task EnsureFacilitiesForShipsAreCachedAsync(
         ISpaceTradersApiClient apiClient,
@@ -294,22 +317,7 @@ public sealed class StartupSyncService(
             if (waypoint is null)
             {
                 var remoteWaypoint = await apiClient.GetWaypointAsync(systemSymbol, waypointSymbol, cancellationToken);
-                var hasMarketFromApi = remoteWaypoint.Traits?.Any(t => t.Symbol == "MARKETPLACE") == true;
-                var hasShipyardFromApi = remoteWaypoint.Traits?.Any(t => t.Symbol == "SHIPYARD") == true;
-
-                waypoint = new CachedWaypoint
-                {
-                    AgentId = dbContext.AgentId,
-                    Symbol = remoteWaypoint.Symbol,
-                    SystemSymbol = remoteWaypoint.SystemSymbol,
-                    Type = remoteWaypoint.Type,
-                    X = remoteWaypoint.X,
-                    Y = remoteWaypoint.Y,
-                    HasMarket = hasMarketFromApi,
-                    HasShipyard = hasShipyardFromApi,
-                    LastObservedAt = now,
-                };
-
+                waypoint = ToCachedWaypoint(dbContext.AgentId, remoteWaypoint, now);
                 dbContext.Waypoints.Add(waypoint);
             }
 

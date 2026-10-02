@@ -9,8 +9,10 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
@@ -55,8 +57,12 @@ public sealed class AlreadyAtDestinationLoopTests
     {
         var executor = new SurveyWaypointGoalExecutor(
             Substitute.For<ISpaceTradersPort>(),
-            Substitute.For<ISurveyRepository>(),
+            _ships,
+            _goals,
+            Substitute.For<ISurveyKeeper>(),
+            Substitute.For<ITradeContextReader>(),
             _orbit,
+            _dock,
             _bus,
             NullLogger<SurveyWaypointGoalExecutor>.Instance);
 
@@ -93,8 +99,9 @@ public sealed class AlreadyAtDestinationLoopTests
             _ships,
             _goals,
             Substitute.For<IAgentRepository>(),
-            Substitute.For<ISurveyRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<ITradeContextReader>(),
+            Substitute.For<IMarketRefresher>(),
             _dock,
             _bus,
             NullLogger<MineAndSellGoalExecutor>.Instance);
@@ -102,7 +109,7 @@ public sealed class AlreadyAtDestinationLoopTests
         await RunOneStepAsync(
             executor,
             Ship("MINER-1", "IN_ORBIT") with { CargoCurrent = 10, CargoCapacity = 40, CargoInventory = [new CargoItemModel("IRON_ORE", 10)] },
-            new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = Target });
+            new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = Target, Selling = true });
 
         AssertOneStepWithoutNavigation();
     }

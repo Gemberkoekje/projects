@@ -1,621 +1,236 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
-using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Orchestration;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
+using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
 namespace SpaceTraders.Application.Tests.Automation;
 
+/// <summary>
+/// Slice 6.4: every free miner takes one trip at a time, a surveyed ore first, then an ore in low supply
+/// (D22); ore it holds is sold first. A ship that can survey doesn't mine while the survey plan is on (D20),
+/// and no drone is bought while the contract takes the miners (D23).
+/// </summary>
 public sealed class MiningAutomationServiceTests
 {
-    private static readonly DateTimeOffset Now = new(2025, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
-    private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
-    private readonly IWaypointRepository _waypoints = Substitute.For<IWaypointRepository>();
+    private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
+    private readonly IContractMineralPlanRepository _contractPlans = Substitute.For<IContractMineralPlanRepository>();
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
-    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
+    private readonly IMiningContextReader _contexts = Substitute.For<IMiningContextReader>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
-    private readonly IShipPurchaseService _shipPurchases = Substitute.For<IShipPurchaseService>();
+    private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly LogRecorder _log = new();
+    private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
+    private MiningAutomationPlanState? _state;
 
-    private MiningAutomationService CreateService() =>
-        new(
-            _markets,
-            _ships,
-            _goals,
-            _waypoints,
-            _shipyards,
-            _settings,
-            _plans,
-            _shipPurchases,
-            NullLogger<MiningAutomationService>.Instance);
+    public MiningAutomationServiceTests()
+    {
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context());
+        _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
+        _goals.When(goals => goals.SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>()))
+            .Do(call => _activeGoals[call.ArgAt<string>(0)] = call.ArgAt<ShipGoal>(1));
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(_ => _state);
+        _plans.When(plans => plans.UpsertAsync(PlanTypes.MiningAutomation, Arg.Any<MiningAutomationPlanState>(), Arg.Any<CancellationToken>()))
+            .Do(call => _state = call.ArgAt<MiningAutomationPlanState>(1));
+        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 }],
+            },
+        ]);
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true });
+    }
 
-    private static MarketSnapshot Snapshot(string waypoint, params TradeGoodSnapshot[] goods) =>
-        new(
-            waypoint,
-            "X1-AB",
-            goods,
-            imports: goods.Where(g => g.Type.Equals("IMPORT", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList(),
-            exports: goods.Where(g => g.Type.Equals("EXPORT", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList(),
-            exchange: goods.Where(g => g.Type.Equals("EXCHANGE", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList());
+    [Fact]
+    public async Task AFreeMiner_MinesTheOreInLowSupplyThatPaysMost_AndSellsItWhereItIsShort()
+    {
+        Fleet(Drone());
 
-    private static TradeGoodSnapshot Good(string symbol, string type = "IMPORT", string supply = "SCARCE") =>
-        new(symbol, type, 0, 0, 10, supply);
+        await RunAsync();
 
-    private static ShipModel Miner(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
-        new(symbol, "X1-AB", waypoint, status, "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 40, MountSymbols: ["MOUNT_MINING_LASER_I"]);
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        trip.TradeSymbol.Should().Be("COPPER_ORE");
+        trip.SourceWaypointSymbol.Should().Be(XB5C);
+        trip.SellWaypointSymbol.Should().Be(H51);
+        trip.Selling.Should().BeFalse();
 
-    private static WaypointCacheModel Waypoint(string symbol, string type = "ASTEROID", int x = 0, int y = 0, string? traitsJson = null) =>
-        new(symbol, "X1-AB", type, x, y, false, false, Now, TraitsJson: traitsJson);
+        var started = _log.Journal.Should().ContainSingle().Subject;
+        started.EventKind.Should().Be("MiningStarted");
+        started.Properties["Reason"].Should().Be("low_supply");
+    }
 
-    private static ShipyardWaypointDto MiningShipyard(string waypoint = "X1-AB-SY1", long price = 23_000) =>
-        new()
+    [Fact]
+    public async Task AFreeMiner_MinesASurveyedOreFirst()
+    {
+        // A survey of XB5C that is mostly silicon: SILICON_CRYSTALS isn't the best paid, but it is surveyed.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
+            .Returns(Context(Survey("S-1", XB5C, "SILICON_CRYSTALS", "SILICON_CRYSTALS", "ICE_WATER")));
+        Fleet(Drone());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        trip.TradeSymbol.Should().Be("SILICON_CRYSTALS");
+        trip.SellWaypointSymbol.Should().Be(F49);
+        _log.Journal.Should().ContainSingle(entry => Equals(entry.Properties["Reason"], "surveyed"));
+    }
+
+    [Fact]
+    public async Task TwoMiners_NeverShareASellMarketAndOre()
+    {
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"));
+
+        await RunAsync();
+
+        _activeGoals.Values.Cast<MineAndSellGoal>()
+            .Select(trip => (trip.SellWaypointSymbol, trip.TradeSymbol))
+            .Should().BeEquivalentTo([(H51, "COPPER_ORE"), (H51, "IRON_ORE")]);
+    }
+
+    [Fact]
+    public async Task AMinerHoldingOre_SellsItFirst()
+    {
+        // Ore left over from the contract (D23).
+        Fleet(Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("COPPER_ORE", 9)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        trip.Selling.Should().BeTrue();
+        trip.TradeSymbol.Should().Be("COPPER_ORE");
+        trip.SellWaypointSymbol.Should().Be(H51);
+        _log.Journal.Should().ContainSingle(entry => Equals(entry.Properties["Reason"], "held_cargo"));
+    }
+
+    [Fact]
+    public async Task AShipThatCanSurvey_DoesNotMine_WhileTheSurveyPlanIsOn()
+    {
+        Fleet(CommandShip());
+        SurveyPlanIs(on: true);
+
+        await RunAsync();
+        _activeGoals.Should().BeEmpty();
+
+        SurveyPlanIs(on: false);
+
+        await RunAsync();
+        _activeGoals["SHIP-1"].Should().BeOfType<MineAndSellGoal>();
+    }
+
+    [Fact]
+    public async Task AMinerWithAnotherGoal_OrAnAssignment_OrInTransit_IsNotFree()
+    {
+        _activeGoals["SHIP-3"] = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = H51, SellWaypointSymbol = F49 };
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-4", "Contract", XB5C, H51, "COPPER_ORE", "C-1", 0, Now, null)]);
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(1) });
+
+        await RunAsync();
+
+        _activeGoals.Should().ContainSingle().Which.Value.Should().BeOfType<TradeBetweenMarketsGoal>();
+    }
+
+    [Fact]
+    public async Task WithNoMinerFree_ItBuysADroneForEachOpeningADroneCanReach()
+    {
+        // Every miner works; four openings near the middle wait, and B7's two are beyond a drone's tank.
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        Fleet(Drone());
+
+        await RunAsync();
+
+        await _purchases.Received(3).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NoDroneIsBought_WhileTheContractTakesTheMiners()
+    {
+        // D23: every free miner joins the contract, a new drone too; the contract plan buys at most one.
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Contract), Arg.Any<CancellationToken>()).Returns(true);
+        _contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
         {
-            WaypointSymbol = waypoint,
-            SystemSymbol = "X1-AB",
-            ShipTypes = ["SHIP_MINING_DRONE"],
-            Ships =
-            [
-                new ShipyardShipDto
-                {
-                    Type = "SHIP_MINING_DRONE",
-                    PurchasePrice = price,
-                }
-            ]
-        };
+            PlanId = Guid.NewGuid(),
+            ContractId = "C-1",
+            ShipSymbol = "SHIP-4",
+            TradeSymbol = "COPPER_ORE",
+            SourceWaypoint = XB5C,
+            DestinationWaypoint = H51,
+            UnitsRequired = 145,
+            UnitsFulfilled = 45,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        Fleet(Drone());
 
-    [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsIdleMiner_ForScarceMineralImport()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
+        await RunAsync();
 
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID", x: 40, y: 40),
-                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
-                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 2, y: 1, traitsJson: "COMMON_METAL_DEPOSITS"),
-                Waypoint("X1-AB-AST-FAR", "ASTEROID", x: 20, y: 18, traitsJson: "COMMON_METAL_DEPOSITS"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(g =>
-                g.TradeSymbol == "IRON_ORE"
-                && g.SellWaypointSymbol == "X1-AB-MKT1"
-                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
-            Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsIdleMiner_ForScarceMineralExchange()
+    public async Task TheState_ListsTheOpenings_WithTheMinersThatCouldTakeThem()
     {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE", type: "EXCHANGE")),
-            ]);
+        // The drone takes copper; iron, silicon and quartz stay open, and so do B7's, which it can't reach.
+        Fleet(Drone(), Drone("SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(1) });
 
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+        await RunAsync();
 
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID", x: 20, y: 20),
-                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
-                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 1, y: 1, traitsJson: "COMMON_METAL_DEPOSITS"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(g =>
-                g.TradeSymbol == "IRON_ORE"
-                && g.SellWaypointSymbol == "X1-AB-MKT1"
-                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
-            Arg.Any<CancellationToken>());
+        _state!.Opportunities.Should().ContainSingle(o => o.Status == MarketAutomationOpportunityStatus.Assigned)
+            .Which.AssignedShipSymbol.Should().Be("SHIP-3");
+        _state.Opportunities.Where(o => o.Status == MarketAutomationOpportunityStatus.Pending).Should().HaveCount(5)
+            .And.OnlyContain(o => o.CandidateShipSymbols.Count == 0, "the only free miner took a trip");
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_PurchasesMiner_WhenNoIdleMinerAndBudgetAllows()
+    public async Task TheState_IsWrittenOnlyWhenItChanges()
     {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("COPPER_ORE")),
-            ]);
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = false, FailureReason = "budget" });
+        Fleet(Drone());
 
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+        await RunAsync();
+        await RunAsync();
+        await RunAsync();
 
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
-
-        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([MiningShipyard()]);
-        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(MiningShipyard());
-        _shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult
-            {
-                IsSuccess = true,
-                PurchasedShip = new ShipModel("MINER-NEW", "X1-AB", "X1-AB-SY1", "DOCKED", "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 20),
-                EstimatedCost = 23_000,
-                ActualCost = 23_000,
-            });
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([Waypoint("X1-AB-AST", "ASTEROID")]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _shipPurchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>());
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-NEW",
-            Arg.Any<MineAndSellGoal>(),
-            Arg.Any<CancellationToken>());
+        await _plans.Received(1).UpsertAsync(PlanTypes.MiningAutomation, Arg.Any<MiningAutomationPlanState>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task EnsureBootstrappedAsync_DoesNotPurchase_WhenIdleMinerExists()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("COPPER_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([Waypoint("X1-AB-AST", "ASTEROID")]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(g => g.TradeSymbol == "COPPER_ORE"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_DoesNotPurchase_WhenDroneCapReached()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("SILVER_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([Miner("MINER-1")]);
-        _goals.GetActiveGoalAsync("MINER-1", Arg.Any<CancellationToken>())
-            .Returns(new MineAndSellGoal
-            {
-                TradeSymbol = "IRON_ORE",
-                SourceWaypointSymbol = "X1-AB-AST",
-                SellWaypointSymbol = "X1-AB-MKTX",
-            });
-
-        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(1);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_ClearsStaleMiningGoal_WhenOpportunityNoLongerScarce()
-    {
-        var miner = Miner("MINER-STALE");
-
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("FOOD", type: "IMPORT", supply: "MODERATE")),
-            ]);
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns(new MineAndSellGoal
-            {
-                TradeSymbol = "IRON_ORE",
-                SourceWaypointSymbol = "X1-AB-AST",
-                SellWaypointSymbol = "X1-AB-MKT1",
-            });
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).ClearActiveGoalAsync("MINER-STALE", Arg.Any<CancellationToken>());
-        await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_ReassignsShipAfterClearingStaleGoal_WhenNewScarceOpportunityExists()
-    {
-        var miner = Miner("MINER-1");
-
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT2", Good("COPPER_ORE")),
-            ]);
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns(
-                new MineAndSellGoal
-                {
-                    TradeSymbol = "IRON_ORE",
-                    SourceWaypointSymbol = "X1-AB-AST",
-                    SellWaypointSymbol = "X1-AB-MKT1",
-                },
-                (ShipGoal?)null);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).ClearActiveGoalAsync("MINER-1", Arg.Any<CancellationToken>());
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(g =>
-                g.TradeSymbol == "COPPER_ORE"
-                && g.SellWaypointSymbol == "X1-AB-MKT2"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsMiner_WhenExistingGoalIsCompleted()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns(new MineAndSellGoal
-            {
-                Status = SpaceTraders.Domain.Enums.GoalStatus.Completed,
-                TradeSymbol = "COPPER_ORE",
-                SourceWaypointSymbol = "X1-AB-AST",
-                SellWaypointSymbol = "X1-AB-MKT2",
-            });
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
-                Waypoint("X1-AB-AST", "ASTEROID", x: 30, y: 30),
-                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 2, y: 2, traitsJson: "COMMON_METAL_DEPOSITS"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(g =>
-                g.TradeSymbol == "IRON_ORE"
-                && g.SellWaypointSymbol == "X1-AB-MKT1"
-                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_PersistsPendingQueue_WhenNoMinerCanBeAssigned()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
-        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([MiningShipyard()]);
-        _shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult
-            {
-                IsSuccess = false,
-                FailureReason = "reserve",
-                EstimatedCost = 23_000,
-            });
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.MiningAutomation,
-            Arg.Is<MiningAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].TradeSymbol == "IRON_ORE"
-                && state.Opportunities[0].SellWaypointSymbol == "X1-AB-MKT1"
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Pending),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_PersistsAssignedQueue_WhenMinerIsAssigned()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.MiningAutomation,
-            Arg.Is<MiningAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].TradeSymbol == "IRON_ORE"
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "MINER-1"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_TransitionsPersistedPendingQueue_ToAssigned_WhenMinerBecomesAvailable()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
-            .Returns(new MiningAutomationPlanState
-            {
-                PlanId = Guid.NewGuid(),
-                CreatedAt = Now,
-                UpdatedAt = Now,
-                Opportunities =
-                [
-                    new MiningAutomationOpportunityState
-                    {
-                        OpportunityKey = "X1-AB-MKT1|IRON_ORE",
-                        TradeSymbol = "IRON_ORE",
-                        SellWaypointSymbol = "X1-AB-MKT1",
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        AssignedShipSymbol = null,
-                        FirstObservedAt = Now,
-                        LastObservedAt = Now,
-                        StopReason = "No idle mining drone available and purchase unavailable.",
-                    }
-                ]
-            });
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.MiningAutomation,
-            Arg.Is<MiningAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "MINER-1"
-                && state.Opportunities[0].StopReason == null),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task HandleAgentCreditsChangedEvent_TransitionsPersistedPendingQueue_ToAssigned_WhenMinerBecomesAvailable()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
-            .Returns(new MiningAutomationPlanState
-            {
-                PlanId = Guid.NewGuid(),
-                CreatedAt = Now,
-                UpdatedAt = Now,
-                Opportunities =
-                [
-                    new MiningAutomationOpportunityState
-                    {
-                        OpportunityKey = "X1-AB-MKT1|IRON_ORE",
-                        TradeSymbol = "IRON_ORE",
-                        SellWaypointSymbol = "X1-AB-MKT1",
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        AssignedShipSymbol = null,
-                        FirstObservedAt = Now,
-                        LastObservedAt = Now,
-                        StopReason = "No idle mining drone available and purchase unavailable.",
-                    }
-                ]
-            });
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-            ]);
-
-        await CreateService().Handle(new Domain.Events.AgentCreditsChangedEvent(10_000, 40_000));
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.MiningAutomation,
-            Arg.Is<MiningAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "MINER-1"
-                && state.Opportunities[0].StopReason == null),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task HandleShipBecameIdleEvent_TransitionsPersistedPendingQueue_ToAssigned_WhenMinerBecomesAvailable()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
-            .Returns(new MiningAutomationPlanState
-            {
-                PlanId = Guid.NewGuid(),
-                CreatedAt = Now,
-                UpdatedAt = Now,
-                Opportunities =
-                [
-                    new MiningAutomationOpportunityState
-                    {
-                        OpportunityKey = "X1-AB-MKT1|IRON_ORE",
-                        TradeSymbol = "IRON_ORE",
-                        SellWaypointSymbol = "X1-AB-MKT1",
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        AssignedShipSymbol = null,
-                        FirstObservedAt = Now,
-                        LastObservedAt = Now,
-                        StopReason = "No idle mining drone available and purchase unavailable.",
-                    }
-                ]
-            });
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-            ]);
-
-        await CreateService().Handle(new Domain.Events.ShipBecameIdleEvent("MINER-1", "Finished previous assignment"));
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.MiningAutomation,
-            Arg.Is<MiningAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "MINER-1"
-                && state.Opportunities[0].StopReason == null),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_DoesNothing_WhenMarketIsNotScarceDemandMineral()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("FOOD", type: "IMPORT", supply: "MODERATE")),
-                Snapshot("X1-AB-MKT2", Good("IRON_ORE", type: "EXCHANGE", supply: "MODERATE")),
-                Snapshot("X1-AB-MKT3", Good("IRON_ORE", type: "EXPORT", supply: "SCARCE")),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_UsesClosestAsteroidToSellWaypoint_WhenMultipleMatchingSourcesExist()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([
-                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
-            ]);
-
-        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
-
-        var miner = Miner("MINER-1", waypoint: "X1-AB-HQ");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
-            .Returns([
-                Waypoint("X1-AB-HQ", "ORBITAL_STATION", x: 100, y: 100),
-                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
-                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 3, y: 3, traitsJson: "COMMON_METAL_DEPOSITS"),
-                Waypoint("X1-AB-AST-FAR", "ASTEROID", x: 40, y: 40, traitsJson: "COMMON_METAL_DEPOSITS"),
-            ]);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<MineAndSellGoal>(goal => goal.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
-            Arg.Any<CancellationToken>());
-    }
+    private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    private void SurveyPlanIs(bool on)
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(on);
+
+    private Task RunAsync()
+        => new MiningAutomationService(
+                _ships,
+                _goals,
+                _assignments,
+                _contractPlans,
+                _shipyards,
+                _contexts,
+                _settings,
+                _plans,
+                _purchases,
+                _log.For<MiningAutomationService>())
+            .EnsureBootstrappedAsync();
 }

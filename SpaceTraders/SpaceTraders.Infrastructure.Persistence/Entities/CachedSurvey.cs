@@ -17,4 +17,7 @@ public sealed class CachedSurvey
     required public string Size { get; init; }
 
     public DateTimeOffset RecordedAt { get; init; }
+
+    /// <summary>How many extractions were made with the survey (slice 6.4): the survey dashboard shows which went unused.</summary>
+    public int Extractions { get; init; }
 }

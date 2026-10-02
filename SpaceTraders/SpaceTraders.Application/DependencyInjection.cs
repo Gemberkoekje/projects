@@ -8,6 +8,7 @@ using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
@@ -59,10 +60,17 @@ public static class DependencyInjection
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();
         services.AddScoped<ITradingAutomationService, TradingAutomationService>();
 
+        // Surveying and mining (slice 6.4): the survey plan, the surveys' bookkeeping, and what a survey or
+        // mining decision reads.
+        services.AddScoped<ISurveyPlanService, SurveyPlanService>();
+        services.AddScoped<ISurveyKeeper, SurveyKeeper>();
+        services.AddScoped<IMiningContextReader, MiningContextReader>();
+
         // Trading (slice 6.5): the trade arithmetic's inputs, the production chains (fetched once per
         // process, shared with the markets dashboard), and the watch that keeps prices fresh where ships are.
         services.AddSingleton<ISupplyChainCache, SupplyChainCache>();
         services.AddScoped<ITradeContextReader, TradeContextReader>();
+        services.AddScoped<IMarketRefresher, MarketRefresher>();
         services.AddScoped<IMarketWatchService, MarketWatchService>();
         services.AddSingleton<MarketWatchAttempts>();
 

@@ -37,14 +37,4 @@ public interface IShipGoalRepository
     /// across all ships.
     /// </summary>
     Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Returns active mining-market targets keyed by destination waypoint and trade symbol.
-    /// </summary>
-    Task<IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)>> GetActiveMineAndSellTargetsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Returns active survey targets keyed by target waypoint and target deposit symbol.
-    /// </summary>
-    Task<IReadOnlySet<(string TargetWaypointSymbol, string TargetDepositSymbol)>> GetActiveSurveyTargetsAsync(CancellationToken cancellationToken = default);
 }

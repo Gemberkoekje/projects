@@ -465,7 +465,6 @@ public sealed record RunKpisDto
     public double? FuelCostPerCreditEarned { get; init; }
 }
 
-
 /// <summary>
 /// A single completed or blocked goal entry in the per-ship goal history log.
 /// </summary>
@@ -519,6 +518,12 @@ public sealed record ShipyardShipDto
     public string? Activity { get; init; }
 
     public required long PurchasePrice { get; init; }
+
+    /// <summary>What the ship's tank holds, from its frame; 0 when the shipyard listed no details.</summary>
+    public int FuelCapacity { get; init; }
+
+    /// <summary>What the ship's cargo holds take together; 0 when the shipyard listed no details.</summary>
+    public int CargoCapacity { get; init; }
 }
 
 public sealed record ShipyardWaypointDto

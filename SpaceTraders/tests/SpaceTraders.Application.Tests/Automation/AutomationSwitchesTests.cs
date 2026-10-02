@@ -25,6 +25,7 @@ public sealed class AutomationSwitchesTests
             ["Automation.Plan.Scout.Enabled"] = "true",
             ["Automation.Plan.Contract.Enabled"] = "true",
             ["Automation.Plan.ProbeDeployment.Enabled"] = "false",
+            ["Automation.Plan.Survey.Enabled"] = "false",
             ["Automation.Plan.Mining.Enabled"] = "false",
             ["Automation.Plan.Trading.Enabled"] = "false",
         });
@@ -39,6 +40,7 @@ public sealed class AutomationSwitchesTests
                 "Automation.Plan.Scout.Enabled",
                 "Automation.Plan.Contract.Enabled",
                 "Automation.Plan.ProbeDeployment.Enabled",
+                "Automation.Plan.Survey.Enabled",
                 "Automation.Plan.Mining.Enabled",
                 "Automation.Plan.Trading.Enabled");
     }
@@ -49,7 +51,7 @@ public sealed class AutomationSwitchesTests
         AutomationSwitches.PlanFor(new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-1" }).Should().Be(AutomationPlan.Scout);
         AutomationSwitches.PlanFor(new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-1" }).Should().Be(AutomationPlan.ProbeDeployment);
         AutomationSwitches.PlanFor(new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-1", SellWaypointSymbol = "X1-AB-2" }).Should().Be(AutomationPlan.Mining);
-        AutomationSwitches.PlanFor(new SurveyWaypointGoal { TargetWaypointSymbol = "X1-AB-1", TargetDepositSymbol = "IRON_ORE" }).Should().Be(AutomationPlan.Mining);
+        AutomationSwitches.PlanFor(new SurveyWaypointGoal { TargetWaypointSymbol = "X1-AB-1", TargetDepositSymbol = "IRON_ORE" }).Should().Be(AutomationPlan.Survey);
         AutomationSwitches.PlanFor(new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-1", SellWaypointSymbol = "X1-AB-2" }).Should().Be(AutomationPlan.Trading);
         AutomationSwitches.PlanFor(new IdleGoal()).Should().BeNull();
     }
