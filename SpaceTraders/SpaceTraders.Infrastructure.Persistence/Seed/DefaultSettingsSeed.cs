@@ -59,6 +59,17 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Runtime.Alert.ResetUpcoming",                   Value = "false",               Type = "bool",    Description = "Dashboard alert: server reset is approaching" },
     ];
 
+    private static readonly Dictionary<string, string> Descriptions = Defaults.ToDictionary(setting => setting.Key, setting => setting.Description, StringComparer.Ordinal);
+
+    /// <summary>
+    /// What a seeded setting does, as this version describes it; null for a key the seed doesn't hold. A stored setting
+    /// keeps the description it was seeded with, which an older version may have written (slice 2.9).
+    /// </summary>
+    /// <param name="key">The setting's key.</param>
+    /// <returns>The description, or null.</returns>
+    public static string? DescriptionOf(string key)
+        => Descriptions.GetValueOrDefault(key);
+
     /// <summary>
     /// Seeds missing settings (does not overwrite existing values).
     /// </summary>

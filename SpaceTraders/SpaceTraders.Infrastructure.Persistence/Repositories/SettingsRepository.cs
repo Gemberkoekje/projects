@@ -109,6 +109,16 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
         }
     }
 
+    /// <summary>
+    /// A setting's value as the journal and the metrics show it: <c>(hidden)</c> when the key may hold a secret (it
+    /// ends in <c>Url</c>, or names a secret, password or API key) and the value isn't empty; otherwise the value.
+    /// </summary>
+    /// <param name="key">The setting's key.</param>
+    /// <param name="value">Its value.</param>
+    /// <returns>What may be shown.</returns>
+    public static string Shown(string key, string value)
+        => MayHoldASecret(key) && value.Length > 0 ? "(hidden)" : value;
+
     private static bool MayHoldASecret(string key)
         => key.EndsWith("Url", StringComparison.OrdinalIgnoreCase)
             || key.Contains("Secret", StringComparison.OrdinalIgnoreCase)
@@ -125,22 +135,11 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
             return;
         }
 
-        var secret = MayHoldASecret(key);
         logger.LogInformation(
             "{EventKind:l}: {Setting} changed from {OldValue} to {NewValue}.",
             JournalEvents.SettingChanged,
             key,
-            Shown(oldValue, secret),
-            Shown(newValue, secret));
-    }
-
-    private static string Shown(string? value, bool secret)
-    {
-        if (value is null)
-        {
-            return "(unset)";
-        }
-
-        return secret && value.Length > 0 ? "(hidden)" : value;
+            oldValue is null ? "(unset)" : Shown(key, oldValue),
+            Shown(key, newValue));
     }
 }

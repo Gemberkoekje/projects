@@ -124,6 +124,9 @@ sum by (type) (rate(spacetraders_messages_handled_total[5m]))
 spacetraders_ship_info
 time() - spacetraders_ship_status_since_timestamp_seconds
 
+# Every setting as it is now, the Runtime.* flags included (a secret shows "(hidden)")
+spacetraders_setting_info
+
 # API calls that failed, and real 429s
 sum by (endpoint, status) (increase(spacetraders_api_requests_total{status!~"2.."}[1h]))
 sum by (source) (increase(spacetraders_api_throttled_total[1h]))

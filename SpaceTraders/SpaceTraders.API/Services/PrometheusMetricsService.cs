@@ -8,13 +8,15 @@ using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
+using SpaceTraders.Infrastructure.Persistence.Repositories;
+using SpaceTraders.Infrastructure.Persistence.Seed;
 
 namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
 /// every ship (role, state, goal, why its goal is blocked, where it is, what it does, its hold, what it cost), the
-/// accepted contracts' deliverables and the usable surveys. What happens (API calls, goal steps, credits earned and spent) is counted where
+/// accepted contracts' deliverables and the usable surveys; and the bot's settings. What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
 /// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
 /// </summary>
@@ -75,6 +77,14 @@ public sealed class PrometheusMetricsService(
         metrics.Surveys([.. surveys
             .GroupBy(s => (s.WaypointSymbol, s.Used))
             .Select(group => new SurveyMetricsSample(group.Key.WaypointSymbol, group.Key.Used, group.Count()))]);
+
+        // Slice 2.9: the settings, for the dashboard's settings table. A secret stays hidden, as in SettingChanged; what a
+        // setting does is what this version says, as a stored description is the one it was seeded with.
+        var settings = await db.Settings.AsNoTracking().ToListAsync(cancellationToken);
+        metrics.Settings([.. settings.Select(setting => new SettingMetricsSample(
+            setting.Key,
+            SettingsRepository.Shown(setting.Key, setting.Value),
+            DefaultSettingsSeed.DescriptionOf(setting.Key) ?? setting.Description))]);
     }
 
     /// <inheritdoc />

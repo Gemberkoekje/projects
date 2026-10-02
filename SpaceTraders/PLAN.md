@@ -79,11 +79,13 @@
 - Slice 6.7 (siphoning) was merged as projects#130 on 2026-10-02 (deployed by gembernodes#29), with your
   decisions D31–D33: siphon drones siphon gases at gas giants by the miners' rules, without surveys (the
   API's siphon call takes none). The siphon plan stays off until you switch it on (D9).
-- Slice 6.8 (spare time) is built on branch `ccr-3f080253-4o4wfu`, with your decisions D34–D37, asked on
-  2026-10-02: "I'd like my command ship not to be idle." With nothing to survey the command ship trades,
-  and with no trade either it mines or siphons whatever sells at the nearest place it can, and sells it;
-  a survey or a trade interrupts that. The spare-time plan stays off until you switch it on (D9); until
-  then the command ship surveys and waits, as before.
+- Slice 6.8 (spare time) was merged as projects#131 on 2026-10-02 (deployed by gembernodes#30), with your
+  decisions D34–D37, asked that day: "I'd like my command ship not to be idle." With nothing to survey the
+  command ship trades, and with no trade either it mines or siphons whatever sells at the nearest place it
+  can, and sells it; a survey or a trade interrupts that. You switched on the siphon, probe and spare-time
+  plans at 21:40–21:42Z; the first minutes' journal matched the plan.
+- Slice 2.9 (a settings table on the dashboard) is built on branch `ccr-212dac2b-p2ent0`, in projects and
+  gembernodes, asked on 2026-10-02: which settings exist, and which are on.
 
 ## Known issues
 
@@ -806,6 +808,37 @@ its own retention, so the bot's database stays small.
     deploys the bot with these metrics (image `fd9e3d3`, since 10:29Z).
   - Noticed: the game lists `MACHINERY` as what raw goods (`ICE_WATER`, `AMMONIA_ICE` and others)
     are made from; the tree shows the game's map as it is.
+
+**2.9 Which settings exist, and which are on** (built 2026-10-02 on branch `ccr-212dac2b-p2ent0`, in projects
+and gembernodes; asked that day)
+- Asked: "Can you work on an extra panel in grafana with which configuration items exist, and which of
+  them are turned on?"
+- Done:
+  - Every 10 seconds the bot exports its settings, one series per setting, always 1:
+    `spacetraders_setting_info{setting,current,description}`, the value as stored and what the setting
+    does. Grafana reads only Prometheus and Loki (phase 2), so the table needs a metric.
+  - A value that may hold a secret shows `(hidden)`, by the rule `SettingChanged` follows
+    (`SettingsRepository.Shown`, now shared). Today that is only `Alerts.WebhookUrl`, which is empty.
+  - What a setting does comes from the running version's seed (`DefaultSettingsSeed.DescriptionOf`): a
+    stored setting keeps the description it was seeded with, and the cluster's agent was registered
+    before 6.3 to 6.5 rewrote the probe, mining and trading plans' descriptions. A key the seed doesn't
+    hold shows its stored description (empty for one only `PUT /settings/{key}` wrote).
+  - The dashboard's side is gembernodes (branch `ccr-212dac2b-p2ent0`): a **Settings** table after the
+    database size and the anomalies. The switches come first (every setting whose value is `true` or
+    `false`), on in green, off in plain text; then the other settings by name, with their values and
+    what they do. The `Runtime.*` status flags are left out (status flags, not settings to tune, B18);
+    the metric has them. The blue "Setting changes" annotations already say when each one changed.
+  - Tests: `PrometheusMetricsServiceTests` (every setting, the secret hidden, the running version's
+    description, only the agent's own), `PrometheusAutomationMetricsTests` (one series per setting as
+    its value changes; gone with the setting) and `MetricsEndpointTests` (the scrape lists it). The
+    table was checked in a browser, in Grafana 11.6.1 (what the chart's newest 8.x ships) against a
+    local Prometheus fed the metric as the bot writes it: 34 rows, the 9 switches first, the empty
+    webhook URL as `(empty)`, no `Runtime.*` row.
+- Noticed (not changed):
+  - The startup settings dump (`SettingsSnapshotLogger`: "Setting {Key} = {Value} …") logs every value as
+    stored, `Alerts.WebhookUrl` included, where `SettingChanged` hides it. The URL is empty, so nothing
+    has leaked; hiding it there too would take one line.
+  - A change reaches the table within about a minute: the 10-second sample, then Prometheus's scrape.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -1602,7 +1635,7 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `AutomationSwitchesTests`, `GameLoopServiceTests`, `DefaultSettingsSeedTests`, `ShipRuleTests`,
       `FleetStatusQueryServiceTests`, `ShipGoalSerializationTests` (Domain) and `PrometheusMetricsTests`
       (API).
-- **6.8 Spare time** (built 2026-10-02 on branch `ccr-3f080253-4o4wfu`, with your decisions D34–D37).
+- **6.8 Spare time** (merged 2026-10-02 as projects#131, deployed by gembernodes#30; built on branch `ccr-3f080253-4o4wfu`, with your decisions D34–D37).
   Asked that day: "I'd like my command ship not to be idle. So can we add a interuptable mining/siphoning
   task that just fills up the cargo with whatever and sells it where it's relevant. If a more important job
   comes up such as trading or surveying it should stop mining, sell it's inventory and start on the new
@@ -1710,3 +1743,4 @@ your PC, 1Password or kubectl:
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
+| 2.9 | The settings table on the SpaceTraders dashboard (branch `ccr-212dac2b-p2ent0`, not merged). It shows data once the bot runs a build with `spacetraders_setting_info`: deploy that build with it |
