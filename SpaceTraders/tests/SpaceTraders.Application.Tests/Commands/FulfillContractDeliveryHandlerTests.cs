@@ -2,6 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using SpaceTraders.Application.Commands.Contracts;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
@@ -55,6 +56,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             Substitute.For<INavigateSubCommand>(),
             bus,
             agents,
+            Substitute.For<IShipAssignmentRepository>(),
             log.For<FulfillContractDeliveryHandler>());
 
         await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-1", "C-1", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -135,6 +137,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             navigate,
             bus,
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IShipAssignmentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-1", "C-1", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -154,6 +157,7 @@ public sealed class FulfillContractDeliveryHandlerTests
         var orbit = Substitute.For<IOrbitSubCommand>();
         var navigate = Substitute.For<INavigateSubCommand>();
         var bus = Substitute.For<Wolverine.IMessageBus>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
 
         ships.FindAsync("SHIP-2", Arg.Any<CancellationToken>()).Returns(new ShipModel(
             Symbol: "SHIP-2",
@@ -176,6 +180,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             navigate,
             bus,
             Substitute.For<IAgentRepository>(),
+            assignments,
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-2", "C-2", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -183,6 +188,9 @@ public sealed class FulfillContractDeliveryHandlerTests
         result.Accepted.Should().BeTrue();
         await navigate.Received(1).ExecuteAsync("SHIP-2", "X1-AB-MKT", Guid.Empty, Arg.Any<CancellationToken>());
         await port.DidNotReceiveWithAnyArgs().DeliverContractAsync(default!, default!, default!, default, default);
+
+        // On its way, the ship is still on its trip (D26).
+        await assignments.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
     }
 
     [Fact]
@@ -243,6 +251,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<Wolverine.IMessageBus>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IShipAssignmentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-3", "C-3", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -288,6 +297,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<Wolverine.IMessageBus>(),
             agents,
+            Substitute.For<IShipAssignmentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-4", "C-4", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -317,6 +327,7 @@ public sealed class FulfillContractDeliveryHandlerTests
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<IMessageBus>(),
             Substitute.For<IAgentRepository>(),
+            Substitute.For<IShipAssignmentRepository>(),
             NullLogger<FulfillContractDeliveryHandler>.Instance);
 
         await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-4", "C-5", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
@@ -324,6 +335,97 @@ public sealed class FulfillContractDeliveryHandlerTests
         await port.DidNotReceiveWithAnyArgs().DeliverContractAsync(default!, default!, default!, default, default);
         await port.DidNotReceiveWithAnyArgs().FulfillContractAsync(default!, default);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ADelivery_EndsTheShipsTrip()
+    {
+        // D26, seen on the cluster on 2026-10-02: the command ship joined the contract while the survey
+        // plan was still off, and its assignment lasted until the contract was fulfilled, so it went on
+        // mining after the survey plan was switched on (D20). Released at each delivery, a ship is
+        // assigned again on the next tick by the plans in their order, so work that matters more comes
+        // first.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var ship = new ShipModel("SHIP-6", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 80, CargoCurrent: 15, CargoCapacity: 15, CargoInventory: [new CargoItemModel("IRON_ORE", 15)]);
+        ships.FindAsync("SHIP-6", Arg.Any<CancellationToken>()).Returns(ship);
+        contracts.FindAsync("C-6", Arg.Any<CancellationToken>()).Returns(Contract("C-6", required: 42, fulfilled: 10), Contract("C-6", required: 42, fulfilled: 25));
+        port.DeliverContractAsync("C-6", "SHIP-6", "IRON_ORE", 15, Arg.Any<CancellationToken>())
+            .Returns(Delivered("C-6", required: 42, fulfilled: 25));
+        assignments.FindAsync("SHIP-6", Arg.Any<CancellationToken>()).Returns(Assignment("SHIP-6", "C-6"));
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IAgentRepository>(),
+            assignments,
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        await sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-6", "C-6", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await port.DidNotReceiveWithAnyArgs().FulfillContractAsync(default!, default);
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a => a.ShipSymbol == "SHIP-6" && a.ContractId == "C-6" && a.CompletedAt.HasValue),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenTheFulfilmentFails_TheShipKeepsItsAssignment()
+    {
+        // D26: the plan gives no ship a trip once every unit is delivered, so a ship released with the
+        // fulfilment still to make would leave it, and its payment, to nobody. Kept on its assignment,
+        // the ship makes the call again on the next tick.
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var ship = new ShipModel("SHIP-7", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 80, 80, CargoCurrent: 2, CargoCapacity: 15, CargoInventory: [new CargoItemModel("IRON_ORE", 2)]);
+        ships.FindAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(ship);
+        contracts.FindAsync("C-7", Arg.Any<CancellationToken>()).Returns(Contract("C-7", required: 42, fulfilled: 40), Contract("C-7", required: 42, fulfilled: 42));
+        port.DeliverContractAsync("C-7", "SHIP-7", "IRON_ORE", 2, Arg.Any<CancellationToken>())
+            .Returns(Delivered("C-7", required: 42, fulfilled: 42));
+        port.FulfillContractAsync("C-7", Arg.Any<CancellationToken>()).ThrowsAsync(new HttpRequestException("The API timed out."));
+        assignments.FindAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(Assignment("SHIP-7", "C-7"));
+        var sut = new FulfillContractDeliveryHandler(
+            port,
+            ships,
+            contracts,
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<INavigateSubCommand>(),
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IAgentRepository>(),
+            assignments,
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
+
+        var deliver = () => sut.ExecuteAsync(new FulfillContractDeliveryCommand("SHIP-7", "C-7", "IRON_ORE", "X1-AB-MKT"), CancellationToken.None);
+
+        await deliver.Should().ThrowAsync<HttpRequestException>();
+        await assignments.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
+    }
+
+    private static ShipAssignmentDto Assignment(string ship, string contractId)
+        => new(ship, "Contract", "X1-AB-AST", "X1-AB-MKT", "IRON_ORE", contractId, 0, DateTimeOffset.UtcNow.AddMinutes(-20), null, RequiredUnits: 32);
+
+    private static ContractActionResult Delivered(string id, int required, int fulfilled) =>
+        new(
+            ContractId: id,
+            FactionSymbol: "COSMIC",
+            ContractType: "PROCUREMENT",
+            IsAccepted: true,
+            IsFulfilled: false,
+            Expiration: DateTimeOffset.UtcNow.AddDays(3),
+            DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+            TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+            Deliverables: [new ContractDeliverableModel("IRON_ORE", "X1-AB-MKT", required, fulfilled)],
+            AgentSymbol: null,
+            AgentCredits: null,
+            ShipCargo: new CargoModel(0, 15, []));
 
     private static ContractDto Contract(string id, int required, int fulfilled) =>
         new(
