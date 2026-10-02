@@ -43,11 +43,15 @@ public sealed class DefaultSettingsSeedTests
         "ActivityLog.RetentionDays",
         "Alerts.WebhookUrl",
 
+        // Trading (slice 6.5): TradeContextReader (the trading plan and the trade executor), and
+        // MarketWatchService.
+        "Trade.MinProfitPerUnit",
+        "Market.RefreshMinutes",
+
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).
         "FleetExpansion.PreferredShipType",
         "Automation.MiningShipPercentage",
-        "Trade.MinProfitPerUnit",
         "Trade.MaxHaulDistance",
     ];
 

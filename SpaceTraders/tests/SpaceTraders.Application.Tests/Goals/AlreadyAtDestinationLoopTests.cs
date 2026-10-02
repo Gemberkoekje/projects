@@ -125,6 +125,7 @@ public sealed class AlreadyAtDestinationLoopTests
             Substitute.For<IScoutAllMarketplacesPlanService>(),
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),
+            new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 

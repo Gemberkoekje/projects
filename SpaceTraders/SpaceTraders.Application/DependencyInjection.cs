@@ -10,6 +10,7 @@ using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using Wolverine;
 using Wolverine.ErrorHandling;
 
@@ -58,6 +59,13 @@ public static class DependencyInjection
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();
         services.AddScoped<ITradingAutomationService, TradingAutomationService>();
 
+        // Trading (slice 6.5): the trade arithmetic's inputs, the production chains (fetched once per
+        // process, shared with the markets dashboard), and the watch that keeps prices fresh where ships are.
+        services.AddSingleton<ISupplyChainCache, SupplyChainCache>();
+        services.AddScoped<ITradeContextReader, TradeContextReader>();
+        services.AddScoped<IMarketWatchService, MarketWatchService>();
+        services.AddSingleton<MarketWatchAttempts>();
+
         // Generic command handlers are discovered from this assembly by Wolverine.
 
         // Baseline goal executors.
@@ -69,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
         services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
+        services.AddSingleton<IShipGoalStepGuard, ShipGoalStepGuard>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {

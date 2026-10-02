@@ -60,6 +60,21 @@ public sealed class RequestBudgetTests
     }
 
     [Fact]
+    public void TryTake_ForAReadThatGivesWay_LeavesTheLastBurstRequestsToWrites()
+    {
+        // D19: however many reads went just before, a write still goes at once.
+        var budget = new RequestBudget();
+        for (var request = 0; request < RequestBudget.PerSecond + RequestBudget.Burst - RequestBudget.WriteReserve; request++)
+        {
+            budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.Zero, $"read {request + 1} leaves the reserve alone");
+        }
+
+        budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.FromSeconds(1), "the next read waits for the next second");
+        budget.TryTake(Start).Should().Be(TimeSpan.Zero, "a write takes from the reserve");
+        budget.BurstRemaining(Start).Should().Be(RequestBudget.WriteReserve - 1);
+    }
+
+    [Fact]
     public void TryTake_RefillsTheBurst60SecondsAfterItWasUsed()
     {
         var budget = new RequestBudget();
@@ -91,7 +106,7 @@ public sealed class RateLimitingHandlerTests
         }
 
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
-        _metrics.DidNotReceive().RateLimitWait(Arg.Any<TimeSpan>());
+        _metrics.DidNotReceive().RateLimitWait(Arg.Any<TimeSpan>(), Arg.Any<string>());
     }
 
     [Fact]
@@ -106,7 +121,50 @@ public sealed class RateLimitingHandlerTests
 
         await SendAsync(new RateLimitingHandler(budget, new RateLimitStatus(), _metrics), requests: 1);
 
-        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait > TimeSpan.FromMilliseconds(500)));
+        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait > TimeSpan.FromMilliseconds(500)), "read");
+    }
+
+    [Fact]
+    public async Task ARead_GivesWayToAWaitingWrite_ButNoLongerThanItsLimit()
+    {
+        // D19: a move or a trade goes before a market refresh, which loses nothing by going later;
+        // but not forever, or a busy fleet would starve the refresh a ship needs before it trades.
+        var budget = new RequestBudget();
+        budget.WriteWaiting();
+        using var handler = new RateLimitingHandler(budget, new RateLimitStatus(), _metrics)
+        {
+            InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)),
+            MaxReadDelay = TimeSpan.FromMilliseconds(300),
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var stopwatch = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/my/market");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250), "the read gave way to the write");
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "then it went, though the write still waits");
+        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait >= TimeSpan.FromMilliseconds(250)), "read");
+    }
+
+    [Fact]
+    public async Task AWrite_DoesNotGiveWay()
+    {
+        var budget = new RequestBudget();
+        budget.WriteWaiting();
+        using var handler = new RateLimitingHandler(budget, new RateLimitStatus(), _metrics)
+        {
+            InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)),
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var stopwatch = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://test/my/ships/SHIP-1/navigate");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(200));
+        budget.WritesWaiting.Should().Be(1, "only the other write still waits");
+        _metrics.DidNotReceive().RateLimitWait(Arg.Any<TimeSpan>(), Arg.Any<string>());
     }
 
     [Fact]

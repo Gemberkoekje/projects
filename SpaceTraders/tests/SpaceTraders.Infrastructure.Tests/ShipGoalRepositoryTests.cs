@@ -183,23 +183,29 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task GetActiveTradeRouteTargetsAsync_ReturnsNormalizedTradeRouteTargets()
+    public async Task ATradeTrip_KeepsItsPlanAndItsProgress()
     {
+        // Slice 6.5: the trip carries what the trading plan chose and how far it has got.
         await SeedShipAsync("SHIP-G9");
-        var setRepo = new ShipGoalRepository(Db);
-        await setRepo.SetActiveGoalAsync("SHIP-G9", new TradeBetweenMarketsGoal
+        var trip = new TradeBetweenMarketsGoal
         {
             GoalId = Guid.NewGuid(),
-            TradeSymbol = "food",
-            BuyWaypointSymbol = "x1-test-buy",
-            SellWaypointSymbol = "x1-test-sell",
-        });
+            TradeSymbol = "EQUIPMENT",
+            BuyWaypointSymbol = "X1-TEST-K85",
+            SellWaypointSymbol = "X1-TEST-A1",
+            Units = 20,
+            ExpectedProfit = 4_508,
+            FeedsTradeSymbol = "SHIP_PARTS",
+            CargoBought = true,
+            PricePaidPerUnit = 3_254,
+            SellWaypointChanged = true,
+        };
+        await new ShipGoalRepository(Db).SetActiveGoalAsync("SHIP-G9", trip);
 
         await using var fresh = CreateFreshContext();
-        var getRepo = new ShipGoalRepository(fresh);
-        var result = await getRepo.GetActiveTradeRouteTargetsAsync();
+        var result = await new ShipGoalRepository(fresh).GetActiveGoalAsync("SHIP-G9");
 
-        result.Should().Contain(("X1-TEST-BUY", "X1-TEST-SELL", "FOOD"));
+        result.Should().BeOfType<TradeBetweenMarketsGoal>().Which.Should().BeEquivalentTo(trip);
     }
 
     [SkippableFact]

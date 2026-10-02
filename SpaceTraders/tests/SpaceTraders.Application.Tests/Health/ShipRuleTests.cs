@@ -276,9 +276,33 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
-    public async Task AHauler_LeftIdleWhileATradingOpportunityHasNoShip_IsAnAnomaly()
+    public async Task ATrader_LeftIdleWhileALucrativeRouteItCouldTakeHasNoShip_IsAnAnomaly()
     {
-        _plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>()).Returns(new TradingAutomationPlanState
+        OpenTradeRoute(candidates: ["SHIP-5"]);
+        _fleet.Have(new ShipModel("SHIP-5", "X1-AB", "X1-AB-B2", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 40, LastSyncedAt: Start, ShipType: "SHIP_LIGHT_HAULER"));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        var violation = (await _harness.EvaluateAsync(_rule, Start.AddMinutes(11))).Should().ContainSingle().Subject;
+        violation.Subject.Should().Be("SHIP-5");
+        violation.Details.Should().Contain("the Trading plan has work it could do: 1 lucrative trade routes without a ship");
+    }
+
+    [Fact]
+    public async Task ATrader_WhoseTankCantReachTheOpenRoutes_IsIdleByDesign()
+    {
+        // Slice 6.5: the open route is the command ship's to take; the drone's 80-unit tank can't
+        // fly it, so the plan doesn't list the drone among its candidates.
+        OpenTradeRoute(candidates: ["SHIP-1"]);
+        _fleet.Have(new ShipModel("SHIP-3", "X1-AB", "X1-AB-B2", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 15, LastSyncedAt: Start, ShipType: "EXCAVATOR"));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
+    }
+
+    private void OpenTradeRoute(IReadOnlyList<string> candidates)
+        => _plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>()).Returns(new TradingAutomationPlanState
         {
             PlanId = Guid.NewGuid(),
             Opportunities =
@@ -290,6 +314,7 @@ public sealed class ShipLeftIdleRuleTests
                     BuyWaypointSymbol = "X1-AB-B2",
                     SellWaypointSymbol = "X1-AB-C3",
                     Status = MarketAutomationOpportunityStatus.Pending,
+                    CandidateShipSymbols = candidates,
                     FirstObservedAt = Start,
                     LastObservedAt = Start,
                 },
@@ -297,12 +322,6 @@ public sealed class ShipLeftIdleRuleTests
             CreatedAt = Start,
             UpdatedAt = Start,
         });
-        _fleet.Have(new ShipModel("SHIP-5", "X1-AB", "X1-AB-B2", "DOCKED", "CRUISE", 80, 80, CargoCapacity: 40, LastSyncedAt: Start, ShipType: "SHIP_LIGHT_HAULER"));
-
-        await _harness.EvaluateAsync(_rule, Start);
-
-        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(11))).Should().ContainSingle().Which.Subject.Should().Be("SHIP-5");
-    }
 
     [Fact]
     public async Task AShipWithWork_OrInTransit_IsNotIdle()

@@ -88,7 +88,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "source");
         _rateLimitWaitSeconds = ZeroFirst(
             "spacetraders_api_rate_limit_wait_seconds_total",
-            "Seconds that requests waited for the local request budget (2 per second plus a burst of 30 per minute).");
+            "Seconds that requests waited for the local request budget (2 per second plus a burst of 30 per minute), by kind: read (GET, gives way to writes) or write.",
+            "kind");
         _messagesHandled = ZeroFirst(
             "spacetraders_messages_handled_total",
             "Messages Wolverine handled without an error, by message type.",
@@ -242,7 +243,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     public void ApiThrottled(string source) => _apiThrottled.Inc(1, source);
 
     /// <inheritdoc />
-    public void RateLimitWait(TimeSpan wait) => _rateLimitWaitSeconds.Inc(wait.TotalSeconds);
+    public void RateLimitWait(TimeSpan wait, string kind) => _rateLimitWaitSeconds.Inc(wait.TotalSeconds, kind);
 
     /// <inheritdoc />
     public void MessageHandled(string messageType) => _messagesHandled.Inc(1, messageType);

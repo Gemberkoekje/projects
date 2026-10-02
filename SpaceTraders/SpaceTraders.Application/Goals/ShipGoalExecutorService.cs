@@ -14,6 +14,7 @@ public sealed class ShipGoalExecutorService(
     IScoutAllMarketplacesPlanService scoutPlanService,
     ISettingsRepository settings,
     IGoalStepCircuitBreaker circuitBreaker,
+    IShipGoalStepGuard stepGuard,
     IAutomationMetrics metrics,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
@@ -30,6 +31,29 @@ public sealed class ShipGoalExecutorService(
             return null;
         }
 
+        // One step at a time per ship (B46): the tick and an arrival could both step a ship that
+        // docks, and both buy or sell. A step that finds the ship busy is skipped; the next tick
+        // takes the ship's next step.
+        if (!stepGuard.TryEnter(shipSymbol))
+        {
+            logger.LogDebug(
+                "ShipGoalExecutorService: another goal step for ship {ShipSymbol} is running; this one is skipped.",
+                shipSymbol);
+            return null;
+        }
+
+        try
+        {
+            return await ExecuteStepAsync(shipSymbol, ct);
+        }
+        finally
+        {
+            stepGuard.Exit(shipSymbol);
+        }
+    }
+
+    private async Task<GoalExecutionResult?> ExecuteStepAsync(string shipSymbol, CancellationToken ct)
+    {
         var ship = await ships.FindAsync(shipSymbol, ct);
         if (ship is null)
         {

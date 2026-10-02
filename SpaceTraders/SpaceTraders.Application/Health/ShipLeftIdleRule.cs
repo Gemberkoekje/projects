@@ -21,7 +21,9 @@ namespace SpaceTraders.Application.Health;
 ///   <item>probe deployment: a target without a probe, while the plan isn't waiting for credits, for a
 ///   probe that isn't parked at a deployed waypoint. A probe is what the plan recognises, or a ship
 ///   whose cached type is <c>SATELLITE</c>: the starting probe, which the plan misses (B25);</item>
-///   <item>mining and trading: an opportunity without a ship (Pending), for a ship that plan can use.</item>
+///   <item>mining: an opportunity without a ship (Pending), for a ship that plan can use;</item>
+///   <item>trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to
+///   take it (slice 6.5).</item>
 /// </list>
 /// <para>
 /// Without such work an idle ship is idle by design: in the first run (D9, D1) the starting probe, the
@@ -139,15 +141,18 @@ public sealed class ShipLeftIdleRule(
         if (context.IsOn(AutomationPlan.Trading)
             && await plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, cancellationToken) is { } trading)
         {
-            var open = trading.Opportunities.Count(opportunity => opportunity.Status == MarketAutomationOpportunityStatus.Pending);
-            if (open > 0)
+            // A lucrative route is work only for a ship that can fly it and finds it lucrative from
+            // where it is: the plan lists those as its candidates (slice 6.5). A drone with a small
+            // tank isn't idle by mistake while the open routes are beyond its reach.
+            var open = trading.Opportunities
+                .Where(opportunity => opportunity.Status == MarketAutomationOpportunityStatus.Pending)
+                .ToList();
+            if (open.Count > 0)
             {
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Trading,
-                    string.Create(CultureInfo.InvariantCulture, $"{open} trading opportunities without a ship"),
-                    ship => ship.Ship.IsTradingCapable
-                        && ship.Ship.FuelCurrent > 0
-                        && ship.Ship.CargoCapacity > ship.Ship.CargoCurrent));
+                    string.Create(CultureInfo.InvariantCulture, $"{open.Count} lucrative trade routes without a ship"),
+                    ship => open.Any(opportunity => opportunity.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
             }
         }
 

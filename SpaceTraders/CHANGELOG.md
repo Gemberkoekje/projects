@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-02, slice 6.5)
+- Trading, as asked on 2026-10-02 (`PLAN.md` 6.5, decisions D14–D18). Any ship with a cargo hold and a fuel tank that has nothing else to do trades; after scouting that is the command ship. A trip's profit is what the sell market pays minus what the buy market charges, times the units, minus the fuel for the whole trip, the flight to the buy market included; it must earn `Trade.MinProfitPerUnit` per unit (D14), and routes whose sell market makes a pricier good from the cargo come first (D15). Two traders never share a route (D18), and the plan buys no ships (D16). Flights beyond one tank refuel at markets on the way instead of drifting. A trip checks its prices again where it lands: at the buy market it buys only while the trip is still lucrative (`TradeDropped` otherwise), and at the sell market it takes the cargo to a market that pays more, once (`TradeRerouted`). Sales above a market's trade volume go in several. Journal: `TradeStarted`, `TradeRerouted`, `TradeDropped`.
+- The market watch: every market with one of our ships at its waypoint is fetched again once `Market.RefreshMinutes` (new, 5; 0 = off) have passed since its prices were last seen; one market a tick, the most overdue, as the tick's last step (D19).
+- Writes before reads for the rate limit (D19): a GET gives way while a POST waits for the budget, leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds. `spacetraders_api_rate_limit_wait_seconds_total` has a `kind` label, `read` or `write`.
+- The game's production chains are fetched once per process and shared by the trading plan and the markets dashboard (`SupplyChainCache`).
+
+### Code – Fixed (2026-10-02, slice 6.5)
+- One goal step at a time per ship (B46): the tick and an arrival could both step a ship as it docks, and a trade step would have bought twice. A step that finds its ship busy is skipped; the next tick takes it.
+
+### Code – Removed (2026-10-02, slice 6.5)
+- The old trading opportunities (a good scarce at one market and abundant at another, prices unread), the hauler purchases that went with them, and `IShipGoalRepository.GetActiveTradeRouteTargetsAsync`, which only they used.
+
+### Docs – Changed (2026-10-02, slice 6.5)
+- `PLAN.md`: slice 6.5 built, with its summary; D14–D19; B46 fixed and B47 (the navigation's fuel fallback leaves a ship in DRIFT) found. `docs/HOW_IT_WORKS.md` describes the market watch, the trading plan and the trip, and the one-step-per-ship guard; `docs/GLOSSARY.md` adds lucrative, market watch, trader and trade trip.
+
 ### Tools – Added (2026-10-02)
 - `tools/investigate/st.py` (slice 5.1): reads the bot's data on the cluster from your PC, read-only, for the `st-investigate` skill: `check` (the pods, Prometheus, Loki and the database in turn), `prom`, `logs` (with `--group`, warnings and errors per statement) and `sql` (as `spacetraders_ro`, through psql or the `postgres:17` image, with the password from psql's password file). It starts and stops its own port-forwards and masks tokens and passwords. See its README.
 

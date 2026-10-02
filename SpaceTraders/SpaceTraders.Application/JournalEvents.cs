@@ -29,6 +29,26 @@ public static class JournalEvents
     /// <summary>Cargo was sold (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>Units</c>, <c>WaypointSymbol</c>, <c>Revenue</c>).</summary>
     public const string CargoSold = nameof(CargoSold);
 
+    /// <summary>
+    /// A ship took a trade trip (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>Units</c>, <c>BuyWaypoint</c>,
+    /// <c>SellWaypoint</c>, <c>SellPrice</c>, <c>FuelCost</c> for the whole trip, <c>ExpectedProfit</c>;
+    /// <c>BuyPrice</c> for a purchase, and <c>FeedsTradeSymbol</c> when the sell market makes a pricier
+    /// good from it).
+    /// </summary>
+    public const string TradeStarted = nameof(TradeStarted);
+
+    /// <summary>
+    /// A trade trip moved its sale to another market, because selling where it was no longer paid
+    /// (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c>, <c>SellWaypoint</c>, <c>Reason</c>).
+    /// </summary>
+    public const string TradeRerouted = nameof(TradeRerouted);
+
+    /// <summary>
+    /// A trade trip was given up before its purchase, because the newest prices made it no longer
+    /// lucrative (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c>, <c>Reason</c>).
+    /// </summary>
+    public const string TradeDropped = nameof(TradeDropped);
+
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);
 

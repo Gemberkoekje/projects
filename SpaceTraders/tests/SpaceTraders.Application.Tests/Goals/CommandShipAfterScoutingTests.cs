@@ -100,6 +100,7 @@ public sealed class CommandShipAfterScoutingTests
             scoutPlan,
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),
+            new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 

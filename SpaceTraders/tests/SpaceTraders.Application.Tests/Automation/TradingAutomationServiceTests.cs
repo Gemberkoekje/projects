@@ -1,403 +1,212 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
-using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
+using static SpaceTraders.Application.Tests.Trading.TradeFixture;
 
 namespace SpaceTraders.Application.Tests.Automation;
 
+/// <summary>
+/// Slice 6.5: every free ship with a cargo hold and a fuel tank trades; the command ship is the first,
+/// once it has scouted. Two traders never share a route, and the plan buys no ships (D16).
+/// </summary>
 public sealed class TradingAutomationServiceTests
 {
-    private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
-    private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
+    private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
+    private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
-    private readonly IShipPurchaseService _shipPurchases = Substitute.For<IShipPurchaseService>();
-    private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
+    private readonly LogRecorder _log = new();
+    private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
+    private TradingAutomationPlanState? _state;
 
-    private TradingAutomationService CreateService()
+    public TradingAutomationServiceTests()
     {
-        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(true, 220_000, 0, 220_000));
-
-        return new(
-            _markets,
-            _ships,
-            _goals,
-            _shipyards,
-            _plans,
-            _shipPurchases,
-            _budget,
-            NullLogger<TradingAutomationService>.Instance);
-    }
-
-    private static MarketSnapshot Snapshot(string waypoint, params TradeGoodSnapshot[] goods) =>
-        new(
-            waypoint,
-            "X1-AB",
-            goods,
-            imports: goods.Where(g => g.Type == "IMPORT").Select(g => g.Symbol).ToList(),
-            exports: goods.Where(g => g.Type == "EXPORT").Select(g => g.Symbol).ToList(),
-            exchange: goods.Where(g => g.Type == "EXCHANGE").Select(g => g.Symbol).ToList());
-
-    private static TradeGoodSnapshot Good(string symbol, string type, string supply) =>
-        new(symbol, type, 0, 0, 10, supply);
-
-    private static ShipModel Trader(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
-        new(symbol, "X1-AB", waypoint, status, "CRUISE", 20, 40, CargoCapacity: 40, ShipType: "SHIP_LIGHT_HAULER");
-
-    private static ShipModel Miner(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
-        new(symbol, "X1-AB", waypoint, status, "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 40, MountSymbols: ["MOUNT_MINING_LASER_I"]);
-
-    private static ShipyardWaypointDto TradeShipyard(string waypoint = "X1-AB-SY1", long price = 60_000) =>
-        new()
-        {
-            WaypointSymbol = waypoint,
-            SystemSymbol = "X1-AB",
-            ShipTypes = ["SHIP_LIGHT_HAULER"],
-            Ships =
-            [
-                new ShipyardShipDto
-                {
-                    Type = "SHIP_LIGHT_HAULER",
-                    PurchasePrice = price,
-                }
-            ]
-        };
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsIdleTradeShip_ForScarceNonMineralWithAbundantSource()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        var trader = Trader("TRADER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "TRADER-1",
-            Arg.Is<TradeBetweenMarketsGoal>(g =>
-                g.TradeSymbol == "FOOD"
-                && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
-                && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_PurchasesTradeShip_WhenNoIdleTraderAndBudgetAllows()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("MEDICINE", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("MEDICINE", "IMPORT", "SCARCE")),
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(TradeShipyard());
-        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult
-            {
-                IsSuccess = true,
-                PurchasedShip = new ShipModel("TRADER-NEW", "X1-AB", "X1-AB-SY1", "DOCKED", "CRUISE", 20, 40, ShipType: "SHIP_LIGHT_HAULER", CargoCapacity: 40),
-                EstimatedCost = 60_000,
-                ActualCost = 60_000,
-            });
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _shipPurchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>());
-        await _ships.DidNotReceive().UpsertAsync(Arg.Any<ShipModel>(), Arg.Any<CancellationToken>());
-        await _goals.Received(1).SetActiveGoalAsync(
-            "TRADER-NEW",
-            Arg.Any<TradeBetweenMarketsGoal>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_KeepsGoalPending_WhenNoShipAndBudgetCannotAffordPurchase()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("CLOTHING", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("CLOTHING", "IMPORT", "SCARCE")),
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(false, 10_000, 0, 10_000, Reason: "reserve"));
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_PersistsPendingQueue_WhenNoTraderCanBeAssigned()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(TradeShipyard());
-        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult
-            {
-                IsSuccess = false,
-                FailureReason = "reserve",
-                EstimatedCost = 60_000,
-            });
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.TradingAutomation,
-            Arg.Is<TradingAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].TradeSymbol == "FOOD"
-                && state.Opportunities[0].BuyWaypointSymbol == "X1-AB-MKT-BUY"
-                && state.Opportunities[0].SellWaypointSymbol == "X1-AB-MKT-SELL"
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Pending),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_PersistsAssignedQueue_WhenTraderIsAssigned()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        var trader = Trader("TRADER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.TradingAutomation,
-            Arg.Is<TradingAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].TradeSymbol == "FOOD"
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "TRADER-1"),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task EnsureBootstrappedAsync_TransitionsPersistedPendingQueue_ToAssigned_WhenTraderBecomesAvailable()
-    {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
-
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+        _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
+        _goals.When(goals => goals.SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>()))
+            .Do(call => _activeGoals[call.ArgAt<string>(0)] = call.ArgAt<ShipGoal>(1));
         _plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
-            .Returns(new TradingAutomationPlanState
-            {
-                PlanId = Guid.NewGuid(),
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                Opportunities =
-                [
-                    new TradingAutomationOpportunityState
-                    {
-                        OpportunityKey = "X1-AB-MKT-BUY|X1-AB-MKT-SELL|FOOD",
-                        TradeSymbol = "FOOD",
-                        BuyWaypointSymbol = "X1-AB-MKT-BUY",
-                        SellWaypointSymbol = "X1-AB-MKT-SELL",
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        AssignedShipSymbol = null,
-                        FirstObservedAt = DateTimeOffset.UtcNow,
-                        LastObservedAt = DateTimeOffset.UtcNow,
-                        StopReason = "No idle trade ship available and purchase unavailable.",
-                    }
-                ]
-            });
-
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
-
-        var trader = Trader("TRADER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _plans.Received(1).UpsertAsync(
-            PlanTypes.TradingAutomation,
-            Arg.Is<TradingAutomationPlanState>(state =>
-                state.Opportunities.Count == 1
-                && state.Opportunities[0].Status == MarketAutomationOpportunityStatus.Assigned
-                && state.Opportunities[0].AssignedShipSymbol == "TRADER-1"
-                && state.Opportunities[0].StopReason == null),
-            Arg.Any<CancellationToken>());
+            .Returns(_ => _state);
+        _plans.When(plans => plans.UpsertAsync(PlanTypes.TradingAutomation, Arg.Any<TradingAutomationPlanState>(), Arg.Any<CancellationToken>()))
+            .Do(call => _state = call.ArgAt<TradingAutomationPlanState>(1));
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_ClearsStaleTradingGoal_WhenSellMarketNoLongerScarce()
+    public async Task TheCommandShip_AfterScouting_TakesTheBestRoute()
     {
-        var trader = Trader("TRADER-STALE");
+        // Scouting done (B10): no goal and no assignment, docked where the scout plan ended.
+        Fleet(CommandShip());
 
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "MODERATE")),
-            });
+        await RunAsync();
 
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
-            .Returns(new TradeBetweenMarketsGoal
-            {
-                TradeSymbol = "FOOD",
-                BuyWaypointSymbol = "X1-AB-MKT-BUY",
-                SellWaypointSymbol = "X1-AB-MKT-SELL",
-            });
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        trip.TradeSymbol.Should().Be("EQUIPMENT");
+        trip.BuyWaypointSymbol.Should().Be(K85);
+        trip.SellWaypointSymbol.Should().Be(D41);
+        trip.Units.Should().Be(20);
+        trip.ExpectedProfit.Should().Be((233 * 20) - (2 * 76));
+        trip.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
+        trip.CargoBought.Should().BeFalse();
 
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).ClearActiveGoalAsync("TRADER-STALE", Arg.Any<CancellationToken>());
+        var started = _log.Journal.Should().ContainSingle().Subject;
+        started.EventKind.Should().Be("TradeStarted");
+        started.Properties["ShipSymbol"].Should().Be("SHIP-1");
+        started.Properties["FeedsTradeSymbol"].Should().Be("SHIP_PARTS");
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsTrader_WhenExistingGoalIsCompleted()
+    public async Task AShipWithAnOpenAssignment_IsNoTrader()
     {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
+        // The contract drone works through its assignment, without a goal.
+        Fleet(CommandShip());
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Contract", Asteroid, A1, "COPPER_ORE", "CONTRACT-1", 0, DateTimeOffset.UtcNow, null)]);
 
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+        await RunAsync();
 
-        var trader = Trader("TRADER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
-            .Returns(new TradeBetweenMarketsGoal
-            {
-                Status = SpaceTraders.Domain.Enums.GoalStatus.Completed,
-                TradeSymbol = "FOOD",
-                BuyWaypointSymbol = "X1-AB-MKT-OLD-BUY",
-                SellWaypointSymbol = "X1-AB-MKT-OLD-SELL",
-            });
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "TRADER-1",
-            Arg.Is<TradeBetweenMarketsGoal>(g =>
-                g.TradeSymbol == "FOOD"
-                && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
-                && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
-            Arg.Any<CancellationToken>());
+        _activeGoals.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_AssignsIdleMiner_WhenNoDedicatedTraderIsAvailable()
+    public async Task AShipWithAnotherPlansGoal_OrInTransit_OrWithoutAHold_IsNoTrader()
     {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
+        _activeGoals["SHIP-1"] = new ScoutWaypointGoal { TargetWaypointSymbol = A1 };
+        var probe = new ShipModel("SHIP-2", SystemSymbol, K85, "DOCKED", "DRIFT", 0, 0, ShipType: "SATELLITE");
+        var flying = CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip(), probe, flying);
 
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+        await RunAsync();
 
-        var miner = Miner("MINER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
-            .Returns((ShipGoal?)null);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Is<TradeBetweenMarketsGoal>(g =>
-                g.TradeSymbol == "FOOD"
-                && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
-                && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
-            Arg.Any<CancellationToken>());
-        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _activeGoals.Should().ContainSingle().Which.Value.Should().BeOfType<ScoutWaypointGoal>();
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_PrefersDedicatedTrader_OverIdleMiner()
+    public async Task AShipWhoseGoalIsBlocked_IsATrader()
     {
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns(new List<MarketSnapshot>
-            {
-                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
-                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
-            });
+        _activeGoals["SHIP-1"] = new ScoutWaypointGoal { TargetWaypointSymbol = A1, Status = GoalStatus.Blocked, StatusReason = "runaway" };
+        Fleet(CommandShip());
 
-        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
-            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+        await RunAsync();
 
-        var miner = Miner("MINER-1");
-        var trader = Trader("TRADER-1");
-        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner, trader]);
-        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
-        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
-
-        await CreateService().EnsureBootstrappedAsync();
-
-        await _goals.Received(1).SetActiveGoalAsync(
-            "TRADER-1",
-            Arg.Any<TradeBetweenMarketsGoal>(),
-            Arg.Any<CancellationToken>());
-        await _goals.DidNotReceive().SetActiveGoalAsync(
-            "MINER-1",
-            Arg.Any<TradeBetweenMarketsGoal>(),
-            Arg.Any<CancellationToken>());
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>();
     }
+
+    [Fact]
+    public async Task TwoTraders_NeverShareARoute()
+    {
+        Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4"));
+
+        await RunAsync();
+
+        var trips = _activeGoals.Values.Cast<TradeBetweenMarketsGoal>().ToList();
+        trips.Should().HaveCount(2);
+        trips.Select(trip => (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol)).Should().OnlyHaveUniqueItems();
+        trips.Should().Contain(trip => trip.SellWaypointSymbol == D41 && trip.TradeSymbol == "EQUIPMENT");
+        trips.Should().Contain(trip => trip.TradeSymbol == "MEDICINE");
+    }
+
+    [Fact]
+    public async Task ARouteATraderHolds_IsNotGivenToAnother()
+    {
+        _activeGoals["SHIP-4"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = K85, SellWaypointSymbol = D41 };
+        Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>()
+            .Which.TradeSymbol.Should().Be("MEDICINE");
+    }
+
+    [Fact]
+    public async Task ATraderHoldingCargo_SellsItWhereItFetchesTheMostFirst()
+    {
+        Fleet(CommandShip(cargo: [new CargoItemModel("EQUIPMENT", 10)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        trip.TradeSymbol.Should().Be("EQUIPMENT");
+        trip.SellWaypointSymbol.Should().Be(A1);
+        trip.CargoBought.Should().BeTrue("there is nothing to buy");
+        trip.PricePaidPerUnit.Should().Be(0);
+        trip.Units.Should().Be(10);
+    }
+
+    [Fact]
+    public async Task CargoNoMarketBuys_StaysAboard_AndTheShipTradesWithTheRestOfItsHold()
+    {
+        // The drone after its contract, with a unit of ore no market here buys.
+        Fleet(CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 1)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        trip.TradeSymbol.Should().Be("EQUIPMENT");
+        trip.CargoBought.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WithoutALucrativeRoute_TheTraderWaits()
+    {
+        Fleet(Drone());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _log.Journal.Should().BeEmpty();
+        _state!.Opportunities.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TheState_ListsTheHeldRoutes_AndTheOpenOnesWithTheShipsThatCouldTakeThem()
+    {
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        var held = _state!.Opportunities.Should().ContainSingle(o => o.Status == MarketAutomationOpportunityStatus.Assigned).Subject;
+        held.AssignedShipSymbol.Should().Be("SHIP-1");
+        held.SellWaypointSymbol.Should().Be(D41);
+        held.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
+
+        // Open for the ShipLeftIdle rule (D13): what SHIP-1 could have done instead, now that it is busy.
+        _state.Opportunities.Where(o => o.Status == MarketAutomationOpportunityStatus.Pending)
+            .Should().HaveCount(2)
+            .And.OnlyContain(o => o.CandidateShipSymbols.SequenceEqual(new[] { "SHIP-1" }));
+    }
+
+    [Fact]
+    public async Task TheState_IsWrittenOnlyWhenItChanges()
+    {
+        // The tick runs every 5 seconds; while nothing happens the plan writes nothing.
+        _activeGoals["SHIP-1"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = K85, SellWaypointSymbol = D41, Units = 20 };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+        await RunAsync();
+        await RunAsync();
+
+        await _plans.Received(1).UpsertAsync(PlanTypes.TradingAutomation, Arg.Any<TradingAutomationPlanState>(), Arg.Any<CancellationToken>());
+    }
+
+    private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    private Task RunAsync()
+        => new TradingAutomationService(
+                _ships,
+                _goals,
+                _assignments,
+                _tradeContexts,
+                _plans,
+                _log.For<TradingAutomationService>())
+            .EnsureBootstrappedAsync();
 }
