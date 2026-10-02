@@ -227,8 +227,13 @@ Scout and Contract are on by default. A plan that is switched off:
 3. **Routes** by nearest neighbour, starting at the ship's waypoint if it is a market, otherwise
    at the alphabetically first market.
 4. **For each stop** it writes a `Scout` assignment and a `ScoutWaypointGoal`. The plan advances
-   when the ship is docked at the stop.
-5. **After the last stop** the plan is Completed and the ship's goal is cleared, so the ship is
+   when the ship is docked at the stop, once: the tick and an arrival can both run the ship's goal
+   step as it docks, and only a visit of the plan's current stop moves the plan on (B45, fixed).
+   Advancing writes the plan before the assignment.
+5. **On every tick** while the plan is active, it re-creates the current stop's assignment and goal
+   if the ship has no open assignment for it, as after a restart. It reads the assignment before
+   the plan, so an advance under way never looks like a missing assignment (B45).
+6. **After the last stop** the plan is Completed and the ship's goal is cleared, so the ship is
    free for other work (B10, fixed). A scout goal that outlived its plan (a database from before
    the fix) is cleared on its next step.
 

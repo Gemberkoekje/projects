@@ -88,14 +88,14 @@ public sealed class ShipGoalExecutorService(
         metrics.GoalStep(activeGoal.Kind.ToString());
         var result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
 
-        if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)
+        if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal scoutGoal)
         {
             // Debug: the scout plan logs what advancing does.
             logger.LogDebug(
                 "ShipGoalExecutorService: ship {ShipSymbol} completed goal {GoalKind}; advancing scout plan.",
                 shipSymbol,
                 activeGoal.Kind);
-            await scoutPlanService.AdvanceAsync(shipSymbol, ct);
+            await scoutPlanService.AdvanceAsync(shipSymbol, scoutGoal.TargetWaypointSymbol, ct);
         }
 
         return result;
