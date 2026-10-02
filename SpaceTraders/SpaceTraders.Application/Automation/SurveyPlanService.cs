@@ -22,7 +22,7 @@ public interface ISurveyPlanService
 }
 
 /// <summary>
-/// The survey plan (PLAN.md slice 6.4). Every ship that can survey surveys, and does nothing else (D20):
+/// The survey plan (PLAN.md slice 6.4). Every ship that can survey surveys before anything else (D20):
 /// each tick a free surveyor gets one survey to take (<see cref="SurveyWaypointGoal"/>), chosen by
 /// <see cref="MiningPlanner.SurveyTargets"/> among the ores with fewer usable surveys than the stock,
 /// <see cref="StockPerOreSetting"/> (D27):
@@ -31,9 +31,10 @@ public interface ISurveyPlanService
 ///   <item>then an ore a market in the system buys, at the asteroid nearest the market that pays most
 ///   for it, among those the miners can reach; the fewest usable surveys first, then the best paid.</item>
 /// </list>
-/// With the stock for every ore, a surveyor waits until a survey runs out. A surveyor takes the best target
-/// no other surveyor works on, or the best one when all are taken. The plan also ends the surveys that
-/// expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey dashboard.
+/// With the stock for every ore, a surveyor waits until a survey runs out, or mines and siphons in its spare time
+/// (slice 6.8): a survey that needs taking takes it off its spare-time trip at once, with its hold aboard (D37). A
+/// surveyor takes the best target no other surveyor works on, or the best one when all are taken. The plan also ends
+/// the surveys that expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey dashboard.
 /// </summary>
 public sealed class SurveyPlanService(
     IShipRepository ships,
@@ -44,6 +45,7 @@ public sealed class SurveyPlanService(
     ISurveyKeeper surveyKeeper,
     IPlanRepository plans,
     ISettingsRepository settings,
+    SpareTimeInterruption interruption,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
     /// <summary>The setting that holds the usable surveys to keep of each ore (D27).</summary>
@@ -68,6 +70,7 @@ public sealed class SurveyPlanService(
 
         var surveying = new Dictionary<string, SurveyWaypointGoal>(StringComparer.OrdinalIgnoreCase);
         var free = new List<ShipModel>();
+        var gathering = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var ship in fleet.Where(ship => FleetRoles.IsSurveyor(ship, surveyPlanOn: true)))
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
@@ -78,6 +81,12 @@ public sealed class SurveyPlanService(
             else if (FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
                 free.Add(ship);
+            }
+            else if (SpareTimeInterruption.IsInterruptible(ship, goal, withAssignment.Contains(ship.Symbol)))
+            {
+                // On a spare-time trip that fills its hold: a survey comes first (D37).
+                free.Add(ship);
+                gathering.Add(ship.Symbol);
             }
         }
 
@@ -102,16 +111,33 @@ public sealed class SurveyPlanService(
                     .ToList();
                 if (reachable.Count == 0)
                 {
-                    logger.LogDebug(
-                        "Survey plan: ship {ShipSymbol} waits: every ore it can reach has {Stock} usable surveys.",
-                        surveyor.Symbol,
-                        stock);
+                    if (!gathering.Contains(surveyor.Symbol))
+                    {
+                        logger.LogDebug(
+                            "Survey plan: ship {ShipSymbol} waits: every ore it can reach has {Stock} usable surveys.",
+                            surveyor.Symbol,
+                            stock);
+                    }
+
                     continue;
                 }
 
                 var target = reachable.FirstOrDefault(candidate => !surveying.Values.Any(goal => Targets(goal, candidate))) ?? reachable[0];
                 var goal = new SurveyWaypointGoal { TargetWaypointSymbol = target.AsteroidSymbol, TargetDepositSymbol = target.Ore };
-                await goals.SetActiveGoalAsync(surveyor.Symbol, goal, cancellationToken);
+                if (gathering.Contains(surveyor.Symbol))
+                {
+                    // The hold stays aboard: surveying needs no room, and the spare-time trip after the survey fills it
+                    // on (D37).
+                    if (!await interruption.TryReplaceAsync(surveyor.Symbol, goal, "survey", cancellationToken))
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    await goals.SetActiveGoalAsync(surveyor.Symbol, goal, cancellationToken);
+                }
+
                 surveying[surveyor.Symbol] = goal;
                 logger.LogDebug(
                     "Survey plan: ship {ShipSymbol} surveys {WaypointSymbol} for {TradeSymbol}{ForContract}.",

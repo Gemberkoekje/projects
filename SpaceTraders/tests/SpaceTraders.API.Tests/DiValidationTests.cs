@@ -61,7 +61,8 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
             .And.NotContain(typeof(SurveyPlanService))
             .And.NotContain(typeof(MiningAutomationService))
             .And.NotContain(typeof(SiphonAutomationService))
-            .And.NotContain(typeof(TradingAutomationService));
+            .And.NotContain(typeof(TradingAutomationService))
+            .And.NotContain(typeof(SpareTimePlanService));
     }
 
     [Fact]
@@ -75,6 +76,19 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
             .SelectMany(chain => chain.HandlerCalls())
             .Select(call => call.HandlerType)
             .Should().Contain(typeof(SiphonResourcesHandler));
+    }
+
+    [Fact]
+    public void TheSpareTimeExtraction_HasItsHandler()
+    {
+        // Slice 6.8: a spare-time trip sends ExtractResourcesCommand through the bus at an asteroid; without a
+        // handler it would extract nothing.
+        var runtime = (WolverineRuntime)_factory.Services.GetRequiredService<IWolverineRuntime>();
+
+        runtime.Handlers.Chains
+            .SelectMany(chain => chain.HandlerCalls())
+            .Select(call => call.HandlerType)
+            .Should().Contain(typeof(ExtractResourcesHandler));
     }
 
     [Fact]

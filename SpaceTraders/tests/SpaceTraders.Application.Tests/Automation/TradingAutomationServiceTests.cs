@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -14,8 +15,9 @@ namespace SpaceTraders.Application.Tests.Automation;
 
 /// <summary>
 /// Slice 6.5: every free ship with a cargo hold and a fuel tank trades. Two traders never share a route.
-/// Slice 6.4: a ship that can survey doesn't trade while the survey plan is on (D20), and the plan buys
-/// its own cargo ships (D21).
+/// Slice 6.4: the plan buys its own cargo ships (D21). Slice 6.8: a surveyor with nothing to survey trades
+/// (D34); with the spare-time plan on, it trades only for a route that waits for it, selling its hold first, and
+/// otherwise keeps gathering (D37).
 /// </summary>
 public sealed class TradingAutomationServiceTests
 {
@@ -27,6 +29,7 @@ public sealed class TradingAutomationServiceTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -222,15 +225,116 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
-    public async Task AShipThatCanSurvey_DoesNotTrade_WhileTheSurveyPlanIsOn()
+    public async Task AShipThatCanSurvey_DoesNotTrade_WhileTheSurveyPlanIsOn_AndTheSpareTimePlanOff()
     {
-        // D20: the command ship surveys, and only that.
+        // D20: the command ship surveys, and only that, until the spare-time plan is switched on.
         SurveyPlanOn();
         Fleet(CommandShip());
 
         await RunAsync();
 
         _activeGoals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WithTheSpareTimePlanOn_AShipThatCanSurvey_TakesARouteThatWaitsForIt()
+    {
+        // D34 (2026-10-02): survey first, then trade, then mine or siphon. The survey plan goes first.
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("EQUIPMENT");
+    }
+
+    [Fact]
+    public async Task WithTheSpareTimePlanOn_AFreeSurveyorWithoutARoute_KeepsItsHold()
+    {
+        // D37: the spare-time plan fills the hold on and sells it once full; the trading plan takes the ship only
+        // for a route that waits for it.
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        CreditsAre(1_000);
+        Fleet(CommandShip(cargo: [new CargoItemModel("EQUIPMENT", 10)]));
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _log.Journal.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ARouteThatWaitsForIt_TakesTheCommandShipOffItsSpareTimeTrip_AndItSellsItsHoldFirst()
+    {
+        // D34 (2026-10-02): "If a more important job comes up such as trading or surveying it should stop mining,
+        // sell it's inventory and start on the new job." Sold at A1, its hold leaves it where EQUIPMENT from K85
+        // to D41 and MEDICINE from D41 to A1 are lucrative.
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        var gathering = CommandShip(waypoint: Asteroid, status: "IN_ORBIT", cargo: [new CargoItemModel("EQUIPMENT", 10)]);
+        _activeGoals["SHIP-1"] = new GatherAndSellGoal { SourceWaypointSymbol = Asteroid };
+        Stored(gathering);
+        Fleet(gathering);
+
+        await RunAsync();
+
+        var sale = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (sale.TradeSymbol, sale.SellWaypointSymbol, sale.CargoBought).Should().Be(("EQUIPMENT", A1, true));
+        _log.Journal.Select(entry => entry.EventKind).Should().Equal("GatheringInterrupted", "TradeStarted");
+        _log.Journal[0].Properties["Reason"].Should().Be("trade");
+    }
+
+    [Fact]
+    public async Task ARouteThatWaitsForIt_WithNothingAboard_TakesTheCommandShipOffItsTrip_ForTheRoute()
+    {
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        var gathering = CommandShip(status: "IN_ORBIT");
+        _activeGoals["SHIP-1"] = new GatherAndSellGoal { SourceWaypointSymbol = Asteroid };
+        Stored(gathering);
+        Fleet(gathering);
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol, trip.CargoBought).Should().Be(("EQUIPMENT", K85, D41, false));
+    }
+
+    [Fact]
+    public async Task ASpareTimeTripThatSells_OrIsInFlight_IsNotInterruptedForATrade()
+    {
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        var selling = new GatherAndSellGoal { SourceWaypointSymbol = Asteroid, Selling = true };
+        var flying = new GatherAndSellGoal { SourceWaypointSymbol = Asteroid };
+        _activeGoals["SHIP-1"] = selling;
+        _activeGoals["SHIP-4"] = flying;
+        Fleet(
+            CommandShip(),
+            CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", DestWaypointSymbol = Asteroid, ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeSameAs(selling);
+        _activeGoals["SHIP-4"].Should().BeSameAs(flying);
+    }
+
+    [Fact]
+    public async Task WithTheSpareTimePlanOn_TheOtherTradersChooseFirst()
+    {
+        // From K85 the command ship would earn most with EQUIPMENT for D41; the shuttle, a trader only, takes it, and
+        // the command ship takes MEDICINE, which is left.
+        SurveyPlanOn();
+        SpareTimePlanOn();
+        CreditsAre(300_000);
+        Fleet(CommandShip(), Shuttle("SHIP-5"));
+
+        await RunAsync();
+
+        _activeGoals["SHIP-5"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("EQUIPMENT");
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("MEDICINE");
     }
 
     [Fact]
@@ -297,6 +401,12 @@ public sealed class TradingAutomationServiceTests
     private void SurveyPlanOn()
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
 
+    private void SpareTimePlanOn()
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.SpareTime), Arg.Any<CancellationToken>()).Returns(true);
+
+    /// <summary>The ship as stored, which the spare-time interruption reads again (B17).</summary>
+    private void Stored(ShipModel ship) => _ships.FindAsync(ship.Symbol, Arg.Any<CancellationToken>()).Returns(ship);
+
     private void CreditsAre(long credits)
         => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(), credits));
 
@@ -314,6 +424,7 @@ public sealed class TradingAutomationServiceTests
                 _settings,
                 _shipyards,
                 _purchases,
+                new SpareTimeInterruption(_ships, _goals, _stepGuard, _log.For<SpareTimeInterruption>()),
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

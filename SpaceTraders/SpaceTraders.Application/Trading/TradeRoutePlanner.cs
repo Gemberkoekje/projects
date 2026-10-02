@@ -396,6 +396,41 @@ public static class TradeRoutePlanner
         return found;
     }
 
+    /// <summary>
+    /// For a ship that holds cargo: the good that fetches the most where it sells best
+    /// (<see cref="TryFindBestSale"/>), after the fuel to get there, when that is anything at all, or whatever it
+    /// fetches when <paramref name="mustSell"/>. The trading plan sells held cargo by this rule, one good a trip, and
+    /// the spare-time trip sells its hold by it (D36), so the trading plan can foresee where that leaves the ship.
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now, with its hold.</param>
+    /// <param name="mustSell">Whether to sell even where the sale doesn't pay for its fuel.</param>
+    /// <param name="cargo">The good to sell, and the units aboard.</param>
+    /// <param name="sale">Where to sell it, and what it fetches there.</param>
+    /// <returns>False when nothing aboard is worth selling, or no market the ship can reach buys it.</returns>
+    public static bool TryFindBestCargoSale(TradeMarketMap map, ShipModel ship, bool mustSell, out CargoItemModel cargo, out TradeSale sale)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        cargo = new CargoItemModel(string.Empty, 0);
+        sale = new TradeSale(string.Empty, 0, 0, 0);
+        var found = false;
+        foreach (var item in (ship.CargoInventory ?? []).Where(item => item.Units > 0))
+        {
+            if (TryFindBestSale(map, ship, item.Symbol, item.Units, out var candidate)
+                && (candidate.NetRevenue > 0 || mustSell)
+                && (!found || candidate.NetRevenue > sale.NetRevenue))
+            {
+                cargo = item;
+                sale = candidate;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
     /// <summary>The fuel a CRUISE flight burns: the distance rounded, at least 1; none to stay put.</summary>
     private static int CruiseFuel(string from, string to, double distance)
         => from.Equals(to, StringComparison.OrdinalIgnoreCase)

@@ -90,6 +90,20 @@ public static class JournalEvents
     public const string SiphonStarted = nameof(SiphonStarted);
 
     /// <summary>
+    /// A ship with nothing to survey or trade took a spare-time trip (slice 6.8: <c>ShipSymbol</c>, <c>WaypointSymbol</c>
+    /// it gathers at, <c>Method</c>: <c>mines</c> or <c>siphons</c>). Its extractions log <c>Extracted</c> and its
+    /// siphons <c>Siphoned</c>, with <c>Target</c> <c>whatever sells</c>; its sales <c>CargoSold</c>.
+    /// </summary>
+    public const string GatheringStarted = nameof(GatheringStarted);
+
+    /// <summary>
+    /// A survey or a trade took a ship off its spare-time trip before its hold was full (slice 6.8, D34, D37:
+    /// <c>ShipSymbol</c>, <c>WaypointSymbol</c> it gathered at, <c>Units</c> aboard, <c>Reason</c>: <c>survey</c>,
+    /// which keeps the hold aboard, or <c>trade</c>, which sells it first).
+    /// </summary>
+    public const string GatheringInterrupted = nameof(GatheringInterrupted);
+
+    /// <summary>
     /// A probe was sent to a shipyard where a purchase waits for one of our ships, which the API requires
     /// (slice 6.3, D30: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>ShipType</c> the purchase is for).
     /// </summary>

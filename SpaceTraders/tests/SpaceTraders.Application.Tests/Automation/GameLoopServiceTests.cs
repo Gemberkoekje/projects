@@ -31,6 +31,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IMiningAutomationService _miningPlan = Substitute.For<IMiningAutomationService>();
     private readonly ISiphonAutomationService _siphonPlan = Substitute.For<ISiphonAutomationService>();
     private readonly ITradingAutomationService _tradingPlan = Substitute.For<ITradingAutomationService>();
+    private readonly ISpareTimePlanService _spareTimePlan = Substitute.For<ISpareTimePlanService>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
@@ -49,6 +50,7 @@ public sealed class GameLoopServiceTests : IDisposable
             .AddSingleton(_miningPlan)
             .AddSingleton(_siphonPlan)
             .AddSingleton(_tradingPlan)
+            .AddSingleton(_spareTimePlan)
             .AddSingleton(_assignments)
             .AddSingleton(_ships)
             .AddSingleton(_goalExecutor)
@@ -97,7 +99,7 @@ public sealed class GameLoopServiceTests : IDisposable
     [Fact]
     public async Task Tick_WithAutomationDisabled_IssuesNoShipCommands()
     {
-        SwitchOn("Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled", "Automation.Plan.ProbeDeployment.Enabled", "Automation.Plan.Mining.Enabled", "Automation.Plan.Siphon.Enabled", "Automation.Plan.Trading.Enabled");
+        SwitchOn("Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled", "Automation.Plan.ProbeDeployment.Enabled", "Automation.Plan.Mining.Enabled", "Automation.Plan.Siphon.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.SpareTime.Enabled");
 
         await TickAsync();
 
@@ -107,6 +109,7 @@ public sealed class GameLoopServiceTests : IDisposable
         await _miningPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _siphonPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _spareTimePlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
         _bus.ReceivedCalls().Should().BeEmpty();
@@ -173,6 +176,21 @@ public sealed class GameLoopServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Tick_BootstrapsTheSpareTimePlan_Last()
+    {
+        // Slice 6.8 (D34): the command ship mines or siphons only when it has nothing to survey and no trade.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Survey.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.SpareTime.Enabled");
+        var steps = new List<string>();
+        _surveyPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "survey"));
+        _tradingPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "trading"));
+        _spareTimePlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "spare time"));
+
+        await TickAsync();
+
+        steps.Should().Equal("survey", "trading", "spare time");
+    }
+
+    [Fact]
     public async Task Tick_BootstrapsOnlyThePlansThatAreSwitchedOn()
     {
         SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
@@ -186,6 +204,7 @@ public sealed class GameLoopServiceTests : IDisposable
         await _miningPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _siphonPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _spareTimePlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _bus.Received(1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
     }
 

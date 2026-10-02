@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -26,6 +27,7 @@ public sealed class SurveyPlanServiceTests
     private readonly ISurveyKeeper _surveyKeeper = Substitute.For<ISurveyKeeper>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -162,6 +164,96 @@ public sealed class SurveyPlanServiceTests
         _state.Targets.Should().HaveCount(6, "the contract's copper, then five sellable ores at XB5C");
     }
 
+    [Fact]
+    public async Task ASurveyThatNeedsTaking_TakesTheCommandShipOffItsSpareTimeTrip_WithItsHoldAboard()
+    {
+        // D37 (2026-10-02): "It surveys on the spot with the hold aboard, then carries on filling, and sells once full."
+        var gathering = CommandShip() with { CargoCurrent = 12, CargoInventory = [new CargoItemModel("COPPER_ORE", 12)] };
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = XB5C };
+        _activeGoals["SHIP-1"] = trip;
+        Stored(gathering);
+        Fleet(gathering, Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(XB5C);
+        var interrupted = _log.Journal.Should().ContainSingle().Subject;
+        interrupted.EventKind.Should().Be("GatheringInterrupted");
+        interrupted.Properties["Reason"].Should().Be("survey");
+        interrupted.Properties["Units"].Should().Be(12);
+        interrupted.Properties["WaypointSymbol"].Should().Be(XB5C);
+    }
+
+    [Fact]
+    public async Task WithEveryOreStocked_TheCommandShipGathersOn()
+    {
+        SurveysAre(
+            Survey("S-1", XB5C, "COPPER_ORE", "ALUMINUM_ORE", "IRON_ORE"),
+            Survey("S-2", XB5C, "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE"),
+            Survey("S-3", XB5C, "ALUMINUM_ORE", "IRON_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND"));
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = XB5C };
+        _activeGoals["SHIP-1"] = trip;
+        Stored(CommandShip());
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeSameAs(trip);
+        _log.Journal.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ASpareTimeTripThatSells_IsNotInterrupted()
+    {
+        // It is nearly done; the plans choose again after its sales.
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = XB5C, Selling = true };
+        _activeGoals["SHIP-1"] = trip;
+        Stored(CommandShip(H51, "DOCKED"));
+        Fleet(CommandShip(H51, "DOCKED"), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeSameAs(trip);
+    }
+
+    [Fact]
+    public async Task AShipWhoseArrivalIsNotRecordedYet_IsNotTakenOffItsTrip()
+    {
+        // B17: the arrival matches the trip's goal. The fleet as the plans read it reckons the ship arrived; as
+        // stored, it is still in flight until the arrival is recorded.
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = XB5C };
+        _activeGoals["SHIP-1"] = trip;
+        Stored(CommandShip(H51, "IN_TRANSIT") with { DestWaypointSymbol = XB5C, ArrivesAt = DateTimeOffset.UtcNow.AddSeconds(-1) });
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeSameAs(trip);
+        _log.Journal.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AShipWhoseGoalStepRuns_IsTakenOffItsTripOnALaterTick()
+    {
+        // B46: a step that turns the trip to selling would write it back over the survey.
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = XB5C };
+        _activeGoals["SHIP-1"] = trip;
+        Stored(CommandShip());
+        Fleet(CommandShip(), Drone());
+        _stepGuard.TryEnter("SHIP-1").Should().BeTrue();
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeSameAs(trip);
+
+        _stepGuard.Exit("SHIP-1");
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>();
+    }
+
+    private void Stored(ShipModel ship) => _ships.FindAsync(ship.Symbol, Arg.Any<CancellationToken>()).Returns(ship);
+
     private void ContractMines(string ore, string asteroid, string destination)
         => _contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
         {
@@ -193,6 +285,7 @@ public sealed class SurveyPlanServiceTests
                 _surveyKeeper,
                 _plans,
                 _settings,
+                new SpareTimeInterruption(_ships, _goals, _stepGuard, _log.For<SpareTimeInterruption>()),
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }

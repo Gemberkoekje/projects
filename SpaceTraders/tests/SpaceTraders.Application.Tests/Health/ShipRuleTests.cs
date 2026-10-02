@@ -402,6 +402,37 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
+    public async Task TheCommandShip_LeftIdleWhileTheSpareTimePlanListsAPlaceToGather_IsAnAnomaly()
+    {
+        // Slice 6.8: the plan gives a trip at once to a ship it lists with a place to gather at; idle for long, the
+        // plan has stopped.
+        _plans.GetAsync<SpareTimePlanState>(PlanTypes.SpareTime, Arg.Any<CancellationToken>()).Returns(new SpareTimePlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Ships =
+            [
+                new SpareTimeShipState { ShipSymbol = "SHIP-1", Activity = SpareTimeActivity.Gathering, SourceWaypointSymbol = "X1-AB-XB5C" },
+                new SpareTimeShipState { ShipSymbol = "SHIP-2", Activity = SpareTimeActivity.Waiting },
+            ],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        var commandShip = FleetFixture.Drone("SHIP-1", Start) with { ShipType = "COMMAND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"], CargoCapacity = 40 };
+        _fleet.Have(commandShip, commandShip with { Symbol = "SHIP-2" });
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        var violation = violations.Should().ContainSingle().Which;
+        violation.Subject.Should().Be("SHIP-1");
+        violation.Details.Should().Contain("the SpareTime plan has work it could do: a place to mine or siphon in its spare time");
+
+        // With the plan off, the command ship waits by design (D13).
+        _harness.PlansOn.Remove(AutomationPlan.SpareTime);
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(12))).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ASurveyorWaiting_WhileEveryOreHasItsStockOfSurveys_IsNotAnAnomaly()
     {
         // D27: with a stock of usable surveys for every ore, there is nothing to survey; the surveyor waits.

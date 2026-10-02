@@ -211,6 +211,26 @@ public sealed class PrometheusMetricsServiceTests
                 GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(siphon),
                 GoalStatus = (int)siphon.Status,
             });
+            // The command ship in its spare time (slice 6.8): mining, and selling a good of its hold.
+            var gather = new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-XB5C" };
+            var selling = gather with { Selling = true, SellTradeSymbol = "QUARTZ_SAND", SellWaypointSymbol = "X1-AB-F49" };
+            foreach (var (symbol, goal) in new[] { ("AGENT-9", gather), ("AGENT-10", selling) })
+            {
+                db.Ships.Add(new CachedShip
+                {
+                    AgentId = AgentId,
+                    Symbol = symbol,
+                    ShipType = "COMMAND",
+                    Status = "IN_ORBIT",
+                    WaypointSymbol = "X1-AB-XB5C",
+                    CargoCapacity = 40,
+                    GoalId = goal.GoalId,
+                    GoalKind = goal.Kind.ToString(),
+                    GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(goal),
+                    GoalStatus = (int)goal.Status,
+                });
+            }
+
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -236,6 +256,8 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-6", "→ X1-AB-A2 (MOON)", "scouting"),
             ("AGENT-7", "X1-AB-H51 (PLANET)", "called to a shipyard"),
             ("AGENT-8", "X1-AB-C38 (GAS_GIANT)", "siphoning for LIQUID_HYDROGEN"),
+            ("AGENT-9", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining in its spare time"),
+            ("AGENT-10", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "selling QUARTZ_SAND"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);

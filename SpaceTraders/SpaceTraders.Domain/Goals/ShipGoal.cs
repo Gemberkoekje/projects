@@ -24,6 +24,7 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(DeployProbeGoal), "DeployProbe")]
 [JsonDerivedType(typeof(MineAndSellGoal), "MineAndSell")]
 [JsonDerivedType(typeof(SiphonAndSellGoal), "SiphonAndSell")]
+[JsonDerivedType(typeof(GatherAndSellGoal), "GatherAndSell")]
 [JsonDerivedType(typeof(TradeBetweenMarketsGoal), "TradeBetweenMarkets")]
 [JsonDerivedType(typeof(SurveyWaypointGoal), "SurveyWaypoint")]
 public abstract record ShipGoal
@@ -206,6 +207,33 @@ public sealed record SiphonAndSellGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.SiphonAndSell;
+}
+
+/// <summary>
+/// One spare-time trip (PLAN.md slice 6.8): a ship that has nothing to survey and no trade (D34) mines or
+/// siphons at <see cref="SourceWaypointSymbol"/>, the nearest place it can (D35), keeping whatever a market buys,
+/// until its hold is full; then it sells each good where it fetches most after fuel (D36), and the goal ends. A
+/// survey or a trade may take the ship off the trip while it fills (D37).
+/// </summary>
+public sealed record GatherAndSellGoal : ShipGoal
+{
+    /// <summary>The asteroid it mines at, or the gas giant it siphons at.</summary>
+    public required string SourceWaypointSymbol { get; init; }
+
+    /// <summary>True at a gas giant, where the trip siphons; false at an asteroid, where it mines.</summary>
+    public bool Siphoning { get; init; }
+
+    /// <summary>True once the trip sells: its hold is full.</summary>
+    public bool Selling { get; init; }
+
+    /// <summary>The good the trip is selling now; empty before it has chosen the next sale.</summary>
+    public string SellTradeSymbol { get; init; } = string.Empty;
+
+    /// <summary>Where it sells <see cref="SellTradeSymbol"/>; empty before it has chosen the next sale.</summary>
+    public string SellWaypointSymbol { get; init; } = string.Empty;
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.GatherAndSell;
 }
 
 /// <summary>

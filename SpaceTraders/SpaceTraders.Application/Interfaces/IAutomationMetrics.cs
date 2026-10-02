@@ -49,8 +49,8 @@ public interface IAutomationMetrics
 
     /// <summary>
     /// Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>): a mining laser's yield,
-    /// or a gas siphon's (slice 6.7). A siphon isn't counted by <see cref="Extraction"/>, which the survey
-    /// statistics read.
+    /// or a gas siphon's (slice 6.7). Neither a siphon nor a spare-time extraction (slice 6.8, which takes no survey
+    /// by design) is counted by <see cref="Extraction"/>, which the survey statistics read.
     /// </summary>
     void Extracted(string shipSymbol, string tradeSymbol, int units);
 

@@ -13,6 +13,7 @@ public enum AutomationPlan
     Mining,
     Siphon,
     Trading,
+    SpareTime,
 }
 
 /// <summary>
@@ -40,6 +41,7 @@ public static class AutomationSwitches
         MineAndSellGoal => AutomationPlan.Mining,
         SiphonAndSellGoal => AutomationPlan.Siphon,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
+        GatherAndSellGoal => AutomationPlan.SpareTime,
         _ => null,
     };
 }
