@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -11,8 +12,8 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
-/// every ship (role, state, goal, why its goal is blocked) and the accepted contracts'
-/// deliverables. What happens (API calls, goal steps, credits earned and spent) is counted where
+/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, its hold) and
+/// the accepted contracts' deliverables. What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
 /// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
 /// </summary>
@@ -23,6 +24,7 @@ public sealed class PrometheusMetricsService(
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
+    private static readonly JsonSerializerOptions CargoJsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>Reads the cache once and hands what it found to the metrics.</summary>
     internal async Task SampleAsync(CancellationToken cancellationToken)
@@ -41,10 +43,14 @@ public sealed class PrometheusMetricsService(
         var assignments = await db.ShipAssignments.AsNoTracking()
             .Where(a => a.CompletedAt == null)
             .ToListAsync(cancellationToken);
-        var assignmentTypes = assignments
+        var assignmentByShip = assignments
             .GroupBy(a => a.ShipSymbol, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.First().Type, StringComparer.Ordinal);
-        ShipMetricsSample[] fleet = [.. ships.Select(ship => ToSample(ship, assignmentTypes, now))];
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        List<string> places = [.. ships.SelectMany(s => new[] { s.WaypointSymbol, s.DestWaypointSymbol }).OfType<string>().Distinct(StringComparer.Ordinal)];
+        var waypointTypes = await db.Waypoints.AsNoTracking()
+            .Where(w => places.Contains(w.Symbol))
+            .ToDictionaryAsync(w => w.Symbol, w => w.Type, StringComparer.Ordinal, cancellationToken);
+        ShipMetricsSample[] fleet = [.. ships.Select(ship => ToSample(ship, assignmentByShip, waypointTypes, now))];
         metrics.Fleet(fleet, now);
         shipJournal.Observe(fleet);
 
@@ -76,15 +82,120 @@ public sealed class PrometheusMetricsService(
         }
     }
 
-    private static ShipMetricsSample ToSample(CachedShip ship, Dictionary<string, string> assignmentTypes, DateTimeOffset now)
+    private static ShipMetricsSample ToSample(
+        CachedShip ship,
+        Dictionary<string, ShipAssignmentRecord> assignments,
+        Dictionary<string, string> waypointTypes,
+        DateTimeOffset now)
     {
         var goal = ship.GoalPayloadJson is null ? null : JsonSerializer.Deserialize<ShipGoal>(ship.GoalPayloadJson);
+        var assignment = assignments.GetValueOrDefault(ship.Symbol);
         var goalLabel = ship.GoalKind
-            ?? assignmentTypes.GetValueOrDefault(ship.Symbol)
+            ?? assignment?.Type
             ?? "None";
         var reason = goal?.Status == GoalStatus.Blocked ? goal.StatusReason ?? "blocked" : string.Empty;
 
-        return new ShipMetricsSample(ship.Symbol, ship.ShipType, State(ship, now), goalLabel, reason);
+        // Cached as in transit, the ship is at (or on its way to) its route's destination.
+        var inTransit = ship.ArrivesAt > now;
+        var at = string.Equals(ship.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase)
+            ? ship.DestWaypointSymbol ?? ship.WaypointSymbol
+            : ship.WaypointSymbol;
+
+        return new ShipMetricsSample(ship.Symbol, ship.ShipType, State(ship, now), goalLabel, reason)
+        {
+            Location = Location(at, inTransit, waypointTypes),
+            Activity = Activity(goal, reason, assignment, at, inTransit),
+            ArrivesAt = inTransit ? ship.ArrivesAt.GetValueOrDefault() : default,
+            CargoCapacity = ship.CargoCapacity,
+            Cargo = Cargo(ship.CargoJson),
+        };
+    }
+
+    /// <summary>The waypoint and its type, such as <c>X1-AB-A1 (ASTEROID)</c>; in transit, an arrow first.</summary>
+    private static string Location(string? at, bool inTransit, Dictionary<string, string> waypointTypes)
+    {
+        if (string.IsNullOrEmpty(at))
+        {
+            return "unknown";
+        }
+
+        var place = waypointTypes.TryGetValue(at, out var type) ? $"{at} ({type})" : at;
+        return inTransit ? $"→ {place}" : place;
+    }
+
+    /// <summary>
+    /// What the bot has the ship do, in a few words: a blocked goal, else its goal, else its
+    /// assignment, else idle. A contract's ship mines at the contract's source and delivers at its
+    /// destination.
+    /// </summary>
+    private static string Activity(ShipGoal? goal, string reason, ShipAssignmentRecord? assignment, string? at, bool inTransit)
+    {
+        if (reason.Length > 0)
+        {
+            return $"blocked ({reason})";
+        }
+
+        if (goal is not null)
+        {
+            return goal switch
+            {
+                ScoutWaypointGoal => "scouting",
+                MineResourceGoal mine => $"mining {mine.TradeSymbol}",
+                MineAndSellGoal mineAndSell => $"mining and selling {mineAndSell.TradeSymbol}",
+                SiphonResourceGoal siphon => $"siphoning {siphon.TradeSymbol}",
+                SellCargoGoal => "selling cargo",
+                DeliverCargoGoal deliver => $"delivering {deliver.TradeSymbol}",
+                SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to a construction site",
+                TradeBetweenMarketsGoal trade => $"trading {trade.TradeSymbol}",
+                SurveyWaypointGoal => "surveying",
+                DeployProbeGoal => "deploying",
+                PatrolMarketGoal => "watching its market",
+                MoveToWaypointGoal => "moving",
+                IdleGoal => "idle",
+                _ => goal.Kind.ToString(),
+            };
+        }
+
+        if (assignment is null)
+        {
+            return "idle";
+        }
+
+        if (!string.Equals(assignment.Type, "Contract", StringComparison.Ordinal))
+        {
+            return assignment.Type.ToLowerInvariant();
+        }
+
+        var good = assignment.CargoSymbol ?? "cargo";
+        if (string.Equals(at, assignment.OriginWaypoint, StringComparison.Ordinal))
+        {
+            return inTransit ? $"on the way to mine {good}" : $"mining {good}";
+        }
+
+        if (string.Equals(at, assignment.DestWaypoint, StringComparison.Ordinal))
+        {
+            return inTransit ? $"on the way to deliver {good}" : $"delivering {good}";
+        }
+
+        return $"working on a contract ({good})";
+    }
+
+    /// <summary>The hold as cached: startup sync and the repository both store symbol and units.</summary>
+    private static IReadOnlyList<CargoItemModel> Cargo(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<CargoItemModel>>(json, CargoJsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The nav status with arrivals dead-reckoned, as the ship repository applies them.</summary>

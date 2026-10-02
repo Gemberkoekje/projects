@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -39,6 +40,7 @@ public sealed class MineResourceVolumeHandler(
     IOrbitSubCommand orbit,
     INavigateSubCommand navigate,
     IMessageBus bus,
+    IAutomationMetrics metrics,
     ILogger<MineResourceVolumeHandler> logger)
 {
     public Task<ShipCommandResult> Handle(MineResourceVolumeCommand command, CancellationToken cancellationToken)
@@ -194,6 +196,7 @@ public sealed class MineResourceVolumeHandler(
             ? await port.ExtractWithSurveyAsync(ship.Symbol, command.Survey, cancellationToken)
             : await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
         await ships.UpdateCargoAsync(ship.Symbol, extractResult.Cargo, cancellationToken);
+        metrics.Extracted(ship.Symbol, extractResult.YieldSymbol, extractResult.YieldUnits);
 
         var cooldownAt = extractResult.CooldownExpiresAt ?? now.AddSeconds(extractResult.CooldownSeconds);
         await ships.UpdateCooldownAsync(ship.Symbol, cooldownAt, cancellationToken);
@@ -270,6 +273,7 @@ public sealed class MineResourceVolumeHandler(
         {
             var result = await port.JettisonCargoAsync(shipSymbol, item.Symbol, item.Units, cancellationToken);
             await ships.UpdateCargoAsync(shipSymbol, result.Cargo, cancellationToken);
+            metrics.Jettisoned(shipSymbol, item.Symbol, item.Units);
         }
     }
 

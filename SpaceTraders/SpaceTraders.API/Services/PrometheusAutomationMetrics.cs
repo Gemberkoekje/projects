@@ -28,12 +28,21 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _contractUnitsRequired;
     private readonly Gauge _contractUnitsFulfilled;
     private readonly Gauge _contractDeadline;
+    private readonly ZeroFirstCounter _extractedUnits;
+    private readonly ZeroFirstCounter _jettisonedUnits;
+    private readonly Gauge _shipInfo;
+    private readonly Gauge _shipArrival;
+    private readonly Gauge _shipCargoUnits;
+    private readonly Gauge _shipCargoCapacity;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
     private readonly HashSet<(string Role, string State)> _shipCountLabels = [];
     private readonly HashSet<(string Contract, string TradeSymbol)> _deliverables = [];
     private readonly HashSet<string> _contracts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Location, string Activity)> _shipInfoLabels = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> _shipGoods = new(StringComparer.Ordinal);
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
     public PrometheusAutomationMetrics(CollectorRegistry registry)
@@ -114,6 +123,35 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_contract_deadline_timestamp_seconds",
             "Deadline of an accepted contract (Unix time).",
             "contract");
+        _extractedUnits = ZeroFirst(
+            "spacetraders_extracted_units_total",
+            "Units ships extracted, by ship and good: each extraction's yield, before what isn't wanted is jettisoned.",
+            "ship",
+            "good");
+        _jettisonedUnits = ZeroFirst(
+            "spacetraders_jettisoned_units_total",
+            "Units ships jettisoned, by ship and good: extracted goods their work doesn't need.",
+            "ship",
+            "good");
+        _shipInfo = metrics.CreateGauge(
+            "spacetraders_ship_info",
+            "One series per ship, always 1: where it is (its waypoint and the waypoint's type; in transit, an arrow and where it goes) and what the bot has it do.",
+            "ship",
+            "location",
+            "activity");
+        _shipArrival = metrics.CreateGauge(
+            "spacetraders_ship_arrival_timestamp_seconds",
+            "When a ship in transit arrives (Unix time); no series while it isn't travelling.",
+            "ship");
+        _shipCargoUnits = metrics.CreateGauge(
+            "spacetraders_ship_cargo_units",
+            "Units in a ship's hold, per good aboard.",
+            "ship",
+            "good");
+        _shipCargoCapacity = metrics.CreateGauge(
+            "spacetraders_ship_cargo_capacity_units",
+            "Units a ship's hold takes.",
+            "ship");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -146,6 +184,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void CreditsSpent(string category, long amount) => _creditsSpent.Inc(amount, category);
+
+    /// <inheritdoc />
+    public void Extracted(string shipSymbol, string tradeSymbol, int units) => _extractedUnits.Inc(units, shipSymbol, tradeSymbol);
+
+    /// <inheritdoc />
+    public void Jettisoned(string shipSymbol, string tradeSymbol, int units) => _jettisonedUnits.Inc(units, shipSymbol, tradeSymbol);
 
     /// <inheritdoc />
     public void Anomaly(string rule, string subject, bool active) => _anomalyActive.WithLabels(rule, subject).Set(active ? 1 : 0);
@@ -183,6 +227,16 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             {
                 _shipStatusSince.RemoveLabelled(_shipLabels[gone]);
                 _shipLabels.Remove(gone);
+            }
+
+            foreach (var ship in ships)
+            {
+                Details(ship);
+            }
+
+            foreach (var gone in _shipInfoLabels.Keys.Where(symbol => !current.Contains(symbol)).ToList())
+            {
+                ForgetDetails(gone);
             }
 
             // Counts stay at 0 once a role and state no longer occur, so a graph goes down to 0.
@@ -228,6 +282,72 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             }
 
             _contracts.UnionWith(currentContracts);
+        }
+    }
+
+    /// <summary>Where a ship is and what it does (one series), when it arrives, and its hold. Under the lock.</summary>
+    private void Details(ShipMetricsSample ship)
+    {
+        var info = (ship.Location, ship.Activity);
+        if (_shipInfoLabels.TryGetValue(ship.Ship, out var previous) && previous != info)
+        {
+            _shipInfo.RemoveLabelled(ship.Ship, previous.Location, previous.Activity);
+        }
+
+        _shipInfo.WithLabels(ship.Ship, ship.Location, ship.Activity).Set(1);
+        _shipInfoLabels[ship.Ship] = info;
+
+        if (ship.ArrivesAt != default)
+        {
+            _shipArrival.WithLabels(ship.Ship).Set(ship.ArrivesAt.ToUnixTimeSeconds());
+            _shipsInTransit.Add(ship.Ship);
+        }
+        else if (_shipsInTransit.Remove(ship.Ship))
+        {
+            _shipArrival.RemoveLabelled(ship.Ship);
+        }
+
+        var goods = ship.Cargo
+            .Where(item => item.Units > 0)
+            .GroupBy(item => item.Symbol, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Units), StringComparer.Ordinal);
+        if (_shipGoods.TryGetValue(ship.Ship, out var aboard))
+        {
+            foreach (var gone in aboard.Where(good => !goods.ContainsKey(good)))
+            {
+                _shipCargoUnits.RemoveLabelled(ship.Ship, gone);
+            }
+        }
+
+        foreach (var (good, units) in goods)
+        {
+            _shipCargoUnits.WithLabels(ship.Ship, good).Set(units);
+        }
+
+        _shipGoods[ship.Ship] = new HashSet<string>(goods.Keys, StringComparer.Ordinal);
+        _shipCargoCapacity.WithLabels(ship.Ship).Set(ship.CargoCapacity);
+    }
+
+    /// <summary>Removes a ship's details once it is gone. Under the lock.</summary>
+    private void ForgetDetails(string ship)
+    {
+        if (_shipInfoLabels.Remove(ship, out var info))
+        {
+            _shipInfo.RemoveLabelled(ship, info.Location, info.Activity);
+            _shipCargoCapacity.RemoveLabelled(ship);
+        }
+
+        if (_shipsInTransit.Remove(ship))
+        {
+            _shipArrival.RemoveLabelled(ship);
+        }
+
+        if (_shipGoods.Remove(ship, out var goods))
+        {
+            foreach (var good in goods)
+            {
+                _shipCargoUnits.RemoveLabelled(ship, good);
+            }
         }
     }
 }

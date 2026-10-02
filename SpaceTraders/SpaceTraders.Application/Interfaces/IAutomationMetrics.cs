@@ -1,3 +1,5 @@
+using SpaceTraders.Application.Ports;
+
 namespace SpaceTraders.Application.Interfaces;
 
 /// <summary>
@@ -40,6 +42,12 @@ public interface IAutomationMetrics
     /// <summary>Adds credits spent (<c>spacetraders_credits_spent_total{category}</c>), by ledger category.</summary>
     void CreditsSpent(string category, long amount);
 
+    /// <summary>Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>).</summary>
+    void Extracted(string shipSymbol, string tradeSymbol, int units);
+
+    /// <summary>Adds units a ship jettisoned (<c>spacetraders_jettisoned_units_total{ship,good}</c>).</summary>
+    void Jettisoned(string shipSymbol, string tradeSymbol, int units);
+
     /// <summary>Sets whether an anomaly is active (<c>spacetraders_anomaly_active{rule,subject}</c>).</summary>
     void Anomaly(string rule, string subject, bool active);
 
@@ -51,9 +59,13 @@ public interface IAutomationMetrics
 
     /// <summary>
     /// Records every ship's state (<c>spacetraders_ships{role,state}</c> and
-    /// <c>spacetraders_ship_status_since_timestamp_seconds{ship,role,state,goal,reason}</c>). A ship
-    /// whose labels changed since the last call entered its state at <paramref name="now"/>; a ship
-    /// that is no longer in <paramref name="ships"/> loses its series.
+    /// <c>spacetraders_ship_status_since_timestamp_seconds{ship,role,state,goal,reason}</c>), where it
+    /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), when it arrives
+    /// (<c>spacetraders_ship_arrival_timestamp_seconds{ship}</c>, while in transit) and its hold
+    /// (<c>spacetraders_ship_cargo_units{ship,good}</c>, <c>spacetraders_ship_cargo_capacity_units{ship}</c>).
+    /// A ship whose labels changed since the last call entered its state at <paramref name="now"/>;
+    /// a ship that is no longer in <paramref name="ships"/> loses its series, and so does a good that
+    /// is no longer aboard.
     /// </summary>
     void Fleet(IReadOnlyCollection<ShipMetricsSample> ships, DateTimeOffset now);
 
@@ -92,6 +104,24 @@ public sealed record ShipMetricsSample
 
     /// <summary>Why its goal is blocked (<c>runaway</c>); empty otherwise.</summary>
     public required string Reason { get; init; }
+
+    /// <summary>
+    /// Where it is: its waypoint and the waypoint's type, such as <c>X1-AB-A1 (ASTEROID)</c>; in
+    /// transit, <c>→</c> and where it goes.
+    /// </summary>
+    public string Location { get; init; } = string.Empty;
+
+    /// <summary>What the bot has it do, in a few words, such as <c>mining COPPER_ORE</c>, <c>scouting</c> or <c>idle</c>.</summary>
+    public string Activity { get; init; } = string.Empty;
+
+    /// <summary>When it arrives, while in transit; <c>default</c> otherwise.</summary>
+    public DateTimeOffset ArrivesAt { get; init; }
+
+    /// <summary>The units its hold takes.</summary>
+    public int CargoCapacity { get; init; }
+
+    /// <summary>What its hold carries, per good.</summary>
+    public IReadOnlyList<CargoItemModel> Cargo { get; init; } = [];
 }
 
 /// <summary>One deliverable of an accepted contract.</summary>

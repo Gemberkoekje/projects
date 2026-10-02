@@ -715,6 +715,23 @@ its own retention, so the bot's database stays small.
     `Outfitting.` and so on as a strategy change that starts a new run. Those prefixes are now
     only reachable through `PUT /settings/{key}`, which accepts any key.
 
+**2.7 Where each ship is, what it does, what it carries** (done; asked 2026-10-02, during 4.3)
+- Asked: the fleet table showed each ship's role, state, goal and time in state. The contract's
+  drone was in orbit at its asteroid and mining, but nothing showed that, nor how much it had mined.
+- Done:
+  - Every 10 seconds, per ship: where it is (the waypoint and its type; in transit, `→` and where
+    it goes), what the bot has it do (its goal in a few words; else its contract work, `mining` at
+    the contract's source, `delivering` at its destination and `on the way to …` between them; else
+    `idle`, or `blocked (…)`), when it arrives while in transit, and its hold per good and its
+    capacity: `spacetraders_ship_info`, `_arrival_timestamp_seconds`, `_cargo_units` and
+    `_cargo_capacity_units`.
+  - What the drones extract and jettison is counted per ship and good:
+    `spacetraders_extracted_units_total`, `spacetraders_jettisoned_units_total`.
+  - The dashboard's side is a gembernodes change: the fleet table's new columns, and panels for the
+    holds and for what was mined.
+  - Noticed: a goal other than scouting reads as its purpose, not its current step (a `MineAndSell`
+    drone reads "mining and selling …" while it sells too); those goals only run from phase 6.
+
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
   metric: credits, the ledger by category, each ship's state, contracts, the API by endpoint,
