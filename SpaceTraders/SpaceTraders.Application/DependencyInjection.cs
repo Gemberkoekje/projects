@@ -1,3 +1,4 @@
+using JasperFx.CodeGeneration.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
@@ -78,10 +79,13 @@ public static class DependencyInjection
             opts.UseRuntimeCompilation();
 
             // Wolverine 6 refuses service location by default. The host allows it for the DbContext,
-            // whose options EF Core registers through a factory. 5.x's AllowedButWarn covers anything
-            // else registered through a lambda (and every test substitute): a handler that needs it
-            // logs a warning instead of failing on its first message.
+            // whose options EF Core registers through a factory. Everything else registered through a
+            // lambda needs it too: an interface that resolves its concrete type, a typed HttpClient,
+            // every test substitute. Allowed without a warning: 5.x's AllowedButWarn logged one per
+            // handler and dependency on each handler's first message, which the RepeatingError rule
+            // counted as one error repeating (B42), and which this composition can't act on.
             opts.RestoreV5Defaults();
+            opts.ServiceLocationPolicy = ServiceLocationPolicy.AlwaysAllowed;
 
             configureWolverine(opts);
 
