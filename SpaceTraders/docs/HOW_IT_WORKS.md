@@ -349,15 +349,22 @@ Markets are not scouted again.
 - **Each tick** it first ends the surveys that expired (`SurveyKeeper`: removed from `cached_surveys`,
   `SurveyEnded` journaled with how often each was used, `spacetraders_surveys_ended_total`). Then
   each free surveyor gets one survey to take (`SurveyWaypointGoal`), the best target it can reach that
-  no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`:
-  1. the contract's ore at the contract's asteroid, while the contract plan mines it, even when a
-     usable survey of it exists;
-  2. otherwise each ore a market in the system buys, at the asteroid nearest the market that pays
-     most for it, among those whose traits yield the ore (`AsteroidDeposits`) and that one of the
-     miners can reach (any asteroid while there are no miners). Ores without a usable survey there
-     come first, then the best paid.
-- **The state** (`plan_states`, `Survey`) lists the targets, best first, with the surveyors on each;
-  it is written only when it changes. The `ShipLeftIdle` rule reads it.
+  no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`.
+  The targets are:
+  1. the contract's ore at the contract's asteroid, while the contract plan mines it;
+  2. each ore a market in the system buys, at the asteroid nearest the market that pays most for it,
+     among those whose traits yield the ore (`AsteroidDeposits`) and that one of the miners can
+     reach (any asteroid while there are no miners).
+
+  A target needs a survey while it has fewer usable surveys holding its ore than
+  `Survey.StockPerOre` (2, D27). Among those, the contract's ore comes first, then the ore with the
+  fewest usable surveys, then the best paid. With the stock for every ore, the surveyor waits until
+  a survey expires or is used up. A survey isn't ore-specific: the API surveys the whole asteroid and
+  returns random deposits, so "for" an ore is the plan's label, and one survey often counts for
+  several ores. Within the drones' reach every target is XB5C.
+- **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
+  each has, whether it needs one, and the surveyors on each; it is written only when it changes. The
+  `ShipLeftIdle` rule reads it: only targets that need a survey are work waiting for a surveyor.
 
 **What an asteroid yields** (`AsteroidDeposits`): the game doesn't publish it, so this is the table
 community bots use, from the trait descriptions and what extractions have shown: common metal
@@ -752,6 +759,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
+| `Survey.StockPerOre` (2) | Usable surveys the survey plan keeps of each ore at its asteroid; with that many for every ore, the surveyors wait until one runs out (D27) |
 | `Trade.MinProfitPerUnit` (200) | Credits per unit, after the fuel for the whole trip, a trade trip must earn to be started, and to be carried on when prices change (D14); 0 means any profit, but see D15 |
 | `Trade.FuelReserveCredits` (5000) | Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24) |
 | `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`) | The cargo ships the trading plan buys, in order: the Nth while the fleet has fewer than N cargo ships (D21); empty buys none |

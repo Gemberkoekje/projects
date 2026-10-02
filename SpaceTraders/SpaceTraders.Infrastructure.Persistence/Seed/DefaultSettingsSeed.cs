@@ -40,6 +40,7 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
         new AgentSetting { Key = "Automation.MiningShipPercentage",              Value = "0.25",                Type = "decimal", Description = "Fraction of mining-capable ships assigned to resource extraction roles" },
+        new AgentSetting { Key = "Survey.StockPerOre",                           Value = "2",                   Type = "int",     Description = "Usable surveys the survey plan keeps of each ore at its asteroid; with that many for every ore, the surveyors wait until one runs out (D27)" },
         new AgentSetting { Key = "Mining.MaxDrones",                             Value = "20",                  Type = "int",     Description = "Maximum number of mining drones to keep in service for mining automation" },
         new AgentSetting { Key = "Runtime.Reset.Next",                            Value = "",                    Type = "string",  Description = "Last observed server reset timestamp (ISO-8601)" },
         new AgentSetting { Key = "Runtime.Reset.Warning",                         Value = "false",               Type = "bool",    Description = "True when a near-term reset warning is active" },

@@ -328,7 +328,11 @@ public sealed class ShipLeftIdleRuleTests
         _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
         {
             PlanId = Guid.NewGuid(),
-            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51" }],
+            Targets =
+            [
+                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", NeedsSurvey = true },
+                new SurveyPlanTarget { TradeSymbol = "IRON_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2 },
+            ],
             CreatedAt = Start,
             UpdatedAt = Start,
         });
@@ -338,6 +342,25 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Details.Should().Contain("the Survey plan has work it could do: 1 targets to survey");
+    }
+
+    [Fact]
+    public async Task ASurveyorWaiting_WhileEveryOreHasItsStockOfSurveys_IsNotAnAnomaly()
+    {
+        // D27: with a stock of usable surveys for every ore, there is nothing to survey; the surveyor waits.
+        _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2 }],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-1", Start) with { ShipType = "COMMAND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"], CargoCapacity = 40 });
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        violations.Should().BeEmpty();
     }
 
     [Fact]

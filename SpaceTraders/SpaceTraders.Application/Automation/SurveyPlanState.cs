@@ -13,7 +13,10 @@ public sealed record SurveyPlanState
 {
     public required Guid PlanId { get; init; }
 
-    /// <summary>The targets, best first: the contract's ore, then the sellable ores.</summary>
+    /// <summary>
+    /// The targets, best first: those that need a survey (the contract's ore, then the sellable ores), then
+    /// those with their stock of usable surveys (D27).
+    /// </summary>
     public required IReadOnlyList<SurveyPlanTarget> Targets { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
@@ -38,6 +41,12 @@ public sealed record SurveyPlanTarget
 
     /// <summary>Whether a usable survey of the asteroid holds the ore already.</summary>
     public bool HasUsableSurvey { get; init; }
+
+    /// <summary>How many usable surveys of the asteroid hold the ore.</summary>
+    public int UsableSurveys { get; init; }
+
+    /// <summary>Whether it has fewer than the stock, so a surveyor would take it (D27).</summary>
+    public bool NeedsSurvey { get; init; }
 
     /// <summary>The surveyors working on it.</summary>
     public IReadOnlyList<string> SurveyorShipSymbols { get; init; } = [];

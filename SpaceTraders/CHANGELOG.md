@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-02, D27)
+- The survey plan keeps a stock of usable surveys per ore instead of surveying the contract's ore without end: `Survey.StockPerOre` (new, 2). The contract's ore comes first only while it has fewer; then the ore with the fewest usable surveys, then the best paid. With the stock for every ore, the surveyor waits until one runs out, and `ShipLeftIdle` doesn't count that as idle.
+
+### Docs – Changed (2026-10-02, D27)
+- `PLAN.md`: D27, and the third 6.4 follow-up; `docs/HOW_IT_WORKS.md`: the survey stock and its setting.
+
 ### Code – Fixed (2026-10-02, B51)
 - Extracting with a survey works: the survey's expiry goes back to the API as the API wrote it (`…Z`), not with an offset (`+00:00`), which the API answered with 422 "invalid payload" on every extraction.
 - A survey the API can't read (422 without a game error code) is dropped with reason `rejected`, and the warning carries the API's response body; it was tried again on every step, five calls a tick with Wolverine's retries.
