@@ -140,6 +140,64 @@ public sealed class PrometheusAutomationMetricsTests
         }
     }
 
+    /// <summary>
+    /// Every counter, each with what its first increment looked like on the cluster: the contract's
+    /// deposit and the drone, booked before Prometheus first scraped the pod; a single 429; a single
+    /// circuit breaker trip.
+    /// </summary>
+    public static TheoryData<string, Action<IAutomationMetrics>, string> FirstIncrements => new()
+    {
+        { "credits earned", metrics => metrics.CreditsEarned("ContractDeposit", 4_267), "spacetraders_credits_earned_total{source=\"ContractDeposit\"} " },
+        { "credits spent", metrics => metrics.CreditsSpent("ShipPurchase", 46_885), "spacetraders_credits_spent_total{category=\"ShipPurchase\"} " },
+        { "429s", metrics => metrics.ApiThrottled("rate_limiter"), "spacetraders_api_throttled_total{source=\"rate_limiter\"} " },
+        { "API responses", metrics => metrics.ApiRequest("POST", "my/ships/{shipSymbol}/extract", "429"), "spacetraders_api_requests_total{method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\",status=\"429\"} " },
+        { "breaker trips", metrics => metrics.GoalBreakerTripped("AGENT-3"), "spacetraders_goal_breaker_trips_total{ship=\"AGENT-3\"} " },
+        { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{kind=\"ScoutWaypoint\"} " },
+        { "messages", metrics => metrics.MessageHandled("ContractAcceptedEvent"), "spacetraders_messages_handled_total{type=\"ContractAcceptedEvent\"} " },
+        { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3)), "spacetraders_api_rate_limit_wait_seconds_total " },
+    };
+
+    /// <summary>
+    /// B43: Prometheus's increase() and rate() count what a series gains between two scrapes, never
+    /// the value Prometheus first sees. A series that held its first increment when it was first
+    /// scraped never showed it on the dashboard: the contract's 4,267 and the drone's 46,885 were
+    /// missing from the ledger panels, and a single 429 or breaker trip could never show at all.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(FirstIncrements))]
+    public async Task ACountersFirstIncrement_ReachesPrometheusAfterItHasScrapedTheSeriesAtZero(
+        string counter, Action<IAutomationMetrics> increment, string series)
+    {
+        increment(_metrics);
+
+        (await ExportAsync()).Should().Contain(series + "0", "the first scrape of {0} must see the series at 0", counter);
+        (await ExportAsync()).Should().NotContain(series + "0\n", "the scrape after that must see {0}' first increment", counter);
+    }
+
+    [Fact]
+    public async Task ASeriesThatFirstAppearsLater_IsScrapedAtZeroFirstToo()
+    {
+        await ExportAsync();
+        await ExportAsync();
+
+        _metrics.CreditsSpent("ShipPurchase", 46_885);
+
+        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{category=\"ShipPurchase\"} 0\n");
+        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{category=\"ShipPurchase\"} 46885\n");
+    }
+
+    [Fact]
+    public async Task ASeriesPrometheusHasSeenAtZero_CountsAtOnce()
+    {
+        _metrics.CreditsEarned("TradeSell", 450);
+        await ExportAsync();
+        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{source=\"TradeSell\"} 450\n");
+
+        _metrics.CreditsEarned("TradeSell", 50);
+
+        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{source=\"TradeSell\"} 500\n");
+    }
+
     [Fact]
     public async Task AShip_KeepsWhenItEnteredItsState_UntilItsStateChanges()
     {
