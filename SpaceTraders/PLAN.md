@@ -49,14 +49,16 @@
   API from an empty local database.
 - Phase 2 is done in the code (2026-10-01): metrics, the ledger and the journal. Its Grafana
   dashboard and alerts (2.4, 2.5) were merged in gembernodes (PR #10) and applied by Flux on
-  2026-10-01; Grafana still needs a rollout restart to read the alert rules. The bot stays off the
-  cluster until phase 4.
+  2026-10-01, and Grafana has read the alert rules since its restart on 2026-10-02.
 - Phase 3 is done in the code (2026-10-01): ten health rules check the bot's own state every
   minute, and each broken one is an anomaly (a metric and journal lines).
 - Phase 4 is merged (2026-10-02): gembernodes PR #11 put the bot back on the cluster at 08:50Z, at
   main `3373ca7` (with B39–B41), and it registered a new agent. Grafana restarted at 09:09Z, so its
   alerts, "bot is down" included, are live. The first-run watch (4.3) is under way; its first
   minutes found B42–B44.
+- Phase 5 is under way (2026-10-02): the `st-investigate` skill is finished and was checked against
+  the first run (5.1), where it explained B42's anomaly and found B45. Its permissions (5.2) wait for
+  your go-ahead.
 
 ## Known issues
 
@@ -744,7 +746,8 @@ its own retention, so the bot's database stays small.
   - The market tree is the game's own: `GET market/supply-chain`, once per start (retried an hour
     after a failure, so a game API that is down can't raise `RepeatingError`), one series per good
     with what it is made from and what is made from it (`spacetraders_good_supply_chain`).
-  - The dashboard itself is a gembernodes change.
+  - The dashboard itself is gembernodes PR #17 (merged; uid `spacetraders-markets`), and PR #18
+    deploys the bot with these metrics (image `fd9e3d3`, since 10:29Z).
   - Noticed: the game lists `MACHINERY` as what raw goods (`ICE_WATER`, `AMMONIA_ICE` and others)
     are made from; the tree shows the game's map as it is.
 
@@ -878,7 +881,7 @@ its own retention, so the bot's database stays small.
 
 ### Phase 4: Back on the cluster (gembernodes)
 
-**4.1 Database logins** (prepared; by hand, before 4.2 is merged)
+**4.1 Database logins** (done by hand; one step left, see below)
 - Do: check the connection string in the 1Password item `spacetraders-secrets`.
   - It should use a dedicated, non-superuser login that owns only the `spacetraders` database;
     create both if they're missing.
@@ -901,6 +904,12 @@ its own retention, so the bot's database stays small.
   - `spacetraders_ro` could read the tables the bot created after the grants, but not write, even
     with read-only switched off; after the revoke it couldn't read `stored_credentials`.
   - Another app's login couldn't connect, and `spacetraders` couldn't create a database.
+- Done by hand before 4.2 was merged: both logins exist. Checked on 2026-10-02 with
+  `tools/investigate/st.py check` (5.1): `spacetraders_ro` connects, isn't a superuser and is
+  read-only. Its password is in psql's password file on your PC.
+- Still to do: step 3 of the gembernodes README, as `postgres` in the `spacetraders` database:
+  `REVOKE SELECT ON stored_credentials FROM spacetraders_ro;`. On 2026-10-02 the read-only login
+  could still read the agent token. Until then `st.py` refuses any query that names the table.
 
 **4.2 Manifests** (done: gembernodes PR #11, merged 2026-10-02)
 - Do: restore `apps/spacetraders/`, the namespace and the ingress (from `3f9f785^`), with these
@@ -991,11 +1000,15 @@ its own retention, so the bot's database stays small.
   - Noticed: "Credits in the last hour" and "Credits per hour" show no data in the bot's first hour
     on the cluster. They subtract the credits of an hour ago (`offset 1h`), which didn't exist yet;
     across restarts `max()` keeps them working.
+  - At 10:50Z, two hours in, with 5.1's helper: four starts, one per deploy (08:50, 09:57, 10:02,
+    10:29), and no other restart; about 310 log lines an hour, now that the scout has finished (some
+    7,500 a day); database 9.5 MB; no 429s and no failed API call in the last hour; no anomaly
+    active. 5.1 found B45 in this run.
   - Still to do: the 24-hour check, and a full reset period.
 
 ### Phase 5: Claude as mechanic (on your PC)
 
-**5.1 The `/st-investigate` skill** (draft written: `SpaceTraders/.claude/skills/st-investigate/SKILL.md`)
+**5.1 The `/st-investigate` skill** (done: `SpaceTraders/.claude/skills/st-investigate/SKILL.md`)
 - The draft marks which data sources arrive with phases 2–4. Finish it once they exist, and
   check it against a real run.
 - Input: an anomaly (rule plus subject), or `week`.
@@ -1011,13 +1024,51 @@ its own retention, so the bot's database stays small.
   - opens a PR with the evidence (queries and log lines).
 - Never: changes settings, or tunes thresholds, budgets or priorities. Observations about
   strategy go under "Noticed".
+- Done (2026-10-02):
+  - `tools/investigate/st.py` reads every source from your PC: `check` (the pods, Prometheus, Loki
+    and the database in turn), `prom`, `logs` (with `--group`: warnings and errors per statement)
+    and `sql`. This PC has no psql, jq or logcli, so it is Python with the standard library only. It
+    starts and stops the port-forwards itself, runs psql from the `postgres:17` Docker image, reads
+    the password from psql's password file, and masks tokens and passwords. Its README says how.
+  - Grafana's datasource proxy needs a Grafana login, so the helper goes to Prometheus and Loki
+    through `kubectl port-forward` instead. The internal API is left out: its key also unlocks
+    `PUT /settings/*` and `POST /control/*`, and the database and the metrics hold the same state.
+  - The skill: the helper's commands, the queries the run proved useful, and what the run taught
+    (`Tick` marks a tick's lines and not a handler's, so two paths acting on one ship show
+    interleaved; the startup probe's expected warnings; quoted PascalCase columns; plan state as
+    JSON; a metric with no series as evidence). Its procedure now checks first whether a symptom is
+    a known B-number and whether the running image has the fix, and lines code up with logs to the
+    millisecond when two paths may race.
+  - Checked against the first run, with the procedure:
+    - **B42's anomaly**, the run's only one, explained: `RepeatingError` was raised at 08:51:46
+      and cleared at 09:01:48, on Wolverine's "Utilizing service location" warning (`@i`
+      `bd1538c5`). All 15 occurrences came from the first pod (image `3373ca7`), the last four
+      at 09:54:38, when the contract's first delivery compiled `FulfillContractDeliveryCommand`'s
+      handler: a handler's first message, as B42 says. The fix (`5d72e4e`, projects PR #116) runs
+      since 09:57:50 (gembernodes PR #14), and none came in the three starts since.
+      Reproduced: with the fix reverted, `HandlerCodegenTests` fails ("18x Utilizing service
+      location …"); with it, it passes.
+    - **B45, found:** grouping the run's warnings by statement showed one "re-created missing
+      assignment" warning from the scout plan, at 09:18:58. The ship's lines, the plan's state in
+      the database and the market metrics showed that the plan had skipped its last stop, and the
+      lines' `Tick` property and millisecond times showed which two paths raced. Fixed with a test
+      that interleaves them, in its own PR.
 
-**5.2 Permissions**
+**5.2 Permissions** (proposed; waits for your go-ahead)
 - Allowed without asking: `kubectl get`, `kubectl logs`, `kubectl port-forward`, `psql` with the
   read-only login, and reads from Grafana. Everything else asks.
 - Waits for 4.1, because the read-only login doesn't exist yet. These rules widen what Claude may
   do on your cluster without asking, so they go in only with your explicit go-ahead.
-- Done when: the skill reproduces and explains one real anomaly from the first run.
+- Done when: the skill reproduces and explains one real anomaly from the first run. Done: B42 (5.1).
+- Proposed, in `SpaceTraders/.claude/settings.json`: allow `Bash(python tools/investigate/st.py:*)`
+  and `Bash(kubectl -n spacetraders logs:*)`, and nothing else.
+  - The helper covers the port-forwards, the pods and their events, Prometheus, Loki and psql with
+    the read-only login. Reads from Grafana aren't needed.
+  - Not `kubectl get` as such: it reads Secrets too (`kubectl get secret -o yaml` shows the agent
+    token, the API key and the database password), and a rule that matches the start of a command
+    can't keep them out (`kubectl get pods,secrets`).
+  - The helper is only as read-only as its code, which is in this repository; the database login
+    is read-only on the server, whatever the code does.
 
 ### Phase 6: Make money, one loop at a time
 
@@ -1044,8 +1095,10 @@ your PC, 1Password or kubectl:
 | Slice | Change |
 |---|---|
 | 2.4 | `infrastructure/monitoring/dashboards/spacetraders-dashboard.json` plus a `configMapGenerator` entry (merged: PR #10) |
-| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; the restart is pending) |
-| 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` |
+| 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; Grafana restarted 2026-10-02) |
+| 2.7 | The fleet table's new columns, and panels for the holds and for what was mined (merged: PR #15) |
+| 2.8 | A markets dashboard per system, uid `spacetraders-markets` (merged: PR #17) |
+| 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` (done; the revoke on `stored_credentials`, step 3, is still to do) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
-| 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (PR #13, not merged); then a Grafana rollout restart |
+| 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |

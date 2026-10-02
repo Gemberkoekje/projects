@@ -11,8 +11,10 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 > (safe to run) is done, including a four-hour soak test; so is phase 2 (visibility: metrics, the
 > ledger, the journal, and a Grafana dashboard and alerts in gembernodes); and so is phase 3 (health
 > rules: the bot checks itself every minute and reports anomalies). Phase 4 (back on the cluster)
-> was merged in gembernodes (PR #11), and its first-run watch (slice 4.3) is under way. Known issues
-> are listed there under B-numbers and decisions under D-numbers.
+> was merged in gembernodes (PR #11), and its first-run watch (slice 4.3) is under way. In phase 5
+> Claude investigates the running bot read-only with the `st-investigate` skill
+> (`tools/investigate/`). Known issues are listed there under B-numbers and decisions under
+> D-numbers.
 
 ---
 
