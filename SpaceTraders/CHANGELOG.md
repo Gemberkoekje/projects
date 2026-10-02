@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-02, B51)
+- Extracting with a survey works: the survey's expiry goes back to the API as the API wrote it (`…Z`), not with an offset (`+00:00`), which the API answered with 422 "invalid payload" on every extraction.
+- A survey the API can't read (422 without a game error code) is dropped with reason `rejected`, and the warning carries the API's response body; it was tried again on every step, five calls a tick with Wolverine's retries.
+
+### Docs – Changed (2026-10-02, B51)
+- `PLAN.md`: B51, and the second 6.4 follow-up with a note on Wolverine's retries; `docs/HOW_IT_WORKS.md`: the rejected survey.
+
 ### Code – Changed (2026-10-02, after slice 6.4's switch-on)
 - A contract assignment lasts one round trip (D26, asked on 2026-10-02): the delivery closes it, after the fulfil call when one was due, and the plans assign the ship again on the next tick, in their order, so work that matters more comes first. A ship whose fulfil call fails keeps its assignment and makes the call again. The plan's first ship joins like every other free miner; it no longer gets its assignment back on every tick, or takes it back from other work.
 - A restart reconsiders the contract's ships once (D26): with automation and the contract plan on, startup recovery releases every ship on the contract that isn't in flight, and the first tick assigns it again. A ship in flight keeps its assignment until its delivery.

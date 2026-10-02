@@ -35,11 +35,42 @@ public sealed class SurveyRefusalTests
     }
 
     [Fact]
+    public async Task ASurveyTheApiCantRead_IsReportedAsRejected_WithWhatTheApiSaid()
+    {
+        // B51, seen on the cluster on 2026-10-02: the API answered an extraction with a survey with 422
+        // ("invalid payload"), and the miner tried the same survey again on every step, five calls a
+        // tick with Wolverine's retries. Dropped, the survey costs one call, and the API's own words, its
+        // "data", are kept for the log.
+        const string body = """{"error":{"message":"The request could not be processed due to an invalid payload or application state.","code":422,"data":{"expiration":["Invalid datetime"]}}}""";
+        _client.ExtractWithSurveyAsync("SHIP-3", Arg.Any<Survey>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new SpaceTradersApiException("invalid payload", HttpStatusCode.UnprocessableEntity, "my/ships/SHIP-3/extract/survey", body, 422));
+
+        var extract = () => new SpaceTradersPortAdapter(_client).ExtractWithSurveyAsync("SHIP-3", Survey());
+
+        var refused = (await extract.Should().ThrowAsync<SurveyRefusedException>()).Which;
+        refused.Signature.Should().Be("SIG-1");
+        refused.Reason.Should().Be("rejected");
+        refused.Detail.Should().Be(body);
+    }
+
+    [Fact]
     public async Task AnyOtherError_StaysTheApis()
     {
         // 4000: the ship's cooldown, which has nothing to do with the survey.
         _client.ExtractWithSurveyAsync("SHIP-3", Arg.Any<Survey>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(ApiError(4000));
+
+        var extract = () => new SpaceTradersPortAdapter(_client).ExtractWithSurveyAsync("SHIP-3", Survey());
+
+        await extract.Should().ThrowAsync<SpaceTradersApiException>();
+    }
+
+    [Fact]
+    public async Task A422WithAGameErrorCode_StaysTheApis()
+    {
+        // 4228: the hold is full. The ship's state, not the survey, which another ship can still use.
+        _client.ExtractWithSurveyAsync("SHIP-3", Arg.Any<Survey>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new SpaceTradersApiException("cargo full", HttpStatusCode.UnprocessableEntity, "my/ships/SHIP-3/extract/survey", null, 4228));
 
         var extract = () => new SpaceTradersPortAdapter(_client).ExtractWithSurveyAsync("SHIP-3", Survey());
 

@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using SpaceTraders.Application.Commands.Ships;
@@ -21,6 +21,7 @@ public sealed class MineResourceVolumeHandlerTests
     private readonly INavigateSubCommand _navigate = Substitute.For<INavigateSubCommand>();
     private readonly Wolverine.IMessageBus _bus = Substitute.For<Wolverine.IMessageBus>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly LogRecorder _log = new();
 
     public MineResourceVolumeHandlerTests()
     {
@@ -141,6 +142,28 @@ public sealed class MineResourceVolumeHandlerTests
         _metrics.DidNotReceiveWithAnyArgs().Extraction(default!, default);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ASurveyTheApiRejects_IsDropped_AndLoggedWithWhatTheApiSaid()
+    {
+        // B51: the API's 422 named no game error; its "data" is the only clue to what it couldn't read.
+        _ships.FindAsync("SHIP-3", Arg.Any<CancellationToken>()).Returns(AtAsteroid("SHIP-3"));
+        _surveys.GetActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new StoredSurvey(Survey("SIG-1", "IRON_ORE"), "SHIP-1", DateTimeOffset.UtcNow, 0)]);
+        var rejected = new SurveyRefusedException(
+            "SIG-1",
+            SurveyRefusedException.RejectedErrorCode,
+            new InvalidOperationException("invalid payload"),
+            """{"error":{"code":422,"data":{"expiration":["Invalid datetime"]}}}""");
+        _port.ExtractWithSurveyAsync("SHIP-3", Arg.Any<SurveyModel>(), Arg.Any<CancellationToken>()).ThrowsAsync(rejected);
+
+        var result = await Handler().ExecuteAsync(new MineResourceVolumeCommand("SHIP-3", "IRON_ORE", "X1-AB-AST", 15), CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await _surveyKeeper.Received(1).RefusedAsync(rejected, Arg.Any<CancellationToken>());
+        _log.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Warning)
+            .Which.Message.Should().Contain("SIG-1").And.Contain("Invalid datetime");
+    }
+
     private MineResourceVolumeHandler Handler()
         => new(
             _port,
@@ -153,7 +176,7 @@ public sealed class MineResourceVolumeHandlerTests
             _navigate,
             _bus,
             _metrics,
-            NullLogger<MineResourceVolumeHandler>.Instance);
+            _log.For<MineResourceVolumeHandler>());
 
     private static ShipModel AtAsteroid(string symbol)
         => new(

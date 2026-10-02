@@ -211,6 +211,17 @@ public sealed class MineResourceVolumeHandler(
         {
             // Exhausted, expired or not taken: the survey is dropped, and the next step extracts with
             // the next best one, or without.
+            if (refused.ErrorCode == SurveyRefusedException.RejectedErrorCode)
+            {
+                // B51: the API couldn't read the survey; what it said is the only clue to why.
+                logger.LogWarning(
+                    refused,
+                    "The API couldn't read survey {Signature} for ship {ShipSymbol}; it is dropped. The API said: {ApiResponse}",
+                    refused.Signature,
+                    ship.Symbol,
+                    refused.Detail);
+            }
+
             await surveyKeeper.RefusedAsync(refused, cancellationToken);
             return new ShipCommandResult(
                 ship.Symbol,

@@ -557,9 +557,12 @@ step does the work.
   (`SurveySelection`: the largest share of the deposits, then the larger deposit, then the later
   expiry), or without one. It counts the extraction (`spacetraders_extractions_total`, with or
   without a survey), the survey's use, and logs `Extracted`. A survey the API refuses (4224
-  exhausted, 4221 expired, 4220 not verified, mapped by the API adapter to `SurveyRefusedException`)
-  is dropped and journaled as `SurveyEnded`, and nothing is extracted that step (B49, fixed: the
-  survey would have been tried again on every step). Other goods are jettisoned.
+  exhausted, 4221 expired, 4220 not verified, or a 422 without a game error code when it can't read
+  the survey, reason `rejected`, B51; mapped by the API adapter to `SurveyRefusedException`) is
+  dropped and journaled as `SurveyEnded`, and nothing is extracted that step (B49, fixed: the survey
+  would have been tried again on every step). A rejected survey is also logged as a warning with the
+  API's response body. The survey goes back to the API as it was given out, its expiry in the API's
+  own form (`…51.937Z`, B51). Other goods are jettisoned.
 - **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`**, used by the tick's contract
   work, dead-reckon arrival themselves and navigate without a goal id (B17). The mining and survey
   goals navigate with `NavigateToWaypointCommand`, which carries the goal id, so their arrivals wake

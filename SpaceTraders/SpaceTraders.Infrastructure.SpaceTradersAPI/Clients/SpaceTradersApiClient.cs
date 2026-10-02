@@ -216,7 +216,7 @@ public sealed class SpaceTradersApiClient(
                 Signature = survey.Signature,
                 Symbol = survey.Symbol,
                 Deposits = survey.Deposits,
-                Expiration = survey.Expiration,
+                Expiration = ExtractWithSurveyRequest.FormatExpiration(survey.Expiration),
                 Size = survey.Size,
             },
             AuthMode.AgentToken,
