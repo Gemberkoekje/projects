@@ -76,6 +76,12 @@ public static class JournalEvents
     /// </summary>
     public const string MiningStarted = nameof(MiningStarted);
 
+    /// <summary>
+    /// A probe was sent to a shipyard where a purchase waits for one of our ships, which the API requires
+    /// (slice 6.3, D30: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>ShipType</c> the purchase is for).
+    /// </summary>
+    public const string ProbeCalled = nameof(ProbeCalled);
+
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);
 

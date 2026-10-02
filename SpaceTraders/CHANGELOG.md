@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-02, slice 6.3: D29, D30)
+- The probe plan works towards a probe at every market of the headquarters' system: while there are fewer probes than markets it buys a SHIP_PROBE where probes cost least, as long as the purchase leaves the credit reserve (`FleetExpansion.MinCreditReserve`, 100,000); its own 200,000 gate (D4) is gone. Until there are enough, the probes roam: each free probe flies, in CRUISE, to a market whose prices are older than `Market.RefreshMinutes` and that no probe is at or flying to, the oldest once twice the flight there counts against it.
+- A purchase at a shipyard where none of our ships is makes no API call, which could only fail: it calls for a ship, the probe plan sends its nearest free probe, and the next attempt buys (D30). With a ship there, the shipyard's price is fetched again first, so the reserve is kept with the price it asks now. New journal kind `ProbeCalled`.
+- The fleet view calls a probe's work "scouting", "called to a shipyard" or "watching its market", instead of "deploying" and "idle".
+
+### Code – Fixed (2026-10-02, slice 6.3)
+- The starting probe, cached with its role `SATELLITE`, is a probe (B25); a probe in flight counts, and keeps its market, so no second probe is bought or sent for it (B15).
+
+### Code – Removed (2026-10-02, slice 6.3)
+- `DeployProbeCommand` and the probe plan's credits handler, which only the old probe plan used.
+
+### Docs – Changed (2026-10-02, slice 6.3)
+- `PLAN.md`: slice 6.3, D29, D30, B15 and B25; `docs/HOW_IT_WORKS.md`: the probe plan, purchases, the idle rule and the journal.
+
 ### Code – Changed (2026-10-02, D28)
 - Miners serve the markets that buy an ore by supply, shortest first: SCARCE, LIMITED, and once none is short, the lowest supply there is, even when it pays less; within a supply level, surveyed ores first. A trip for a market that isn't short logs reason `lowest_supply`.
 - A drone is bought only when its first trip, by the miners' own ranking, would serve a market in low supply (SCARCE or LIMITED), and one a tick. It used to buy one for every low-supply opening at once, and a drone bought for a scarce market could then mine surveyed ore for a market that wasn't short, leaving the opening to pay for the next drone.

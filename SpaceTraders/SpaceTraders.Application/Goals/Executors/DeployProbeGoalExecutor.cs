@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -11,80 +9,52 @@ using Wolverine;
 namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
-/// Executor for <see cref="DeployProbeGoal"/>.
-/// Navigates the probe to its target waypoint using DRIFT mode (for fuel-less ships),
-/// then marks the deployment complete so the <see cref="IProbeDeploymentPlanService"/> can advance.
+/// Executor for <see cref="DeployProbeGoal"/>: one flight of a probe (PLAN.md slice 6.3). The probe flies in
+/// CRUISE: it has no tank, so no flight costs it fuel, and DRIFT would only make it ten times slower. Its
+/// arrival fetches the market and the shipyard there, and docks it; then the goal ends, and the probe plan
+/// gives it the next market, or leaves it where it is.
 /// </summary>
 public sealed class DeployProbeGoalExecutor(
     IShipGoalRepository goals,
-    IProbeDeploymentPlanService probeDeploymentPlan,
-    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<DeployProbeGoalExecutor> logger) : IShipGoalExecutor
 {
+    private const string CruiseMode = "CRUISE";
+    private const string DriftMode = "DRIFT";
+
+    /// <inheritdoc />
     public bool CanExecute(ShipGoal goal) => goal is DeployProbeGoal;
 
+    /// <inheritdoc />
     public async Task<GoalExecutionResult> ExecuteStepAsync(
         ShipModel ship,
         ShipGoal goal,
         ShipGoalContext ctx,
         CancellationToken ct)
     {
-        var deployGoal = (DeployProbeGoal)goal;
+        var flight = (DeployProbeGoal)goal;
 
         if (ship.LocalStatus == ShipLocalStatus.InTransit)
         {
-            return GoalExecutionResult.WaitingForArrival("Probe is in transit to deployment target.");
+            return GoalExecutionResult.WaitingForArrival("Probe is in transit.");
         }
 
-        var atTarget = string.Equals(
-            ship.WaypointSymbol,
-            deployGoal.TargetWaypointSymbol,
-            StringComparison.OrdinalIgnoreCase);
-
-        if (atTarget)
+        if (string.Equals(ship.WaypointSymbol, flight.TargetWaypointSymbol, StringComparison.OrdinalIgnoreCase))
         {
-            // Ensure the probe is docked before setting DRIFT mode.
-            if (ship.LocalStatus == ShipLocalStatus.InOrbit)
-            {
-                await dock.ExecuteAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Docking probe at deployment target.");
-            }
-
-            // Probe is docked at target — set DRIFT flight mode if not already set.
-            if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
-            {
-                logger.LogInformation(
-                    "DeployProbeGoalExecutor: setting DRIFT mode for probe {ShipSymbol} at {WaypointSymbol}.",
-                    ship.Symbol,
-                    deployGoal.TargetWaypointSymbol);
-
-                await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            }
-
-            logger.LogDebug(
-                "DeployProbeGoalExecutor: probe {ShipSymbol} deployed at {WaypointSymbol}; advancing deployment plan.",
-                ship.Symbol,
-                deployGoal.TargetWaypointSymbol);
-
-            await probeDeploymentPlan.AdvanceAsync(deployGoal.TargetWaypointSymbol, ct);
             await goals.ClearActiveGoalAsync(ship.Symbol, ct);
-
-            return GoalExecutionResult.Completed($"Probe deployed at {deployGoal.TargetWaypointSymbol} in DRIFT mode.");
+            return GoalExecutionResult.Completed($"Probe at {flight.TargetWaypointSymbol}.");
         }
 
-        // Not yet at target — set DRIFT mode before navigating if the probe has no fuel capacity.
-        if (ship.FuelCapacity <= 0
-            && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+        // The old probe plan parked probes in DRIFT, and the navigation's fuel fallback can leave a ship in
+        // it (B47).
+        if (string.Equals(ship.FlightMode, DriftMode, StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogInformation(
-                "DeployProbeGoalExecutor: probe {ShipSymbol} has no fuel; switching to DRIFT mode before navigating.",
-                ship.Symbol);
-
-            await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
+            logger.LogDebug("DeployProbeGoalExecutor: probe {ShipSymbol} switches from DRIFT to CRUISE.", ship.Symbol);
+            await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, CruiseMode), ct);
+            return GoalExecutionResult.Progressing("Switching the probe to CRUISE.");
         }
 
-        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, deployGoal.TargetWaypointSymbol), ct);
-        return GoalExecutionResult.WaitingForArrival($"Probe navigating to deployment target {deployGoal.TargetWaypointSymbol}.");
+        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, flight.TargetWaypointSymbol), ct);
+        return GoalExecutionResult.WaitingForArrival($"Probe flying to {flight.TargetWaypointSymbol}.");
     }
 }

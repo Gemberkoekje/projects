@@ -50,6 +50,10 @@ public static class DependencyInjection
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IShipPurchaseService, ShipPurchaseService>();
+
+        // A purchase that waits for one of our ships at a shipyard, from tick to tick, for the probe plan
+        // to answer (slice 6.3, D30).
+        services.AddSingleton<ShipyardCalls>();
         services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
         services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();
         services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();

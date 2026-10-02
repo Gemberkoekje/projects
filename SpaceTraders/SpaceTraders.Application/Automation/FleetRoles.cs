@@ -53,6 +53,21 @@ public static class FleetRoles
     }
 
     /// <summary>
+    /// Whether the ship is a probe, which the probe plan flies and nothing else uses (D29): a probe frame, or
+    /// the type a probe is cached with, <c>SHIP_PROBE</c> when bought and its registration role
+    /// <c>SATELLITE</c> after startup sync. The starting probe is one (B25).
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a probe.</returns>
+    public static bool IsProbe(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
+            || ship.ShipType.Equals("SATELLITE", StringComparison.OrdinalIgnoreCase)
+            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_PROBE\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Whether a ship is free for new work: not in transit, no goal (or one that is done or blocked), and no
     /// open assignment.
     /// </summary>

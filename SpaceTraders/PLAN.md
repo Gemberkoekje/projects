@@ -71,7 +71,11 @@
   (deployed by gembernodes#25 at 15:08Z). Your decision D27, a stock of surveys per ore instead of
   surveying the contract's ore without end, is live (projects#126 and #127, deployed by gembernodes#26
   and #27). The contract was fulfilled at 15:49Z (23,076 credits). Your decision D28, one rule for
-  what miners mine and when a drone is bought, is built on branch `claude/spacetraders-mining-rules`.
+  what miners mine and when a drone is bought, was merged as projects#128.
+- Slice 6.3 (probes) is built on branch `claude/spacetraders-more-scouting`, with your decisions D29
+  (a probe for every market, bought while the credits stay at 100,000; until then they roam) and D30
+  (a purchase where none of our ships is fetches a probe first). It fixes B15 and B25. The probe plan
+  stays off until you switch it on (D9).
 
 ## Known issues
 
@@ -97,7 +101,7 @@ the misbehaviour.
 | B12 | **Log noise.** Information-level logs on every 5 s tick, `System.Net.Http` at Information (about 4 lines per API call), no correlation properties, and the ship symbol logged under three names (`ShipSymbol`, `Symbol`, `Ship`). The production JSON has no rendered message. | `Program.cs:60-74`, tick services | 1.9 (done) |
 | B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
-| B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
+| B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 (done: the plan buys by count, probes in flight included, and a probe in flight keeps its market) |
 | B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); survey part: 6.4 (done) |
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 (done for the mining and survey trips, which navigate with their goal; the contract commands still dead-reckon for themselves) |
 | B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 (done) |
@@ -107,7 +111,7 @@ the misbehaviour.
 | B22 | **The dashboard publishes the internal API key.** The WebUI container writes the key into `config.js`, which anyone who can open the dashboard can read. The old ingress served both the dashboard and the API on the public `gemberkoekje.nl`, so anyone could call `PUT /settings/*` and `POST /control/*`. | `SpaceTraders.WebUI/docker-entrypoint.sh:11-29`, `SpaceTraders.WebUI/index.html:17`; gembernodes `3f9f785^:ingress/spacetraders-ingress.yaml` | 4.2 (done: LAN only, not merged) |
 | B23 | **A failed startup leaves an idle pod that looks healthy.** One try/catch wraps the startup chain. If database init, agent bootstrap, the run lifecycle, startup sync or recovery throws, the later services (the tick and pruning among them) never start, and nothing retries. `/health/live` runs no checks, and the old deployment used it for the startup and liveness probes, so Kubernetes never restarts the pod. | `DeferredStartupHostedService.cs:57-89`, `Program.cs:146` | 1.11 (done) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
-| B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 |
+| B25 | **The starting probe is probably not recognised as a probe.** Startup sync stores a ship's registration role as its type (`SATELLITE` for the starting probe), but the probe plan only accepts type `SHIP_PROBE` or a symbol containing `PROBE` or `SATELLITE`, and ship symbols look like `AGENT-2`. The plan then buys a probe instead of using the free one. | `StartupSyncService.cs:64`, `ProbeDeploymentPlanService.cs:495-498` | 6.3 (done: `FleetRoles.IsProbe` reads the frame and both cached types) |
 | B26 | **A newly registered agent had no settings until the pod restarted** (found and confirmed in 1.4). Registration wrote the new agent's rows and default settings through a DbContext that was created before the new agent was set: resolving the API client creates it, for the endpoint-usage counter. So all of it was stored under the previous agent. With every setting missing, `Automation.Enabled` read as off, and after a server reset the bot sat idle until its next restart. | `AgentBootstrapService.cs` (`RegisterNewAgentAsync`), `ApiEndpointUsageRecorder.cs` | 1.4 (done) |
 | B27 | **A contract plan waiting for budget calls the API on every tick** (found in 1.9, seen at runtime in 1.14: 12 calls a minute). It is retried every 5 s, and each retry fetches every contract (`GET my/contracts`) and saves a new plan: 12 calls a minute while it waits, and the waiting can last as long as the credits stay short. Its log lines went to Debug in 1.9; the calls are still there. | `ContractPlanService.cs` (`EnsureBootstrappedAsync`, `RefreshContractsCacheOnceAsync`) | 1.14 (done) |
 | B28 | **Startup sync caches a shipyard without its prices** (found in 1.14). It stored the priced ships where the ship types belong and left the prices empty, and purchases read the price from the latter. A purchase at a shipyard where a ship sat at startup then failed with "price unknown" until a ship arrived there again, and every restart did the same to each shipyard with a ship parked at it; a parked probe never leaves. In the soak test the contract plan waited 9 minutes for a drone it could afford, until the scout docked at that shipyard. | `StartupSyncService.cs` (`EnsureFacilitiesForShipsAreCachedAsync`) vs `SpaceTradersPortAdapter.GetShipyardAsync`; `ShipyardRepository.MapToDto`, `ShipPurchaseService.ResolveShipPurchasePrice` | 1.14 (done) |
@@ -129,7 +133,7 @@ the misbehaviour.
 | B44 | **The error-log alert fires on the bot's ordinary lines** (found in 4.3). Gembernodes' "Error logs detected" rule matches `(?i)error` anywhere in a line, and 2.5 added `spacetraders` to it. The bot's JSON lines contain the word without being errors: the startup settings dump (`Health.Errors.MaxRepeatsIn10Minutes`), Wolverine's "…this is an error" (B42) and a `RepeatingError` anomaly's own lines. It fired five minutes after the first start. | gembernodes `infrastructure/monitoring/grafana-alerting-provisioning.yaml` (`loki-error-logs`) | 4.3 (done: gembernodes PR #13) |
 | B45 | **The scout plan can skip a stop** (found in 5.1, on the cluster). When the ship docks at a stop, the tick and the arrival can both run its goal step. On 2026-10-02 at 09:18:58 the arrival's step moved the plan from stop 25 to stop 26, X1-DC53-J58. In the same second the tick's resume check read the plan from before that advance and the assignment from after it, took the assignment for missing and set the ship's goal back to stop 25; and the visit to stop 25 completed a second time, in the tick's goal step, which moved the plan past stop 26. The plan logged "all 26 waypoints visited", but J58's market was never fetched, and markets aren't scouted again. Any stop can be skipped this way, whenever a tick coincides with an arrival. | `ScoutAllMarketplacesPlanService.cs` (`ResumeIfAssignmentMissingAsync`, `AdvanceAsync`), `ShipGoalExecutorService.cs`; Loki, 09:18:58Z (`Tick` 326) | 5.1 (done) |
 | B46 | **Two goal steps can run for one ship at once** (found in 6.5, from the code; B45 was the scout plan's case). The tick steps every ship every 5 s, and an arrival steps the ship it docks, on a thread of its own. Both read the ship before either acts, so a trade step would buy twice, or try to sell cargo that is already sold. | `GameLoopService.cs` (goal steps), `ShipNavigationCompletedHandler.cs`, `ShipGoalExecutorService.cs` | 6.5 (done) |
-| B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting, contract and probe flights still can. | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
+| B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting and contract flights still can. A probe has no tank, so no flight of its runs short of fuel, and the probe executor switches a probe it finds in DRIFT back to CRUISE (6.3). | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
 | B48 | **Only two of three asteroid types can be mined** (found in 6.4, from the code and the live waypoints). `MineResourceVolumeCommand` accepted only `ASTEROID_FIELD` and `ENGINEERED_ASTEROID`; 56 of X1-DC53's 57 asteroids are of type `ASTEROID`, so a drone sent to any of them got a state mismatch instead of ore, on every step. | `MineResourceVolumeCommand.cs` (`IsValidExtractionWaypoint`) | 6.4 (done) |
 | B49 | **A used-up survey is tried again and again** (found in 6.4, from the code). An extraction with a survey that is exhausted, expired or doesn't verify fails with 4224, 4221 or 4220, and nothing removed the survey from the cache, so the miner picked it again on every step; only its expiry ended that. | `MineAndSellGoalExecutor.cs` (`GetBestActiveSurveyAsync`), `SurveyRepository.cs` | 6.4 (done) |
 | B50 | **The command ship stays on the contract after the survey plan is switched on** (found in 6.4's first watch, on the cluster). The contract plan gave SPECTER-1 a contract assignment at 14:14:29Z, 23 s before the survey switch, and a contract assignment lasted until the contract was fulfilled. The survey plan takes only free ships, so SPECTER-1 went on mining copper (7 units in its first 22 minutes) instead of surveying (D20). The plan also gave its first ship its assignment back on every tick, whatever that ship did or had become. | `ContractPlanService.cs` (`EnsureActivePlanAssignmentAsync`), `FulfillContractDeliveryCommand.cs` | 6.4 (fixed with D26) |
@@ -145,7 +149,7 @@ get the next D-number.
 | D1 | Bootstrap stops once a contract plan is Completed or DeferredUnsupported (`ContractPlanService.cs:51-63`), so the bot never takes a second contract. | **Intended for now:** one contract per reset. Taking the next contract comes later. B9 still applies: after fulfilment the plan must complete and release the ship. |
 | D2 | Non-mineral contracts are parked as unsupported (`ContractPlanService.cs:104-127`). | **Keep it simple:** they stay unsupported. Together with D1, a reset whose first contract isn't a mineral gets no contract. |
 | D3 | Does the rate limiter follow the API's rules? | **It must follow the official guide; any difference is a bug** (B13, slice 1.10). |
-| D4 | The probe plan waits for 200k credits (`ProbeDeploymentPlanService.cs:71`). | **Keep it for now;** tune once everything runs. |
+| D4 | The probe plan waits for 200k credits (`ProbeDeploymentPlanService.cs:71`). | **Keep it for now;** tune once everything runs. **Replaced by D29.** |
 | D5 | Keep the React WebUI, or let Grafana take over? | **Keep it for now;** decide later. |
 | D6 | Exclude the `spacetraders` database from the nightly `pg_dumpall`? | **No change.** The size guard (1.6) keeps the database small, and the dump stays the consistent copy. A file-level copy of a running Postgres can only be restored reliably if the NAS snapshot is atomic. |
 | D7 | Delete `SpaceTradersV3/`? | **Done 2026-10-01.** |
@@ -170,6 +174,8 @@ get the next D-number.
 | D26 | Slice 6.4's first watch (asked on 2026-10-02): when does a ship on the contract reconsider its work? | **After each round trip, and once at every restart:** "Any ship should probably have a release and re-assign after each mining round trip. Just to determine if there's something more important to do at that point", and it "explicitly reconsiders once whenever the pod restarts". A delivery closes the ship's contract assignment, and the plans assign it again on the next tick, in their order; at startup, every ship on the contract that isn't in flight is released. Mining, trading and survey trips already ended with each trip. |
 | D27 | Slice 6.4's first watch (asked on 2026-10-02): how much does a surveyor survey? SPECTER-1 surveyed XB5C "for copper" 36 times in half an hour, and 27 surveys lay unused, because the contract's ore always came first. | **A small stock per ore:** "I'd expect him to make 1 copper ore survey and then move to the next ore type"; of the options, keep a stock of 2 usable surveys of each ore (`Survey.StockPerOre`), the contract's ore first, then the ore with the fewest. With the stock for every ore, the surveyor waits until one runs out. Refined the same day: "Stock per ore per asteroid. I'd like the surveys to be close to wherever the mineral can be sold": every market that buys an ore gets the reachable asteroid nearest it, each keeping its own stock. |
 | D28 | Slice 6.4's first watch (asked on 2026-10-02): what do miners mine, and when is a drone bought? After the contract, the mining plan bought SPECTER-4 for A3's scarce silicon, and the drone mined surveyed iron for H51, where iron was MODERATE: the opening that paid for it stayed open, ready to pay for the next drone. | **One rule for both:** "The buying logic and the mining logic should follow the same rules. I do not mind if the buying logic buys a drone for silicon and the drone mines iron if they are both SCARCE. I do mind if the iron is not SCARCE, because at that point, endless drones are going to be bought." And: "Mine for scarce first, but once all ores are no longer SCARCE, keep mining for whatever the lowest supply ore is, even if it's not that profitable (as it will improve the amount and prices of higher-valued goods such as the metals that's made from the ores)." Miners serve the markets that buy an ore by supply, shortest first (SCARCE, LIMITED, then the lowest there is); within a level surveyed first, then value. A drone is bought, one a tick, only when its first trip by that ranking would be in low supply (SCARCE or LIMITED, D22). |
+| D29 | Slice 6.3 (asked on 2026-10-02, "I'd like more scouting to be done"): how many probes, bought when, doing what? The probe plan (D4) never ran (D9): the starting probe sat at H52, and most markets' prices were hours old. | **A probe for every market, roaming until then:** "Long term goal: Each marketplace should have a sattelite"; probes "can be bought as long as the total credits doesn't dip below 100.000 credits (down from 200.000)"; "If not enough sattelites are available to cover the entire market, sattelites should drift between nearby markets (prioritizing markets that haven't been updated for a while)". Asked, as SHIP_PROBE isn't the cheapest ship in X1-DC53 (81,645 at A2, against 33,905 for a SHIP_SURVEYOR): **SHIP_PROBE**, which needs no fuel and which no other plan uses. The 100,000 is the credit reserve every purchase keeps (`FleetExpansion.MinCreditReserve`). Replaces D4. |
+| D30 | Slice 6.3 (asked on 2026-10-02): the API sells a ship only where one of our ships is. SPECTER-2, parked at H52 since the start, is what let the plans buy drones there (SPECTER-4 at 15:49Z); roaming probes leave the shipyards. | **Fetch a probe:** when a plan can afford a ship at a shipyard where none of our ships is, the nearest free probe flies there and waits until the purchase is made, then roams on. The purchase makes no API call that could only fail. |
 
 ## Phases
 
@@ -1131,7 +1137,92 @@ How credits are split stays your call; Claude only fixes deviations from intende
 - **6.2 The command ship after scouting:** B10, and the scout part of B16 (both fixed in 1.14;
   what's left is a clean reset period). The ship moves on to its next job instead of holding on to
   the finished scout goal.
-- **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
+- **6.3 Probes** (built 2026-10-02 on branch `claude/spacetraders-more-scouting`, with your decisions
+  D29 and D30; fixes B15 and B25). Asked that day: "I'd like more scouting to be done": a probe at
+  every market in the long run, bought while the credits stay at 100,000; while there are fewer
+  probes than markets, they drift between nearby markets, those not updated for a while first.
+  - Done:
+    - **Which ships are probes** (`FleetRoles.IsProbe`): a probe frame, or the type a probe is cached
+      with, `SHIP_PROBE` when bought and its role `SATELLITE` after startup sync. The starting probe
+      is one (B25). No other plan uses a probe: it has no hold, no tank and no mounts.
+    - **Buying** (D29): while the headquarters' system has fewer probes than markets (26 in X1-DC53),
+      the plan buys a SHIP_PROBE at the shipyard that sells it for the least (A2, 81,645 on
+      2026-10-02), at most one a tick, as long as the purchase leaves the credit reserve
+      (`FleetExpansion.MinCreditReserve`, 100,000): the first from 181,645 credits. Probes in flight
+      count (B15). The 200,000 gate (D4), and the credits handler that woke the old plan, are gone.
+    - **Roaming** (`Probes/ProbePlanner.cs`, no I/O): each tick every free probe (no flight, not in
+      transit) gets a market that is due, its prices older than `Market.RefreshMinutes` (5), with no
+      probe at it or on its way. Each pair of free probe and due market is scored by the market's age
+      minus twice the flight there (CRUISE, as the API reckons it), and the best pair goes first, so
+      a market goes to the probe nearest it: a market 10 minutes away must be 20 minutes staler than
+      one next door. A market never seen is the oldest (J58, which B45 skipped). With a probe at every
+      market nothing due is left without one, and the probes stay; the market watch keeps their
+      markets fresh. Simulated on X1-DC53's 26 markets over a day, the prices' average age is about an
+      hour with one probe, 36 minutes with two, 22 with three, 13 with five and 7 with ten; of the
+      weights 1 to 6, 2 kept them youngest without leaving the far markets much older.
+    - **The flight** (`DeployProbeGoalExecutor`): one goal per flight, in CRUISE. A probe has no tank,
+      so no flight costs it fuel, and DRIFT (where the old plan parked probes) would make it ten times
+      slower: a probe found in DRIFT is switched to CRUISE first. The arrival fetches the market and
+      the shipyard, as every arrival does; then the goal ends and the plan chooses again.
+    - **A purchase fetches a probe** (D30, `Services/ShipyardCalls.cs`): the API sells a ship only
+      where one of ours is. `ShipPurchaseService` checks that first: without a ship there it makes no
+      API call and records a call at the shipyard. The probe plan sends the nearest free probe, which
+      stays while the call is open (2 minutes after the last attempt), and the next attempt buys.
+      Every plan buys this way: the mining plan's drones at H52, the trading plan's shuttle at A2
+      (which, with none of our ships at A2, would have failed at the API) and the probes. New journal
+      kind `ProbeCalled`.
+    - **The price at the moment of purchase:** with a ship at the shipyard, the purchase fetches the
+      shipyard again and keeps the reserve with the price it asks now. A cached price can be hours
+      old, and every purchase moves it (SPECTER-3 cost 46,885, SPECTER-4 48,328).
+    - **The plan's state** lists every market with the probe at it or on its way, or another ship of
+      ours at it, or when it is due; the next probe's shipyard and price and why it isn't bought
+      (`Purchase`: `WaitingForCredits`, `WaitingForAShipAtTheShipyard`, ...); and the open calls.
+      Written only when it changes. Journal: `PlanStarted` once, `PlanBlocked`
+      (`waiting_for_credits`) when it starts waiting, `ProbeCalled`, and `ShipPurchased`.
+    - `ShipLeftIdle` (D13): a due market that no probe or ship watches is work for any probe; a probe
+      parked at its market while every market is watched is not idle.
+    - The fleet view: a probe flying to a market is "scouting", one fetched to a shipyard "called to a
+      shipyard", one without a flight "watching its market" (they said "deploying" and "idle").
+  - Noticed (not changed):
+    - Purchases share the credits above the reserve, plan by plan in the tick's order (probes, then
+      mining, then trading), and as the credits grow a cheaper ship's bar comes first: a drone (48,328)
+      from 148,328 credits, a probe from 181,645. While the mining plan wants drones (D28), probes may
+      wait. How the credits are split is yours.
+    - A roaming probe has no goal for up to a tick after each arrival, and the 10-second sampler can
+      catch that: a `ShipIdle` (`goal_ended`) journal line for about half its flights, as for a miner
+      after each trip.
+    - The flight weight (2) and a call's 2 minutes are constants, not settings.
+    - A probe at A2 is SCARCE, so its price rises as probes are bought: 26 probes cost well over 2
+      million credits.
+  - To switch it on: `PUT /settings/Automation.Plan.ProbeDeployment.Enabled` with `{"value": "true"}`.
+    The setting's description in the cluster's database still describes the old plan: a description
+    is seeded once per agent, so the new one comes with the next reset.
+  - Done when: a full reset period with the probe plan on and no open anomaly for it.
+- **6.3 in short** (built 2026-10-02): every market of the headquarters' system gets a probe in the
+  long run, bought while the credits stay at the reserve; until then the probes roam, each to the
+  market whose prices are oldest once the flight there counts against it; and a purchase where none
+  of our ships is fetches a probe first. To understand this, start with
+  `SpaceTraders.Application/Probes/ProbePlanner.cs`, then `Automation/ProbeDeploymentPlanService.cs`,
+  and `Services/ShipPurchaseService.cs` with `Services/ShipyardCalls.cs`;
+  `tests/SpaceTraders.Application.Tests/Probes/ProbePlannerTests.cs` holds X1-DC53's positions.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Probes/ProbePlanner.cs`, `Services/ShipyardCalls.cs`;
+    - rewritten: `Automation/ProbeDeploymentPlanService.cs`, `ProbeDeploymentPlanState.cs`,
+      `Goals/Executors/DeployProbeGoalExecutor.cs`;
+    - changed: `Services/ShipPurchaseService.cs` and `IShipPurchaseService.cs` (a ship there, the
+      calls, the price again, `ShipPurchaseFailure`), `Commands/Fleet/PurchaseShipCommand.cs`,
+      `Automation/FleetRoles.cs` (`IsProbe`), `Health/ShipLeftIdleRule.cs`, `JournalEvents.cs`
+      (`ProbeCalled`), `DependencyInjection.cs`; `DeployProbeGoal` (Domain: `ForPurchase`);
+      `PrometheusMetricsService` (API: the fleet view's words); `DefaultSettingsSeed` (Persistence:
+      the probe switch's description, for the next agent);
+    - removed: `EventHandlers/ProbeDeploymentCreditsChangedHandler.cs` and
+      `Commands/Ships/DeployProbeCommand.cs`, which only the old plan used;
+    - tests: `Probes/ProbePlannerTests` (new), `Automation/ProbeDeploymentPlanServiceTests` and
+      `Goals/DeployProbeGoalExecutorTests` (rewritten), `Services/ShipPurchaseServiceTests` (a ship
+      there, the calls, the price; `ShipyardCallsTests`), `PurchaseShipHandlerTests`,
+      `Health/ShipRuleTests` (the probe cases), `AlreadyAtDestinationLoopTests`,
+      `PrometheusMetricsTests` (API), and the credits handler's tests removed from
+      `LedgerEntryHandlerTests`.
 - **6.4 Surveying and mining** (merged 2026-10-02 as projects#122, its dashboard as gembernodes#21,
   deployed by gembernodes#22; it took in the old 6.4, mining drones mine and sell, with the survey
   part of B16, B17 and B34). Asked that day:

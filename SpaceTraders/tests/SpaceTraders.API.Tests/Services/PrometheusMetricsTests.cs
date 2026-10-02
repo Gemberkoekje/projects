@@ -137,8 +137,38 @@ public sealed class PrometheusMetricsServiceTests
                 GoalStatus = (int)scout.Status,
             });
 
-            // The probe, parked without work (D9).
+            // The probe, parked without a flight: the market watch keeps H51 fresh (slice 6.3).
             db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-2", ShipType = "SATELLITE", Status = "DOCKED", WaypointSymbol = "X1-AB-H51" });
+
+            // A probe roaming to the next market, and one called to a shipyard for a purchase (D30).
+            var roam = new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-A2" };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-6",
+                ShipType = "SHIP_PROBE",
+                Status = "IN_TRANSIT",
+                WaypointSymbol = "X1-AB-A2",
+                DestWaypointSymbol = "X1-AB-A2",
+                ArrivesAt = now.AddMinutes(4),
+                GoalId = roam.GoalId,
+                GoalKind = roam.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(roam),
+                GoalStatus = (int)roam.Status,
+            });
+            var call = new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-A2", ForPurchase = true };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-7",
+                ShipType = "SATELLITE",
+                Status = "DOCKED",
+                WaypointSymbol = "X1-AB-H51",
+                GoalId = call.GoalId,
+                GoalKind = call.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(call),
+                GoalStatus = (int)call.Status,
+            });
 
             // The contract's drone, in orbit at its asteroid, and a second one on its way to deliver.
             db.Ships.Add(new CachedShip
@@ -184,9 +214,11 @@ public sealed class PrometheusMetricsServiceTests
         ships.Select(s => (s.Ship, s.Location, s.Activity)).Should().BeEquivalentTo(new[]
         {
             ("AGENT-1", "→ X1-AB-A2 (MOON)", "scouting"),
-            ("AGENT-2", "X1-AB-H51 (PLANET)", "idle"),
+            ("AGENT-2", "X1-AB-H51 (PLANET)", "watching its market"),
             ("AGENT-3", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE"),
             ("AGENT-5", "→ X1-AB-H51 (PLANET)", "on the way to deliver COPPER_ORE"),
+            ("AGENT-6", "→ X1-AB-A2 (MOON)", "scouting"),
+            ("AGENT-7", "X1-AB-H51 (PLANET)", "called to a shipyard"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);

@@ -138,10 +138,17 @@ public sealed record PatrolMarketGoal : ShipGoal
     public override ShipGoalKind Kind => ShipGoalKind.PatrolMarket;
 }
 
-/// <summary>The probe navigates to <see cref="TargetWaypointSymbol"/>, sets DRIFT flight mode, and stays docked to collect market/shipyard data.</summary>
+/// <summary>
+/// One flight of a probe (PLAN.md slice 6.3): it flies to <see cref="TargetWaypointSymbol"/> in CRUISE, where
+/// its arrival fetches the market and the shipyard; then the goal ends, and the probe plan chooses again. A
+/// probe with no goal stays where it is, and the market watch keeps that market fresh.
+/// </summary>
 public sealed record DeployProbeGoal : ShipGoal
 {
     public required string TargetWaypointSymbol { get; init; }
+
+    /// <summary>True when a shipyard called for it, because a purchase there waits for one of our ships (D30).</summary>
+    public bool ForPurchase { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.DeployProbe;

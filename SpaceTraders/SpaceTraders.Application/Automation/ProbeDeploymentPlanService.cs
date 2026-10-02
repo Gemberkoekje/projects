@@ -1,521 +1,356 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
-using Wolverine;
+using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
 
+/// <summary>The probe plan (PLAN.md slice 6.3).</summary>
 public interface IProbeDeploymentPlanService
 {
+    /// <summary>
+    /// One pass of the plan: buys a probe while the system has more markets than probes and the credits
+    /// allow, sends the nearest free probe to each shipyard that calls for a ship, and every other free probe
+    /// to the market that needs one most.
+    /// </summary>
+    /// <param name="cancellationToken">Stops the pass.</param>
+    /// <returns>A task that completes when the pass is done.</returns>
     Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Advances the active probe deployment plan after a probe has been deployed to a waypoint.
-    /// Marks the waypoint as deployed and completes the plan when all targets are covered.
-    /// </summary>
-    Task AdvanceAsync(string waypointSymbol, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Re-evaluates deferred Phase 1 deployment when agent credits changed.
-    /// </summary>
-    Task OnCreditsChangedAsync(CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// The probe plan (PLAN.md slice 6.3, D29, D30), in the headquarters' system. Long term every market has a
+/// probe of its own, which the market watch uses to keep its prices fresh. Each pass:
+/// <list type="number">
+///   <item>while there are fewer probes than markets, it buys a SHIP_PROBE at the shipyard that sells it for
+///   the least, as long as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29);</item>
+///   <item>it flies the free probes (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
+///   waits for one of our ships (<see cref="ShipyardCalls"/>, D30), the others between nearby markets, the
+///   one whose prices are oldest first, until there is a probe at every market.</item>
+/// </list>
+/// A probe is any probe in the system, the starting one included (B25); a probe in flight, or with a flight
+/// to make, keeps its market, so no target is bought or flown to twice (B15).
+/// </summary>
 public sealed class ProbeDeploymentPlanService(
-    IProbeDeploymentPlanRepository probeDeploymentPlans,
-    IShipRepository ships,
-    IWaypointRepository waypoints,
+    IProbeDeploymentPlanRepository plans,
     IAgentRepository agents,
+    IWaypointRepository waypoints,
+    IMarketRepository markets,
+    IShipRepository ships,
+    IShipGoalRepository goals,
     IShipyardRepository shipyards,
-    IBudgetPolicy budget,
     IShipPurchaseService shipPurchases,
-    IMessageBus bus,
+    ShipyardCalls calls,
+    ISettingsRepository settings,
     ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
 {
-    /// <summary>For tests: buys ships through a real <see cref="ShipPurchaseService"/> over <paramref name="port"/>.</summary>
-    internal ProbeDeploymentPlanService(
-        IProbeDeploymentPlanRepository probeDeploymentPlans,
-        IShipRepository ships,
-        IWaypointRepository waypoints,
-        IAgentRepository agents,
-        IShipyardRepository shipyards,
-        IBudgetPolicy budget,
-        ISpaceTradersPort port,
-        IMessageBus bus,
-        ILogger<ProbeDeploymentPlanService> logger)
-        : this(
-            probeDeploymentPlans,
-            ships,
-            waypoints,
-            agents,
-            shipyards,
-            budget,
-            new ShipPurchaseService(
-                port,
-                agents,
-                ships,
-                shipyards,
-                budget,
-                bus,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance),
-            bus,
-            logger)
-    {
-    }
+    /// <summary>The ship the plan buys (D29).</summary>
+    public const string ProbeShipType = "SHIP_PROBE";
 
-    private const string ProbeShipType = "SHIP_PROBE";
-    private const long Phase1CapitalThreshold = 200_000;
+    /// <summary>How old a market's prices may get when <c>Market.RefreshMinutes</c> gives no interval.</summary>
+    internal const int DefaultDueMinutes = 5;
 
+    private static readonly JsonSerializerOptions CompareOptions = new();
+
+    /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
-        var existingPlan = await probeDeploymentPlans.GetAsync(cancellationToken);
-        if (existingPlan is not null)
-        {
-            var reconciledPlan = await ReconcileTargetsAsync(existingPlan, cancellationToken);
-            if (reconciledPlan.Status == ProbeDeploymentPlanStatus.Active && !reconciledPlan.WaitingForPhase1Credits)
-            {
-                await ResumeIfDeploymentsPendingAsync(reconciledPlan, cancellationToken);
-            }
-
-            return;
-        }
-
         var agent = await agents.GetAsync(cancellationToken);
         if (agent is null || string.IsNullOrWhiteSpace(agent.HeadquartersSymbol))
         {
-            logger.LogWarning("Probe deployment plan bootstrap skipped: agent or headquarters not available.");
+            logger.LogDebug("Probe plan: the agent or its headquarters isn't cached yet.");
             return;
         }
 
-        var systemSymbol = ExtractSystemSymbol(agent.HeadquartersSymbol);
+        var systemSymbol = SystemOf(agent.HeadquartersSymbol);
         var systemWaypoints = await waypoints.GetBySystemAsync(systemSymbol, cancellationToken);
-        var targets = systemWaypoints
-            .Where(w => w.HasMarket || w.HasShipyard)
-            .Select(w => w.Symbol)
+        var marketSymbols = systemWaypoints
+            .Where(waypoint => waypoint.HasMarket)
+            .Select(waypoint => waypoint.Symbol)
+            .Order(StringComparer.Ordinal)
             .ToList();
-
-        var shipyardTargets = systemWaypoints
-            .Where(w => w.HasShipyard)
-            .Select(w => w.Symbol)
-            .ToList();
-
-        if (targets.Count == 0)
+        if (marketSymbols.Count == 0)
         {
-            logger.LogWarning(
-                "Probe deployment plan bootstrap skipped: no market or shipyard waypoints found in system {System}.",
-                systemSymbol);
+            logger.LogDebug("Probe plan: no markets cached in system {System}.", systemSymbol);
             return;
+        }
+
+        var existing = await plans.GetAsync(cancellationToken);
+        var fleet = await ships.GetAllAsync(cancellationToken);
+        var (purchase, shipyard, price) = await BuyProbeAsync(systemSymbol, ProbesIn(fleet, systemSymbol).Count, marketSymbols.Count, cancellationToken);
+        if (purchase == ProbePurchaseStatus.Bought)
+        {
+            fleet = await ships.GetAllAsync(cancellationToken);
         }
 
         var now = TimeProvider.System.GetUtcNow();
-        var plan = new ProbeDeploymentPlanState
+        var minutes = await settings.GetAsync<int>(MarketWatchService.RefreshMinutesSetting, cancellationToken);
+        var dueAfter = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultDueMinutes);
+        var lastSeen = (await markets.GetAllFreshnessAsync(cancellationToken))
+            .GroupBy(freshness => freshness.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Max(freshness => freshness.LastObservedAt), StringComparer.OrdinalIgnoreCase);
+        var probes = new List<ProbeShip>();
+        foreach (var probe in ProbesIn(fleet, systemSymbol))
         {
-            PlanId = Guid.NewGuid(),
-            SystemSymbol = systemSymbol,
-            TargetWaypointSymbols = targets,
-            ShipyardWaypointSymbols = shipyardTargets,
-            DeployedWaypointSymbols = [],
-            Status = ProbeDeploymentPlanStatus.Active,
-            CreatedAt = now,
-            UpdatedAt = now,
+            probes.Add(await ProbeShipAsync(probe, cancellationToken));
+        }
+
+        var snapshot = new ProbeSnapshot
+        {
+            Positions = systemWaypoints
+                .GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => new WaypointPosition(group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase),
+            Markets = [.. marketSymbols.Select(symbol => new ProbeMarket(symbol, lastSeen.GetValueOrDefault(symbol, DateTimeOffset.MinValue)))],
+            Probes = probes,
+            ShipsAt = fleet
+                .Where(ship => ship.LocalStatus != ShipLocalStatus.InTransit && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+                .Select(ship => ship.WaypointSymbol!)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase),
+            Calls = calls.Open(now),
+            Now = now,
+            DueAfter = dueAfter,
         };
 
-        await probeDeploymentPlans.UpsertAsync(plan, cancellationToken);
-
-        logger.LogInformation(
-            "{EventKind:l}: {Plan} plan for system {System} with {Count} target waypoints.",
-            JournalEvents.PlanStarted,
-            AutomationPlan.ProbeDeployment,
-            systemSymbol,
-            targets.Count);
-
-        await ResumeIfDeploymentsPendingAsync(plan, cancellationToken);
-    }
-
-    public async Task AdvanceAsync(string waypointSymbol, CancellationToken cancellationToken = default)
-    {
-        var plan = await probeDeploymentPlans.GetAsync(cancellationToken);
-        if (plan is null)
+        var moves = ProbePlanner.Plan(snapshot);
+        foreach (var move in moves)
         {
-            logger.LogWarning(
-                "Probe deployment plan advance requested for waypoint {WaypointSymbol} but no active plan found.",
-                waypointSymbol);
-            return;
+            await SendAsync(move, cancellationToken);
         }
 
-        if (plan.Status != ProbeDeploymentPlanStatus.Active)
-        {
-            logger.LogDebug(
-                "Probe deployment plan advance requested for waypoint {WaypointSymbol} but plan status is {Status}; ignoring.",
-                waypointSymbol,
-                plan.Status);
-            return;
-        }
-
-        if (plan.DeployedWaypointSymbols.Contains(waypointSymbol, StringComparer.OrdinalIgnoreCase))
-        {
-            logger.LogDebug(
-                "Probe deployment plan advance skipped: waypoint {WaypointSymbol} is already marked deployed.",
-                waypointSymbol);
-            return;
-        }
-
-        var now = TimeProvider.System.GetUtcNow();
-        var deployed = plan.DeployedWaypointSymbols
-            .Append(waypointSymbol)
-            .ToList();
-
-        var allDeployed = plan.TargetWaypointSymbols
-            .All(t => deployed.Contains(t, StringComparer.OrdinalIgnoreCase));
-
-        var updated = plan with
-        {
-            DeployedWaypointSymbols = deployed,
-            Status = allDeployed ? ProbeDeploymentPlanStatus.Completed : ProbeDeploymentPlanStatus.Active,
-            UpdatedAt = now,
-        };
-
-        await probeDeploymentPlans.UpsertAsync(updated, cancellationToken);
-
-        if (allDeployed)
+        var state = State(existing, systemSymbol, snapshot, fleet, moves, purchase, shipyard, price);
+        if (existing is null)
         {
             logger.LogInformation(
-                "{EventKind:l}: {Plan} plan: all {Count} waypoints in system {System} are covered.",
-                JournalEvents.PlanCompleted,
+                "{EventKind:l}: {Plan} plan for system {System}: {Probes} probes for {Markets} markets.",
+                JournalEvents.PlanStarted,
                 AutomationPlan.ProbeDeployment,
-                plan.TargetWaypointSymbols.Count,
-                plan.SystemSymbol);
-            return;
+                systemSymbol,
+                state.Probes,
+                state.Markets.Count);
         }
 
-        logger.LogInformation(
-            "Probe deployment plan advanced: {WaypointSymbol} marked deployed ({Deployed}/{Total}).",
-            waypointSymbol,
-            deployed.Count,
-            plan.TargetWaypointSymbols.Count);
+        if (purchase == ProbePurchaseStatus.WaitingForCredits && existing?.Purchase != ProbePurchaseStatus.WaitingForCredits)
+        {
+            logger.LogInformation(
+                "{EventKind:l}: {Plan} plan waits ({Reason}): a probe costs {Price} at {WaypointSymbol}, and the purchase must leave the credit reserve.",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.ProbeDeployment,
+                "waiting_for_credits",
+                price,
+                shipyard);
+        }
 
-        await DispatchNextProbeAsync(updated, [], cancellationToken);
+        await SaveStateAsync(existing, state, cancellationToken);
     }
 
-    public async Task OnCreditsChangedAsync(CancellationToken cancellationToken = default)
+    private static List<ShipModel> ProbesIn(IReadOnlyList<ShipModel> fleet, string systemSymbol)
+        => [.. fleet.Where(ship => FleetRoles.IsProbe(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase))];
+
+    private static string SystemOf(string waypointSymbol)
     {
-        var plan = await probeDeploymentPlans.GetAsync(cancellationToken);
-        if (plan is null
-            || plan.Status != ProbeDeploymentPlanStatus.Active
-            || !plan.WaitingForPhase1Credits)
-        {
-            return;
-        }
-
-        // Every credit change gets here: below the threshold the plan keeps waiting, instead of
-        // waking up only to go back to waiting.
-        var agent = await agents.GetAsync(cancellationToken);
-        if (agent is null || agent.Credits < Phase1CapitalThreshold)
-        {
-            return;
-        }
-
-        var resumedPlan = plan with
-        {
-            WaitingForPhase1Credits = false,
-            UpdatedAt = TimeProvider.System.GetUtcNow(),
-        };
-
-        await probeDeploymentPlans.UpsertAsync(resumedPlan, cancellationToken);
-        await ResumeIfDeploymentsPendingAsync(resumedPlan, cancellationToken);
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
-    private async Task ResumeIfDeploymentsPendingAsync(
-        ProbeDeploymentPlanState plan,
-        CancellationToken cancellationToken)
+    /// <summary>The engine's speed from the cached engine; a probe bought since the last restart has none yet.</summary>
+    private static int EngineSpeed(ShipModel ship)
     {
-        var remaining = plan.TargetWaypointSymbols
-            .Where(t => !plan.DeployedWaypointSymbols.Contains(t, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-
-        if (remaining.Count == 0)
+        if (string.IsNullOrWhiteSpace(ship.EngineJson))
         {
-            return;
+            return ProbePlanner.DefaultProbeSpeed;
         }
 
-        // Dispatch one probe per idle available probe, up to the number of remaining targets.
-        // Each dispatch mutates the in-memory plan view (tracks which probes are in-flight)
-        // so the same probe is never assigned twice in a single resume pass.
-        var inFlight = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < remaining.Count; i++)
+        try
         {
-            var progressed = await DispatchNextProbeAsync(plan, inFlight, cancellationToken);
-            if (!progressed)
-            {
-                break;
-            }
+            using var engine = JsonDocument.Parse(ship.EngineJson);
+            return engine.RootElement.TryGetProperty("speed", out var speed) && speed.TryGetInt32(out var value) && value > 0
+                ? value
+                : ProbePlanner.DefaultProbeSpeed;
         }
-    }
-
-    private async Task<ProbeDeploymentPlanState> ReconcileTargetsAsync(
-        ProbeDeploymentPlanState plan,
-        CancellationToken cancellationToken)
-    {
-        var systemWaypoints = await waypoints.GetBySystemAsync(plan.SystemSymbol, cancellationToken);
-        if (systemWaypoints.Count == 0)
+        catch (JsonException)
         {
-            return plan;
+            return ProbePlanner.DefaultProbeSpeed;
         }
-
-        var discoveredTargets = systemWaypoints
-            .Where(w => w.HasMarket || w.HasShipyard)
-            .Select(w => w.Symbol)
-            .ToList();
-
-        if (discoveredTargets.Count == 0)
-        {
-            return plan;
-        }
-
-        var discoveredShipyards = systemWaypoints
-            .Where(w => w.HasShipyard)
-            .Select(w => w.Symbol)
-            .ToList();
-
-        var currentTargets = plan.TargetWaypointSymbols.ToList();
-        var currentShipyards = (plan.ShipyardWaypointSymbols ?? []).ToList();
-
-        var hasNewTargets = false;
-        foreach (var target in discoveredTargets)
-        {
-            if (!currentTargets.Contains(target, StringComparer.OrdinalIgnoreCase))
-            {
-                currentTargets.Add(target);
-                hasNewTargets = true;
-            }
-        }
-
-        var hasNewShipyards = false;
-        foreach (var shipyard in discoveredShipyards)
-        {
-            if (!currentShipyards.Contains(shipyard, StringComparer.OrdinalIgnoreCase))
-            {
-                currentShipyards.Add(shipyard);
-                hasNewShipyards = true;
-            }
-        }
-
-        if (!hasNewTargets && !hasNewShipyards)
-        {
-            return plan;
-        }
-
-        var now = TimeProvider.System.GetUtcNow();
-        var allDeployed = currentTargets
-            .All(t => plan.DeployedWaypointSymbols.Contains(t, StringComparer.OrdinalIgnoreCase));
-
-        var reconciled = plan with
-        {
-            TargetWaypointSymbols = currentTargets,
-            ShipyardWaypointSymbols = currentShipyards,
-            Status = allDeployed ? ProbeDeploymentPlanStatus.Completed : ProbeDeploymentPlanStatus.Active,
-            UpdatedAt = now,
-        };
-
-        await probeDeploymentPlans.UpsertAsync(reconciled, cancellationToken);
-
-        logger.LogInformation(
-            "Probe deployment plan reconciled for system {System}: +{TargetCount} targets, +{ShipyardCount} shipyards.",
-            plan.SystemSymbol,
-            currentTargets.Count - plan.TargetWaypointSymbols.Count,
-            currentShipyards.Count - (plan.ShipyardWaypointSymbols ?? []).Count);
-
-        return reconciled;
-    }
-
-    private async Task<bool> DispatchNextProbeAsync(
-        ProbeDeploymentPlanState plan,
-        HashSet<string> inFlight,
-        CancellationToken cancellationToken)
-    {
-        var nextTarget = await SelectNextTargetAsync(plan, inFlight, cancellationToken);
-
-        if (nextTarget is null)
-        {
-            return false;
-        }
-
-        var availableProbe = await FindAvailableProbeAsync(plan, inFlight, cancellationToken);
-        if (availableProbe is null)
-        {
-            logger.LogDebug(
-                "Probe deployment plan: no available probe for {WaypointSymbol}; attempting to purchase one.",
-                nextTarget);
-            await TryPurchaseProbeAsync(plan.SystemSymbol, nextTarget, cancellationToken);
-            // Mark this target as in-flight for the current resume pass so we do not
-            // repeatedly attempt/log the same purchase when no ship is available at a shipyard.
-            inFlight.Add(nextTarget);
-            return true;
-        }
-
-        inFlight.Add(availableProbe.Symbol);
-        inFlight.Add(nextTarget);
-
-        logger.LogInformation(
-            "Probe deployment plan: dispatching probe {ShipSymbol} to {WaypointSymbol}.",
-            availableProbe.Symbol,
-            nextTarget);
-
-        await bus.PublishAsync(new DeployProbeCommand(availableProbe.Symbol, nextTarget));
-        return true;
     }
 
     /// <summary>
-    /// Selects the next waypoint to deploy to, respecting phase order and capital gates.
-    /// Phase 0 (shipyard waypoints) always dispatches first.
-    /// Phase 1 (market-only waypoints) only dispatches when credits reach <see cref="Phase1CapitalThreshold"/>.
+    /// Buys the next probe (D29) while the system has more markets than probes, at the shipyard that sells it
+    /// for the least. <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when
+    /// none of ours is at the shipyard (D30).
     /// </summary>
-    private async Task<string?> SelectNextTargetAsync(
-        ProbeDeploymentPlanState plan,
+    private async Task<(ProbePurchaseStatus Status, string Shipyard, long Price)> BuyProbeAsync(
+        string systemSymbol,
+        int probes,
+        int marketCount,
         CancellationToken cancellationToken)
     {
-        return await SelectNextTargetAsync(plan, [], cancellationToken);
+        var offer = (await shipyards.GetAllAsync(cancellationToken))
+            .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(candidate => candidate.Ships
+                .Where(ship => ship.Type.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
+                .Select(ship => (Shipyard: candidate.WaypointSymbol, Price: ship.PurchasePrice)))
+            .OrderBy(candidate => candidate.Price)
+            .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
+            .ToList();
+        var (shipyard, price) = offer.Count > 0 ? offer[0] : (string.Empty, 0L);
+        if (probes >= marketCount)
+        {
+            return (ProbePurchaseStatus.EveryMarketHasOne, shipyard, price);
+        }
+
+        if (offer.Count == 0)
+        {
+            return (ProbePurchaseStatus.NoShipyardSellsProbes, shipyard, price);
+        }
+
+        ShipPurchaseResult result;
+        try
+        {
+            result = await shipPurchases.TryPurchaseAsync(ProbeShipType, shipyard, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // The probes fly on: a purchase that keeps failing shows as RepeatingError.
+            logger.LogWarning(ex, "Probe plan: buying a {ShipType} at {WaypointSymbol} failed.", ProbeShipType, shipyard);
+            return (ProbePurchaseStatus.None, shipyard, price);
+        }
+
+        var status = result switch
+        {
+            { IsSuccess: true } => ProbePurchaseStatus.Bought,
+            { Failure: ShipPurchaseFailure.OverBudget } => ProbePurchaseStatus.WaitingForCredits,
+            { Failure: ShipPurchaseFailure.NoShipAtShipyard } => ProbePurchaseStatus.WaitingForAShipAtTheShipyard,
+            { Failure: ShipPurchaseFailure.PriceUnknown } => ProbePurchaseStatus.NoShipyardSellsProbes,
+            _ => ProbePurchaseStatus.None,
+        };
+        return (status, shipyard, result.EstimatedCost > 0 ? result.EstimatedCost : price);
     }
 
-    private async Task<string?> SelectNextTargetAsync(
-        ProbeDeploymentPlanState plan,
-        HashSet<string> inFlight,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// The probe as the plan sees it: free, or holding the market it flies to, or will fly to once its goal's
+    /// next step runs.
+    /// </summary>
+    private async Task<ProbeShip> ProbeShipAsync(ShipModel probe, CancellationToken cancellationToken)
     {
-        // Phase 0: shipyard waypoints — no capital gate.
-        // Guard against plans persisted before ShipyardWaypointSymbols was introduced.
-        var shipyardTargets = plan.ShipyardWaypointSymbols ?? [];
-        var nextShipyard = shipyardTargets
-            .FirstOrDefault(t =>
-                !plan.DeployedWaypointSymbols.Contains(t, StringComparer.OrdinalIgnoreCase)
-                && !inFlight.Contains(t, StringComparer.OrdinalIgnoreCase));
+        var goal = await goals.GetActiveGoalAsync(probe.Symbol, cancellationToken);
+        var flight = goal is DeployProbeGoal { Status: not GoalStatus.Completed and not GoalStatus.Blocked } deploy
+            ? deploy.TargetWaypointSymbol
+            : string.Empty;
+        var waypoint = probe.LocalStatus == ShipLocalStatus.InTransit
+            ? FirstOf(probe.DestWaypointSymbol, flight, probe.WaypointSymbol)
+            : FirstOf(flight, probe.WaypointSymbol);
+        return new ProbeShip(probe.Symbol, waypoint, FleetRoles.IsFree(probe, goal, hasOpenAssignment: false), EngineSpeed(probe));
+    }
 
-        if (nextShipyard is not null)
+    private static string FirstOf(params string?[] symbols)
+        => symbols.FirstOrDefault(symbol => !string.IsNullOrWhiteSpace(symbol)) ?? string.Empty;
+
+    private async Task SendAsync(ProbeMove move, CancellationToken cancellationToken)
+    {
+        await goals.SetActiveGoalAsync(
+            move.ShipSymbol,
+            new DeployProbeGoal { TargetWaypointSymbol = move.WaypointSymbol, ForPurchase = move.ForPurchase },
+            cancellationToken);
+        if (move.ForPurchase)
         {
-            return nextShipyard;
+            logger.LogInformation(
+                "{EventKind:l}: probe {ShipSymbol} flies to {WaypointSymbol}, where a {ShipType} purchase waits for one of our ships.",
+                JournalEvents.ProbeCalled,
+                move.ShipSymbol,
+                move.WaypointSymbol,
+                move.ShipType);
+            return;
         }
 
-        // Phase 1: market-only waypoints — require Phase1CapitalThreshold credits.
-        var nextMarket = plan.TargetWaypointSymbols
-            .FirstOrDefault(t =>
-                !shipyardTargets.Contains(t, StringComparer.OrdinalIgnoreCase)
-                && !plan.DeployedWaypointSymbols.Contains(t, StringComparer.OrdinalIgnoreCase)
-                && !inFlight.Contains(t, StringComparer.OrdinalIgnoreCase));
+        logger.LogDebug(
+            "Probe plan: probe {ShipSymbol} flies to {WaypointSymbol}, the market that needs a probe most.",
+            move.ShipSymbol,
+            move.WaypointSymbol);
+    }
 
-        if (nextMarket is null)
+    private static ProbeDeploymentPlanState State(
+        ProbeDeploymentPlanState? existing,
+        string systemSymbol,
+        ProbeSnapshot snapshot,
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<ProbeMove> moves,
+        ProbePurchaseStatus purchase,
+        string shipyard,
+        long price)
+    {
+        // Where each probe is, or flies to, once this pass's flights are given.
+        var holds = snapshot.Probes
+            .Select(probe => (
+                probe.Symbol,
+                Waypoint: moves.FirstOrDefault(move => string.Equals(move.ShipSymbol, probe.Symbol, StringComparison.Ordinal))?.WaypointSymbol ?? probe.WaypointSymbol))
+            .ToList();
+        var probeSymbols = snapshot.Probes.Select(probe => probe.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var shipsAt = fleet
+            .Where(ship => !probeSymbols.Contains(ship.Symbol)
+                && ship.LocalStatus != ShipLocalStatus.InTransit
+                && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+            .Select(ship => ship.WaypointSymbol!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        string ProbeAt(string waypointSymbol) => holds
+            .Where(hold => hold.Waypoint.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase))
+            .Select(hold => hold.Symbol)
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault() ?? string.Empty;
+
+        return new ProbeDeploymentPlanState
         {
-            return null;
-        }
-
-        var agent = await agents.GetAsync(cancellationToken);
-        if (agent is null || agent.Credits < Phase1CapitalThreshold)
-        {
-            if (!plan.WaitingForPhase1Credits)
-            {
-                logger.LogInformation(
-                    "{EventKind:l}: {Plan} plan waits ({Reason}): market probes wait for {Threshold} credits, the agent has {Credits}.",
-                    JournalEvents.PlanBlocked,
-                    AutomationPlan.ProbeDeployment,
-                    "waiting_for_credits",
-                    Phase1CapitalThreshold,
-                    agent?.Credits ?? 0);
-
-                var deferredPlan = plan with
+            PlanId = existing?.PlanId ?? Guid.NewGuid(),
+            SystemSymbol = systemSymbol,
+            Probes = snapshot.Probes.Count,
+            Markets =
+            [
+                .. snapshot.Markets.Select(market =>
                 {
-                    WaitingForPhase1Credits = true,
-                    UpdatedAt = TimeProvider.System.GetUtcNow(),
-                };
-
-                await probeDeploymentPlans.UpsertAsync(deferredPlan, cancellationToken);
-            }
-
-            return null;
-        }
-
-        return nextMarket;
+                    var view = new ProbeMarketState
+                    {
+                        WaypointSymbol = market.WaypointSymbol,
+                        ProbeSymbol = ProbeAt(market.WaypointSymbol),
+                        WatchedByShip = shipsAt.Contains(market.WaypointSymbol),
+                    };
+                    return view.IsUnwatched
+                        ? view with { DueAt = market.LastSeenAt == DateTimeOffset.MinValue ? DateTimeOffset.MinValue : market.LastSeenAt + snapshot.DueAfter }
+                        : view;
+                }),
+            ],
+            Purchase = purchase,
+            NextProbeShipyard = shipyard,
+            NextProbePrice = price,
+            Calls =
+            [
+                .. snapshot.Calls
+                    .Where(call => snapshot.Positions.ContainsKey(call.WaypointSymbol))
+                    .Select(call => new ProbeCallState
+                    {
+                        WaypointSymbol = call.WaypointSymbol,
+                        ShipType = call.ShipType,
+                        ProbeSymbol = ProbeAt(call.WaypointSymbol),
+                    }),
+            ],
+            CreatedAt = existing?.CreatedAt ?? snapshot.Now,
+            UpdatedAt = snapshot.Now,
+        };
     }
 
-    private async Task<ShipModel?> FindAvailableProbeAsync(
-        ProbeDeploymentPlanState plan,
-        HashSet<string> inFlight,
-        CancellationToken cancellationToken)
+    /// <summary>Records the view. Only a change is written: the tick runs every 5 seconds.</summary>
+    private async Task SaveStateAsync(ProbeDeploymentPlanState? existing, ProbeDeploymentPlanState state, CancellationToken cancellationToken)
     {
-        var allShips = await ships.GetAllAsync(cancellationToken);
-        return allShips.FirstOrDefault(s =>
-            IsProbeShip(s)
-            && s.LocalStatus != ShipLocalStatus.InTransit
-            && !inFlight.Contains(s.Symbol)
-            && !plan.DeployedWaypointSymbols.Contains(s.WaypointSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase));
-    }
-
-    private async Task TryPurchaseProbeAsync(string systemSymbol, string targetWaypoint, CancellationToken cancellationToken)
-    {
-        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
-
-        var shipyard = shipyardList
-            .FirstOrDefault(s => s.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
-                && s.ShipTypes.Contains(ProbeShipType, StringComparer.OrdinalIgnoreCase));
-
-        if (shipyard is null)
+        if (existing is not null && Comparable(existing) == Comparable(state))
         {
-            logger.LogDebug(
-                "Probe deployment plan: no known shipyard in system {System} sells {Type}; will retry.",
-                systemSymbol,
-                ProbeShipType);
             return;
         }
 
-        var estimatedCost = shipyard.Ships
-            .FirstOrDefault(s => ProbeShipType.Equals(s.Type, StringComparison.OrdinalIgnoreCase))
-            ?.PurchasePrice ?? 0;
-
-        var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
-        if (!decision.CanAfford)
-        {
-            logger.LogDebug(
-                "Probe deployment plan: cannot afford probe at {Shipyard} — {Reason}",
-                shipyard.WaypointSymbol,
-                decision.Reason);
-            return;
-        }
-
-        logger.LogInformation(
-            "Probe deployment plan: purchasing {Type} at {Shipyard} (estimated cost {Cost}).",
-            ProbeShipType,
-            shipyard.WaypointSymbol,
-            estimatedCost);
-
-        var purchase = await shipPurchases.TryPurchaseAsync(ProbeShipType, shipyard.WaypointSymbol, cancellationToken);
-        if (!purchase.IsSuccess || purchase.PurchasedShip is null)
-        {
-            logger.LogDebug(
-                "Probe deployment plan: probe purchase denied at {Shipyard} — {Reason}",
-                shipyard.WaypointSymbol,
-                purchase.FailureReason ?? "Purchase failed.");
-            return;
-        }
-
-        logger.LogInformation(
-            "Probe deployment plan: purchased {ShipSymbol}; dispatching to {WaypointSymbol}.",
-            purchase.PurchasedShip.Symbol,
-            targetWaypoint);
-
-        await bus.PublishAsync(new DeployProbeCommand(purchase.PurchasedShip.Symbol, targetWaypoint));
+        await plans.UpsertAsync(state, cancellationToken);
     }
 
-    /// <summary>Whether the plan treats <paramref name="ship"/> as a probe; it misses the starting probe (B25).</summary>
-    internal static bool IsProbeShip(ShipModel ship)
-        => ship.ShipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase)
-           || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase)
-           || ship.Symbol.Contains("SATELLITE", StringComparison.OrdinalIgnoreCase);
-
-    private static string ExtractSystemSymbol(string waypointSymbol)
-    {
-        var parts = waypointSymbol.Split('-');
-        return parts.Length >= 2 ? $"{parts[0]}-{parts[1]}" : waypointSymbol;
-    }
+    private static string Comparable(ProbeDeploymentPlanState state)
+        => JsonSerializer.Serialize(state with { PlanId = Guid.Empty, CreatedAt = default, UpdatedAt = default }, CompareOptions);
 }
