@@ -130,6 +130,35 @@ public interface IAutomationMetrics
     /// </summary>
     /// <param name="madeFrom">Each exported good, with the goods it is made from.</param>
     void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom);
+
+    /// <summary>
+    /// Records the agent's settings, one series per setting, always 1
+    /// (<c>spacetraders_setting_info{setting,current,description}</c>): its value now and what it does, for the
+    /// dashboard's settings table (slice 2.9). A setting whose value or description changed loses its old series, and a
+    /// setting that is no longer in <paramref name="settings"/> loses its own.
+    /// </summary>
+    void Settings(IReadOnlyCollection<SettingMetricsSample> settings);
+}
+
+/// <summary>One of the agent's settings as the metrics show it (slice 2.9).</summary>
+public sealed record SettingMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SettingMetricsSample(string Setting, string Value, string Description)
+    {
+        this.Setting = Setting;
+        this.Value = Value;
+        this.Description = Description;
+    }
+
+    /// <summary>The setting's key, such as <c>Automation.Plan.Mining.Enabled</c>.</summary>
+    public required string Setting { get; init; }
+
+    /// <summary>Its value now, as it may be shown: <c>(hidden)</c> for one that may hold a secret.</summary>
+    public required string Value { get; init; }
+
+    /// <summary>What it does; empty for a key nothing describes (one only <c>PUT /settings/{key}</c> wrote).</summary>
+    public required string Description { get; init; }
 }
 
 /// <summary>The usable surveys of one waypoint, used or not yet, as the metrics show them.</summary>

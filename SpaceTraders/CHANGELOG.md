@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-02, slice 2.9)
+- The bot exports its settings for the dashboard's new settings table: one series per setting, with its value and what it does (`spacetraders_setting_info{setting,current,description}`, every 10 seconds). A value that may hold a secret shows `(hidden)`, as in `SettingChanged`; what a setting does is the running version's description, not the one stored when the agent was seeded.
+
+### Docs – Changed (2026-10-02, slice 2.9)
+- `PLAN.md`: slice 2.9, and 6.8 marked merged; `docs/HOW_IT_WORKS.md`: the new metric, and the settings table under "How settings work"; the `st-investigate` skill: a query for the settings.
+
 ### Code – Added (2026-10-02, slice 6.8: D34–D37)
 - Spare time, as asked on 2026-10-02: "I'd like my command ship not to be idle." A new spare-time plan (`Automation.Plan.SpareTime.Enabled`, off by default, bootstrapped last) gives the command ship, when it has nothing to survey and no trade, one trip at a time (`GatherAndSellGoal`): it mines or siphons at the nearest asteroid or gas giant it can work that yields something a market buys (D35), without surveys, keeping whatever sells, until its hold is full; then it sells each good where it fetches most after fuel (D36), and the plans choose again.
 - A survey that needs taking takes the ship off a trip that fills its hold at once, with the hold aboard (D37). With the spare-time plan on, the command ship trades when it has nothing to survey (D34, amending D20): the trading plan takes it, free or off a trip that fills its hold, for a route that waits for it once its hold is sold, after the other traders; it sells its hold first. A trip is only taken over when no goal step of the ship runs and the ship isn't in flight (B46, B17).

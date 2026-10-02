@@ -56,6 +56,7 @@ public sealed class MetricsEndpointTests
         "spacetraders_anomaly_active",
         "spacetraders_db_size_bytes",
         "spacetraders_server_next_reset_timestamp_seconds",
+        "spacetraders_setting_info",
     ];
 
     [Fact]

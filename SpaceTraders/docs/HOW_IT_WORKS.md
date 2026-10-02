@@ -896,6 +896,11 @@ other app (D8):
   reset monitor), is a `SettingChanged` journal line with `Setting`, `OldValue` and `NewValue`
   (`SettingsRepository`). A key that may hold a secret (ending in `Url`, or naming a secret,
   password or API key) shows `(hidden)` instead of its value.
+- The SpaceTraders dashboard's **Settings** table shows every setting with its value now and what
+  it does (`spacetraders_setting_info`, section 11): the switches first, on or off, then the rest by
+  name; the `Runtime.*` status flags are left out. A value that may hold a secret is hidden there too.
+  What a setting does comes from the running version's seed: a stored description is the one the
+  setting was seeded with, which an older version may have written (slice 2.9).
 
 ### What each setting does
 
@@ -1167,6 +1172,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_shipyard_ship_type` | `system`, `waypoint`, `ship_type` | 1 for each ship type a shipyard sells | Every minute |
   | `spacetraders_shipyard_ship_price`, `_ship_supply` | `system`, `waypoint`, `ship_type` | A ship type's price and supply (1 to 5) as last seen, once a ship has been there | Every minute |
   | `spacetraders_good_supply_chain` | `good`, `made_from`, `used_for` | One series per good, always 1: the goods it is made from and the goods made from it, comma-separated (`GET market/supply-chain`) | Once per start |
+  | `spacetraders_setting_info` | `setting`, `current`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`) and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
 
 ---
 

@@ -50,6 +50,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipyardShipPrice;
     private readonly Gauge _shipyardShipSupply;
     private readonly Gauge _supplyChain;
+    private readonly Gauge _settingInfo;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
@@ -65,6 +66,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string System, string Waypoint, string ShipType)> _shipyardShips = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
+    private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
     public PrometheusAutomationMetrics(CollectorRegistry registry)
@@ -252,6 +254,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "good",
             "made_from",
             "used_for");
+        _settingInfo = metrics.CreateGauge(
+            "spacetraders_setting_info",
+            "One series per setting the agent has, always 1: its value now (one that may hold a secret shows (hidden)) and what it does.",
+            "setting",
+            "current",
+            "description");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -543,6 +551,29 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             {
                 _supplyChain.WithLabels(series.Good, series.MadeFrom, series.UsedFor).Set(1);
                 _supplyChainLabels.Add(series);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void Settings(IReadOnlyCollection<SettingMetricsSample> settings)
+    {
+        var current = settings
+            .GroupBy(sample => sample.Setting, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => (group.First().Value, group.First().Description), StringComparer.Ordinal);
+
+        lock (_lock)
+        {
+            foreach (var (setting, labels) in _settingLabels.Where(series => current.GetValueOrDefault(series.Key) != series.Value).ToList())
+            {
+                _settingInfo.RemoveLabelled(setting, labels.Value, labels.Description);
+                _settingLabels.Remove(setting);
+            }
+
+            foreach (var (setting, labels) in current)
+            {
+                _settingInfo.WithLabels(setting, labels.Value, labels.Description).Set(1);
+                _settingLabels[setting] = labels;
             }
         }
     }
