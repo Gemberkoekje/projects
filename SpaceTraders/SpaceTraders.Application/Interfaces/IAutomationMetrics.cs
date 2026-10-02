@@ -256,6 +256,9 @@ public sealed record ShipMetricsSample
 
     /// <summary>What its hold carries, per good.</summary>
     public IReadOnlyList<CargoItemModel> Cargo { get; init; } = [];
+
+    /// <summary>What was paid for it and for the mounts and modules installed on it, as the ledger has it; 0 for a starting ship.</summary>
+    public long Value { get; init; }
 }
 
 /// <summary>One deliverable of an accepted contract.</summary>
