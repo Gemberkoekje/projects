@@ -65,6 +65,7 @@ public sealed class ShipGoalExecutorService(
         if (activeGoal is not ScoutWaypointGoal
             and not DeployProbeGoal
             and not MineAndSellGoal
+            and not SiphonAndSellGoal
             and not TradeBetweenMarketsGoal
             and not SurveyWaypointGoal)
         {

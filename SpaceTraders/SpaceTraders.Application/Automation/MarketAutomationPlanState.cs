@@ -3,6 +3,7 @@ namespace SpaceTraders.Application.Automation;
 public static partial class PlanTypes
 {
     public const string MiningAutomation = "MiningAutomation";
+    public const string SiphonAutomation = "SiphonAutomation";
     public const string TradingAutomation = "TradingAutomation";
 }
 
@@ -14,6 +15,10 @@ public enum MarketAutomationOpportunityStatus
     Cancelled = 3,
 }
 
+/// <summary>
+/// The mining plan's view after its last pass (slice 6.4): the low-supply openings, written only when they change.
+/// The siphon plan keeps its view alike, under <see cref="PlanTypes.SiphonAutomation"/> (slice 6.7).
+/// </summary>
 public sealed record MiningAutomationPlanState
 {
     public required Guid PlanId { get; init; }
@@ -27,28 +32,29 @@ public sealed record MiningAutomationPlanState
 
 /// <summary>
 /// A low-supply opening in the mining plan's view (slice 6.4, D22): a market with an ore in low supply, and
-/// the asteroid nearest it that yields the ore.
+/// the asteroid nearest it that yields the ore. The siphon plan lists its gases alike (slice 6.7), with the gas
+/// giant nearest the market.
 /// </summary>
 public sealed record MiningAutomationOpportunityState
 {
-    /// <summary>The opening's key: sell market and ore.</summary>
+    /// <summary>The opening's key: sell market and ore (or gas).</summary>
     public required string OpportunityKey { get; init; }
 
     public required string TradeSymbol { get; init; }
 
     public required string SellWaypointSymbol { get; init; }
 
-    /// <summary>The asteroid nearest the market whose traits yield the ore.</summary>
+    /// <summary>The asteroid nearest the market whose traits yield the ore; for a gas, the gas giant nearest it.</summary>
     public string SourceWaypointSymbol { get; init; } = string.Empty;
 
-    /// <summary>Assigned while a miner's trip sells the ore there; Pending otherwise.</summary>
+    /// <summary>Assigned while a miner's (or siphoner's) trip sells the good there; Pending otherwise.</summary>
     public required MarketAutomationOpportunityStatus Status { get; init; }
 
     public string? AssignedShipSymbol { get; init; }
 
     /// <summary>
-    /// For a pending opening: the miners without a trip that could reach its asteroid. The <c>ShipLeftIdle</c>
-    /// rule reads it (D13).
+    /// For a pending opening: the miners (or siphoners) without a trip that could reach its asteroid (or gas
+    /// giant). The <c>ShipLeftIdle</c> rule reads it (D13).
     /// </summary>
     public IReadOnlyList<string> CandidateShipSymbols { get; init; } = [];
 

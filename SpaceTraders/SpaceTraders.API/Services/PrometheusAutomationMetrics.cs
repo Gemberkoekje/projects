@@ -148,7 +148,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "contract");
         _extractedUnits = ZeroFirst(
             "spacetraders_extracted_units_total",
-            "Units ships extracted, by ship and good: each extraction's yield, before what isn't wanted is jettisoned.",
+            "Units ships extracted, by ship and good: each extraction's or siphon's yield, before what isn't wanted is jettisoned.",
             "ship",
             "good");
         _jettisonedUnits = ZeroFirst(

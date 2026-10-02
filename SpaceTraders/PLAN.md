@@ -76,6 +76,9 @@
   (a probe for every market, bought while the credits stay at 100,000; until then they roam) and D30
   (a purchase where none of our ships is fetches a probe first). It fixes B15 and B25. The probe plan
   stays off until you switch it on (D9).
+- Slice 6.7 (siphoning) is built on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33: siphon
+  drones siphon gases at gas giants by the miners' rules, without surveys (the API's siphon call takes
+  none). The siphon plan stays off until you switch it on (D9).
 
 ## Known issues
 
@@ -176,6 +179,9 @@ get the next D-number.
 | D28 | Slice 6.4's first watch (asked on 2026-10-02): what do miners mine, and when is a drone bought? After the contract, the mining plan bought SPECTER-4 for A3's scarce silicon, and the drone mined surveyed iron for H51, where iron was MODERATE: the opening that paid for it stayed open, ready to pay for the next drone. | **One rule for both:** "The buying logic and the mining logic should follow the same rules. I do not mind if the buying logic buys a drone for silicon and the drone mines iron if they are both SCARCE. I do mind if the iron is not SCARCE, because at that point, endless drones are going to be bought." And: "Mine for scarce first, but once all ores are no longer SCARCE, keep mining for whatever the lowest supply ore is, even if it's not that profitable (as it will improve the amount and prices of higher-valued goods such as the metals that's made from the ores)." Miners serve the markets that buy an ore by supply, shortest first (SCARCE, LIMITED, then the lowest there is); within a level surveyed first, then value. A drone is bought, one a tick, only when its first trip by that ranking would be in low supply (SCARCE or LIMITED, D22). |
 | D29 | Slice 6.3 (asked on 2026-10-02, "I'd like more scouting to be done"): how many probes, bought when, doing what? The probe plan (D4) never ran (D9): the starting probe sat at H52, and most markets' prices were hours old. | **A probe for every market, roaming until then:** "Long term goal: Each marketplace should have a sattelite"; probes "can be bought as long as the total credits doesn't dip below 100.000 credits (down from 200.000)"; "If not enough sattelites are available to cover the entire market, sattelites should drift between nearby markets (prioritizing markets that haven't been updated for a while)". Asked, as SHIP_PROBE isn't the cheapest ship in X1-DC53 (81,645 at A2, against 33,905 for a SHIP_SURVEYOR): **SHIP_PROBE**, which needs no fuel and which no other plan uses. The 100,000 is the credit reserve every purchase keeps (`FleetExpansion.MinCreditReserve`). Replaces D4. |
 | D30 | Slice 6.3 (asked on 2026-10-02): the API sells a ship only where one of our ships is. SPECTER-2, parked at H52 since the start, is what let the plans buy drones there (SPECTER-4 at 15:49Z); roaming probes leave the shipyards. | **Fetch a probe:** when a plan can afford a ship at a shipyard where none of our ships is, the nearest free probe flies there and waits until the purchase is made, then roams on. The purchase makes no API call that could only fail. |
+| D31 | Slice 6.7 (asked on 2026-10-02): miners work an ore contract before anything else (D23), but gas contracts (HYDROCARBON, LIQUID_HYDROGEN, LIQUID_NITROGEN) are parked as unsupported (D2). Should siphons take them? | **Keep D2 for now:** siphons only siphon and sell to the markets. With one contract per reset (D1) a gas contract rarely comes up; it can be a slice of its own. |
+| D32 | Slice 6.7 (asked on 2026-10-02): when does the siphon plan buy siphon drones? | **The miners' rule (D28), with a cap of their own:** one a tick, only when its first trip would serve a market where the gas is SCARCE or LIMITED, within the credit reserve, up to `Siphon.MaxDrones`, "max 10 default". |
+| D33 | Slice 6.7 (asked on 2026-10-02): miners jettison every ore but their trip's (6.4, Noticed). A gas giant can't be surveyed, so a siphon drone would jettison about two siphons in three. Do siphons do the same? | **Keep every gas:** a trip keeps every gas it siphons, which fills the hold about three times faster; it sells its own gas at its market, and the plan sells the others on the following trips. |
 
 ## Phases
 
@@ -1501,6 +1507,92 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `ShipGoalExecutorServiceTests`, the trip's round trip in `ShipGoalRepositoryTests`, D19 in
       `RateLimitHandlerTests`.
 - **6.6 Jump gate construction.**
+- **6.7 Siphoning** (built 2026-10-02 on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33).
+  Asked that day: "Can you work on implementing syphons. Functions practically the same as minors,
+  including surveys, but for gassy materials."
+  - **No surveys, by the game's rules:** the API's siphon call (`POST my/ships/{ship}/siphon`) takes no
+    survey (the OpenAPI spec v2.3.0 gives it no body), the docs use surveys with the extract call only,
+    and a surveyor's deposits are ores only (the command ship's Surveyor II lists 13 ores). Everything
+    else follows the miners.
+  - **X1-DC53** (public API, 2026-10-02): one gas giant, C38 (-57,-143), with STRONG_MAGNETOSPHERE as its
+    only trait. The orbital station C39 at the same spot sells `SHIP_SIPHON_DRONE` (and probes), and
+    exchanges the three gases; G50 imports all three, E47 and F48 the two liquids. C40, a fuel station
+    39 from C38, is the refuelling stop towards G50 and E47 for an 80-unit tank.
+  - Done:
+    - **Who siphons** (`FleetRoles.IsSiphoner`): a ship with a gas siphon, a hold and a tank, and nothing
+      to mine or survey with, whichever plans are on: a siphon drone. The command ship has a
+      MOUNT_GAS_SIPHON_II too, but it mines or surveys, as before. A siphoner trades only when the siphon
+      plan has no trip for it, as a miner.
+    - **What a gas giant yields** (`Siphoning/GasGiants.cs`): the game publishes no table, and C38's
+      traits name no gas, so every gas giant counts as yielding HYDROCARBON, LIQUID_HYDROGEN and
+      LIQUID_NITROGEN, about equally (the gases C39 exchanges). Only GAS_GIANT waypoints are siphoned.
+    - **The siphon plan** (`SiphonAutomationService`, new switch `Automation.Plan.Siphon.Enabled`, off;
+      bootstrapped after mining and before trading): one trip per goal (`SiphonAndSellGoal`), chosen again
+      after each sale. A siphoner that holds goods a market buys sells them first, one good a trip, where
+      each fetches most after fuel (a full hold only sells, even at a loss on the fuel: a siphon trip would
+      end at once without its gas aboard, on every tick); otherwise the best of
+      `SiphonPlanner.SiphonTargets`: every market
+      that buys a gas, siphoned at the gas giant nearest it and sold there, the market shortest of its
+      gas first (D28), then the most a siphon is expected to fetch, then the nearest gas giant. One
+      siphoner per sell market and gas. Journal: `SiphonStarted`, reason `low_supply`, `lowest_supply`
+      or `held_cargo`.
+    - **The trip** (`SiphonAndSellGoalExecutor`, `SiphonResourcesCommand`): flies with its goal through
+      refuelling stops, never DRIFT (`GoalFlight`), orbits, siphons once per cooldown and keeps every
+      good a market it can reach from the gas giant buys (D33), jettisoning the rest, which would fill the
+      hold for good. A full hold, of any gases, turns it to selling: its own gas at its market, in
+      batches of the trade volume, then the market fetched again (D25). Journal: `Siphoned` per siphon.
+    - **Drones** (D32): when no siphoner is free, a `SHIP_SIPHON_DRONE` is bought, one a tick, only when
+      its first trip by the same ranking would serve a market short of its gas, at the shipyard that
+      sells it for the least in a system where our ships are, up to `Siphon.MaxDrones` (new, 10), within
+      the credit reserve. In X1-DC53 that is C39.
+    - **Contracts** stay mineral-only (D2, D31).
+    - **Visibility:** a siphon's yield counts in `spacetraders_extracted_units_total`, so the dashboard's
+      fleet table and "Mined and jettisoned per hour" show gases with no gembernodes change; it isn't an
+      extraction in `spacetraders_extractions_total`, which the survey statistics read. The Journal
+      panel shows the new kinds. The fleet view says "siphoning for …" and "selling …". The plan's state
+      (`plan_states`, `SiphonAutomation`) lists the gas openings of every system where our ships are,
+      before the first drone too; `ShipLeftIdle` (D13) counts a gas opening as work for the siphoners
+      the plan lists as able to reach its gas giant.
+  - Noticed (not changed):
+    - **The first drone needs a ship at C39:** the API sells a ship only where one of ours is, and no
+      ship of ours stays at C39. The purchase calls for a probe (D30), which only the probe plan answers:
+      with it off, no siphon drone is bought until a ship happens to be there.
+    - **The gas processor:** the docs say a siphon needs a gas siphon and a gas processor module. The
+      command ship has a MODULE_GAS_PROCESSOR_I; whether a siphon drone does isn't known here (the
+      shipyard listing the bot caches has no modules), and the plan doesn't ask. If the API refused a
+      drone's siphons, each attempt would drop its trip with a warning, and `RepeatingError` would show it.
+    - **Unconfirmed yields:** the three gases at about a third each are an assumption until the first
+      `Siphoned` lines.
+    - **Log volume:** a `Siphoned` line per siphon, as `Extracted` per extraction: at a cooldown of about
+      70 seconds (an extraction's, in the soak test) that is some 1,200 lines a day per drone, 12,000 for
+      ten, against the 50,000-a-day log alert that mining's lines count towards too.
+    - A trip sells only its own gas at its market, as you chose; the other gases follow one good a trip,
+      each where it fetches most after fuel, which is often the same market without a flight.
+    - The mining planner's tie-break by the nearest asteroid never applies: its comparer ends with the
+      opening's key, so ties go by key. The siphon planner's does apply.
+  - To switch it on: `PUT /settings/Automation.Plan.Siphon.Enabled` with `{"value": "true"}` (and the
+    probe plan, for the first purchase at C39).
+  - Done when: a full reset period with the siphon plan on and no open anomaly for it.
+  - **To understand this,** start with `SpaceTraders.Application/Siphoning/SiphonPlanner.cs` and
+    `GasGiants.cs`, then `Automation/SiphonAutomationService.cs` and
+    `Goals/Executors/SiphonAndSellGoalExecutor.cs`;
+    `tests/SpaceTraders.Application.Tests/Siphoning/SiphonFixture.cs` holds X1-DC53's gas side (positions
+    from the API, prices made up).
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Siphoning/GasGiants.cs`, `Siphoning/SiphonPlanner.cs`, `Automation/SiphonAutomationService.cs`,
+      `Goals/Executors/SiphonAndSellGoalExecutor.cs`, `Commands/Ships/SiphonResourcesCommand.cs`;
+    - changed: `Automation/FleetRoles.cs` (`IsSiphoner`), `AutomationSwitches.cs` (the Siphon plan),
+      `GameLoopService.cs`, `MarketAutomationPlanState.cs` (`PlanTypes.SiphonAutomation`),
+      `Goals/ShipGoalExecutorService.cs`, `Health/ShipLeftIdleRule.cs`, `Mining/MiningPlanner.cs`
+      (`IsDemanded` and `CanSellFrom` shared), `JournalEvents.cs`, `IAutomationMetrics.cs`,
+      `Services/FleetStatusQueryService.cs`, `DependencyInjection.cs`; `SiphonAndSellGoal` and
+      `ShipGoalKind` (Domain); `PrometheusMetricsService`, `PrometheusAutomationMetrics` (API);
+      `DefaultSettingsSeed` (Persistence: the switch and `Siphon.MaxDrones`);
+    - tests: `Siphoning/SiphonPlannerTests` and `SiphonFixture`, `Automation/SiphonAutomationServiceTests`,
+      `Goals/SiphonAndSellGoalExecutorTests`, `Commands/SiphonResourcesHandlerTests` (new); additions to
+      `AutomationSwitchesTests`, `GameLoopServiceTests`, `DefaultSettingsSeedTests`, `ShipRuleTests`,
+      `FleetStatusQueryServiceTests`, `ShipGoalSerializationTests` (Domain) and `PrometheusMetricsTests`
+      (API).
 
 ## Changes in gembernodes
 

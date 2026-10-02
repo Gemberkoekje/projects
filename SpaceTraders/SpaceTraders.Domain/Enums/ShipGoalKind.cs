@@ -16,4 +16,5 @@ public enum ShipGoalKind
     MineAndSell = 11,
     TradeBetweenMarkets = 12,
     SurveyWaypoint = 13,
+    SiphonAndSell = 14,
 }

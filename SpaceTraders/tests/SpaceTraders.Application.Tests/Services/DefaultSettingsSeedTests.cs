@@ -19,6 +19,7 @@ public sealed class DefaultSettingsSeedTests
         "Automation.Plan.ProbeDeployment.Enabled",
         "Automation.Plan.Survey.Enabled",
         "Automation.Plan.Mining.Enabled",
+        "Automation.Plan.Siphon.Enabled",
         "Automation.Plan.Trading.Enabled",
 
         // ShipGoalExecutorService, OutagePauseHandler, DatabaseSizeGuardService.
@@ -53,6 +54,9 @@ public sealed class DefaultSettingsSeedTests
 
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",
+
+        // Siphoning (slice 6.7): SiphonAutomationService's cap on siphon drones (D32).
+        "Siphon.MaxDrones",
 
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).

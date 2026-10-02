@@ -119,6 +119,7 @@ public sealed class PrometheusMetricsServiceTests
             db.Waypoints.Add(Waypoint("X1-AB-XB5C", "ENGINEERED_ASTEROID"));
             db.Waypoints.Add(Waypoint("X1-AB-H51", "PLANET"));
             db.Waypoints.Add(Waypoint("X1-AB-A2", "MOON"));
+            db.Waypoints.Add(Waypoint("X1-AB-C38", "GAS_GIANT"));
 
             // The scout, on its way to the next market.
             db.Ships.Add(new CachedShip
@@ -195,6 +196,21 @@ public sealed class PrometheusMetricsServiceTests
                 CargoCapacity = 15,
                 CargoJson = """[{"Symbol":"COPPER_ORE","Units":15}]""",
             });
+            // A siphon drone at its gas giant (slice 6.7).
+            var siphon = new SiphonAndSellGoal { TradeSymbol = "LIQUID_HYDROGEN", SourceWaypointSymbol = "X1-AB-C38", SellWaypointSymbol = "X1-AB-H51" };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-8",
+                ShipType = "SHIP_SIPHON_DRONE",
+                Status = "IN_ORBIT",
+                WaypointSymbol = "X1-AB-C38",
+                CargoCapacity = 15,
+                GoalId = siphon.GoalId,
+                GoalKind = siphon.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(siphon),
+                GoalStatus = (int)siphon.Status,
+            });
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -219,6 +235,7 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-5", "→ X1-AB-H51 (PLANET)", "on the way to deliver COPPER_ORE"),
             ("AGENT-6", "→ X1-AB-A2 (MOON)", "scouting"),
             ("AGENT-7", "X1-AB-H51 (PLANET)", "called to a shipyard"),
+            ("AGENT-8", "X1-AB-C38 (GAS_GIANT)", "siphoning for LIQUID_HYDROGEN"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);

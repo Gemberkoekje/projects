@@ -164,6 +164,7 @@ public sealed class PrometheusMetricsService(
                 MineResourceGoal mine => $"mining {mine.TradeSymbol}",
                 MineAndSellGoal mineAndSell => mineAndSell.Selling ? $"selling {mineAndSell.TradeSymbol}" : $"mining {mineAndSell.TradeSymbol}",
                 SiphonResourceGoal siphon => $"siphoning {siphon.TradeSymbol}",
+                SiphonAndSellGoal siphonAndSell => siphonAndSell.Selling ? $"selling {siphonAndSell.TradeSymbol}" : $"siphoning for {siphonAndSell.TradeSymbol}",
                 SellCargoGoal => "selling cargo",
                 DeliverCargoGoal deliver => $"delivering {deliver.TradeSymbol}",
                 SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to a construction site",

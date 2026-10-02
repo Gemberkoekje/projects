@@ -17,7 +17,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<IdleGoal>();
-        result!.GoalId.Should().Be(goalId);
+        result.GoalId.Should().Be(goalId);
         result.Status.Should().Be(GoalStatus.Executing);
         result.Kind.Should().Be(ShipGoalKind.Idle);
     }
@@ -38,7 +38,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<MineResourceGoal>();
-        var mineGoal = (MineResourceGoal)result!;
+        var mineGoal = (MineResourceGoal)result;
         mineGoal.GoalId.Should().Be(goalId);
         mineGoal.Status.Should().Be(GoalStatus.Executing);
         mineGoal.TradeSymbol.Should().Be("IRON_ORE");
@@ -60,9 +60,29 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<SiphonResourceGoal>();
-        var siphonGoal = (SiphonResourceGoal)result!;
+        var siphonGoal = (SiphonResourceGoal)result;
         siphonGoal.TradeSymbol.Should().Be("HYDROCARBON");
         siphonGoal.SourceWaypointSymbol.Should().Be("X1-AB-GG1");
+    }
+
+    [Fact]
+    public void SiphonAndSellGoal_RoundTrip_PreservesAllFields()
+    {
+        // Slice 6.7: a siphon trip is stored with the ship, as a mining trip is.
+        var goal = new SiphonAndSellGoal
+        {
+            GoalId = Guid.NewGuid(),
+            TradeSymbol = "LIQUID_HYDROGEN",
+            SourceWaypointSymbol = "X1-AB-GG1",
+            SellWaypointSymbol = "X1-AB-G50",
+            Selling = true,
+        };
+
+        var json = JsonSerializer.Serialize<ShipGoal>(goal);
+        var result = JsonSerializer.Deserialize<ShipGoal>(json);
+
+        result.Should().BeOfType<SiphonAndSellGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Kind.Should().Be(ShipGoalKind.SiphonAndSell);
     }
 
     [Fact]
@@ -80,7 +100,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<SellCargoGoal>();
-        var sellGoal = (SellCargoGoal)result!;
+        var sellGoal = (SellCargoGoal)result;
         sellGoal.DestinationWaypointSymbol.Should().Be("X1-AB-01");
         sellGoal.TradeSymbols.Should().BeEquivalentTo(symbols);
     }
@@ -100,7 +120,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<DeliverCargoGoal>();
-        var deliverGoal = (DeliverCargoGoal)result!;
+        var deliverGoal = (DeliverCargoGoal)result;
         deliverGoal.ContractId.Should().Be("contract-xyz");
         deliverGoal.TradeSymbol.Should().Be("EQUIPMENT");
         deliverGoal.DeliveryWaypointSymbol.Should().Be("X1-AB-02");
@@ -120,7 +140,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<SupplyConstructionGoal>();
-        var supplyGoal = (SupplyConstructionGoal)result!;
+        var supplyGoal = (SupplyConstructionGoal)result;
         supplyGoal.TradeSymbol.Should().Be("ALUMINUM");
         supplyGoal.ConstructionSiteWaypointSymbol.Should().Be("X1-AB-JG");
     }
@@ -138,7 +158,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<MoveToWaypointGoal>();
-        ((MoveToWaypointGoal)result!).TargetWaypointSymbol.Should().Be("X1-AB-WP5");
+        ((MoveToWaypointGoal)result).TargetWaypointSymbol.Should().Be("X1-AB-WP5");
     }
 
     [Fact]
@@ -154,7 +174,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<ScoutWaypointGoal>();
-        ((ScoutWaypointGoal)result!).TargetWaypointSymbol.Should().Be("X1-AB-WP7");
+        ((ScoutWaypointGoal)result).TargetWaypointSymbol.Should().Be("X1-AB-WP7");
     }
 
     [Fact]
@@ -170,7 +190,7 @@ public sealed class ShipGoalSerializationTests
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
         result.Should().BeOfType<PatrolMarketGoal>();
-        ((PatrolMarketGoal)result!).TargetWaypointSymbol.Should().Be("X1-AB-WP3");
+        ((PatrolMarketGoal)result).TargetWaypointSymbol.Should().Be("X1-AB-WP3");
     }
 
     [Fact]

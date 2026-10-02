@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-02, slice 6.7: D31–D33)
+- Siphoning, as asked on 2026-10-02: "Functions practically the same as miners, including surveys, but for gassy materials." A new siphon plan (`Automation.Plan.Siphon.Enabled`, off by default) gives every siphoner (a ship with a gas siphon, a hold and a tank, and nothing to mine or survey with: a siphon drone) one trip at a time, by the miners' rules (D28): the market shortest of a gas first, siphoned at the gas giant nearest it and sold there. Surveys can't be used: the API's siphon call takes none, and a surveyor finds ores only.
+- A trip keeps every gas it siphons that a market it can reach buys (D33), not only its own, and the plan sells the others after it, one good a trip, where each fetches most; the rest is jettisoned. A full hold only sells, so a siphoner can't take a trip that ends at once on every tick.
+- The plan buys a `SHIP_SIPHON_DRONE` by the miners' rule (D32): one a tick, only when its first trip would serve a market short of a gas, within the credit reserve, up to `Siphon.MaxDrones` (new, 10). Gas contracts stay unsupported (D2, D31).
+- New goal `SiphonAndSell`, command `SiphonResourcesCommand`, journal kinds `SiphonStarted` and `Siphoned`. Siphoned units count in `spacetraders_extracted_units_total`, so the dashboard's mined panels show gases, but not as extractions in the survey statistics. `ShipLeftIdle` counts a gas opening as work for the siphoners that can reach it; the fleet view says "siphoning for …".
+
+### Docs – Changed (2026-10-02, slice 6.7)
+- `PLAN.md`: slice 6.7 and D31–D33; `docs/HOW_IT_WORKS.md`: the siphon plan, its goal and command, the settings, the journal and metrics, and the idle rule; `docs/GLOSSARY.md`: siphon, siphoner, gas giant.
+
 ### Code – Changed (2026-10-02, slice 6.3: D29, D30)
 - The probe plan works towards a probe at every market of the headquarters' system: while there are fewer probes than markets it buys a SHIP_PROBE where probes cost least, as long as the purchase leaves the credit reserve (`FleetExpansion.MinCreditReserve`, 100,000); its own 200,000 gate (D4) is gone. Until there are enough, the probes roam: each free probe flies, in CRUISE, to a market whose prices are older than `Market.RefreshMinutes` and that no probe is at or flying to, the oldest once twice the flight there counts against it.
 - A purchase at a shipyard where none of our ships is makes no API call, which could only fail: it calls for a ship, the probe plan sends its nearest free probe, and the next attempt buys (D30). With a ship there, the shipyard's price is fetched again first, so the reserve is kept with the price it asks now. New journal kind `ProbeCalled`.

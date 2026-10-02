@@ -315,13 +315,29 @@ public static class MiningPlanner
         return asteroid.Length > 0;
     }
 
-    /// <summary>Whether a miner, with a full tank at the asteroid, can carry its hold to the market.</summary>
-    private static bool CanSellFrom(TradeMarketMap map, ShipModel miner, string asteroid, string market)
-        => TradeRoutePlanner.TryPlanFlight(map, asteroid, market, miner.FuelCapacity, miner.FuelCapacity, out _);
+    /// <summary>
+    /// Whether a ship, with a full tank where it mines or siphons, can carry its hold to the market. The siphon
+    /// plan (slice 6.7) asks the same of a gas giant.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The miner or siphoner.</param>
+    /// <param name="source">Where it fills its hold: an asteroid or a gas giant.</param>
+    /// <param name="market">Where it would sell.</param>
+    /// <returns>True when a flight there exists.</returns>
+    public static bool CanSellFrom(TradeMarketMap map, ShipModel ship, string source, string market)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return TradeRoutePlanner.TryPlanFlight(map, source, market, ship.FuelCapacity, ship.FuelCapacity, out _);
+    }
 
-    /// <summary>Whether a market takes a good: it imports or exchanges it, at a price.</summary>
-    private static bool IsDemanded(TradeGoodSnapshot good)
-        => good.SellPrice > 0 && DemandTypes.Contains(good.Type);
+    /// <summary>Whether a market takes a good: it imports or exchanges it, at a price. Gases too (slice 6.7).</summary>
+    /// <param name="good">The good as last seen at the market.</param>
+    /// <returns>True when the market buys the good.</returns>
+    public static bool IsDemanded(TradeGoodSnapshot good)
+    {
+        ArgumentNullException.ThrowIfNull(good);
+        return good.SellPrice > 0 && DemandTypes.Contains(good.Type);
+    }
 
     private static bool IsExtractable(TradeMarketMap map, string waypointSymbol)
         => map.Waypoints.Any(waypoint => waypoint.Symbol.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase)

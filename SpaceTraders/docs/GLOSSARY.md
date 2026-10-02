@@ -21,8 +21,9 @@ decisions).
 | **Domain Event** | Two kinds exist. *Bus events* are published through Wolverine and handled by zero or more handlers (for example `ShipInTransitEvent`, `ShipNavigationCompletedEvent`). *Aggregate events* are raised inside domain aggregates (`AggregateRoot.RaiseDomainEvent`) but never dispatched, so nothing handles them (B7). |
 | **EF Core** | Entity Framework Core – the ORM used to map C# entities to PostgreSQL tables. The schema itself is created and extended at startup by `SpaceTradersDatabaseInitializer`, not by EF migrations. |
 | **Fleet** | All ships owned by the agent. |
-| **GameLoopService** | The leader-only loop that runs every 5 seconds: it bootstraps the five plans, steps every ship's active goal, drives contract assignments and publishes API availability changes. |
-| **Goal** | What a ship is working towards, such as `ScoutWaypointGoal`, `DeployProbeGoal`, `MineAndSellGoal`, `TradeBetweenMarketsGoal` or `SurveyWaypointGoal`. Each ship has at most one active goal. |
+| **GameLoopService** | The leader-only loop that runs every 5 seconds: it bootstraps the plans that are switched on, steps every ship's active goal, drives contract assignments and publishes API availability changes. |
+| **Gas Giant** | A waypoint of type `GAS_GIANT`, the only kind a gas siphon works at. Every gas giant counts as yielding HYDROCARBON, LIQUID_HYDROGEN and LIQUID_NITROGEN (`GasGiants`, slice 6.7): the game publishes no table, and its traits name no gas. |
+| **Goal** | What a ship is working towards, such as `ScoutWaypointGoal`, `DeployProbeGoal`, `MineAndSellGoal`, `SiphonAndSellGoal`, `TradeBetweenMarketsGoal` or `SurveyWaypointGoal`. Each ship has at most one active goal. |
 | **Goal Executor** | Code that advances one kind of goal by one step, such as `MineAndSellGoalExecutor`. `ShipGoalExecutorService` picks the executor for a ship's active goal. |
 | **Health Rule** | An intended behaviour written down as a check the bot runs on itself every minute (`IHealthRule`, evaluated by `HealthMonitorService`), such as "a fulfilled contract has no active plan or assignment". A broken rule is an anomaly. |
 | **Leader Election** | A mechanism ensuring only one instance runs leader-only automation work. Implemented by `LeaderElectionService` and backed by the `leader_leases` table. |
@@ -30,10 +31,12 @@ decisions).
 | **Read, Write** | For the rate limit (D19): a read is a GET, a write anything else. Writes go first: a read gives way while a write waits, and leaves part of the burst to writes. |
 | **Minimal API** | The ASP.NET Core programming model used in `SpaceTraders.API` – endpoint groups defined with `MapGet`/`MapPost` rather than controllers. |
 | **Npgsql** | The official .NET PostgreSQL driver and the EF Core provider used in `SpaceTraders.Infrastructure.Persistence`. |
-| **Plan** | One of the five automation services `GameLoopService` bootstraps on every tick: scout, contract, probe deployment, mining and trading. Each keeps its own state in the database. |
+| **Plan** | One of the seven automation services `GameLoopService` bootstraps on every tick, each with its own switch: scout, contract, probe deployment, survey, mining, siphon and trading. Each keeps its own state in the database. |
 | **Run** | A period of operation with a strategy label, start and end credits and a settings snapshot, recorded in the `runs` table by `RunLifecycleService`. |
 | **SpaceTradersApiClient** | The typed `HttpClient` wrapper in `SpaceTraders.Infrastructure.SpaceTradersAPI` that abstracts all calls to the SpaceTraders v2 REST API. |
 | **State-gated command** | A ship command that checks the ship's cached state (docked, in orbit, in transit) before calling the API. When the state is wrong, it publishes `ShipStateMismatchEvent` instead. |
+| **Siphon** | Collecting gas at a gas giant with a gas siphon (`POST my/ships/{ship}/siphon`), the mining laser's counterpart for gases. It takes no survey: the API's siphon call has none, and a surveyor finds ores only. |
+| **Siphoner** | A ship the siphon plan gives trips (slice 6.7): a gas siphon, a hold and a tank, and nothing to mine or survey with (`FleetRoles.IsSiphoner`), in practice a siphon drone. The command ship has a siphon too, but it mines or surveys. |
 | **Stateless** | A .NET state-machine library. The application project references it, but no code uses it. |
 | **Request Budget** | `RequestBudget`, the client's copy of the API guide's limit: 2 requests in any second and, once those are used, up to 30 more in any 60 seconds. Both windows slide, so the client never exceeds a fixed window the server counts in. A singleton, so it survives the HttpClient factory recreating its handlers. |
 | **Lucrative** | A trade trip that earns at least `Trade.MinProfitPerUnit` per unit after the fuel for the whole trip, the flight to the buy market included (D14). The trading plan offers only lucrative trips, and a trip checks it again at the buy market before it buys. |
