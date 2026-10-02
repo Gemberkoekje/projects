@@ -221,24 +221,42 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
-    public async Task TheStartingProbe_LeftIdleWhileTargetsWait_IsAnAnomaly()
+    public async Task AProbe_LeftIdleWhileADueMarketHasNobodyWatchingIt_IsAnAnomaly()
     {
-        // The probe plan doesn't recognise the starting probe (B25); the rule does.
-        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(waitingForCredits: false, deployed: ["X1-AB-H59"]));
-        _fleet.Have(FleetFixture.StartingProbe("SHIP-2", "X1-AB-A1", Start), FleetFixture.StartingProbe("SHIP-4", "X1-AB-H59", Start));
+        // D29: the plan gives every free probe a due market that nothing watches. The starting probe, whose
+        // cached type is its role, is a probe (B25).
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", ProbeSymbol = "SHIP-2" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", DueAt = Start.AddMinutes(-20) }));
+        _fleet.Have(FleetFixture.StartingProbe("SHIP-2", "X1-AB-A1", Start));
 
         await _harness.EvaluateAsync(_rule, Start);
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Should().Match<HealthViolation>(violation =>
-            violation.Subject == "SHIP-2" && violation.Details.Contains("1 target waypoints without a probe", StringComparison.Ordinal));
+            violation.Subject == "SHIP-2" && violation.Details.Contains("1 markets that no probe or ship watches are due", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task AProbePlanWaitingForCredits_HasNoWork()
+    public async Task WithEveryMarketWatched_AProbeAtItsMarketIsNotIdleByMistake()
     {
-        // D4: market probes wait for 200,000 credits.
-        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(waitingForCredits: true, deployed: ["X1-AB-H59"]));
+        // D29's long-term goal: a probe at every market, without a goal, watching it.
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", ProbeSymbol = "SHIP-2" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", WatchedByShip = true }));
+        _fleet.Have(FleetFixture.StartingProbe("SHIP-2", "X1-AB-A1", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AMarketSeenWithinTheInterval_IsNoWorkYet()
+    {
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", ProbeSymbol = "SHIP-2" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", DueAt = Start.AddHours(1) }));
         _fleet.Have(FleetFixture.StartingProbe("SHIP-2", "X1-AB-A1", Start));
 
         await _harness.EvaluateAsync(_rule, Start);
@@ -461,15 +479,12 @@ public sealed class ShipLeftIdleRuleTests
         UpdatedAt = Start,
     };
 
-    private static ProbeDeploymentPlanState ProbePlan(bool waitingForCredits, IReadOnlyList<string> deployed) => new()
+    private static ProbeDeploymentPlanState ProbePlan(params ProbeMarketState[] markets) => new()
     {
         PlanId = Guid.NewGuid(),
         SystemSymbol = "X1-AB",
-        TargetWaypointSymbols = ["X1-AB-H59", "X1-AB-B2"],
-        ShipyardWaypointSymbols = ["X1-AB-H59"],
-        DeployedWaypointSymbols = deployed,
-        Status = ProbeDeploymentPlanStatus.Active,
-        WaitingForPhase1Credits = waitingForCredits,
+        Probes = 1,
+        Markets = markets,
         CreatedAt = Start,
         UpdatedAt = Start,
     };

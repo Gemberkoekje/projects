@@ -35,9 +35,10 @@ public sealed class PurchaseShipHandler(
         IShipRepository ships,
         IShipyardRepository shipyards,
         IBudgetPolicy budget,
+        ShipyardCalls calls,
         IMessageBus bus,
         ILogger<PurchaseShipHandler> logger)
-        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
+        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, calls, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
     {
     }
 

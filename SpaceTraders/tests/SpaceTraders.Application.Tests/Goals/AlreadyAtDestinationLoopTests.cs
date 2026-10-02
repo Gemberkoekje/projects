@@ -77,12 +77,7 @@ public sealed class AlreadyAtDestinationLoopTests
     [Fact]
     public async Task ProbeInOrbitAtTarget_TakesOneStep()
     {
-        var executor = new DeployProbeGoalExecutor(
-            _goals,
-            Substitute.For<IProbeDeploymentPlanService>(),
-            _dock,
-            _bus,
-            NullLogger<DeployProbeGoalExecutor>.Instance);
+        var executor = new DeployProbeGoalExecutor(_goals, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
 
         await RunOneStepAsync(
             executor,

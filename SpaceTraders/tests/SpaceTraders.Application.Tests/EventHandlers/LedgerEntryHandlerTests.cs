@@ -1,6 +1,5 @@
 using FluentAssertions;
 using NSubstitute;
-using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -101,36 +100,5 @@ public sealed class MessageMetricsMiddlewareTests
         MessageMetricsMiddleware.After(new Envelope(new ShipRefueledEvent("AGENT-1", 720, 174_280, "X1-AB-2")), metrics);
 
         metrics.Received(1).MessageHandled("ShipRefueledEvent");
-    }
-}
-
-public sealed class ProbeDeploymentCreditsChangedHandlerTests
-{
-    private readonly IProbeDeploymentPlanService _probes = Substitute.For<IProbeDeploymentPlanService>();
-    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
-
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public async Task ACreditChange_LeavesTheProbePlanAlone_WhileItOrAutomationIsOff(bool automationOn, bool planOn)
-    {
-        // Credit changes are published now (B7), and waking the probe plan can buy probes: a plan that
-        // is switched off buys nothing (D9).
-        _settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>()).Returns(automationOn);
-        _settings.GetAsync<bool>("Automation.Plan.ProbeDeployment.Enabled", Arg.Any<CancellationToken>()).Returns(planOn);
-
-        await new ProbeDeploymentCreditsChangedHandler(_probes, _settings).Handle(new AgentCreditsChangedEvent(100_000, 250_000), CancellationToken.None);
-
-        await _probes.DidNotReceive().OnCreditsChangedAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ACreditChange_WakesTheProbePlan_WhenItIsOn()
-    {
-        _settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
-
-        await new ProbeDeploymentCreditsChangedHandler(_probes, _settings).Handle(new AgentCreditsChangedEvent(100_000, 250_000), CancellationToken.None);
-
-        await _probes.Received(1).OnCreditsChangedAsync(Arg.Any<CancellationToken>());
     }
 }

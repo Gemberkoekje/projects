@@ -9,12 +9,24 @@ using Wolverine;
 
 namespace SpaceTraders.Application.Services;
 
+/// <summary>
+/// Buys ships for every plan, within the credit reserve (<see cref="IBudgetPolicy"/>,
+/// <c>FleetExpansion.MinCreditReserve</c>).
+/// </summary>
+/// <remarks>
+/// The API sells a ship only to an agent with a ship at the shipyard (D30). Without one there, the
+/// purchase makes no API call: it calls for a ship (<see cref="ShipyardCalls"/>), which the probe plan
+/// answers with its nearest free probe, and the plan's next attempt buys. With one there, the price is
+/// fetched again first, so the reserve is kept with the price the shipyard asks now: a cached price can be
+/// hours old, and every purchase moves it.
+/// </remarks>
 public sealed class ShipPurchaseService(
     ISpaceTradersPort port,
     IAgentRepository agents,
     IShipRepository ships,
     IShipyardRepository shipyards,
     IBudgetPolicy budget,
+    ShipyardCalls calls,
     IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
@@ -25,38 +37,49 @@ public sealed class ShipPurchaseService(
     {
         if (string.IsNullOrWhiteSpace(shipType) || string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
-            return new ShipPurchaseResult
-            {
-                IsSuccess = false,
-                FailureReason = "Ship type or shipyard waypoint was empty.",
-            };
+            return Failed(ShipPurchaseFailure.InvalidRequest, "Ship type or shipyard waypoint was empty.", 0);
         }
 
         var cached = await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken);
         var estimatedCost = ResolveShipPurchasePrice(cached, shipType);
 
-        if (estimatedCost <= 0)
+        if (cached is null || estimatedCost <= 0)
         {
-            return new ShipPurchaseResult
-            {
-                IsSuccess = false,
-                FailureReason = "Purchase price unknown (shipyard not yet visited or stale cache).",
-                EstimatedCost = estimatedCost,
-            };
+            return Failed(ShipPurchaseFailure.PriceUnknown, "Purchase price unknown (shipyard not yet visited or stale cache).", estimatedCost);
         }
 
         var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
         if (!decision.CanAfford)
         {
-            return new ShipPurchaseResult
+            return Failed(ShipPurchaseFailure.OverBudget, decision.Reason, estimatedCost);
+        }
+
+        if (!await HasShipAtAsync(shipyardWaypoint, cancellationToken))
+        {
+            calls.Call(shipyardWaypoint, shipType, TimeProvider.System.GetUtcNow());
+            logger.LogDebug(
+                "Ship purchase: no ship of ours at {WaypointSymbol} to buy a {ShipType} there; calling for one (D30).",
+                shipyardWaypoint,
+                shipType);
+            return Failed(
+                ShipPurchaseFailure.NoShipAtShipyard,
+                $"No ship of ours at {shipyardWaypoint}; the API sells a ship only where one is (D30).",
+                estimatedCost);
+        }
+
+        var quotedCost = await QuoteAsync(cached, shipType, estimatedCost, cancellationToken);
+        if (quotedCost != estimatedCost)
+        {
+            estimatedCost = quotedCost;
+            decision = await budget.EvaluateAsync(quotedCost, cancellationToken);
+            if (!decision.CanAfford)
             {
-                IsSuccess = false,
-                FailureReason = decision.Reason,
-                EstimatedCost = estimatedCost,
-            };
+                return Failed(ShipPurchaseFailure.OverBudget, decision.Reason, quotedCost);
+            }
         }
 
         var result = await port.PurchaseShipAsync(shipType, shipyardWaypoint, cancellationToken);
+        calls.Answer(shipyardWaypoint);
 
         await agents.SetAgentAsync(bus, result.Agent, cancellationToken);
 
@@ -103,6 +126,14 @@ public sealed class ShipPurchaseService(
             ? type
             : ShipType.None;
 
+    private static ShipPurchaseResult Failed(ShipPurchaseFailure failure, string? reason, long estimatedCost) => new()
+    {
+        IsSuccess = false,
+        Failure = failure,
+        FailureReason = reason,
+        EstimatedCost = estimatedCost,
+    };
+
     private static long ResolveShipPurchasePrice(ShipyardWaypointDto? dto, string shipType)
     {
         if (dto is null)
@@ -112,5 +143,40 @@ public sealed class ShipPurchaseService(
 
         var match = dto.Ships.FirstOrDefault(s => shipType.Equals(s.Type, StringComparison.OrdinalIgnoreCase));
         return match?.PurchasePrice ?? 0;
+    }
+
+    /// <summary>Whether one of our ships is at the waypoint, not in flight; arrivals are dead-reckoned.</summary>
+    private async Task<bool> HasShipAtAsync(string waypointSymbol, CancellationToken cancellationToken)
+        => (await ships.GetAllAsync(cancellationToken)).Any(ship =>
+            ship.LocalStatus != ShipLocalStatus.InTransit
+            && string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The price the shipyard asks now, fetched while our ship is there, and stored for the other plans;
+    /// the cached price when the fetch fails or lists no price.
+    /// </summary>
+    private async Task<long> QuoteAsync(ShipyardWaypointDto cached, string shipType, long cachedCost, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var fresh = await port.GetShipyardAsync(cached.SystemSymbol, cached.WaypointSymbol, cancellationToken);
+            if (fresh is null || string.IsNullOrWhiteSpace(fresh.ShipsDetailJson))
+            {
+                return cachedCost;
+            }
+
+            await shipyards.UpsertAsync(fresh, cancellationToken);
+            var quoted = ResolveShipPurchasePrice(await shipyards.FindByWaypointAsync(cached.WaypointSymbol, cancellationToken), shipType);
+            return quoted > 0 ? quoted : cachedCost;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug(
+                ex,
+                "Ship purchase: couldn't fetch the shipyard at {WaypointSymbol} again; buying at its cached price {Cost}.",
+                cached.WaypointSymbol,
+                cachedCost);
+            return cachedCost;
+        }
     }
 }

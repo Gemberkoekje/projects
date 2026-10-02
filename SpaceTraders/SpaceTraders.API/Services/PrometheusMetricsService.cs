@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
@@ -120,12 +121,16 @@ public sealed class PrometheusMetricsService(
         return new ShipMetricsSample(ship.Symbol, ship.ShipType, State(ship, now), goalLabel, reason)
         {
             Location = Location(at, inTransit, waypointTypes),
-            Activity = Activity(goal, reason, assignment, at, inTransit),
+            Activity = Activity(goal, reason, assignment, at, inTransit, IsProbe(ship)),
             ArrivesAt = inTransit ? ship.ArrivesAt.GetValueOrDefault() : default,
             CargoCapacity = ship.CargoCapacity,
             Cargo = Cargo(ship.CargoJson),
         };
     }
+
+    /// <summary>Whether the ship is a probe, as the probe plan counts one (<see cref="FleetRoles.IsProbe"/>).</summary>
+    private static bool IsProbe(CachedShip ship)
+        => FleetRoles.IsProbe(new ShipModel(ship.Symbol, ship.SystemSymbol, ship.WaypointSymbol, ship.Status, ship.FlightMode, ship.FuelCurrent, ship.FuelCapacity, ShipType: ship.ShipType, FrameJson: ship.FrameJson));
 
     /// <summary>The waypoint and its type, such as <c>X1-AB-A1 (ASTEROID)</c>; in transit, an arrow first.</summary>
     private static string Location(string? at, bool inTransit, Dictionary<string, string> waypointTypes)
@@ -141,10 +146,10 @@ public sealed class PrometheusMetricsService(
 
     /// <summary>
     /// What the bot has the ship do, in a few words: a blocked goal, else its goal, else its
-    /// assignment, else idle. A contract's ship mines at the contract's source and delivers at its
-    /// destination.
+    /// assignment, else idle, or for a probe, watching its market. A contract's ship mines at the
+    /// contract's source and delivers at its destination.
     /// </summary>
-    private static string Activity(ShipGoal? goal, string reason, ShipAssignmentRecord? assignment, string? at, bool inTransit)
+    private static string Activity(ShipGoal? goal, string reason, ShipAssignmentRecord? assignment, string? at, bool inTransit, bool isProbe)
     {
         if (reason.Length > 0)
         {
@@ -164,7 +169,8 @@ public sealed class PrometheusMetricsService(
                 SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to a construction site",
                 TradeBetweenMarketsGoal trade => $"trading {trade.TradeSymbol}",
                 SurveyWaypointGoal survey => $"surveying for {survey.TargetDepositSymbol}",
-                DeployProbeGoal => "deploying",
+                DeployProbeGoal { ForPurchase: true } => "called to a shipyard",
+                DeployProbeGoal => "scouting",
                 PatrolMarketGoal => "watching its market",
                 MoveToWaypointGoal => "moving",
                 IdleGoal => "idle",
@@ -174,7 +180,8 @@ public sealed class PrometheusMetricsService(
 
         if (assignment is null)
         {
-            return "idle";
+            // A probe without a flight stays where it is, and the market watch keeps that market fresh (slice 6.3).
+            return isProbe && !inTransit ? "watching its market" : "idle";
         }
 
         if (!string.Equals(assignment.Type, "Contract", StringComparison.Ordinal))

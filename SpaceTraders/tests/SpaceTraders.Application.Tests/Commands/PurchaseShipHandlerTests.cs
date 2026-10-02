@@ -5,6 +5,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Commands;
@@ -40,6 +41,10 @@ public sealed class PurchaseShipHandlerTests
         budget.EvaluateAsync(12_000, Arg.Any<CancellationToken>())
             .Returns(new BudgetDecision(true, 100_000, 20_000, 80_000));
 
+        // The API sells a ship only where one of ours is (D30).
+        ships.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([new ShipModel("PROBE-1", "X1-AB", "X1-AB-SY1", "DOCKED", "CRUISE", 0, 0, ShipType: "SATELLITE")]);
+
         port.PurchaseShipAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
             .Returns(new PurchaseShipActionResult(
                 new AgentModel("AGENT", null, "X1-AB-HQ", 88_000, "FACTION", 2),
@@ -55,6 +60,7 @@ public sealed class PurchaseShipHandlerTests
             ships,
             shipyards,
             budget,
+            new ShipyardCalls(),
             bus,
             NullLogger<PurchaseShipHandler>.Instance);
 

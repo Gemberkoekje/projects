@@ -18,9 +18,8 @@ namespace SpaceTraders.Application.Health;
 ///   <item>scout: the active plan's next stop, for the plan's ship;</item>
 ///   <item>contract: the active plan's contract, for the plan's ship and, while units remain, for any
 ///   other miner (D23, slice 6.4); or, while the plan waits for a ship or budget, any miner;</item>
-///   <item>probe deployment: a target without a probe, while the plan isn't waiting for credits, for a
-///   probe that isn't parked at a deployed waypoint. A probe is what the plan recognises, or a ship
-///   whose cached type is <c>SATELLITE</c>: the starting probe, which the plan misses (B25);</item>
+///   <item>probes: a market whose prices are due, with no probe at it or on its way and no other ship of
+///   ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25);</item>
 ///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4);</item>
 ///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
 ///   to reach it (slice 6.4);</item>
@@ -46,8 +45,6 @@ public sealed class ShipLeftIdleRule(
 
     /// <summary>The minutes when the setting gives none.</summary>
     public const int DefaultMinutes = 10;
-
-    private const string SatelliteType = "SATELLITE";
 
     /// <inheritdoc />
     public string Name => "ShipLeftIdle";
@@ -76,11 +73,6 @@ public sealed class ShipLeftIdleRule(
 
         return violations;
     }
-
-    /// <summary>A probe as the probe plan recognises it, or the starting probe, which it misses (B25).</summary>
-    private static bool IsProbe(FleetShip ship)
-        => ProbeDeploymentPlanService.IsProbeShip(ship.Ship)
-           || ship.Ship.ShipType.Equals(SatelliteType, StringComparison.OrdinalIgnoreCase);
 
     private async Task<IReadOnlyList<WaitingWork>> WorkWaitingAsync(HealthCheckContext context, CancellationToken cancellationToken)
     {
@@ -127,18 +119,17 @@ public sealed class ShipLeftIdleRule(
                 ship => FleetRoles.IsSurveyor(ship.Ship, surveyOn)));
         }
 
+        // The plan gives every free probe a due market that nothing watches (D29), so a probe can only be left
+        // idle while one waits when the plan has stopped. A probe that stays at a shipyard for a purchase
+        // (D30) waits seconds: a call lasts two minutes after the last attempt.
         if (context.IsOn(AutomationPlan.ProbeDeployment)
-            && await probePlans.GetAsync(cancellationToken) is { Status: ProbeDeploymentPlanStatus.Active, WaitingForPhase1Credits: false } probe)
+            && await probePlans.GetAsync(cancellationToken) is { } probes
+            && probes.Markets.Count(market => market.IsUnwatched && market.DueAt <= context.Now) is > 0 and var unwatched)
         {
-            var deployed = probe.DeployedWaypointSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var targetsLeft = probe.TargetWaypointSymbols.Count(target => !deployed.Contains(target));
-            if (targetsLeft > 0)
-            {
-                waiting.Add(new WaitingWork(
-                    AutomationPlan.ProbeDeployment,
-                    string.Create(CultureInfo.InvariantCulture, $"{targetsLeft} target waypoints without a probe"),
-                    ship => IsProbe(ship) && !deployed.Contains(ship.Ship.WaypointSymbol ?? string.Empty)));
-            }
+            waiting.Add(new WaitingWork(
+                AutomationPlan.ProbeDeployment,
+                string.Create(CultureInfo.InvariantCulture, $"{unwatched} markets that no probe or ship watches are due"),
+                ship => FleetRoles.IsProbe(ship.Ship)));
         }
 
         if (context.IsOn(AutomationPlan.Mining)

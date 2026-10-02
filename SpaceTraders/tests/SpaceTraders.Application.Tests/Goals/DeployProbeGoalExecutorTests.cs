@@ -1,9 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -13,63 +11,64 @@ using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Goals;
 
+/// <summary>Slice 6.3: one flight of a probe per goal, in CRUISE; the arrival fetches the market.</summary>
 public sealed class DeployProbeGoalExecutorTests
 {
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
-    private readonly IProbeDeploymentPlanService _probeDeploymentPlan = Substitute.For<IProbeDeploymentPlanService>();
-    private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
 
-    private DeployProbeGoalExecutor CreateExecutor() =>
-        new(
-            _goals,
-            _probeDeploymentPlan,
-            _dock,
-            _bus,
-            NullLogger<DeployProbeGoalExecutor>.Instance);
-
-    private static DeployProbeGoal Goal() => new() { TargetWaypointSymbol = "X1-AB-MKT" };
-
-    private static ShipModel Probe(string waypoint, string status) =>
-        new("PROBE-1", "X1-AB", waypoint, status, "CRUISE", 0, 0);
-
-    [Fact]
-    public async Task ExecuteStepAsync_SetsDriftAdvancesPlanAndClearsGoal_WhenDockedAtTarget()
+    [Theory]
+    [InlineData("DOCKED")]
+    [InlineData("IN_ORBIT")]
+    public async Task AtItsMarket_TheFlightIsOver(string status)
     {
-        var result = await CreateExecutor().ExecuteStepAsync(Probe("X1-AB-MKT", "DOCKED"), Goal(), new ShipGoalContext(), CancellationToken.None);
+        // The arrival already fetched the market and docked; the probe plan chooses the next market.
+        var result = await StepAsync(Probe("X1-AB-MKT", status));
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _bus.Received(1).InvokeAsync(
-            Arg.Is<PatchShipNavCommand>(c => c.ShipSymbol == "PROBE-1" && c.FlightMode == "DRIFT"),
-            Arg.Any<CancellationToken>());
-        await _probeDeploymentPlan.Received(1).AdvanceAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _goals.Received(1).ClearActiveGoalAsync("PROBE-1", Arg.Any<CancellationToken>());
-        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+        _bus.ReceivedCalls().Should().BeEmpty("the old plan set DRIFT here, which made the next flight ten times slower");
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_Docks_WhenInOrbitAtTarget()
+    public async Task Elsewhere_ItFliesThere()
     {
-        var result = await CreateExecutor().ExecuteStepAsync(Probe("X1-AB-MKT", "IN_ORBIT"), Goal(), new ShipGoalContext(), CancellationToken.None);
-
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        await _dock.Received(1).ExecuteAsync("PROBE-1", Arg.Any<CancellationToken>());
-        await _probeDeploymentPlan.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _goals.DidNotReceive().ClearActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteStepAsync_NavigatesToTarget_WhenElsewhere()
-    {
-        var result = await CreateExecutor().ExecuteStepAsync(Probe("X1-AB-HQ", "DOCKED"), Goal(), new ShipGoalContext(), CancellationToken.None);
+        var result = await StepAsync(Probe("X1-AB-HQ", "DOCKED"));
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "PROBE-1" && c.DestinationWaypoint == "X1-AB-MKT"),
             Arg.Any<CancellationToken>());
-        await _dock.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _probeDeploymentPlan.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
     }
+
+    [Fact]
+    public async Task AProbeInDrift_SwitchesToCruise_BeforeItFlies()
+    {
+        // A probe has no tank, so CRUISE costs it nothing; the old plan parked probes in DRIFT (B47).
+        var result = await StepAsync(Probe("X1-AB-HQ", "DOCKED") with { FlightMode = "DRIFT" });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<PatchShipNavCommand>(c => c.ShipSymbol == "PROBE-1" && c.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task InFlight_ItWaits()
+    {
+        var result = await StepAsync(Probe("X1-AB-MKT", "IN_TRANSIT") with { ArrivesAt = DateTimeOffset.MaxValue });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        _bus.ReceivedCalls().Should().BeEmpty();
+        await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
+    }
+
+    private static ShipModel Probe(string waypoint, string status) =>
+        new("PROBE-1", "X1-AB", waypoint, status, "CRUISE", 0, 0, ShipType: "SATELLITE");
+
+    private Task<GoalExecutionResult> StepAsync(ShipModel probe)
+        => new DeployProbeGoalExecutor(_goals, _bus, NullLogger<DeployProbeGoalExecutor>.Instance)
+            .ExecuteStepAsync(probe, new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-MKT" }, new ShipGoalContext(), CancellationToken.None);
 }
