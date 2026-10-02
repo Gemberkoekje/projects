@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 
@@ -20,6 +21,7 @@ public sealed class MineResourceVolumeHandlerTests
         var orbit = Substitute.For<IOrbitSubCommand>();
         var navigate = Substitute.For<INavigateSubCommand>();
         var bus = Substitute.For<Wolverine.IMessageBus>();
+        var metrics = Substitute.For<IAutomationMetrics>();
 
         var ship = new ShipModel(
             Symbol: "SHIP-1",
@@ -62,14 +64,18 @@ public sealed class MineResourceVolumeHandlerTests
         port.JettisonCargoAsync("SHIP-1", "ICE_WATER", 2, Arg.Any<CancellationToken>())
             .Returns(new JettisonActionResult(new CargoModel(8, 40, [new CargoItemModel("IRON_ORE", 8)])));
 
-        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, NullLogger<MineResourceVolumeHandler>.Instance);
+        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, metrics, NullLogger<MineResourceVolumeHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new MineResourceVolumeCommand("SHIP-1", "IRON_ORE", "X1-AB-AST", 20), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();
         await port.Received(1).ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>());
         await port.Received(1).JettisonCargoAsync("SHIP-1", "ICE_WATER", 2, Arg.Any<CancellationToken>());
-        await navigate.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default!, default, default);
+        await navigate.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default!, Guid.Empty, default);
+
+        // What the dashboard shows as mined, and what went overboard.
+        metrics.Received(1).Extracted("SHIP-1", "IRON_ORE", 8);
+        metrics.Received(1).Jettisoned("SHIP-1", "ICE_WATER", 2);
     }
 
     [Fact]
@@ -82,6 +88,7 @@ public sealed class MineResourceVolumeHandlerTests
         var orbit = Substitute.For<IOrbitSubCommand>();
         var navigate = Substitute.For<INavigateSubCommand>();
         var bus = Substitute.For<Wolverine.IMessageBus>();
+        var metrics = Substitute.For<IAutomationMetrics>();
 
         var ship = new ShipModel(
             Symbol: "SHIP-2",
@@ -96,7 +103,7 @@ public sealed class MineResourceVolumeHandlerTests
 
         ships.FindAsync("SHIP-2", Arg.Any<CancellationToken>()).Returns(ship);
 
-        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, NullLogger<MineResourceVolumeHandler>.Instance);
+        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, metrics, NullLogger<MineResourceVolumeHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new MineResourceVolumeCommand("SHIP-2", "IRON_ORE", "X1-AB-AST", 15), CancellationToken.None);
 
@@ -115,6 +122,7 @@ public sealed class MineResourceVolumeHandlerTests
         var orbit = Substitute.For<IOrbitSubCommand>();
         var navigate = Substitute.For<INavigateSubCommand>();
         var bus = Substitute.For<Wolverine.IMessageBus>();
+        var metrics = Substitute.For<IAutomationMetrics>();
 
         var ship = new ShipModel(
             Symbol: "SHIP-3",
@@ -137,7 +145,7 @@ public sealed class MineResourceVolumeHandlerTests
                 Cargo: new CargoModel(1, 40),
                 CooldownSeconds: 1));
 
-        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, NullLogger<MineResourceVolumeHandler>.Instance);
+        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, metrics, NullLogger<MineResourceVolumeHandler>.Instance);
 
         var result = await sut.ExecuteAsync(new MineResourceVolumeCommand("SHIP-3", "IRON_ORE", "X1-AB-AST", 15, sentinelSurvey), CancellationToken.None);
 

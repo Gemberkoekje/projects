@@ -10,6 +10,7 @@ using Prometheus;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -92,7 +93,7 @@ public sealed class PrometheusMetricsServiceTests
         await service.SampleAsync(CancellationToken.None);
 
         _metrics.Received(1).Credits(175_000);
-        ships.Should().BeEquivalentTo(new[]
+        ships.Select(s => new ShipMetricsSample(s.Ship, s.Role, s.State, s.Goal, s.Reason)).Should().BeEquivalentTo(new[]
         {
             new ShipMetricsSample("AGENT-1", "COMMAND", "DOCKED", "None", string.Empty),
             new ShipMetricsSample("AGENT-2", "SATELLITE", "IN_TRANSIT", "None", string.Empty),
@@ -101,6 +102,112 @@ public sealed class PrometheusMetricsServiceTests
         });
         contracts.Should().Equal(new ContractMetricsSample("C-1", "IRON_ORE", 42, 7, new DateTimeOffset(2026, 10, 08, 07, 09, 22, TimeSpan.Zero)));
     }
+
+    /// <summary>
+    /// The dashboard's fleet table shows where each ship is (and what is there), what the bot has it
+    /// do and what it carries: on 2026-10-02 a drone in orbit was mining, and nothing showed it.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_SaysWhereEachShipIsWhatItDoesAndWhatItCarries()
+    {
+        var now = TimeProvider.System.GetUtcNow();
+        var scout = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-A2" };
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Waypoints.Add(Waypoint("X1-AB-XB5C", "ENGINEERED_ASTEROID"));
+            db.Waypoints.Add(Waypoint("X1-AB-H51", "PLANET"));
+            db.Waypoints.Add(Waypoint("X1-AB-A2", "MOON"));
+
+            // The scout, on its way to the next market.
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-1",
+                ShipType = "COMMAND",
+                Status = "IN_TRANSIT",
+                WaypointSymbol = "X1-AB-A2",
+                DestWaypointSymbol = "X1-AB-A2",
+                ArrivesAt = now.AddMinutes(2),
+                CargoCapacity = 40,
+                GoalId = scout.GoalId,
+                GoalKind = scout.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(scout),
+                GoalStatus = (int)scout.Status,
+            });
+
+            // The probe, parked without work (D9).
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-2", ShipType = "SATELLITE", Status = "DOCKED", WaypointSymbol = "X1-AB-H51" });
+
+            // The contract's drone, in orbit at its asteroid, and a second one on its way to deliver.
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-3",
+                ShipType = "SHIP_MINING_DRONE",
+                Status = "IN_ORBIT",
+                WaypointSymbol = "X1-AB-XB5C",
+                CargoCurrent = 11,
+                CargoCapacity = 15,
+                CargoJson = """[{"Symbol":"COPPER_ORE","Units":9},{"Symbol":"SILICON_CRYSTALS","Units":2}]""",
+            });
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-5",
+                ShipType = "SHIP_MINING_DRONE",
+                Status = "IN_TRANSIT",
+                WaypointSymbol = "X1-AB-H51",
+                DestWaypointSymbol = "X1-AB-H51",
+                ArrivesAt = now.AddMinutes(3),
+                CargoCurrent = 15,
+                CargoCapacity = 15,
+                CargoJson = """[{"Symbol":"COPPER_ORE","Units":15}]""",
+            });
+            db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
+            db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        ships.Select(s => (s.Ship, s.Location, s.Activity)).Should().BeEquivalentTo(new[]
+        {
+            ("AGENT-1", "→ X1-AB-A2 (MOON)", "scouting"),
+            ("AGENT-2", "X1-AB-H51 (PLANET)", "idle"),
+            ("AGENT-3", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE"),
+            ("AGENT-5", "→ X1-AB-H51 (PLANET)", "on the way to deliver COPPER_ORE"),
+        });
+        var drone = ships.Single(s => s.Ship == "AGENT-3");
+        drone.CargoCapacity.Should().Be(15);
+        drone.Cargo.Should().BeEquivalentTo(new[] { new CargoItemModel("COPPER_ORE", 9), new CargoItemModel("SILICON_CRYSTALS", 2) });
+        drone.ArrivesAt.Should().Be(default);
+        ships.Single(s => s.Ship == "AGENT-1").ArrivesAt.Should().BeCloseTo(now.AddMinutes(2), TimeSpan.FromSeconds(1));
+    }
+
+    private static CachedWaypoint Waypoint(string symbol, string type)
+        => new() { AgentId = AgentId, Symbol = symbol, SystemSymbol = "X1-AB", Type = type };
+
+    private static ShipAssignmentRecord ContractAssignment(string ship) => new()
+    {
+        AgentId = AgentId,
+        ShipSymbol = ship,
+        Type = "Contract",
+        OriginWaypoint = "X1-AB-XB5C",
+        DestWaypoint = "X1-AB-H51",
+        CargoSymbol = "COPPER_ORE",
+        ContractId = "C-1",
+    };
 
     private static ServiceProvider BuildProvider()
     {
@@ -155,6 +262,8 @@ public sealed class PrometheusAutomationMetricsTests
         { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{kind=\"ScoutWaypoint\"} " },
         { "messages", metrics => metrics.MessageHandled("ContractAcceptedEvent"), "spacetraders_messages_handled_total{type=\"ContractAcceptedEvent\"} " },
         { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3)), "spacetraders_api_rate_limit_wait_seconds_total " },
+        { "units extracted", metrics => metrics.Extracted("AGENT-3", "COPPER_ORE", 2), "spacetraders_extracted_units_total{ship=\"AGENT-3\",good=\"COPPER_ORE\"} " },
+        { "units jettisoned", metrics => metrics.Jettisoned("AGENT-3", "SILICON_CRYSTALS", 2), "spacetraders_jettisoned_units_total{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} " },
     };
 
     /// <summary>
@@ -225,6 +334,38 @@ public sealed class PrometheusAutomationMetricsTests
         (await ExportAsync()).Should().NotContain("ship=\"AGENT-1\"");
     }
 
+    /// <summary>
+    /// The fleet table: where a ship is, what it does, and its hold. Series that no longer hold are
+    /// removed, so the table shows one row per ship and the hold only what is in it.
+    /// </summary>
+    [Fact]
+    public async Task AShip_ShowsWhereItIsWhatItDoesAndWhatItCarries()
+    {
+        _metrics.Fleet([Drone("X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE", [new("COPPER_ORE", 9), new("SILICON_CRYSTALS", 2)])], Start);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_info{ship=\"AGENT-3\",location=\"X1-AB-XB5C (ENGINEERED_ASTEROID)\",activity=\"mining COPPER_ORE\"} 1\n");
+        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"COPPER_ORE\"} 9\n");
+        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} 2\n");
+        text.Should().Contain("spacetraders_ship_cargo_capacity_units{ship=\"AGENT-3\"} 15\n");
+        text.Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
+
+        // It jettisoned the crystals, filled up, and is on its way to deliver.
+        _metrics.Fleet([Drone("→ X1-AB-H51 (PLANET)", "on the way to deliver COPPER_ORE", [new("COPPER_ORE", 15)], Start.AddMinutes(4))], Start.AddMinutes(1));
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_info{ship=\"AGENT-3\",location=\"→ X1-AB-H51 (PLANET)\",activity=\"on the way to deliver COPPER_ORE\"} 1\n");
+        text.Should().NotContain("activity=\"mining COPPER_ORE\"");
+        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"COPPER_ORE\"} 15\n");
+        text.Should().NotContain("good=\"SILICON_CRYSTALS\"");
+        text.Should().Contain($"spacetraders_ship_arrival_timestamp_seconds{{ship=\"AGENT-3\"}} {Start.AddMinutes(4).ToUnixTimeSeconds()}\n");
+
+        // Arrived: no arrival time any more.
+        _metrics.Fleet([Drone("X1-AB-H51 (PLANET)", "delivering COPPER_ORE", [new("COPPER_ORE", 15)])], Start.AddMinutes(4));
+
+        (await ExportAsync()).Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
+    }
+
     [Fact]
     public async Task AContractThatIsGone_LosesItsSeries()
     {
@@ -238,6 +379,16 @@ public sealed class PrometheusAutomationMetricsTests
 
         (await ExportAsync()).Should().NotContain("contract=\"C-1\"");
     }
+
+    private static ShipMetricsSample Drone(string location, string activity, CargoItemModel[] cargo, DateTimeOffset arrivesAt = default)
+        => new("AGENT-3", "SHIP_MINING_DRONE", arrivesAt == default ? "IN_ORBIT" : "IN_TRANSIT", "Contract", string.Empty)
+        {
+            Location = location,
+            Activity = activity,
+            ArrivesAt = arrivesAt,
+            CargoCapacity = 15,
+            Cargo = cargo,
+        };
 
     private static string StatusLine(string ship, string role, string state, string goal, string reason, DateTimeOffset since)
         => $"spacetraders_ship_status_since_timestamp_seconds{{ship=\"{ship}\",role=\"{role}\",state=\"{state}\",goal=\"{goal}\",reason=\"{reason}\"}} {since.ToUnixTimeSeconds()}";
