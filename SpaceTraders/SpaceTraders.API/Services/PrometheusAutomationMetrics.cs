@@ -34,6 +34,17 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipArrival;
     private readonly Gauge _shipCargoUnits;
     private readonly Gauge _shipCargoCapacity;
+    private readonly Gauge _marketObserved;
+    private readonly Gauge _marketPurchasePrice;
+    private readonly Gauge _marketSellPrice;
+    private readonly Gauge _marketTradeVolume;
+    private readonly Gauge _marketSupply;
+    private readonly Gauge _marketActivity;
+    private readonly Gauge _shipyardObserved;
+    private readonly Gauge _shipyardShipType;
+    private readonly Gauge _shipyardShipPrice;
+    private readonly Gauge _shipyardShipSupply;
+    private readonly Gauge _supplyChain;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
@@ -43,6 +54,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Dictionary<string, (string Location, string Activity)> _shipInfoLabels = new(StringComparer.Ordinal);
     private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _shipGoods = new(StringComparer.Ordinal);
+    private readonly HashSet<(string System, string Waypoint, string WaypointType)> _markets = [];
+    private readonly HashSet<(string System, string Waypoint, string Good, string Kind)> _marketGoods = [];
+    private readonly HashSet<(string System, string Waypoint, string WaypointType)> _shipyards = [];
+    private readonly HashSet<(string System, string Waypoint, string ShipType)> _shipyardShips = [];
+    private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
     public PrometheusAutomationMetrics(CollectorRegistry registry)
@@ -152,6 +168,58 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_ship_cargo_capacity_units",
             "Units a ship's hold takes.",
             "ship");
+        _marketObserved = metrics.CreateGauge(
+            "spacetraders_market_observed_timestamp_seconds",
+            "When the bot last refreshed a cached market (Unix time).",
+            "system",
+            "waypoint",
+            "waypoint_type");
+        string[] marketGoodLabels = ["system", "waypoint", "good", "kind"];
+        _marketPurchasePrice = metrics.CreateGauge(
+            "spacetraders_market_purchase_price",
+            "What a market charges a ship per unit of a good, as last seen. kind is EXPORT, IMPORT or EXCHANGE.",
+            marketGoodLabels);
+        _marketSellPrice = metrics.CreateGauge(
+            "spacetraders_market_sell_price",
+            "What a market pays a ship per unit of a good, as last seen.",
+            marketGoodLabels);
+        _marketTradeVolume = metrics.CreateGauge(
+            "spacetraders_market_trade_volume",
+            "Units of a good a market trades per transaction before its price moves, as last seen.",
+            marketGoodLabels);
+        _marketSupply = metrics.CreateGauge(
+            "spacetraders_market_supply",
+            "A good's supply at a market, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
+            marketGoodLabels);
+        _marketActivity = metrics.CreateGauge(
+            "spacetraders_market_activity",
+            "A good's activity at a market, as last seen: 0 RESTRICTED, 1 WEAK, 2 GROWING, 3 STRONG.",
+            marketGoodLabels);
+        _shipyardObserved = metrics.CreateGauge(
+            "spacetraders_shipyard_observed_timestamp_seconds",
+            "When the bot last refreshed a cached shipyard (Unix time).",
+            "system",
+            "waypoint",
+            "waypoint_type");
+        string[] shipyardShipLabels = ["system", "waypoint", "ship_type"];
+        _shipyardShipType = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_type",
+            "1 for each ship type a shipyard sells.",
+            shipyardShipLabels);
+        _shipyardShipPrice = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_price",
+            "What a shipyard charges for a ship type, as last seen.",
+            shipyardShipLabels);
+        _shipyardShipSupply = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_supply",
+            "A ship type's supply at a shipyard, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
+            shipyardShipLabels);
+        _supplyChain = metrics.CreateGauge(
+            "spacetraders_good_supply_chain",
+            "One series per good, always 1: the goods it is made from and the goods made from it (the game's production chains).",
+            "good",
+            "made_from",
+            "used_for");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -282,6 +350,169 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             }
 
             _contracts.UnionWith(currentContracts);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Markets(IReadOnlyCollection<MarketMetricsSample> markets)
+    {
+        lock (_lock)
+        {
+            var currentMarkets = new HashSet<(string System, string Waypoint, string WaypointType)>();
+            var currentGoods = new HashSet<(string System, string Waypoint, string Good, string Kind)>();
+            foreach (var market in markets)
+            {
+                var key = (market.System, market.Waypoint, market.WaypointType);
+                _marketObserved.WithLabels(key.System, key.Waypoint, key.WaypointType).Set(market.ObservedAt.ToUnixTimeSeconds());
+                currentMarkets.Add(key);
+
+                foreach (var good in market.Goods)
+                {
+                    var goodKey = (market.System, market.Waypoint, good.Symbol, good.Type);
+                    string[] labels = [goodKey.System, goodKey.Waypoint, goodKey.Symbol, goodKey.Type];
+                    _marketPurchasePrice.WithLabels(labels).Set(good.PurchasePrice);
+                    _marketSellPrice.WithLabels(labels).Set(good.SellPrice);
+                    _marketTradeVolume.WithLabels(labels).Set(good.TradeVolume);
+                    SetOrRemove(_marketSupply, labels, SupplyLevel(good.Supply));
+                    SetOrRemove(_marketActivity, labels, ActivityLevel(good.Activity));
+                    currentGoods.Add(goodKey);
+                }
+            }
+
+            foreach (var gone in _markets.Where(market => !currentMarkets.Contains(market)).ToList())
+            {
+                _marketObserved.RemoveLabelled(gone.System, gone.Waypoint, gone.WaypointType);
+                _markets.Remove(gone);
+            }
+
+            foreach (var gone in _marketGoods.Where(good => !currentGoods.Contains(good)).ToList())
+            {
+                string[] labels = [gone.System, gone.Waypoint, gone.Good, gone.Kind];
+                _marketPurchasePrice.RemoveLabelled(labels);
+                _marketSellPrice.RemoveLabelled(labels);
+                _marketTradeVolume.RemoveLabelled(labels);
+                _marketSupply.RemoveLabelled(labels);
+                _marketActivity.RemoveLabelled(labels);
+                _marketGoods.Remove(gone);
+            }
+
+            _markets.UnionWith(currentMarkets);
+            _marketGoods.UnionWith(currentGoods);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Shipyards(IReadOnlyCollection<ShipyardMetricsSample> shipyards)
+    {
+        lock (_lock)
+        {
+            var currentShipyards = new HashSet<(string System, string Waypoint, string WaypointType)>();
+            var currentShips = new HashSet<(string System, string Waypoint, string ShipType)>();
+            foreach (var shipyard in shipyards)
+            {
+                var key = (shipyard.System, shipyard.Waypoint, shipyard.WaypointType);
+                _shipyardObserved.WithLabels(key.System, key.Waypoint, key.WaypointType).Set(shipyard.ObservedAt.ToUnixTimeSeconds());
+                currentShipyards.Add(key);
+
+                var priced = shipyard.Ships
+                    .GroupBy(ship => ship.Type, StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+                foreach (var shipType in shipyard.ShipTypes.Concat(priced.Keys).Distinct(StringComparer.Ordinal))
+                {
+                    string[] labels = [shipyard.System, shipyard.Waypoint, shipType];
+                    _shipyardShipType.WithLabels(labels).Set(1);
+                    if (priced.TryGetValue(shipType, out var ship))
+                    {
+                        _shipyardShipPrice.WithLabels(labels).Set(ship.PurchasePrice);
+                        SetOrRemove(_shipyardShipSupply, labels, SupplyLevel(ship.Supply ?? string.Empty));
+                    }
+                    else
+                    {
+                        _shipyardShipPrice.RemoveLabelled(labels);
+                        _shipyardShipSupply.RemoveLabelled(labels);
+                    }
+
+                    currentShips.Add((shipyard.System, shipyard.Waypoint, shipType));
+                }
+            }
+
+            foreach (var gone in _shipyards.Where(shipyard => !currentShipyards.Contains(shipyard)).ToList())
+            {
+                _shipyardObserved.RemoveLabelled(gone.System, gone.Waypoint, gone.WaypointType);
+                _shipyards.Remove(gone);
+            }
+
+            foreach (var gone in _shipyardShips.Where(ship => !currentShips.Contains(ship)).ToList())
+            {
+                string[] labels = [gone.System, gone.Waypoint, gone.ShipType];
+                _shipyardShipType.RemoveLabelled(labels);
+                _shipyardShipPrice.RemoveLabelled(labels);
+                _shipyardShipSupply.RemoveLabelled(labels);
+                _shipyardShips.Remove(gone);
+            }
+
+            _shipyards.UnionWith(currentShipyards);
+            _shipyardShips.UnionWith(currentShips);
+        }
+    }
+
+    /// <inheritdoc />
+    public void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom)
+    {
+        var goods = madeFrom.Keys.Concat(madeFrom.Values.SelectMany(inputs => inputs)).Distinct(StringComparer.Ordinal);
+        var current = goods
+            .Select(good => (
+                Good: good,
+                MadeFrom: string.Join(", ", madeFrom.GetValueOrDefault(good, []).Order(StringComparer.Ordinal)),
+                UsedFor: string.Join(", ", madeFrom.Where(chain => chain.Value.Contains(good, StringComparer.Ordinal)).Select(chain => chain.Key).Order(StringComparer.Ordinal))))
+            .ToHashSet();
+
+        lock (_lock)
+        {
+            foreach (var gone in _supplyChainLabels.Where(series => !current.Contains(series)).ToList())
+            {
+                _supplyChain.RemoveLabelled(gone.Good, gone.MadeFrom, gone.UsedFor);
+                _supplyChainLabels.Remove(gone);
+            }
+
+            foreach (var series in current)
+            {
+                _supplyChain.WithLabels(series.Good, series.MadeFrom, series.UsedFor).Set(1);
+                _supplyChainLabels.Add(series);
+            }
+        }
+    }
+
+    /// <summary>A supply level as a number, so a graph can show it: 1 SCARCE to 5 ABUNDANT; none when unknown.</summary>
+    private static double? SupplyLevel(string supply) => supply.ToUpperInvariant() switch
+    {
+        "SCARCE" => 1,
+        "LIMITED" => 2,
+        "MODERATE" => 3,
+        "HIGH" => 4,
+        "ABUNDANT" => 5,
+        _ => null,
+    };
+
+    /// <summary>An activity as a number: 0 RESTRICTED, 1 WEAK, 2 GROWING, 3 STRONG; none when unknown.</summary>
+    private static double? ActivityLevel(string activity) => activity.ToUpperInvariant() switch
+    {
+        "RESTRICTED" => 0,
+        "WEAK" => 1,
+        "GROWING" => 2,
+        "STRONG" => 3,
+        _ => null,
+    };
+
+    private static void SetOrRemove(Gauge gauge, string[] labels, double? value)
+    {
+        if (value is { } known)
+        {
+            gauge.WithLabels(labels).Set(known);
+        }
+        else
+        {
+            gauge.RemoveLabelled(labels);
         }
     }
 

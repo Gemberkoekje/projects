@@ -123,6 +123,7 @@ builder.Services.AddSingleton<DataRetentionService>();
 builder.Services.AddSingleton<DatabaseSizeGuardService>();
 builder.Services.AddSingleton<ShipStateJournal>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
+builder.Services.AddSingleton<PrometheusMarketMetricsService>();
 
 // The health rules (phase 3): the monitor evaluates them every minute, each in the scope of one
 // evaluation. The API client's handler records the 401s and 429s they read.

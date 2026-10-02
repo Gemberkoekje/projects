@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Code – Added (2026-10-02)
+- Metrics for a markets dashboard per system (slice 2.8): every minute the cached markets (per good: prices, trade volume, supply, activity) and shipyards (ship types, prices, supply), with when each was last refreshed (`spacetraders_market_*`, `spacetraders_shipyard_*`, `PrometheusMarketMetricsService`); and once per start the game's production chains from `GET market/supply-chain`, one series per good with what it is made from and what is made from it (`spacetraders_good_supply_chain`).
 - Metrics for the dashboard's fleet table (slice 2.7): where each ship is (the waypoint and its type, or `→` and where it goes), what the bot has it do (`mining COPPER_ORE`, `scouting`, `idle`…), when it arrives, and its hold per good (`spacetraders_ship_info`, `spacetraders_ship_arrival_timestamp_seconds`, `spacetraders_ship_cargo_units`, `spacetraders_ship_cargo_capacity_units`); and what drones extract and jettison, per ship and good (`spacetraders_extracted_units_total`, `spacetraders_jettisoned_units_total`).
 
 ### Code – Fixed (2026-10-02)

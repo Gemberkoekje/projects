@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Interfaces;
@@ -75,6 +76,95 @@ public interface IAutomationMetrics
     /// A contract that is no longer in <paramref name="deliverables"/> loses its series.
     /// </summary>
     void Contracts(IReadOnlyCollection<ContractMetricsSample> deliverables);
+
+    /// <summary>
+    /// Records the cached markets: when each was observed
+    /// (<c>spacetraders_market_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>) and, once a
+    /// ship has been there, each good's prices, trade volume, supply and activity
+    /// (<c>spacetraders_market_purchase_price</c>, <c>_sell_price</c>, <c>_trade_volume</c>, <c>_supply</c>
+    /// and <c>_activity</c>, each <c>{system,waypoint,good,kind}</c>). A market or a good that is no
+    /// longer in <paramref name="markets"/> loses its series.
+    /// </summary>
+    void Markets(IReadOnlyCollection<MarketMetricsSample> markets);
+
+    /// <summary>
+    /// Records the cached shipyards: when each was observed
+    /// (<c>spacetraders_shipyard_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>), the ship
+    /// types it sells (<c>spacetraders_shipyard_ship_type{system,waypoint,ship_type}</c>) and, once a ship
+    /// has been there, their prices and supply (<c>spacetraders_shipyard_ship_price</c>,
+    /// <c>_ship_supply</c>). A shipyard or a ship type that is no longer listed loses its series.
+    /// </summary>
+    void Shipyards(IReadOnlyCollection<ShipyardMetricsSample> shipyards);
+
+    /// <summary>
+    /// Records the game's production chains, one series per good
+    /// (<c>spacetraders_good_supply_chain{good,made_from,used_for}</c>): what it is made from, and what is
+    /// made from it. Raw goods are made from nothing.
+    /// </summary>
+    /// <param name="madeFrom">Each exported good, with the goods it is made from.</param>
+    void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom);
+}
+
+/// <summary>One cached market as the metrics show it.</summary>
+public sealed record MarketMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MarketMetricsSample(string System, string Waypoint, string WaypointType, DateTimeOffset ObservedAt, IReadOnlyList<TradeGoodSnapshot> Goods)
+    {
+        this.System = System;
+        this.Waypoint = Waypoint;
+        this.WaypointType = WaypointType;
+        this.ObservedAt = ObservedAt;
+        this.Goods = Goods;
+    }
+
+    /// <summary>The system it is in.</summary>
+    public required string System { get; init; }
+
+    /// <summary>Its waypoint.</summary>
+    public required string Waypoint { get; init; }
+
+    /// <summary>The waypoint's type (<c>PLANET</c>, <c>ASTEROID</c>, ...); empty when unknown.</summary>
+    public required string WaypointType { get; init; }
+
+    /// <summary>When the bot last refreshed it.</summary>
+    public required DateTimeOffset ObservedAt { get; init; }
+
+    /// <summary>Its goods with their prices; empty until a ship has been there.</summary>
+    public required IReadOnlyList<TradeGoodSnapshot> Goods { get; init; }
+}
+
+/// <summary>One cached shipyard as the metrics show it.</summary>
+public sealed record ShipyardMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipyardMetricsSample(string System, string Waypoint, string WaypointType, DateTimeOffset ObservedAt, IReadOnlyList<string> ShipTypes, IReadOnlyList<ShipyardShipDto> Ships)
+    {
+        this.System = System;
+        this.Waypoint = Waypoint;
+        this.WaypointType = WaypointType;
+        this.ObservedAt = ObservedAt;
+        this.ShipTypes = ShipTypes;
+        this.Ships = Ships;
+    }
+
+    /// <summary>The system it is in.</summary>
+    public required string System { get; init; }
+
+    /// <summary>Its waypoint.</summary>
+    public required string Waypoint { get; init; }
+
+    /// <summary>The waypoint's type; empty when unknown.</summary>
+    public required string WaypointType { get; init; }
+
+    /// <summary>When the bot last refreshed it.</summary>
+    public required DateTimeOffset ObservedAt { get; init; }
+
+    /// <summary>The ship types it sells.</summary>
+    public required IReadOnlyList<string> ShipTypes { get; init; }
+
+    /// <summary>The ships with their prices; empty until a ship has been there.</summary>
+    public required IReadOnlyList<ShipyardShipDto> Ships { get; init; }
 }
 
 /// <summary>One ship as the metrics show it.</summary>

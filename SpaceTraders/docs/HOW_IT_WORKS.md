@@ -96,9 +96,10 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
 | 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
-| 14 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
+| 14 | `PrometheusMarketMetricsService` | every minute | Exports the cached markets and shipyards, and once the game's production chains (`GET market/supply-chain`, retried hourly after a failure) |
+| 15 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
 
-One try/catch wraps the chain. Steps 5, 9, 11 and 14 catch their own errors. A throw in steps 1, 4, 6,
+One try/catch wraps the chain. Steps 5, 9, 11 and 15 catch their own errors. A throw in steps 1, 4, 6,
 8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
 stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
 before any of those, so a pod that keeps failing during startup still prunes at every start.
@@ -816,6 +817,13 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the health rules (section 12) and the size guard's limits | Every minute (health rules), every 5 minutes (size guard) |
   | `spacetraders_db_size_bytes` | | `pg_database_size` | Every 5 minutes (size guard) |
   | `spacetraders_server_next_reset_timestamp_seconds` | | When the server resets next (Unix time), from `GET /` | At agent bootstrap |
+  | `spacetraders_market_observed_timestamp_seconds` | `system`, `waypoint`, `waypoint_type` | When the bot last refreshed a cached market | Every minute (`PrometheusMarketMetricsService`) |
+  | `spacetraders_market_purchase_price`, `_sell_price`, `_trade_volume` | `system`, `waypoint`, `good`, `kind` | A good at a market as last seen: what the market charges, what it pays, its trade volume; `kind` is `EXPORT`, `IMPORT` or `EXCHANGE`. Only once a ship has been there | Every minute |
+  | `spacetraders_market_supply`, `_activity` | `system`, `waypoint`, `good`, `kind` | Supply 1 `SCARCE` to 5 `ABUNDANT`; activity 0 `RESTRICTED`, 1 `WEAK`, 2 `GROWING`, 3 `STRONG` | Every minute |
+  | `spacetraders_shipyard_observed_timestamp_seconds` | `system`, `waypoint`, `waypoint_type` | When the bot last refreshed a cached shipyard | Every minute |
+  | `spacetraders_shipyard_ship_type` | `system`, `waypoint`, `ship_type` | 1 for each ship type a shipyard sells | Every minute |
+  | `spacetraders_shipyard_ship_price`, `_ship_supply` | `system`, `waypoint`, `ship_type` | A ship type's price and supply (1 to 5) as last seen, once a ship has been there | Every minute |
+  | `spacetraders_good_supply_chain` | `good`, `made_from`, `used_for` | One series per good, always 1: the goods it is made from and the goods made from it, comma-separated (`GET market/supply-chain`) | Once per start |
 
 ---
 

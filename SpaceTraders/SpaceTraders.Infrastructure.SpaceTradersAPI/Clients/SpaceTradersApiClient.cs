@@ -169,6 +169,11 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    // With the agent token, like the other game data: a request without one that the server
+    // refused would count as a 401 (ApiUnauthorized).
+    public Task<SupplyChain> GetSupplyChainAsync(CancellationToken cancellationToken = default)
+        => GetWrappedAsync<SupplyChain>("market/supply-chain", AuthMode.AgentToken, cancellationToken);
+
     public Task<ShipCargo> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default)
         => GetWrappedAsync<ShipCargo>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/cargo",

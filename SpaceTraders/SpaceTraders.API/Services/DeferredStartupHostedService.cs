@@ -79,6 +79,7 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);
             await StartServiceAsync<PrometheusMetricsService>(cancellationToken);
+            await StartServiceAsync<PrometheusMarketMetricsService>(cancellationToken);
 
             // Last: the health rules judge what startup has set up, and its own failures aren't theirs.
             await StartServiceAsync<HealthMonitorService>(cancellationToken);
