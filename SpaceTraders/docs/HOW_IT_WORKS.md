@@ -384,17 +384,20 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   and the plan chooses the next one:
   1. a miner that holds ore a market buys sells it first, where it fetches most after fuel (reason
      `held_cargo`): ore left over from the contract, for one;
-  2. otherwise the best of `MiningPlanner.MiningTargets`: a surveyed ore first, one a usable survey
-     at an asteroid it can reach holds, sold where it fetches most (reason `surveyed`); then an ore a
-     market has in low supply (SCARCE or LIMITED, imported or exchanged, D22), mined at the asteroid
-     nearest that market whose traits yield it, and sold there (reason `low_supply`). Among either,
+  2. otherwise the best of `MiningPlanner.MiningTargets`: every market that buys an ore (imported or
+     exchanged), mined at an asteroid it can reach with a usable survey holding the ore, or else at
+     the asteroid nearest the market whose traits yield it, and sold there. The market shortest of its
+     ore comes first (D28): SCARCE, then LIMITED (low supply, D22), and once no market is short, the
+     lowest supply there is, even when it pays less. Within a supply level, a surveyed ore first, then
      the most a single extraction is expected to fetch: the ore's share of the survey's deposits
      (without a survey, one of the asteroid's ores) times its price. One miner per sell market and
-     ore. It logs `MiningStarted`.
-- **Drones:** when no miner was free and low-supply openings wait that a drone from the shipyard
-  could reach (its tank, from the shipyard's listing), it buys one drone per opening, up to
-  `Mining.MaxDrones` (default 20), within the credit reserve. Not while the contract plan mines: the
-  contract would take the drone, and the contract plan buys at most one (D23).
+     ore. It logs `MiningStarted`, reason `surveyed`, `low_supply` or `lowest_supply`.
+- **Drones:** when no miner was free, it asks the same ranking what a drone from the shipyard would
+  mine (its tank from the shipyard's listing, the trips under way held), and buys one only if that
+  trip would serve a market short of its ore (SCARCE or LIMITED, D28). One a tick, so the next tick
+  counts its trip; up to `Mining.MaxDrones` (default 20), within the credit reserve. Not while the
+  contract plan mines: the contract would take the drone, and the contract plan buys at most one
+  (D23).
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
   miner's trip sells there, Pending otherwise, with the free miners that could reach it, for the
   `ShipLeftIdle` rule. It is written only when it changes.
