@@ -14,7 +14,13 @@ public interface IScoutAllMarketplacesPlanService
     /// Creates the next assignment when another waypoint remains, or marks the plan complete when
     /// all waypoints have been visited.
     /// </summary>
-    Task AdvanceAsync(string shipSymbol, CancellationToken cancellationToken = default);
+    /// <param name="shipSymbol">The ship whose scout goal completed.</param>
+    /// <param name="visitedWaypointSymbol">
+    /// The waypoint the ship visited. Only a visit of the plan's current waypoint moves the plan on:
+    /// a second completion of the same visit, or a goal for an earlier waypoint, changes nothing.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the database calls.</param>
+    Task AdvanceAsync(string shipSymbol, string visitedWaypointSymbol, CancellationToken cancellationToken = default);
 }
 
 public sealed class ScoutAllMarketplacesPlanService(
@@ -108,7 +114,7 @@ public sealed class ScoutAllMarketplacesPlanService(
             route[0]);
     }
 
-    public async Task AdvanceAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    public async Task AdvanceAsync(string shipSymbol, string visitedWaypointSymbol, CancellationToken cancellationToken = default)
     {
         var plan = await scoutPlans.GetAsync(cancellationToken);
         if (plan is null)
@@ -140,6 +146,20 @@ public sealed class ScoutAllMarketplacesPlanService(
             return;
         }
 
+        // The tick and an arrival can both run the ship's goal step when it docks, and both complete
+        // the visit. Only the first may move the plan on: a second advance would skip the next stop
+        // (B45).
+        var currentWaypoint = plan.RouteWaypointSymbols[plan.CurrentRouteIndex];
+        if (!string.Equals(currentWaypoint, visitedWaypointSymbol, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogDebug(
+                "Scout plan advance skipped for ship {ShipSymbol}: it visited {WaypointSymbol}, but the plan's current stop is {Destination}.",
+                shipSymbol,
+                visitedWaypointSymbol,
+                currentWaypoint);
+            return;
+        }
+
         var nextIndex = plan.CurrentRouteIndex + 1;
         var now = TimeProvider.System.GetUtcNow();
 
@@ -158,16 +178,13 @@ public sealed class ScoutAllMarketplacesPlanService(
             return;
         }
 
-        // Mark the current assignment as completed before creating the next one.
-        if (currentAssignment is not null && !currentAssignment.CompletedAt.HasValue)
-        {
-            await assignments.UpsertAsync(currentAssignment with { CompletedAt = now }, cancellationToken);
-        }
-
+        // The plan is written before the assignment, and the resume check reads them the other way
+        // round, so it never sees an assignment that is newer than the plan it compares it with (B45).
         if (nextIndex >= plan.RouteWaypointSymbols.Count)
         {
             var completed = plan with { Status = ScoutPlanStatus.Completed, UpdatedAt = now };
             await scoutPlans.UpsertAsync(completed, cancellationToken);
+            await CompleteAssignmentAsync(currentAssignment, now, cancellationToken);
 
             // The last goal is done too: the ship is free for other work (B10).
             await goals.ClearActiveGoalAsync(shipSymbol, cancellationToken);
@@ -183,6 +200,7 @@ public sealed class ScoutAllMarketplacesPlanService(
 
         var advanced = plan with { CurrentRouteIndex = nextIndex, UpdatedAt = now };
         await scoutPlans.UpsertAsync(advanced, cancellationToken);
+        await CompleteAssignmentAsync(currentAssignment, now, cancellationToken);
 
         var nextWaypoint = plan.RouteWaypointSymbols[nextIndex];
         logger.LogInformation(
@@ -215,15 +233,25 @@ public sealed class ScoutAllMarketplacesPlanService(
     /// re-creates the assignment so the ship resumes correctly after a process restart or crash.
     /// </summary>
     private async Task ResumeIfAssignmentMissingAsync(
-        ScoutAllMarketplacesPlanState plan,
+        ScoutAllMarketplacesPlanState existingPlan,
         CancellationToken cancellationToken)
     {
-        if (plan.Status != ScoutPlanStatus.Active)
+        if (existingPlan.Status != ScoutPlanStatus.Active)
         {
             return;
         }
 
-        var currentAssignment = await assignments.FindAsync(plan.ShipSymbol, cancellationToken);
+        var currentAssignment = await assignments.FindAsync(existingPlan.ShipSymbol, cancellationToken);
+
+        // Read the plan again, after the assignment: AdvanceAsync writes them the other way round.
+        // An arrival can move the plan on while this runs, and a plan read before the assignment
+        // could be from before that advance and the assignment from after it. That looked like a
+        // missing assignment, and sent the ship back to the stop it had just visited (B45).
+        var plan = await scoutPlans.GetAsync(cancellationToken);
+        if (plan is null || plan.Status != ScoutPlanStatus.Active)
+        {
+            return;
+        }
 
         // An active assignment for the correct step is already present; nothing to do.
         if (currentAssignment is not null
@@ -250,6 +278,17 @@ public sealed class ScoutAllMarketplacesPlanService(
             plan.ShipSymbol,
             plan.CurrentRouteIndex,
             expectedWaypoint);
+    }
+
+    private async Task CompleteAssignmentAsync(
+        ShipAssignmentDto? assignment,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (assignment is not null && !assignment.CompletedAt.HasValue)
+        {
+            await assignments.UpsertAsync(assignment with { CompletedAt = now }, cancellationToken);
+        }
     }
 
     private async Task SetScoutGoalAsync(

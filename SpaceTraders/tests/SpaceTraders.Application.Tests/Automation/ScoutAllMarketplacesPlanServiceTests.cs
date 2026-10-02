@@ -224,7 +224,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(ActivePlan("SHIP-1", ["X1-AB-001", "X1-AB-002", "X1-AB-003"], currentIndex: 0));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         await scoutPlans.Received(1).UpsertAsync(
             Arg.Is<ScoutAllMarketplacesPlanState>(p =>
@@ -251,7 +251,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(ActivePlan("SHIP-1", ["X1-AB-001", "X1-AB-002"], currentIndex: 1));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-002", CancellationToken.None);
 
         await scoutPlans.Received(1).UpsertAsync(
             Arg.Is<ScoutAllMarketplacesPlanState>(p => p.Status == ScoutPlanStatus.Completed),
@@ -269,7 +269,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         scoutPlans.GetAsync(Arg.Any<CancellationToken>()).Returns((ScoutAllMarketplacesPlanState?)null);
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         await scoutPlans.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
         await assignments.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
@@ -285,7 +285,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(ActivePlan("OTHER-SHIP", ["X1-AB-001", "X1-AB-002"], currentIndex: 0));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         await scoutPlans.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
         await assignments.DidNotReceiveWithAnyArgs().UpsertAsync(default!, default);
@@ -318,7 +318,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(activeAssignment);
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         await assignments.Received(1).UpsertAsync(
             Arg.Is<ShipAssignmentDto>(a =>
@@ -351,7 +351,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(activeAssignment);
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-002", CancellationToken.None);
 
         await assignments.Received(1).UpsertAsync(
             Arg.Is<ShipAssignmentDto>(a =>
@@ -384,7 +384,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(alreadyCompleted);
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         // Should NOT upsert the already-completed assignment again.
         await assignments.DidNotReceive().UpsertAsync(
@@ -417,7 +417,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             Substitute.For<IShipGoalRepository>(),
             NullLogger<ScoutAllMarketplacesPlanService>.Instance);
 
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-002", CancellationToken.None);
 
         // Next assignment must target the third waypoint in the persisted route.
         await assignments.Received(1).UpsertAsync(
@@ -447,7 +447,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
                 .Returns(ActivePlan("SHIP-1", route, currentIndex: startIndex));
 
             var sut = CreateService(scoutPlans, assignments);
-            await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+            await sut.AdvanceAsync("SHIP-1", route[startIndex], CancellationToken.None);
 
             var expectedNext = route[startIndex + 1];
             await assignments.Received(1).UpsertAsync(
@@ -485,7 +485,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(nextStepAlreadyActive);
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         // Must not upsert any new assignment.
         await assignments.DidNotReceive().UpsertAsync(Arg.Any<ShipAssignmentDto>(), Arg.Any<CancellationToken>());
@@ -519,7 +519,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
         var sut = CreateService(scoutPlans, assignments);
 
         // First call: should complete step 0 and create step 1.
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
         await assignments.Received(1).UpsertAsync(
             Arg.Is<ShipAssignmentDto>(a => a.StepIndex == 1 && !a.CompletedAt.HasValue),
@@ -545,14 +545,15 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(activeAtStep1);
 
-        // Second (duplicate) advance call: plan already advanced; should be blocked.
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        // Second (duplicate) advance call for the same visit: plan already advanced; should be blocked.
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-001", CancellationToken.None);
 
-        // nextIndex for currentIndex=1 would be 2, which is out of range (plan complete path).
-        // But regardless, no NEW non-completed assignment should be written for step 2.
+        // No NEW non-completed assignment should be written for step 2, and the plan must not
+        // complete: X1-AB-002 hasn't been visited (B45).
         await assignments.DidNotReceive().UpsertAsync(
             Arg.Is<ShipAssignmentDto>(a => !a.CompletedAt.HasValue && a.StepIndex == 2),
             Arg.Any<CancellationToken>());
+        await scoutPlans.DidNotReceive().UpsertAsync(Arg.Any<ScoutAllMarketplacesPlanState>(), Arg.Any<CancellationToken>());
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
@@ -570,7 +571,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(ActivePlan("SHIP-1", route, currentIndex: 2));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-003", CancellationToken.None);
 
         await scoutPlans.Received(1).UpsertAsync(
             Arg.Is<ScoutAllMarketplacesPlanState>(p =>
@@ -590,7 +591,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(ActivePlan("SHIP-1", route, currentIndex: 2));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-003", CancellationToken.None);
 
         await assignments.DidNotReceive().UpsertAsync(
             Arg.Is<ShipAssignmentDto>(a => !a.CompletedAt.HasValue),
@@ -607,7 +608,7 @@ public sealed class ScoutAllMarketplacesPlanServiceTests
             .Returns(CompletedPlan("SHIP-1", ["X1-AB-001", "X1-AB-002"]));
 
         var sut = CreateService(scoutPlans, assignments);
-        await sut.AdvanceAsync("SHIP-1", CancellationToken.None);
+        await sut.AdvanceAsync("SHIP-1", "X1-AB-002", CancellationToken.None);
 
         await scoutPlans.DidNotReceive().UpsertAsync(Arg.Any<ScoutAllMarketplacesPlanState>(), Arg.Any<CancellationToken>());
         await assignments.DidNotReceive().UpsertAsync(Arg.Any<ShipAssignmentDto>(), Arg.Any<CancellationToken>());
