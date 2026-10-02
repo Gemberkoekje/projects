@@ -4,7 +4,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Application.Siphoning;
+using SpaceTraders.Application.SpareTime;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using Wolverine;
@@ -12,38 +12,34 @@ using Wolverine;
 namespace SpaceTraders.Application.Commands.Ships;
 
 /// <summary>
-/// One siphon at the gas giant <see cref="SourceWaypoint"/> for a siphon trip (PLAN.md slice 6.7), as one
-/// extraction of a mining trip (<see cref="MineResourceVolumeCommand"/>), without a survey: the API's siphon call
-/// takes none. A docked ship orbits first (refuelling where fuel is sold), and a ship on cooldown or with a full
-/// hold waits. Every good a market the ship can carry it to buys is kept (D33), whichever gas the trip is for;
-/// only what no such market buys is jettisoned.
+/// One extraction at the asteroid <see cref="SourceWaypoint"/> for a spare-time trip (PLAN.md slice 6.8), as one siphon
+/// of a siphon trip (<see cref="SiphonResourcesCommand"/>): without a survey, as the surveys stay for the drones (D35).
+/// A docked ship orbits first, and a ship on cooldown or with a full hold waits. Every good a market the ship can carry
+/// it to buys is kept, whatever it is; only what no such market buys is jettisoned. The yield counts in the mined
+/// units, but not as an extraction in the survey statistics, which would read a spare-time extraction, unsurveyed by
+/// design, as a sign of too few surveys.
 /// </summary>
-public sealed record SiphonResourcesCommand
+public sealed record ExtractResourcesCommand
 {
-    /// <summary>The ship that siphons.</summary>
+    /// <summary>The ship that extracts.</summary>
     public required string ShipSymbol { get; init; }
 
-    /// <summary>The gas the trip is for, for the journal.</summary>
-    public required string TradeSymbol { get; init; }
-
-    /// <summary>The gas giant the ship is at.</summary>
+    /// <summary>The asteroid the ship is at.</summary>
     public required string SourceWaypoint { get; init; }
 
     /// <summary>Creates the command.</summary>
-    /// <param name="ShipSymbol">The ship that siphons.</param>
-    /// <param name="TradeSymbol">The gas the trip is for.</param>
-    /// <param name="SourceWaypoint">The gas giant the ship is at.</param>
+    /// <param name="ShipSymbol">The ship that extracts.</param>
+    /// <param name="SourceWaypoint">The asteroid the ship is at.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public SiphonResourcesCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint)
+    public ExtractResourcesCommand(string ShipSymbol, string SourceWaypoint)
     {
         this.ShipSymbol = ShipSymbol;
-        this.TradeSymbol = TradeSymbol;
         this.SourceWaypoint = SourceWaypoint;
     }
 }
 
-/// <summary>Handles <see cref="SiphonResourcesCommand"/>.</summary>
-public sealed class SiphonResourcesHandler(
+/// <summary>Handles <see cref="ExtractResourcesCommand"/>.</summary>
+public sealed class ExtractResourcesHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IWaypointRepository waypoints,
@@ -51,20 +47,20 @@ public sealed class SiphonResourcesHandler(
     IOrbitSubCommand orbit,
     IMessageBus bus,
     IAutomationMetrics metrics,
-    ILogger<SiphonResourcesHandler> logger)
+    ILogger<ExtractResourcesHandler> logger)
 {
     /// <summary>Wolverine's entry point.</summary>
-    /// <param name="command">The siphon to make.</param>
+    /// <param name="command">The extraction to make.</param>
     /// <param name="cancellationToken">Stops the work.</param>
-    /// <returns>The ship's state afterwards; not accepted when it can't siphon there.</returns>
-    public Task<ShipCommandResult> Handle(SiphonResourcesCommand command, CancellationToken cancellationToken)
+    /// <returns>The ship's state afterwards; not accepted when it can't extract there.</returns>
+    public Task<ShipCommandResult> Handle(ExtractResourcesCommand command, CancellationToken cancellationToken)
         => ExecuteAsync(command, cancellationToken);
 
-    /// <summary>Makes one siphon, when the ship is in orbit at the gas giant and off cooldown.</summary>
-    /// <param name="command">The siphon to make.</param>
+    /// <summary>Makes one extraction, when the ship is in orbit at the asteroid and off cooldown.</summary>
+    /// <param name="command">The extraction to make.</param>
     /// <param name="cancellationToken">Stops the work.</param>
-    /// <returns>The ship's state afterwards; not accepted when it can't siphon there.</returns>
-    public async Task<ShipCommandResult> ExecuteAsync(SiphonResourcesCommand command, CancellationToken cancellationToken)
+    /// <returns>The ship's state afterwards; not accepted when it can't extract there.</returns>
+    public async Task<ShipCommandResult> ExecuteAsync(ExtractResourcesCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         if (ship is null)
@@ -72,7 +68,7 @@ public sealed class SiphonResourcesHandler(
             return ShipCommandResult.Rejected(command.ShipSymbol, ShipLocalStatus.None, string.Empty, string.Empty);
         }
 
-        // The trip flies the ship there (GoalFlight); this command only siphons where it is.
+        // The trip flies the ship there (GoalFlight); this command only extracts where it is.
         if (ship.LocalStatus == ShipLocalStatus.InTransit
             || !string.Equals(ship.WaypointSymbol, command.SourceWaypoint, StringComparison.OrdinalIgnoreCase))
         {
@@ -89,10 +85,10 @@ public sealed class SiphonResourcesHandler(
         {
             await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
-                nameof(SiphonResourcesCommand),
+                nameof(ExtractResourcesCommand),
                 "IN_ORBIT",
                 ship.Status ?? "UNKNOWN",
-                "Ship must be in orbit before siphoning.");
+                "Ship must be in orbit before extraction.");
             return Rejected(ship);
         }
 
@@ -104,32 +100,34 @@ public sealed class SiphonResourcesHandler(
         }
 
         var waypoint = await waypoints.FindAsync(command.SourceWaypoint, cancellationToken);
-        if (waypoint is not null && !GasGiants.IsSiphonable(waypoint.Type))
+        if (waypoint is not null && !AsteroidDeposits.IsExtractable(waypoint.Type))
         {
             await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
-                nameof(SiphonResourcesCommand),
-                "GAS_GIANT",
+                nameof(ExtractResourcesCommand),
+                "ASTEROID, ASTEROID_FIELD or ENGINEERED_ASTEROID",
                 waypoint.Type,
-                $"Waypoint {command.SourceWaypoint} is type {waypoint.Type}, which can't be siphoned.");
+                $"Waypoint {command.SourceWaypoint} is type {waypoint.Type}, which can't be mined.");
             return Rejected(ship);
         }
 
-        var siphoned = await port.SiphonResourcesAsync(ship.Symbol, cancellationToken);
-        await ships.UpdateCargoAsync(ship.Symbol, siphoned.Cargo, cancellationToken);
-        metrics.Extracted(ship.Symbol, siphoned.YieldSymbol, siphoned.YieldUnits);
-        await ships.UpdateCooldownAsync(ship.Symbol, siphoned.CooldownExpiresAt ?? now.AddSeconds(siphoned.CooldownSeconds), cancellationToken);
+        var extracted = await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
+        await ships.UpdateCargoAsync(ship.Symbol, extracted.Cargo, cancellationToken);
+        metrics.Extracted(ship.Symbol, extracted.YieldSymbol, extracted.YieldUnits);
+        await ships.UpdateCooldownAsync(ship.Symbol, extracted.CooldownExpiresAt ?? now.AddSeconds(extracted.CooldownSeconds), cancellationToken);
 
+        // The template MineResourceVolumeCommand logs, so the journal reads every extraction alike.
         logger.LogInformation(
-            "{EventKind:l}: ship {ShipSymbol} siphoned {Units} {TradeSymbol} at {WaypointSymbol}, siphoning for {Target}.",
-            JournalEvents.Siphoned,
+            "{EventKind:l}: ship {ShipSymbol} extracted {Units} {TradeSymbol} at {WaypointSymbol}, mining for {Target}, with survey {Signature}.",
+            JournalEvents.Extracted,
             ship.Symbol,
-            siphoned.YieldUnits,
-            siphoned.YieldSymbol,
+            extracted.YieldUnits,
+            extracted.YieldSymbol,
             command.SourceWaypoint,
-            command.TradeSymbol);
+            GatherPlanner.AnyGood,
+            string.Empty);
 
-        var cargo = await JettisonUnsellableAsync(ship, siphoned.Cargo, cancellationToken);
+        var cargo = await JettisonUnsellableAsync(ship, extracted.Cargo, cancellationToken);
         return new ShipCommandResult(
             ship.Symbol,
             ShipLocalStatus.InOrbit,
@@ -143,8 +141,8 @@ public sealed class SiphonResourcesHandler(
     }
 
     /// <summary>
-    /// Keeps every good a market the ship can carry it to from here buys (D33): the siphon plan sells the other
-    /// gases after the trip's. What no such market buys would fill the hold for good, so it goes overboard.
+    /// Keeps every good a market the ship can carry it to from here buys, whatever it is (slice 6.8, the rule of a
+    /// siphon, D33); what no such market buys would fill the hold for good, so it goes overboard.
     /// </summary>
     private async Task<CargoModel> JettisonUnsellableAsync(ShipModel ship, CargoModel cargo, CancellationToken cancellationToken)
     {

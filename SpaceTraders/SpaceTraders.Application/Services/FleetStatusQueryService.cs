@@ -418,6 +418,13 @@ internal sealed class FleetStatusQueryService(
             MineAndSellGoal mineAndSell => (ShipGoalKind.MineResource, $"Mining {mineAndSell.TradeSymbol} at {mineAndSell.SourceWaypointSymbol} and selling at {mineAndSell.SellWaypointSymbol}", mineAndSell.SourceWaypointSymbol, mineAndSell.SellWaypointSymbol),
             SiphonResourceGoal siphon => (ShipGoalKind.SiphonResource, $"Siphoning {siphon.TradeSymbol} at {siphon.SourceWaypointSymbol}", siphon.SourceWaypointSymbol, (string?)null),
             SiphonAndSellGoal siphonAndSell => (ShipGoalKind.SiphonResource, $"Siphoning at {siphonAndSell.SourceWaypointSymbol} for {siphonAndSell.TradeSymbol} and selling at {siphonAndSell.SellWaypointSymbol}", siphonAndSell.SourceWaypointSymbol, siphonAndSell.SellWaypointSymbol),
+            GatherAndSellGoal gather => (
+                gather.Siphoning ? ShipGoalKind.SiphonResource : ShipGoalKind.MineResource,
+                gather.Selling
+                    ? $"Selling its spare-time hold{(gather.SellTradeSymbol.Length > 0 ? $": {gather.SellTradeSymbol} at {gather.SellWaypointSymbol}" : string.Empty)}"
+                    : $"{(gather.Siphoning ? "Siphoning" : "Mining")} whatever sells at {gather.SourceWaypointSymbol} in its spare time",
+                gather.SourceWaypointSymbol,
+                gather.SellWaypointSymbol.Length > 0 ? gather.SellWaypointSymbol : null),
             SellCargoGoal sell => (ShipGoalKind.SellCargo, $"Selling cargo at {sell.DestinationWaypointSymbol}", null, sell.DestinationWaypointSymbol),
             TradeBetweenMarketsGoal trade => (ShipGoalKind.SellCargo, $"Trading {trade.TradeSymbol} from {trade.BuyWaypointSymbol} to {trade.SellWaypointSymbol}", trade.BuyWaypointSymbol, trade.SellWaypointSymbol),
             DeliverCargoGoal dlv => (ShipGoalKind.DeliverCargo, $"Delivering {dlv.TradeSymbol} to {dlv.DeliveryWaypointSymbol}", null, dlv.DeliveryWaypointSymbol),
@@ -447,7 +454,7 @@ internal sealed class FleetStatusQueryService(
             return [];
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.System.GetUtcNow();
         var snapshots = new List<ShipActivitySnapshot>(allShips.Count);
         foreach (var ship in allShips)
         {
@@ -468,7 +475,7 @@ internal sealed class FleetStatusQueryService(
         }
 
         var goal = await shipGoals.GetActiveGoalAsync(ship.Symbol, ct);
-        return BuildActivitySnapshot(ship, goal, DateTimeOffset.UtcNow);
+        return BuildActivitySnapshot(ship, goal, TimeProvider.System.GetUtcNow());
     }
 
     // -----------------------------------------------------------------------

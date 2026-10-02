@@ -21,6 +21,7 @@ public sealed class DefaultSettingsSeedTests
         "Automation.Plan.Mining.Enabled",
         "Automation.Plan.Siphon.Enabled",
         "Automation.Plan.Trading.Enabled",
+        "Automation.Plan.SpareTime.Enabled",
 
         // ShipGoalExecutorService, OutagePauseHandler, DatabaseSizeGuardService.
         "Automation.CircuitBreaker.MaxGoalStepsPerMinute",

@@ -208,6 +208,33 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void TryFindBestCargoSale_SellsTheGoodThatFetchesMostAfterFuel_First()
+    {
+        // Slice 6.8: the rule the trading plan sells held cargo by, and the spare-time trip its hold (D36).
+        // At A1, 10 FOOD fetch 24,920 and 10 EQUIPMENT 34,990, each less 180 for the fuel.
+        var ship = CommandShip(cargo: [new CargoItemModel("FOOD", 10), new CargoItemModel("EQUIPMENT", 10)]);
+
+        TradeRoutePlanner.TryFindBestCargoSale(Map(), ship, mustSell: false, out var cargo, out var sale).Should().BeTrue();
+
+        cargo.Should().Be(new CargoItemModel("EQUIPMENT", 10));
+        sale.WaypointSymbol.Should().Be(A1);
+    }
+
+    [Fact]
+    public void TryFindBestCargoSale_LeavesCargoWhoseSaleDoesntPayForItsFuel_UnlessItMustSell()
+    {
+        // Only A1, 104 from K85, buys FOOD here: one unit fetches 2,492 there, against 2 FUEL at 18,000 each.
+        var map = Map(
+            Market(K85, Good("FUEL", "EXCHANGE", 93, 79, 180)),
+            Market(A1, Good("FOOD", "IMPORT", 5_028, 2_492, 60), Good("FUEL", "EXCHANGE", 18_000, 76, 180)));
+        var ship = CommandShip(cargo: [new CargoItemModel("FOOD", 1)]);
+
+        TradeRoutePlanner.TryFindBestCargoSale(map, ship, mustSell: false, out _, out _).Should().BeFalse();
+        TradeRoutePlanner.TryFindBestCargoSale(map, ship, mustSell: true, out var cargo, out var sale).Should().BeTrue();
+        (cargo.Symbol, sale.WaypointSymbol).Should().Be(("FOOD", A1));
+    }
+
+    [Fact]
     public void AnAsteroidWithoutAMarket_IsNoMarket()
     {
         var map = Map();

@@ -86,6 +86,27 @@ public sealed class ShipGoalSerializationTests
     }
 
     [Fact]
+    public void GatherAndSellGoal_RoundTrip_PreservesAllFields()
+    {
+        // Slice 6.8: a spare-time trip is stored with the ship, with the sale it has chosen.
+        var goal = new GatherAndSellGoal
+        {
+            GoalId = Guid.NewGuid(),
+            SourceWaypointSymbol = "X1-AB-GG1",
+            Siphoning = true,
+            Selling = true,
+            SellTradeSymbol = "HYDROCARBON",
+            SellWaypointSymbol = "X1-AB-G50",
+        };
+
+        var json = JsonSerializer.Serialize<ShipGoal>(goal);
+        var result = JsonSerializer.Deserialize<ShipGoal>(json);
+
+        result.Should().BeOfType<GatherAndSellGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Kind.Should().Be(ShipGoalKind.GatherAndSell);
+    }
+
+    [Fact]
     public void SellCargoGoal_RoundTrip_PreservesTradeSymbolList()
     {
         var symbols = new[] { "IRON_ORE", "ALUMINUM_ORE" };

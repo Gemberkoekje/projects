@@ -65,6 +65,10 @@ public static class DependencyInjection
         services.AddScoped<ISiphonAutomationService, SiphonAutomationService>();
         services.AddScoped<ITradingAutomationService, TradingAutomationService>();
 
+        // Spare time (slice 6.8): the command ship mines or siphons when it has nothing to survey or trade.
+        services.AddScoped<ISpareTimePlanService, SpareTimePlanService>();
+        services.AddScoped<SpareTimeInterruption>();
+
         // Surveying and mining (slice 6.4): the survey plan, the surveys' bookkeeping, and what a survey or
         // mining decision reads.
         services.AddScoped<ISurveyPlanService, SurveyPlanService>();
@@ -87,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MineAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SiphonAndSellGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, GatherAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();

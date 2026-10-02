@@ -72,13 +72,18 @@
   surveying the contract's ore without end, is live (projects#126 and #127, deployed by gembernodes#26
   and #27). The contract was fulfilled at 15:49Z (23,076 credits). Your decision D28, one rule for
   what miners mine and when a drone is bought, was merged as projects#128.
-- Slice 6.3 (probes) is built on branch `claude/spacetraders-more-scouting`, with your decisions D29
-  (a probe for every market, bought while the credits stay at 100,000; until then they roam) and D30
-  (a purchase where none of our ships is fetches a probe first). It fixes B15 and B25. The probe plan
-  stays off until you switch it on (D9).
-- Slice 6.7 (siphoning) is built on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33: siphon
-  drones siphon gases at gas giants by the miners' rules, without surveys (the API's siphon call takes
-  none). The siphon plan stays off until you switch it on (D9).
+- Slice 6.3 (probes) was merged as projects#129 on 2026-10-02 (deployed by gembernodes#28), with your
+  decisions D29 (a probe for every market, bought while the credits stay at 100,000; until then they
+  roam) and D30 (a purchase where none of our ships is fetches a probe first). It fixes B15 and B25. The
+  probe plan stays off until you switch it on (D9).
+- Slice 6.7 (siphoning) was merged as projects#130 on 2026-10-02 (deployed by gembernodes#29), with your
+  decisions D31–D33: siphon drones siphon gases at gas giants by the miners' rules, without surveys (the
+  API's siphon call takes none). The siphon plan stays off until you switch it on (D9).
+- Slice 6.8 (spare time) is built on branch `ccr-3f080253-4o4wfu`, with your decisions D34–D37, asked on
+  2026-10-02: "I'd like my command ship not to be idle." With nothing to survey the command ship trades,
+  and with no trade either it mines or siphons whatever sells at the nearest place it can, and sells it;
+  a survey or a trade interrupts that. The spare-time plan stays off until you switch it on (D9); until
+  then the command ship surveys and waits, as before.
 
 ## Known issues
 
@@ -168,7 +173,7 @@ get the next D-number.
 | D17 | Slice 6.5: may cargo use `FleetExpansion.MinCreditReserve`? | **Yes** (2026-10-02): cargo turns back into credits when it is sold. Credits for the trip's fuel are kept back. |
 | D18 | Slice 6.5: may two traders share a route? | **No, for now** (2026-10-02, "to keep everything simple"): a route, the good with its buy and sell market, that one trader holds isn't offered to another. |
 | D19 | How do reads (GET: a market refresh) and writes (anything else: moving a ship, trading) share the API's rate limit? | **Writes first** (2026-10-02): "I'd rather have a POST to move a ship or trade goods than a market refresh that can be done 10 seconds later without penalty." A read gives way while a write waits for the budget, leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds, so reads can't starve. The market watch runs last in the tick, one market a tick. |
-| D20 | Slice 6.4: the command ship can both survey (MOUNT_SURVEYOR_II) and mine (MOUNT_MINING_LASER_II). With surveying on, which does a ship that can do both do? | **Survey only** (2026-10-02): "Let's start with survey only. I think we'll end up with too many surveys, but we'll start simple and iterate." Its laser stays unused; the drones mine with its surveys. |
+| D20 | Slice 6.4: the command ship can both survey (MOUNT_SURVEYOR_II) and mine (MOUNT_MINING_LASER_II). With surveying on, which does a ship that can do both do? | **Survey only** (2026-10-02): "Let's start with survey only. I think we'll end up with too many surveys, but we'll start simple and iterate." Its laser stays unused; the drones mine with its surveys. **Amended by D34** while the spare-time plan is on. |
 | D21 | Slice 6.4: mining comes before trading, so the command ship no longer trades. Which cargo ships does the trading plan buy, and how many? | **A light shuttle first, then up to 2 light haulers** (2026-10-02): "start with a light shuttle to get things going, then pick up, for now, up to 2 light haulers once funds become available." Only when a lucrative route waits and every trader has a trip, within the credit reserve. The list is the setting `Trade.ShipPurchases`. Replaces D16. |
 | D22 | Slice 6.4: which supply counts as "low supply" for mining an ore to sell at that market? | **SCARCE and LIMITED** (2026-10-02). |
 | D23 | Slice 6.4: how many ships may mine for the contract? | **Every free miner** (2026-10-02), the contract before market mining; ore left over is sold. The contract plan still buys at most one drone, and the mining plan buys none while the contract takes the miners. |
@@ -182,6 +187,10 @@ get the next D-number.
 | D31 | Slice 6.7 (asked on 2026-10-02): miners work an ore contract before anything else (D23), but gas contracts (HYDROCARBON, LIQUID_HYDROGEN, LIQUID_NITROGEN) are parked as unsupported (D2). Should siphons take them? | **Keep D2 for now:** siphons only siphon and sell to the markets. With one contract per reset (D1) a gas contract rarely comes up; it can be a slice of its own. |
 | D32 | Slice 6.7 (asked on 2026-10-02): when does the siphon plan buy siphon drones? | **The miners' rule (D28), with a cap of their own:** one a tick, only when its first trip would serve a market where the gas is SCARCE or LIMITED, within the credit reserve, up to `Siphon.MaxDrones`, "max 10 default". |
 | D33 | Slice 6.7 (asked on 2026-10-02): miners jettison every ore but their trip's (6.4, Noticed). A gas giant can't be surveyed, so a siphon drone would jettison about two siphons in three. Do siphons do the same? | **Keep every gas:** a trip keeps every gas it siphons, which fills the hold about three times faster; it sells its own gas at its market, and the plan sells the others on the following trips. |
+| D34 | Slice 6.8 (asked on 2026-10-02): "I'd like my command ship not to be idle. So can we add a interuptable mining/siphoning task that just fills up the cargo with whatever and sells it where it's relevant. If a more important job comes up such as trading or surveying it should stop mining, sell it's inventory and start on the new job." With the survey plan on, the command ship never trades (D20): should it trade when it has nothing to survey? | **Survey, then trade, then mine** (2026-10-02): with nothing to survey it takes a lucrative route that waits for it (`Trade.MinProfitPerUnit` after fuel), after the other traders; it mines or siphons only when there is neither, and a route that turns up interrupts that, its hold sold first. Amends D20 while the spare-time plan is on; with it off, D20 holds, so the switch brings all of slice 6.8 (D9). |
+| D35 | Slice 6.8 (asked on 2026-10-02): where does the command ship mine or siphon? It has a mining laser, a gas siphon and a 40-unit hold; XB5C, where it surveys, is 19 from H51, and the only gas giant, C38, about 170 away. | **The nearest source:** the nearest asteroid or gas giant it can work, that it can reach and that yields a good a market it can carry it to buys: it stays near its surveys, so an interruption costs little. Without surveys, which stay for the drones. |
+| D36 | Slice 6.8 (asked on 2026-10-02): "sells it where it's relevant": which market does each good go to? | **Best price after fuel:** each good where it fetches most after the fuel to get there, the rule miners, siphoners and traders sell cargo they hold by. |
+| D37 | Slice 6.8 (asked on 2026-10-02): a survey usually comes up at the asteroid the command ship mines at. Sell first, as asked for D34, or survey straight away? Surveying needs no room in the hold. | **Survey first:** it surveys on the spot with its hold aboard, then carries on filling, and sells once full. Only a trade makes it sell first, as a trade needs the room. |
 
 ## Phases
 
@@ -1143,7 +1152,7 @@ How credits are split stays your call; Claude only fixes deviations from intende
 - **6.2 The command ship after scouting:** B10, and the scout part of B16 (both fixed in 1.14;
   what's left is a clean reset period). The ship moves on to its next job instead of holding on to
   the finished scout goal.
-- **6.3 Probes** (built 2026-10-02 on branch `claude/spacetraders-more-scouting`, with your decisions
+- **6.3 Probes** (merged 2026-10-02 as projects#129, deployed by gembernodes#28; built on branch `claude/spacetraders-more-scouting`, with your decisions
   D29 and D30; fixes B15 and B25). Asked that day: "I'd like more scouting to be done": a probe at
   every market in the long run, bought while the credits stay at 100,000; while there are fewer
   probes than markets, they drift between nearby markets, those not updated for a while first.
@@ -1204,7 +1213,7 @@ How credits are split stays your call; Claude only fixes deviations from intende
     The setting's description in the cluster's database still describes the old plan: a description
     is seeded once per agent, so the new one comes with the next reset.
   - Done when: a full reset period with the probe plan on and no open anomaly for it.
-- **6.3 in short** (built 2026-10-02): every market of the headquarters' system gets a probe in the
+- **6.3 in short** (merged 2026-10-02 as projects#129): every market of the headquarters' system gets a probe in the
   long run, bought while the credits stay at the reserve; until then the probes roam, each to the
   market whose prices are oldest once the flight there counts against it; and a purchase where none
   of our ships is fetches a probe first. To understand this, start with
@@ -1507,7 +1516,7 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `ShipGoalExecutorServiceTests`, the trip's round trip in `ShipGoalRepositoryTests`, D19 in
       `RateLimitHandlerTests`.
 - **6.6 Jump gate construction.**
-- **6.7 Siphoning** (built 2026-10-02 on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33).
+- **6.7 Siphoning** (merged 2026-10-02 as projects#130, deployed by gembernodes#29; built on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33).
   Asked that day: "Can you work on implementing syphons. Functions practically the same as minors,
   including surveys, but for gassy materials."
   - **No surveys, by the game's rules:** the API's siphon call (`POST my/ships/{ship}/siphon`) takes no
@@ -1593,6 +1602,97 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `AutomationSwitchesTests`, `GameLoopServiceTests`, `DefaultSettingsSeedTests`, `ShipRuleTests`,
       `FleetStatusQueryServiceTests`, `ShipGoalSerializationTests` (Domain) and `PrometheusMetricsTests`
       (API).
+- **6.8 Spare time** (built 2026-10-02 on branch `ccr-3f080253-4o4wfu`, with your decisions D34–D37).
+  Asked that day: "I'd like my command ship not to be idle. So can we add a interuptable mining/siphoning
+  task that just fills up the cargo with whatever and sells it where it's relevant. If a more important job
+  comes up such as trading or surveying it should stop mining, sell it's inventory and start on the new
+  job." With the survey plan on, the command ship surveys and nothing else (D20); with a stock of surveys
+  for every ore (D27), it waited.
+  - Done:
+    - **The order** (D34): survey, then trade, then mine or siphon. A new plan, spare time
+      (`SpareTimePlanService`, switch `Automation.Plan.SpareTime.Enabled`, off), is bootstrapped last, so it
+      gets the command ship only when the survey and trading plans left it free. It gives a trip to every
+      ship that gathers in its spare time (`FleetRoles.GathersInSpareTime`): a surveyor, with the survey plan
+      on, with a mining laser or a gas siphon, a hold and a tank. That is the command ship; with the survey
+      plan off it is a miner, as before.
+    - **The trip** (`GatherAndSellGoal`, `GatherAndSellGoalExecutor`): at the nearest asteroid or gas giant it
+      can work and reach that yields a good a market it can carry it to buys (D35, `GatherPlanner`): XB5C,
+      where it surveys, in practice. It mines (`ExtractResourcesCommand`, new) or siphons
+      (`SiphonResourcesCommand`) once per cooldown, without surveys, which stay for the drones, keeping every
+      good a reachable market buys (D33's rule) until the hold is full. Then it sells one good at a time,
+      each where it fetches most after fuel (D36): it records the sale in its goal, flies there through
+      refuelling stops, docks, sells in batches and fetches the market again (D25). A full hold sells even
+      where the sale doesn't pay for its fuel; after that, what doesn't pay stays aboard for the next trip.
+      The goal ends, and the plans choose again.
+    - **A survey interrupts it** (D37): the survey plan treats a spare-time trip that fills its hold as free
+      and replaces it with the survey; the hold stays aboard, and the next trip fills it on.
+    - **A trade interrupts it** (D34): with the spare-time plan on, the trading plan takes the command ship,
+      free or on a trip that fills its hold, for a route that waits for it once its hold is sold, after the
+      other traders have chosen. It judges the route from where selling the hold leaves the ship
+      (`GatherPlanner.AfterSellingHold`), so the route is still lucrative once the hold is sold and the ship
+      doesn't turn back to gathering on the way. The ship sells its hold first, one good a trip, by the rule
+      held cargo is sold by (`TradeRoutePlanner.TryFindBestCargoSale`, now shared), then takes its route.
+      Without such a route the trading plan leaves the ship and its hold to the spare-time plan (D37).
+    - **Safe interruptions** (`SpareTimeInterruption`): only while the trip fills its hold, only when no
+      goal step of the ship runs (B46: a step that turns the trip to selling would write it back over the
+      new goal), and only when the ship as stored isn't in flight, so its arrival still matches the goal
+      that flew it (B17). Otherwise a later tick tries again.
+    - **Visibility:** journal kinds `GatheringStarted` (`Method` `mines` or `siphons`) and
+      `GatheringInterrupted` (`Reason` `survey` or `trade`, `Units` aboard); extractions and siphons log
+      `Extracted` and `Siphoned` with `Target` `whatever sells`. The yield counts in
+      `spacetraders_extracted_units_total`, so the dashboard's mined panels show it with no gembernodes
+      change, but a spare-time extraction isn't counted in `spacetraders_extractions_total`: the survey
+      statistics would read an extraction without a survey, which it is by design, as a sign of too few
+      surveys. The fleet view says "mining in its spare time", "siphoning in its spare time" or "selling …".
+      The plan's state (`plan_states`, `SpareTime`) lists each such ship, what it does and its trip's source;
+      `ShipLeftIdle` (D13) counts a ship it lists with a source as having work.
+    - **The switch brings it all** (D9): with the spare-time plan off, the command ship surveys and waits as
+      before, and doesn't trade (D20).
+    - Warnings fixed on the way, in files this slice touches: `FleetStatusQueryService` reads the time from
+      `TimeProvider` (S6354), and `FleetStatusQueryServiceTests` lost 13 QW0021 and 2 S8969 warnings. Left:
+      QW0028 on `SpareTimePlanState.PlanId`, a `Guid` like every plan state's.
+  - Noticed (not changed):
+    - **A survey may wait one cooldown:** mining and surveying share the ship's cooldown, so a survey that
+      comes up right after an extraction waits for it (about 70 seconds in the soak test); before, the
+      ship was idle and surveyed at once.
+    - **Spare-time ore is sold, never delivered:** with the survey plan on the command ship isn't a miner,
+      so the contract never takes it (D20, D23), even when the contract wants the ore it holds.
+    - **Shared markets:** it sells at the markets the drones sell at (H51, F49 near XB5C), which moves their
+      prices for the drones' trips too.
+    - **Travel time isn't in the sale** (as in 6.5): with a 400-unit tank fuel is cheap, so a good may go to
+      a far market for a few credits more per unit.
+    - **Cargo ships:** the command ship takes routes only after the other traders, and doesn't count
+      towards "every trader has a trip" (D21), so it neither delays nor triggers a cargo ship purchase.
+    - **Selling the hold for a trade goes good by good** through the trading plan, so a survey that comes
+      up between two sales comes first (survey > trade).
+    - **Log volume:** an `Extracted` or `Siphoned` line per extraction, about 1,200 a day, as for a drone.
+  - To switch it on: `PUT /settings/Automation.Plan.SpareTime.Enabled` with `{"value": "true"}`. The survey
+    plan must be on for the command ship to count as gathering in its spare time, and the trading plan for
+    trades to come first; both are.
+  - Done when: a full reset period with the spare-time plan on and no open anomaly for it.
+  - **To understand this,** start with `SpaceTraders.Application/SpareTime/GatherPlanner.cs`, then
+    `Automation/SpareTimePlanService.cs`, `Goals/Executors/GatherAndSellGoalExecutor.cs` and
+    `Automation/SpareTimeInterruption.cs`, with `TradeInsteadOfGatheringAsync` in
+    `Automation/TradingAutomationService.cs`; `tests/SpaceTraders.Application.Tests/SpareTime/SpareTimeFixture.cs`
+    holds X1-DC53's middle and its gas side.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `SpareTime/GatherPlanner.cs`, `Automation/SpareTimePlanService.cs`, `SpareTimePlanState.cs`,
+      `SpareTimeInterruption.cs`, `Goals/Executors/GatherAndSellGoalExecutor.cs`,
+      `Commands/Ships/ExtractResourcesCommand.cs`;
+    - changed: `Automation/FleetRoles.cs` (`GathersInSpareTime`, `HasMiningLaser`), `AutomationSwitches.cs`
+      (the SpareTime plan), `GameLoopService.cs`, `SurveyPlanService.cs` (D37), `TradingAutomationService.cs`
+      (D34), `Trading/TradeRoutePlanner.cs` (`TryFindBestCargoSale`), `Mining/MiningPlanner.cs`
+      (`IsSellableFrom`, shared with `Commands/Ships/SiphonResourcesCommand.cs`),
+      `Goals/ShipGoalExecutorService.cs`, `Health/ShipLeftIdleRule.cs`, `JournalEvents.cs`,
+      `Interfaces/IAutomationMetrics.cs`, `Services/FleetStatusQueryService.cs`, `DependencyInjection.cs`;
+      `GatherAndSellGoal` and `ShipGoalKind` (Domain); `PrometheusMetricsService` (API); `DefaultSettingsSeed`
+      (Persistence: the switch);
+    - tests: `SpareTime/GatherPlannerTests` and `SpareTimeFixture`, `Automation/SpareTimePlanServiceTests`,
+      `Goals/GatherAndSellGoalExecutorTests`, `Commands/ExtractResourcesHandlerTests` (new); additions to
+      `SurveyPlanServiceTests`, `TradingAutomationServiceTests`, `TradeRoutePlannerTests`,
+      `AutomationSwitchesTests`, `GameLoopServiceTests`, `DefaultSettingsSeedTests`, `ShipRuleTests`,
+      `FleetStatusQueryServiceTests`, `ShipGoalSerializationTests` (Domain), `DiValidationTests` and
+      `PrometheusMetricsTests` (API).
 
 ## Changes in gembernodes
 

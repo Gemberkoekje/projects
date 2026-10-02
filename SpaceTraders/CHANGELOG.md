@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-02, slice 6.8: D34–D37)
+- Spare time, as asked on 2026-10-02: "I'd like my command ship not to be idle." A new spare-time plan (`Automation.Plan.SpareTime.Enabled`, off by default, bootstrapped last) gives the command ship, when it has nothing to survey and no trade, one trip at a time (`GatherAndSellGoal`): it mines or siphons at the nearest asteroid or gas giant it can work that yields something a market buys (D35), without surveys, keeping whatever sells, until its hold is full; then it sells each good where it fetches most after fuel (D36), and the plans choose again.
+- A survey that needs taking takes the ship off a trip that fills its hold at once, with the hold aboard (D37). With the spare-time plan on, the command ship trades when it has nothing to survey (D34, amending D20): the trading plan takes it, free or off a trip that fills its hold, for a route that waits for it once its hold is sold, after the other traders; it sells its hold first. A trip is only taken over when no goal step of the ship runs and the ship isn't in flight (B46, B17).
+- New command `ExtractResourcesCommand` (one extraction without a survey, keeping every good a reachable market buys), journal kinds `GatheringStarted` and `GatheringInterrupted`. Spare-time yields count in `spacetraders_extracted_units_total`, not as extractions in the survey statistics. `ShipLeftIdle` counts spare-time work; the fleet view says "mining in its spare time", "siphoning in its spare time" or "selling …".
+
+### Code – Changed (2026-10-02, slice 6.8)
+- The trading plan sells held cargo by `TradeRoutePlanner.TryFindBestCargoSale`, now shared with the spare-time trip, and the siphon command keeps its gases by `MiningPlanner.IsSellableFrom`, now shared with the spare-time extraction. Neither changes what they do.
+- `FleetStatusQueryService` reads the time from `TimeProvider` (warning S6354).
+
+### Docs – Changed (2026-10-02, slice 6.8)
+- `PLAN.md`: slice 6.8 and D34–D37 (D20 amended while the spare-time plan is on), and 6.3 and 6.7 marked merged; `docs/HOW_IT_WORKS.md`: the spare-time plan, its goal, command, journal kinds, metrics, setting and idle rule, and what changes for the survey and trading plans; `docs/GLOSSARY.md`: gather, spare time.
+
 ### Code – Added (2026-10-02, slice 6.7: D31–D33)
 - Siphoning, as asked on 2026-10-02: "Functions practically the same as miners, including surveys, but for gassy materials." A new siphon plan (`Automation.Plan.Siphon.Enabled`, off by default) gives every siphoner (a ship with a gas siphon, a hold and a tank, and nothing to mine or survey with: a siphon drone) one trip at a time, by the miners' rules (D28): the market shortest of a gas first, siphoned at the gas giant nearest it and sold there. Surveys can't be used: the API's siphon call takes none, and a surveyor finds ores only.
 - A trip keeps every gas it siphons that a market it can reach buys (D33), not only its own, and the plan sells the others after it, one good a trip, where each fetches most; the rest is jettisoned. A full hold only sells, so a siphoner can't take a trip that ends at once on every tick.

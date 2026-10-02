@@ -20,7 +20,7 @@ One process, `SpaceTraders.API`, hosts everything.
 
 ```text
 startup chain ─► tick every 5 s (leader only)
-                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Survey, Mining, Siphon, Trading
+                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Survey, Mining, Siphon, Trading, SpareTime
                   ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
                   ├─ contract assignments: deliver, or mine
                   ├─ refresh one market where a ship is, once due (the market watch)
@@ -185,7 +185,7 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 - Runs 5 s after the previous tick ends, on the leader only.
 - Each tick:
   1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Contract,
-     ProbeDeployment, Survey, Mining, Siphon and Trading.
+     ProbeDeployment, Survey, Mining, Siphon, Trading and SpareTime.
   2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
   3. If the contract plan is switched on, for every active `Contract` assignment:
      `FulfillContractDeliveryCommand` once the ship holds a whole trip (what the contract still
@@ -238,18 +238,20 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
 All plan state is JSON in `plan_states`, one row per plan type.
 
 Each plan has a switch, `Automation.Plan.{Plan}.Enabled` (`AutomationSwitches`). Per D9 only
-Scout and Contract are on by default; the survey plan (slice 6.4) and the siphon plan (slice 6.7) are
-off too until switched on. A plan that is switched off:
+Scout and Contract are on by default; the survey plan (slice 6.4), the siphon plan (slice 6.7) and the
+spare-time plan (slice 6.8) are off too until switched on. A plan that is switched off:
 - isn't bootstrapped, so it doesn't buy anything;
 - doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe, survey,
-  mine-and-sell, siphon-and-sell, trade). They resume when it is switched back on;
+  mine-and-sell, siphon-and-sell, trade, gather-and-sell). They resume when it is switched back on;
 - for the contract plan: the tick's contract work (step 3) is skipped too.
 
 The plans are bootstrapped in the order of the table, so a plan higher up claims the ships it wants
 first. Which plan a ship works for follows from what it can do (`FleetRoles`, slice 6.4): with the
-survey plan on, a ship that can survey surveys, and only that (D20); a ship that can mine mines (the
-contract first, D23, then the mining plan's trips); a ship that can siphon, and can neither mine nor
-survey, siphons (slice 6.7); trading takes what the others leave free.
+survey plan on, a ship that can survey surveys, and only that (D20), unless the spare-time plan is on
+too: then the command ship, with nothing to survey, trades (D34), and with no trade either mines or
+siphons in its spare time (slice 6.8); a ship that can mine mines (the contract first, D23, then the
+mining plan's trips); a ship that can siphon, and can neither mine nor survey, siphons (slice 6.7);
+trading takes what the others leave free, and the spare-time plan what trading leaves.
 
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
@@ -260,6 +262,7 @@ survey, siphons (slice 6.7); trading takes what the others leave free.
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`, up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`, up to `Siphon.MaxDrones` (D32) |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21) |
+| SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
 
 ### Scout (`ScoutAllMarketplacesPlanService`)
 
@@ -358,7 +361,8 @@ The goal is a probe at every market of the HQ system, where the market watch kee
 ### Survey (`SurveyPlanService`, slice 6.4)
 
 - **A surveyor** is any ship with a surveyor mount; with this plan on it surveys, and nothing else
-  (D20): the command ship's mining laser stays unused.
+  (D20): the command ship's mining laser stays unused, unless the spare-time plan is on (slice 6.8):
+  then, with nothing to survey, the command ship trades, or mines and siphons (D34).
 - **Each tick** it first ends the surveys that expired (`SurveyKeeper`: removed from `cached_surveys`,
   `SurveyEnded` journaled with how often each was used, `spacetraders_surveys_ended_total`). Then
   each free surveyor gets one survey to take (`SurveyWaypointGoal`), the best target it can reach that
@@ -374,7 +378,12 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   A target needs a survey while it has fewer usable surveys holding its ore than
   `Survey.StockPerOre` (2, D27). Among those, the contract's ore comes first, then the ore with the
   fewest usable surveys, then the best paid. With the stock for every ore, the surveyor waits until
-  a survey expires or is used up. A survey isn't ore-specific: the API surveys the whole asteroid and
+  a survey expires or is used up, or, with the spare-time plan on, mines or siphons in the meantime
+  (slice 6.8).
+- **A spare-time trip that fills its hold** counts as free: a survey that needs taking takes the ship off it
+  at once, with its hold aboard (D37), when that is safe (`SpareTimeInterruption`, see
+  [Spare time](#spare-time-sparetimeplanservice-slice-68)), and logs `GatheringInterrupted` (`Reason`
+  `survey`). A survey isn't ore-specific: the API surveys the whole asteroid and
   returns random deposits, so "for" an ore is the plan's label, and one survey often counts for
   several ores. Within the drones' reach every target is XB5C.
 - **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
@@ -460,9 +469,17 @@ siphoned.
 
 - **A trader** is any ship with a cargo hold and a fuel tank that has no goal (or a blocked one), no
   open assignment, and isn't in transit, and that the survey, mining and siphon plans, which go first,
-  left free. With the survey plan on, a ship that can survey never trades (D20), so the command ship no
-  longer does; a miner trades only when neither the contract nor the mining plan has work for it, and a
-  siphoner only when the siphon plan has none.
+  left free. With the survey plan on, a ship that can survey never trades (D20), unless the spare-time
+  plan is on (below); a miner trades only when neither the contract nor the mining plan has work for
+  it, and a siphoner only when the siphon plan has none.
+- **A ship that gathers in its spare time** (the command ship, with the survey and spare-time plans on,
+  slice 6.8) trades when it has nothing to survey (D34), but only for a route that waits for it once
+  its hold is sold, and after the other traders have chosen. The route is judged from where selling its
+  hold leaves it (`GatherPlanner.AfterSellingHold`), so it is still there once the hold is sold. Then
+  the ship sells its hold first, one good a trip, by the rule every trader sells held cargo by, and
+  takes the route after; a spare-time trip that fills its hold is interrupted for that
+  (`GatheringInterrupted`, `Reason` `trade`), when it is safe. Without such a route the plan leaves the
+  ship, and its hold, to the spare-time plan (D37).
 - **A trip** (`TradeRoutePlanner`) is one good, bought at one market and sold at another:
   - its profit is what the sell market pays minus what the buy market charges, times the units,
     minus the fuel for the whole trip: from where the ship is to the buy market, then on to the sell
@@ -499,6 +516,53 @@ siphoned.
   reconsiders where it lands, with the prices its arrival has just fetched: see
   `TradeBetweenMarkets` under [Executors](#executors).
 
+### Spare time (`SpareTimePlanService`, slice 6.8)
+
+Asked for on 2026-10-02: "I'd like my command ship not to be idle." With the survey plan on, the
+command ship surveys (D20), and with every ore stocked (D27) it waited. The spare-time plan, bootstrapped
+last, gives it something to do then; your decisions are D34–D37.
+
+- **Who:** a surveyor (with the survey plan on) that also has a mining laser or a gas siphon, a hold and a
+  tank (`FleetRoles.GathersInSpareTime`): the command ship. With the survey plan off it is a miner, and the
+  mining plan gives it work.
+- **The order (D34):** survey first, then trade, then mine or siphon. The survey plan goes first, the
+  trading plan takes the ship for a route that waits for it (see [Trading](#trading-tradingautomationservice-slice-65)),
+  and this plan gets it only when neither did.
+- **The trip** (`GatherAndSellGoal`, one per goal; `GatheringStarted`, `Method` `mines` or `siphons`):
+  1. at the nearest asteroid (with its mining laser) or gas giant (with its gas siphon) that it can reach
+     through refuelling stops and that yields a good a market it can carry it to buys (D35,
+     `GatherPlanner.TryFindSource`): in X1-DC53 usually XB5C, where it surveys. No survey guides it: the
+     surveys stay for the drones;
+  2. it mines (`ExtractResourcesCommand`) or siphons (`SiphonResourcesCommand`) once per cooldown, keeping
+     every good a market it can carry it to buys, whatever it is, and jettisoning the rest (D33's rule),
+     until its hold is full. A source that no longer yields anything a market buys ends the trip;
+  3. full, it sells the hold one good at a time, each where it fetches most after the fuel to get there
+     (D36, `TradeRoutePlanner.TryFindBestCargoSale`, the rule every trader sells held cargo by): it records
+     the sale in the goal, flies there, docks, sells in batches of the trade volume and fetches the market
+     again (D25). A full hold sells even where the sale doesn't pay for its fuel, or the next trip would have
+     no room; after that, what doesn't pay for its fuel stays aboard for the next trip;
+  4. the goal ends, and the plans choose again: a survey, a trade or the next trip.
+- **Interrupted** while the trip still fills its hold (a trip that sells is nearly done):
+  - a survey that needs taking takes the ship at once, with its hold aboard (D37): surveying needs no room,
+    and the next trip fills the hold on;
+  - a route that waits for it takes it, its hold sold first (D34): see Trading;
+  - only when replacing the trip's goal is safe (`SpareTimeInterruption`): no goal step of the ship runs
+    (B46), and the ship as stored isn't in flight, so its arrival still matches the goal that flew it (B17).
+    Otherwise a later tick tries again. The journal says `GatheringInterrupted` (`Reason` `survey` or
+    `trade`, with the `Units` aboard).
+- **Its state** (`plan_states`, `SpareTime`) lists each such ship, what it does (`Gathering`, `Selling`,
+  `Busy` with another plan's work, or `Waiting` with nowhere to gather and sell) and its trip's source, for
+  the `ShipLeftIdle` rule; it is written only when it changes. A ship with a full hold that no market it can
+  reach buys gets no trip: it would end at once, on every tick.
+- **Visibility:** each extraction logs `Extracted` and each siphon `Siphoned`, with `Target` `whatever sells`.
+  The yield counts in `spacetraders_extracted_units_total`, so the dashboard's mined panels show it, but a
+  spare-time extraction isn't counted in `spacetraders_extractions_total`: the survey statistics would read an
+  extraction without a survey, which it is by design, as a sign of too few surveys. The fleet view says
+  `mining in its spare time`, `siphoning in its spare time` or `selling …`.
+- **Off** (the default), the command ship surveys and waits as before, and doesn't trade (D20); a trip under
+  way waits where it is, as every plan's goals do, and a survey still takes the ship off a trip that fills
+  its hold.
+
 ### Purchasing
 
 - **`ShipPurchaseService`:**
@@ -529,15 +593,17 @@ siphoned.
 | Scout | an assignment and a goal | — (picks one ship, once) |
 | Contract | an assignment only | it is a miner (not a surveyor while the survey plan is on), not in transit, and has no assignment and no goal (or a finished or blocked one) |
 | ProbeDeployment | a `DeployProbeGoal` | it is a probe (`FleetRoles.IsProbe`: a probe frame, or cached as `SHIP_PROBE` or `SATELLITE`), not in transit, and has no goal (or a finished or blocked one) |
-| Survey | a `SurveyWaypointGoal` | it has a surveyor mount, is not in transit, and has no assignment and no goal (or a finished or blocked one) |
+| Survey | a `SurveyWaypointGoal` | it has a surveyor mount, is not in transit, and has no assignment and no goal (or a finished or blocked one), or is on a spare-time trip that fills its hold (D37) |
 | Mining | a `MineAndSellGoal` | it is a miner, not in transit, and has no assignment and no goal (or a finished or blocked one) |
 | Siphon | a `SiphonAndSellGoal` | it is a siphoner (`FleetRoles.IsSiphoner`: a gas siphon, a hold and a tank, nothing to mine or survey with), not in transit, and has no assignment and no goal (or a finished or blocked one) |
-| Trading | a `TradeBetweenMarketsGoal` | it has a cargo hold and a fuel tank, isn't a surveyor while the survey plan is on, is not in transit, and has no assignment and no goal (or a finished or blocked one) |
+| Trading | a `TradeBetweenMarketsGoal` | it has a cargo hold and a fuel tank, isn't a surveyor while the survey plan is on, is not in transit, and has no assignment and no goal (or a finished or blocked one). With the spare-time plan on, a ship that gathers in its spare time too, free or on a spare-time trip that fills its hold, but only for a route that waits for it (D34) |
+| SpareTime | a `GatherAndSellGoal` | it gathers in its spare time (`FleetRoles.GathersInSpareTime`: a surveyor, with the survey plan on, with a mining laser or a gas siphon, a hold and a tank), is not in transit, and has no assignment and no goal (or a finished or blocked one) |
 
 **Consequences:**
 - After scouting, the command ship has no goal and no assignment. With the survey plan on it
-  surveys (D20); with it off it is a miner, so the contract or the mining plan takes it, and trading
-  only when neither has work for it.
+  surveys (D20), and with the spare-time plan on too it trades or gathers when it has nothing to
+  survey (D34); with the survey plan off it is a miner, so the contract or the mining plan takes it,
+  and trading only when neither has work for it.
 - A drone that finishes a trip is free for a moment: the contract plan, bootstrapped first, takes it
   while the contract needs units (D23), and the mining plan otherwise.
 
@@ -549,21 +615,23 @@ siphoned.
 
 - **Storage:** each ship has at most one active goal, stored in `cached_ships` (`GoalId`,
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
-- **Kinds:** 14 kinds are defined, but only six are ever created: `ScoutWaypoint`,
-  `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `TradeBetweenMarkets` and `SurveyWaypoint`. The older
-  `SiphonResource`, like `MineResource`, is never created.
+- **Kinds:** 15 kinds are defined, but only seven are ever created: `ScoutWaypoint`,
+  `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `GatherAndSell`, `TradeBetweenMarkets` and
+  `SurveyWaypoint`. The older `SiphonResource`, like `MineResource`, is never created.
 - **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
   Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
   (`runaway`).
 - **Set by:**
-  - the scout, probe, survey, mining, siphon and trading plans;
+  - the scout, probe, survey, mining, siphon, trading and spare-time plans; the survey and trading plans
+    also replace a spare-time trip that fills its hold (`SpareTimeInterruption`, slice 6.8);
   - `MineAndSellGoalExecutor` and `SiphonAndSellGoalExecutor`, which record that their trip turns to
-    selling, and `TradeBetweenMarketsGoalExecutor`, which records its purchase, and a sale it moves, in
-    their own goal (the goal id stays, so the arrival still matches).
+    selling, `GatherAndSellGoalExecutor`, which records that too and each sale it chooses, and
+    `TradeBetweenMarketsGoalExecutor`, which records its purchase, and a sale it moves, in their own goal
+    (the goal id stays, so the arrival still matches).
 - **Cleared by:**
   - `DeployProbeGoalExecutor` when it finishes, `TradeBetweenMarketsGoalExecutor` when the trip is
-    sold or dropped, `MineAndSellGoalExecutor` and `SiphonAndSellGoalExecutor` when the trip is sold or
-    can't go on, and
+    sold or dropped, `MineAndSellGoalExecutor`, `SiphonAndSellGoalExecutor` and
+    `GatherAndSellGoalExecutor` when the trip is sold or can't go on, and
     `SurveyWaypointGoalExecutor` after each survey (slice 6.4; B16's survey part, fixed: survey goals
     were never cleared);
   - the scout plan, when its last stop is done.
@@ -572,15 +640,15 @@ siphoned.
 
 - **Loads** the ship with `FindAsync`. That skips the arrival dead-reckoning that `GetAllAsync`
   applies (B17).
-- **Runs** one step of the executor for the active goal. Only the six kinds above are
+- **Runs** one step of the executor for the active goal. Only the seven kinds above are
   dispatched, so `IdleGoalExecutor` is unreachable.
 - **Skips** every goal step while `Automation.Enabled` is off, whatever triggered it, and the
   goals of a plan that is switched off.
 - **One step at a time per ship** (B46): a step that finds another step of the same ship running is
   skipped (`ShipGoalStepGuard`, in memory), and the next tick takes the ship's next step. The tick and
   an arrival could both step a ship as it docks, and a trade step would have bought twice.
-- **Skips** a goal that is `Blocked`. It stays blocked until a plan replaces it; mining, siphon and
-  trading treat its ship as free, but the scout plan never replaces its goal.
+- **Skips** a goal that is `Blocked`. It stays blocked until a plan replaces it; mining, siphon,
+  trading and spare time treat its ship as free, but the scout plan never replaces its goal.
 - **Circuit breaker:** before each step it counts the ship's goal steps over the last minute
   (`GoalStepCircuitBreaker`, in memory). The tick alone takes 12. Above
   `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (default 60) it doesn't run the step: it
@@ -611,6 +679,7 @@ step does the work.
 | `DeployProbe` | One flight of a probe (slice 6.3). At the target (the arrival fetched its market and shipyard, and docked): clear the goal and complete; the probe plan chooses again. Elsewhere: in DRIFT, [cmd] switch to CRUISE first (a probe has no tank, so no flight costs it fuel); then [cmd] navigate. |
 | `MineAndSell` | One trip (slice 6.4). **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`. **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
+| `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
 | `TradeBetweenMarkets` | [cmd] navigate towards the buy market, by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative: [API] buy and publish `CargoPurchasedEvent`, and record the purchase in the goal; otherwise clear the goal (`TradeDropped`), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `Idle` | Unreachable. |
@@ -648,6 +717,13 @@ step does the work.
   which the survey statistics read) and logs `Siphoned`. It keeps every good that a market the ship can
   carry it to from the gas giant buys (D33), whichever gas its trip is for, and jettisons the rest, which
   would fill the hold for good. Another waypoint type is refused, with a `ShipStateMismatchEvent`.
+- **`ExtractResourcesCommand`** (slice 6.8) extracts once per call at the ASTEROID, ASTEROID_FIELD or
+  ENGINEERED_ASTEROID waypoint the ship is at, for a spare-time trip, without a survey (the surveys stay
+  for the drones, D35): in orbit (a docked ship orbits first), off cooldown and with room in the hold.
+  It stores the cargo and the cooldown, counts the yield in `spacetraders_extracted_units_total` (not
+  in `spacetraders_extractions_total`) and logs `Extracted` (`Target` `whatever sells`, no `Signature`).
+  It keeps every good that a market the ship can carry it to buys, as a siphon does (D33), and jettisons
+  the rest. Another waypoint type is refused, with a `ShipStateMismatchEvent`.
 - **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`**, used by the tick's contract
   work, dead-reckon arrival themselves and navigate without a goal id (B17). The mining and survey
   goals navigate with `NavigateToWaypointCommand`, which carries the goal id, so their arrivals wake
@@ -787,7 +863,7 @@ other app (D8):
 | `cached_waypoints`, `cached_systems` | Systems where ships are, with each waypoint's traits and modifiers (B34, fixed) | Sync (inserts, and fills in missing traits); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
 | `agent_settings` | Settings | Seed, `PUT /settings` | bounded: one row per setting |
 | `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | bounded: one row per ship |
-| `plan_states` | Plan JSON per plan type | All seven plans | bounded: one row per plan |
+| `plan_states` | Plan JSON per plan type | All eight plans | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
 | `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments | 30 days |
@@ -823,14 +899,14 @@ other app (D8):
 
 ### What each setting does
 
-The seed holds 45 settings: the 30 that change what the bot does (8 of them the health rules'
+The seed holds 46 settings: the 31 that change what the bot does (8 of them the health rules'
 thresholds), 3 that are read without changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
 removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
 | Setting (default) | Effect |
 |---|---|
 | `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
-| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20) |
+| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
@@ -1014,16 +1090,18 @@ The seven pages in `src/Future` are not routed.
   | `ContractAccepted` | Contract plan | `ContractId`, `TradeSymbol`, `WaypointSymbol`, `Payment` |
   | `ContractDelivered`, `ContractFulfilled` | `FulfillContractDeliveryCommand` | `ContractId`, `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`; `Payment` |
   | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost` |
-  | `CargoBought`, `CargoSold` | Trade, mining and siphon executors | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
+  | `CargoBought`, `CargoSold` | Trade, mining, siphon and spare-time executors | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
   | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it |
   | `TradeRerouted` | Trade executor, at the sell market | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellPrice`, `SellWaypoint`, `NewSellPrice`, `FuelCost`, `Reason` |
   | `TradeDropped` | Trade executor | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellWaypoint`, `Reason`: `not_lucrative` (with `Units`, `BuyPrice`, `SellPrice`, `ExpectedProfit`, `MinProfitPerUnit`), `not_possible` or `not_bought_here` |
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
-  | `Extracted` | `MineResourceVolumeCommand`, per extraction | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for, `Signature` of the survey (empty without one) |
+  | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
   | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `contract`); `ContractId` for the contract |
-  | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for |
+  | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |
   | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`) |
+  | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
+  | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
   | `ProbeCalled` | Probe plan, when it sends a probe to a shipyard where a purchase waits for one of our ships (D30) | `ShipSymbol`, `WaypointSymbol`, `ShipType` the purchase is for |
   | `PlanStarted`, `PlanCompleted` | Scout, contract and probe plans | `Plan`, and the plan's ship, contract or system |
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`) | `Plan`, `Reason` |
@@ -1035,9 +1113,10 @@ The seven pages in `src/Future` are not routed.
   | `AnomalyRaised` | The health monitor (Warning) and the size guard | `Rule`, `Subject`; the monitor's also `Details` |
   | `AnomalyCleared` | The health monitor and the size guard | `Rule`, `Subject`; the monitor's also `ActiveMinutes` |
 
-  Mining, siphoning and trading have no plan to start or complete. Mining journals each trip
+  Mining, siphoning, trading and spare time have no plan to start or complete. Mining journals each trip
   (`MiningStarted`, `Extracted` per extraction, `CargoSold`), and each survey's life (`Surveyed`, then
-  `SurveyEnded`); siphoning each trip (`SiphonStarted`, `Siphoned` per siphon, `CargoSold`);
+  `SurveyEnded`); siphoning each trip (`SiphonStarted`, `Siphoned` per siphon, `CargoSold`); spare time
+  each trip (`GatheringStarted`, `Extracted` or `Siphoned`, `CargoSold`, or `GatheringInterrupted`);
   trading journals each trip: `TradeStarted`, then `CargoBought` and `CargoSold`, with
   `TradeRerouted` or `TradeDropped` when prices change.
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
@@ -1072,9 +1151,9 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_messages_handled_total` | `type` | Messages Wolverine handled without an error (`MessageMetricsMiddleware`) | Per message |
   | `spacetraders_goal_steps_total` | `kind` | Goal steps run | Per step |
   | `spacetraders_goal_breaker_trips_total` | `ship` | Goals the circuit breaker blocked | Per trip |
-  | `spacetraders_extracted_units_total` | `ship`, `good` | Units extracted: each extraction's yield (`MineResourceVolumeHandler`), and each siphon's (`SiphonResourcesHandler`, slice 6.7), so the dashboard's mined panels show gases too | Per extraction or siphon |
-  | `spacetraders_jettisoned_units_total` | `ship`, `good` | Units jettisoned: extracted goods the trip doesn't mine for; siphoned goods no market the ship can reach buys | Per jettison |
-  | `spacetraders_extractions_total` | `ship`, `surveyed` | Extractions, with a survey (`true`) or without one (`false`): many without one while a surveyor works means too few surveys (slice 6.4). Siphons aren't extractions here: they can't take a survey | Per extraction |
+  | `spacetraders_extracted_units_total` | `ship`, `good` | Units extracted: each extraction's yield (`MineResourceVolumeHandler`, and `ExtractResourcesHandler` in spare time, slice 6.8), and each siphon's (`SiphonResourcesHandler`, slice 6.7), so the dashboard's mined panels show gases too | Per extraction or siphon |
+  | `spacetraders_jettisoned_units_total` | `ship`, `good` | Units jettisoned: extracted goods the trip doesn't mine for; siphoned goods, and goods a spare-time extraction got, that no market the ship can reach buys | Per jettison |
+  | `spacetraders_extractions_total` | `ship`, `surveyed` | Extractions, with a survey (`true`) or without one (`false`): many without one while a surveyor works means too few surveys (slice 6.4). Siphons aren't extractions here: they can't take a survey; nor are spare-time extractions (slice 6.8), which take none by design | Per extraction |
   | `spacetraders_surveys_taken_total` | `waypoint`, `size` | Surveys our ships took | Per survey |
   | `spacetraders_surveys_ended_total` | `waypoint`, `reason`, `used` | Surveys that ended: `expired`, `exhausted` or `not_verified`; `used` when any extraction used it. Many that expire unused mean too many surveys | Per survey |
   | `spacetraders_surveys_active` | `waypoint`, `used` | Usable surveys in the cache, used yet or not | Every 10 s |
@@ -1148,7 +1227,10 @@ treats as free (section 3):
   gas giant (slice 6.7);
 - trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to take it:
   one it can fly, and that is lucrative from where the ship is (slice 6.5). A drone whose tank can't
-  reach the open routes is idle by design.
+  reach the open routes is idle by design;
+- spare time: a place to mine or siphon, for a ship the plan lists with one (slice 6.8). The plan gives
+  such a ship a trip at once, so only a plan that has stopped leaves it idle; one it lists as waiting has
+  nowhere to gather and sell.
 
 Without such work an idle ship is idle by design: in the first run (D9, D1) the starting probe,
 the command ship after scouting and the drone after its contract. Likewise an idle fleet isn't

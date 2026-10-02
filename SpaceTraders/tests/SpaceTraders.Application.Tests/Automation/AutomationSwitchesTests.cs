@@ -29,6 +29,7 @@ public sealed class AutomationSwitchesTests
             ["Automation.Plan.Mining.Enabled"] = "false",
             ["Automation.Plan.Siphon.Enabled"] = "false",
             ["Automation.Plan.Trading.Enabled"] = "false",
+            ["Automation.Plan.SpareTime.Enabled"] = "false",
         });
     }
 
@@ -44,7 +45,8 @@ public sealed class AutomationSwitchesTests
                 "Automation.Plan.Survey.Enabled",
                 "Automation.Plan.Mining.Enabled",
                 "Automation.Plan.Siphon.Enabled",
-                "Automation.Plan.Trading.Enabled");
+                "Automation.Plan.Trading.Enabled",
+                "Automation.Plan.SpareTime.Enabled");
     }
 
     [Fact]
@@ -56,6 +58,7 @@ public sealed class AutomationSwitchesTests
         AutomationSwitches.PlanFor(new SiphonAndSellGoal { TradeSymbol = "HYDROCARBON", SourceWaypointSymbol = "X1-AB-1", SellWaypointSymbol = "X1-AB-2" }).Should().Be(AutomationPlan.Siphon);
         AutomationSwitches.PlanFor(new SurveyWaypointGoal { TargetWaypointSymbol = "X1-AB-1", TargetDepositSymbol = "IRON_ORE" }).Should().Be(AutomationPlan.Survey);
         AutomationSwitches.PlanFor(new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-1", SellWaypointSymbol = "X1-AB-2" }).Should().Be(AutomationPlan.Trading);
+        AutomationSwitches.PlanFor(new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-1" }).Should().Be(AutomationPlan.SpareTime);
         AutomationSwitches.PlanFor(new IdleGoal()).Should().BeNull();
     }
 }

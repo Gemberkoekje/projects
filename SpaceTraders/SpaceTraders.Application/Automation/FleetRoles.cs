@@ -7,19 +7,24 @@ namespace SpaceTraders.Application.Automation;
 /// <summary>
 /// Which plan a ship works for, by what it can do (PLAN.md slice 6.4), so every plan sees the fleet alike:
 /// <list type="bullet">
-///   <item>with the survey plan on, a ship that can survey surveys, and nothing else (D20): the command
-///   ship's mining laser stays unused;</item>
+///   <item>with the survey plan on, a ship that can survey surveys, and nothing else (D20). With the spare-time plan
+///   on too (slice 6.8), one that can also mine or siphon (the command ship) trades when it has nothing to survey
+///   (D34), and with no trade either mines or siphons whatever it can, which a survey or a trade interrupts
+///   (D35–D37);</item>
 ///   <item>a ship that can mine, and doesn't survey, mines: the contract first, every free miner (D23), then
 ///   the mining plan's trips. Only a miner neither has work for may trade;</item>
 ///   <item>a ship that can siphon, and can neither mine nor survey, siphons (slice 6.7): the siphon plan's
-///   trips. Only a siphoner the siphon plan has no work for may trade. The command ship's siphon stays
-///   unused: it mines, or surveys;</item>
+///   trips. Only a siphoner the siphon plan has no work for may trade. The command ship siphons only in its
+///   spare time;</item>
 ///   <item>any other ship with a hold and a tank trades.</item>
 /// </list>
 /// </summary>
 public static class FleetRoles
 {
-    /// <summary>Whether the ship surveys, and only surveys (D20).</summary>
+    /// <summary>
+    /// Whether the ship is a surveyor, which surveys before anything else (D20); with the spare-time plan on, it trades
+    /// or gathers when it has nothing to survey (slice 6.8, D34).
+    /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="surveyPlanOn">Whether the survey plan is switched on.</param>
     /// <returns>True for a ship with a surveyor mount while the survey plan is on.</returns>
@@ -41,7 +46,8 @@ public static class FleetRoles
 
     /// <summary>
     /// Whether the ship siphons (slice 6.7): a gas siphon, a hold and a tank, and nothing to mine or survey with,
-    /// whichever plans are on. That is a siphon drone: a ship that can also mine mines, or surveys (D20).
+    /// whichever plans are on. That is a siphon drone: a ship that can also mine mines, or surveys (D20) and siphons
+    /// only in its spare time (slice 6.8).
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>True for a ship the siphon plan may give work.</returns>
@@ -52,6 +58,37 @@ public static class FleetRoles
             && ship.IsTradingCapable
             && !ship.HasMiningEquipment
             && !ship.HasSurveyEquipment;
+    }
+
+    /// <summary>
+    /// Whether the ship mines or siphons in its spare time (slice 6.8): a surveyor (<see cref="IsSurveyor"/>) with a
+    /// hold, a tank, and a mining laser or a gas siphon. That is the command ship, while the survey plan is on;
+    /// with it off, the command ship is a miner, and the mining plan gives it work.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <param name="surveyPlanOn">Whether the survey plan is switched on.</param>
+    /// <returns>True for a ship the spare-time plan may give a trip.</returns>
+    public static bool GathersInSpareTime(ShipModel ship, bool surveyPlanOn)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return IsSurveyor(ship, surveyPlanOn)
+            && ship.IsTradingCapable
+            && (HasMiningLaser(ship) || ship.HasGasSiphonEquipment);
+    }
+
+    /// <summary>
+    /// Whether the ship has a mining laser. <see cref="ShipModel.HasMiningEquipment"/> also counts a surveyor
+    /// mount, which can't extract; a bought mining drone counts by its type, as its mounts are recorded only at
+    /// the next startup sync.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship that can extract at an asteroid.</returns>
+    public static bool HasMiningLaser(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.ShipType.Equals("SHIP_MINING_DRONE", StringComparison.OrdinalIgnoreCase)
+            || ship.ShipType.Equals("SHIP_ORE_HOUND", StringComparison.OrdinalIgnoreCase)
+            || (ship.MountSymbols ?? []).Any(mount => mount.Contains("MINING_LASER", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

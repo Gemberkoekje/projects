@@ -330,6 +330,24 @@ public static class MiningPlanner
         return TradeRoutePlanner.TryPlanFlight(map, source, market, ship.FuelCapacity, ship.FuelCapacity, out _);
     }
 
+    /// <summary>
+    /// Whether a market the ship can carry a good to from a waypoint buys it, at any price: what a siphon (D33) and a
+    /// spare-time trip (slice 6.8) keep of what they get there. What no such market buys would fill the hold for good.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The ship.</param>
+    /// <param name="from">Where it fills its hold.</param>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when a market it can carry the good to buys it.</returns>
+    public static bool IsSellableFrom(TradeMarketMap map, ShipModel ship, string from, string tradeSymbol)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        return map.MarketWaypoints.Any(market =>
+            map.TryGetGood(market, tradeSymbol, out var good)
+            && good.SellPrice > 0
+            && CanSellFrom(map, ship, from, market));
+    }
+
     /// <summary>Whether a market takes a good: it imports or exchanges it, at a price. Gases too (slice 6.7).</summary>
     /// <param name="good">The good as last seen at the market.</param>
     /// <returns>True when the market buys the good.</returns>

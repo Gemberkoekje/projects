@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.SpareTime;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -25,13 +26,18 @@ public interface ITradingAutomationService
 /// The trading plan (PLAN.md slice 6.5). Every tick it gives each free trader a trip:
 /// <list type="bullet">
 ///   <item>a trader is any ship with a cargo hold and a fuel tank that has no goal (or a blocked one),
-///   no open assignment, and isn't in transit, and that the survey and mining plans, which go first, left
-///   free: with the survey plan on, a ship that can survey never trades (D20, slice 6.4);</item>
+///   no open assignment, and isn't in transit, and that the survey, mining and siphon plans, which go first,
+///   left free: with the survey plan on, a ship that can survey trades only in its spare time, while the
+///   spare-time plan is on (D34, slice 6.8), and otherwise never (D20);</item>
 ///   <item>a trader that holds cargo first sells it where it fetches the most after fuel, when that
 ///   earns anything;</item>
 ///   <item>otherwise it gets its best lucrative route (<see cref="TradeRoutePlanner.Rank"/>) that no
 ///   other trader holds: two traders never share a route. When several traders are free, the best
-///   route goes first, to the trader it is best for.</item>
+///   route goes first, to the trader it is best for;</item>
+///   <item>with the spare-time plan on, a ship that gathers in its spare time (the command ship, when the survey
+///   plan has nothing for it) trades only for a route that waits for it once its hold is sold, after the other
+///   traders (D34): then it sells its hold first, and a spare-time trip that fills its hold is interrupted for it.
+///   Otherwise the spare-time plan keeps it (D37).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -49,6 +55,7 @@ public sealed class TradingAutomationService(
     ISettingsRepository settings,
     IShipyardRepository shipyards,
     IShipPurchaseService shipPurchases,
+    SpareTimeInterruption interruption,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -66,6 +73,7 @@ public sealed class TradingAutomationService(
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
         var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var spareTimeOn = await settings.IsPlanEnabledAsync(AutomationPlan.SpareTime, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -74,18 +82,36 @@ public sealed class TradingAutomationService(
 
         var held = new List<HeldRoute>();
         var free = new List<ShipModel>();
+
+        // Ships that gather in their spare time (slice 6.8), free or on a spare-time trip that fills its hold, while
+        // the spare-time plan is on: the survey plan, which goes first, had nothing for them, and they trade only for
+        // a route that waits for them (D34). Any other surveyor surveys, and only that (D20).
+        var gatherers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var onTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var ship in fleet)
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            var hasAssignment = withAssignment.Contains(ship.Symbol);
+            var gathers = spareTimeOn && FleetRoles.GathersInSpareTime(ship, surveyOn);
             if (goal is TradeBetweenMarketsGoal trade && trade.Status != GoalStatus.Blocked)
             {
                 held.Add(new HeldRoute(ship.Symbol, trade));
             }
             else if (ship.IsTradingCapable
-                && !FleetRoles.IsSurveyor(ship, surveyOn)
-                && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
+                && (gathers || !FleetRoles.IsSurveyor(ship, surveyOn))
+                && FleetRoles.IsFree(ship, goal, hasAssignment))
             {
                 free.Add(ship);
+                if (gathers)
+                {
+                    gatherers.Add(ship.Symbol);
+                }
+            }
+            else if (gathers && SpareTimeInterruption.IsInterruptible(ship, goal, hasAssignment))
+            {
+                free.Add(ship);
+                gatherers.Add(ship.Symbol);
+                onTrip.Add(ship.Symbol);
             }
         }
 
@@ -96,9 +122,9 @@ public sealed class TradingAutomationService(
         {
             var context = await tradeContexts.ReadAsync(system.Key, cancellationToken);
             var traders = new List<ShipModel>();
-            foreach (var ship in system)
+            foreach (var ship in system.Where(ship => !gatherers.Contains(ship.Symbol)))
             {
-                if (TryFindCargoSale(context.Map, ship, out var cargo, out var sale))
+                if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, ship, mustSell: false, out var cargo, out var sale))
                 {
                     var goal = await SellHeldCargoAsync(context.Map, ship, cargo, sale, cancellationToken);
                     held.Add(new HeldRoute(ship.Symbol, goal));
@@ -110,8 +136,14 @@ public sealed class TradingAutomationService(
                 }
             }
 
-            await AssignRoutesAsync(context, traders, held, heldKeys, pending, cancellationToken);
+            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, cancellationToken);
             idle += traders.Count;
+
+            // After the other traders: a ship that gathers in its spare time takes a route that is left for it.
+            foreach (var ship in system.Where(ship => gatherers.Contains(ship.Symbol)))
+            {
+                credits = await TradeInsteadOfGatheringAsync(context, credits, ship, onTrip.Contains(ship.Symbol), held, heldKeys, cancellationToken);
+            }
         }
 
         // A new cargo ship only when every trader has a trip (D21).
@@ -196,28 +228,57 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// For a trader that holds cargo: the good that fetches the most, after the fuel to where it sells
-    /// best, when that is anything at all. A good no reachable market buys, or one that doesn't pay
-    /// for the fuel to sell it, stays aboard and takes up room.
+    /// A ship that gathers in its spare time (slice 6.8) trades only when a route waits for it once its hold is sold
+    /// (D34): then it sells its hold first, one good a trip, by the rule every trader sells held cargo by
+    /// (<see cref="TradeRoutePlanner.TryFindBestCargoSale"/>: a good no reachable market buys, or one that doesn't pay
+    /// for the fuel to sell it, stays aboard), and takes its best route after. A spare-time trip that fills its hold is
+    /// interrupted for that (<see cref="SpareTimeInterruption"/>). The route is judged from where selling the hold leaves
+    /// the ship (<see cref="GatherPlanner.AfterSellingHold"/>), so it is still lucrative once the hold is sold and the
+    /// ship doesn't turn back to gathering on the way. Without one, the spare-time plan keeps the ship, and it sells its
+    /// hold once full (D37).
     /// </summary>
-    private static bool TryFindCargoSale(TradeMarketMap map, ShipModel ship, out CargoItemModel cargo, out TradeSale sale)
+    /// <returns>The credits left for cargo.</returns>
+    private async Task<long> TradeInsteadOfGatheringAsync(
+        TradeContext context,
+        long credits,
+        ShipModel ship,
+        bool onTrip,
+        List<HeldRoute> held,
+        HashSet<string> heldKeys,
+        CancellationToken cancellationToken)
     {
-        cargo = new CargoItemModel(string.Empty, 0);
-        sale = new TradeSale(string.Empty, 0, 0, 0);
-        var found = false;
-        foreach (var item in (ship.CargoInventory ?? []).Where(item => item.Units > 0))
+        var routes = TradeRoutePlanner.Rank(context.Map, GatherPlanner.AfterSellingHold(context.Map, ship), credits, context.MinProfitPerUnit, heldKeys);
+        if (routes.Count == 0)
         {
-            if (TradeRoutePlanner.TryFindBestSale(map, ship, item.Symbol, item.Units, out var candidate)
-                && candidate.NetRevenue > 0
-                && (!found || candidate.NetRevenue > sale.NetRevenue))
-            {
-                cargo = item;
-                sale = candidate;
-                found = true;
-            }
+            return credits;
         }
 
-        return found;
+        var sellsHold = TradeRoutePlanner.TryFindBestCargoSale(context.Map, ship, mustSell: false, out var cargo, out var sale);
+
+        // Nothing aboard pays for its sale: the hold stays as it is, and the routes were judged from here.
+        var goal = sellsHold ? HeldCargoGoal(context.Map, ship, cargo, sale) : RouteGoal(routes[0]);
+        if (onTrip)
+        {
+            if (!await interruption.TryReplaceAsync(ship.Symbol, goal, "trade", cancellationToken))
+            {
+                return credits;
+            }
+        }
+        else
+        {
+            await goals.SetActiveGoalAsync(ship.Symbol, goal, cancellationToken);
+        }
+
+        held.Add(new HeldRoute(ship.Symbol, goal));
+        heldKeys.Add(held[^1].Key);
+        if (sellsHold)
+        {
+            LogHeldCargoSale(ship, cargo, sale, goal);
+            return credits;
+        }
+
+        LogRoute(ship, routes[0]);
+        return credits - (routes[0].Units * routes[0].BuyPrice);
     }
 
     private async Task<TradeBetweenMarketsGoal> SellHeldCargoAsync(
@@ -227,7 +288,15 @@ public sealed class TradingAutomationService(
         TradeSale sale,
         CancellationToken cancellationToken)
     {
-        var goal = new TradeBetweenMarketsGoal
+        var goal = HeldCargoGoal(map, ship, cargo, sale);
+        await goals.SetActiveGoalAsync(ship.Symbol, goal, cancellationToken);
+        LogHeldCargoSale(ship, cargo, sale, goal);
+        return goal;
+    }
+
+    /// <summary>A trip that sells cargo the ship holds, from where it is, where it fetches the most after fuel.</summary>
+    private static TradeBetweenMarketsGoal HeldCargoGoal(TradeMarketMap map, ShipModel ship, CargoItemModel cargo, TradeSale sale)
+        => new()
         {
             TradeSymbol = cargo.Symbol,
             BuyWaypointSymbol = ship.WaypointSymbol ?? string.Empty,
@@ -237,8 +306,9 @@ public sealed class TradingAutomationService(
             FeedsTradeSymbol = map.PricierGoodMadeFrom(sale.WaypointSymbol, cargo.Symbol),
             CargoBought = true,
         };
-        await goals.SetActiveGoalAsync(ship.Symbol, goal, cancellationToken);
 
+    private void LogHeldCargoSale(ShipModel ship, CargoItemModel cargo, TradeSale sale, TradeBetweenMarketsGoal goal)
+    {
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} sells the {Units} {TradeSymbol} it holds, from {BuyWaypoint}, at {SellWaypoint} ({SellPrice} each); about {ExpectedProfit} credits after {FuelCost} for fuel.",
             JournalEvents.TradeStarted,
@@ -250,14 +320,14 @@ public sealed class TradingAutomationService(
             sale.SellPrice,
             sale.NetRevenue,
             sale.FuelCost);
-        return goal;
     }
 
     /// <summary>
     /// Gives the free traders of one system their routes, best route first: each round, the trader whose
     /// best route ranks highest gets it, and that route is no longer open to the others.
     /// </summary>
-    private async Task AssignRoutesAsync(
+    /// <returns>The credits left for cargo once the routes' purchases are counted.</returns>
+    private async Task<long> AssignRoutesAsync(
         TradeContext context,
         List<ShipModel> traders,
         List<HeldRoute> held,
@@ -317,11 +387,21 @@ public sealed class TradingAutomationService(
                 trader.WaypointSymbol,
                 context.MinProfitPerUnit);
         }
+
+        return credits;
     }
 
     private async Task<TradeBetweenMarketsGoal> StartRouteAsync(ShipModel ship, TradeRoute route, CancellationToken cancellationToken)
     {
-        var goal = new TradeBetweenMarketsGoal
+        var goal = RouteGoal(route);
+        await goals.SetActiveGoalAsync(ship.Symbol, goal, cancellationToken);
+        LogRoute(ship, route);
+        return goal;
+    }
+
+    /// <summary>A trip along a route: buy at its buy market, sell at its sell market.</summary>
+    private static TradeBetweenMarketsGoal RouteGoal(TradeRoute route)
+        => new()
         {
             TradeSymbol = route.TradeSymbol,
             BuyWaypointSymbol = route.BuyWaypointSymbol,
@@ -330,8 +410,9 @@ public sealed class TradingAutomationService(
             ExpectedProfit = route.Profit,
             FeedsTradeSymbol = route.FeedsTradeSymbol,
         };
-        await goals.SetActiveGoalAsync(ship.Symbol, goal, cancellationToken);
 
+    private void LogRoute(ShipModel ship, TradeRoute route)
+    {
         if (route.FeedsProduction)
         {
             logger.LogInformation(
@@ -363,8 +444,6 @@ public sealed class TradingAutomationService(
                 route.Profit,
                 route.FuelCost);
         }
-
-        return goal;
     }
 
     /// <summary>

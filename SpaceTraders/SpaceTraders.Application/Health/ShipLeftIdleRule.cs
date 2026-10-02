@@ -26,7 +26,9 @@ namespace SpaceTraders.Application.Health;
 ///   <item>siphon: likewise, a gas in low supply without a ship, for a siphoner the plan lists as able to
 ///   reach its gas giant (slice 6.7);</item>
 ///   <item>trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to
-///   take it (slice 6.5).</item>
+///   take it (slice 6.5);</item>
+///   <item>spare time: a place to mine or siphon, for a ship the plan lists with one (slice 6.8): the command ship
+///   with nothing to survey or trade.</item>
 /// </list>
 /// <para>
 /// Without such work an idle ship is idle by design: in the first run (D9, D1) the starting probe, the
@@ -182,6 +184,24 @@ public sealed class ShipLeftIdleRule(
                     AutomationPlan.Trading,
                     string.Create(CultureInfo.InvariantCulture, $"{open.Count} lucrative trade routes without a ship"),
                     ship => open.Any(opportunity => opportunity.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
+            }
+        }
+
+        // The plan gives a trip at once to every free ship it lists with a place to gather at (slice 6.8), so one can
+        // only be left idle while the plan has stopped. A ship it lists as waiting has nowhere to gather and sell.
+        if (context.IsOn(AutomationPlan.SpareTime)
+            && await plans.GetAsync<SpareTimePlanState>(PlanTypes.SpareTime, cancellationToken) is { } spareTime)
+        {
+            var withSource = spareTime.Ships
+                .Where(ship => ship.SourceWaypointSymbol.Length > 0)
+                .Select(ship => ship.ShipSymbol)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (withSource.Count > 0)
+            {
+                waiting.Add(new WaitingWork(
+                    AutomationPlan.SpareTime,
+                    "a place to mine or siphon in its spare time",
+                    ship => withSource.Contains(ship.Symbol)));
             }
         }
 

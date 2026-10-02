@@ -154,7 +154,7 @@ public sealed class FleetStatusQueryServiceTests
         shipRepo.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100));
 
-        var startedAt = new DateTimeOffset(2024, 1, 1, 8, 0, 0, TimeSpan.Zero);
+        var startedAt = new DateTimeOffset(2024, 01, 01, 08, 00, 00, TimeSpan.Zero);
         var endedAt = startedAt.AddMinutes(20);
         var historyEntry = new ShipGoalHistoryEntry
         {
@@ -190,7 +190,7 @@ public sealed class FleetStatusQueryServiceTests
 
         result.Should().NotBeNull();
         result.Should().ContainSingle();
-        result![0].CreditsEarned.Should().Be(900);
+        result[0].CreditsEarned.Should().Be(900);
         result[0].CreditsSpent.Should().Be(250);
         result[0].NetCredits.Should().Be(650);
         result[0].LedgerEntryCount.Should().Be(4);
@@ -527,7 +527,7 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     [Fact]
     public async Task GetAssignmentsAsync_ShipWithMineResourceGoal_LinkedToConstructionFleetGoal()
     {
-        var assignedAt = new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var assignedAt = new DateTimeOffset(2024, 01, 01, 12, 00, 00, TimeSpan.Zero);
         var fleetGoal = new FleetGoal(
             FleetGoalKind.Construction,
             "Supply BAUXITE to X1-AB-GATE",
@@ -658,6 +658,32 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     }
 
     [Fact]
+    public async Task GetAssignmentsAsync_GatherAndSellGoal_SaysWhatTheShipDoesInItsSpareTime()
+    {
+        // Slice 6.8: the command ship's spare-time trip, siphoning; then selling a good of its hold.
+        var trip = new GatherAndSellGoal { SourceWaypointSymbol = "X1-DC53-C38", Siphoning = true };
+        var svc = Build(
+            shipRepo: ShipsWith("SHIP-1", "SHIP-2"),
+            shipGoalRepo: ShipGoalsWith(
+                ("SHIP-1", trip),
+                ("SHIP-2", trip with { Selling = true, SellTradeSymbol = "HYDROCARBON", SellWaypointSymbol = "X1-DC53-G50" })));
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Should().HaveCount(2);
+        result.Should().Contain(snapshot =>
+            snapshot.ShipSymbol == "SHIP-1"
+            && snapshot.GoalKind == ShipGoalKind.SiphonResource
+            && snapshot.GoalDescription == "Siphoning whatever sells at X1-DC53-C38 in its spare time"
+            && snapshot.SourceWaypoint == "X1-DC53-C38"
+            && snapshot.DestinationWaypoint == null);
+        result.Should().Contain(snapshot =>
+            snapshot.ShipSymbol == "SHIP-2"
+            && snapshot.GoalDescription == "Selling its spare-time hold: HYDROCARBON at X1-DC53-G50"
+            && snapshot.DestinationWaypoint == "X1-DC53-G50");
+    }
+
+    [Fact]
     public async Task GetAssignmentsAsync_TradeBetweenMarketsGoal_UsesTradingSnapshot()
     {
         var svc = Build(
@@ -682,7 +708,7 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     [Fact]
     public async Task GetAssignmentsAsync_NoShipGoal_UsesActiveContractAssignmentSnapshot()
     {
-        var assignedAt = new DateTimeOffset(2024, 2, 1, 10, 0, 0, TimeSpan.Zero);
+        var assignedAt = new DateTimeOffset(2024, 02, 01, 10, 00, 00, TimeSpan.Zero);
 
         var assignmentRepo = Substitute.For<IShipAssignmentRepository>();
         assignmentRepo.FindAsync("MINER-1", Arg.Any<CancellationToken>()).Returns(
@@ -910,6 +936,6 @@ public sealed class FleetStatusQueryServiceActivityTests
         var result = await svc.GetShipActivityAsync("SHIP-1");
 
         result.Should().NotBeNull();
-        result!.ActivityDescription.Should().Contain("Docked").And.Contain("X1-BASE");
+        result.ActivityDescription.Should().Contain("Docked").And.Contain("X1-BASE");
     }
 }
