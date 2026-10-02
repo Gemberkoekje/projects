@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-02)
+- A handler's first message no longer logs a warning for each dependency it resolves from the container (B42): Wolverine allows service location without one (`ServiceLocationPolicy.AlwaysAllowed`). On the cluster these warnings, all with one template, raised the `RepeatingError` anomaly in the bot's second minute, and their text ("…this is an error") tripped gembernodes' error-log alert.
+- Every counter series reaches Prometheus at 0 before it counts (B43, `ZeroFirstCounter`): what a new series counts waits until a scrape has exported that 0, at most two scrape intervals. Prometheus's `increase()` and `rate()` never count the value a series has when it is first scraped, so the contract's deposit and the first drone, booked before the pod's first scrape, were missing from the ledger panels, and a single 429, failed call or breaker trip could never show.
+
+### Docs – Changed (2026-10-02)
+- `PLAN.md`: phase 4 merged and the first-run watch (4.3) started; B42–B44 found in its first minutes. `README.md` reports the bot back on the cluster, and `docs/HOW_IT_WORKS.md` says when Wolverine compiles a handler and how counters reach Prometheus.
+
 ### Docs – Added (2026-10-01)
 - `PLAN.md`: the plan for getting the bot safely back on the cluster, with the known issues found by reading the code (B1–B25) and the decisions taken (D1–D11).
 - `docs/HOW_IT_WORKS.md`: what the code does today, written from the code.

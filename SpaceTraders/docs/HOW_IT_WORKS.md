@@ -42,10 +42,13 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
   `Application=SpaceTraders.API`. The host logs through its own logger and leaves Serilog's static
   `Log.Logger` alone, so test hosts running side by side don't share one (B41).
 - **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
-  nothing goes to Postgres. It compiles the handler code at startup (`WolverineFx.RuntimeCompilation`).
+  nothing goes to Postgres. It compiles a handler's code at runtime (`WolverineFx.RuntimeCompilation`)
+  when the handler's first message comes, not at startup.
   Its generated code resolves the DbContext from the scope (`AlwaysUseServiceLocationFor`), because
-  EF Core registers the DbContext's options through a factory; anything else that needs service
-  location logs a warning, as in 5.x (`RestoreV5Defaults()`), instead of failing the handler. A crash loses the messages still in flight; after the restart,
+  EF Core registers the DbContext's options through a factory. Anything else registered through a
+  lambda (an interface resolving its concrete type, a typed HttpClient) is resolved from the scope
+  too, without a warning (`ServiceLocationPolicy.AlwaysAllowed`): 5.x's warning, one per handler and
+  dependency on each handler's first message, raised a `RepeatingError` anomaly on every start (B42). A crash loses the messages still in flight; after the restart,
   startup sync and startup recovery pick the ships up again, and pending arrivals wait in
   `scheduled_ship_events`. Any handler exception is retried after 250 ms, 500 ms and 1 s, then
   the message is discarded.
@@ -781,6 +784,14 @@ The seven pages in `src/Future` are not routed.
   before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the
   .NET meters, Wolverine's among them). Labels stay low-cardinality: a few per ship or contract
   at most.
+
+  Every `spacetraders_*` counter series reaches Prometheus at 0 before it counts anything
+  (`ZeroFirstCounter`, B43). Prometheus's `increase()` and `rate()` never count the value a series
+  has when it is first scraped, so a series that held its first increment then (the contract's
+  deposit and the first drone, booked before the pod's first scrape; any single 429 or breaker
+  trip) never showed on the dashboard. A new series is published at 0, and what it counts waits
+  until a scrape has exported that 0: up to two scrape intervals (2 minutes on the cluster). Locally,
+  a new series shows its count from the second `curl` of `/metrics` after it appeared.
 
   | Metric | Labels | What it counts or shows | Updated |
   |---|---|---|---|
