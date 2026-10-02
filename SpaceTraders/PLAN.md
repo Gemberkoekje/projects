@@ -111,7 +111,7 @@ the misbehaviour.
 | B41 | **Hosts in one process share a logger** (found when CI failed on main at `41a7c22`, after #114 had passed). By default the Serilog hosting package sends a host's lines to the process-wide `Log.Logger`, which every host replaces when it starts and closes when it stops. Production runs one host per process; the tests run several side by side, so a host's warnings could reach another host's error log, or none. `HealthRuleScenarioTests`' RepeatingError scenario failed that way, which kept CI from building the images. | `Program.cs` (`UseSerilog`), Serilog.Extensions.Hosting (`preserveStaticLogger`) | 4.2 (done) |
 | B42 | **A handler's first message raises `RepeatingError`** (found in 4.3, on the cluster). Wolverine compiles a handler when its first message comes, and under 5.x's `AllowedButWarn` (`RestoreV5Defaults()`) it logged a warning for each dependency it resolves from the container ("Utilizing service location for …"). They all share one template: 11 in the bot's first minute, over the rule's limit of 5, so the anomaly was raised on every start, and could be again whenever a handler first ran later. Their text ("…this is an error") also tripped the error-log alert (B44). | `DependencyInjection.cs` (`RestoreV5Defaults()`), `RepeatingErrorRule.cs` | 4.3 (done) |
 | B43 | **A counter's first value never reaches the dashboard** (found in 4.3). Prometheus's `increase()` and `rate()` count what a series gains between two scrapes, never the value it has when first scraped, and prometheus-net creates a labelled series on its first increment. On the cluster the contract's deposit (4,267) and the first drone (46,885) were booked about 25 seconds before Prometheus first scraped the pod, so the ledger panels showed neither; a single 429, failed call or breaker trip could never show at all. | `PrometheusAutomationMetrics.cs`; the dashboard's ledger, 429 and breaker panels | 4.3 (done) |
-| B44 | **The error-log alert fires on the bot's ordinary lines** (found in 4.3). Gembernodes' "Error logs detected" rule matches `(?i)error` anywhere in a line, and 2.5 added `spacetraders` to it. The bot's JSON lines contain the word without being errors: the startup settings dump (`Health.Errors.MaxRepeatsIn10Minutes`), Wolverine's "…this is an error" (B42) and a `RepeatingError` anomaly's own lines. It fired five minutes after the first start. | gembernodes `infrastructure/monitoring/grafana-alerting-provisioning.yaml` (`loki-error-logs`) | 4.3 (gembernodes) |
+| B44 | **The error-log alert fires on the bot's ordinary lines** (found in 4.3). Gembernodes' "Error logs detected" rule matches `(?i)error` anywhere in a line, and 2.5 added `spacetraders` to it. The bot's JSON lines contain the word without being errors: the startup settings dump (`Health.Errors.MaxRepeatsIn10Minutes`), Wolverine's "…this is an error" (B42) and a `RepeatingError` anomaly's own lines. It fired five minutes after the first start. | gembernodes `infrastructure/monitoring/grafana-alerting-provisioning.yaml` (`loki-error-logs`) | 4.3 (done: gembernodes PR #13, not merged) |
 
 ### Decisions (2026-10-01)
 
@@ -954,7 +954,7 @@ its own retention, so the bot's database stays small.
     50,000).
   - Found: B42 (`RepeatingError` raised at 08:51:46 and cleared at 09:01:48), B43 (the ledger
     panels missed the deposit and the drone) and B44 (the error-log email at 08:55:50). B42 and B43
-    are fixed in this repository; B44 is a gembernodes change.
+    are fixed in this repository; B44 in gembernodes PR #13.
   - Noticed: "Credits in the last hour" and "Credits per hour" show no data in the bot's first hour
     on the cluster. They subtract the credits of an hour ago (`offset 1h`), which didn't exist yet;
     across restarts `max()` keeps them working.
@@ -1015,4 +1015,4 @@ your PC, 1Password or kubectl:
 | 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
-| 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match; then a Grafana rollout restart |
+| 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (PR #13, not merged); then a Grafana rollout restart |
