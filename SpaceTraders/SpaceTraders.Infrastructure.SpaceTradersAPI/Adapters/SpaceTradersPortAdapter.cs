@@ -201,6 +201,12 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         };
     }
 
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetSupplyChainAsync(CancellationToken cancellationToken = default)
+    {
+        var supplyChain = await client.GetSupplyChainAsync(cancellationToken);
+        return supplyChain.ExportToImportMap ?? new Dictionary<string, IReadOnlyList<string>>();
+    }
+
     public async Task<MarketDataModel> GetMarketAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
         var market = await client.GetMarketAsync(systemSymbol, waypointSymbol, cancellationToken);

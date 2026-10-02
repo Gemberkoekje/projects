@@ -68,6 +68,9 @@ public interface ISpaceTradersApiClient
 
     Task<Shipyard> GetShipyardAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>The game's production chains: for each exported good, the goods it is made from.</summary>
+    Task<SupplyChain> GetSupplyChainAsync(CancellationToken cancellationToken = default);
+
     // Phase 1 additions
     Task<ShipCargo> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default);
 

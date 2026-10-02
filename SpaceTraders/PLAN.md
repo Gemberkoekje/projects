@@ -727,10 +727,26 @@ its own retention, so the bot's database stays small.
     `_cargo_capacity_units`.
   - What the drones extract and jettison is counted per ship and good:
     `spacetraders_extracted_units_total`, `spacetraders_jettisoned_units_total`.
-  - The dashboard's side is a gembernodes change: the fleet table's new columns, and panels for the
-    holds and for what was mined.
+  - The dashboard's side is gembernodes PR #15 (merged): the fleet table's new columns, and panels
+    for the holds and for what was mined. Gembernodes PR #16 deploys the bot with them.
   - Noticed: a goal other than scouting reads as its purpose, not its current step (a `MineAndSell`
     drone reads "mining and selling …" while it sells too); those goals only run from phase 6.
+
+**2.8 A markets dashboard per system** (done; asked 2026-10-02, during 4.3)
+- Asked: a second dashboard with a dropdown for the system to watch, that system's market and
+  shipyard data, and the market tree: which goods are made from which.
+- Done:
+  - Every minute the bot exports the markets and shipyards it has cached
+    (`PrometheusMarketMetricsService`): per market and good its prices, trade volume, supply (1 to
+    5) and activity (0 to 3) as last seen; per shipyard its ship types and, once a ship has been
+    there, their prices and supply; and when each was last refreshed. A market that no ship has
+    visited yet shows only that it exists.
+  - The market tree is the game's own: `GET market/supply-chain`, once per start (retried an hour
+    after a failure, so a game API that is down can't raise `RepeatingError`), one series per good
+    with what it is made from and what is made from it (`spacetraders_good_supply_chain`).
+  - The dashboard itself is a gembernodes change.
+  - Noticed: the game lists `MACHINERY` as what raw goods (`ICE_WATER`, `AMMONIA_ICE` and others)
+    are made from; the tree shows the game's map as it is.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a

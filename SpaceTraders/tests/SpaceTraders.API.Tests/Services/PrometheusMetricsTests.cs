@@ -366,6 +366,75 @@ public sealed class PrometheusAutomationMetricsTests
         (await ExportAsync()).Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
     }
 
+    /// <summary>The markets dashboard (slice 2.8): a market's goods with their prices, volume, supply and activity.</summary>
+    [Fact]
+    public async Task AMarket_ShowsItsGoodsWithPricesVolumeSupplyAndActivity()
+    {
+        _metrics.Markets([Market(
+            new TradeGoodSnapshot("COPPER_ORE", "IMPORT", 60, 55, 60, "SCARCE", "WEAK"),
+            new TradeGoodSnapshot("FUEL", "EXCHANGE", 72, 68, 180, "MODERATE", string.Empty))]);
+
+        var text = await ExportAsync();
+        text.Should().Contain($"spacetraders_market_observed_timestamp_seconds{{system=\"X1-AB\",waypoint=\"X1-AB-H51\",waypoint_type=\"PLANET\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().Contain("spacetraders_market_purchase_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
+        text.Should().Contain("spacetraders_market_sell_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 55\n");
+        text.Should().Contain("spacetraders_market_trade_volume{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
+        text.Should().Contain("spacetraders_market_supply{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
+        text.Should().Contain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
+        text.Should().Contain("spacetraders_market_supply{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 3\n");
+        text.Should().NotContain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\"");
+
+        // The next visit no longer lists copper; after a reset the new agent knows no markets yet.
+        _metrics.Markets([Market(new TradeGoodSnapshot("FUEL", "EXCHANGE", 74, 70, 180, "LIMITED", "GROWING"))]);
+        text = await ExportAsync();
+        text.Should().NotContain("good=\"COPPER_ORE\"");
+        text.Should().Contain("spacetraders_market_purchase_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 74\n");
+        text.Should().Contain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 2\n");
+
+        _metrics.Markets([]);
+        (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H51\"");
+    }
+
+    [Fact]
+    public async Task AShipyard_ShowsItsShipTypesAndThePricesItKnows()
+    {
+        _metrics.Shipyards([new ShipyardMetricsSample(
+            "X1-AB",
+            "X1-AB-H52",
+            "MOON",
+            Start,
+            ["SHIP_MINING_DRONE", "SHIP_PROBE"],
+            [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 46_885, Supply = "MODERATE" }])]);
+
+        var text = await ExportAsync();
+        text.Should().Contain($"spacetraders_shipyard_observed_timestamp_seconds{{system=\"X1-AB\",waypoint=\"X1-AB-H52\",waypoint_type=\"MOON\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_price{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 46885\n");
+        text.Should().Contain("spacetraders_shipyard_ship_supply{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 3\n");
+        text.Should().NotContain("spacetraders_shipyard_ship_price{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"}");
+
+        _metrics.Shipyards([]);
+        (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H52\"");
+    }
+
+    [Fact]
+    public async Task TheSupplyChain_ShowsWhatEachGoodIsMadeFromAndWhatIsMadeFromIt()
+    {
+        _metrics.SupplyChain(new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["IRON"] = ["IRON_ORE"],
+            ["MACHINERY"] = ["IRON"],
+            ["FAB_MATS"] = ["QUARTZ_SAND", "IRON"],
+        });
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_good_supply_chain{good=\"IRON\",made_from=\"IRON_ORE\",used_for=\"FAB_MATS, MACHINERY\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{good=\"FAB_MATS\",made_from=\"IRON, QUARTZ_SAND\",used_for=\"\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{good=\"IRON_ORE\",made_from=\"\",used_for=\"IRON\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{good=\"QUARTZ_SAND\",made_from=\"\",used_for=\"FAB_MATS\"} 1\n");
+    }
+
     [Fact]
     public async Task AContractThatIsGone_LosesItsSeries()
     {
@@ -379,6 +448,9 @@ public sealed class PrometheusAutomationMetricsTests
 
         (await ExportAsync()).Should().NotContain("contract=\"C-1\"");
     }
+
+    private static MarketMetricsSample Market(params TradeGoodSnapshot[] goods)
+        => new("X1-AB", "X1-AB-H51", "PLANET", Start, goods);
 
     private static ShipMetricsSample Drone(string location, string activity, CargoItemModel[] cargo, DateTimeOffset arrivesAt = default)
         => new("AGENT-3", "SHIP_MINING_DRONE", arrivesAt == default ? "IN_ORBIT" : "IN_TRANSIT", "Contract", string.Empty)

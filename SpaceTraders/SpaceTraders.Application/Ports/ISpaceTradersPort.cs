@@ -40,6 +40,9 @@ public interface ISpaceTradersPort
 
     Task<ShipyardDataModel> GetShipyardAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>The game's production chains: each exported good, with the goods it is made from.</summary>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetSupplyChainAsync(CancellationToken cancellationToken = default);
+
     Task<RegisterResult> RegisterAsync(string agentSymbol, string faction, string? email, CancellationToken cancellationToken = default);
 
     // Phase 1 additions
