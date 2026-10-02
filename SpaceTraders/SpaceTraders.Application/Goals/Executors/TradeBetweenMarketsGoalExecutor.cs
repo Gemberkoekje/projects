@@ -1,11 +1,10 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
@@ -15,250 +14,267 @@ using Wolverine;
 namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
-/// Executor for <see cref="TradeBetweenMarketsGoal"/>.
-/// Buys the target good at the configured source market and sells it at the destination market.
+/// Executor for <see cref="TradeBetweenMarketsGoal"/>: one trip of a trade route (PLAN.md slice 6.5).
+/// The ship flies to the buy market, buys, flies to the sell market and sells, refuelling on the way
+/// where a market is beyond one tank (<see cref="TradeRoutePlanner.NextStop"/>). A ship can't change
+/// course in flight, so it reconsiders the trip where it lands, with the prices its arrival has just
+/// refreshed (and the newest prices known for the other market):
+/// <list type="bullet">
+///   <item>at the buy market, before buying: when the trip is no longer lucrative, it gives it up
+///   (<c>TradeDropped</c>) and the trading plan chooses again from there;</item>
+///   <item>at the sell market, before selling: when selling there is no longer lucrative and another
+///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
+/// </list>
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
     IShipRepository ships,
     IShipGoalRepository goals,
     IAgentRepository agents,
     ISpaceTradersPort port,
+    ITradeContextReader tradeContexts,
     IDockSubCommand dock,
     IMessageBus bus,
     ILogger<TradeBetweenMarketsGoalExecutor> logger) : IShipGoalExecutor
 {
+    private const string NotLucrative = "not_lucrative";
+    private const string NotPossible = "not_possible";
+    private const string NotBoughtHere = "not_bought_here";
+
+    /// <inheritdoc />
     public bool CanExecute(ShipGoal goal) => goal is TradeBetweenMarketsGoal;
 
+    /// <inheritdoc />
     public async Task<GoalExecutionResult> ExecuteStepAsync(
         ShipModel ship,
         ShipGoal goal,
         ShipGoalContext ctx,
         CancellationToken ct)
     {
-        var tradeGoal = (TradeBetweenMarketsGoal)goal;
+        var trade = (TradeBetweenMarketsGoal)goal;
 
         if (ship.LocalStatus == ShipLocalStatus.InTransit)
         {
             return GoalExecutionResult.WaitingForArrival("Trade ship is in transit.");
         }
 
-        var cargoInventory = ship.CargoInventory ?? [];
-        var targetUnits = cargoInventory
-            .FirstOrDefault(i => i.Symbol.Equals(tradeGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
-            .Units ?? 0;
+        return trade.CargoBought
+            ? await SellStepAsync(ship, trade, ct)
+            : await BuyStepAsync(ship, trade, ct);
+    }
 
-        if (targetUnits <= 0)
+    private async Task<GoalExecutionResult> BuyStepAsync(ShipModel ship, TradeBetweenMarketsGoal trade, CancellationToken ct)
+    {
+        if (!IsAt(ship, trade.BuyWaypointSymbol))
         {
-            var atBuyWaypoint = string.Equals(
-                ship.WaypointSymbol,
-                tradeGoal.BuyWaypointSymbol,
-                StringComparison.OrdinalIgnoreCase);
-
-            if (!atBuyWaypoint)
-            {
-                await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, tradeGoal.BuyWaypointSymbol), ct);
-                return GoalExecutionResult.WaitingForArrival(
-                    $"Navigating to buy waypoint {tradeGoal.BuyWaypointSymbol}.");
-            }
-
-            if (ship.LocalStatus == ShipLocalStatus.InOrbit)
-            {
-                await dock.ExecuteAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing(
-                    $"Docking at buy waypoint {tradeGoal.BuyWaypointSymbol}.");
-            }
-
-            var availableCapacity = ship.CargoCapacity - ship.CargoCurrent;
-            if (availableCapacity <= 0)
-            {
-                return GoalExecutionResult.Blocked(
-                    $"Ship {ship.Symbol} has no cargo capacity available to buy {tradeGoal.TradeSymbol}.");
-            }
-
-            var unitsToBuy = await DetermineUnitsToBuyAsync(ship, tradeGoal, availableCapacity, ct);
-            if (unitsToBuy <= 0)
-            {
-                return GoalExecutionResult.Blocked(
-                    $"No purchasable units available for {tradeGoal.TradeSymbol} at {tradeGoal.BuyWaypointSymbol} (market volume or credits insufficient).");
-            }
-
-            var buyResult = await port.BuyCargoAsync(ship.Symbol, tradeGoal.TradeSymbol, unitsToBuy, ct);
-            await ships.UpdateCargoAsync(ship.Symbol, buyResult.Cargo, ct);
-            await agents.SetCreditsAsync(bus, buyResult.AgentCredits, ct);
-
-            // The ledger and the credits-spent metric (B7). The port's "revenue" is the transaction's total.
-            await bus.PublishAsync(new CargoPurchasedEvent(
-                ship.Symbol,
-                new TradeSymbol(tradeGoal.TradeSymbol),
-                unitsToBuy,
-                buyResult.Revenue,
-                buyResult.AgentCredits,
-                tradeGoal.BuyWaypointSymbol));
-
-            logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
-                JournalEvents.CargoBought,
-                ship.Symbol,
-                unitsToBuy,
-                tradeGoal.TradeSymbol,
-                tradeGoal.BuyWaypointSymbol,
-                buyResult.Revenue);
-
-            await goals.SetActiveGoalAsync(ship.Symbol, tradeGoal, ct);
-            return GoalExecutionResult.Progressing(
-                $"Bought {unitsToBuy} {tradeGoal.TradeSymbol} at {tradeGoal.BuyWaypointSymbol}; preparing to sell.");
-        }
-
-        var atSellWaypoint = string.Equals(
-            ship.WaypointSymbol,
-            tradeGoal.SellWaypointSymbol,
-            StringComparison.OrdinalIgnoreCase);
-
-        if (!atSellWaypoint)
-        {
-            await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, tradeGoal.SellWaypointSymbol), ct);
-            return GoalExecutionResult.WaitingForArrival(
-                $"Navigating to sell waypoint {tradeGoal.SellWaypointSymbol}.");
+            return await FlyTowardsAsync(ship, trade.BuyWaypointSymbol, ct);
         }
 
         if (ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
             await dock.ExecuteAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing(
-                $"Docking at sell waypoint {tradeGoal.SellWaypointSymbol}.");
+            return GoalExecutionResult.Progressing($"Docking at buy waypoint {trade.BuyWaypointSymbol}.");
         }
 
-        var sellResult = await port.SellCargoAsync(ship.Symbol, tradeGoal.TradeSymbol, targetUnits, ct);
-        await ships.UpdateCargoAsync(ship.Symbol, sellResult.Cargo, ct);
-        await agents.SetCreditsAsync(bus, sellResult.AgentCredits, ct);
+        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        if (!TradeRoutePlanner.TryEvaluate(
+                context.Map,
+                ship,
+                trade.TradeSymbol,
+                trade.BuyWaypointSymbol,
+                trade.SellWaypointSymbol,
+                context.Credits,
+                out var route))
+        {
+            return await DropAsync(ship, trade, NotPossible, ct);
+        }
 
-        // The ledger and the credits-earned metric (B7).
-        await bus.PublishAsync(new ShipCargoSoldEvent(
+        if (!route.IsLucrative(context.MinProfitPerUnit))
+        {
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: buying {Units} at {BuyPrice} and selling at {SellPrice} at {SellWaypoint} earns {ExpectedProfit} after fuel, under {MinProfitPerUnit} a unit ({Reason}).",
+                JournalEvents.TradeDropped,
+                ship.Symbol,
+                trade.TradeSymbol,
+                trade.BuyWaypointSymbol,
+                route.Units,
+                route.BuyPrice,
+                route.SellPrice,
+                trade.SellWaypointSymbol,
+                route.Profit,
+                context.MinProfitPerUnit,
+                NotLucrative);
+            return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip is no longer lucrative; dropped.");
+        }
+
+        var result = await port.BuyCargoAsync(ship.Symbol, trade.TradeSymbol, route.Units, ct);
+        await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
+        await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
+
+        // The ledger and the credits-spent metric (B7). The port's "revenue" is the transaction's total.
+        await bus.PublishAsync(new CargoPurchasedEvent(
             ship.Symbol,
-            new TradeSymbol(tradeGoal.TradeSymbol),
-            targetUnits,
-            sellResult.Revenue,
-            sellResult.AgentCredits));
+            new TradeSymbol(trade.TradeSymbol),
+            route.Units,
+            result.Revenue,
+            result.AgentCredits,
+            trade.BuyWaypointSymbol));
 
         logger.LogInformation(
-            "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
-            JournalEvents.CargoSold,
+            "{EventKind:l}: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
+            JournalEvents.CargoBought,
             ship.Symbol,
-            targetUnits,
-            tradeGoal.TradeSymbol,
-            tradeGoal.SellWaypointSymbol,
-            sellResult.Revenue);
+            route.Units,
+            trade.TradeSymbol,
+            trade.BuyWaypointSymbol,
+            result.Revenue);
+
+        await goals.SetActiveGoalAsync(
+            ship.Symbol,
+            trade with
+            {
+                CargoBought = true,
+                Units = route.Units,
+                PricePaidPerUnit = result.Revenue / route.Units,
+            },
+            ct);
+        return GoalExecutionResult.Progressing(
+            $"Bought {route.Units} {trade.TradeSymbol} at {trade.BuyWaypointSymbol}; next, selling at {trade.SellWaypointSymbol}.");
+    }
+
+    private async Task<GoalExecutionResult> SellStepAsync(ShipModel ship, TradeBetweenMarketsGoal trade, CancellationToken ct)
+    {
+        var units = (ship.CargoInventory ?? [])
+            .Where(item => item.Symbol.Equals(trade.TradeSymbol, StringComparison.OrdinalIgnoreCase))
+            .Sum(item => item.Units);
+        if (units <= 0)
+        {
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Completed($"No {trade.TradeSymbol} aboard; nothing left to sell.");
+        }
+
+        if (!IsAt(ship, trade.SellWaypointSymbol))
+        {
+            return await FlyTowardsAsync(ship, trade.SellWaypointSymbol, ct);
+        }
+
+        if (ship.LocalStatus == ShipLocalStatus.InOrbit)
+        {
+            await dock.ExecuteAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Progressing($"Docking at sell waypoint {trade.SellWaypointSymbol}.");
+        }
+
+        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
+        var marginHere = here.SellPrice - trade.PricePaidPerUnit;
+        var lucrativeHere = sellsHere && marginHere > 0 && marginHere >= context.MinProfitPerUnit;
+        if (!lucrativeHere
+            && !trade.SellWaypointChanged
+            && TradeRoutePlanner.TryFindBestSale(context.Map, ship, trade.TradeSymbol, units, out var elsewhere)
+            && !elsewhere.WaypointSymbol.Equals(trade.SellWaypointSymbol, StringComparison.OrdinalIgnoreCase)
+            && elsewhere.NetRevenue > (sellsHere ? (long)here.SellPrice * units : 0))
+        {
+            return await SellElsewhereAsync(context.Map, ship, trade, elsewhere, sellsHere ? here.SellPrice : 0, ct);
+        }
+
+        if (!sellsHere)
+        {
+            return await DropAsync(ship, trade, NotBoughtHere, ct);
+        }
+
+        // One sale may not exceed the market's trade volume, so a larger load goes in several.
+        var batchSize = here.TradeVolume > 0 ? here.TradeVolume : units;
+        for (var left = units; left > 0;)
+        {
+            var batch = Math.Min(left, batchSize);
+            var result = await port.SellCargoAsync(ship.Symbol, trade.TradeSymbol, batch, ct);
+            await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
+            await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
+
+            // The ledger and the credits-earned metric (B7).
+            await bus.PublishAsync(new ShipCargoSoldEvent(
+                ship.Symbol,
+                new TradeSymbol(trade.TradeSymbol),
+                batch,
+                result.Revenue,
+                result.AgentCredits));
+
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+                JournalEvents.CargoSold,
+                ship.Symbol,
+                batch,
+                trade.TradeSymbol,
+                trade.SellWaypointSymbol,
+                result.Revenue);
+            left -= batch;
+        }
 
         await goals.ClearActiveGoalAsync(ship.Symbol, ct);
         return GoalExecutionResult.Completed(
-            $"Sold {targetUnits} {tradeGoal.TradeSymbol} at {tradeGoal.SellWaypointSymbol}; ship returned to idle.");
+            $"Sold {units} {trade.TradeSymbol} at {trade.SellWaypointSymbol}; the trip is done.");
     }
 
-    private async Task<int> DetermineUnitsToBuyAsync(
+    private async Task<GoalExecutionResult> SellElsewhereAsync(
+        TradeMarketMap map,
         ShipModel ship,
-        TradeBetweenMarketsGoal tradeGoal,
-        int availableCapacity,
+        TradeBetweenMarketsGoal trade,
+        TradeSale elsewhere,
+        long priceHere,
         CancellationToken ct)
     {
-        var market = await port.GetMarketAsync(ship.SystemSymbol ?? string.Empty, tradeGoal.BuyWaypointSymbol, ct);
-        var tradeGood = TryGetTradeGood(market.TradeGoodsJson, tradeGoal.TradeSymbol);
+        await goals.SetActiveGoalAsync(
+            ship.Symbol,
+            trade with { SellWaypointSymbol = elsewhere.WaypointSymbol, SellWaypointChanged = true },
+            ct);
 
-        var tradeVolume = tradeGood?.TradeVolume ?? 0;
-        var unitsToBuy = tradeVolume <= 0
-            ? availableCapacity
-            : Math.Min(availableCapacity, tradeVolume);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} takes its {TradeSymbol} from {WaypointSymbol} ({SellPrice} each) to {SellWaypoint} ({NewSellPrice} each, {FuelCost} for fuel) ({Reason}).",
+            JournalEvents.TradeRerouted,
+            ship.Symbol,
+            trade.TradeSymbol,
+            trade.SellWaypointSymbol,
+            priceHere,
+            elsewhere.WaypointSymbol,
+            elsewhere.SellPrice,
+            elsewhere.FuelCost,
+            NotLucrative);
 
-        if (tradeVolume > 0 && unitsToBuy < availableCapacity)
-        {
-            logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {WaypointSymbol} from {RequestedUnits} to market trade volume {TradeVolume}.",
-                ship.Symbol,
-                tradeGoal.TradeSymbol,
-                tradeGoal.BuyWaypointSymbol,
-                availableCapacity,
-                tradeVolume);
-        }
-
-        var purchasePrice = tradeGood?.PurchasePrice ?? 0;
-        if (purchasePrice <= 0)
-        {
-            return unitsToBuy;
-        }
-
-        var agent = await agents.GetAsync(ct);
-        if (agent is null || agent.Credits <= 0)
-        {
-            logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot buy {TradeSymbol} at {WaypointSymbol}; agent credits are unavailable or zero.",
-                ship.Symbol,
-                tradeGoal.TradeSymbol,
-                tradeGoal.BuyWaypointSymbol);
-            return 0;
-        }
-
-        var affordableUnitsLong = agent.Credits / purchasePrice;
-        if (affordableUnitsLong <= 0)
-        {
-            logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: ship {ShipSymbol} cannot afford any {TradeSymbol} at {WaypointSymbol}; credits {Credits}, purchase price {PurchasePrice}.",
-                ship.Symbol,
-                tradeGoal.TradeSymbol,
-                tradeGoal.BuyWaypointSymbol,
-                agent.Credits,
-                purchasePrice);
-            return 0;
-        }
-
-        var affordableUnits = (int)Math.Min(int.MaxValue, affordableUnitsLong);
-        if (affordableUnits < unitsToBuy)
-        {
-            logger.LogDebug(
-                "TradeBetweenMarketsGoalExecutor: clamped buy quantity for ship {ShipSymbol} and {TradeSymbol} at {WaypointSymbol} from {RequestedUnits} to affordable units {AffordableUnits} (credits {Credits}, purchase price {PurchasePrice}).",
-                ship.Symbol,
-                tradeGoal.TradeSymbol,
-                tradeGoal.BuyWaypointSymbol,
-                unitsToBuy,
-                affordableUnits,
-                agent.Credits,
-                purchasePrice);
-        }
-
-        return Math.Min(unitsToBuy, affordableUnits);
+        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, TradeRoutePlanner.NextStop(map, ship, elsewhere.WaypointSymbol)), ct);
+        return GoalExecutionResult.WaitingForArrival(
+            $"Selling at {elsewhere.WaypointSymbol} instead of {trade.SellWaypointSymbol}.");
     }
 
-    private static TradeGoodJson? TryGetTradeGood(string? tradeGoodsJson, string tradeSymbol)
+    /// <summary>
+    /// Flies towards a market: straight there when one tank will do, otherwise to the first market on
+    /// the way where it can refuel. Each arrival refreshes that market's prices and steps the goal again.
+    /// </summary>
+    private async Task<GoalExecutionResult> FlyTowardsAsync(ShipModel ship, string destination, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(tradeGoodsJson) || string.IsNullOrWhiteSpace(tradeSymbol))
-        {
-            return null;
-        }
-
-        try
-        {
-            var tradeGoods = JsonSerializer.Deserialize<List<TradeGoodJson>>(tradeGoodsJson);
-            if (tradeGoods is null || tradeGoods.Count == 0)
-            {
-                return null;
-            }
-
-            return tradeGoods.FirstOrDefault(g =>
-                string.Equals(g.Symbol, tradeSymbol, StringComparison.OrdinalIgnoreCase));
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
+        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var stop = TradeRoutePlanner.NextStop(context.Map, ship, destination);
+        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, stop), ct);
+        return GoalExecutionResult.WaitingForArrival(
+            stop.Equals(destination, StringComparison.OrdinalIgnoreCase)
+                ? $"Navigating to {destination}."
+                : $"Navigating to {destination}, refuelling at {stop} on the way.");
     }
 
-    private sealed class TradeGoodJson
+    /// <summary>Gives the trip up: the trading plan chooses again, and sells any cargo where it fetches most.</summary>
+    private async Task<GoalExecutionResult> DropAsync(ShipModel ship, TradeBetweenMarketsGoal trade, string reason, CancellationToken ct)
     {
-        [JsonPropertyName("symbol")]
-        public string? Symbol { get; init; }
-
-        [JsonPropertyName("tradeVolume")]
-        public int TradeVolume { get; init; }
-
-        [JsonPropertyName("purchasePrice")]
-        public long PurchasePrice { get; init; }
+        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: it can't be carried on to {SellWaypoint} ({Reason}).",
+            JournalEvents.TradeDropped,
+            ship.Symbol,
+            trade.TradeSymbol,
+            ship.WaypointSymbol,
+            trade.SellWaypointSymbol,
+            reason);
+        return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip can't be carried on ({reason}); dropped.");
     }
+
+    private static bool IsAt(ShipModel ship, string waypointSymbol)
+        => string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase);
 }

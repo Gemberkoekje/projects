@@ -261,7 +261,7 @@ public sealed class PrometheusAutomationMetricsTests
         { "breaker trips", metrics => metrics.GoalBreakerTripped("AGENT-3"), "spacetraders_goal_breaker_trips_total{ship=\"AGENT-3\"} " },
         { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{kind=\"ScoutWaypoint\"} " },
         { "messages", metrics => metrics.MessageHandled("ContractAcceptedEvent"), "spacetraders_messages_handled_total{type=\"ContractAcceptedEvent\"} " },
-        { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3)), "spacetraders_api_rate_limit_wait_seconds_total " },
+        { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3), "read"), "spacetraders_api_rate_limit_wait_seconds_total{kind=\"read\"} " },
         { "units extracted", metrics => metrics.Extracted("AGENT-3", "COPPER_ORE", 2), "spacetraders_extracted_units_total{ship=\"AGENT-3\",good=\"COPPER_ORE\"} " },
         { "units jettisoned", metrics => metrics.Jettisoned("AGENT-3", "SILICON_CRYSTALS", 2), "spacetraders_jettisoned_units_total{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} " },
     };

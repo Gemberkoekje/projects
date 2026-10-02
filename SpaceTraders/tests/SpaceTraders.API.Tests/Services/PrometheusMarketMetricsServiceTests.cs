@@ -8,6 +8,7 @@ using SpaceTraders.API.Services;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
@@ -98,7 +99,8 @@ public sealed class PrometheusMarketMetricsServiceTests
         await service.SampleAsync(Start.AddMinutes(1), CancellationToken.None);
 
         await _port.Received(1).GetSupplyChainAsync(Arg.Any<CancellationToken>());
-        _metrics.Received(1).SupplyChain(chains);
+        _metrics.Received(1).SupplyChain(Arg.Is<IReadOnlyDictionary<string, IReadOnlyList<string>>>(
+            exported => exported.Count == 1 && exported["IRON"].SequenceEqual(new[] { "IRON_ORE" })));
     }
 
     [Fact]
@@ -118,7 +120,11 @@ public sealed class PrometheusMarketMetricsServiceTests
     }
 
     private PrometheusMarketMetricsService Service(ServiceProvider provider)
-        => new(provider.GetRequiredService<IServiceScopeFactory>(), _metrics, NullLogger<PrometheusMarketMetricsService>.Instance);
+        => new(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            provider.GetRequiredService<ISupplyChainCache>(),
+            NullLogger<PrometheusMarketMetricsService>.Instance);
 
     private ServiceProvider BuildProvider()
     {
@@ -134,6 +140,7 @@ public sealed class PrometheusMarketMetricsServiceTests
         services.AddScoped<IMarketRepository, MarketRepository>();
         services.AddScoped<IShipyardRepository, ShipyardRepository>();
         services.AddScoped(_ => _port);
+        services.AddSingleton<ISupplyChainCache>(_ => new SupplyChainCache(NullLogger<SupplyChainCache>.Instance));
         return services.BuildServiceProvider();
     }
 

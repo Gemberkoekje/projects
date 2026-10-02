@@ -150,8 +150,22 @@ public sealed class GoalStepCircuitBreakerTests
             Substitute.For<IScoutAllMarketplacesPlanService>(),
             _settings,
             new GoalStepCircuitBreaker(),
+            new NoStepGuard(),
             _metrics,
             NullLogger<ShipGoalExecutorService>.Instance);
+
+    /// <summary>
+    /// Lets every step run. The breaker is tested on its own here: the one-step-per-ship guard (B46)
+    /// would skip the nested steps that stand in for a handler that re-triggers itself.
+    /// </summary>
+    private sealed class NoStepGuard : IShipGoalStepGuard
+    {
+        public bool TryEnter(string shipSymbol) => true;
+
+        public void Exit(string shipSymbol)
+        {
+        }
+    }
 
     /// <summary>Runs the next goal step from inside each step, like a handler that re-triggers itself.</summary>
     private sealed class LoopingExecutor : IShipGoalExecutor

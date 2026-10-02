@@ -31,8 +31,12 @@ public interface IAutomationMetrics
     /// </summary>
     void ApiThrottled(string source);
 
-    /// <summary>Adds the time a request waited for the local request budget (<c>spacetraders_api_rate_limit_wait_seconds_total</c>).</summary>
-    void RateLimitWait(TimeSpan wait);
+    /// <summary>
+    /// Adds the time a request waited for the local request budget
+    /// (<c>spacetraders_api_rate_limit_wait_seconds_total</c>), by <paramref name="kind"/>: <c>read</c>
+    /// for a GET, which gives way to writes (D19), or <c>write</c> for anything else.
+    /// </summary>
+    void RateLimitWait(TimeSpan wait, string kind);
 
     /// <summary>Counts a message Wolverine handled without an error (<c>spacetraders_messages_handled_total{type}</c>).</summary>
     void MessageHandled(string messageType);

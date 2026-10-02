@@ -26,6 +26,8 @@ decisions).
 | **Goal Executor** | Code that advances one kind of goal by one step, such as `MineAndSellGoalExecutor`. `ShipGoalExecutorService` picks the executor for a ship's active goal. |
 | **Health Rule** | An intended behaviour written down as a check the bot runs on itself every minute (`IHealthRule`, evaluated by `HealthMonitorService`), such as "a fulfilled contract has no active plan or assignment". A broken rule is an anomaly. |
 | **Leader Election** | A mechanism ensuring only one instance runs leader-only automation work. Implemented by `LeaderElectionService` and backed by the `leader_leases` table. |
+| **Market Watch** | `MarketWatchService`, the last step of every tick: one market a tick, among those with one of our ships at the waypoint, is fetched again once `Market.RefreshMinutes` (5) have passed since its prices were last seen. The API shows a market's prices only while a ship is there. |
+| **Read, Write** | For the rate limit (D19): a read is a GET, a write anything else. Writes go first: a read gives way while a write waits, and leaves part of the burst to writes. |
 | **Minimal API** | The ASP.NET Core programming model used in `SpaceTraders.API` – endpoint groups defined with `MapGet`/`MapPost` rather than controllers. |
 | **Npgsql** | The official .NET PostgreSQL driver and the EF Core provider used in `SpaceTraders.Infrastructure.Persistence`. |
 | **Plan** | One of the five automation services `GameLoopService` bootstraps on every tick: scout, contract, probe deployment, mining and trading. Each keeps its own state in the database. |
@@ -34,7 +36,10 @@ decisions).
 | **State-gated command** | A ship command that checks the ship's cached state (docked, in orbit, in transit) before calling the API. When the state is wrong, it publishes `ShipStateMismatchEvent` instead. |
 | **Stateless** | A .NET state-machine library. The application project references it, but no code uses it. |
 | **Request Budget** | `RequestBudget`, the client's copy of the API guide's limit: 2 requests in any second and, once those are used, up to 30 more in any 60 seconds. Both windows slide, so the client never exceeds a fixed window the server counts in. A singleton, so it survives the HttpClient factory recreating its handlers. |
+| **Lucrative** | A trade trip that earns at least `Trade.MinProfitPerUnit` per unit after the fuel for the whole trip, the flight to the buy market included (D14). The trading plan offers only lucrative trips, and a trip checks it again at the buy market before it buys. |
 | **Local Queue** | Wolverine's in-process queue for published messages, kept in memory. Until slice 1.3 it was a *durable* local queue that also stored every message in Postgres, and with Wolverine's durability agent off it never deleted a handled one (B2). |
 | **Tick** | One pass of `GameLoopService`. |
+| **Trader** | Any ship with a cargo hold and a fuel tank that the trading plan may give a trip: no goal (or a blocked one), no assignment, not in transit (slice 6.5). |
+| **Trade Trip** | One good bought at one market and sold at another (`TradeBetweenMarketsGoal`): one purchase, refuelling at markets on the way where a flight is beyond one tank. Its route, the good with its buy and sell market, belongs to one trader at a time (D18). |
 | **WebUI** | The React/Vite dashboard in `SpaceTraders.WebUI`, served at `/spacetraders/dashboard`. It reads the internal API with the `X-Api-Key` header and listens to the SignalR hub for refresh hints. |
 | **Wolverine** | The in-process command/event bus used in place of MediatR. Provides convention-based handler discovery, retry policies and in-memory local queues. |

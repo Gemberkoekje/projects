@@ -16,7 +16,8 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - With automation switched on (<see cref="AutomationSwitches"/>): bootstraps each plan that is
-///    switched on, runs one goal step per ship, and runs the contract plan's assignments.
+///    switched on, runs one goal step per ship, runs the contract plan's assignments, and last
+///    refreshes one market where a ship is, when one is due (<see cref="IMarketWatchService"/>).
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
 public sealed class GameLoopService(
@@ -118,6 +119,14 @@ public sealed class GameLoopService(
         {
             await RunContractAssignmentsAsync(cancellationToken);
         }
+
+        // Last, and one market a tick: a refresh is a read, which can go later without loss, while a
+        // move or a trade can't (D19, 6.5).
+        await RunStepAsync(
+            [],
+            services => services.GetRequiredService<IMarketWatchService>().RefreshDueMarketAsync(cancellationToken),
+            exception => logger.LogError(exception, "GameLoopService: refreshing a market where a ship is failed; the next tick tries again."),
+            cancellationToken);
     }
 
     /// <summary>
@@ -182,7 +191,7 @@ public sealed class GameLoopService(
                 {
                     ["Plan"] = AutomationPlan.Contract,
                     ["ShipSymbol"] = assignment.ShipSymbol,
-                    ["ContractId"] = assignment.ContractId!,
+                    ["ContractId"] = assignment.ContractId,
                 },
                 services => RunContractAssignmentAsync(assignment, services, cancellationToken),
                 exception => logger.LogError(

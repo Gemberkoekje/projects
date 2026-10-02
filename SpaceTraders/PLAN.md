@@ -59,6 +59,9 @@
 - Phase 5 is done (2026-10-02): the `st-investigate` skill is finished and was checked against the
   first run (5.1), where it explained B42's anomaly and found B45; the helper and the bot's pod logs
   run without asking (5.2).
+- Slice 6.5 (trading) is built on branch `claude/spacetraders-trading` (2026-10-02), with your
+  decisions D14–D19; it found B46 (fixed with it) and B47 (open). The trading plan stays off until
+  you switch it on (D9).
 
 ## Known issues
 
@@ -115,6 +118,8 @@ the misbehaviour.
 | B43 | **A counter's first value never reaches the dashboard** (found in 4.3). Prometheus's `increase()` and `rate()` count what a series gains between two scrapes, never the value it has when first scraped, and prometheus-net creates a labelled series on its first increment. On the cluster the contract's deposit (4,267) and the first drone (46,885) were booked about 25 seconds before Prometheus first scraped the pod, so the ledger panels showed neither; a single 429, failed call or breaker trip could never show at all. | `PrometheusAutomationMetrics.cs`; the dashboard's ledger, 429 and breaker panels | 4.3 (done) |
 | B44 | **The error-log alert fires on the bot's ordinary lines** (found in 4.3). Gembernodes' "Error logs detected" rule matches `(?i)error` anywhere in a line, and 2.5 added `spacetraders` to it. The bot's JSON lines contain the word without being errors: the startup settings dump (`Health.Errors.MaxRepeatsIn10Minutes`), Wolverine's "…this is an error" (B42) and a `RepeatingError` anomaly's own lines. It fired five minutes after the first start. | gembernodes `infrastructure/monitoring/grafana-alerting-provisioning.yaml` (`loki-error-logs`) | 4.3 (done: gembernodes PR #13) |
 | B45 | **The scout plan can skip a stop** (found in 5.1, on the cluster). When the ship docks at a stop, the tick and the arrival can both run its goal step. On 2026-10-02 at 09:18:58 the arrival's step moved the plan from stop 25 to stop 26, X1-DC53-J58. In the same second the tick's resume check read the plan from before that advance and the assignment from after it, took the assignment for missing and set the ship's goal back to stop 25; and the visit to stop 25 completed a second time, in the tick's goal step, which moved the plan past stop 26. The plan logged "all 26 waypoints visited", but J58's market was never fetched, and markets aren't scouted again. Any stop can be skipped this way, whenever a tick coincides with an arrival. | `ScoutAllMarketplacesPlanService.cs` (`ResumeIfAssignmentMissingAsync`, `AdvanceAsync`), `ShipGoalExecutorService.cs`; Loki, 09:18:58Z (`Tick` 326) | 5.1 (done) |
+| B46 | **Two goal steps can run for one ship at once** (found in 6.5, from the code; B45 was the scout plan's case). The tick steps every ship every 5 s, and an arrival steps the ship it docks, on a thread of its own. Both read the ship before either acts, so a trade step would buy twice, or try to sell cargo that is already sold. | `GameLoopService.cs` (goal steps), `ShipNavigationCompletedHandler.cs`, `ShipGoalExecutorService.cs` | 6.5 (done) |
+| B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting, contract and probe flights still can. | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
 
 ### Decisions (2026-10-01)
 
@@ -136,6 +141,12 @@ get the next D-number.
 | D11 | Should the dashboard and the internal API stay reachable from the internet (B22)? | **LAN only**, like Grafana (slice 4.2). |
 | D12 | The credit-drop alert (B37) would fire on every purchase above 10% of the credits. Fix it as it is meant, change what it watches, or remove it? | **Remove it** (2026-10-01): credits only drop when the bot spends them, so it could only report the bot's own spending. Removed (B37). |
 | D13 | Two of 3.2's rules clash with D9 and D1 in the first run: with only scout and contract on, the starting probe, the command ship after scouting and the drone after its contract are idle by design, and once the contract has paid, the credits stop changing. Taken literally, "idle for at most N minutes" and "credits change at least once in 24 hours" would stay active for the rest of every reset, and phase 6 needs a clean reset period. | **Only when work waits** (2026-10-01): a ship counts as idle only while a plan that is on has work it could give that ship, and the credits must change daily only while ships have work. |
+| D14 | Slice 6.5: when is a trade trip lucrative, worth starting and worth carrying on when prices change? | **`Trade.MinProfitPerUnit` per unit, after fuel** (2026-10-02): the existing setting (200), now read by the trader. 0 means any profit, but see D15. |
+| D15 | Slice 6.5: how do goods in the market tree, which let a market make pricier goods, come first? | **Tree routes first** (2026-10-02): among lucrative routes, one whose sell market makes a pricier good from the cargo beats any that doesn't, then the most profitable. Hence D14's bar matters: at 0, a trip earning 47 credits that feeds JEWELRY would beat one earning 7,000 that feeds nothing (the live prices of 2026-10-02). |
+| D16 | Slice 6.5: does the trading plan buy ships? | **Not for now** (2026-10-02): it trades with the ships it has, first the command ship after scouting, then the drone after its contract. Buying haulers needs a budget of its own; keep it in mind for later. |
+| D17 | Slice 6.5: may cargo use `FleetExpansion.MinCreditReserve`? | **Yes** (2026-10-02): cargo turns back into credits when it is sold. Credits for the trip's fuel are kept back. |
+| D18 | Slice 6.5: may two traders share a route? | **No, for now** (2026-10-02, "to keep everything simple"): a route, the good with its buy and sell market, that one trader holds isn't offered to another. |
+| D19 | How do reads (GET: a market refresh) and writes (anything else: moving a ship, trading) share the API's rate limit? | **Writes first** (2026-10-02): "I'd rather have a POST to move a ship or trade goods than a market refresh that can be done 10 seconds later without penalty." A read gives way while a write waits for the budget, leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds, so reads can't starve. The market watch runs last in the tick, one market a tick. |
 
 ## Phases
 
@@ -1100,7 +1111,95 @@ How credits are split stays your call; Claude only fixes deviations from intende
 - **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
 - **6.4 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`): the
   survey part of B16, B17, and B34 (traits, so drones go where their mineral is).
-- **6.5 Trading** (`TradingAutomationService`).
+- **6.5 Trading** (built 2026-10-02 on branch `claude/spacetraders-trading`). Asked for that day:
+  1. a trader can be any ship with fuel and a cargo bay;
+  2. a trip's profit is what the sell market pays minus what the buy market charges, minus the fuel,
+     the fuel to get to the first market to begin with included (your note, the same day);
+  3. two traders on one route are discouraged, to keep it simple (D18);
+  4. when new prices come in, from a ship getting there or from the regular check of the ships at
+     markets, the ship reconsiders whether its trade is still lucrative, and if not, goes elsewhere;
+  5. goods in the market tree that let pricier goods become available come first (D15);
+
+  and, added during the work: every market with one of our ships at its waypoint refreshes once every
+  x minutes. That check didn't exist: markets only refreshed when a ship arrived. Then: a move or a
+  trade goes before a market refresh, or any GET, for the rate limit. Your choices: D14–D19.
+  - Done:
+    - **The trade arithmetic** (`TradeRoutePlanner`, no I/O): profit = (sell price − buy price) ×
+      units − the fuel for the whole trip: from where the ship is to the buy market, then on to the
+      sell market. A trip is one purchase, as many units as the free hold, both markets' trade
+      volumes and the credits allow (D17). Fuel is CRUISE, the distance rounded, paid in whole FUEL
+      units (100 each) at the market each leg ends at; the logs of the first run confirm that (a
+      222-long leg cost 3 × 79). A flight longer than one tank refuels at markets on the way, the
+      fewest stops first: from J57, where scouting ended, one tank reaches only I56, and without stops
+      the command ship found no route at all. Never DRIFT (B47).
+    - **The trading plan** (`TradingAutomationService`) gives every free trader a trip each tick: a
+      ship with a cargo hold and a fuel tank, no goal (or a blocked one), no assignment, not in
+      transit. Cargo it holds is sold first, where it fetches most after fuel, when that earns
+      anything. The best route goes first, to the trader it is best for; a held route isn't offered
+      again (D18). It buys no ships (D16). Its state lists the held routes and the open ones, with the
+      ships that could take them (`ShipLeftIdle` reads those, D13), and is written only when it changes.
+    - **The trip** (`TradeBetweenMarketsGoalExecutor`) reconsiders where it lands, because a ship
+      can't change course in flight, and changing its goal in flight would lose its arrival (B17): at
+      the buy market, with the prices its arrival just fetched, it buys while the trip is still
+      lucrative and otherwise drops it (`TradeDropped`), and the plan chooses again from there. The
+      flight there is spent by then, so that check counts only the fuel still ahead. At the
+      sell market, when selling there no longer pays and another market pays more after fuel, it takes
+      the cargo there, once per trip (`TradeRerouted`). Sales above the market's trade volume go in
+      several. New journal kinds: `TradeStarted`, `TradeRerouted`, `TradeDropped`.
+    - **The market watch** (`MarketWatchService`), the last step of every tick, one market a tick
+      (D19): each market with one of our ships at it is fetched again once `Market.RefreshMinutes` (5,
+      new; 0 = off) have passed since it was last seen, the one that has waited longest first. A market
+      that fails, or comes back without prices, waits an interval too. A probe parked at a market keeps
+      it current; until the probe plan runs (6.3), that is the starting probe at H52 and wherever the
+      other ships are.
+    - **Writes before reads** (D19, `RateLimitingHandler`): a GET gives way while a POST waits for the
+      budget (before, it also gave way while a POST was in flight, and could use the whole burst),
+      leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds.
+      The wait metric has a `kind` label, `read` or `write`, which shows whether a write ever waits.
+      On 2026-10-02 the bot made 67 GETs and 425 POSTs in 6 hours and waited 0 seconds: this is for
+      when probes watch every market.
+    - **B46**: one goal step at a time per ship (`ShipGoalStepGuard`); a step that finds its ship busy
+      is skipped, and the next tick takes it.
+    - The production chains are fetched once per process and shared with the markets dashboard
+      (`SupplyChainCache`): still one call per start.
+    - A dry run of the planner on the live prices of 2026-10-02 (the command ship at J57, 252 fuel,
+      129,451 credits): two routes clear 200 a unit, both feeding nothing. The first trip would be
+      MEDICINE from D41 to A1, about 6,982 after 738 of fuel: 648 to get from J57 to D41 by way of
+      I56, and 90 on to A1. EQUIPMENT from K85 to D41, which feeds SHIP_PARTS, earns 198 a unit from
+      there, the 530 to get to K85 included.
+  - Noticed (not changed):
+    - Travel time is not in the profit (your formula): a trip across the system counts the same as
+      one next door.
+    - Prices are as last seen. Most markets were last seen during scouting, hours old; each arrival
+      and the watch refresh them, and the trip reconsiders on arrival.
+    - The watch adds price samples: 3 markets with ships today is about 4,000 rows a day; with probes
+      at all 25 markets about 40,000 (7 days raw, then hourly; the size guard watches).
+  - To switch it on: `PUT /settings/Automation.Plan.Trading.Enabled` with `{"value": "true"}`.
+  - Done when: a full reset period with the trading plan on and no open anomaly for it.
+- **6.5 in short** (built 2026-10-02): idle ships with a hold trade between markets for the most
+  profit after fuel, routes that grow a pricier good's production first; each trip checks its prices
+  again at both markets, and the markets where ships are refresh every 5 minutes, after the moves and
+  trades, which go first for the rate limit too (D19). To understand this,
+  start with `SpaceTraders.Application/Trading/TradeRoutePlanner.cs`, then
+  `Automation/TradingAutomationService.cs` and `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`;
+  `tests/SpaceTraders.Application.Tests/Trading/TradeFixture.cs` holds the live prices the tests use.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Trading/TradeRoutePlanner.cs` (the arithmetic and refuelling flights), `TradeMarketMap.cs`,
+      `TradeContextReader.cs`; `Automation/MarketWatchService.cs`; `Goals/ShipGoalStepGuard.cs` (B46);
+      `Services/SupplyChainCache.cs`;
+    - rewritten: `Automation/TradingAutomationService.cs`, `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`;
+    - changed: `TradeBetweenMarketsGoal` (`SpaceTraders.Domain/Goals/ShipGoal.cs`: the trip's plan and
+      progress), `GameLoopService` (the watch first), `ShipGoalExecutorService` (the guard),
+      `ShipLeftIdleRule` (candidates), `MarketAutomationPlanState`, `JournalEvents`,
+      `DependencyInjection`; `RequestBudget` and `RateLimitingHandler` (Infrastructure.SpaceTradersAPI,
+      D19); `PrometheusMarketMetricsService` (SpaceTraders.API, the shared cache) and
+      `PrometheusAutomationMetrics` (the wait metric's `kind`);
+      `DefaultSettingsSeed` (Persistence: `Market.RefreshMinutes`); `GetActiveTradeRouteTargetsAsync`
+      removed from the goal repository;
+    - tests: `Trading/TradeRoutePlannerTests`, `TradingAutomationServiceTests`,
+      `TradeBetweenMarketsGoalExecutorTests`, `MarketWatchServiceTests`, `SupplyChainCacheTests`, B46 in
+      `ShipGoalExecutorServiceTests`, the trip's round trip in `ShipGoalRepositoryTests`, D19 in
+      `RateLimitHandlerTests`.
 - **6.6 Jump gate construction.**
 
 ## Changes in gembernodes

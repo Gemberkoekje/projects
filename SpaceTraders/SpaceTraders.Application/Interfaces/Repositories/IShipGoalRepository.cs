@@ -44,11 +44,6 @@ public interface IShipGoalRepository
     Task<IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)>> GetActiveMineAndSellTargetsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns active trading targets keyed by source waypoint, destination waypoint, and trade symbol.
-    /// </summary>
-    Task<IReadOnlySet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>> GetActiveTradeRouteTargetsAsync(CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Returns active survey targets keyed by target waypoint and target deposit symbol.
     /// </summary>
     Task<IReadOnlySet<(string TargetWaypointSymbol, string TargetDepositSymbol)>> GetActiveSurveyTargetsAsync(CancellationToken cancellationToken = default);

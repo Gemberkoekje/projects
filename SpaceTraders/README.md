@@ -13,8 +13,9 @@ cache of the game state, and runs its ships automatically. A React dashboard sho
 > rules: the bot checks itself every minute and reports anomalies). Phase 4 (back on the cluster)
 > was merged in gembernodes (PR #11), and its first-run watch (slice 4.3) is under way. In phase 5
 > Claude investigates the running bot read-only with the `st-investigate` skill
-> (`tools/investigate/`). Known issues are listed there under B-numbers and decisions under
-> D-numbers.
+> (`tools/investigate/`). Phase 6 makes money one loop at a time: trading (slice 6.5) is built,
+> and stays off until it is switched on. Known issues are listed there under B-numbers and decisions
+> under D-numbers.
 
 ---
 

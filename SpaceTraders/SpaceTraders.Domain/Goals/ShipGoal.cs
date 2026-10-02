@@ -164,16 +164,44 @@ public sealed record MineAndSellGoal : ShipGoal
 }
 
 /// <summary>
-/// The ship buys <see cref="TradeSymbol"/> at <see cref="BuyWaypointSymbol"/> and sells it at
-/// <see cref="SellWaypointSymbol"/> while the market opportunity remains active.
+/// One trip of a trade route: the ship buys <see cref="TradeSymbol"/> at <see cref="BuyWaypointSymbol"/>
+/// and sells it at <see cref="SellWaypointSymbol"/>. It checks the trip again with the newest prices when
+/// it gets to each market: before it buys, and before it sells (PLAN.md slice 6.5).
 /// </summary>
 public sealed record TradeBetweenMarketsGoal : ShipGoal
 {
+    /// <summary>The good the trip carries.</summary>
     public required string TradeSymbol { get; init; }
 
+    /// <summary>Where the trip buys the good; for cargo the ship already held, where it was when the trip began.</summary>
     public required string BuyWaypointSymbol { get; init; }
 
+    /// <summary>Where the trip sells the good.</summary>
     public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>The units the trip planned to carry when it was chosen; 0 for a goal from before slice 6.5.</summary>
+    public int Units { get; init; }
+
+    /// <summary>What the trip was expected to earn after fuel, in credits, when it was chosen.</summary>
+    public long ExpectedProfit { get; init; }
+
+    /// <summary>
+    /// The pricier good the sell market makes from <see cref="TradeSymbol"/>, or empty when the trip
+    /// feeds no production there.
+    /// </summary>
+    public string FeedsTradeSymbol { get; init; } = string.Empty;
+
+    /// <summary>
+    /// True once the cargo is aboard: after the purchase, or from the start for a trip that sells cargo
+    /// the ship already held.
+    /// </summary>
+    public bool CargoBought { get; init; }
+
+    /// <summary>What one unit cost at the buy market; 0 for cargo the ship already held.</summary>
+    public long PricePaidPerUnit { get; init; }
+
+    /// <summary>True once the trip has moved its sale to another market. It does so at most once.</summary>
+    public bool SellWaypointChanged { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.TradeBetweenMarkets;

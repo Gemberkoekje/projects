@@ -19,6 +19,7 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IGoalStepCircuitBreaker _circuitBreaker = Substitute.For<IGoalStepCircuitBreaker>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly LogRecorder _log = new();
 
     private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
@@ -38,6 +39,7 @@ public sealed class ShipGoalExecutorServiceTests
             _scoutPlanService,
             _settings,
             _circuitBreaker,
+            _stepGuard,
             _metrics,
             _log.For<ShipGoalExecutorService>());
 
@@ -56,6 +58,33 @@ public sealed class ShipGoalExecutorServiceTests
         blocked.EventKind.Should().Be("ShipBlocked");
         blocked.Properties["ShipSymbol"].Should().Be("SHIP-1");
         blocked.Properties["Reason"].Should().Be("runaway");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AStepForAShipWhoseStepIsStillRunning_IsSkipped()
+    {
+        // B46: the tick steps every ship, and an arrival steps the ship it docks. Both could run one
+        // ship's step at once (B45 was the scout plan's case), and a trade step would buy twice.
+        var tradeGoal = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-001", SellWaypointSymbol = "X1-AB-002" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(tradeGoal);
+        _executor.CanExecute(tradeGoal).Returns(true);
+        var buying = new TaskCompletionSource<GoalExecutionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _executor.ExecuteStepAsync(FullFuelShip, tradeGoal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => buying.Task);
+
+        var tickStep = CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        var arrivalStep = CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        buying.SetResult(GoalExecutionResult.Progressing("bought"));
+        var results = await Task.WhenAll(tickStep, arrivalStep);
+
+        await _executor.Received(1).ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+        results.Should().ContainSingle(result => result == null, "the second step finds the ship busy and is skipped");
+
+        // Once the first step is done, the ship takes steps again.
+        _executor.ExecuteStepAsync(FullFuelShip, tradeGoal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Progressing("selling"));
+        (await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None)).Should().NotBeNull();
     }
 
     [Fact]
@@ -131,6 +160,7 @@ public sealed class ShipGoalExecutorServiceTests
             scoutPlanService,
             _settings,
             new GoalStepCircuitBreaker(),
+            _stepGuard,
             Substitute.For<IAutomationMetrics>(),
             log.For<ShipGoalExecutorService>());
 

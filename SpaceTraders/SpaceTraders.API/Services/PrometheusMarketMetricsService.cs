@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Infrastructure.Persistence;
 
 namespace SpaceTraders.API.Services;
@@ -10,21 +11,19 @@ namespace SpaceTraders.API.Services;
 /// Every minute, exports the markets and shipyards the bot has cached, for the markets dashboard
 /// (slice 2.8): each good's prices, volume, supply and activity, each shipyard's ships and prices,
 /// and when each was last refreshed. Markets only change while a ship is there, so a minute is often
-/// enough. Once per start it also exports the game's production chains, one API call: what each
-/// good is made from.
+/// enough. Once per start it also exports the game's production chains: what each good is made from.
+/// They come from <see cref="ISupplyChainCache"/>, which the trading plan shares: one API call per
+/// start between them, and after a failure one an hour.
 /// </summary>
 public sealed class PrometheusMarketMetricsService(
     IServiceScopeFactory serviceScopeFactory,
     IAutomationMetrics metrics,
+    ISupplyChainCache supplyChain,
     ILogger<PrometheusMarketMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromMinutes(1);
 
-    /// <summary>How long to wait before asking for the production chains again after a failure.</summary>
-    private static readonly TimeSpan SupplyChainRetry = TimeSpan.FromHours(1);
-
     private bool _hasSupplyChain;
-    private DateTimeOffset _supplyChainDueAt = DateTimeOffset.MinValue;
 
     /// <summary>Reads the cache once and hands the markets and shipyards to the metrics.</summary>
     /// <param name="now">The time of this sample; it decides when the production chains are asked for again.</param>
@@ -68,9 +67,14 @@ public sealed class PrometheusMarketMetricsService(
                 shipyard.Ships)),
         ]);
 
-        if (!_hasSupplyChain && now >= _supplyChainDueAt)
+        if (!_hasSupplyChain)
         {
-            await ExportSupplyChainAsync(scope.ServiceProvider.GetRequiredService<ISpaceTradersPort>(), now, cancellationToken);
+            var chains = await supplyChain.GetAsync(scope.ServiceProvider.GetRequiredService<ISpaceTradersPort>(), now, cancellationToken);
+            if (chains.Count > 0)
+            {
+                metrics.SupplyChain(chains);
+                _hasSupplyChain = true;
+            }
         }
     }
 
@@ -93,21 +97,6 @@ public sealed class PrometheusMarketMetricsService(
             }
 
             await Task.Delay(SampleInterval, stoppingToken);
-        }
-    }
-
-    private async Task ExportSupplyChainAsync(ISpaceTradersPort port, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        try
-        {
-            metrics.SupplyChain(await port.GetSupplyChainAsync(cancellationToken));
-            _hasSupplyChain = true;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            // At most once an hour, so a game API that is down can't raise RepeatingError.
-            _supplyChainDueAt = now + SupplyChainRetry;
-            logger.LogWarning(ex, "Couldn't fetch the game's production chains; trying again at {RetryAt}.", _supplyChainDueAt);
         }
     }
 }

@@ -32,6 +32,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
+    private readonly IMarketWatchService _marketWatch = Substitute.For<IMarketWatchService>();
     private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
 
     public GameLoopServiceTests()
@@ -47,6 +48,7 @@ public sealed class GameLoopServiceTests : IDisposable
             .AddSingleton(_assignments)
             .AddSingleton(_ships)
             .AddSingleton(_goalExecutor)
+            .AddSingleton(_marketWatch)
             .BuildServiceProvider();
 
         _serviceScopeFactory.CreateScope().Returns(_ => _serviceProvider.CreateScope());
@@ -101,7 +103,38 @@ public sealed class GameLoopServiceTests : IDisposable
         await _miningPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
         _bus.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Tick_RefreshesAMarketLast_AfterThePlansTheShipsAndTheContractWork()
+    {
+        // D19: a refresh is a read, which can go later without loss; a move or a trade can't.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.Contract.Enabled");
+        var steps = new List<string>();
+        _tradingPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "plan"));
+        _goalExecutor.ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ => RecordShipStep(steps));
+        _bus.InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "contract"));
+        _marketWatch.RefreshDueMarketAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "market"));
+
+        await TickAsync();
+
+        steps.Should().Equal("plan", "ship", "ship", "contract", "market");
+    }
+
+    [Fact]
+    public async Task Tick_AThrowingMarketWatch_IsLoggedAndTheNextTickRuns()
+    {
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled");
+        _marketWatch.RefreshDueMarketAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("API error.")));
+
+        await TickAsync();
+        await TickAsync();
+
+        await _marketWatch.Received(2).RefreshDueMarketAsync(Arg.Any<CancellationToken>());
+        await _tradingPlan.Received(2).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -190,6 +223,7 @@ public sealed class GameLoopServiceTests : IDisposable
         await _contractPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+        await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -247,6 +281,18 @@ public sealed class GameLoopServiceTests : IDisposable
         {
             _settings.GetAsync<bool>(key, Arg.Any<CancellationToken>()).Returns(true);
         }
+    }
+
+    private static Task Record(List<string> steps, string step)
+    {
+        steps.Add(step);
+        return Task.CompletedTask;
+    }
+
+    private static Task<GoalExecutionResult?> RecordShipStep(List<string> steps)
+    {
+        steps.Add("ship");
+        return Task.FromResult<GoalExecutionResult?>(null);
     }
 
     private static bool Has(Dictionary<string, object> context, string key, object value)

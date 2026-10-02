@@ -153,6 +153,7 @@ public sealed class ScoutStopSkippedTests
             CreateScoutPlan(),
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),
+            new ShipGoalStepGuard(), // Its own per step, so the interleaved steps both run: this tests B45's fix, not B46's guard.
             Substitute.For<IAutomationMetrics>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 
