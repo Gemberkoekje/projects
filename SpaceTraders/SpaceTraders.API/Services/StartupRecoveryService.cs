@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
@@ -9,7 +10,7 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Runs once at startup (after <see cref="StartupSyncService"/>) to resume
-/// ships interrupted by a pod restart.
+/// ships interrupted by a pod restart, and to have the plans reconsider the contract's ships.
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
@@ -29,6 +30,13 @@ public sealed class StartupRecoveryService(
         {
             logger.LogInformation("StartupRecovery: automation disabled; skipping ship state recovery.");
             return;
+        }
+
+        // A restart reconsiders the contract's ships once, instead of at their deliveries (D26). A plan
+        // that is switched off is left as it is.
+        if (await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken))
+        {
+            await scope.ServiceProvider.GetRequiredService<IContractPlanService>().ReleaseShipsAsync(cancellationToken);
         }
 
         var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();

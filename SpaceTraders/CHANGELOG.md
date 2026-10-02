@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-02, after slice 6.4's switch-on)
+- A contract assignment lasts one round trip (D26, asked on 2026-10-02): the delivery closes it, after the fulfil call when one was due, and the plans assign the ship again on the next tick, in their order, so work that matters more comes first. A ship whose fulfil call fails keeps its assignment and makes the call again. The plan's first ship joins like every other free miner; it no longer gets its assignment back on every tick, or takes it back from other work.
+- A restart reconsiders the contract's ships once (D26): with automation and the contract plan on, startup recovery releases every ship on the contract that isn't in flight, and the first tick assigns it again. A ship in flight keeps its assignment until its delivery.
+
+### Code – Fixed (2026-10-02, after slice 6.4's switch-on)
+- The command ship surveys once the survey plan is on, after its current contract trip or at the next restart (B50): it had joined the contract before the survey switch, and a contract assignment lasted until the contract was fulfilled.
+
+### Docs – Changed (2026-10-02, after slice 6.4's switch-on)
+- `PLAN.md`: 6.4 merged (projects#122, gembernodes#21 and #22) and switched on; B50 and D26; the follow-up's summary. `docs/HOW_IT_WORKS.md`: contract trips, the restart release.
+
 ### Code – Added (2026-10-02, slice 6.4)
 - Surveying, as asked on 2026-10-02 (`PLAN.md` 6.4, decisions D20–D25). A new survey plan (`Automation.Plan.Survey.Enabled`, off by default) has every ship that can survey survey, and only that (D20): the contract's ore at the contract's asteroid first, otherwise ores the system's markets buy, at the asteroid nearest the market that pays most for them among those the miners can reach; ores without a usable survey first. One survey per goal; the goal ends after each.
 - What an asteroid yields, from its traits (`AsteroidDeposits`), and which survey to extract with: the one where the ore makes up the largest share of the deposits, then the larger deposit, then the later expiry. Extractions use it, for the contract's miners too.

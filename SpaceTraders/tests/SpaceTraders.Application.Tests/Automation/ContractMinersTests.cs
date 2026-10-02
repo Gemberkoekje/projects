@@ -113,6 +113,73 @@ public sealed class ContractMinersTests
         _open.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task ThePlansOwnShip_AfterItsTrip_IsAssignedAgainLikeAnyFreeMiner()
+    {
+        // D26: every ship's contract assignment ends with its delivery, the first ship's too.
+        _open.Clear();
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"));
+
+        await RunAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().BeEquivalentTo("SHIP-3", "SHIP-4");
+        _open.Should().OnlyContain(a => a.ContractId == ContractId && a.OriginWaypoint == XB5C && a.DestWaypoint == H51 && a.RequiredUnits == 100);
+        _log.Journal.Where(entry => entry.EventKind == "MiningStarted").Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task WithTheSurveyPlanOn_ThePlansShip_ThatCanSurvey_IsNotPutBackOnTheContract()
+    {
+        // D20 and D26: the command ship, chosen while the survey plan was off, surveys once its trip is
+        // over. Its assignment used to be restored on every tick until the contract was fulfilled.
+        _plans.GetAsync(Arg.Any<CancellationToken>()).Returns(Plan() with { ShipSymbol = "SHIP-1" });
+        _open.Clear();
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        Fleet(CommandShip(waypoint: H51, status: "DOCKED"), Drone("SHIP-3", XB5C, "IN_ORBIT"));
+
+        await RunAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().Equal("SHIP-3");
+    }
+
+    [Fact]
+    public async Task ThePlansShip_BusyWithOtherWork_IsLeftToIt()
+    {
+        // D26: the contract takes free miners only, the first ship included; it used to take that one
+        // back from whatever it was doing.
+        _open.Clear();
+        _goals.GetActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>())
+            .Returns(new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51, Selling = true });
+        Fleet(Drone("SHIP-3", XB5C, "IN_ORBIT"));
+
+        await RunAsync();
+
+        _open.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ARestart_ReconsidersEveryShipOnTheContract_ThatIsNotInFlight()
+    {
+        // D26, asked for on 2026-10-02: after a restart the command ship surveys at once, instead of
+        // first filling its hold with ore for the contract. A ship in flight keeps its assignment until
+        // its delivery: without one, nothing would record its arrival, and it would never be free again.
+        _open.Add(Assignment("SHIP-1"));
+        _open.Add(Assignment("SHIP-4"));
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        Fleet(
+            CommandShip(),
+            Drone("SHIP-3", XB5C, "IN_ORBIT"),
+            Drone("SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(2) });
+
+        await Sut().ReleaseShipsAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().Equal("SHIP-4");
+
+        await RunAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().BeEquivalentTo("SHIP-3", "SHIP-4");
+    }
+
     private static ContractMineralPlanState Plan() => new()
     {
         PlanId = Guid.NewGuid(),
@@ -145,20 +212,21 @@ public sealed class ContractMinersTests
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
-    private Task RunAsync()
-        => new ContractPlanService(
-                _plans,
-                _contracts,
-                _ships,
-                _assignments,
-                Substitute.For<IShipyardRepository>(),
-                Substitute.For<IWaypointRepository>(),
-                Substitute.For<ISpaceTradersPort>(),
-                Substitute.For<IShipPurchaseService>(),
-                Substitute.For<IAgentRepository>(),
-                Substitute.For<IMessageBus>(),
-                _goals,
-                _settings,
-                _log.For<ContractPlanService>())
-            .EnsureBootstrappedAsync();
+    private Task RunAsync() => Sut().EnsureBootstrappedAsync();
+
+    private ContractPlanService Sut()
+        => new(
+            _plans,
+            _contracts,
+            _ships,
+            _assignments,
+            Substitute.For<IShipyardRepository>(),
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
+            _goals,
+            _settings,
+            _log.For<ContractPlanService>());
 }

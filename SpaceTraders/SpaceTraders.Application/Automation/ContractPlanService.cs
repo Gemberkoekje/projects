@@ -15,6 +15,12 @@ public interface IContractPlanService
     Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default);
 
     Task AdvanceAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Closes the contract assignment of every ship that is not in flight, once, when the bot starts
+    /// (D26). The plans assign those ships again on the first tick, in their order.
+    /// </summary>
+    Task ReleaseShipsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class ContractPlanService(
@@ -63,7 +69,6 @@ public sealed class ContractPlanService(
                 var advanced = await AdvanceActivePlanAsync(existing, cancellationToken);
                 if (advanced.Status == ContractMineralPlanStatus.Active)
                 {
-                    await EnsureActivePlanAssignmentAsync(advanced, cancellationToken);
                     await AddFreeMinersAsync(advanced, cancellationToken);
                 }
 
@@ -317,6 +322,43 @@ public sealed class ContractPlanService(
         }
 
         await AdvanceAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A restart reconsiders those ships at once rather than at their deliveries: the command ship, for
+    /// one, surveys straight away once the survey plan is on (D20), instead of first filling its hold. A
+    /// ship keeps its cargo; one that mines for the contract again delivers it with its next trip. A ship
+    /// in flight keeps its assignment until its delivery: without one, nothing would record its arrival.
+    /// </remarks>
+    public async Task ReleaseShipsAsync(CancellationToken cancellationToken = default)
+    {
+        var inFlight = (await ships.GetAllAsync(cancellationToken))
+            .Where(ship => ship.LocalStatus == ShipLocalStatus.InTransit)
+            .Select(ship => ship.Symbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var now = TimeProvider.System.GetUtcNow();
+        var released = new List<string>();
+
+        foreach (var assignment in await assignments.GetAllActiveAsync(cancellationToken))
+        {
+            if (assignment.CompletedAt.HasValue
+                || !assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
+                || inFlight.Contains(assignment.ShipSymbol))
+            {
+                continue;
+            }
+
+            await assignments.UpsertAsync(assignment with { CompletedAt = now }, cancellationToken);
+            released.Add(assignment.ShipSymbol);
+        }
+
+        if (released.Count > 0)
+        {
+            logger.LogInformation(
+                "Contract plan: the restart released {ShipSymbols} from the contract; the plans assign them again on the first tick.",
+                string.Join(", ", released));
+        }
     }
 
     public async Task AdvanceAsync(CancellationToken cancellationToken = default)
@@ -675,74 +717,6 @@ public sealed class ContractPlanService(
         }
     }
 
-    private async Task EnsureActivePlanAssignmentAsync(ContractMineralPlanState plan, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(plan.ShipSymbol)
-            || string.IsNullOrWhiteSpace(plan.ContractId)
-            || string.IsNullOrWhiteSpace(plan.TradeSymbol)
-            || string.IsNullOrWhiteSpace(plan.SourceWaypoint)
-            || string.IsNullOrWhiteSpace(plan.DestinationWaypoint))
-        {
-            return;
-        }
-
-        var contract = await contracts.FindAsync(plan.ContractId, cancellationToken);
-        if (contract is null || contract.IsFulfilled)
-        {
-            return;
-        }
-
-        var deliverable = DeserializeDeliverables(contract.DeliverablesJson)
-            .FirstOrDefault(d =>
-                d.TradeSymbol.Equals(plan.TradeSymbol, StringComparison.OrdinalIgnoreCase)
-                && d.DestinationSymbol.Equals(plan.DestinationWaypoint, StringComparison.OrdinalIgnoreCase));
-
-        if (deliverable is null)
-        {
-            return;
-        }
-
-        var remainingUnits = Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled);
-        if (remainingUnits <= 0)
-        {
-            return;
-        }
-
-        var assignment = await assignments.FindAsync(plan.ShipSymbol, cancellationToken);
-        var shouldCreate = assignment is null
-            || assignment.CompletedAt.HasValue
-            || !assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(assignment.ContractId, plan.ContractId, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(assignment.CargoSymbol, plan.TradeSymbol, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(assignment.OriginWaypoint, plan.SourceWaypoint, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(assignment.DestWaypoint, plan.DestinationWaypoint, StringComparison.OrdinalIgnoreCase);
-
-        if (shouldCreate)
-        {
-            var now = TimeProvider.System.GetUtcNow();
-            await assignments.UpsertAsync(new ShipAssignmentDto(
-                ShipSymbol: plan.ShipSymbol,
-                AssignmentType: ContractAssignmentType,
-                OriginWaypoint: plan.SourceWaypoint,
-                DestWaypoint: plan.DestinationWaypoint,
-                CargoSymbol: plan.TradeSymbol,
-                ContractId: plan.ContractId,
-                StepIndex: 0,
-                AssignedAt: now,
-                CompletedAt: null,
-                PurchaseUnitPrice: 0,
-                RequiredUnits: remainingUnits,
-                SupplyCompleted: false), cancellationToken);
-
-            logger.LogInformation(
-                "Contract plan bootstrap: restored missing active assignment for contract {ContractId} on ship {ShipSymbol}.",
-                plan.ContractId,
-                plan.ShipSymbol);
-        }
-
-        // An existing assignment's remaining units are kept current by AdvanceActivePlanAsync.
-    }
-
     /// <summary>Whether the plan mines <paramref name="tradeSymbol"/>; other deliverables are parked (D2).</summary>
     internal static bool IsMineralSymbol(string tradeSymbol)
     {
@@ -800,10 +774,16 @@ public sealed class ContractPlanService(
                 && string.Equals(assignment.ContractId, contractId, StringComparison.OrdinalIgnoreCase))];
 
     /// <summary>
-    /// Every free miner joins the active contract (D23): the same work as the plan's first ship, mining at
-    /// its asteroid and delivering to its destination. Several ships may bring more than the contract
-    /// still needs; what is left over is sold once the contract is fulfilled (the mining plan).
+    /// Every free miner joins the active contract (D23), mining at the plan's asteroid and delivering to
+    /// its destination. Several ships may bring more than the contract still needs; what is left over is
+    /// sold once the contract is fulfilled (the mining plan).
     /// </summary>
+    /// <remarks>
+    /// An assignment lasts one round trip: the delivery closes it (D26), and the ship joins again here,
+    /// on the next tick, if it is still a free miner. The plan's first ship is no exception, so the
+    /// command ship, chosen while the survey plan was off, surveys once it is on (D20), and a ship with
+    /// other work keeps it.
+    /// </remarks>
     private async Task AddFreeMinersAsync(ContractMineralPlanState plan, CancellationToken cancellationToken)
     {
         var remainingUnits = Math.Max(0, plan.UnitsRequired - plan.UnitsFulfilled);
@@ -824,7 +804,6 @@ public sealed class ContractPlanService(
         foreach (var ship in await ships.GetAllAsync(cancellationToken))
         {
             if (!FleetRoles.IsMiner(ship, surveyOn)
-                || ship.Symbol.Equals(plan.ShipSymbol, StringComparison.OrdinalIgnoreCase)
                 || !FleetRoles.IsFree(ship, await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken), withAssignment.Contains(ship.Symbol)))
             {
                 continue;

@@ -93,7 +93,7 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
 | 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
 | 9 | `StartupSnapshotService` | once | One JSON snapshot row, from the cache |
-| 10 | `StartupRecoveryService` | once | Resumes ships |
+| 10 | `StartupRecoveryService` | once | Resumes ships; releases the contract's ships (D26) |
 | 11 | `SettingsStartupLoggingService` | once | Logs every setting |
 | 12 | `GameLoopService` | every 5 s | The tick |
 | 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
@@ -164,8 +164,10 @@ in the ships' systems, and the market and shipyard where each ship is (not in tr
 API (B35, fixed); before, it fetched all of that again, about 11 calls on every start. The cache
 holds less than the API returns: no crew or mount details.
 
-**Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false.
-For each cached ship:
+**Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false. With
+the contract plan on, it first releases every ship on the contract that isn't in flight, so the
+first tick reconsiders it (D26, see
+[Contract](#contract-contractplanservice-plus-step-3-of-the-tick)). Then, for each cached ship:
 
 | Ship state | Recovery action |
 |---|---|
@@ -278,15 +280,15 @@ Markets are not scouted again.
 
 ### Contract (`ContractPlanService`, plus step 3 of the tick)
 
-- **While the plan is Active,** bootstrap advances it from the cached contract, which every
-  delivery updates: it records the units delivered, keeps the remaining units of every ship's
-  contract assignment current, and restores the first ship's missing assignment. Then every free
-  miner joins (D23, slice 6.4): it gets a `Contract` assignment like the first ship's and logs
-  `MiningStarted` (reason `contract`). A free miner has no goal (or a finished or blocked one), no
-  assignment, isn't in transit and, with the survey plan on, can't survey (D20). Several ships may
-  bring more than the contract still needs; the mining plan sells what is left over. It writes only
-  what changed. A plan in any other status except PendingBudget makes bootstrap return immediately:
-  one contract per reset (D1).
+- **While the plan is Active,** bootstrap advances it from the cached contract, which every delivery
+  updates: it records the units delivered and keeps the remaining units of every ship's contract
+  assignment current. Then every free miner joins (D23, slice 6.4), the plan's first ship among
+  them: it gets a `Contract` assignment for one round trip (D26) and logs `MiningStarted` (reason
+  `contract`). A free miner has no goal (or a finished or blocked one), no assignment, isn't in
+  transit and, with the survey plan on, can't survey (D20). Several ships may bring more than the
+  contract still needs; the mining plan sells what is left over. It writes only what changed. A plan
+  in any other status except PendingBudget makes bootstrap return immediately: one contract per
+  reset (D1).
 - **Otherwise it:**
   1. refreshes contracts from the API, ignoring errors, but only while there is no plan yet;
   2. negotiates a contract if none is open, using the first ship that has a waypoint;
@@ -310,6 +312,14 @@ Markets are not scouted again.
     nothing is pending and the cached contract isn't fulfilled yet (another ship may have done it,
     D23), recording the payment in the cached credits and publishing `ContractFulfilledEvent` with
     it.
+  - **The trip ends there** (D26): the delivery closes the ship's assignment, and on the next tick
+    the plans assign the ship again, in their order, so work that matters more comes first: a miner
+    rejoins the contract, while the command ship surveys once the survey plan is on. A ship whose
+    fulfil call failed keeps its assignment and makes the call again. A ship keeps its cargo when it
+    is released.
+  - **At a restart** (`StartupRecoveryService`, with automation and the contract plan on), every
+    ship on the contract that isn't in flight is released at once (D26). A ship in flight keeps its
+    assignment until its delivery: without one, nothing would record its arrival.
 - **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes every
   contract assignment, which releases the ships (B9, fixed). A ship that still holds the ore sells
   it through the mining plan. Every unit delivered isn't enough: until the fulfil call has gone out,

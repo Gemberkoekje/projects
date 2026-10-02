@@ -40,8 +40,11 @@ public sealed class FulfillContractDeliveryHandler(
     INavigateSubCommand navigate,
     IMessageBus bus,
     IAgentRepository agents,
+    IShipAssignmentRepository assignments,
     ILogger<FulfillContractDeliveryHandler> logger)
 {
+    private const string ContractAssignmentType = "Contract";
+
     public Task Handle(FulfillContractDeliveryCommand command, CancellationToken cancellationToken)
         => ExecuteAsync(command, cancellationToken);
 
@@ -179,6 +182,10 @@ public sealed class FulfillContractDeliveryHandler(
                 fulfilled.PaymentOnFulfilled);
         }
 
+        // Only now: a ship whose fulfilment failed keeps its assignment, which sends it to make the
+        // call again on the next tick.
+        await EndTripAsync(command, cancellationToken);
+
         var refreshed = await ships.FindAsync(command.ShipSymbol, cancellationToken) ?? ship;
 
         return new ShipCommandResult(
@@ -191,6 +198,28 @@ public sealed class FulfillContractDeliveryHandler(
             CargoCurrent: refreshed.CargoCurrent,
             CargoCapacity: refreshed.CargoCapacity,
             Accepted: true);
+    }
+
+    /// <summary>
+    /// Closes the ship's contract assignment at its delivery (D26): the assignment lasts one round trip,
+    /// and the plans assign the ship again on the next tick, in their order, so work that matters more
+    /// comes first. A ship that can survey, for one, surveys once the survey plan is on (D20).
+    /// </summary>
+    private async Task EndTripAsync(FulfillContractDeliveryCommand command, CancellationToken cancellationToken)
+    {
+        var assignment = await assignments.FindAsync(command.ShipSymbol, cancellationToken);
+        if (assignment is not { CompletedAt: null }
+            || !assignment.AssignmentType.Equals(ContractAssignmentType, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(assignment.ContractId, command.ContractId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await assignments.UpsertAsync(assignment with { CompletedAt = TimeProvider.System.GetUtcNow() }, cancellationToken);
+        logger.LogDebug(
+            "Contract trip over: ship {ShipSymbol} delivered for contract {ContractId}, and the plans assign it again on the next tick.",
+            command.ShipSymbol,
+            command.ContractId);
     }
 
     private async Task<ShipModel> ApplyArrivalDeadReckoningIfDueAsync(ShipModel ship, CancellationToken cancellationToken)

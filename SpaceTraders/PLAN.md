@@ -62,10 +62,12 @@
 - Slice 6.5 (trading) was merged as projects#121 on 2026-10-02 (deployed by gembernodes#20), with
   your decisions D14–D19; it found B46 (fixed with it) and B47 (open). The trading plan stays off
   until you switch it on (D9).
-- Slice 6.4 (surveying and mining, and cargo ships for trading) is built on branch
-  `claude/spacetraders-surveying` (2026-10-02), with your decisions D20–D25. It fixed B34 first, at
-  your request, then the survey part of B16, B17 for the mining and survey trips, B48 and B49. The
-  survey and mining plans stay off until you switch them on (D9).
+- Slice 6.4 (surveying and mining, and cargo ships for trading) was merged as projects#122 on
+  2026-10-02 (its dashboard section as gembernodes#21), with your decisions D20–D25, and deployed by
+  gembernodes#22 at 14:13Z. It fixed B34 first, at your request, then the survey part of B16, B17
+  for the mining and survey trips, B48 and B49. Trading was switched on at 13:08Z, surveying and
+  mining at 14:14Z. Its first watch found B50, fixed with your decision D26 on branch
+  `claude/spacetraders-trip-release`.
 
 ## Known issues
 
@@ -126,6 +128,7 @@ the misbehaviour.
 | B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting, contract and probe flights still can. | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
 | B48 | **Only two of three asteroid types can be mined** (found in 6.4, from the code and the live waypoints). `MineResourceVolumeCommand` accepted only `ASTEROID_FIELD` and `ENGINEERED_ASTEROID`; 56 of X1-DC53's 57 asteroids are of type `ASTEROID`, so a drone sent to any of them got a state mismatch instead of ore, on every step. | `MineResourceVolumeCommand.cs` (`IsValidExtractionWaypoint`) | 6.4 (done) |
 | B49 | **A used-up survey is tried again and again** (found in 6.4, from the code). An extraction with a survey that is exhausted, expired or doesn't verify fails with 4224, 4221 or 4220, and nothing removed the survey from the cache, so the miner picked it again on every step; only its expiry ended that. | `MineAndSellGoalExecutor.cs` (`GetBestActiveSurveyAsync`), `SurveyRepository.cs` | 6.4 (done) |
+| B50 | **The command ship stays on the contract after the survey plan is switched on** (found in 6.4's first watch, on the cluster). The contract plan gave SPECTER-1 a contract assignment at 14:14:29Z, 23 s before the survey switch, and a contract assignment lasted until the contract was fulfilled. The survey plan takes only free ships, so SPECTER-1 went on mining copper (7 units in its first 22 minutes) instead of surveying (D20). The plan also gave its first ship its assignment back on every tick, whatever that ship did or had become. | `ContractPlanService.cs` (`EnsureActivePlanAssignmentAsync`), `FulfillContractDeliveryCommand.cs` | 6.4 (fixed with D26) |
 
 ### Decisions (2026-10-01)
 
@@ -159,6 +162,7 @@ get the next D-number.
 | D23 | Slice 6.4: how many ships may mine for the contract? | **Every free miner** (2026-10-02), the contract before market mining; ore left over is sold. The contract plan still buys at most one drone, and the mining plan buys none while the contract takes the miners. |
 | D24 | Slice 6.4 (asked during the work): how do traders keep money for fuel? | **A trading bar** (2026-10-02): "a trading bar of, say 5.000 credits, under which only fuel can be bought", so the bot never holds expensive cargo without the fuel to move it. Cargo leaves `Trade.FuelReserveCredits` (5,000) untouched, on top of the trip's own fuel. |
 | D25 | Slice 6.4 (asked during the work): when are prices fetched again after a trade? | **Right after each purchase or sale** (2026-10-02), "while the ship is still there". Cargo purchases and sales, by traders and miners; refuels aren't counted as purchases here (they happen at almost every departure and move only FUEL's price). |
+| D26 | Slice 6.4's first watch (asked on 2026-10-02): when does a ship on the contract reconsider its work? | **After each round trip, and once at every restart:** "Any ship should probably have a release and re-assign after each mining round trip. Just to determine if there's something more important to do at that point", and it "explicitly reconsiders once whenever the pod restarts". A delivery closes the ship's contract assignment, and the plans assign it again on the next tick, in their order; at startup, every ship on the contract that isn't in flight is released. Mining, trading and survey trips already ended with each trip. |
 
 ## Phases
 
@@ -1121,9 +1125,9 @@ How credits are split stays your call; Claude only fixes deviations from intende
   what's left is a clean reset period). The ship moves on to its next job instead of holding on to
   the finished scout goal.
 - **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
-- **6.4 Surveying and mining** (built 2026-10-02 on branch `claude/spacetraders-surveying`; it took
-  in the old 6.4, mining drones mine and sell, with the survey part of B16, B17 and B34). Asked that
-  day:
+- **6.4 Surveying and mining** (merged 2026-10-02 as projects#122, its dashboard as gembernodes#21,
+  deployed by gembernodes#22; it took in the old 6.4, mining drones mine and sell, with the survey
+  part of B16, B17 and B34). Asked that day:
   1. a ship that can survey surveys before it trades: the contract's ore first, otherwise ores the
      system's markets buy, at asteroids near the market that buys them;
   2. a miner mines surveyed ores before unsurveyed asteroids;
@@ -1198,17 +1202,43 @@ How credits are split stays your call; Claude only fixes deviations from intende
     - The survey request sends the cached survey back to the API; whether the API accepts the expiry
       as it comes back from the database is only known once it runs: a rejection shows as
       `SurveyEnded` with reason `not_verified`, and the miner carries on without surveys.
+  - Follow-up after the switch-on (2026-10-02, your decision D26, fixes B50; built on branch
+    `claude/spacetraders-trip-release`). To understand it, start with `EndTripAsync` in
+    `FulfillContractDeliveryCommand.cs`, then `AddFreeMinersAsync` and `ReleaseShipsAsync` in
+    `Automation/ContractPlanService.cs`.
+    - **A contract trip ends at its delivery:** the delivery closes the ship's contract assignment,
+      after the fulfil call when one was due, and the plans assign the ship again on the next tick,
+      in their order. A miner rejoins the contract (`MiningStarted`, reason `contract`, now once per
+      trip); with the survey plan on, the command ship surveys. A ship whose fulfil call fails keeps
+      its assignment and makes the call again: no ship would get a trip with no units left.
+    - **The plan's first ship is no longer special:** it got its assignment back on every tick,
+      whatever it was doing, and even had another assignment replaced; now it joins like every free
+      miner. The two tests of that restore are replaced by tests of the new rule.
+    - **A restart reconsiders once** (`StartupRecoveryService`, with automation and the contract plan
+      on): every ship on the contract that isn't in flight is released, and the first tick assigns
+      it again. A ship in flight keeps its assignment until its delivery: without one, nothing would
+      record its arrival, and it would never be free again.
+    - Noticed (not changed): a released ship keeps its cargo. A miner delivers it with its next trip,
+      but the command ship, once it surveys, carries what it mined for the contract (7 copper on
+      SPECTER-1) for good: nothing sells a surveyor's cargo. Surveying needs no hold, so it costs only
+      the ore's value. Yours to call.
+    - Files: `FulfillContractDeliveryCommand.cs`, `Automation/ContractPlanService.cs`
+      (`EnsureActivePlanAssignmentAsync` removed, `ReleaseShipsAsync` added),
+      `StartupRecoveryService.cs` (API); tests: `ContractMinersTests` (four new),
+      `FulfillContractDeliveryHandlerTests` (two new, one extended), `StartupRecoveryServiceTests`
+      (new, API), and the two restore tests removed from `ContractPlanServiceTests`.
   - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
     `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
   - Done when: a full reset period with these plans on and no open anomaly for them.
-- **6.4 in short** (built 2026-10-02): the command ship surveys (the contract's ore first), every free
-  miner works the contract and then mines surveyed or scarce ores for the market, one trip at a time;
-  the trading plan buys a shuttle and then haulers, keeps 5,000 credits for fuel, and fetches a market
-  again after each trade; asteroids' traits are stored, so the bot knows what each yields. To
-  understand this, start with `SpaceTraders.Application/Mining/MiningPlanner.cs` and
-  `AsteroidDeposits.cs`, then `Automation/SurveyPlanService.cs`, `MiningAutomationService.cs` and
-  `FleetRoles.cs`; `tests/SpaceTraders.Application.Tests/Mining/MiningFixture.cs` holds X1-DC53's
-  middle as the tests use it.
+- **6.4 in short** (merged 2026-10-02 as projects#122): the command ship surveys (the contract's ore
+  first), every free miner works the contract and then mines surveyed or scarce ores for the market,
+  one trip at a time; the trading plan buys a shuttle and then haulers, keeps 5,000 credits for
+  fuel, and fetches a market again after each trade; asteroids' traits are stored, so the bot knows
+  what each yields. To understand this, start with
+  `SpaceTraders.Application/Mining/MiningPlanner.cs` and `AsteroidDeposits.cs`, then
+  `Automation/SurveyPlanService.cs`, `MiningAutomationService.cs` and `FleetRoles.cs`;
+  `tests/SpaceTraders.Application.Tests/Mining/MiningFixture.cs` holds X1-DC53's middle as the tests
+  use it.
   - Files, in `SpaceTraders.Application` unless named:
     - new: `Mining/AsteroidDeposits.cs`, `SurveySelection.cs`, `MiningPlanner.cs`, `MiningContext.cs`,
       `SurveyKeeper.cs`; `Automation/SurveyPlanService.cs`, `SurveyPlanState.cs`, `FleetRoles.cs`;
