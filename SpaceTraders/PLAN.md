@@ -56,9 +56,9 @@
   main `3373ca7` (with B39–B41), and it registered a new agent. Grafana restarted at 09:09Z, so its
   alerts, "bot is down" included, are live. The first-run watch (4.3) is under way; its first
   minutes found B42–B44.
-- Phase 5 is under way (2026-10-02): the `st-investigate` skill is finished and was checked against
-  the first run (5.1), where it explained B42's anomaly and found B45. Its permissions (5.2) wait for
-  your go-ahead.
+- Phase 5 is done (2026-10-02): the `st-investigate` skill is finished and was checked against the
+  first run (5.1), where it explained B42's anomaly and found B45; the helper and the bot's pod logs
+  run without asking (5.2).
 
 ## Known issues
 
@@ -1054,14 +1054,15 @@ its own retention, so the bot's database stays small.
       lines' `Tick` property and millisecond times showed which two paths raced. Fixed with a test
       that interleaves them, in its own PR.
 
-**5.2 Permissions** (proposed; waits for your go-ahead)
+**5.2 Permissions** (done; your go-ahead of 2026-10-02)
 - Allowed without asking: `kubectl get`, `kubectl logs`, `kubectl port-forward`, `psql` with the
   read-only login, and reads from Grafana. Everything else asks.
 - Waits for 4.1, because the read-only login doesn't exist yet. These rules widen what Claude may
   do on your cluster without asking, so they go in only with your explicit go-ahead.
 - Done when: the skill reproduces and explains one real anomaly from the first run. Done: B42 (5.1).
-- Proposed, in `SpaceTraders/.claude/settings.json`: allow `Bash(python tools/investigate/st.py:*)`
-  and `Bash(kubectl -n spacetraders logs:*)`, and nothing else.
+- Done: `SpaceTraders/.claude/settings.json` allows `Bash(python tools/investigate/st.py *)` and
+  `Bash(kubectl -n spacetraders logs *)`, and nothing else. A session started in the `SpaceTraders`
+  folder reads them.
   - The helper covers the port-forwards, the pods and their events, Prometheus, Loki and psql with
     the read-only login. Reads from Grafana aren't needed.
   - Not `kubectl get` as such: it reads Secrets too (`kubectl get secret -o yaml` shows the agent
@@ -1069,6 +1070,20 @@ its own retention, so the bot's database stays small.
     can't keep them out (`kubectl get pods,secrets`).
   - The helper is only as read-only as its code, which is in this repository; the database login
     is read-only on the server, whatever the code does.
+
+**Phase 5 in short** (done 2026-10-02)
+- Claude can investigate the running bot from your PC, read-only: `tools/investigate/st.py` reads
+  the pods, Prometheus, Loki and the database (as `spacetraders_ro`), and the `st-investigate` skill
+  turns a symptom into evidence, a test that reproduces it and a fix (5.1). Two commands run without
+  asking: the helper and the bot's pod logs (5.2).
+- Checked against the first run: the procedure explained B42's anomaly and reproduced it with its
+  test, and found B45, the scout plan skipping a stop when a tick and an arrival race.
+- Traps it took: this PC has no psql, jq or logcli; Grafana's API needs a login; plain `kubectl get`
+  reads Secrets; the read-only login can still read the agent token until 4.1's revoke; Wolverine's
+  warnings run to dozens of lines; and `sed -i` in Git Bash turns CRLF files into LF.
+- To understand this phase, start with `.claude/skills/st-investigate/SKILL.md`, then
+  `tools/investigate/README.md` and `st.py`'s `check`; for an example of the procedure, B45 in the
+  known issues and `ScoutStopSkippedTests`.
 
 ### Phase 6: Make money, one loop at a time
 

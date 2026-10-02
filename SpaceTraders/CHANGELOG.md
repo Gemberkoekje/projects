@@ -10,8 +10,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Tools – Added (2026-10-02)
 - `tools/investigate/st.py` (slice 5.1): reads the bot's data on the cluster from your PC, read-only, for the `st-investigate` skill: `check` (the pods, Prometheus, Loki and the database in turn), `prom`, `logs` (with `--group`, warnings and errors per statement) and `sql` (as `spacetraders_ro`, through psql or the `postgres:17` image, with the password from psql's password file). It starts and stops its own port-forwards and masks tokens and passwords. See its README.
 
+### Tools – Added (2026-10-02, slice 5.2)
+- `.claude/settings.json`: Claude may run `tools/investigate/st.py` and `kubectl -n spacetraders logs` without asking, and nothing else (your go-ahead of 2026-10-02).
+
 ### Docs – Changed (2026-10-02, phase 5)
-- `.claude/skills/st-investigate/SKILL.md` is finished (slice 5.1) and was checked against the bot's first run on the cluster: it explained B42's anomaly and found B45. It reads every source through `tools/investigate/st.py`, leaves the internal API out (its key also unlocks settings and control), and records what the run taught. `PLAN.md`: 5.1 done, 5.2's permissions proposed (they wait for your go-ahead), 4.1 done but for the revoke on `stored_credentials`, and the gembernodes PRs of 2.7, 2.8 and B44 named. `README.md` reports phase 5.
+- `.claude/skills/st-investigate/SKILL.md` is finished (slice 5.1) and was checked against the bot's first run on the cluster: it explained B42's anomaly and found B45. It reads every source through `tools/investigate/st.py`, leaves the internal API out (its key also unlocks settings and control), and records what the run taught. `PLAN.md`: phase 5 done, with a short summary; 4.1 done but for the revoke on `stored_credentials`; the gembernodes PRs of 2.7, 2.8 and B44 named. `README.md` reports phase 5.
 
 ### Code – Added (2026-10-02)
 - Metrics for a markets dashboard per system (slice 2.8): every minute the cached markets (per good: prices, trade volume, supply, activity) and shipyards (ship types, prices, supply), with when each was last refreshed (`spacetraders_market_*`, `spacetraders_shipyard_*`, `PrometheusMarketMetricsService`); and once per start the game's production chains from `GET market/supply-chain`, one series per good with what it is made from and what is made from it (`spacetraders_good_supply_chain`).
