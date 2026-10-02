@@ -72,10 +72,11 @@ public static class MiningPlanner
 
     /// <summary>
     /// What surveyors survey: the contract's ore, and each ore a market in the system buys, at the asteroid
-    /// nearest the market that pays most for it, among those whose traits yield it and that one of the miners
-    /// can reach (any asteroid while there are no miners). An ore needs a survey while it has fewer usable
-    /// surveys there than <paramref name="stock"/> (D27). Those come first: the contract's ore, then the ore
-    /// with the fewest usable surveys, then the best paid. The ores with their stock follow, for the plan's view.
+    /// nearest each market that buys it, among those whose traits yield it and that one of the miners can
+    /// reach (any asteroid while there are no miners): one target per ore and asteroid, for the market that
+    /// pays most of those it is nearest (D27). An ore needs a survey at an asteroid while it has fewer usable
+    /// surveys there than <paramref name="stock"/>. Those come first: the contract's ore, then the fewest
+    /// usable surveys, then the best paid. The targets with their stock follow, for the plan's view.
     /// </summary>
     /// <param name="context">The system.</param>
     /// <param name="contracts">The contract's ore and asteroid, while the contract plan mines; else none.</param>
@@ -107,17 +108,25 @@ public static class MiningPlanner
                 NeedsSurvey: usable < stock));
         }
 
+        // Surveys close to wherever the ore is sold (D27, refined): every market that buys it, not only the
+        // one that pays most. Markets that share their nearest asteroid share its target.
+        var sellable = new Dictionary<(string Ore, string Asteroid), SurveyTarget>();
         foreach (var ore in AsteroidDeposits.Ores.Order(StringComparer.Ordinal))
         {
-            if (!TryFindBestBuyer(map, ore, out var buyer, out var price)
-                || !TryFindNearestAsteroid(map, ore, buyer, asteroid => miners.Count == 0 || miners.Any(miner => CanReach(map, miner, asteroid)), out var asteroid))
+            foreach (var (buyer, price) in Buyers(map, ore))
             {
-                continue;
-            }
+                if (!TryFindNearestAsteroid(map, ore, buyer, asteroid => miners.Count == 0 || miners.Any(miner => CanReach(map, miner, asteroid)), out var asteroid)
+                    || (sellable.TryGetValue((ore, asteroid), out var known) && known.SellPrice >= price))
+                {
+                    continue;
+                }
 
-            var usable = SurveySelection.CountUsable(context.Surveys, asteroid, ore, context.Now);
-            targets.Add(new SurveyTarget(ore, asteroid, buyer, price, ForContract: false, usable, NeedsSurvey: usable < stock));
+                var usable = SurveySelection.CountUsable(context.Surveys, asteroid, ore, context.Now);
+                sellable[(ore, asteroid)] = new SurveyTarget(ore, asteroid, buyer, price, ForContract: false, usable, NeedsSurvey: usable < stock);
+            }
         }
+
+        targets.AddRange(sellable.Values);
 
         // The contract's ore came first whatever surveys there were, so the only surveyor surveyed for it
         // without end (D27).
@@ -252,21 +261,16 @@ public static class MiningPlanner
         return value != 0 ? value : string.CompareOrdinal(x.Key, y.Key);
     }
 
-    /// <summary>The market in the system that pays most for an ore; a tie goes to the first by symbol.</summary>
-    private static bool TryFindBestBuyer(TradeMarketMap map, string ore, out string buyer, out long price)
+    /// <summary>Every market in the system that buys an ore, with what it pays, by symbol.</summary>
+    private static IEnumerable<(string Market, long Price)> Buyers(TradeMarketMap map, string ore)
     {
-        buyer = string.Empty;
-        price = 0;
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
-            if (map.TryGetGood(market, ore, out var good) && good.SellPrice > price)
+            if (map.TryGetGood(market, ore, out var good) && good.SellPrice > 0)
             {
-                buyer = market;
-                price = good.SellPrice;
+                yield return (market, good.SellPrice);
             }
         }
-
-        return price > 0;
     }
 
     /// <summary>The market a miner gets most at for an ore, from the asteroid, after the fuel to get there.</summary>

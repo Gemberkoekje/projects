@@ -352,9 +352,11 @@ Markets are not scouted again.
   no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`.
   The targets are:
   1. the contract's ore at the contract's asteroid, while the contract plan mines it;
-  2. each ore a market in the system buys, at the asteroid nearest the market that pays most for it,
-     among those whose traits yield the ore (`AsteroidDeposits`) and that one of the miners can
-     reach (any asteroid while there are no miners).
+  2. each ore a market in the system buys, at the asteroid nearest each market that buys it (D27,
+     refined: surveys close to wherever the ore is sold), among those whose traits yield the ore
+     (`AsteroidDeposits`) and that one of the miners can reach (any asteroid while there are no
+     miners). One target per ore and asteroid, for the market that pays most of those it is nearest;
+     each keeps its own stock.
 
   A target needs a survey while it has fewer usable surveys holding its ore than
   `Survey.StockPerOre` (2, D27). Among those, the contract's ore comes first, then the ore with the
