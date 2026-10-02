@@ -3,12 +3,13 @@ using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
 
-/// <summary>The plans the tick runs. Each has its own on/off setting.</summary>
+/// <summary>The plans the tick runs, in this order. Each has its own on/off setting.</summary>
 public enum AutomationPlan
 {
     Scout,
     Contract,
     ProbeDeployment,
+    Survey,
     Mining,
     Trading,
 }
@@ -34,7 +35,8 @@ public static class AutomationSwitches
     {
         ScoutWaypointGoal => AutomationPlan.Scout,
         DeployProbeGoal => AutomationPlan.ProbeDeployment,
-        MineAndSellGoal or SurveyWaypointGoal => AutomationPlan.Mining,
+        SurveyWaypointGoal => AutomationPlan.Survey,
+        MineAndSellGoal => AutomationPlan.Mining,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
         _ => null,
     };

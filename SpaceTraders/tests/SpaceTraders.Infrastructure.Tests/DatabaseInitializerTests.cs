@@ -88,6 +88,30 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
         (await TableOptionsAsync("cached_ships")).Should().BeEquivalentTo("fillfactor=50", "autovacuum_vacuum_threshold=10");
     }
 
+    [SkippableFact]
+    public async Task InitializeAsync_AddsTheSurveysUseCount_ToATableFromBeforeIt()
+    {
+        // Slice 6.4: the cluster's cached_surveys was created without "Extractions", and a table that
+        // exists is never created again; without the column, every survey query fails.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        await ExecuteAsync("""ALTER TABLE cached_surveys DROP COLUMN "Extractions";""");
+        await ExecuteAsync("""
+            INSERT INTO cached_surveys ("AgentId", "Signature", "ShipSymbol", "WaypointSymbol", "DepositsJson", "Expiration", "Size", "RecordedAt")
+            VALUES ('INITIALIZER-TEST@2026-09-27', 'SIG-1', 'SHIP-1', 'X1-AB-XB5C', '[{"Symbol":"COPPER_ORE"}]', now() + interval '1 hour', 'SMALL', now());
+            """);
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        var surveys = new SpaceTraders.Infrastructure.Persistence.Repositories.SurveyRepository(db);
+        await surveys.RecordExtractionAsync("SIG-1");
+        (await surveys.GetActiveAsync()).Should().ContainSingle().Which.Extractions.Should().Be(1);
+    }
+
     private async Task<string[]> TableOptionsAsync(string table)
     {
         await using var connection = new NpgsqlConnection(_pg.GetConnectionString());

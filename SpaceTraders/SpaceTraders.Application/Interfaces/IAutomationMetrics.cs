@@ -53,6 +53,25 @@ public interface IAutomationMetrics
     /// <summary>Adds units a ship jettisoned (<c>spacetraders_jettisoned_units_total{ship,good}</c>).</summary>
     void Jettisoned(string shipSymbol, string tradeSymbol, int units);
 
+    /// <summary>Counts an extraction (<c>spacetraders_extractions_total{ship,surveyed}</c>), with a survey or without one (slice 6.4).</summary>
+    void Extraction(string shipSymbol, bool surveyed);
+
+    /// <summary>Counts a survey a ship took (<c>spacetraders_surveys_taken_total{waypoint,size}</c>).</summary>
+    void SurveyTaken(string waypointSymbol, string size);
+
+    /// <summary>
+    /// Counts a survey that ended (<c>spacetraders_surveys_ended_total{waypoint,reason,used}</c>): it
+    /// <c>expired</c>, or the API refused it as <c>exhausted</c> or <c>not_verified</c>; <c>used</c> when any
+    /// extraction was made with it. Many unused surveys mean surveying runs ahead of the miners.
+    /// </summary>
+    void SurveyEnded(string waypointSymbol, string reason, bool used);
+
+    /// <summary>
+    /// Records the usable surveys in the cache (<c>spacetraders_surveys_active{waypoint,used}</c>), by
+    /// waypoint and whether any extraction used them yet. A waypoint without surveys loses its series.
+    /// </summary>
+    void Surveys(IReadOnlyCollection<SurveyMetricsSample> surveys);
+
     /// <summary>Sets whether an anomaly is active (<c>spacetraders_anomaly_active{rule,subject}</c>).</summary>
     void Anomaly(string rule, string subject, bool active);
 
@@ -107,6 +126,27 @@ public interface IAutomationMetrics
     /// </summary>
     /// <param name="madeFrom">Each exported good, with the goods it is made from.</param>
     void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom);
+}
+
+/// <summary>The usable surveys of one waypoint, used or not yet, as the metrics show them.</summary>
+public sealed record SurveyMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SurveyMetricsSample(string Waypoint, bool Used, int Count)
+    {
+        this.Waypoint = Waypoint;
+        this.Used = Used;
+        this.Count = Count;
+    }
+
+    /// <summary>The surveyed waypoint.</summary>
+    public required string Waypoint { get; init; }
+
+    /// <summary>Whether any extraction was made with these surveys.</summary>
+    public required bool Used { get; init; }
+
+    /// <summary>How many there are.</summary>
+    public required int Count { get; init; }
 }
 
 /// <summary>One cached market as the metrics show it.</summary>

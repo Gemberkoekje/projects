@@ -260,6 +260,7 @@ public sealed class ShipLeftIdleRuleTests
                     TradeSymbol = "COPPER_ORE",
                     SellWaypointSymbol = "X1-AB-C3",
                     Status = MarketAutomationOpportunityStatus.Pending,
+                    CandidateShipSymbols = ["SHIP-3"],
                     FirstObservedAt = Start,
                     LastObservedAt = Start,
                 },
@@ -273,6 +274,70 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Details.Should().Contain("the Mining plan has work it could do: 1 mining opportunities without a ship");
+    }
+
+    [Fact]
+    public async Task AMinerOutOfReachOfEveryOpening_IsIdleByDesign()
+    {
+        // Slice 6.4: an opening is work only for the miners the plan lists as able to reach it; a drone's
+        // tank doesn't get it to B7's asteroids.
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities =
+            [
+                new MiningAutomationOpportunityState
+                {
+                    OpportunityKey = "X1-AB-B7|GOLD_ORE",
+                    TradeSymbol = "GOLD_ORE",
+                    SellWaypointSymbol = "X1-AB-B7",
+                    Status = MarketAutomationOpportunityStatus.Pending,
+                    FirstObservedAt = Start,
+                    LastObservedAt = Start,
+                },
+            ],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-3", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AMiner_LeftIdleWhileTheContractStillNeedsUnits_IsAnAnomaly()
+    {
+        // D23: every free miner joins the contract, not only the plan's first ship.
+        _contract.Plans.GetAsync(Arg.Any<CancellationToken>()).Returns(ContractFixture.Plan(ContractMineralPlanStatus.Active, Start));
+        _fleet.Have(FleetFixture.Drone("SHIP-4", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        var violation = violations.Should().ContainSingle().Which;
+        violation.Subject.Should().Be("SHIP-4");
+        violation.Details.Should().Contain("the Contract plan has work it could do: contract C-1");
+    }
+
+    [Fact]
+    public async Task ASurveyor_LeftIdleWhileThereIsSomethingToSurvey_IsAnAnomaly()
+    {
+        // D20: with the survey plan on, a ship that can survey surveys.
+        _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51" }],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-1", Start) with { ShipType = "COMMAND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"], CargoCapacity = 40 });
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        violations.Should().ContainSingle().Which.Details.Should().Contain("the Survey plan has work it could do: 1 targets to survey");
     }
 
     [Fact]

@@ -1,752 +1,338 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Orchestration;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
 
+/// <summary>The mining plan (PLAN.md slice 6.4).</summary>
 public interface IMiningAutomationService
 {
+    /// <summary>One pass of the plan: gives every free miner a trip, and buys drones for openings no miner can take.</summary>
+    /// <param name="cancellationToken">Stops the pass.</param>
+    /// <returns>A task that completes when the pass is done.</returns>
     Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default);
-
-    Task Handle(Domain.Events.MarketDataRefreshedEvent @event, CancellationToken cancellationToken = default);
-
-    Task Handle(Domain.Events.AgentCreditsChangedEvent @event, CancellationToken cancellationToken = default);
-
-    Task Handle(Domain.Events.ShipBecameIdleEvent @event, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// The mining plan (PLAN.md slice 6.4). Each tick it gives every free miner one trip
+/// (<see cref="MineAndSellGoal"/>); the contract plan has taken the miners it wants first (D23):
+/// <list type="bullet">
+///   <item>a miner is a ship with a mining laser, a hold and a tank that doesn't survey (D20,
+///   <see cref="FleetRoles"/>);</item>
+///   <item>a miner that holds ore a market buys sells it first, where it fetches most after fuel: the ore
+///   left over from a contract, for one;</item>
+///   <item>otherwise it takes the best of <see cref="MiningPlanner.MiningTargets"/>: a surveyed ore first,
+///   sold where it fetches most, then an ore a market has in low supply (D22), sold there. One miner per
+///   sell market and ore;</item>
+///   <item>when no miner was free and an opening in low supply waits that a new drone could reach, it buys
+///   a drone per opening, up to <c>Mining.MaxDrones</c> and within the credit reserve; not while the
+///   contract plan mines, which would take the drone (D23).</item>
+/// </list>
+/// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
+/// reads them, D13), and is written only when it changes.
+/// </summary>
 public sealed class MiningAutomationService(
-    IMarketRepository markets,
     IShipRepository ships,
     IShipGoalRepository goals,
-    IWaypointRepository waypoints,
+    IShipAssignmentRepository assignments,
+    IContractMineralPlanRepository contractPlans,
     IShipyardRepository shipyards,
+    IMiningContextReader miningContexts,
     ISettingsRepository settings,
     IPlanRepository plans,
     IShipPurchaseService shipPurchases,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
-    private const string ScarceSupply = "SCARCE";
-    private const string ImportType = "IMPORT";
-    private const string ExchangeType = "EXCHANGE";
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
     private const string MaxMiningDronesSettingKey = "Mining.MaxDrones";
     private const int DefaultMaxMiningDrones = 20;
 
-    private static readonly IReadOnlySet<string> KnownMineralSymbols = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "ALUMINUM_ORE",
-        "AMMONIA_ICE",
-        "COPPER_ORE",
-        "DIAMONDS",
-        "GOLD_ORE",
-        "ICE_WATER",
-        "IRON_ORE",
-        "MERITIUM_ORE",
-        "PLATINUM_ORE",
-        "QUARTZ_SAND",
-        "SILICON_CRYSTALS",
-        "SILVER_ORE",
-    };
+    private static readonly JsonSerializerOptions CompareOptions = new();
 
+    /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
-        var now = TimeProvider.System.GetUtcNow();
-        var opportunities = await GetScarceMineralBuyOpportunitiesAsync(cancellationToken);
-
-        logger.LogDebug(
-            "Mining automation: found {OpportunityCount} scarce market opportunity(s) in cached market data.",
-            opportunities.Count);
-
-        var activeOpportunityKeys = BuildOpportunityKeySet(opportunities);
-
-        await CleanupStaleMiningGoalsAsync(activeOpportunityKeys, cancellationToken);
-
-        var queue = await ReconcileQueueAsync(opportunities, now, cancellationToken);
-        if (opportunities.Count == 0)
-        {
-            await plans.UpsertAsync(PlanTypes.MiningAutomation, queue, cancellationToken);
-            return;
-        }
-
-        var updatedQueue = await TryAssignOrPurchaseForOpportunitiesAsync(opportunities, queue, now, cancellationToken);
-        await plans.UpsertAsync(PlanTypes.MiningAutomation, updatedQueue, cancellationToken);
-    }
-
-    public Task Handle(Domain.Events.MarketDataRefreshedEvent @event, CancellationToken cancellationToken = default) =>
-        EnsureBootstrappedAsync(cancellationToken);
-
-    public Task Handle(Domain.Events.AgentCreditsChangedEvent @event, CancellationToken cancellationToken = default) =>
-        EnsureBootstrappedAsync(cancellationToken);
-
-    public Task Handle(Domain.Events.ShipBecameIdleEvent @event, CancellationToken cancellationToken = default) =>
-        EnsureBootstrappedAsync(cancellationToken);
-
-    private async Task CleanupStaleMiningGoalsAsync(
-        IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)> activeOpportunityKeys,
-        CancellationToken cancellationToken)
-    {
+        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
+        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+            .Where(assignment => !assignment.CompletedAt.HasValue)
+            .Select(assignment => assignment.ShipSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var free = new List<ShipModel>();
         foreach (var ship in fleet)
         {
-            var activeGoal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
-            if (activeGoal is not MineAndSellGoal miningGoal)
+            var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            if (goal is MineAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
             {
-                continue;
+                var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
+                heldKeys.Add(key);
+                heldBy[key] = ship.Symbol;
             }
-
-            var key = CreateOpportunityKey(miningGoal.SellWaypointSymbol, miningGoal.TradeSymbol);
-            if (activeOpportunityKeys.Contains(key))
+            else if (FleetRoles.IsMiner(ship, surveyOn) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
-                continue;
+                free.Add(ship);
             }
-
-            await goals.ClearActiveGoalAsync(ship.Symbol, cancellationToken);
-            logger.LogInformation(
-                "Mining automation: cleared stale mining goal for ship {ShipSymbol} ({TradeSymbol} -> {SellWaypoint}) because market is no longer SCARCE.",
-                ship.Symbol,
-                miningGoal.TradeSymbol,
-                miningGoal.SellWaypointSymbol);
         }
+
+        var freeAtStart = free.Count > 0;
+        var opportunities = new List<MiningAutomationOpportunityState>();
+        var pending = new List<(MiningOpportunity Opportunity, string SystemSymbol)>();
+        foreach (var system in fleet
+            .Where(ship => FleetRoles.IsMiner(ship, surveyOn) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
+        {
+            var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
+            var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)).ToList();
+            var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var miner in candidates)
+            {
+                if (await GiveTripAsync(context, miner, heldKeys, heldBy, cancellationToken))
+                {
+                    withTrip.Add(miner.Symbol);
+                }
+            }
+
+            foreach (var opportunity in MiningPlanner.LowSupplyOpportunities(context.Map))
+            {
+                var held = heldBy.TryGetValue(opportunity.Key, out var holder);
+                var able = candidates
+                    .Where(miner => !withTrip.Contains(miner.Symbol) && MiningPlanner.CanReach(context.Map, miner, opportunity.AsteroidSymbol))
+                    .Select(miner => miner.Symbol)
+                    .Order(StringComparer.Ordinal)
+                    .ToList();
+                opportunities.Add(new MiningAutomationOpportunityState
+                {
+                    OpportunityKey = opportunity.Key,
+                    TradeSymbol = opportunity.Ore,
+                    SellWaypointSymbol = opportunity.SellWaypointSymbol,
+                    SourceWaypointSymbol = opportunity.AsteroidSymbol,
+                    Status = held ? MarketAutomationOpportunityStatus.Assigned : MarketAutomationOpportunityStatus.Pending,
+                    AssignedShipSymbol = held ? holder : null,
+                    CandidateShipSymbols = held ? [] : able,
+                    FirstObservedAt = default,
+                    LastObservedAt = default,
+                });
+
+                if (!held)
+                {
+                    pending.Add((opportunity, system.Key));
+                }
+            }
+        }
+
+        if (pending.Count > 0 && !freeAtStart && !await ContractTakesMinersAsync(cancellationToken))
+        {
+            await BuyDronesAsync(fleet, pending, cancellationToken);
+        }
+
+        await SaveStateAsync(opportunities, cancellationToken);
     }
 
-    private async Task<MiningAutomationPlanState> TryAssignOrPurchaseForOpportunitiesAsync(
-        IReadOnlyList<MiningOpportunity> opportunities,
-        MiningAutomationPlanState queue,
-        DateTimeOffset now,
+    /// <summary>Gives a free miner its next trip: selling ore it holds, else the best mining target.</summary>
+    /// <returns>False when there is nothing it can mine and sell.</returns>
+    private async Task<bool> GiveTripAsync(
+        MiningContext context,
+        ShipModel miner,
+        HashSet<string> heldKeys,
+        Dictionary<string, string> heldBy,
         CancellationToken cancellationToken)
     {
-        var activeTargets = await goals.GetActiveMineAndSellTargetsAsync(cancellationToken);
-        var assignedShips = await ships.GetAllAsync(cancellationToken);
-        var shipsWithGoals = await LoadShipsWithActiveGoalAsync(assignedShips, cancellationToken);
-        var queueItems = queue.Opportunities.ToDictionary(item => item.OpportunityKey, StringComparer.OrdinalIgnoreCase);
-        var idleMinerCount = assignedShips.Count(ship =>
-            ship.IsMiningCapable
-            && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
-            && !shipsWithGoals.Contains(ship.Symbol));
-        var hasIdleMinerAtStart = idleMinerCount > 0;
-
-        logger.LogDebug(
-            "Mining automation: {IdleMinerCount} idle mining drone(s) available before assignment.",
-            idleMinerCount);
-
-        var unassignedOpportunities = new List<MiningOpportunity>();
-
-        foreach (var opportunity in opportunities)
+        if (TryFindHeldOreSale(context.Map, miner, out var ore, out var sale))
         {
-            var targetKey = CreateOpportunityKey(
-                opportunity.SellWaypointSymbol,
-                opportunity.TradeSymbol);
-            var queueKey = FormatOpportunityKey(targetKey.SellWaypointSymbol, targetKey.TradeSymbol);
-
-            if (activeTargets.Contains(targetKey))
+            await StartAsync(miner, new MineAndSellGoal
             {
-                if (queueItems.TryGetValue(queueKey, out var activeItem))
-                {
-                    queueItems[queueKey] = activeItem with
-                    {
-                        Status = MarketAutomationOpportunityStatus.Assigned,
-                        LastObservedAt = now,
-                        StopReason = null,
-                    };
-                }
-
-                continue;
-            }
-
-            var idleDrone = FindIdleMiningDrone(assignedShips, shipsWithGoals);
-            if (idleDrone is null)
-            {
-                unassignedOpportunities.Add(opportunity);
-
-                if (queueItems.TryGetValue(queueKey, out var pendingItem))
-                {
-                    queueItems[queueKey] = pendingItem with
-                    {
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        LastObservedAt = now,
-                        StopReason = "No idle mining drone currently available.",
-                    };
-                }
-
-                continue;
-            }
-
-            var sourceWaypoint = await ResolveSourceAsteroidAsync(
-                idleDrone,
-                opportunity.TradeSymbol,
-                opportunity.SellWaypointSymbol,
-                cancellationToken);
-            if (string.IsNullOrWhiteSpace(sourceWaypoint))
-            {
-                logger.LogDebug(
-                    "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no asteroid source found.",
-                    opportunity.TradeSymbol,
-                    opportunity.SellWaypointSymbol);
-
-                if (queueItems.TryGetValue(queueKey, out var deferredItem))
-                {
-                    queueItems[queueKey] = deferredItem with
-                    {
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        LastObservedAt = now,
-                        StopReason = "No asteroid source waypoint found.",
-                    };
-                }
-
-                continue;
-            }
-
-            var goal = new MineAndSellGoal
-            {
-                TradeSymbol = opportunity.TradeSymbol,
-                SourceWaypointSymbol = sourceWaypoint,
-                SellWaypointSymbol = opportunity.SellWaypointSymbol,
-            };
-
-            await goals.SetActiveGoalAsync(idleDrone.Symbol, goal, cancellationToken);
-            shipsWithGoals.Add(idleDrone.Symbol);
-
-            var updatedTargets = activeTargets.ToHashSet();
-            updatedTargets.Add(targetKey);
-            activeTargets = updatedTargets;
-
-            if (queueItems.TryGetValue(queueKey, out var assignedItem))
-            {
-                queueItems[queueKey] = assignedItem with
-                {
-                    Status = MarketAutomationOpportunityStatus.Assigned,
-                    AssignedShipSymbol = idleDrone.Symbol,
-                    LastObservedAt = now,
-                    StopReason = null,
-                };
-            }
-
-            logger.LogInformation(
-                "Mining automation: assigned ship {ShipSymbol} to mine {TradeSymbol} from {SourceWaypoint} and sell at {SellWaypoint}.",
-                idleDrone.Symbol,
-                opportunity.TradeSymbol,
-                sourceWaypoint,
-                opportunity.SellWaypointSymbol);
-        }
-
-        if (unassignedOpportunities.Count > 0 && !hasIdleMinerAtStart)
-        {
-            await TryPurchaseForUnassignedOpportunitiesAsync(
-                unassignedOpportunities,
-                assignedShips,
-                shipsWithGoals,
-                activeTargets,
-                queueItems,
-                now,
-                cancellationToken);
-        }
-        else if (unassignedOpportunities.Count > 0)
-        {
-            logger.LogDebug(
-                "Mining automation: skipping miner purchase for {OpportunityCount} unassigned opportunity(s) because idle mining drone(s) already exist.",
-                unassignedOpportunities.Count);
-        }
-
-        return queue with
-        {
-            Opportunities = queueItems.Values
-                .OrderBy(item => item.SellWaypointSymbol, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(item => item.TradeSymbol, StringComparer.OrdinalIgnoreCase)
-                .ToList(),
-            UpdatedAt = now,
-        };
-    }
-
-    private static ShipModel? FindIdleMiningDrone(
-        IReadOnlyList<ShipModel> shipsInFleet,
-        IReadOnlySet<string> shipsWithGoals)
-    {
-        return shipsInFleet.FirstOrDefault(ship =>
-            ship.IsMiningCapable
-            && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
-            && !shipsWithGoals.Contains(ship.Symbol));
-    }
-
-    private async Task TryPurchaseForUnassignedOpportunitiesAsync(
-        IReadOnlyList<MiningOpportunity> unassignedOpportunities,
-        IReadOnlyList<ShipModel> currentFleet,
-        IReadOnlySet<string> shipsWithGoals,
-        IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)> activeTargets,
-        Dictionary<string, MiningAutomationOpportunityState> queueItems,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        if (unassignedOpportunities.Count == 0)
-        {
-            return;
-        }
-
-        var updatedFleet = currentFleet.ToList();
-        var updatedShipsWithGoals = shipsWithGoals.ToHashSet();
-        var updatedActiveTargets = activeTargets.ToHashSet();
-
-        foreach (var opportunity in unassignedOpportunities)
-        {
-            var idleDrone = await TryPurchaseMiningDroneAsync(opportunity.SellWaypointSymbol, updatedFleet, cancellationToken);
-            if (idleDrone is null)
-            {
-                logger.LogDebug(
-                    "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no idle drone and purchase unavailable.",
-                    opportunity.TradeSymbol,
-                    opportunity.SellWaypointSymbol);
-
-                var queueKey = FormatOpportunityKey(
-                    opportunity.SellWaypointSymbol.ToUpperInvariant(),
-                    opportunity.TradeSymbol.ToUpperInvariant());
-
-                if (queueItems.TryGetValue(queueKey, out var pendingItem))
-                {
-                    queueItems[queueKey] = pendingItem with
-                    {
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        LastObservedAt = now,
-                        StopReason = "No idle mining drone available and purchase unavailable.",
-                    };
-                }
-
-                continue;
-            }
-
-            updatedFleet.Add(idleDrone);
-
-            var sourceWaypoint = await ResolveSourceAsteroidAsync(
-                idleDrone,
-                opportunity.TradeSymbol,
-                opportunity.SellWaypointSymbol,
-                cancellationToken);
-            if (string.IsNullOrWhiteSpace(sourceWaypoint))
-            {
-                logger.LogInformation(
-                    "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint} after purchase; no asteroid source found.",
-                    opportunity.TradeSymbol,
-                    opportunity.SellWaypointSymbol);
-
-                var queueKey = FormatOpportunityKey(
-                    opportunity.SellWaypointSymbol.ToUpperInvariant(),
-                    opportunity.TradeSymbol.ToUpperInvariant());
-
-                if (queueItems.TryGetValue(queueKey, out var deferredItem))
-                {
-                    queueItems[queueKey] = deferredItem with
-                    {
-                        Status = MarketAutomationOpportunityStatus.Pending,
-                        LastObservedAt = now,
-                        StopReason = "No asteroid source waypoint found.",
-                    };
-                }
-
-                continue;
-            }
-
-            var goal = new MineAndSellGoal
-            {
-                TradeSymbol = opportunity.TradeSymbol,
-                SourceWaypointSymbol = sourceWaypoint,
-                SellWaypointSymbol = opportunity.SellWaypointSymbol,
-            };
-
-            await goals.SetActiveGoalAsync(idleDrone.Symbol, goal, cancellationToken);
-            updatedShipsWithGoals.Add(idleDrone.Symbol);
-
-            var targetKey = CreateOpportunityKey(
-                opportunity.SellWaypointSymbol,
-                opportunity.TradeSymbol);
-            updatedActiveTargets.Add(targetKey);
-
-            var queueKeyFinal = FormatOpportunityKey(targetKey.SellWaypointSymbol, targetKey.TradeSymbol);
-
-            if (queueItems.TryGetValue(queueKeyFinal, out var assignedItem))
-            {
-                queueItems[queueKeyFinal] = assignedItem with
-                {
-                    Status = MarketAutomationOpportunityStatus.Assigned,
-                    AssignedShipSymbol = idleDrone.Symbol,
-                    LastObservedAt = now,
-                    StopReason = null,
-                };
-            }
-
-            logger.LogInformation(
-                "Mining automation: purchased drone and assigned {ShipSymbol} to mine {TradeSymbol} from {SourceWaypoint} and sell at {SellWaypoint}.",
-                idleDrone.Symbol,
-                opportunity.TradeSymbol,
-                sourceWaypoint,
-                opportunity.SellWaypointSymbol);
-        }
-    }
-
-    private async Task<HashSet<string>> LoadShipsWithActiveGoalAsync(
-        IReadOnlyList<ShipModel> fleet,
-        CancellationToken cancellationToken)
-    {
-        var withGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var ship in fleet)
-        {
-            var activeGoal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
-            if (activeGoal is not null
-                && activeGoal.Status is not Domain.Enums.GoalStatus.Completed
-                and not Domain.Enums.GoalStatus.Blocked)
-            {
-                withGoals.Add(ship.Symbol);
-            }
-        }
-
-        return withGoals;
-    }
-
-    private async Task<ShipModel?> TryPurchaseMiningDroneAsync(
-        string sellWaypointSymbol,
-        IReadOnlyList<ShipModel> currentFleet,
-        CancellationToken cancellationToken)
-    {
-        var maxMiningDrones = await GetMaxMiningDronesAsync(cancellationToken);
-        var miningDroneCount = currentFleet.Count(ship => ship.IsMiningCapable);
-
-        if (miningDroneCount >= maxMiningDrones)
-        {
-            logger.LogDebug(
-                "Mining automation: mining drone cap reached ({Current}/{Max}); purchase skipped.",
-                miningDroneCount,
-                maxMiningDrones);
-            return null;
-        }
-
-        var shipyardOptions = await shipyards.GetAllAsync(cancellationToken);
-        if (shipyardOptions.Count == 0)
-        {
-            return null;
-        }
-
-        var preferredSystem = ExtractSystemSymbol(sellWaypointSymbol);
-        var shipyard = shipyardOptions.FirstOrDefault(candidate =>
-            candidate.SystemSymbol.Equals(preferredSystem, StringComparison.OrdinalIgnoreCase)
-            && candidate.ShipTypes.Contains(MiningDroneShipType, StringComparer.OrdinalIgnoreCase))
-            ?? shipyardOptions.FirstOrDefault(candidate =>
-                candidate.ShipTypes.Contains(MiningDroneShipType, StringComparer.OrdinalIgnoreCase));
-
-        if (shipyard is null)
-        {
-            return null;
-        }
-
-        var purchased = await shipPurchases.TryPurchaseAsync(
-            MiningDroneShipType,
-            shipyard.WaypointSymbol,
-            cancellationToken);
-        if (!purchased.IsSuccess || purchased.PurchasedShip is null)
-        {
-            logger.LogDebug(
-                "Mining automation: mining drone purchase denied at {Shipyard} — {Reason}.",
-                shipyard.WaypointSymbol,
-                purchased.FailureReason ?? "Purchase failed.");
-            return null;
-        }
-
-        logger.LogInformation(
-            "Mining automation: purchased mining drone {ShipSymbol} at {Shipyard}.",
-            purchased.PurchasedShip.Symbol,
-            shipyard.WaypointSymbol);
-
-        return purchased.PurchasedShip;
-    }
-
-    private async Task<IReadOnlyList<MiningOpportunity>> GetScarceMineralBuyOpportunitiesAsync(CancellationToken cancellationToken)
-    {
-        var snapshots = await markets.GetAllSnapshotsAsync(cancellationToken);
-        var opportunities = new List<MiningOpportunity>();
-
-        foreach (var snapshot in snapshots)
-        {
-            foreach (var good in snapshot.TradeGoods)
-            {
-                if (!IsDemandType(good.Type)
-                    || !good.Supply.Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase)
-                    || !IsMineralSymbol(good.Symbol))
-                {
-                    continue;
-                }
-
-                opportunities.Add(new MiningOpportunity(snapshot.WaypointSymbol, good.Symbol));
-            }
-        }
-
-        return opportunities;
-    }
-
-    private static HashSet<(string SellWaypointSymbol, string TradeSymbol)> BuildOpportunityKeySet(
-        IReadOnlyList<MiningOpportunity> opportunities)
-    {
-        var keys = new HashSet<(string SellWaypointSymbol, string TradeSymbol)>();
-        foreach (var opportunity in opportunities)
-        {
-            keys.Add(CreateOpportunityKey(opportunity.SellWaypointSymbol, opportunity.TradeSymbol));
-        }
-
-        return keys;
-    }
-
-    private static (string SellWaypointSymbol, string TradeSymbol) CreateOpportunityKey(
-        string sellWaypointSymbol,
-        string tradeSymbol) =>
-        (
-            sellWaypointSymbol.ToUpperInvariant(),
-            tradeSymbol.ToUpperInvariant()
-        );
-
-    private async Task<int> GetMaxMiningDronesAsync(CancellationToken cancellationToken)
-    {
-        var configured = await settings.GetAsync<int>(MaxMiningDronesSettingKey, cancellationToken);
-        if (configured > 0)
-        {
-            return configured;
-        }
-
-        return DefaultMaxMiningDrones;
-    }
-
-    private async Task<string> ResolveSourceAsteroidAsync(
-        ShipModel ship,
-        string tradeSymbol,
-        string sellWaypointSymbol,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(ship.SystemSymbol) || string.IsNullOrWhiteSpace(tradeSymbol))
-        {
-            return string.Empty;
-        }
-
-        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
-        var originWaypoint = ResolveSourceSelectionOrigin(systemWaypoints, ship.WaypointSymbol, sellWaypointSymbol);
-        var resourceCandidates = systemWaypoints
-            .Where(IsAsteroidWaypoint)
-            .Where(waypoint => MatchesTradeSymbolAvailability(waypoint, tradeSymbol))
-            .OrderBy(waypoint => DistanceFrom(originWaypoint, waypoint))
-            .ThenBy(waypoint => waypoint.LastObservedAt)
-            .ToList();
-
-        if (resourceCandidates.Count > 0)
-        {
-            return resourceCandidates[0].Symbol;
-        }
-
-        var fallbackCandidates = systemWaypoints
-            .Where(IsAsteroidWaypoint)
-            .OrderBy(waypoint => DistanceFrom(originWaypoint, waypoint))
-            .ThenBy(waypoint => waypoint.LastObservedAt)
-            .ToList();
-
-        return fallbackCandidates.Count > 0
-            ? fallbackCandidates[0].Symbol
-            : string.Empty;
-    }
-
-    private static WaypointCacheModel? ResolveSourceSelectionOrigin(
-        IReadOnlyList<WaypointCacheModel> systemWaypoints,
-        string? shipWaypointSymbol,
-        string sellWaypointSymbol)
-    {
-        if (!string.IsNullOrWhiteSpace(sellWaypointSymbol))
-        {
-            var sellWaypoint = systemWaypoints.FirstOrDefault(waypoint =>
-                waypoint.Symbol.Equals(sellWaypointSymbol, StringComparison.OrdinalIgnoreCase));
-            if (sellWaypoint is not null)
-            {
-                return sellWaypoint;
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(shipWaypointSymbol))
-        {
-            return systemWaypoints.FirstOrDefault(waypoint =>
-                waypoint.Symbol.Equals(shipWaypointSymbol, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return null;
-    }
-
-    private static bool IsAsteroidWaypoint(WaypointCacheModel waypoint)
-    {
-        var traitBlob = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}";
-        return traitBlob.Contains("_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("MINERAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("COMMON_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("PRECIOUS_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("RARE_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("METAL_ORES", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("PRECIOUS_STONE_DEPOSITS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("SILICON_CRYSTALS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("QUARTZ_SAND", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("ICE_CRYSTALS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("AMMONIA_ICE", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("METHANE_POOLS", StringComparison.OrdinalIgnoreCase)
-            || traitBlob.Contains("EXPLOSIVE_GASES", StringComparison.OrdinalIgnoreCase)
-            || waypoint.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static decimal DistanceFrom(WaypointCacheModel? from, WaypointCacheModel to)
-    {
-        if (from is null)
-        {
-            return decimal.MaxValue;
-        }
-
-        var dx = to.X - from.X;
-        var dy = to.Y - from.Y;
-        return (decimal)Math.Sqrt((dx * dx) + (dy * dy));
-    }
-
-    private static bool MatchesTradeSymbolAvailability(WaypointCacheModel waypoint, string tradeSymbol)
-    {
-        var upperTradeSymbol = tradeSymbol.ToUpperInvariant();
-        var haystack = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}"
-            .ToUpperInvariant();
-
-        if (haystack.Contains(upperTradeSymbol, StringComparison.OrdinalIgnoreCase))
-        {
+                TradeSymbol = ore.Symbol,
+                SourceWaypointSymbol = miner.WaypointSymbol ?? string.Empty,
+                SellWaypointSymbol = sale.WaypointSymbol,
+                Selling = true,
+            }, "held_cargo", cancellationToken);
             return true;
         }
 
-        foreach (var depositTrait in GetDepositTraitHintsForTradeSymbol(upperTradeSymbol))
+        var targets = MiningPlanner.MiningTargets(context, miner, heldKeys);
+        if (targets.Count == 0)
         {
-            if (haystack.Contains(depositTrait, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static IReadOnlyList<string> GetDepositTraitHintsForTradeSymbol(string tradeSymbol)
-    {
-        return tradeSymbol switch
-        {
-            "IRON_ORE" or "COPPER_ORE" or "ALUMINUM_ORE" =>
-            ["COMMON_METAL_DEPOSITS", "METAL_ORES"],
-
-            "SILVER_ORE" or "GOLD_ORE" or "PLATINUM_ORE" or "MERITIUM_ORE" =>
-            ["PRECIOUS_METAL_DEPOSITS", "RARE_METAL_DEPOSITS", "METAL_ORES"],
-
-            "DIAMONDS" =>
-            ["PRECIOUS_STONE_DEPOSITS"],
-
-            "SILICON_CRYSTALS" or "QUARTZ_SAND" =>
-            ["SILICON_CRYSTALS", "QUARTZ_SAND", "MINERAL_DEPOSITS"],
-
-            "AMMONIA_ICE" or "ICE_WATER" =>
-            ["ICE_CRYSTALS", "AMMONIA_ICE"],
-
-            _ when tradeSymbol.EndsWith("_ORE", StringComparison.OrdinalIgnoreCase) =>
-            ["METAL_ORES", "MINERAL_DEPOSITS"],
-
-            _ when tradeSymbol.EndsWith("_CRYSTALS", StringComparison.OrdinalIgnoreCase) =>
-            ["CRYSTALS", "MINERAL_DEPOSITS"],
-
-            _ when tradeSymbol.EndsWith("_ICE", StringComparison.OrdinalIgnoreCase) =>
-            ["ICE_CRYSTALS", "MINERAL_DEPOSITS"],
-
-            _ => [tradeSymbol],
-        };
-    }
-
-    private static bool IsDemandType(string tradeType) =>
-        tradeType.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
-        || tradeType.Equals(ExchangeType, StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsMineralSymbol(string symbol)
-    {
-        if (string.IsNullOrWhiteSpace(symbol))
-        {
+            logger.LogDebug("Mining plan: nothing to mine that ship {ShipSymbol} can reach and sell.", miner.Symbol);
             return false;
         }
 
-        if (KnownMineralSymbols.Contains(symbol))
+        var target = targets[0];
+        heldKeys.Add(target.Key);
+        heldBy[target.Key] = miner.Symbol;
+        await StartAsync(miner, new MineAndSellGoal
         {
-            return true;
-        }
-
-        var upper = symbol.ToUpperInvariant();
-        return upper.Contains("_ORE", StringComparison.OrdinalIgnoreCase)
-            || upper.Contains("CRYSTAL", StringComparison.OrdinalIgnoreCase)
-            || upper.Contains("QUARTZ", StringComparison.OrdinalIgnoreCase)
-            || upper.Contains("DIAMOND", StringComparison.OrdinalIgnoreCase)
-            || upper.Contains("_ICE", StringComparison.OrdinalIgnoreCase);
+            TradeSymbol = target.Ore,
+            SourceWaypointSymbol = target.AsteroidSymbol,
+            SellWaypointSymbol = target.SellWaypointSymbol,
+        }, target.Surveyed ? "surveyed" : "low_supply", cancellationToken);
+        return true;
     }
 
-    private async Task<MiningAutomationPlanState> ReconcileQueueAsync(
-        IReadOnlyList<MiningOpportunity> opportunities,
-        DateTimeOffset now,
+    private async Task StartAsync(ShipModel miner, MineAndSellGoal trip, string reason, CancellationToken cancellationToken)
+    {
+        await goals.SetActiveGoalAsync(miner.Symbol, trip, cancellationToken);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} mines {TradeSymbol} at {WaypointSymbol} and sells it at {SellWaypoint} ({Reason}).",
+            JournalEvents.MiningStarted,
+            miner.Symbol,
+            trip.TradeSymbol,
+            trip.SourceWaypointSymbol,
+            trip.SellWaypointSymbol,
+            reason);
+    }
+
+    /// <summary>
+    /// For a miner that holds ore: the ore that fetches most where it sells best, after the fuel to get
+    /// there, when that is anything at all. Other cargo is jettisoned on the next extraction.
+    /// </summary>
+    private static bool TryFindHeldOreSale(TradeMarketMap map, ShipModel miner, out CargoItemModel ore, out TradeSale sale)
+    {
+        ore = new CargoItemModel(string.Empty, 0);
+        sale = new TradeSale(string.Empty, 0, 0, 0);
+        var found = false;
+        foreach (var item in (miner.CargoInventory ?? []).Where(item => item.Units > 0))
+        {
+            if (TradeRoutePlanner.TryFindBestSale(map, miner, item.Symbol, item.Units, out var candidate)
+                && candidate.NetRevenue > 0
+                && (!found || candidate.NetRevenue > sale.NetRevenue))
+            {
+                ore = item;
+                sale = candidate;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>Whether the contract plan mines now: it takes every free miner (D23), a bought drone included.</summary>
+    private async Task<bool> ContractTakesMinersAsync(CancellationToken cancellationToken)
+        => await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken)
+            && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
+            && contract.UnitsFulfilled < contract.UnitsRequired;
+
+    /// <summary>
+    /// Buys a drone for each low-supply opening no miner took, as long as a drone from the shipyard could
+    /// reach its asteroid, up to <c>Mining.MaxDrones</c> and within the credit reserve.
+    /// </summary>
+    private async Task BuyDronesAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<(MiningOpportunity Opportunity, string SystemSymbol)> pending,
         CancellationToken cancellationToken)
     {
-        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);
-        var existingItems = existing?.Opportunities.ToDictionary(item => item.OpportunityKey, StringComparer.OrdinalIgnoreCase)
-            ?? new Dictionary<string, MiningAutomationOpportunityState>(StringComparer.OrdinalIgnoreCase);
-        var activeKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var opportunity in opportunities)
+        var maxDrones = await settings.GetAsync<int>(MaxMiningDronesSettingKey, cancellationToken);
+        if (maxDrones <= 0)
         {
-            var key = FormatOpportunityKey(
-                opportunity.SellWaypointSymbol.ToUpperInvariant(),
-                opportunity.TradeSymbol.ToUpperInvariant());
-            activeKeys.Add(key);
-
-            if (existingItems.TryGetValue(key, out var current))
-            {
-                existingItems[key] = current with
-                {
-                    LastObservedAt = now,
-                    StopReason = current.Status == MarketAutomationOpportunityStatus.Pending ? current.StopReason : null,
-                };
-            }
-            else
-            {
-                existingItems[key] = new MiningAutomationOpportunityState
-                {
-                    OpportunityKey = key,
-                    TradeSymbol = opportunity.TradeSymbol,
-                    SellWaypointSymbol = opportunity.SellWaypointSymbol,
-                    Status = MarketAutomationOpportunityStatus.Pending,
-                    AssignedShipSymbol = null,
-                    FirstObservedAt = now,
-                    LastObservedAt = now,
-                    StopReason = null,
-                };
-            }
+            maxDrones = DefaultMaxMiningDrones;
         }
 
-        var reconciled = existingItems.Values
-            .Where(item => activeKeys.Contains(item.OpportunityKey))
-            .OrderBy(item => item.SellWaypointSymbol, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(item => item.TradeSymbol, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return new MiningAutomationPlanState
+        var drones = fleet.Count(ship => ship.IsMiningCapable);
+        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        foreach (var (opportunity, systemSymbol) in pending)
         {
-            PlanId = existing?.PlanId ?? Guid.NewGuid(),
-            Opportunities = reconciled,
-            CreatedAt = existing?.CreatedAt ?? now,
-            UpdatedAt = now,
-        };
+            if (drones >= maxDrones)
+            {
+                logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
+                return;
+            }
+
+            var shipyard = shipyardList
+                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
+                    && candidate.Ships.Any(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0))
+                .OrderBy(candidate => candidate.Ships.First(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase)).PurchasePrice)
+                .ThenBy(candidate => candidate.WaypointSymbol, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (shipyard is null)
+            {
+                logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, MiningDroneShipType);
+                return;
+            }
+
+            var context = await miningContexts.ReadAsync(systemSymbol, cancellationToken);
+            var forSale = shipyard.Ships.First(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase));
+            var newDrone = new ShipModel(
+                "NEW-DRONE",
+                systemSymbol,
+                shipyard.WaypointSymbol,
+                "DOCKED",
+                "CRUISE",
+                forSale.FuelCapacity,
+                forSale.FuelCapacity,
+                CargoCapacity: forSale.CargoCapacity);
+            if (forSale.FuelCapacity > 0 && !MiningPlanner.CanReach(context.Map, newDrone, opportunity.AsteroidSymbol))
+            {
+                logger.LogDebug(
+                    "Mining plan: a drone from {Shipyard} can't reach {WaypointSymbol} to mine {TradeSymbol}; no purchase for it.",
+                    shipyard.WaypointSymbol,
+                    opportunity.AsteroidSymbol,
+                    opportunity.Ore);
+                continue;
+            }
+
+            var purchased = await shipPurchases.TryPurchaseAsync(MiningDroneShipType, shipyard.WaypointSymbol, cancellationToken);
+            if (!purchased.IsSuccess)
+            {
+                logger.LogDebug(
+                    "Mining plan: mining drone purchase denied at {Shipyard} — {Reason}.",
+                    shipyard.WaypointSymbol,
+                    purchased.FailureReason ?? "Purchase failed.");
+                return;
+            }
+
+            drones++;
+        }
     }
 
-    private static string ExtractSystemSymbol(string waypointSymbol)
+    /// <summary>Records the openings. Only a change is written: the tick runs every 5 seconds.</summary>
+    private async Task SaveStateAsync(IReadOnlyList<MiningAutomationOpportunityState> opportunities, CancellationToken cancellationToken)
     {
-        var parts = waypointSymbol.Split('-');
-        return parts.Length >= 2 ? $"{parts[0]}-{parts[1]}" : waypointSymbol;
+        var now = TimeProvider.System.GetUtcNow();
+        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);
+        var firstSeen = (existing?.Opportunities ?? [])
+            .GroupBy(opportunity => opportunity.OpportunityKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().FirstObservedAt, StringComparer.OrdinalIgnoreCase);
+        List<MiningAutomationOpportunityState> dated =
+        [
+            .. opportunities
+                .OrderBy(opportunity => opportunity.SellWaypointSymbol, StringComparer.Ordinal)
+                .ThenBy(opportunity => opportunity.TradeSymbol, StringComparer.Ordinal)
+                .Select(opportunity => opportunity with
+                {
+                    FirstObservedAt = firstSeen.GetValueOrDefault(opportunity.OpportunityKey, now),
+                    LastObservedAt = now,
+                }),
+        ];
+
+        if (existing is not null && Same(existing.Opportunities, dated))
+        {
+            return;
+        }
+
+        await plans.UpsertAsync(
+            PlanTypes.MiningAutomation,
+            new MiningAutomationPlanState
+            {
+                PlanId = existing?.PlanId ?? Guid.NewGuid(),
+                Opportunities = dated,
+                CreatedAt = existing?.CreatedAt ?? now,
+                UpdatedAt = now,
+            },
+            cancellationToken);
     }
 
-    private static string FormatOpportunityKey(string sellWaypointSymbol, string tradeSymbol) =>
-        $"{sellWaypointSymbol}|{tradeSymbol}";
+    /// <summary>Whether two lists of openings say the same, apart from when they were seen.</summary>
+    private static bool Same(IReadOnlyList<MiningAutomationOpportunityState> before, IReadOnlyList<MiningAutomationOpportunityState> after)
+        => JsonSerializer.Serialize(before.Select(Undated), CompareOptions) == JsonSerializer.Serialize(after.Select(Undated), CompareOptions);
 
-    private sealed record MiningOpportunity(string SellWaypointSymbol, string TradeSymbol);
+    private static MiningAutomationOpportunityState Undated(MiningAutomationOpportunityState opportunity)
+        => opportunity with { FirstObservedAt = default, LastObservedAt = default };
 }

@@ -25,17 +25,32 @@ public sealed record MiningAutomationPlanState
     public required DateTimeOffset UpdatedAt { get; init; }
 }
 
+/// <summary>
+/// A low-supply opening in the mining plan's view (slice 6.4, D22): a market with an ore in low supply, and
+/// the asteroid nearest it that yields the ore.
+/// </summary>
 public sealed record MiningAutomationOpportunityState
 {
+    /// <summary>The opening's key: sell market and ore.</summary>
     public required string OpportunityKey { get; init; }
 
     public required string TradeSymbol { get; init; }
 
     public required string SellWaypointSymbol { get; init; }
 
+    /// <summary>The asteroid nearest the market whose traits yield the ore.</summary>
+    public string SourceWaypointSymbol { get; init; } = string.Empty;
+
+    /// <summary>Assigned while a miner's trip sells the ore there; Pending otherwise.</summary>
     public required MarketAutomationOpportunityStatus Status { get; init; }
 
     public string? AssignedShipSymbol { get; init; }
+
+    /// <summary>
+    /// For a pending opening: the miners without a trip that could reach its asteroid. The <c>ShipLeftIdle</c>
+    /// rule reads it (D13).
+    /// </summary>
+    public IReadOnlyList<string> CandidateShipSymbols { get; init; } = [];
 
     public required DateTimeOffset FirstObservedAt { get; init; }
 

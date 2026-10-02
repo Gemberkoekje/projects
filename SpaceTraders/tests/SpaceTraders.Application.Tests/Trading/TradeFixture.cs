@@ -77,8 +77,8 @@ internal static class TradeFixture
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? [K85Market(), D41Market(), A1Market()] : markets, MadeFrom);
 
-    public static TradeContext Context(TradeMarketMap map, long credits = 129_451, int minProfitPerUnit = 200)
-        => new(map, credits, minProfitPerUnit);
+    public static TradeContext Context(TradeMarketMap map, long credits = 129_451, int minProfitPerUnit = 200, long fuelReserve = 0)
+        => new(map, credits, minProfitPerUnit, fuelReserve);
 
     /// <summary>The command ship: a 40-unit hold and a 400-unit tank.</summary>
     public static ShipModel CommandShip(

@@ -30,6 +30,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _contractDeadline;
     private readonly ZeroFirstCounter _extractedUnits;
     private readonly ZeroFirstCounter _jettisonedUnits;
+    private readonly ZeroFirstCounter _extractions;
+    private readonly ZeroFirstCounter _surveysTaken;
+    private readonly ZeroFirstCounter _surveysEnded;
+    private readonly Gauge _surveysActive;
     private readonly Gauge _shipInfo;
     private readonly Gauge _shipArrival;
     private readonly Gauge _shipCargoUnits;
@@ -59,6 +63,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _shipyards = [];
     private readonly HashSet<(string System, string Waypoint, string ShipType)> _shipyardShips = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
+    private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
     public PrometheusAutomationMetrics(CollectorRegistry registry)
@@ -150,6 +155,27 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "Units ships jettisoned, by ship and good: extracted goods their work doesn't need.",
             "ship",
             "good");
+        _extractions = ZeroFirst(
+            "spacetraders_extractions_total",
+            "Extractions, by ship and whether a survey guided them (surveyed: true or false).",
+            "ship",
+            "surveyed");
+        _surveysTaken = ZeroFirst(
+            "spacetraders_surveys_taken_total",
+            "Surveys our ships took, by waypoint and deposit size (SMALL, MODERATE, LARGE).",
+            "waypoint",
+            "size");
+        _surveysEnded = ZeroFirst(
+            "spacetraders_surveys_ended_total",
+            "Surveys that ended, by waypoint, why (expired, exhausted, not_verified) and whether any extraction used them (used: true or false).",
+            "waypoint",
+            "reason",
+            "used");
+        _surveysActive = metrics.CreateGauge(
+            "spacetraders_surveys_active",
+            "Usable surveys in the cache, by waypoint and whether any extraction used them yet (used: true or false).",
+            "waypoint",
+            "used");
         _shipInfo = metrics.CreateGauge(
             "spacetraders_ship_info",
             "One series per ship, always 1: where it is (its waypoint and the waypoint's type; in transit, an arrow and where it goes) and what the bot has it do.",
@@ -259,6 +285,38 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void Jettisoned(string shipSymbol, string tradeSymbol, int units) => _jettisonedUnits.Inc(units, shipSymbol, tradeSymbol);
+
+    /// <inheritdoc />
+    public void Extraction(string shipSymbol, bool surveyed) => _extractions.Inc(1, shipSymbol, Flag(surveyed));
+
+    /// <inheritdoc />
+    public void SurveyTaken(string waypointSymbol, string size) => _surveysTaken.Inc(1, waypointSymbol, size);
+
+    /// <inheritdoc />
+    public void SurveyEnded(string waypointSymbol, string reason, bool used) => _surveysEnded.Inc(1, waypointSymbol, reason, Flag(used));
+
+    /// <inheritdoc />
+    public void Surveys(IReadOnlyCollection<SurveyMetricsSample> surveys)
+    {
+        var current = surveys
+            .GroupBy(sample => (sample.Waypoint, Used: Flag(sample.Used)))
+            .ToDictionary(group => group.Key, group => group.Sum(sample => sample.Count));
+
+        lock (_lock)
+        {
+            foreach (var gone in _surveyLabels.Where(series => !current.ContainsKey(series)).ToList())
+            {
+                _surveysActive.RemoveLabelled(gone.Waypoint, gone.Used);
+                _surveyLabels.Remove(gone);
+            }
+
+            foreach (var (series, count) in current)
+            {
+                _surveysActive.WithLabels(series.Waypoint, series.Used).Set(count);
+                _surveyLabels.Add(series);
+            }
+        }
+    }
 
     /// <inheritdoc />
     public void Anomaly(string rule, string subject, bool active) => _anomalyActive.WithLabels(rule, subject).Set(active ? 1 : 0);
@@ -483,6 +541,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             }
         }
     }
+
+    /// <summary>A yes-or-no label: <c>true</c> or <c>false</c>.</summary>
+    private static string Flag(bool value) => value ? "true" : "false";
 
     /// <summary>A supply level as a number, so a graph can show it: 1 SCARCE to 5 ABUNDANT; none when unknown.</summary>
     private static double? SupplyLevel(string supply) => supply.ToUpperInvariant() switch

@@ -16,10 +16,6 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
         }
 
         var now = TimeProvider.System.GetUtcNow();
-        await db.Surveys
-            .Where(s => s.AgentId == db.AgentId && s.Expiration <= now)
-            .ExecuteDeleteAsync(cancellationToken);
-
         var signatures = surveys.Select(s => s.Signature).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var existing = await db.Surveys
             .Where(s => s.AgentId == db.AgentId && signatures.Contains(s.Signature))
@@ -27,7 +23,13 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
 
         foreach (var survey in surveys)
         {
-            var values = new CachedSurvey
+            if (existing.ContainsKey(survey.Signature))
+            {
+                // The API hands out a signature once; a survey stored already keeps its use count.
+                continue;
+            }
+
+            db.Surveys.Add(new CachedSurvey
             {
                 AgentId = db.AgentId,
                 Signature = survey.Signature,
@@ -37,62 +39,71 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
                 Expiration = survey.Expiration,
                 Size = survey.Size,
                 RecordedAt = now,
-            };
-
-            if (existing.TryGetValue(survey.Signature, out var entity))
-            {
-                db.Entry(entity).CurrentValues.SetValues(values);
-            }
-            else
-            {
-                db.Surveys.Add(values);
-            }
+            });
         }
 
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<SurveyModel>> GetActiveByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<StoredSurvey>> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         var now = TimeProvider.System.GetUtcNow();
         var entities = await db.Surveys
             .AsNoTracking()
-            .Where(s => s.WaypointSymbol == waypointSymbol && s.Expiration > now)
-            .OrderByDescending(s => s.Size == "LARGE"
-                ? 3
-                : s.Size == "MODERATE"
-                    ? 2
-                    : s.Size == "SMALL"
-                        ? 1
-                        : 0)
-            .ThenByDescending(s => s.Expiration)
+            .Where(s => s.AgentId == db.AgentId && s.Expiration > now)
+            .OrderByDescending(s => s.RecordedAt)
+            .ThenBy(s => s.Signature)
             .ToListAsync(cancellationToken);
 
-        return entities.Select(MapToModel).ToList();
+        return entities.Select(MapToStored).ToList();
     }
 
-    public async Task<SurveyModel> GetBestActiveSurveyAsync(string waypointSymbol, string preferredDepositSymbol, CancellationToken cancellationToken = default)
+    public async Task RecordExtractionAsync(string signature, CancellationToken cancellationToken = default)
     {
-        var surveys = await GetActiveByWaypointAsync(waypointSymbol, cancellationToken);
-        if (surveys.Count == 0)
+        var entity = await db.Surveys.FirstOrDefaultAsync(s => s.AgentId == db.AgentId && s.Signature == signature, cancellationToken);
+        if (entity is null)
         {
-            return new SurveyModel(string.Empty, waypointSymbol, [], DateTimeOffset.MinValue, string.Empty);
+            return;
         }
 
-        if (!string.IsNullOrWhiteSpace(preferredDepositSymbol))
-        {
-            var preferred = surveys.FirstOrDefault(s => s.Deposits.Any(d => d.Symbol.Equals(preferredDepositSymbol, StringComparison.OrdinalIgnoreCase)));
-            if (preferred is not null)
-            {
-                return preferred;
-            }
-        }
-
-        return surveys[0];
+        db.Entry(entity).Property(s => s.Extractions).CurrentValue = entity.Extractions + 1;
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static SurveyModel MapToModel(CachedSurvey entity) =>
-        new(entity.Signature, entity.WaypointSymbol, DeserializeDeposits(entity.DepositsJson), entity.Expiration, entity.Size);
+    public async Task<IReadOnlyList<StoredSurvey>> RemoveAsync(string signature, CancellationToken cancellationToken = default)
+    {
+        var entities = await db.Surveys
+            .Where(s => s.AgentId == db.AgentId && s.Signature == signature)
+            .ToListAsync(cancellationToken);
+        return await RemoveAllAsync(entities, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<StoredSurvey>> RemoveExpiredAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var entities = await db.Surveys
+            .Where(s => s.AgentId == db.AgentId && s.Expiration <= now)
+            .ToListAsync(cancellationToken);
+        return await RemoveAllAsync(entities, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<StoredSurvey>> RemoveAllAsync(List<CachedSurvey> entities, CancellationToken cancellationToken)
+    {
+        if (entities.Count == 0)
+        {
+            return [];
+        }
+
+        db.Surveys.RemoveRange(entities);
+        await db.SaveChangesAsync(cancellationToken);
+        return entities.Select(MapToStored).ToList();
+    }
+
+    private static StoredSurvey MapToStored(CachedSurvey entity) =>
+        new(
+            new SurveyModel(entity.Signature, entity.WaypointSymbol, DeserializeDeposits(entity.DepositsJson), entity.Expiration, entity.Size),
+            entity.ShipSymbol,
+            entity.RecordedAt,
+            entity.Extractions);
 
     private static IReadOnlyList<SurveyDepositModel> DeserializeDeposits(string json)
     {

@@ -12,8 +12,8 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
-/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, its hold) and
-/// the accepted contracts' deliverables. What happens (API calls, goal steps, credits earned and spent) is counted where
+/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, its hold), the
+/// accepted contracts' deliverables and the usable surveys. What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
 /// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
 /// </summary>
@@ -58,6 +58,15 @@ public sealed class PrometheusMetricsService(
             .Where(c => c.IsAccepted)
             .ToListAsync(cancellationToken);
         metrics.Contracts([.. contracts.SelectMany(ToSamples)]);
+
+        // Slice 6.4: the usable surveys, used or not yet, for the survey dashboard.
+        var surveys = await db.Surveys.AsNoTracking()
+            .Where(s => s.Expiration > now)
+            .Select(s => new { s.WaypointSymbol, Used = s.Extractions > 0 })
+            .ToListAsync(cancellationToken);
+        metrics.Surveys([.. surveys
+            .GroupBy(s => (s.WaypointSymbol, s.Used))
+            .Select(group => new SurveyMetricsSample(group.Key.WaypointSymbol, group.Key.Used, group.Count()))]);
     }
 
     /// <inheritdoc />
@@ -141,13 +150,13 @@ public sealed class PrometheusMetricsService(
             {
                 ScoutWaypointGoal => "scouting",
                 MineResourceGoal mine => $"mining {mine.TradeSymbol}",
-                MineAndSellGoal mineAndSell => $"mining and selling {mineAndSell.TradeSymbol}",
+                MineAndSellGoal mineAndSell => mineAndSell.Selling ? $"selling {mineAndSell.TradeSymbol}" : $"mining {mineAndSell.TradeSymbol}",
                 SiphonResourceGoal siphon => $"siphoning {siphon.TradeSymbol}",
                 SellCargoGoal => "selling cargo",
                 DeliverCargoGoal deliver => $"delivering {deliver.TradeSymbol}",
                 SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to a construction site",
                 TradeBetweenMarketsGoal trade => $"trading {trade.TradeSymbol}",
-                SurveyWaypointGoal => "surveying",
+                SurveyWaypointGoal survey => $"surveying for {survey.TargetDepositSymbol}",
                 DeployProbeGoal => "deploying",
                 PatrolMarketGoal => "watching its market",
                 MoveToWaypointGoal => "moving",

@@ -27,6 +27,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IScoutAllMarketplacesPlanService _scoutPlan = Substitute.For<IScoutAllMarketplacesPlanService>();
     private readonly IContractPlanService _contractPlan = Substitute.For<IContractPlanService>();
     private readonly IProbeDeploymentPlanService _probePlan = Substitute.For<IProbeDeploymentPlanService>();
+    private readonly ISurveyPlanService _surveyPlan = Substitute.For<ISurveyPlanService>();
     private readonly IMiningAutomationService _miningPlan = Substitute.For<IMiningAutomationService>();
     private readonly ITradingAutomationService _tradingPlan = Substitute.For<ITradingAutomationService>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
@@ -43,6 +44,7 @@ public sealed class GameLoopServiceTests : IDisposable
             .AddSingleton(_scoutPlan)
             .AddSingleton(_contractPlan)
             .AddSingleton(_probePlan)
+            .AddSingleton(_surveyPlan)
             .AddSingleton(_miningPlan)
             .AddSingleton(_tradingPlan)
             .AddSingleton(_assignments)
@@ -138,6 +140,21 @@ public sealed class GameLoopServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Tick_BootstrapsTheSurveyPlan_BeforeTheMiningAndTradingPlans()
+    {
+        // Slice 6.4: the survey plan claims the ships that can survey first (D20).
+        SwitchOn("Automation.Enabled", "Automation.Plan.Survey.Enabled", "Automation.Plan.Mining.Enabled", "Automation.Plan.Trading.Enabled");
+        var steps = new List<string>();
+        _surveyPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "survey"));
+        _miningPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "mining"));
+        _tradingPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "trading"));
+
+        await TickAsync();
+
+        steps.Should().Equal("survey", "mining", "trading");
+    }
+
+    [Fact]
     public async Task Tick_BootstrapsOnlyThePlansThatAreSwitchedOn()
     {
         SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
@@ -147,6 +164,7 @@ public sealed class GameLoopServiceTests : IDisposable
         await _scoutPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _contractPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _probePlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _surveyPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _miningPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
         await _bus.Received(1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());

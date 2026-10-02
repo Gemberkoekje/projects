@@ -209,22 +209,24 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task GetActiveSurveyTargetsAsync_ReturnsNormalizedSurveyTargets()
+    public async Task AMiningTrip_IsStoredAndRead_WithWhetherItSells()
     {
+        // Slice 6.4: a trip turns to selling once its hold is full, and must stay so across a restart.
         await SeedShipAsync("SHIP-G10");
-        var setRepo = new ShipGoalRepository(Db);
-        await setRepo.SetActiveGoalAsync("SHIP-G10", new SurveyWaypointGoal
+        var trip = new MineAndSellGoal
         {
             GoalId = Guid.NewGuid(),
-            TargetWaypointSymbol = "x1-test-a1",
-            TargetDepositSymbol = "iron_ore",
-        });
+            TradeSymbol = "COPPER_ORE",
+            SourceWaypointSymbol = "X1-TEST-XB5C",
+            SellWaypointSymbol = "X1-TEST-H51",
+            Selling = true,
+        };
+        await new ShipGoalRepository(Db).SetActiveGoalAsync("SHIP-G10", trip);
 
         await using var fresh = CreateFreshContext();
-        var getRepo = new ShipGoalRepository(fresh);
-        var result = await getRepo.GetActiveSurveyTargetsAsync();
+        var result = await new ShipGoalRepository(fresh).GetActiveGoalAsync("SHIP-G10");
 
-        result.Should().Contain(("X1-TEST-A1", "IRON_ORE"));
+        result.Should().BeOfType<MineAndSellGoal>().Which.Should().BeEquivalentTo(trip);
     }
 
     [SkippableFact]

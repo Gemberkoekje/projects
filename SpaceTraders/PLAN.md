@@ -59,9 +59,13 @@
 - Phase 5 is done (2026-10-02): the `st-investigate` skill is finished and was checked against the
   first run (5.1), where it explained B42's anomaly and found B45; the helper and the bot's pod logs
   run without asking (5.2).
-- Slice 6.5 (trading) is built on branch `claude/spacetraders-trading` (2026-10-02), with your
-  decisions D14–D19; it found B46 (fixed with it) and B47 (open). The trading plan stays off until
-  you switch it on (D9).
+- Slice 6.5 (trading) was merged as projects#121 on 2026-10-02 (deployed by gembernodes#20), with
+  your decisions D14–D19; it found B46 (fixed with it) and B47 (open). The trading plan stays off
+  until you switch it on (D9).
+- Slice 6.4 (surveying and mining, and cargo ships for trading) is built on branch
+  `claude/spacetraders-surveying` (2026-10-02), with your decisions D20–D25. It fixed B34 first, at
+  your request, then the survey part of B16, B17 for the mining and survey trips, B48 and B49. The
+  survey and mining plans stay off until you switch them on (D9).
 
 ## Known issues
 
@@ -88,8 +92,8 @@ the misbehaviour.
 | B13 | **API limits and errors don't follow the official guide** (https://spacetraders.io/api-guide/rate-limits; per D3 that makes them bugs).<br>• **Limit:** the guide allows 2 requests per second with a burst of 30 requests per 60 seconds, per IP and per account. The code makes every request take a token from both a 2/s bucket and a 30-per-60 s bucket, which caps the bot at 30 requests a minute: a quarter of the sustained rate. This reads "burst" as extra capacity on top of 2/s, the only reading in which a burst is faster than the normal rate; the guide doesn't spell out how the two combine, so the 429 counter must confirm it after the fix.<br>• **502:** the guide says to wait a few minutes. The code retries after 1, 2 and 4 seconds, then the tick keeps calling every 5 s, because nothing reads `IsAvailable`.<br>• **429 without `x-ratelimit-*` headers** (from the cloud infrastructure, not the rate limiter): the guide recommends exponential backoff. The code retries once after 1 second.<br>• **The buckets probably reset.** The limiter is registered as a transient handler, so the HttpClient factory recreates its buckets whenever it rebuilds the handler chain (every 2 minutes by default). | `RateLimitingHandler.cs:13-32`, `RateLimitResponseHandler.cs`, `RetryHandler.cs` | 1.10 (done) |
 | B14 | **One failing step stops the whole tick.** The tick has a single try/catch, so an exception in any plan skips every later plan, all ship steps and the contract commands, again every 5 s while it keeps failing. Example: until the scout plan has saved its state, scout ship selection throws whenever there isn't exactly one ship with fuel. | `GameLoopService.cs:33-44`, `ScoutShipSelectionService.cs:21-42` | 1.11 (done) |
 | B15 | **The probe plan buys a probe every tick for a target whose probe is still travelling.** Each pass starts with an empty in-flight set, and a travelling probe doesn't count as available, so the target looks unserved. Only the credit reserve stops the purchases. | `ProbeDeploymentPlanService.cs:220-245, 336-345, 427-438` | 6.3 |
-| B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); 6.4 |
-| B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 |
+| B16 | **Goal status never changes, and scout and survey goals are never cleared.** `UpdateGoalStatusAsync` has no production caller, so every goal stays `Assigned` and the Completed/Blocked checks in mining and trading never match.<br>• A finished scout goal keeps the command ship "busy" (B10).<br>• When the mining executor replaces a miner's goal with a survey goal, that miner keeps surveying and never returns to mining. | `ShipGoalRepository.cs:70-81`, `MineAndSellGoalExecutor.cs:194-213`, `MiningAutomationService.cs:397` | scout part: 1.14 (done); survey part: 6.4 (done) |
+| B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 (done for the mining and survey trips, which navigate with their goal; the contract commands still dead-reckon for themselves) |
 | B18 | **Most settings do nothing.** Of the 47 seeded settings, only `Automation.Enabled` (partly, see B5), `FleetExpansion.MinCreditReserve`, `Mining.MaxDrones`, `ActivityLog.RetentionDays` and `Alerts.WebhookUrl` change what the bot does.<br>• `Navigation.*` and `Maintenance.*` are read only by services that never run.<br>• `Trade.*` is read only by the market views.<br>• 21 keys are read by nothing at all.<br>• The `Runtime.*` keys are status flags, not settings to tune.<br>The settings table in `docs/HOW_IT_WORKS.md` lists each one. | `DefaultSettingsSeed.cs` | 2.6 (done) |
 | B19 | **Price history is never recorded.** Market trade goods are stored as camelCase JSON, but `MarketPriceSampleRepository` reads them back case-sensitively into PascalCase properties. Every good is skipped, so `market_price_samples` stays empty and the price endpoints return nothing. `MarketRepository` reads the same JSON case-insensitively, so mining and trading are unaffected. | `MarketPriceSampleRepository.cs:15, 119-127`, `SpaceTradersPortAdapter.cs:202` | 2.2 (done) |
 | B20 | **A restart clears every ship's active goal.** Startup sync overwrites each existing ship row with `SetValues(new CachedShip { … })`, and that object doesn't carry the goal columns, so they become null.<br>• A scout ship whose assignment already matches the current route step doesn't get its goal back.<br>• Arrival wake-ups scheduled before the restart no longer match any goal (B17). | `StartupSyncService.cs:106-130` | 1.12 (done) |
@@ -106,7 +110,7 @@ the misbehaviour.
 | B31 | **A restart blanks the contract's terms** (found in 1.14). Startup sync stored contracts without their deadline and deliverables, so after every restart the contract plan couldn't read its deliverable until the next delivery response wrote it back: it couldn't restore a lost assignment, and a ship that had delivered everything couldn't fulfil. | `StartupSyncService.cs` (contracts) | 1.14 (done) |
 | B32 | **The ship table grows without end** (found in 1.14). `cached_ships` holds a few wide rows (about 2 kB of ship JSON each) that change every minute or so. Postgres prunes their old versions in place, which kept the table's dead-tuple count under the autovacuum trigger (50), so VACUUM never ran and every update that didn't fit its page extended the table: about 250 kB an hour with one busy ship, and in phase 6 that scales with the fleet. | soak samples: 32 pages for 3 rows, 0 autovacuums in 2 hours | 1.14 (done) |
 | B33 | **Contract payments never reach the cached credits** (found in 1.14). The accept and fulfil responses carry the agent's new credits, but only refuels, sales and purchases wrote them to the cached agent. Purchases are budgeted from the cache, so after a contract the bot thinks it has less than it does until the next restart: in the soak test 6,620 less (130,564 cached, 137,184 in the game). | `FulfillContractDeliveryCommand.cs`, `ContractPlanService.cs` (accept) | 1.14 (done) |
-| B34 | **Waypoint traits are never stored** (found in 1.14). Startup sync stores only a waypoint's market and shipyard flags, and nothing calls `WaypointRepository.UpsertRangeAsync`, the one method that writes traits (and modifiers, orbitals and charts). What reads them finds nothing:<br>• the mining plan means to pick the nearest asteroid whose deposits can yield the mineral, but always falls back to the nearest asteroid of any kind, so a drone can be sent where its mineral never comes up;<br>• the contract plan's trait score is always 0. It only breaks ties between equally near asteroids (nearest first is by design); whether a farther asteroid with the right deposits should win is a strategy question;<br>• the dashboard shows no traits. | `StartupSyncService.cs` (`EnsureSystemsForShipsAreCachedAsync`), `MiningAutomationService.cs` (`MatchesTradeSymbolAvailability`), `ContractPlanService.cs` (`ScoreTradeSymbolMatch`), `FleetStatusMapper.cs` | 6.4 |
+| B34 | **Waypoint traits are never stored** (found in 1.14). Startup sync stores only a waypoint's market and shipyard flags, and nothing calls `WaypointRepository.UpsertRangeAsync`, the one method that writes traits (and modifiers, orbitals and charts). What reads them finds nothing:<br>• the mining plan means to pick the nearest asteroid whose deposits can yield the mineral, but always falls back to the nearest asteroid of any kind, so a drone can be sent where its mineral never comes up;<br>• the contract plan's trait score is always 0. It only breaks ties between equally near asteroids (nearest first is by design); whether a farther asteroid with the right deposits should win is a strategy question;<br>• the dashboard shows no traits. | `StartupSyncService.cs` (`EnsureSystemsForShipsAreCachedAsync`), `MiningAutomationService.cs` (`MatchesTradeSymbolAvailability`), `ContractPlanService.cs` (`ScoreTradeSymbolMatch`), `FleetStatusMapper.cs` | 6.4 (done) |
 | B35 | **The startup snapshot repeats startup sync's API calls** (found in 1.14). Right after startup sync it fetches the agent, the ships, the system, every page of its waypoints, and the markets and shipyards where ships are, all of which sync has just fetched or found cached: about 11 calls on every start. | `StartupSnapshotService.cs` vs `StartupSyncService.cs` | 0.5 (done) |
 | B36 | **The Docker integration tests skip silently on Windows** (found in 1.14). Four test classes decide whether Docker runs by looking for `/var/run/docker.sock` or `DOCKER_HOST`. Docker Desktop on Windows has neither, so the tests report "skipped" while Docker is running. Until it's fixed, the README says to set `DOCKER_HOST=npipe://./pipe/docker_engine`. | `MessageStorageIntegrationTests.cs`, `AgentCleanupIntegrationTests.cs`, `DatabaseInitializerTests.cs`, `IntegrationTestBase.cs` | 0.5 (done) |
 | B37 | **The credit-drop alert can't fire** (found in 2.2). `AlertHandler` compares each credit change with the credits it remembers in a field from the previous one, but Wolverine creates the handler anew for every message, so the field is always empty. Until 2.2 nothing published the event anyway. The event carries the old credits, so the fix is small, but it would then warn, and post to `Alerts.WebhookUrl`, on every purchase that costs more than 10% of the credits, a ship included. | `AlertHandler.cs` (`_previousCredits`) | D12: removed |
@@ -120,6 +124,8 @@ the misbehaviour.
 | B45 | **The scout plan can skip a stop** (found in 5.1, on the cluster). When the ship docks at a stop, the tick and the arrival can both run its goal step. On 2026-10-02 at 09:18:58 the arrival's step moved the plan from stop 25 to stop 26, X1-DC53-J58. In the same second the tick's resume check read the plan from before that advance and the assignment from after it, took the assignment for missing and set the ship's goal back to stop 25; and the visit to stop 25 completed a second time, in the tick's goal step, which moved the plan past stop 26. The plan logged "all 26 waypoints visited", but J58's market was never fetched, and markets aren't scouted again. Any stop can be skipped this way, whenever a tick coincides with an arrival. | `ScoutAllMarketplacesPlanService.cs` (`ResumeIfAssignmentMissingAsync`, `AdvanceAsync`), `ShipGoalExecutorService.cs`; Loki, 09:18:58Z (`Tick` 326) | 5.1 (done) |
 | B46 | **Two goal steps can run for one ship at once** (found in 6.5, from the code; B45 was the scout plan's case). The tick steps every ship every 5 s, and an arrival steps the ship it docks, on a thread of its own. Both read the ship before either acts, so a trade step would buy twice, or try to sell cargo that is already sold. | `GameLoopService.cs` (goal steps), `ShipNavigationCompletedHandler.cs`, `ShipGoalExecutorService.cs` | 6.5 (done) |
 | B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting, contract and probe flights still can. | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
+| B48 | **Only two of three asteroid types can be mined** (found in 6.4, from the code and the live waypoints). `MineResourceVolumeCommand` accepted only `ASTEROID_FIELD` and `ENGINEERED_ASTEROID`; 56 of X1-DC53's 57 asteroids are of type `ASTEROID`, so a drone sent to any of them got a state mismatch instead of ore, on every step. | `MineResourceVolumeCommand.cs` (`IsValidExtractionWaypoint`) | 6.4 (done) |
+| B49 | **A used-up survey is tried again and again** (found in 6.4, from the code). An extraction with a survey that is exhausted, expired or doesn't verify fails with 4224, 4221 or 4220, and nothing removed the survey from the cache, so the miner picked it again on every step; only its expiry ended that. | `MineAndSellGoalExecutor.cs` (`GetBestActiveSurveyAsync`), `SurveyRepository.cs` | 6.4 (done) |
 
 ### Decisions (2026-10-01)
 
@@ -143,10 +149,16 @@ get the next D-number.
 | D13 | Two of 3.2's rules clash with D9 and D1 in the first run: with only scout and contract on, the starting probe, the command ship after scouting and the drone after its contract are idle by design, and once the contract has paid, the credits stop changing. Taken literally, "idle for at most N minutes" and "credits change at least once in 24 hours" would stay active for the rest of every reset, and phase 6 needs a clean reset period. | **Only when work waits** (2026-10-01): a ship counts as idle only while a plan that is on has work it could give that ship, and the credits must change daily only while ships have work. |
 | D14 | Slice 6.5: when is a trade trip lucrative, worth starting and worth carrying on when prices change? | **`Trade.MinProfitPerUnit` per unit, after fuel** (2026-10-02): the existing setting (200), now read by the trader. 0 means any profit, but see D15. |
 | D15 | Slice 6.5: how do goods in the market tree, which let a market make pricier goods, come first? | **Tree routes first** (2026-10-02): among lucrative routes, one whose sell market makes a pricier good from the cargo beats any that doesn't, then the most profitable. Hence D14's bar matters: at 0, a trip earning 47 credits that feeds JEWELRY would beat one earning 7,000 that feeds nothing (the live prices of 2026-10-02). |
-| D16 | Slice 6.5: does the trading plan buy ships? | **Not for now** (2026-10-02): it trades with the ships it has, first the command ship after scouting, then the drone after its contract. Buying haulers needs a budget of its own; keep it in mind for later. |
+| D16 | Slice 6.5: does the trading plan buy ships? | **Not for now** (2026-10-02): it trades with the ships it has, first the command ship after scouting, then the drone after its contract. Buying haulers needs a budget of its own; keep it in mind for later. **Replaced by D21.** |
 | D17 | Slice 6.5: may cargo use `FleetExpansion.MinCreditReserve`? | **Yes** (2026-10-02): cargo turns back into credits when it is sold. Credits for the trip's fuel are kept back. |
 | D18 | Slice 6.5: may two traders share a route? | **No, for now** (2026-10-02, "to keep everything simple"): a route, the good with its buy and sell market, that one trader holds isn't offered to another. |
 | D19 | How do reads (GET: a market refresh) and writes (anything else: moving a ship, trading) share the API's rate limit? | **Writes first** (2026-10-02): "I'd rather have a POST to move a ship or trade goods than a market refresh that can be done 10 seconds later without penalty." A read gives way while a write waits for the budget, leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds, so reads can't starve. The market watch runs last in the tick, one market a tick. |
+| D20 | Slice 6.4: the command ship can both survey (MOUNT_SURVEYOR_II) and mine (MOUNT_MINING_LASER_II). With surveying on, which does a ship that can do both do? | **Survey only** (2026-10-02): "Let's start with survey only. I think we'll end up with too many surveys, but we'll start simple and iterate." Its laser stays unused; the drones mine with its surveys. |
+| D21 | Slice 6.4: mining comes before trading, so the command ship no longer trades. Which cargo ships does the trading plan buy, and how many? | **A light shuttle first, then up to 2 light haulers** (2026-10-02): "start with a light shuttle to get things going, then pick up, for now, up to 2 light haulers once funds become available." Only when a lucrative route waits and every trader has a trip, within the credit reserve. The list is the setting `Trade.ShipPurchases`. Replaces D16. |
+| D22 | Slice 6.4: which supply counts as "low supply" for mining an ore to sell at that market? | **SCARCE and LIMITED** (2026-10-02). |
+| D23 | Slice 6.4: how many ships may mine for the contract? | **Every free miner** (2026-10-02), the contract before market mining; ore left over is sold. The contract plan still buys at most one drone, and the mining plan buys none while the contract takes the miners. |
+| D24 | Slice 6.4 (asked during the work): how do traders keep money for fuel? | **A trading bar** (2026-10-02): "a trading bar of, say 5.000 credits, under which only fuel can be bought", so the bot never holds expensive cargo without the fuel to move it. Cargo leaves `Trade.FuelReserveCredits` (5,000) untouched, on top of the trip's own fuel. |
+| D25 | Slice 6.4 (asked during the work): when are prices fetched again after a trade? | **Right after each purchase or sale** (2026-10-02), "while the ship is still there". Cargo purchases and sales, by traders and miners; refuels aren't counted as purchases here (they happen at almost every departure and move only FUEL's price). |
 
 ## Phases
 
@@ -919,9 +931,9 @@ its own retention, so the bot's database stays small.
 - Done by hand before 4.2 was merged: both logins exist. Checked on 2026-10-02 with
   `tools/investigate/st.py check` (5.1): `spacetraders_ro` connects, isn't a superuser and is
   read-only. Its password is in psql's password file on your PC.
-- Still to do: step 3 of the gembernodes README, as `postgres` in the `spacetraders` database:
-  `REVOKE SELECT ON stored_credentials FROM spacetraders_ro;`. On 2026-10-02 the read-only login
-  could still read the agent token. Until then `st.py` refuses any query that names the table.
+- Step 3 of the gembernodes README, `REVOKE SELECT ON stored_credentials FROM spacetraders_ro;`, was
+  done by you on 2026-10-02: `st.py check` reports `can_read_agent_token = f`. `st.py` still refuses
+  any query that names the table.
 
 **4.2 Manifests** (done: gembernodes PR #11, merged 2026-10-02)
 - Do: restore `apps/spacetraders/`, the namespace and the ingress (from `3f9f785^`), with these
@@ -1109,9 +1121,115 @@ How credits are split stays your call; Claude only fixes deviations from intende
   what's left is a clean reset period). The ship moves on to its next job instead of holding on to
   the finished scout goal.
 - **6.3 Probes** (`ProbeDeploymentPlanService`): B15 and B25.
-- **6.4 Mining drones mine and sell** (`MiningAutomationService`, `MineAndSellGoalExecutor`): the
-  survey part of B16, B17, and B34 (traits, so drones go where their mineral is).
-- **6.5 Trading** (built 2026-10-02 on branch `claude/spacetraders-trading`). Asked for that day:
+- **6.4 Surveying and mining** (built 2026-10-02 on branch `claude/spacetraders-surveying`; it took
+  in the old 6.4, mining drones mine and sell, with the survey part of B16, B17 and B34). Asked that
+  day:
+  1. a ship that can survey surveys before it trades: the contract's ore first, otherwise ores the
+     system's markets buy, at asteroids near the market that buys them;
+  2. a miner mines surveyed ores before unsurveyed asteroids;
+  3. several ships may mine for a contract; over-mining is fine, the rest is sold;
+  4. ships mine ores that are in low supply at a market, and sell them there;
+  5. a ship that can mine mines before it trades, so the command ship stops trading, and the trading
+     plan buys its own cargo ships;
+
+  and during the work: fix B34 first; a survey dashboard, to see whether we survey too much or too
+  little; a credit bar under which only fuel is bought (D24); and the market fetched again after each
+  trade (D25). Your choices: D20–D25.
+  - Done:
+    - **B34, first:** startup sync stores each waypoint's traits and modifiers (and orbitals, parent,
+      chart), and fetches a system's waypoints again, once, when a cached one has no traits: the
+      cluster's 85 waypoints get theirs at the first start after the deploy, keeping when each was
+      last observed. **What an asteroid yields** (`AsteroidDeposits`) follows from its traits, by the
+      table community bots use (the game publishes none): XB5C's common metal deposits yielded the six
+      ores it lists, about equally, on 2026-10-02.
+    - **The survey plan** (`SurveyPlanService`, new switch `Automation.Plan.Survey.Enabled`, off): a
+      ship that can survey surveys, and only that (D20). One survey per goal: the contract's ore at
+      the contract's asteroid while the contract plan mines it; otherwise an ore a market buys, at the
+      asteroid nearest the market that pays most, among those the miners can reach (a drone's 80-unit
+      tank keeps it in the middle of X1-DC53, so that is XB5C); ores without a usable survey there
+      first, then the best paid. The goal ends after each survey (B16's survey part: survey goals
+      never ended), and the plan gives the next.
+    - **Extraction** (`MineResourceVolumeCommand`) picks the best usable survey of the asteroid for its
+      ore: the largest share of the deposits, then the larger deposit, then the later expiry. A survey
+      the API refuses (4224 exhausted, 4221 expired, 4220 not verified) is dropped (B49). Any asteroid
+      type can be mined (B48).
+    - **The mining plan** (rewritten): one trip per goal, chosen again after each sale. A miner that
+      holds ore sells it first, where it fetches most (the contract's leftovers); otherwise a surveyed
+      ore first, sold where it fetches most; then an ore in low supply (SCARCE or LIMITED, D22), mined
+      at the asteroid nearest that market and sold there. One miner per sell market and ore. The trip
+      flies with its goal (B17), through refuelling stops, never DRIFT. It buys drones only for
+      low-supply openings a drone could reach, and not while the contract takes the miners (D23).
+    - **The contract** (D23): every free miner joins the active contract with an assignment like the
+      first ship's; completion releases them all, and a ship that arrives after another fulfilled the
+      contract doesn't call fulfil again. With the survey plan on, the command ship surveys the
+      contract's ore, and the contract's miners extract with those surveys.
+    - **Who does what** (`FleetRoles`): the survey plan is bootstrapped before mining and trading;
+      with it on, a ship that can survey neither mines nor trades (D20); a miner trades only when
+      neither the contract nor the mining plan has work for it.
+    - **Cargo ships** (D21): when every trader has a trip, the trading plan buys the next ship in
+      `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`), when it would
+      have a lucrative route from the shipyard, within the credit reserve: the shuttle (117,273) from
+      about 217,000 credits, a hauler (354,210) from about 454,000.
+    - **D24:** cargo leaves `Trade.FuelReserveCredits` (5,000) untouched, on top of the trip's fuel.
+      **D25:** after each purchase and sale, by a trader or a miner, the market is fetched again while
+      the ship is still docked (`MarketRefresher`, which the market watch uses too).
+    - **The survey dashboard's data:** each survey's life is counted and journaled: `Surveyed` (one per
+      survey: deposits, size, expiry), `Extracted` (per extraction, with the survey's signature or
+      none), `SurveyEnded` (expired, exhausted or not verified, with how many extractions used it);
+      metrics `spacetraders_surveys_taken_total`, `_surveys_ended_total{reason,used}`,
+      `_surveys_active{used}` and `spacetraders_extractions_total{surveyed}`. Surveys expiring unused
+      mean too many; extractions without a survey while a surveyor works mean too few.
+      `cached_surveys` gained `Extractions`; there are no migrations, so the initializer adds the
+      column to the cluster's table (`ADD COLUMN IF NOT EXISTS`). The dashboard's survey section is a
+      gembernodes change (see the table at the end); its PromQL passed `promtool check rules`.
+    - `ShipLeftIdle` (D13) counts survey work for surveyors, contract work for every free miner, and a
+      low-supply opening only for the miners that can reach it.
+  - Noticed (not changed):
+    - `HasMiningEquipment` counts a surveyor mount as mining equipment, and a test asserts it, against
+      the comment that says "mining mount or miner-type frame". No ship we have or can buy has a
+      surveyor and a hold without a laser, so it changes nothing today. Yours to call.
+    - Extraction still jettisons every ore but the one the trip mines, as before. At XB5C without a
+      survey that is five extractions in six; keeping what a nearby market buys would fill holds
+      faster, at the price of more sell stops.
+    - The contract plan picks the asteroid nearest the ship it starts with (by design, B34); with the
+      traits stored, its tie-break by deposits now works. Whether an asteroid that yields the ore
+      should beat a nearer one that doesn't is still your call.
+    - Asteroid modifiers (STRIPPED, UNSTABLE, ...) are stored but not used.
+    - The survey request sends the cached survey back to the API; whether the API accepts the expiry
+      as it comes back from the database is only known once it runs: a rejection shows as
+      `SurveyEnded` with reason `not_verified`, and the miner carries on without surveys.
+  - To switch it on: `PUT /settings/Automation.Plan.Survey.Enabled` and
+    `.../Automation.Plan.Mining.Enabled` with `{"value": "true"}` (trading as in 6.5).
+  - Done when: a full reset period with these plans on and no open anomaly for them.
+- **6.4 in short** (built 2026-10-02): the command ship surveys (the contract's ore first), every free
+  miner works the contract and then mines surveyed or scarce ores for the market, one trip at a time;
+  the trading plan buys a shuttle and then haulers, keeps 5,000 credits for fuel, and fetches a market
+  again after each trade; asteroids' traits are stored, so the bot knows what each yields. To
+  understand this, start with `SpaceTraders.Application/Mining/MiningPlanner.cs` and
+  `AsteroidDeposits.cs`, then `Automation/SurveyPlanService.cs`, `MiningAutomationService.cs` and
+  `FleetRoles.cs`; `tests/SpaceTraders.Application.Tests/Mining/MiningFixture.cs` holds X1-DC53's
+  middle as the tests use it.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Mining/AsteroidDeposits.cs`, `SurveySelection.cs`, `MiningPlanner.cs`, `MiningContext.cs`,
+      `SurveyKeeper.cs`; `Automation/SurveyPlanService.cs`, `SurveyPlanState.cs`, `FleetRoles.cs`;
+      `Goals/Executors/GoalFlight.cs`; `Services/MarketRefresher.cs`; `Ports/SurveyRefusedException.cs`;
+    - rewritten: `Automation/MiningAutomationService.cs`, `Goals/Executors/MineAndSellGoalExecutor.cs`,
+      `SurveyWaypointGoalExecutor.cs`; `ISurveyRepository` and `SurveyRepository` (Persistence);
+    - changed: `ContractPlanService` (D23), `TradingAutomationService` (D20, D21), `TradeContextReader`
+      (D24), `TradeBetweenMarketsGoalExecutor` (D25), `MarketWatchService`, `MineResourceVolumeCommand`
+      (B48, B49), `FulfillContractDeliveryCommand`, `ShipLeftIdleRule`, `AutomationSwitches` (the
+      Survey plan), `GameLoopService`, `JournalEvents`, `IAutomationMetrics`, `TradeMarketMap`,
+      `TradeRoutePlanner`, `MineAndSellGoal` (Domain: `Selling`), `ShipyardShipDto`;
+      `StartupSyncService` (API, B34), `PrometheusAutomationMetrics`, `PrometheusMetricsService`;
+      `SpaceTradersPortAdapter` (the refusals); `ShipyardRepository`, `CachedSurvey`,
+      `SpaceTradersDatabaseInitializer`, `DefaultSettingsSeed` (Persistence); two unused goal queries
+      removed from `IShipGoalRepository`;
+    - tests: `Mining/*`, `Automation/SurveyPlanServiceTests`, `MiningAutomationServiceTests`,
+      `ContractMinersTests`, the executors', `SurveyRepositoryTests`, `SurveyRefusalTests`,
+      `MarketRefresherTests`, `ShipyardShipCapacityTests`; B34 in `StartupSyncServiceTests`, the
+      column in `DatabaseInitializerTests`, and additions to the trading, contract delivery, idle rule,
+      game loop and metrics tests.
+- **6.5 Trading** (merged 2026-10-02 as projects#121; deployed by gembernodes#20). Asked for that day:
   1. a trader can be any ship with fuel and a cargo bay;
   2. a trip's profit is what the sell market pays minus what the buy market charges, minus the fuel,
      the fuel to get to the first market to begin with included (your note, the same day);
@@ -1213,6 +1331,7 @@ your PC, 1Password or kubectl:
 | 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; Grafana restarted 2026-10-02) |
 | 2.7 | The fleet table's new columns, and panels for the holds and for what was mined (merged: PR #15) |
 | 2.8 | A markets dashboard per system, uid `spacetraders-markets` (merged: PR #17) |
+| 6.4 | A survey section on the SpaceTraders dashboard: surveys taken, the share that ended unused, the share of extractions with a survey, usable surveys per asteroid, and the survey journal (branch `claude/spacetraders-survey-dashboard`, not committed; ships with 6.4's deploy) |
 | 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` (done; the revoke on `stored_credentials`, step 3, is still to do) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |

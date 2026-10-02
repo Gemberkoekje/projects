@@ -16,12 +16,14 @@ namespace SpaceTraders.Application.Health;
 /// </para>
 /// <list type="bullet">
 ///   <item>scout: the active plan's next stop, for the plan's ship;</item>
-///   <item>contract: the active plan's contract, for the plan's ship; or, while the plan waits for a
-///   ship or budget, any mining-capable ship;</item>
+///   <item>contract: the active plan's contract, for the plan's ship and, while units remain, for any
+///   other miner (D23, slice 6.4); or, while the plan waits for a ship or budget, any miner;</item>
 ///   <item>probe deployment: a target without a probe, while the plan isn't waiting for credits, for a
 ///   probe that isn't parked at a deployed waypoint. A probe is what the plan recognises, or a ship
 ///   whose cached type is <c>SATELLITE</c>: the starting probe, which the plan misses (B25);</item>
-///   <item>mining: an opportunity without a ship (Pending), for a ship that plan can use;</item>
+///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4);</item>
+///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
+///   to reach it (slice 6.4);</item>
 ///   <item>trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to
 ///   take it (slice 6.5).</item>
 /// </list>
@@ -93,22 +95,34 @@ public sealed class ShipLeftIdleRule(
                 ship => ship.Symbol.Equals(scout.ShipSymbol, StringComparison.OrdinalIgnoreCase)));
         }
 
+        var surveyOn = context.IsOn(AutomationPlan.Survey);
         if (context.IsOn(AutomationPlan.Contract) && await contractPlans.GetAsync(cancellationToken) is { } contract)
         {
             if (contract.Status == ContractMineralPlanStatus.Active)
             {
+                var unitsLeft = contract.UnitsFulfilled < contract.UnitsRequired;
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Contract,
                     $"contract {contract.ContractId}",
-                    ship => ship.Symbol.Equals(contract.ShipSymbol, StringComparison.OrdinalIgnoreCase)));
+                    ship => ship.Symbol.Equals(contract.ShipSymbol, StringComparison.OrdinalIgnoreCase)
+                        || (unitsLeft && FleetRoles.IsMiner(ship.Ship, surveyOn))));
             }
             else if (contract.Status == ContractMineralPlanStatus.PendingBudget)
             {
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Contract,
                     $"contract {contract.ContractId} waits for a mining ship",
-                    ship => ship.Ship.IsMiningCapable));
+                    ship => FleetRoles.IsMiner(ship.Ship, surveyOn)));
             }
+        }
+
+        if (surveyOn
+            && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { Targets.Count: > 0 } survey)
+        {
+            waiting.Add(new WaitingWork(
+                AutomationPlan.Survey,
+                string.Create(CultureInfo.InvariantCulture, $"{survey.Targets.Count} targets to survey"),
+                ship => FleetRoles.IsSurveyor(ship.Ship, surveyOn)));
         }
 
         if (context.IsOn(AutomationPlan.ProbeDeployment)
@@ -128,13 +142,17 @@ public sealed class ShipLeftIdleRule(
         if (context.IsOn(AutomationPlan.Mining)
             && await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken) is { } mining)
         {
-            var open = mining.Opportunities.Count(opportunity => opportunity.Status == MarketAutomationOpportunityStatus.Pending);
-            if (open > 0)
+            // An opening is work only for a miner that can reach its asteroid: the plan lists those as its
+            // candidates (slice 6.4). A drone isn't idle by mistake while the openings are beyond its tank.
+            var open = mining.Opportunities
+                .Where(opportunity => opportunity.Status == MarketAutomationOpportunityStatus.Pending)
+                .ToList();
+            if (open.Count > 0)
             {
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Mining,
-                    string.Create(CultureInfo.InvariantCulture, $"{open} mining opportunities without a ship"),
-                    ship => ship.Ship.IsMiningCapable));
+                    string.Create(CultureInfo.InvariantCulture, $"{open.Count} mining opportunities without a ship"),
+                    ship => open.Any(opportunity => opportunity.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
             }
         }
 

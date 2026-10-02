@@ -148,16 +148,26 @@ public sealed record DeployProbeGoal : ShipGoal
 }
 
 /// <summary>
-/// The ship mines <see cref="TradeSymbol"/> at <see cref="SourceWaypointSymbol"/> and sells it at
-/// <see cref="SellWaypointSymbol"/> while the target market opportunity remains active.
+/// One mining trip (PLAN.md slice 6.4): the ship mines <see cref="TradeSymbol"/> at
+/// <see cref="SourceWaypointSymbol"/> until its hold is full, with the best survey there when there is
+/// one, then sells it at <see cref="SellWaypointSymbol"/>; then the goal ends, and the mining plan
+/// chooses the next trip.
 /// </summary>
 public sealed record MineAndSellGoal : ShipGoal
 {
+    /// <summary>The ore the trip mines; other ores are jettisoned.</summary>
     public required string TradeSymbol { get; init; }
 
+    /// <summary>Where it mines.</summary>
     public required string SourceWaypointSymbol { get; init; }
 
+    /// <summary>Where it sells.</summary>
     public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True once the trip sells: its hold is full, or it was given ore the ship already held to sell.
+    /// </summary>
+    public bool Selling { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.MineAndSell;

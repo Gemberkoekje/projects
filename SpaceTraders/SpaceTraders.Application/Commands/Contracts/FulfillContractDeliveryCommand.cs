@@ -156,8 +156,9 @@ public sealed class FulfillContractDeliveryHandler(
                 command.ContractId);
         }
 
+        // Several ships deliver to one contract (D23): only the first to find nothing pending fulfils it.
         var contract = await contracts.FindAsync(command.ContractId, cancellationToken);
-        if (contract is not null && !HasPendingDeliverables(contract.DeliverablesJson))
+        if (contract is not null && !contract.IsFulfilled && !HasPendingDeliverables(contract.DeliverablesJson))
         {
             var fulfilled = await port.FulfillContractAsync(command.ContractId, cancellationToken);
             await contracts.UpsertAsync(MapToDto(fulfilled), cancellationToken);

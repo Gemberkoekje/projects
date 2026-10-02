@@ -18,6 +18,7 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Common;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Contracts;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Shipyards;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Systems;
 
 namespace SpaceTraders.API.Tests.Services;
 
@@ -49,6 +50,8 @@ public sealed class StartupSyncServiceTests
             });
         _apiClient.GetMyContractsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(new PagedApiResponse<Contract> { Data = [], Meta = new Meta { Total = 0, Page = 1, Limit = 20 } });
+        _apiClient.GetWaypointsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new PagedApiResponse<Waypoint> { Data = [], Meta = new Meta { Total = 0, Page = 1, Limit = 20 } });
     }
 
     [Fact]
@@ -124,7 +127,7 @@ public sealed class StartupSyncServiceTests
         var shipyard = await new ShipyardRepository(scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>())
             .FindByWaypointAsync("X1-AB-2");
         shipyard.Should().NotBeNull();
-        shipyard!.ShipTypes.Should().Equal("SHIP_MINING_DRONE");
+        shipyard.ShipTypes.Should().Equal("SHIP_MINING_DRONE");
         shipyard.Ships.Should().ContainSingle(s => s.Type == "SHIP_MINING_DRONE" && s.PurchasePrice == 42_940);
     }
 
@@ -133,7 +136,7 @@ public sealed class StartupSyncServiceTests
     {
         // B31: startup sync stored contracts without their terms, so every restart blanked the
         // deliverables and the deadline that the contract plan works from, until the next delivery.
-        var deadline = new DateTimeOffset(2026, 10, 8, 7, 9, 22, TimeSpan.Zero);
+        var deadline = new DateTimeOffset(2026, 10, 08, 07, 09, 22, TimeSpan.Zero);
         using var provider = BuildProvider();
         await using (var seedScope = provider.CreateAsyncScope())
         {
@@ -183,6 +186,104 @@ public sealed class StartupSyncServiceTests
         JsonSerializer.Deserialize<List<ContractDeliverableDto>>(contract.DeliverablesJson ?? "[]")
             .Should().Equal(new ContractDeliverableDto("IRON_ORE", "X1-AB-MKT", 42, 7));
     }
+
+    [Fact]
+    public async Task StartAsync_StoresEachWaypointsTraitsAndModifiers()
+    {
+        // B34: sync stored only a waypoint's market and shipyard flags, so nothing could tell which
+        // asteroid yields which ore.
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            await db.SaveChangesAsync();
+        }
+
+        _apiClient.GetWaypointsAsync("X1-AB", 1, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(SystemWaypoints());
+
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await using var scope = provider.CreateAsyncScope();
+        var asteroid = await new WaypointRepository(scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>()).FindAsync("X1-AB-1");
+        asteroid.Should().NotBeNull();
+        asteroid.Type.Should().Be("ASTEROID");
+        asteroid.TraitsJson.Should().Contain("COMMON_METAL_DEPOSITS");
+        asteroid.ModifiersJson.Should().Contain("STRIPPED");
+        asteroid.ParentSymbol.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StartAsync_FillsInTheTraitsOfWaypointsCachedWithoutThem()
+    {
+        // B34 on the cluster: the system's waypoints were cached before sync stored traits, and a
+        // cached system was never fetched again. Filling them in keeps when each was last observed,
+        // which scouting reads.
+        var observed = new DateTimeOffset(2026, 10, 02, 08, 51, 00, TimeSpan.Zero);
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-1", SystemSymbol = "X1-AB", Type = "ASTEROID", X = 5, Y = 7, LastObservedAt = observed });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON", LastObservedAt = observed });
+            await db.SaveChangesAsync();
+        }
+
+        _apiClient.GetWaypointsAsync("X1-AB", 1, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(SystemWaypoints());
+
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await using var scope = provider.CreateAsyncScope();
+        var waypoints = new WaypointRepository(scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>());
+        var asteroid = await waypoints.FindAsync("X1-AB-1");
+        asteroid!.TraitsJson.Should().Contain("COMMON_METAL_DEPOSITS");
+        asteroid.ModifiersJson.Should().Contain("STRIPPED");
+        asteroid.LastObservedAt.Should().Be(observed);
+        (await waypoints.GetBySystemAsync("X1-AB")).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task StartAsync_DoesNotFetchTheWaypointsAgain_WhenTheirTraitsAreCached()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-1", SystemSymbol = "X1-AB", Type = "ASTEROID", TraitsJson = """[{"symbol":"COMMON_METAL_DEPOSITS"}]""" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON", TraitsJson = "[]" });
+            await db.SaveChangesAsync();
+        }
+
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await _apiClient.DidNotReceive().GetWaypointsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    private static PagedApiResponse<Waypoint> SystemWaypoints() => new()
+    {
+        Data =
+        [
+            new Waypoint
+            {
+                Symbol = "X1-AB-1",
+                SystemSymbol = "X1-AB",
+                Type = "ASTEROID",
+                X = 5,
+                Y = 7,
+                Traits = [new WaypointTrait { Symbol = "COMMON_METAL_DEPOSITS" }],
+                Modifiers = [new WaypointModifier { Symbol = "STRIPPED" }],
+            },
+            new Waypoint { Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON", Orbits = "X1-AB-0", Traits = [] },
+        ],
+        Meta = new Meta { Total = 2, Page = 1, Limit = 20 },
+    };
 
     private ServiceProvider BuildProvider()
     {

@@ -4,6 +4,7 @@ using NSubstitute.ExceptionExtensions;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 using Wolverine;
 
@@ -167,6 +168,6 @@ public sealed class MarketWatchServiceTests
         => _markets.GetLastObservedAtAsync(waypoint, Arg.Any<CancellationToken>()).Returns(DateTimeOffset.UtcNow.AddMinutes(-minutesAgo));
 
     private Task RefreshAsync()
-        => new MarketWatchService(_ships, _waypoints, _markets, _port, _settings, _attempts, _bus, _log.For<MarketWatchService>())
+        => new MarketWatchService(_ships, _waypoints, _markets, new MarketRefresher(_port, _markets, _bus, _log.For<MarketRefresher>()), _settings, _attempts, _log.For<MarketWatchService>())
             .RefreshDueMarketAsync(CancellationToken.None);
 }

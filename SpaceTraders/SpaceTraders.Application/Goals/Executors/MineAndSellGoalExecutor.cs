@@ -4,6 +4,7 @@ using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
@@ -13,231 +14,151 @@ using Wolverine;
 namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
-/// Executor for <see cref="MineAndSellGoal"/>.
-/// Mines the target resource at the source waypoint and sells collected units at the configured market.
-/// Prefers using cached surveys for increased extraction yield when available.
+/// Executor for <see cref="MineAndSellGoal"/>: one mining trip (PLAN.md slice 6.4). The ship flies to the
+/// asteroid, through refuelling stops when it must, and extracts once per cooldown, with the best survey
+/// there for its ore when there is one (<see cref="MineResourceVolumeCommand"/>), until its hold is full.
+/// Then it flies to the sell market, docks and sells, in batches of the market's trade volume, and the
+/// goal ends: the mining plan chooses the next trip.
 /// </summary>
 public sealed class MineAndSellGoalExecutor(
     IShipRepository ships,
     IShipGoalRepository goals,
     IAgentRepository agents,
-    ISurveyRepository surveys,
     ISpaceTradersPort port,
+    ITradeContextReader tradeContexts,
+    IMarketRefresher marketRefresher,
     IDockSubCommand dock,
     IMessageBus bus,
     ILogger<MineAndSellGoalExecutor> logger) : IShipGoalExecutor
 {
+    /// <inheritdoc />
     public bool CanExecute(ShipGoal goal) => goal is MineAndSellGoal;
 
+    /// <inheritdoc />
     public async Task<GoalExecutionResult> ExecuteStepAsync(
         ShipModel ship,
         ShipGoal goal,
         ShipGoalContext ctx,
         CancellationToken ct)
     {
-        var miningGoal = (MineAndSellGoal)goal;
+        var trip = (MineAndSellGoal)goal;
 
         if (ship.LocalStatus == ShipLocalStatus.InTransit)
         {
             return GoalExecutionResult.WaitingForArrival("Mining ship is in transit.");
         }
 
-        var cargoInventory = ship.CargoInventory ?? [];
-        var targetUnits = cargoInventory
-            .FirstOrDefault(i => i.Symbol.Equals(miningGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
-            .Units ?? 0;
-
-        if (targetUnits <= 0)
+        if (!trip.Selling && ship.CargoCapacity > 0 && ship.CargoCurrent >= ship.CargoCapacity)
         {
-            // Try to find a survey for the target mineral at the source waypoint.
-            var survey = await surveys.GetBestActiveSurveyAsync(
-                miningGoal.SourceWaypointSymbol,
-                miningGoal.TradeSymbol,
-                ct);
-
-            if (!IsUsableSurvey(survey))
-            {
-                await TryAssignSurveyGoalAsync(ship, miningGoal, ct);
-                return GoalExecutionResult.WaitingForArrival(
-                    $"Waiting for active survey for {miningGoal.TradeSymbol} at {miningGoal.SourceWaypointSymbol} before mining.");
-            }
-
-            var mineResult = await bus.InvokeAsync<ShipCommandResult>(
-                new MineResourceVolumeCommand(
-                    ship.Symbol,
-                    miningGoal.TradeSymbol,
-                    miningGoal.SourceWaypointSymbol,
-                    Math.Max(1, ship.CargoCapacity),
-                    survey),
-                ct);
-
-            if (mineResult is null)
-            {
-                logger.LogWarning(
-                    "MineAndSellGoalExecutor: mining command returned null result for ship {ShipSymbol}.",
-                    ship.Symbol);
-                return GoalExecutionResult.Blocked("Mining command returned no result.");
-            }
-
-            if (!mineResult.Accepted)
-            {
-                return GoalExecutionResult.Blocked(
-                    $"Mining command rejected at {mineResult.WaypointSymbol} with state {mineResult.Status}.");
-            }
-
-            if (mineResult.Status == ShipLocalStatus.InTransit)
-            {
-                return GoalExecutionResult.WaitingForArrival(
-                    $"Navigating to mining source {miningGoal.SourceWaypointSymbol}.");
-            }
-
-            if (ship.CooldownExpiresAt.HasValue && ship.CooldownExpiresAt.Value > TimeProvider.System.GetUtcNow())
-            {
-                return GoalExecutionResult.WaitingForCooldown(
-                    "Waiting for extraction cooldown.",
-                    ship.CooldownExpiresAt);
-            }
-
-            return GoalExecutionResult.Progressing($"Mining {miningGoal.TradeSymbol} in progress.");
+            await goals.SetActiveGoalAsync(ship.Symbol, trip with { Selling = true }, ct);
+            return GoalExecutionResult.Progressing($"Hold full of {trip.TradeSymbol}; next, selling at {trip.SellWaypointSymbol}.");
         }
 
-        var atSellWaypoint = string.Equals(
-            ship.WaypointSymbol,
-            miningGoal.SellWaypointSymbol,
-            StringComparison.OrdinalIgnoreCase);
+        return trip.Selling
+            ? await SellStepAsync(ship, trip, ct)
+            : await MineStepAsync(ship, trip, ct);
+    }
 
-        if (!atSellWaypoint)
+    private async Task<GoalExecutionResult> MineStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)
+    {
+        if (!IsAt(ship, trip.SourceWaypointSymbol))
         {
-            await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, miningGoal.SellWaypointSymbol), ct);
-            return GoalExecutionResult.WaitingForArrival(
-                $"Navigating to sell waypoint {miningGoal.SellWaypointSymbol}.");
+            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, trip.SourceWaypointSymbol, dock, bus, ct);
+        }
+
+        if (ship.CooldownExpiresAt.HasValue && ship.CooldownExpiresAt.Value > TimeProvider.System.GetUtcNow())
+        {
+            return GoalExecutionResult.WaitingForCooldown("Waiting for extraction cooldown.", ship.CooldownExpiresAt);
+        }
+
+        // One extraction, with the best survey for the ore when there is one; a docked ship orbits first.
+        var mined = await bus.InvokeAsync<ShipCommandResult>(
+            new MineResourceVolumeCommand(ship.Symbol, trip.TradeSymbol, trip.SourceWaypointSymbol, Math.Max(1, ship.CargoCapacity)),
+            ct);
+        if (mined is null || !mined.Accepted)
+        {
+            // The plan chooses again on the next tick; a trip that keeps failing shows as RepeatingError.
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            logger.LogWarning(
+                "MineAndSellGoalExecutor: ship {ShipSymbol} can't mine {TradeSymbol} at {WaypointSymbol} (state {Status}); the trip is dropped.",
+                ship.Symbol,
+                trip.TradeSymbol,
+                trip.SourceWaypointSymbol,
+                mined?.Status ?? ShipLocalStatus.None);
+            return GoalExecutionResult.Blocked($"Mining rejected at {trip.SourceWaypointSymbol}.");
+        }
+
+        return GoalExecutionResult.Progressing($"Mining {trip.TradeSymbol} at {trip.SourceWaypointSymbol}.");
+    }
+
+    private async Task<GoalExecutionResult> SellStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)
+    {
+        var units = (ship.CargoInventory ?? [])
+            .Where(item => item.Symbol.Equals(trip.TradeSymbol, StringComparison.OrdinalIgnoreCase))
+            .Sum(item => item.Units);
+        if (units <= 0)
+        {
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Completed($"No {trip.TradeSymbol} aboard; the trip is done.");
+        }
+
+        if (!IsAt(ship, trip.SellWaypointSymbol))
+        {
+            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, trip.SellWaypointSymbol, dock, bus, ct);
         }
 
         if (ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
             await dock.ExecuteAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing(
-                $"Docking at sell waypoint {miningGoal.SellWaypointSymbol}.");
+            return GoalExecutionResult.Progressing($"Docking at sell waypoint {trip.SellWaypointSymbol}.");
         }
 
-        var sellResult = await port.SellCargoAsync(ship.Symbol, miningGoal.TradeSymbol, targetUnits, ct);
-        await ships.UpdateCargoAsync(ship.Symbol, sellResult.Cargo, ct);
-        await agents.SetCreditsAsync(bus, sellResult.AgentCredits, ct);
+        // The arrival has just refreshed the market's prices.
+        var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct)).Map;
+        if (!map.TryGetGood(trip.SellWaypointSymbol, trip.TradeSymbol, out var good) || good.SellPrice <= 0)
+        {
+            // The market no longer buys it: the mining plan sells the ore where it fetches most.
+            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            return GoalExecutionResult.Completed($"{trip.SellWaypointSymbol} doesn't buy {trip.TradeSymbol} any more; the trip ends.");
+        }
 
-        // The ledger and the credits-earned metric (B7).
-        await bus.PublishAsync(new ShipCargoSoldEvent(
-            ship.Symbol,
-            new TradeSymbol(miningGoal.TradeSymbol),
-            targetUnits,
-            sellResult.Revenue,
-            sellResult.AgentCredits));
+        // One sale may not exceed the market's trade volume, so a larger load goes in several.
+        var batchSize = good.TradeVolume > 0 ? good.TradeVolume : units;
+        for (var left = units; left > 0;)
+        {
+            var batch = Math.Min(left, batchSize);
+            var sale = await port.SellCargoAsync(ship.Symbol, trip.TradeSymbol, batch, ct);
+            await ships.UpdateCargoAsync(ship.Symbol, sale.Cargo, ct);
+            await agents.SetCreditsAsync(bus, sale.AgentCredits, ct);
 
-        logger.LogInformation(
-            "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
-            JournalEvents.CargoSold,
-            ship.Symbol,
-            targetUnits,
-            miningGoal.TradeSymbol,
-            miningGoal.SellWaypointSymbol,
-            sellResult.Revenue);
+            // The ledger and the credits-earned metric (B7).
+            await bus.PublishAsync(new ShipCargoSoldEvent(
+                ship.Symbol,
+                new TradeSymbol(trip.TradeSymbol),
+                batch,
+                sale.Revenue,
+                sale.AgentCredits));
 
-        // Keep goal active; the orchestrator decides when the market opportunity ends.
-        await goals.SetActiveGoalAsync(ship.Symbol, miningGoal, ct);
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+                JournalEvents.CargoSold,
+                ship.Symbol,
+                batch,
+                trip.TradeSymbol,
+                trip.SellWaypointSymbol,
+                sale.Revenue);
+            left -= batch;
+        }
 
-        return GoalExecutionResult.Progressing(
-            $"Sold {targetUnits} {miningGoal.TradeSymbol} at {miningGoal.SellWaypointSymbol}; continuing mining loop.");
+        // The sale moved the price: the market again, while the ship is still there (D25).
+        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trip.SellWaypointSymbol, ship.Symbol, ct);
+
+        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+        return GoalExecutionResult.Completed($"Sold {units} {trip.TradeSymbol} at {trip.SellWaypointSymbol}; the trip is done.");
     }
 
-    private async Task TryAssignSurveyGoalAsync(ShipModel minerShip, MineAndSellGoal miningGoal, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(miningGoal.SourceWaypointSymbol)
-            || string.IsNullOrWhiteSpace(miningGoal.TradeSymbol))
-        {
-            return;
-        }
-
-        var activeSurveyTargets = await goals.GetActiveSurveyTargetsAsync(ct);
-        var target = (
-            miningGoal.SourceWaypointSymbol.ToUpperInvariant(),
-            miningGoal.TradeSymbol.ToUpperInvariant());
-
-        if (activeSurveyTargets is not null && activeSurveyTargets.Contains(target))
-        {
-            return;
-        }
-
-        var surveyGoal = new SurveyWaypointGoal
-        {
-            TargetWaypointSymbol = miningGoal.SourceWaypointSymbol,
-            TargetDepositSymbol = miningGoal.TradeSymbol,
-        };
-
-        var allShips = await ships.GetAllAsync(ct);
-        var surveyShips = allShips
-            .Where(candidate =>
-                candidate.HasSurveyEquipment
-                && candidate.LocalStatus != ShipLocalStatus.InTransit)
-            .OrderByDescending(candidate =>
-                candidate.Symbol.Equals(minerShip.Symbol, StringComparison.OrdinalIgnoreCase))
-            .ThenBy(candidate => candidate.Symbol, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (surveyShips.Count == 0)
-        {
-            return;
-        }
-
-        var surveyShipSymbol = string.Empty;
-        var fallbackSurveyShipSymbol = string.Empty;
-
-        foreach (var candidate in surveyShips)
-        {
-            var currentGoal = await goals.GetActiveGoalAsync(candidate.Symbol, ct);
-            if (currentGoal is SurveyWaypointGoal existingSurveyGoal
-                && existingSurveyGoal.TargetWaypointSymbol.Equals(miningGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase)
-                && existingSurveyGoal.TargetDepositSymbol.Equals(miningGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase)
-                && existingSurveyGoal.Status is not GoalStatus.Completed
-                && existingSurveyGoal.Status is not GoalStatus.Blocked)
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(fallbackSurveyShipSymbol))
-            {
-                fallbackSurveyShipSymbol = candidate.Symbol;
-            }
-
-            if (currentGoal is null
-                || currentGoal.Status is GoalStatus.Completed or GoalStatus.Blocked
-                || candidate.Symbol.Equals(minerShip.Symbol, StringComparison.OrdinalIgnoreCase))
-            {
-                surveyShipSymbol = candidate.Symbol;
-                break;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(surveyShipSymbol))
-        {
-            surveyShipSymbol = fallbackSurveyShipSymbol;
-        }
-
-        if (string.IsNullOrWhiteSpace(surveyShipSymbol))
-        {
-            return;
-        }
-
-        await goals.SetActiveGoalAsync(surveyShipSymbol, surveyGoal, ct);
-        logger.LogInformation(
-            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {ShipSymbol} for {TradeSymbol} at {WaypointSymbol}.",
-            surveyShipSymbol,
-            miningGoal.TradeSymbol,
-            miningGoal.SourceWaypointSymbol);
-    }
-
-    private static bool IsUsableSurvey(SurveyModel survey) =>
-        survey is not null
-        && !string.IsNullOrWhiteSpace(survey.Signature)
-        && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)
-        && !string.IsNullOrWhiteSpace(survey.Size)
-        && survey.Expiration > TimeProvider.System.GetUtcNow();
+    private static bool IsAt(ShipModel ship, string waypointSymbol)
+        => string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase);
 }

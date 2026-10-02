@@ -161,6 +161,7 @@ public sealed class GameLoopService(
         AutomationPlan.Scout => services.GetRequiredService<IScoutAllMarketplacesPlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.Contract => services.GetRequiredService<IContractPlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.ProbeDeployment => services.GetRequiredService<IProbeDeploymentPlanService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.Survey => services.GetRequiredService<ISurveyPlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.Mining => services.GetRequiredService<IMiningAutomationService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.Trading => services.GetRequiredService<ITradingAutomationService>().EnsureBootstrappedAsync(cancellationToken),
         _ => throw new ArgumentOutOfRangeException(nameof(plan), plan, "Unknown plan."),

@@ -6,6 +6,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
@@ -28,6 +29,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
+    private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly LogRecorder _log = new();
@@ -103,6 +105,54 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             "SHIP-1",
             Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 20 && g.PricePaidPerUnit == 3_254 && g.SellWaypointSymbol == D41),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ItBuysOnlyWhatTheCreditsAboveTheFuelReservePayFor()
+    {
+        // D24: 37,692 credits, 5,000 of them kept for fuel and 152 for the trip's own fuel, buy 10 units
+        // at 3,254; without the reserve they would buy 11.
+        PricesAre(Map(), credits: 37_692, fuelReserve: 5_000);
+        BuyReturns(units: 10, total: 32_540);
+
+        await StepAsync(CommandShip(K85), Trip());
+
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 10, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_NothingIsBought_WithTheCreditsDownToTheFuelReserve()
+    {
+        // D24: what is left above the 5,000 doesn't pay for a single unit after the trip's fuel.
+        PricesAre(Map(), credits: 8_254, fuelReserve: 5_000);
+
+        var result = await StepAsync(CommandShip(K85), Trip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
+    }
+
+    [Fact]
+    public async Task AfterBuying_ItFetchesTheBuyMarketAgain_WhileItIsStillThere()
+    {
+        // D25: the purchase moved the price.
+        BuyReturns(units: 20, total: 65_080);
+
+        await StepAsync(CommandShip(K85), Trip());
+
+        await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, K85, "SHIP-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AfterSelling_ItFetchesTheSellMarketAgain_WhileItIsStillThere()
+    {
+        // D25: the sale moved the price.
+        SellReturns(69_740);
+
+        await StepAsync(Loaded(D41), Trip(bought: true));
+
+        await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, D41, "SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -271,8 +321,8 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoSold" && Equals(e.Properties["Revenue"], 69_740L));
     }
 
-    private void PricesAre(TradeMarketMap map)
-        => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, Credits));
+    private void PricesAre(TradeMarketMap map, long credits = Credits, long fuelReserve = 0)
+        => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, credits, fuelReserve: fuelReserve));
 
     private void BuyReturns(int units, long total)
         => _port.BuyCargoAsync("SHIP-1", "EQUIPMENT", units, Arg.Any<CancellationToken>())
@@ -289,6 +339,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
                 _agents,
                 _port,
                 _tradeContexts,
+                _refresher,
                 _dock,
                 _bus,
                 _log.For<TradeBetweenMarketsGoalExecutor>())

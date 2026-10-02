@@ -7,6 +7,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-02, slice 6.4)
+- Surveying, as asked on 2026-10-02 (`PLAN.md` 6.4, decisions D20–D25). A new survey plan (`Automation.Plan.Survey.Enabled`, off by default) has every ship that can survey survey, and only that (D20): the contract's ore at the contract's asteroid first, otherwise ores the system's markets buy, at the asteroid nearest the market that pays most for them among those the miners can reach; ores without a usable survey first. One survey per goal; the goal ends after each.
+- What an asteroid yields, from its traits (`AsteroidDeposits`), and which survey to extract with: the one where the ore makes up the largest share of the deposits, then the larger deposit, then the later expiry. Extractions use it, for the contract's miners too.
+- The mining plan, rewritten: one trip per goal (mine until the hold is full, sell, choose again). A miner sells ore it holds first; otherwise it mines a surveyed ore first, then an ore in low supply (SCARCE or LIMITED, D22) at the asteroid nearest the market that is short of it, and sells it there. Trips fly with their goal through refuelling stops, never DRIFT. Drones are bought only for openings a drone could reach, and not while the contract takes the miners.
+- Every free miner joins the active contract (D23); completion releases them all, and ore left over is sold by the mining plan.
+- The trading plan buys its own cargo ships (D21, replacing D16): `Trade.ShipPurchases` (new; a light shuttle, then up to two light haulers), when every trader has a trip, a new ship would have a lucrative route, and the purchase keeps the credit reserve. With the survey plan on, a ship that can survey doesn't trade (D20); miners trade only when no mining work waits.
+- `Trade.FuelReserveCredits` (new, 5,000): cargo purchases leave it untouched, so only fuel is bought below it (D24).
+- After each purchase or sale, by a trader or a miner, the market is fetched again while the ship is still docked (D25, `MarketRefresher`, shared with the market watch).
+- For a survey dashboard: journal kinds `Surveyed`, `SurveyEnded` (with how many extractions used the survey), `Extracted` and `MiningStarted`; metrics `spacetraders_surveys_taken_total`, `spacetraders_surveys_ended_total{reason,used}`, `spacetraders_surveys_active{used}` and `spacetraders_extractions_total{surveyed}`. `cached_surveys` gained `Extractions`; the initializer adds the column to an existing table.
+
+### Code – Fixed (2026-10-02, slice 6.4)
+- Waypoint traits are stored (B34): startup sync stores each waypoint's traits and modifiers, and fetches a system's waypoints again once when a cached one has none, so the cluster's waypoints get theirs at the next start.
+- Every asteroid type can be mined (B48): `ASTEROID`, the type of 56 of X1-DC53's 57 asteroids, was refused.
+- A survey the API refuses (exhausted, expired, not verified) is dropped instead of tried again on every step (B49).
+- Survey goals end after their survey, and a miner no longer hands out survey goals or waits for one (B16's survey part); mining and survey trips navigate with their goal, so their arrivals wake them (B17 for those trips).
+- A ship that delivers after another has fulfilled the contract no longer calls fulfil again.
+
+### Code – Removed (2026-10-02, slice 6.4)
+- The mining plan's event `Handle` methods (never wired, see `DiValidationTests`), its stale-goal cleanup, and `IShipGoalRepository.GetActiveMineAndSellTargetsAsync` and `GetActiveSurveyTargetsAsync`, which only the old mining code used.
+
+### Docs – Changed (2026-10-02, slice 6.4)
+- `PLAN.md`: slice 6.4 built, with its summary; D20–D25; B48 and B49 found and fixed; B16, B17 and B34 updated; 6.5 merged; 4.1's revoke done. `docs/HOW_IT_WORKS.md` describes the survey plan, the mining plan, the contract's miners, the cargo ship purchases, the fuel reserve, the refetch after trades, the new journal kinds, metrics and settings.
+
 ### Code – Added (2026-10-02, slice 6.5)
 - Trading, as asked on 2026-10-02 (`PLAN.md` 6.5, decisions D14–D18). Any ship with a cargo hold and a fuel tank that has nothing else to do trades; after scouting that is the command ship. A trip's profit is what the sell market pays minus what the buy market charges, times the units, minus the fuel for the whole trip, the flight to the buy market included; it must earn `Trade.MinProfitPerUnit` per unit (D14), and routes whose sell market makes a pricier good from the cargo come first (D15). Two traders never share a route (D18), and the plan buys no ships (D16). Flights beyond one tank refuel at markets on the way instead of drifting. A trip checks its prices again where it lands: at the buy market it buys only while the trip is still lucrative (`TradeDropped` otherwise), and at the sell market it takes the cargo to a market that pays more, once (`TradeRerouted`). Sales above a market's trade volume go in several. Journal: `TradeStarted`, `TradeRerouted`, `TradeDropped`.
 - The market watch: every market with one of our ships at its waypoint is fetched again once `Market.RefreshMinutes` (new, 5; 0 = off) have passed since its prices were last seen; one market a tick, the most overdue, as the tick's last step (D19).

@@ -57,6 +57,7 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
 
         handlerTypes.Should().Contain(typeof(ShipNavigationCompletedHandler));
         handlerTypes.Should().NotContain(typeof(ContractPlanService))
+            .And.NotContain(typeof(SurveyPlanService))
             .And.NotContain(typeof(MiningAutomationService))
             .And.NotContain(typeof(TradingAutomationService));
     }

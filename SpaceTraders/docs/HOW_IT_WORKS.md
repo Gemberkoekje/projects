@@ -20,7 +20,7 @@ One process, `SpaceTraders.API`, hosts everything.
 
 ```text
 startup chain ─► tick every 5 s (leader only)
-                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Mining, Trading
+                  ├─ bootstrap the plans that are on: Scout, Contract, ProbeDeployment, Survey, Mining, Trading
                   ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
                   ├─ contract assignments: deliver, or mine
                   ├─ refresh one market where a ship is, once due (the market watch)
@@ -147,7 +147,9 @@ checks it. The lease is not released on shutdown.
 
 **Startup sync** (`StartupSyncService`):
 - **Fetches:** the agent, all ships, and for each system that has a ship, the system and its
-  waypoints if they aren't cached yet. It also fetches market and shipyard data at waypoints where
+  waypoints, with their traits and modifiers, when none are cached or any cached one lacks its
+  traits (B34, fixed: until then no trait was ever stored, so nothing knew what an asteroid yields).
+  Waypoints cached already keep when they were last observed, which scouting reads. It also fetches market and shipyard data at waypoints where
   a ship is not in transit, and the first page of contracts (20). It stores them the way the
   other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and
   contracts with their terms, so a restart doesn't blank the deliverables the contract plan works
@@ -160,7 +162,7 @@ checks it. The lease is not released on shutdown.
 startup sync has just cached: the agent, the ships with their goals, the contracts, every waypoint
 in the ships' systems, and the market and shipyard where each ship is (not in transit). It calls no
 API (B35, fixed); before, it fetched all of that again, about 11 calls on every start. The cache
-holds less than the API returns: no crew, mount details or (until B34) waypoint traits.
+holds less than the API returns: no crew or mount details.
 
 **Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false.
 For each cached ship:
@@ -181,12 +183,13 @@ It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 - Runs 5 s after the previous tick ends, on the leader only.
 - Each tick:
   1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Contract,
-     ProbeDeployment, Mining and Trading.
+     ProbeDeployment, Survey, Mining and Trading.
   2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
   3. If the contract plan is switched on, for every active `Contract` assignment:
      `FulfillContractDeliveryCommand` once the ship holds a whole trip (what the contract still
      needs, at most a full hold; with nothing left to deliver, that command fulfils the contract),
-     otherwise `MineResourceVolumeCommand` (B8, fixed).
+     otherwise `MineResourceVolumeCommand` (B8, fixed), with the best survey for the contract's ore
+     when there is one (slice 6.4). Every miner on the contract has such an assignment (D23).
   4. Refresh one market where a ship is, when one is due (the market watch, below): last, because
      a refresh is a read, which can go later without loss, while moves and trades can't (D19).
   5. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
@@ -209,8 +212,10 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
 - The API shows a market's prices only while a ship of ours is there, so the watch fetches only those
   markets: each waypoint with a market where a ship is docked or in orbit, once however many ships
   are there.
-- A market is due once that many minutes have passed since its prices were last seen, by the watch or
-  by an arrival, so a ship that has just arrived adds no call.
+- A market is due once that many minutes have passed since its prices were last seen, by the watch,
+  by an arrival or after a trade there (D25), so a ship that has just arrived or traded adds no call.
+- Each refresh goes through `MarketRefresher`, which the trade and mining executors use too: after
+  each purchase and sale they fetch the market again while the ship is still docked there (D25).
 - One market a tick, the one that has waited longest (D19): twelve ticks a minute refresh 25 markets
   in about two minutes, and the watch never holds the next tick up with a run of reads. A market the
   watch asked for waits an interval even when the answer failed or had no prices, so it can't stay
@@ -230,19 +235,26 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
 All plan state is JSON in `plan_states`, one row per plan type.
 
 Each plan has a switch, `Automation.Plan.{Plan}.Enabled` (`AutomationSwitches`). Per D9 only
-Scout and Contract are on by default. A plan that is switched off:
+Scout and Contract are on by default; the survey plan (slice 6.4) is off too until switched on. A
+plan that is switched off:
 - isn't bootstrapped, so it doesn't buy anything;
-- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe,
-  mine-and-sell and survey, trade). They resume when it is switched back on;
+- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe, survey,
+  mine-and-sell, trade). They resume when it is switched back on;
 - for the contract plan: the tick's contract work (step 3) is skipped too.
+
+The plans are bootstrapped in the order of the table, so a plan higher up claims the ships it wants
+first. Which plan a ship works for follows from what it can do (`FleetRoles`, slice 6.4): with the
+survey plan on, a ship that can survey surveys, and only that (D20); a ship that can mine mines (the
+contract first, D23, then the mining plan's trips); trading takes what the others leave free.
 
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
 | Scout | Visit every marketplace in the starting system once | The one ship with fuel | Active → Completed | Nothing |
-| Contract | Fulfil one mineral contract | A mining-capable ship without an assignment | PendingBudget, Active, DeferredUnsupported, Completed | `SHIP_MINING_DRONE` |
+| Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE` |
 | ProbeDeployment | Park a probe at every market and shipyard in the HQ system | Probes | Active ⇄ Completed, plus a waiting flag | `SHIP_PROBE` |
-| Mining | Sell minerals where they are scarce | Mining-capable ships without a goal | Opportunity queue (Pending/Assigned) | `SHIP_MINING_DRONE`, up to `Mining.MaxDrones` |
-| Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank, without a goal or an assignment | Held and open routes (Assigned/Pending) | Nothing (D16) |
+| Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | Nothing |
+| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`, up to `Mining.MaxDrones` |
+| Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21) |
 
 ### Scout (`ScoutAllMarketplacesPlanService`)
 
@@ -267,9 +279,14 @@ Markets are not scouted again.
 ### Contract (`ContractPlanService`, plus step 3 of the tick)
 
 - **While the plan is Active,** bootstrap advances it from the cached contract, which every
-  delivery updates: it records the units delivered, keeps the assignment's remaining units current,
-  and restores a missing assignment. It writes only what changed. A plan in any other status
-  except PendingBudget makes bootstrap return immediately: one contract per reset (D1).
+  delivery updates: it records the units delivered, keeps the remaining units of every ship's
+  contract assignment current, and restores the first ship's missing assignment. Then every free
+  miner joins (D23, slice 6.4): it gets a `Contract` assignment like the first ship's and logs
+  `MiningStarted` (reason `contract`). A free miner has no goal (or a finished or blocked one), no
+  assignment, isn't in transit and, with the survey plan on, can't survey (D20). Several ships may
+  bring more than the contract still needs; the mining plan sells what is left over. It writes only
+  what changed. A plan in any other status except PendingBudget makes bootstrap return immediately:
+  one contract per reset (D1).
 - **Otherwise it:**
   1. refreshes contracts from the API, ignoring errors, but only while there is no plan yet;
   2. negotiates a contract if none is open, using the first ship that has a waypoint;
@@ -277,23 +294,26 @@ Markets are not scouted again.
   4. accepts it, records the acceptance payment in the cached credits (B33, fixed) and publishes
      `ContractAcceptedEvent` with it, for the ledger (B7, fixed);
   5. parks a non-mineral deliverable as DeferredUnsupported (D2);
-  6. picks an idle mining-capable ship, or buys a drone. If neither works, the plan becomes
+  6. picks an idle miner (no goal, no assignment, not a surveyor while the survey plan is on), or
+     buys a drone. If neither works, the plan becomes
      PendingBudget and is retried every tick. A retry works from the cached contract and only
      tries the ship again: it calls the API only to buy, and stores nothing while the plan keeps
      waiting (B27, fixed);
   7. picks the nearest asteroid;
   8. saves an Active plan and a `Contract` assignment.
 - **The work itself is step 3 of the tick:**
-  - **Mining:** `MineResourceVolumeCommand` travels to the asteroid, extracts once per cooldown
-    and jettisons other goods.
+  - **Mining:** `MineResourceVolumeCommand` travels to the asteroid, extracts once per cooldown,
+    with the best survey there for the contract's ore when there is one (slice 6.4), and
+    jettisons other goods.
   - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination, docks, delivers
     what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
-    nothing is pending, recording the payment in the cached credits and publishing
-    `ContractFulfilledEvent` with it.
-- **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes the
-  assignment, which releases the ship (B9, fixed). Every unit delivered isn't enough: until the
-  fulfil call has gone out, the assignment stays open with 0 units left, so the ship goes back
-  to make it.
+    nothing is pending and the cached contract isn't fulfilled yet (another ship may have done it,
+    D23), recording the payment in the cached credits and publishing `ContractFulfilledEvent` with
+    it.
+- **Completion:** once the contract is fulfilled, bootstrap completes the plan and closes every
+  contract assignment, which releases the ships (B9, fixed). A ship that still holds the ore sells
+  it through the mining plan. Every unit delivered isn't enough: until the fulfil call has gone out,
+  the assignment stays open with 0 units left, so the ship goes back to make it.
 
 ### Probe deployment (`ProbeDeploymentPlanService`)
 
@@ -312,27 +332,67 @@ Markets are not scouted again.
   docks, marks the waypoint deployed and clears the goal.
 - **Without a free probe,** it buys one after a budget check (B15).
 
-### Mining (`MiningAutomationService`)
+### Survey (`SurveyPlanService`, slice 6.4)
 
-- **Opportunities** are cached market goods of type IMPORT or EXCHANGE, with supply SCARCE and a
-  mineral symbol.
-- **Each tick it:**
-  1. clears `MineAndSellGoal`s whose opportunity is gone;
-  2. gives the first idle miner a `MineAndSellGoal` for each untargeted opportunity;
-  3. if there was no idle miner when the pass started, buys one drone per leftover opportunity,
-     up to `Mining.MaxDrones` (default 20). It prefers a shipyard in the sell market's system.
+- **A surveyor** is any ship with a surveyor mount; with this plan on it surveys, and nothing else
+  (D20): the command ship's mining laser stays unused.
+- **Each tick** it first ends the surveys that expired (`SurveyKeeper`: removed from `cached_surveys`,
+  `SurveyEnded` journaled with how often each was used, `spacetraders_surveys_ended_total`). Then
+  each free surveyor gets one survey to take (`SurveyWaypointGoal`), the best target it can reach that
+  no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`:
+  1. the contract's ore at the contract's asteroid, while the contract plan mines it, even when a
+     usable survey of it exists;
+  2. otherwise each ore a market in the system buys, at the asteroid nearest the market that pays
+     most for it, among those whose traits yield the ore (`AsteroidDeposits`) and that one of the
+     miners can reach (any asteroid while there are no miners). Ores without a usable survey there
+     come first, then the best paid.
+- **The state** (`plan_states`, `Survey`) lists the targets, best first, with the surveyors on each;
+  it is written only when it changes. The `ShipLeftIdle` rule reads it.
+
+**What an asteroid yields** (`AsteroidDeposits`): the game doesn't publish it, so this is the table
+community bots use, from the trait descriptions and what extractions have shown: common metal
+deposits yield aluminum, copper and iron ore, ice water, quartz sand and silicon crystals (as XB5C did
+on 2026-10-02); mineral deposits silicon, quartz, ammonia ice, ice water, iron ore and precious stones;
+precious metal deposits platinum, gold and silver ore and five common ores; rare metal deposits
+uranite and meritium ore; frozen and ice crystals ice water and ammonia ice. Only ASTEROID,
+ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows what is really there.
+
+### Mining (`MiningAutomationService`, slice 6.4)
+
+- **A miner** is a ship with a mining laser, a hold and a tank that doesn't survey (D20). The
+  contract plan, bootstrapped earlier, has taken the free miners it wants (D23).
+- **Each tick** every free miner gets one trip (`MineAndSellGoal`); the trip ends when it is sold,
+  and the plan chooses the next one:
+  1. a miner that holds ore a market buys sells it first, where it fetches most after fuel (reason
+     `held_cargo`): ore left over from the contract, for one;
+  2. otherwise the best of `MiningPlanner.MiningTargets`: a surveyed ore first, one a usable survey
+     at an asteroid it can reach holds, sold where it fetches most (reason `surveyed`); then an ore a
+     market has in low supply (SCARCE or LIMITED, imported or exchanged, D22), mined at the asteroid
+     nearest that market whose traits yield it, and sold there (reason `low_supply`). Among either,
+     the most a single extraction is expected to fetch: the ore's share of the survey's deposits
+     (without a survey, one of the asteroid's ores) times its price. One miner per sell market and
+     ore. It logs `MiningStarted`.
+- **Drones:** when no miner was free and low-supply openings wait that a drone from the shipyard
+  could reach (its tank, from the shipyard's listing), it buys one drone per opening, up to
+  `Mining.MaxDrones` (default 20), within the credit reserve. Not while the contract plan mines: the
+  contract would take the drone, and the contract plan buys at most one (D23).
+- **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
+  miner's trip sells there, Pending otherwise, with the free miners that could reach it, for the
+  `ShipLeftIdle` rule. It is written only when it changes.
 
 ### Trading (`TradingAutomationService`, slice 6.5)
 
 - **A trader** is any ship with a cargo hold and a fuel tank that has no goal (or a blocked one), no
-  open assignment, and isn't in transit: after scouting, the command ship; after its contract, the
-  mining drone. The plan buys no ships (D16).
+  open assignment, and isn't in transit, and that the survey and mining plans, which go first, left
+  free. With the survey plan on, a ship that can survey never trades (D20), so the command ship no
+  longer does; a miner trades only when neither the contract nor the mining plan has work for it.
 - **A trip** (`TradeRoutePlanner`) is one good, bought at one market and sold at another:
   - its profit is what the sell market pays minus what the buy market charges, times the units,
     minus the fuel for the whole trip: from where the ship is to the buy market, then on to the sell
     market;
   - the units are one purchase: as many as the free hold, both markets' trade volumes and the
-    credits allow (cargo may use the credit reserve, D17; the trip's fuel is kept back);
+    credits allow (cargo may use the credit reserve, D17; the trip's fuel and
+    `Trade.FuelReserveCredits`, 5,000, are kept back, D24: below them only fuel is bought);
   - the fuel is CRUISE, the distance rounded, at least 1 per flight, paid in whole FUEL units of 100
     at the market each flight ends at, at that market's price (where it sells none, the system's
     average). A flight longer than the tank holds refuels at markets that sell fuel on the way, the
@@ -346,9 +406,18 @@ Markets are not scouted again.
     anything; cargo no reachable market buys, or that doesn't pay for the fuel, stays aboard;
   - otherwise the best route goes first, to the trader it is best for, and a route one trader holds
     is not offered to another (D18). It logs `TradeStarted`.
+- **Cargo ships** (D21, which replaced D16): when every trader has a trip, the plan buys the next
+  ship in `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`): the Nth
+  while the fleet has fewer than N cargo ships (a hold and a tank, nothing to mine, siphon or survey
+  with), at the shipyard that sells it for the least, and only when the new ship would have a
+  lucrative route from the shipyard with the credits left after the purchase. `ShipPurchaseService`
+  keeps the credit reserve. One purchase a pass.
 - **The state** (`plan_states`, `TradingAutomation`) lists the held routes (Assigned) and up to 20
   lucrative routes no trader holds (Pending), each with the free traders that could have taken it,
   for the `ShipLeftIdle` rule. It is written only when it changes.
+- **After each purchase and sale** the trip fetches the market again while the ship is still docked
+  there (D25, `MarketRefresher`), so the next decisions see what the trade did to the prices. A
+  failed fetch is logged at Warning and leaves the trade as it is.
 - **Prices change** while a trip is under way. A ship can't change course in flight, so the trip
   reconsiders where it lands, with the prices its arrival has just fetched: see
   `TradeBetweenMarkets` under [Executors](#executors).
@@ -365,26 +434,25 @@ Markets are not scouted again.
   4. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus
   `FleetExpansion.MinCreditReserve`.
-- **Buying order within a tick:** contract, probe, mining. Trading buys nothing (D16). There is no
-  other priority.
+- **Buying order within a tick:** contract, probe, mining, trading. There is no other priority.
 
 ### Which ships a plan considers free
 
 | Plan | Claims a ship with | Treats a ship as free when |
 |---|---|---|
 | Scout | an assignment and a goal | — (picks one ship, once) |
-| Contract | an assignment only | it has no active assignment and is mining-capable; goals are ignored |
+| Contract | an assignment only | it is a miner (not a surveyor while the survey plan is on), not in transit, and has no assignment and no goal (or a finished or blocked one) |
 | ProbeDeployment | a `DeployProbeGoal` | it is a probe, not in transit, and not parked at a deployed waypoint |
-| Mining | a `MineAndSellGoal` | it is mining-capable, not in transit, and has no goal (goals never count as finished, B16) |
-| Trading | a `TradeBetweenMarketsGoal` | it has a cargo hold and a fuel tank, is not in transit, and has no assignment and no goal (or a blocked one) |
+| Survey | a `SurveyWaypointGoal` | it has a surveyor mount, is not in transit, and has no assignment and no goal (or a finished or blocked one) |
+| Mining | a `MineAndSellGoal` | it is a miner, not in transit, and has no assignment and no goal (or a finished or blocked one) |
+| Trading | a `TradeBetweenMarketsGoal` | it has a cargo hold and a fuel tank, isn't a surveyor while the survey plan is on, is not in transit, and has no assignment and no goal (or a finished or blocked one) |
 
 **Consequences:**
-- A drone that the contract plan just bought has no goal yet, so mining can also give it one
-  (trading leaves a ship with an assignment alone). The ship then gets both a goal step and contract
-  commands in the same tick.
-- After scouting, the command ship has no goal and no assignment. It is mining-capable, so
-  mining, trading or a new contract plan can use it. With the trading plan on, it is the first ship
-  to trade.
+- After scouting, the command ship has no goal and no assignment. With the survey plan on it
+  surveys (D20); with it off it is a miner, so the contract or the mining plan takes it, and trading
+  only when neither has work for it.
+- A drone that finishes a trip is free for a moment: the contract plan, bootstrapped first, takes it
+  while the contract needs units (D23), and the mining plan otherwise.
 
 ---
 
@@ -400,18 +468,17 @@ Markets are not scouted again.
   Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
   (`runaway`).
 - **Set by:**
-  - the scout, mining and trading plans;
+  - the scout, survey, mining and trading plans;
   - `DeployProbeHandler`;
-  - `MineAndSellGoalExecutor`, which assigns survey goals and can overwrite another ship's goal;
-  - `TradeBetweenMarketsGoalExecutor`, which records its purchase, and a sale it moves, in its own
+  - `MineAndSellGoalExecutor`, which records that its trip turns to selling, and
+    `TradeBetweenMarketsGoalExecutor`, which records its purchase, and a sale it moves, in their own
     goal (the goal id stays, so the arrival still matches).
 - **Cleared by:**
-  - `DeployProbeGoalExecutor` when it finishes, and `TradeBetweenMarketsGoalExecutor` when the trip
-    is sold or dropped;
-  - the scout plan, when its last stop is done;
-  - mining, for opportunities that have gone.
-
-  Survey goals are never cleared.
+  - `DeployProbeGoalExecutor` when it finishes, `TradeBetweenMarketsGoalExecutor` when the trip is
+    sold or dropped, `MineAndSellGoalExecutor` when the trip is sold or can't go on, and
+    `SurveyWaypointGoalExecutor` after each survey (slice 6.4; B16's survey part, fixed: survey goals
+    were never cleared);
+  - the scout plan, when its last stop is done.
 
 ### `ShipGoalExecutorService`
 
@@ -455,9 +522,9 @@ step does the work.
 |---|---|
 | `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
 | `DeployProbe` | Docked at the target: set DRIFT, advance the probe plan, clear the goal, complete. In orbit at the target: dock. Elsewhere: DRIFT if it has no fuel tank, then [cmd] navigate. |
-| `MineAndSell` | **No target good aboard, no usable survey:** assign a survey goal to a survey-capable ship, possibly itself.<br>**With a survey:** [cmd] `MineResourceVolumeCommand`.<br>**Holding the good:** [cmd] navigate to the sell market, dock, then [API] sell and publish `ShipCargoSoldEvent`. It never completes. |
+| `MineAndSell` | One trip (slice 6.4). **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `TradeBetweenMarkets` | [cmd] navigate towards the buy market, by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative: [API] buy and publish `CargoPurchasedEvent`, and record the purchase in the goal; otherwise clear the goal (`TradeDropped`), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
-| `SurveyWaypoint` | [cmd] navigate to the target. Docked there: orbit. In orbit: [API] survey, store the surveys in `cached_surveys`, complete. The goal is never cleared. |
+| `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `Idle` | Unreachable. |
 
 ### Commands
@@ -474,8 +541,19 @@ step does the work.
   `ShipNavigationCompletedEvent`.
 - **Orbit, Navigate, Dock and Refuel** are DI sub-commands, not bus messages. Refuel publishes
   `ShipRefueledEvent`.
-- **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`** dead-reckon arrival
-  themselves and navigate without a goal id (B17).
+- **`MineResourceVolumeCommand`** extracts once per call at an ASTEROID, ASTEROID_FIELD or
+  ENGINEERED_ASTEROID waypoint (B48, fixed: only the last two were accepted, so 56 of X1-DC53's 57
+  asteroids were refused), with the best usable survey of the waypoint for its ore
+  (`SurveySelection`: the largest share of the deposits, then the larger deposit, then the later
+  expiry), or without one. It counts the extraction (`spacetraders_extractions_total`, with or
+  without a survey), the survey's use, and logs `Extracted`. A survey the API refuses (4224
+  exhausted, 4221 expired, 4220 not verified, mapped by the API adapter to `SurveyRefusedException`)
+  is dropped and journaled as `SurveyEnded`, and nothing is extracted that step (B49, fixed: the
+  survey would have been tried again on every step). Other goods are jettisoned.
+- **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`**, used by the tick's contract
+  work, dead-reckon arrival themselves and navigate without a goal id (B17). The mining and survey
+  goals navigate with `NavigateToWaypointCommand`, which carries the goal id, so their arrivals wake
+  them.
 - **`PatchShipNavCommand`** changes the flight mode.
 - **Selling and buying** are direct API calls from the executors, which publish what they did.
 - **Credits:** whatever changes the credits stores them in the cached agent and publishes
@@ -506,7 +584,7 @@ wait for a cooldown simply run again on a later tick.
 |---|---|---|
 | `ShipInTransitEvent` | Navigate, startup recovery | Dashboard notification; `activity_logs` row |
 | `ShipArrivedEvent` | `ShipEventScheduler` | `ShipArrivedEventHandler` → `NavigateToWaypointArrivedCommand` |
-| `MarketDataRefreshedEvent` | Arrival at a market; the market watch | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed); the mining plan's `Handle` method isn't discovered (see below) |
+| `MarketDataRefreshedEvent` | Arrival at a market; the market watch; a refresh after a trade (D25) | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
 | `ShipCargoSoldEvent` | Mining and trade executors | `LedgerEntryHandler` (TradeSell); `activity_logs` row |
@@ -538,9 +616,9 @@ happens instead (B7, fixed).
 ### Wolverine details
 
 - **Discovery:** Wolverine finds handlers by convention (class names ending in `Handler` or
-  `Consumer`). The `Handle` methods on `ContractPlanService` and `MiningAutomationService` are
-  therefore not wired; `TradingAutomationService` has none since slice 6.5. `DiValidationTests` checks this, because a
-  plan that is switched off could otherwise still run from an event.
+  `Consumer`). The `Handle` methods on `ContractPlanService` are therefore not wired; the trading,
+  survey and mining plans have none (since slices 6.5 and 6.4). `DiValidationTests` checks this,
+  because a plan that is switched off could otherwise still run from an event.
 - **`InvokeAsync`** runs a command inline, and its exceptions reach the caller. Executors and
   the tick use it.
 - **`PublishAsync`** goes through in-memory local queues. All events use it, as do
@@ -609,14 +687,14 @@ other app (D8):
 | `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship. Created with `fillfactor=50` and `autovacuum_vacuum_threshold=10`, so its frequent updates stay in place and VACUUM runs (B32) |
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
 | `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
-| `cached_waypoints`, `cached_systems` | Systems where ships are | Sync (insert only); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
+| `cached_waypoints`, `cached_systems` | Systems where ships are, with each waypoint's traits and modifiers (B34, fixed) | Sync (inserts, and fills in missing traits); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
 | `agent_settings` | Settings | Seed, `PUT /settings` | bounded: one row per setting |
 | `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | bounded: one row per ship |
-| `plan_states` | Plan JSON per plan type | All five plans | bounded: one row per plan |
+| `plan_states` | Plan JSON per plan type | All six plans | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
 | `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments | 30 days |
-| `cached_surveys` | Surveys | Survey executor | bounded: expired rows removed when new surveys are saved |
+| `cached_surveys` | Surveys, with who took them, when, and how many extractions used them (`Extractions`, slice 6.4) | `SurveyKeeper`: the survey executor stores, extractions count, refusals remove | bounded: the survey plan removes expired surveys on every pass (journaling each), and an extraction refusal removes its survey |
 | `leader_leases` | Leader lease | Leader election | bounded: one row |
 | `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
 | `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
@@ -655,13 +733,15 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | Setting (default) | Effect |
 |---|---|
 | `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
-| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9) |
+| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Trading.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20) |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
 | `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `Trade.MinProfitPerUnit` (200) | Credits per unit, after the fuel for the whole trip, a trade trip must earn to be started, and to be carried on when prices change (D14); 0 means any profit, but see D15 |
+| `Trade.FuelReserveCredits` (5000) | Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24) |
+| `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`) | The cargo ships the trading plan buys, in order: the Nth while the fleet has fewer than N cargo ships (D21); empty buys none |
 | `Market.RefreshMinutes` (5) | Minutes between refreshes of a market where one of our ships is (the market watch); 0 switches it off |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
 | `Alerts.WebhookUrl` (empty) | Where alerts are posted, as `{"text": …}`. Only the token-reset alert can fire. |
@@ -839,6 +919,10 @@ The seven pages in `src/Future` are not routed.
   | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it |
   | `TradeRerouted` | Trade executor, at the sell market | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellPrice`, `SellWaypoint`, `NewSellPrice`, `FuelCost`, `Reason` |
   | `TradeDropped` | Trade executor | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellWaypoint`, `Reason`: `not_lucrative` (with `Units`, `BuyPrice`, `SellPrice`, `ExpectedProfit`, `MinProfitPerUnit`), `not_possible` or `not_bought_here` |
+  | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
+  | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
+  | `Extracted` | `MineResourceVolumeCommand`, per extraction | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for, `Signature` of the survey (empty without one) |
+  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `contract`); `ContractId` for the contract |
   | `PlanStarted`, `PlanCompleted` | Scout, contract and probe plans | `Plan`, and the plan's ship, contract or system |
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`) | `Plan`, `Reason` |
   | `ShipIdle` | `ShipStateJournal`, from the 10 s sample: `idle_at_start`, `new_ship`, `goal_ended` (with `PreviousGoal`) | `ShipSymbol`, `Reason` |
@@ -849,9 +933,10 @@ The seven pages in `src/Future` are not routed.
   | `AnomalyRaised` | The health monitor (Warning) and the size guard | `Rule`, `Subject`; the monitor's also `Details` |
   | `AnomalyCleared` | The health monitor and the size guard | `Rule`, `Subject`; the monitor's also `ActiveMinutes` |
 
-  Mining has no plan to start or complete: it is an opportunity queue. Trading journals each trip
-  instead: `TradeStarted`, then `CargoBought` and `CargoSold`, with `TradeRerouted` or `TradeDropped`
-  when prices change.
+  Mining and trading have no plan to start or complete. Mining journals each trip (`MiningStarted`,
+  `Extracted` per extraction, `CargoSold`), and each survey's life (`Surveyed`, then `SurveyEnded`);
+  trading journals each trip: `TradeStarted`, then `CargoBought` and `CargoSold`, with
+  `TradeRerouted` or `TradeDropped` when prices change.
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
   `PrometheusAutomationMetrics` defines them all at startup, so a scrape lists every one, also
   before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the
@@ -885,7 +970,11 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_goal_steps_total` | `kind` | Goal steps run | Per step |
   | `spacetraders_goal_breaker_trips_total` | `ship` | Goals the circuit breaker blocked | Per trip |
   | `spacetraders_extracted_units_total` | `ship`, `good` | Units extracted: each extraction's yield (`MineResourceVolumeHandler`) | Per extraction |
-  | `spacetraders_jettisoned_units_total` | `ship`, `good` | Units jettisoned: extracted goods the contract doesn't need | Per jettison |
+  | `spacetraders_jettisoned_units_total` | `ship`, `good` | Units jettisoned: extracted goods the trip doesn't mine for | Per jettison |
+  | `spacetraders_extractions_total` | `ship`, `surveyed` | Extractions, with a survey (`true`) or without one (`false`): many without one while a surveyor works means too few surveys (slice 6.4) | Per extraction |
+  | `spacetraders_surveys_taken_total` | `waypoint`, `size` | Surveys our ships took | Per survey |
+  | `spacetraders_surveys_ended_total` | `waypoint`, `reason`, `used` | Surveys that ended: `expired`, `exhausted` or `not_verified`; `used` when any extraction used it. Many that expire unused mean too many surveys | Per survey |
+  | `spacetraders_surveys_active` | `waypoint`, `used` | Usable surveys in the cache, used yet or not | Every 10 s |
   | `spacetraders_anomaly_active` | `rule`, `subject` | 1 while an anomaly is active, then 0: the health rules (section 12) and the size guard's limits | Every minute (health rules), every 5 minutes (size guard) |
   | `spacetraders_db_size_bytes` | | `pg_database_size` | Every 5 minutes (size guard) |
   | `spacetraders_server_next_reset_timestamp_seconds` | | When the server resets next (Unix time), from `GET /` | At agent bootstrap |
@@ -944,12 +1033,14 @@ bot's own state: at start, then every minute.
 treats as free (section 3):
 
 - scout: the active plan's next stop, for the plan's ship;
-- contract: the active plan's contract, for the plan's ship; while the plan waits for a ship or
-  budget, any mining-capable ship;
+- contract: the active plan's contract, for the plan's ship and, while units remain, for any other
+  miner (D23); while the plan waits for a ship or budget, any miner;
+- survey: a target to survey, for a ship that can survey (D20);
 - probe deployment: a target without a probe while the plan isn't waiting for credits (D4), for a
   probe not parked at a deployed waypoint. A probe is what the plan recognises, or a ship whose
   cached type is `SATELLITE`: the starting probe, which the plan misses (B25);
-- mining: an opportunity without a ship (Pending), for a ship that plan can use;
+- mining: a low-supply opening without a ship (Pending), for a miner the plan lists as able to reach
+  its asteroid (slice 6.4). A drone whose tank can't reach the open ones is idle by design;
 - trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to take it:
   one it can fly, and that is lucrative from where the ship is (slice 6.5). A drone whose tank can't
   reach the open routes is idle by design.

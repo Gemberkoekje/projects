@@ -48,6 +48,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -119,6 +121,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -214,6 +218,8 @@ public sealed class ContractPlanServiceTests
             shipPurchases,
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -272,6 +278,8 @@ public sealed class ContractPlanServiceTests
             shipPurchases,
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             log.For<ContractPlanService>());
 
         for (var tick = 0; tick < 12; tick++)
@@ -328,6 +336,8 @@ public sealed class ContractPlanServiceTests
             shipPurchases,
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -380,6 +390,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -473,6 +485,8 @@ public sealed class ContractPlanServiceTests
             shipPurchases,
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -569,6 +583,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -644,6 +660,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -769,6 +787,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             agents,
             bus,
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             log.For<ContractPlanService>());
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -835,6 +855,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -889,7 +911,7 @@ public sealed class ContractPlanServiceTests
                 new("COPPER_ORE", "X1-AB-MKT", 40, 40),
             })));
 
-        assignments.FindAsync("SHIP-MINER-2", Arg.Any<CancellationToken>()).Returns(new ShipAssignmentDto(
+        var assignment = new ShipAssignmentDto(
             ShipSymbol: "SHIP-MINER-2",
             AssignmentType: "Contract",
             OriginWaypoint: "X1-AB-AST",
@@ -901,7 +923,9 @@ public sealed class ContractPlanServiceTests
             CompletedAt: null,
             PurchaseUnitPrice: 0,
             RequiredUnits: 40,
-            SupplyCompleted: false));
+            SupplyCompleted: false);
+        assignments.FindAsync("SHIP-MINER-2", Arg.Any<CancellationToken>()).Returns(assignment);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([assignment]);
 
         var sut = new ContractPlanService(
             plans,
@@ -914,6 +938,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1017,7 +1043,7 @@ public sealed class ContractPlanServiceTests
                 new("IRON_ORE", "X1-AB-MKT", 80, 50),
             })));
 
-        assignments.FindAsync("SHIP-MINER-3", Arg.Any<CancellationToken>()).Returns(new ShipAssignmentDto(
+        var assignment = new ShipAssignmentDto(
             ShipSymbol: "SHIP-MINER-3",
             AssignmentType: "Contract",
             OriginWaypoint: "X1-AB-AST",
@@ -1029,7 +1055,9 @@ public sealed class ContractPlanServiceTests
             CompletedAt: null,
             PurchaseUnitPrice: 0,
             RequiredUnits: 80,
-            SupplyCompleted: false));
+            SupplyCompleted: false);
+        assignments.FindAsync("SHIP-MINER-3", Arg.Any<CancellationToken>()).Returns(assignment);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([assignment]);
 
         var sut = new ContractPlanService(
             plans,
@@ -1042,6 +1070,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1092,7 +1122,7 @@ public sealed class ContractPlanServiceTests
                 new("COPPER_ORE", "X1-AB-MKT", 30, 30),
             })));
 
-        assignments.FindAsync("SHIP-MINER-4", Arg.Any<CancellationToken>()).Returns(new ShipAssignmentDto(
+        var assignment = new ShipAssignmentDto(
             ShipSymbol: "SHIP-MINER-4",
             AssignmentType: "Contract",
             OriginWaypoint: "X1-AB-AST",
@@ -1104,7 +1134,9 @@ public sealed class ContractPlanServiceTests
             CompletedAt: null,
             PurchaseUnitPrice: 0,
             RequiredUnits: 5,
-            SupplyCompleted: false));
+            SupplyCompleted: false);
+        assignments.FindAsync("SHIP-MINER-4", Arg.Any<CancellationToken>()).Returns(assignment);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([assignment]);
 
         var sut = new ContractPlanService(
             plans,
@@ -1117,6 +1149,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1171,6 +1205,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1225,6 +1261,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(evnt, CancellationToken.None);
@@ -1269,6 +1307,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(new DeliverableObtainedEvent("SHIP-MINER-1", "IRON_ORE", 4), CancellationToken.None);
@@ -1339,6 +1379,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1401,6 +1443,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1482,6 +1526,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1532,7 +1578,7 @@ public sealed class ContractPlanServiceTests
             DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
             TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
             DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("IRON_ORE", "X1-AB-MKT", 42, unitsFulfilled) })));
-        assignments.FindAsync("SHIP-MINER-9", Arg.Any<CancellationToken>()).Returns(new ShipAssignmentDto(
+        var assignment = new ShipAssignmentDto(
             ShipSymbol: "SHIP-MINER-9",
             AssignmentType: "Contract",
             OriginWaypoint: "X1-AB-AST",
@@ -1544,7 +1590,9 @@ public sealed class ContractPlanServiceTests
             CompletedAt: null,
             PurchaseUnitPrice: 0,
             RequiredUnits: assignmentRequiredUnits,
-            SupplyCompleted: false));
+            SupplyCompleted: false);
+        assignments.FindAsync("SHIP-MINER-9", Arg.Any<CancellationToken>()).Returns(assignment);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([assignment]);
         var sut = new ContractPlanService(
             plans,
             contracts,
@@ -1556,6 +1604,8 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IShipPurchaseService>(),
             Substitute.For<IAgentRepository>(),
             Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
             NullLogger<ContractPlanService>.Instance);
         return (sut, plans, assignments);
     }
