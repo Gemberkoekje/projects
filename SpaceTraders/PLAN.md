@@ -94,8 +94,9 @@
 - Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D51) is split in three: 6.10a (visibility and
   the role board's rates) is merged and deployed (projects#136, gembernodes#34); 6.10b (the order ships are bought in, a designated
   surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged and deployed
-  (projects#137, gembernodes#35 and #36: the cluster runs `04b6b18`), and its turn fix projects#138 is merged, not yet deployed;
-  6.10c (drones drifting to minerals out of fuel range) is built.
+  (projects#137, its turn fix projects#138, gembernodes#35, #36 and #37); 6.10c (drones drifting to minerals out of fuel range)
+  is merged and deployed (projects#139, gembernodes#37: the cluster runs `befe91f` since 12:13Z on 2026-10-03). Its first
+  drift (SPECTER-4 to B7, 12:35Z) found B54.
 
 ## Known issues
 
@@ -160,6 +161,7 @@ the misbehaviour.
 | B51 | **The API can't read the surveys the bot sends back** (found on the cluster on 2026-10-02, with the first surveys, right after the D26 deploy). Every extraction with a survey was answered 422 "invalid payload": the bot sent the survey's expiry as .NET writes a `DateTimeOffset` (`2026-10-02T15:44:51.937+00:00`), not as the API gave it out (`…51.937Z`). The refusal isn't one of B49's codes, so the step failed, Wolverine tried it 4 more times, and the next tick did it all again: 364 failed calls in the first 12 minutes, and SPECTER-3 extracted nothing. | `SpaceTradersApiClient.cs` (`ExtractWithSurveyAsync`), `SpaceTradersPortAdapter.cs` | 6.4 (fixed) |
 | B52 | **After a restart the dashboard could read 0 credits** (found in a health check on 2026-10-03, on the cluster). prometheus-net publishes a gauge without labels at 0 as soon as it is defined, and the bot sets the credits only once the startup chain knows the agent. When Prometheus scraped the new pod in between, it stored the 0: after the deploy of 2026-10-03 the credits read 0 from 07:27:51Z to 07:28:36Z, and with the old pod gone at 07:28:30 the dashboard's "Value gained per hour" fell from 56,896 to −517,672, to show the same amount as a gain an hour later. After the deploy at 15:45Z the day before, the credits and the database size both read 0: −153,292, then +228,819 at 16:45:30Z. Three of the run's 16 starts stored a 0 (15:34Z and 15:45Z on 2026-10-02, 07:27Z on 2026-10-03); whether one does depends on when the first scrape comes. | `PrometheusAutomationMetrics.cs` (`spacetraders_agent_credits`, `spacetraders_db_size_bytes`, `spacetraders_server_next_reset_timestamp_seconds`), `PrometheusMetricsService.cs` (the first sample) | health check (done) |
 | B53 | **Every flight logs about a dozen lines** (found in the same health check). Handler after handler said at Information that the ship had left or arrived: the navigation command, the orbit, "in transit", the scheduler's wake-up, "arrived; dispatching", "arrived at", the market and shipyard refresh, the dock, "docked; navigation complete", "navigation complete; resuming goal" and the goal's outcome, about 12 lines a hop. With twelve ships, flights were about 80% of the bot's 2,850 lines an hour (about 6,000 a ship a day), and the log budget of 50,000 a day (2.5) would have been passed that night on normal running. Now a flight logs one line when it leaves and one when it lands, besides its refuel. Replaying the day's logs without the others gives about 2,300 lines a ship a day, as the soak test measured for a mining drone (1.9); the budget itself becomes a number per ship in gembernodes. | `NavigateToWaypointCommand.cs`, `SubCommands/` (orbit, dock, navigate), `ShipArrivedEventHandler.cs`, `ShipNavigationCompletedHandler.cs`, `ShipEventScheduler.cs`; Loki, 2026-10-03 00:27–07:27Z (`--group`) | health check (done) |
+| B54 | **The survey plan surveys where no miner will mine** (found in 6.10c's first watch, on the cluster). An asteroid counted for the surveys when one of the miners could reach it, one way. A ship in transit counts as at its destination, so when SPECTER-4 set off at 12:35:20Z on 2026-10-03 on its drift of 2 hours 25 to B7 (D45), the survey plan at once wanted surveys at B14 for B7's five ores, and at B37 for B7's gold, platinum and silver: B37 is 68 from B7, 136 there and back, more than a drone's tank, so no drone can mine it for B7. The command ship left its trading for B37 (12:35:51Z) and took two surveys there at 12:40:11Z that no drone could use, expiring 13:13Z and 13:26Z; B14's would have expired long before the drone got there. Before 6.10c no miner was ever at a far market, so reaching was enough. | `MiningPlanner.cs` (`SurveyTargets`), `SurveyPlanService.cs`; Loki, 12:35–12:41Z (`ShipSymbol="SPECTER-1"`); the survey plan's state at 12:35:49Z | 6.10c follow-up (fixed: an asteroid counts where a miner could mine it for the market, the mining plan's trip in CRUISE; a drone still drifting counts once it is there) |
 
 ### Decisions (2026-10-01)
 
@@ -2040,6 +2042,14 @@ How credits are split stays your call; Claude only fixes deviations from intende
         way. That is the rule as decided; the coverage keepers keep one drone at each far mineral.
       - **Surveys before the drone gets there:** a ship in transit counts as at its destination, so while a drone drifts to
         B7 the survey plan may survey B14 for it, if the surveyor reaches B14 in CRUISE; those surveys can expire first.
+        It happened at the first drift, worse than noted: the command ship also surveyed B37, where no drone can mine.
+        That is B54, fixed in the follow-up below.
+    - **Follow-up, B54** (2026-10-03, branch `claude/spacetraders-b54`): the survey plan counts an asteroid where a miner
+      could mine it for the market, as the mining plan reckons the trip (in CRUISE, there and on to the market with the
+      fuel left), not where a miner merely reaches it; and a drone still drifting to a far market counts once it is there.
+      To understand it, start with `SurveyTargets` in `Mining/MiningPlanner.cs`, then `MinersAsync` in
+      `Automation/SurveyPlanService.cs`. Tests: `MiningPlannerTests` and `SurveyPlanServiceTests` (one new each). The
+      surveys already taken at B37 expire by themselves (13:26Z).
       - **The contract plan takes any free miner** without checking that it can reach the contract's asteroid in CRUISE,
         and the contract's commands fly with the fallback (B47). Under D1 (one contract per reset) and D23 (no drone is
         bought while the contract mines) no drone has drifted while a contract wants ore; a slice that takes the next

@@ -100,6 +100,20 @@ public sealed class MiningPlannerTests
     }
 
     [Fact]
+    public void AnAsteroidIsSurveyed_OnlyWhereAMinerCouldMineForTheMarket()
+    {
+        // B54, seen on the cluster on 2026-10-03 at the first drift (slice 6.10c): with a drone bound for B7, the survey plan
+        // sent the command ship to survey B37 for B7's gold, 68 from B7, 136 there and back: more than a drone's tank, so no
+        // drone mines there. A survey is for a miner's trip: to the asteroid and on to the market, in CRUISE, with the fuel
+        // left. Here B7 buys iron too, which near B7 only B13, 48 away, yields: a drone at B7 reaches it, but can't bring
+        // the iron back.
+        var targets = MiningPlanner.SurveyTargets(new MiningContext(MapWithIronAtB7(), [], 129_357, Now), [], [Drone(waypoint: B7)], stock: 2);
+
+        targets.Should().Contain(target => target.Ore == "GOLD_ORE" && target.AsteroidSymbol == B14 && target.BuyerSymbol == B7);
+        targets.Should().NotContain(target => target.Ore == "IRON_ORE" && target.BuyerSymbol == B7);
+    }
+
+    [Fact]
     public void WithoutMiners_EveryAsteroidCounts()
     {
         var targets = MiningPlanner.SurveyTargets(Context(), [], [], stock: 2);

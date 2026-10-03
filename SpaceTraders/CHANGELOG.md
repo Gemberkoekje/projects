@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B54)
+- The survey plan surveys an asteroid for a market only where a miner could mine it for that market: a trip in CRUISE from where the miner is, to the asteroid and on to the market with the fuel left, as the mining plan reckons it. A drone still drifting to a far market (D45) counts once it is there. At the first drift on the cluster, the command ship left its trading to survey B37, which no drone can mine for B7 (136 there and back on an 80-unit tank), and would have surveyed B14 hours before the drone got there.
+
+### Docs – Changed (2026-10-03, B54)
+- `PLAN.md`: B54, and 6.10c merged and deployed. `docs/HOW_IT_WORKS.md`: where the survey plan surveys.
+
 ### Code – Added (2026-10-03, slice 6.10c: D45)
 - Drones for minerals out of fuel range (D45), as asked on 2026-10-03: "I'd like a way to add mining/siphoning drones for the minerals outside of fuel range, e.g. by having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal behavior." A market out of a drone's CRUISE reach that sells fuel is a far target, gathered at the asteroid (or gas giant) nearest it within a CRUISE round trip of it; it ranks after every reachable target of its supply level (D28), and among the ores no drone works on (D48) after those in reach. Its trip (`Drifting`) drifts to the market first, 1 fuel whatever the distance and about ten times slower, logging `DriftStarted`; from there it mines or siphons in CRUISE. New and free drones both take far targets: an ore only a far market is short of counts for "a drone per scarce mineral" (D48), and the role board keeps a drone gathering it. The board values a far trip with its drift. The fleet view says `drifting to … to mine …`.
 - A navigation can ask for a flight mode (`NavigateToWaypointCommand.FlightMode`, `FlightModeSubCommand`), set in orbit before it flies, with an API call only when the ship's mode differs: DRIFT for a drift, CRUISE for every flight of the mining, siphon, survey, spare-time and trade executors.
