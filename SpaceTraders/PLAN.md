@@ -1914,13 +1914,17 @@ How credits are split stays your call; Claude only fixes deviations from intende
         plan ran (a 502 pauses them for 3 minutes), the probe plan, which runs before the survey, mining, siphon and trading
         plans, waits a tick; a plan that fails before it says holds the purchases after it. The order says who may buy; the
         reserve stays the purchase's own check.
-      - **The turn** between drones and cargo ships counts the drones and cargo ships bought since the list's last cargo
-        ship: the ledger's `ShipPurchase` rows (read once a start) and the purchases of this process, which
-        `ShipPurchaseService` records at once, as the ledger's row comes a moment later and the siphon plan, later in the
-        same tick, would otherwise buy a second drone. A turn passes when the other kind has nothing to buy: a drone's
-        first trip wouldn't serve a market short of its mineral, or a miner is free; a new cargo ship would have no
-        lucrative route (judged with any credits, so a hauler that isn't affordable yet keeps its turn), or a trader has
-        no trip. Probes and surveyors don't take turns.
+      - **The turn** between drones and cargo ships goes to the kind not bought last: after the list's last cargo ship a
+        drone, then a cargo ship, and so on. It reads the ledger's `ShipPurchase` rows (once a start) and the purchases of
+        this process, which `ShipPurchaseService` records at once, as the ledger's row comes a moment later and the siphon
+        plan, later in the same tick, would otherwise buy a second drone. Any drone counts, the contract's and a scarce
+        mineral's too; a cargo ship is a type of the list or one of the game's freighters. A turn passes when the other
+        kind has nothing to buy: a drone's first trip wouldn't serve a market short of its mineral, or a miner is free; a
+        new cargo ship would have no lucrative route (judged with any credits, so a hauler that isn't affordable yet keeps
+        its turn), or a trader has no trip. A turn that passed isn't made up later. Probes and surveyors don't take
+        turns. (The design notes counted the purchases since the list's last cargo ship; a review found that an edited
+        list, or a lost ledger row, then left it the drones' turn for good, and that passed turns came back as a run of
+        one kind.)
       - **A cargo ship of the list is saved up for** whatever the routes (D43, "then save up for cargo ships"); it is
         bought, as before (D21), when every trader has a trip and the new ship would have a lucrative route with the
         credits left after it. Past the list, one more of its last type at a time, in turn with the drones: D21's "up to 2
@@ -1954,8 +1958,9 @@ How credits are split stays your call; Claude only fixes deviations from intende
         scarce mineral is already there (four mining drones for COPPER, SILICON and QUARTZ near the middle; seven siphon
         drones for three gases), so the next purchases are the surveyor, then the shuttle.
       - **A trader without a trip holds the list back:** a cargo ship is bought only when every trader has a trip (D21),
-        and nothing after it while it is to buy. Freed by the surveyor, the command ship trades: while it finds no lucrative
-        route, the shuttle waits, and so do probes and drones.
+        and nothing after it while it is to buy ("save up", D43). Freed by the surveyor, the command ship trades: while it
+        finds no lucrative route, the shuttle waits, and so do probes and drones. With the role board on, a drone that its
+        mining or siphon plan had no trip for, and that finds no route, counts as such a trader too.
       - **During a contract** the mining plan buys nothing (D23), so a drone for a scarce ore waits for the contract's end,
         while cargo ships and probes, after it in the order, may be bought.
       - **Coverage counts drones, not trips:** a drone kept for a mineral may be on another trip; the trip-level rule moves

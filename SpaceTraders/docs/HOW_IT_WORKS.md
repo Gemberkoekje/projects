@@ -756,12 +756,13 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   4. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
   5. `Probes`: a probe for every market (D29);
   6. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
-     in turn: a drone, a cargo ship, and so on. The turn counts the drones and cargo ships bought since
-     the list's last cargo ship (the ledger's `ShipPurchase` rows, which carry the type, and this process's
-     purchases, which the ledger gets a moment later): the drones' while no more drones than cargo ships
-     were bought. A turn passes when the other kind has nothing to buy: no drone's first trip would serve a
-     market short of its mineral, or a miner is free; no new cargo ship would have a lucrative route, or a
-     trader has no trip.
+     in turn: the kind not bought last, so after the list's last cargo ship a drone, then a cargo ship, and
+     so on (the ledger's `ShipPurchase` rows, which carry the type, and this process's purchases, which the
+     ledger gets a moment later). Any drone counts, the contract's and a scarce mineral's too; a cargo ship is
+     a type of the list or one of the game's freighters, so the ones bought before the list was changed
+     count. A turn passes when the other kind has nothing to buy: no drone's first trip would serve a market
+     short of its mineral, or a miner is free; no new cargo ship would have a lucrative route, or a trader has
+     no trip. A turn that passed isn't made up later.
 - **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
   pass what it would buy now, or nothing, and asks before it buys (`IPurchaseOrder.ReportAsync`). A plan
   may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,
