@@ -1,6 +1,7 @@
 using System.Globalization;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Roles;
 
 namespace SpaceTraders.Application.Health;
 
@@ -20,7 +21,8 @@ namespace SpaceTraders.Application.Health;
 ///   other miner (D23, slice 6.4); or, while the plan waits for a ship or budget, any miner;</item>
 ///   <item>probes: a market whose prices are due, with no probe at it or on its way and no other ship of
 ///   ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25);</item>
-///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4);</item>
+///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4), or, with the role board on, the ship
+///   with the survey role (slice 6.9);</item>
 ///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
 ///   to reach it (slice 6.4);</item>
 ///   <item>siphon: likewise, a gas in low supply without a ship, for a siphoner the plan lists as able to
@@ -92,6 +94,7 @@ public sealed class ShipLeftIdleRule(
         }
 
         var surveyOn = context.IsOn(AutomationPlan.Survey);
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken, surveyOn);
         if (context.IsOn(AutomationPlan.Contract) && await contractPlans.GetAsync(cancellationToken) is { } contract)
         {
             if (contract.Status == ContractMineralPlanStatus.Active)
@@ -101,14 +104,14 @@ public sealed class ShipLeftIdleRule(
                     AutomationPlan.Contract,
                     $"contract {contract.ContractId}",
                     ship => ship.Symbol.Equals(contract.ShipSymbol, StringComparison.OrdinalIgnoreCase)
-                        || (unitsLeft && FleetRoles.IsMiner(ship.Ship, surveyOn))));
+                        || (unitsLeft && board.MinesForContract(ship.Ship))));
             }
             else if (contract.Status == ContractMineralPlanStatus.PendingBudget)
             {
                 waiting.Add(new WaitingWork(
                     AutomationPlan.Contract,
                     $"contract {contract.ContractId} waits for a mining ship",
-                    ship => FleetRoles.IsMiner(ship.Ship, surveyOn)));
+                    ship => board.MinesForContract(ship.Ship)));
             }
         }
 
@@ -120,7 +123,7 @@ public sealed class ShipLeftIdleRule(
             waiting.Add(new WaitingWork(
                 AutomationPlan.Survey,
                 string.Create(CultureInfo.InvariantCulture, $"{toSurvey} targets to survey"),
-                ship => FleetRoles.IsSurveyor(ship.Ship, surveyOn)));
+                ship => board.IsSurveyor(ship.Ship)));
         }
 
         // The plan gives every free probe a due market that nothing watches (D29), so a probe can only be left

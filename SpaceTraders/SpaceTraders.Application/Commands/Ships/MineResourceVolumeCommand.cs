@@ -4,6 +4,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Domain.Enums;
 using Wolverine;
 
@@ -45,6 +46,7 @@ public sealed class MineResourceVolumeHandler(
     INavigateSubCommand navigate,
     IMessageBus bus,
     IAutomationMetrics metrics,
+    IGatheringRates rates,
     ILogger<MineResourceVolumeHandler> logger)
 {
     public Task<ShipCommandResult> Handle(MineResourceVolumeCommand command, CancellationToken cancellationToken)
@@ -238,6 +240,7 @@ public sealed class MineResourceVolumeHandler(
         await ships.UpdateCargoAsync(ship.Symbol, extractResult.Cargo, cancellationToken);
         metrics.Extracted(ship.Symbol, extractResult.YieldSymbol, extractResult.YieldUnits);
         metrics.Extraction(ship.Symbol, surveyed);
+        rates.Record(ship.Symbol, GatheringKind.Mining, extractResult.YieldUnits, extractResult.CooldownSeconds);
         if (surveyed)
         {
             await surveyKeeper.UsedAsync(survey.Signature, cancellationToken);

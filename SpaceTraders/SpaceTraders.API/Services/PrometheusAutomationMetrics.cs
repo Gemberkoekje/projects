@@ -51,6 +51,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipyardShipSupply;
     private readonly Gauge _supplyChain;
     private readonly Gauge _settingInfo;
+    private readonly Gauge _roleInfo;
+    private readonly Gauge _roleCreditsPerHour;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
@@ -67,6 +69,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
     private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Role, string Reason)> _roleLabels = new(StringComparer.Ordinal);
+    private readonly HashSet<(string Ship, string Role)> _roleEstimates = [];
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
     public PrometheusAutomationMetrics(CollectorRegistry registry)
@@ -260,6 +264,17 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "setting",
             "current",
             "description");
+        _roleInfo = metrics.CreateGauge(
+            "spacetraders_ship_role_info",
+            "One series per ship on the role board, always 1: its role (Survey, Mine, Siphon, Trade or None) and why it has it.",
+            "ship",
+            "role",
+            "reason");
+        _roleCreditsPerHour = metrics.CreateGauge(
+            "spacetraders_ship_role_credits_per_hour",
+            "What each role a ship could take would earn it per hour, by the role board's estimate: its best trip, after fuel, with the production chains' share.",
+            "ship",
+            "role");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -574,6 +589,47 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             {
                 _settingInfo.WithLabels(setting, labels.Value, labels.Description).Set(1);
                 _settingLabels[setting] = labels;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void Roles(IReadOnlyCollection<RoleMetricsSample> roles)
+    {
+        var current = roles
+            .GroupBy(sample => sample.Ship, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var estimates = current.Values
+            .SelectMany(sample => sample.CreditsPerHour.Select(estimate => (sample.Ship, Role: estimate.Key, estimate.Value)))
+            .ToList();
+
+        lock (_lock)
+        {
+            foreach (var (ship, labels) in _roleLabels
+                .Where(series => !current.TryGetValue(series.Key, out var sample) || (sample.Role, sample.Reason) != series.Value)
+                .ToList())
+            {
+                _roleInfo.RemoveLabelled(ship, labels.Role, labels.Reason);
+                _roleLabels.Remove(ship);
+            }
+
+            foreach (var sample in current.Values)
+            {
+                _roleInfo.WithLabels(sample.Ship, sample.Role, sample.Reason).Set(1);
+                _roleLabels[sample.Ship] = (sample.Role, sample.Reason);
+            }
+
+            var now = estimates.Select(estimate => (estimate.Ship, estimate.Role)).ToHashSet();
+            foreach (var gone in _roleEstimates.Where(series => !now.Contains(series)).ToList())
+            {
+                _roleCreditsPerHour.RemoveLabelled(gone.Ship, gone.Role);
+                _roleEstimates.Remove(gone);
+            }
+
+            foreach (var (ship, role, value) in estimates)
+            {
+                _roleCreditsPerHour.WithLabels(ship, role).Set(value);
+                _roleEstimates.Add((ship, role));
             }
         }
     }

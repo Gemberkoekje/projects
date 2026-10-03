@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
@@ -49,6 +50,7 @@ public sealed class MiningAutomationService(
     ISettingsRepository settings,
     IPlanRepository plans,
     IShipPurchaseService shipPurchases,
+    IRoleAdvisor roles,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
@@ -60,7 +62,7 @@ public sealed class MiningAutomationService(
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
-        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -79,7 +81,7 @@ public sealed class MiningAutomationService(
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
             }
-            else if (FleetRoles.IsMiner(ship, surveyOn) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
+            else if (board.IsMiner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
                 free.Add(ship);
             }
@@ -88,7 +90,7 @@ public sealed class MiningAutomationService(
         var freeAtStart = free.Count > 0;
         var opportunities = new List<MiningAutomationOpportunityState>();
         foreach (var system in fleet
-            .Where(ship => FleetRoles.IsMiner(ship, surveyOn) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .Where(ship => board.IsMiner(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
@@ -127,7 +129,7 @@ public sealed class MiningAutomationService(
 
         if (!freeAtStart && !await ContractTakesMinersAsync(cancellationToken))
         {
-            await BuyDroneAsync(fleet, surveyOn, heldKeys, cancellationToken);
+            await BuyDroneAsync(fleet, board, heldKeys, cancellationToken);
         }
 
         await SaveStateAsync(opportunities, cancellationToken);
@@ -224,7 +226,7 @@ public sealed class MiningAutomationService(
     /// </summary>
     private async Task BuyDroneAsync(
         IReadOnlyList<ShipModel> fleet,
-        bool surveyOn,
+        FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
         CancellationToken cancellationToken)
     {
@@ -243,7 +245,7 @@ public sealed class MiningAutomationService(
 
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
         foreach (var systemSymbol in fleet
-            .Where(ship => FleetRoles.IsMiner(ship, surveyOn) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .Where(ship => board.IsMiner(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .Select(ship => ship.SystemSymbol!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.Ordinal))
@@ -270,7 +272,8 @@ public sealed class MiningAutomationService(
                 "CRUISE",
                 forSale.FuelCapacity,
                 forSale.FuelCapacity,
-                CargoCapacity: forSale.CargoCapacity);
+                CargoCapacity: forSale.CargoCapacity,
+                ShipType: MiningDroneShipType);
             var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys);
             if (targets.Count == 0 || !targets[0].LowSupply)
             {
@@ -278,6 +281,16 @@ public sealed class MiningAutomationService(
                     "Mining plan: no drone bought in {SystemSymbol}: its first trip would not serve a market short of its ore ({Trip}).",
                     systemSymbol,
                     targets.Count == 0 ? "nothing it can reach" : $"{targets[0].Ore} for {targets[0].SellWaypointSymbol}, {targets[0].Supply}");
+                continue;
+            }
+
+            // With the role board on (slice 6.9), a drone that would earn more trading would trade, and the next pass would
+            // buy another for the same opening.
+            if (board.RolesOn && !await roles.WouldTakeAsync(newDrone, FleetRole.Mine, cancellationToken))
+            {
+                logger.LogDebug(
+                    "Mining plan: no drone bought in {SystemSymbol}: the role board would have it trade, which would pay it more.",
+                    systemSymbol);
                 continue;
             }
 

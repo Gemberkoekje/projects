@@ -8,6 +8,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
@@ -21,6 +22,7 @@ public sealed class MineResourceVolumeHandlerTests
     private readonly INavigateSubCommand _navigate = Substitute.For<INavigateSubCommand>();
     private readonly Wolverine.IMessageBus _bus = Substitute.For<Wolverine.IMessageBus>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly GatheringRates _rates = new();
     private readonly LogRecorder _log = new();
 
     public MineResourceVolumeHandlerTests()
@@ -176,6 +178,7 @@ public sealed class MineResourceVolumeHandlerTests
             _navigate,
             _bus,
             _metrics,
+            _rates,
             _log.For<MineResourceVolumeHandler>());
 
     private static ShipModel AtAsteroid(string symbol)

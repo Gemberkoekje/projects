@@ -4,6 +4,7 @@ using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -22,7 +23,8 @@ public interface ISurveyPlanService
 }
 
 /// <summary>
-/// The survey plan (PLAN.md slice 6.4). Every ship that can survey surveys before anything else (D20):
+/// The survey plan (PLAN.md slice 6.4). Every ship that can survey surveys before anything else (D20); with the role
+/// board on (slice 6.9), the ships it gives the survey role (<see cref="FleetRoleBoard"/>):
 /// each tick a free surveyor gets one survey to take (<see cref="SurveyWaypointGoal"/>), chosen by
 /// <see cref="MiningPlanner.SurveyTargets"/> among the ores with fewer usable surveys than the stock,
 /// <see cref="StockPerOreSetting"/> (D27):
@@ -62,6 +64,7 @@ public sealed class SurveyPlanService(
         var now = TimeProvider.System.GetUtcNow();
         await surveyKeeper.ExpireAsync(now, cancellationToken);
 
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken, surveyOn: true);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -71,7 +74,7 @@ public sealed class SurveyPlanService(
         var surveying = new Dictionary<string, SurveyWaypointGoal>(StringComparer.OrdinalIgnoreCase);
         var free = new List<ShipModel>();
         var gathering = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var ship in fleet.Where(ship => FleetRoles.IsSurveyor(ship, surveyPlanOn: true)))
+        foreach (var ship in fleet.Where(board.IsSurveyor))
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
             if (goal is SurveyWaypointGoal survey && survey.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
@@ -94,12 +97,12 @@ public sealed class SurveyPlanService(
         var stock = await settings.ThresholdAsync(StockPerOreSetting, DefaultStockPerOre, cancellationToken);
         var targets = new List<SurveyPlanTarget>();
         foreach (var system in fleet
-            .Where(ship => FleetRoles.IsSurveyor(ship, surveyPlanOn: true) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .Where(ship => board.IsSurveyor(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             var miners = fleet
-                .Where(ship => FleetRoles.IsMiner(ship, surveyPlanOn: true)
+                .Where(ship => board.MinesForContract(ship)
                     && string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase))
                 .ToList();
             var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);

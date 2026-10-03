@@ -5,7 +5,9 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -26,6 +28,7 @@ public sealed class ContractMinersTests
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly IPlanRepository _planStates = Substitute.For<IPlanRepository>();
     private readonly LogRecorder _log = new();
     private readonly List<ShipAssignmentDto> _open = [];
 
@@ -87,6 +90,24 @@ public sealed class ContractMinersTests
         await RunAsync();
 
         _open.Select(a => a.ShipSymbol).Should().BeEquivalentTo("SHIP-3", "SHIP-1");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_EveryShipThatCanMine_JoinsWhateverItsRole_ButTheOneThatSurveys()
+    {
+        // D40: the contract comes first, and doesn't wait for the board's next evaluation to give a ship the mining role.
+        // A ship that can only survey surveys, so the command ship, with the trade role, joins too.
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        RoleBoardTestSupport.RolesAre(_settings, _planStates, ("SHIP-1", FleetRole.Trade), ("SHIP-4", FleetRole.Trade), ("SHIP-6", FleetRole.Survey));
+        Fleet(
+            Drone("SHIP-3", XB5C, "IN_ORBIT"),
+            CommandShip(),
+            Drone("SHIP-4"),
+            CommandShip(symbol: "SHIP-6"));
+
+        await RunAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().BeEquivalentTo("SHIP-3", "SHIP-1", "SHIP-4");
     }
 
     [Fact]
@@ -228,5 +249,6 @@ public sealed class ContractMinersTests
             Substitute.For<IMessageBus>(),
             _goals,
             _settings,
+            _planStates,
             _log.For<ContractPlanService>());
 }

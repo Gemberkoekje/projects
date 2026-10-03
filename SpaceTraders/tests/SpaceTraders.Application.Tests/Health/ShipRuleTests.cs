@@ -5,6 +5,8 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -399,6 +401,25 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Details.Should().Contain("the Survey plan has work it could do: 1 targets to survey");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_AShipThatCanSurvey_ButHasAnotherRole_IsNotLeftIdleBySurveyWork()
+    {
+        // Slice 6.9 (D38): the ship with the survey role surveys; the command ship trades while a survey ship surveys.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade));
+        _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", NeedsSurvey = true }],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-1", Start) with { ShipType = "COMMAND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"], CargoCapacity = 40 });
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(11))).Should().BeEmpty();
     }
 
     [Fact]

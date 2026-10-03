@@ -57,6 +57,8 @@ public sealed class MetricsEndpointTests
         "spacetraders_db_size_bytes",
         "spacetraders_server_next_reset_timestamp_seconds",
         "spacetraders_setting_info",
+        "spacetraders_ship_role_info",
+        "spacetraders_ship_role_credits_per_hour",
     ];
 
     [Fact]

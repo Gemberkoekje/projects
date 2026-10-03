@@ -1,0 +1,26 @@
+using System.Text.Json.Serialization;
+
+namespace SpaceTraders.Application.Roles;
+
+/// <summary>
+/// The work a ship does for the fleet (PLAN.md slice 6.9, D38): the role board gives every ship one, from what it
+/// carries and what the others can do. Stored by name, so the plan state reads as it is meant.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FleetRole>))]
+public enum FleetRole
+{
+    /// <summary>No role: a probe, which the probe plan flies, or a ship none of whose roles has a plan on.</summary>
+    None = 0,
+
+    /// <summary>Surveys for the miners (a surveyor mount), first of all (D38); in its spare time it trades or gathers (D34).</summary>
+    Survey = 1,
+
+    /// <summary>Mines (a mining laser, a hold and a tank): the contract first (D40), then the mining plan's trips.</summary>
+    Mine = 2,
+
+    /// <summary>Siphons gases (a gas siphon, a hold and a tank): the siphon plan's trips.</summary>
+    Siphon = 3,
+
+    /// <summary>Trades between markets (a hold and a tank): the trading plan's trips.</summary>
+    Trade = 4,
+}

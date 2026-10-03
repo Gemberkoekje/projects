@@ -4,6 +4,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.SpareTime;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
@@ -47,6 +48,7 @@ public sealed class ExtractResourcesHandler(
     IOrbitSubCommand orbit,
     IMessageBus bus,
     IAutomationMetrics metrics,
+    IGatheringRates rates,
     ILogger<ExtractResourcesHandler> logger)
 {
     /// <summary>Wolverine's entry point.</summary>
@@ -114,6 +116,7 @@ public sealed class ExtractResourcesHandler(
         var extracted = await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
         await ships.UpdateCargoAsync(ship.Symbol, extracted.Cargo, cancellationToken);
         metrics.Extracted(ship.Symbol, extracted.YieldSymbol, extracted.YieldUnits);
+        rates.Record(ship.Symbol, GatheringKind.Mining, extracted.YieldUnits, extracted.CooldownSeconds);
         await ships.UpdateCooldownAsync(ship.Symbol, extracted.CooldownExpiresAt ?? now.AddSeconds(extracted.CooldownSeconds), cancellationToken);
 
         // The template MineResourceVolumeCommand logs, so the journal reads every extraction alike.

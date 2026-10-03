@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.SpareTime;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
@@ -41,6 +43,7 @@ public sealed class SpareTimePlanService(
     ITradeContextReader tradeContexts,
     IPlanRepository plans,
     ISettingsRepository settings,
+    ICargoJettison cargoJettison,
     ILogger<SpareTimePlanService> logger) : ISpareTimePlanService
 {
     private static readonly JsonSerializerOptions CompareOptions = new();
@@ -48,7 +51,7 @@ public sealed class SpareTimePlanService(
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
-        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -57,7 +60,7 @@ public sealed class SpareTimePlanService(
 
         var maps = new Dictionary<string, TradeMarketMap>(StringComparer.OrdinalIgnoreCase);
         var states = new List<SpareTimeShipState>();
-        foreach (var ship in fleet.Where(ship => FleetRoles.GathersInSpareTime(ship, surveyOn)))
+        foreach (var ship in fleet.Where(board.GathersInSpareTime))
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
             if (goal is GatherAndSellGoal { Status: not GoalStatus.Blocked and not GoalStatus.Completed } trip)
@@ -92,12 +95,18 @@ public sealed class SpareTimePlanService(
     /// <summary>Gives a free ship its trip, at the nearest place it can gather and sell (D35).</summary>
     private async Task<SpareTimeShipState> GiveTripAsync(TradeMarketMap map, ShipModel ship, CancellationToken cancellationToken)
     {
-        // A trip would turn to selling at once, find nothing to sell and end, on every tick.
+        // A full hold that no market it can reach buys will never be sold: it goes overboard (D42), or a trip would turn
+        // to selling at once, find nothing to sell and end, on every tick.
         if (ship.CargoCapacity > 0
             && ship.CargoCurrent >= ship.CargoCapacity
             && !TradeRoutePlanner.TryFindBestCargoSale(map, ship, mustSell: true, out _, out _))
         {
-            logger.LogDebug("Spare-time plan: ship {ShipSymbol} has a full hold that no market it can reach buys.", ship.Symbol);
+            foreach (var (cargo, reason) in HeldCargo.ToJettison(map, ship, _ => false))
+            {
+                await cargoJettison.JettisonAsync(ship, cargo, reason, cancellationToken);
+            }
+
+            logger.LogDebug("Spare-time plan: ship {ShipSymbol} had a full hold that no market it can reach buys; the next pass gives it a trip.", ship.Symbol);
             return new SpareTimeShipState { ShipSymbol = ship.Symbol, Activity = SpareTimeActivity.Waiting };
         }
 

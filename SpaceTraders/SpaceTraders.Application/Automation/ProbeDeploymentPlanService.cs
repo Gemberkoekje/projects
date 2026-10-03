@@ -157,25 +157,7 @@ public sealed class ProbeDeploymentPlanService(
     }
 
     /// <summary>The engine's speed from the cached engine; a probe bought since the last restart has none yet.</summary>
-    private static int EngineSpeed(ShipModel ship)
-    {
-        if (string.IsNullOrWhiteSpace(ship.EngineJson))
-        {
-            return ProbePlanner.DefaultProbeSpeed;
-        }
-
-        try
-        {
-            using var engine = JsonDocument.Parse(ship.EngineJson);
-            return engine.RootElement.TryGetProperty("speed", out var speed) && speed.TryGetInt32(out var value) && value > 0
-                ? value
-                : ProbePlanner.DefaultProbeSpeed;
-        }
-        catch (JsonException)
-        {
-            return ProbePlanner.DefaultProbeSpeed;
-        }
-    }
+    private static int EngineSpeed(ShipModel ship) => FleetRoles.EngineSpeed(ship, ProbePlanner.DefaultProbeSpeed);
 
     /// <summary>
     /// Buys the next probe (D29) while the system has more markets than probes, at the shipyard that sells it

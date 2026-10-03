@@ -3,10 +3,14 @@ using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
 
-/// <summary>The plans the tick runs, in this order. Each has its own on/off setting.</summary>
+/// <summary>
+/// The plans the tick runs, in this order. Each has its own on/off setting. The role board (slice 6.9) runs before
+/// the plans whose ships it gives roles.
+/// </summary>
 public enum AutomationPlan
 {
     Scout,
+    Roles,
     Contract,
     ProbeDeployment,
     Survey,

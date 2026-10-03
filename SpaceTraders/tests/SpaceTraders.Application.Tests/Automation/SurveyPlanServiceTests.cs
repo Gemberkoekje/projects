@@ -6,6 +6,8 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -69,6 +71,19 @@ public sealed class SurveyPlanServiceTests
         var survey = _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>().Subject;
         survey.TargetWaypointSymbol.Should().Be(XB5C);
         survey.TargetDepositSymbol.Should().Be("COPPER_ORE");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
+    {
+        // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-5", FleetRole.Survey));
+        Fleet(CommandShip(), Drone(), SurveyShip());
+
+        await RunAsync();
+
+        _activeGoals.Keys.Should().Equal("SHIP-5");
+        _activeGoals["SHIP-5"].Should().BeOfType<SurveyWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(XB5C);
     }
 
     [Fact]
@@ -271,6 +286,10 @@ public sealed class SurveyPlanServiceTests
         });
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    /// <summary>A survey ship, as bought: a surveyor, and nothing to carry anything in.</summary>
+    private static ShipModel SurveyShip()
+        => new("SHIP-5", SystemSymbol, XB5C, "IN_ORBIT", "CRUISE", 80, 80, ShipType: "SHIP_SURVEYOR", MountSymbols: ["MOUNT_SURVEYOR_I"]);
 
     private void SurveysAre(params SurveyModel[] surveys)
         => _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(surveys));

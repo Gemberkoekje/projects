@@ -104,6 +104,21 @@ public static class JournalEvents
     public const string GatheringInterrupted = nameof(GatheringInterrupted);
 
     /// <summary>
+    /// The role board gave a ship another role (slice 6.9, D38: <c>ShipSymbol</c>, <c>OldRole</c>, <c>NewRole</c>,
+    /// <c>Reason</c>: <c>only_role</c>, <c>survey_first</c>, <c>contract</c>, <c>most_profitable</c>, <c>no_work</c> or
+    /// <c>no_role</c>; for a role chosen by profit also <c>CreditsPerHour</c> and the <c>Job</c> that decided it). It takes
+    /// effect when the ship's trip ends.
+    /// </summary>
+    public const string RoleChanged = nameof(RoleChanged);
+
+    /// <summary>
+    /// A free ship threw cargo overboard that nothing would sell or use (D42: <c>ShipSymbol</c>, <c>TradeSymbol</c>,
+    /// <c>Units</c>, <c>WaypointSymbol</c>, <c>Reason</c>: <c>no_buyer</c>, no market it can reach buys it, or
+    /// <c>not_worth_the_fuel</c>, the best sale doesn't pay for the fuel to get there).
+    /// </summary>
+    public const string CargoJettisoned = nameof(CargoJettisoned);
+
+    /// <summary>
     /// A probe was sent to a shipyard where a purchase waits for one of our ships, which the API requires
     /// (slice 6.3, D30: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>ShipType</c> the purchase is for).
     /// </summary>

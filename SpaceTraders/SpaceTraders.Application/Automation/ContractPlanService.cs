@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
@@ -36,6 +37,7 @@ public sealed class ContractPlanService(
     IMessageBus bus,
     IShipGoalRepository goals,
     ISettingsRepository settings,
+    IPlanRepository planStates,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
     private const string ContractAssignmentType = "Contract";
@@ -536,7 +538,7 @@ public sealed class ContractPlanService(
             return null;
         }
 
-        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var board = await FleetRoleBoard.ReadAsync(settings, planStates, cancellationToken);
         var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
         var activeAssignmentsByShip = activeAssignments
             .Where(a => !a.CompletedAt.HasValue)
@@ -554,7 +556,7 @@ public sealed class ContractPlanService(
                 continue;
             }
 
-            if (!FleetRoles.IsMiner(ship, surveyOn))
+            if (!board.MinesForContract(ship))
             {
                 logger.LogDebug(
                     "Contract plan ship selection: skipping ship {ShipSymbol} — not mining-capable (type {ShipType}, mounts: {Mounts}, cargo: {Cargo}, fuel: {Fuel}).",
@@ -794,7 +796,7 @@ public sealed class ContractPlanService(
             return;
         }
 
-        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
+        var board = await FleetRoleBoard.ReadAsync(settings, planStates, cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
@@ -803,7 +805,7 @@ public sealed class ContractPlanService(
 
         foreach (var ship in await ships.GetAllAsync(cancellationToken))
         {
-            if (!FleetRoles.IsMiner(ship, surveyOn)
+            if (!board.MinesForContract(ship)
                 || !FleetRoles.IsFree(ship, await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken), withAssignment.Contains(ship.Symbol)))
             {
                 continue;

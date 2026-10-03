@@ -85,6 +85,50 @@ public sealed class PrometheusMetricsService(
             setting.Key,
             SettingsRepository.Shown(setting.Key, setting.Value),
             DefaultSettingsSeed.DescriptionOf(setting.Key) ?? setting.Description))]);
+
+        // Slice 6.9: the role board, for the dashboard's roles table, while it is on: switched off, the plans no longer
+        // read the roles its state keeps.
+        var boardOn = IsOn(settings.Find(setting => setting.Key == AutomationSwitches.PlanEnabledSetting(AutomationPlan.Roles))?.Value);
+        var roles = boardOn
+            ? await db.PlanStates.AsNoTracking()
+                .Where(plan => plan.PlanType == PlanTypes.Roles)
+                .Select(plan => plan.StateJson)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        metrics.Roles(RoleSamples(roles));
+    }
+
+    /// <summary>The role board's ships, from its state's JSON; none without a readable state.</summary>
+    internal static IReadOnlyCollection<RoleMetricsSample> RoleSamples(string? stateJson)
+    {
+        RolePlanState? state;
+        try
+        {
+            state = string.IsNullOrWhiteSpace(stateJson) ? null : JsonSerializer.Deserialize<RolePlanState>(stateJson);
+        }
+        catch (JsonException)
+        {
+            state = null;
+        }
+
+        return [.. (state?.Ships ?? []).Select(ship => new RoleMetricsSample(
+            ship.ShipSymbol,
+            ship.Role.ToString(),
+            ship.Reason,
+            ship.Estimates.ToDictionary(estimate => estimate.Role.ToString(), estimate => estimate.CreditsPerHour, StringComparer.Ordinal)))];
+    }
+
+    /// <summary>Whether a switch's stored value is on, read as the settings repository reads a <c>bool</c>: JSON <c>true</c>.</summary>
+    internal static bool IsOn(string? value)
+    {
+        try
+        {
+            return value is not null && JsonSerializer.Deserialize<bool>(value);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <inheritdoc />

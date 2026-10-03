@@ -5,7 +5,9 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -30,6 +32,8 @@ public sealed class TradingAutomationServiceTests
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly ShipGoalStepGuard _stepGuard = new();
+    private readonly IContractMineralPlanRepository _contractPlans = Substitute.For<IContractMineralPlanRepository>();
+    private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -64,6 +68,14 @@ public sealed class TradingAutomationServiceTests
         ]);
         _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ShipPurchaseResult { IsSuccess = true });
+        _jettison.JettisonAsync(Arg.Any<ShipModel>(), Arg.Any<CargoItemModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var ship = call.Arg<ShipModel>();
+                var gone = call.Arg<CargoItemModel>();
+                List<CargoItemModel> left = [.. (ship.CargoInventory ?? []).Where(item => item.Symbol != gone.Symbol)];
+                return new CargoModel(left.Sum(item => item.Units), ship.CargoCapacity, left);
+            });
     }
 
     [Fact]
@@ -168,16 +180,83 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
-    public async Task CargoNoMarketBuys_StaysAboard_AndTheShipTradesWithTheRestOfItsHold()
+    public async Task CargoNoMarketBuys_IsJettisoned_AndTheShipTradesWithItsWholeHold()
     {
-        // The drone after its contract, with a unit of ore no market here buys.
+        // D42 (it used to stay aboard for good): a unit of ore no market here buys, after a contract that is over.
         Fleet(CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 1)]));
 
         await RunAsync();
 
+        await _jettison.Received(1).JettisonAsync(
+            Arg.Is<ShipModel>(ship => ship.Symbol == "SHIP-1"),
+            new CargoItemModel("COPPER_ORE", 1),
+            HeldCargo.NoBuyer,
+            Arg.Any<CancellationToken>());
         var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
         trip.TradeSymbol.Should().Be("EQUIPMENT");
         trip.CargoBought.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TheContractsOre_StaysAboardAShipThatMinesForTheContract()
+    {
+        // D42's exception: ore the contract wants is earmarked for the ship's next delivery (D26).
+        ContractWants("COPPER_ORE");
+        Fleet(CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 1)]));
+
+        await RunAsync();
+
+        await _jettison.DidNotReceiveWithAnyArgs().JettisonAsync(default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ASurveyorWithNothingToSurvey_AndNoSpareTimeTrip_SellsItsHoldWhereThatPays()
+    {
+        // D42: the copper the command ship mined for the contract (SPECTER-1's 7) was carried for good once it surveyed.
+        SurveyPlanOn();
+        Fleet(CommandShip(cargo: [new CargoItemModel("EQUIPMENT", 10)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol, trip.CargoBought).Should().Be(("EQUIPMENT", A1, true));
+    }
+
+    [Fact]
+    public async Task ASurveyorWithNothingToSurvey_JettisonsWhatNoMarketBuys_AndTakesNoRoute()
+    {
+        SurveyPlanOn();
+        Fleet(CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 7)]));
+
+        await RunAsync();
+
+        await _jettison.Received(1).JettisonAsync(Arg.Any<ShipModel>(), new CargoItemModel("COPPER_ORE", 7), HeldCargo.NoBuyer, Arg.Any<CancellationToken>());
+        _activeGoals.Should().BeEmpty("a surveyor surveys, and doesn't trade (D20)");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_TheCommandShipTrades_WhenItsRoleIsTrade_ThoughTheSurveyPlanIsOn()
+    {
+        // Slice 6.9: a ship that can only survey surveys, so the command ship takes what pays it most (D38).
+        SurveyPlanOn();
+        RolesAre(("SHIP-1", FleetRole.Trade));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("EQUIPMENT");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_AShipWithTheSurveyRole_OrNoRoleYet_DoesNotTrade()
+    {
+        SurveyPlanOn();
+        RolesAre(("SHIP-1", FleetRole.Survey));
+        Fleet(CommandShip(), Drone(symbol: "SHIP-3"));
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
     }
 
     [Fact]
@@ -398,6 +477,27 @@ public sealed class TradingAutomationServiceTests
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
+    private void RolesAre(params (string Ship, FleetRole Role)[] roles) => RoleBoardTestSupport.RolesAre(_settings, _plans, roles);
+
+    private void ContractWants(string ore)
+    {
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Contract), Arg.Any<CancellationToken>()).Returns(true);
+        _contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ContractId = "C-1",
+            ShipSymbol = "SHIP-3",
+            TradeSymbol = ore,
+            SourceWaypoint = Asteroid,
+            DestinationWaypoint = A1,
+            UnitsRequired = 40,
+            UnitsFulfilled = 10,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+    }
+
     private void SurveyPlanOn()
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
 
@@ -425,6 +525,8 @@ public sealed class TradingAutomationServiceTests
                 _shipyards,
                 _purchases,
                 new SpareTimeInterruption(_ships, _goals, _stepGuard, _log.For<SpareTimeInterruption>()),
+                _contractPlans,
+                _jettison,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }
