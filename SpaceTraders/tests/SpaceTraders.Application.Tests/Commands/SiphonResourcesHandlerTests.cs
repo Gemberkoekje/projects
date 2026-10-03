@@ -5,6 +5,7 @@ using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using static SpaceTraders.Application.Tests.Siphoning.SiphonFixture;
@@ -25,6 +26,7 @@ public sealed class SiphonResourcesHandlerTests
     private readonly IOrbitSubCommand _orbit = Substitute.For<IOrbitSubCommand>();
     private readonly Wolverine.IMessageBus _bus = Substitute.For<Wolverine.IMessageBus>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly GatheringRates _rates = new();
     private readonly LogRecorder _log = new();
 
     public SiphonResourcesHandlerTests()
@@ -57,6 +59,7 @@ public sealed class SiphonResourcesHandlerTests
         // What the dashboard shows as extracted; not an extraction for the survey statistics.
         _metrics.Received(1).Extracted("SHIP-5", "LIQUID_NITROGEN", 5);
         _metrics.DidNotReceiveWithAnyArgs().Extraction(default!, default);
+        _rates.For("SHIP-5", GatheringKind.Siphoning).Should().Be(new GatheringRate(5, 70, Observed: true));
 
         var siphoned = _log.Journal.Should().ContainSingle().Subject;
         siphoned.EventKind.Should().Be("Siphoned");
@@ -159,5 +162,6 @@ public sealed class SiphonResourcesHandlerTests
             _orbit,
             _bus,
             _metrics,
+            _rates,
             _log.For<SiphonResourcesHandler>());
 }

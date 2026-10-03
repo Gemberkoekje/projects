@@ -50,6 +50,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -123,6 +124,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -220,6 +222,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -280,6 +283,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             log.For<ContractPlanService>());
 
         for (var tick = 0; tick < 12; tick++)
@@ -338,6 +342,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -392,6 +397,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -487,6 +493,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -585,6 +592,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -662,6 +670,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -789,6 +798,7 @@ public sealed class ContractPlanServiceTests
             bus,
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             log.For<ContractPlanService>());
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -857,6 +867,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -940,6 +951,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1072,6 +1084,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1151,6 +1164,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -1207,6 +1221,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1263,6 +1278,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(evnt, CancellationToken.None);
@@ -1309,6 +1325,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(new DeliverableObtainedEvent("SHIP-MINER-1", "IRON_ORE", 4), CancellationToken.None);
@@ -1381,6 +1398,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1455,6 +1473,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
         return (sut, plans, assignments);
     }

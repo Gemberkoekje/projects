@@ -4,6 +4,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -24,6 +25,7 @@ public sealed class SpareTimePlanServiceTests
     private readonly ITradeContextReader _contexts = Substitute.For<ITradeContextReader>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SpareTimePlanState? _state;
@@ -154,13 +156,15 @@ public sealed class SpareTimePlanServiceTests
     }
 
     [Fact]
-    public async Task AFullHoldThatNoMarketBuys_GetsNoTrip()
+    public async Task AFullHoldThatNoMarketBuys_IsJettisoned_AndGetsNoTripThisPass()
     {
-        // A trip would turn to selling at once, find nothing to sell and end, on every tick.
+        // A trip would turn to selling at once, find nothing to sell and end, on every tick; and the hold would never be
+        // sold, so it goes overboard (D42). The next pass gives the ship a trip.
         Fleet(CommandShip(XB5C, cargo: [new CargoItemModel("EXOTIC_MATTER", 40)]));
 
         await RunAsync();
 
+        await _jettison.Received(1).JettisonAsync(Arg.Any<ShipModel>(), new CargoItemModel("EXOTIC_MATTER", 40), HeldCargo.NoBuyer, Arg.Any<CancellationToken>());
         _activeGoals.Should().BeEmpty();
         _log.Journal.Should().BeEmpty();
         _state!.Ships.Should().ContainSingle().Which.Activity.Should().Be(SpareTimeActivity.Waiting);
@@ -193,6 +197,7 @@ public sealed class SpareTimePlanServiceTests
                 _contexts,
                 _plans,
                 _settings,
+                _jettison,
                 _log.For<SpareTimePlanService>())
             .EnsureBootstrappedAsync();
 }

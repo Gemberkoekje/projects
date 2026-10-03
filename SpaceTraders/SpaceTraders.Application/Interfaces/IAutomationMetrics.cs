@@ -138,6 +138,39 @@ public interface IAutomationMetrics
     /// setting that is no longer in <paramref name="settings"/> loses its own.
     /// </summary>
     void Settings(IReadOnlyCollection<SettingMetricsSample> settings);
+
+    /// <summary>
+    /// Records the role board's view (slice 6.9): each ship's role and why, one series per ship, always 1
+    /// (<c>spacetraders_ship_role_info{ship,role,reason}</c>), and what each role it could take would earn it per hour, by
+    /// the board's estimate (<c>spacetraders_ship_role_credits_per_hour{ship,role}</c>). A ship whose role or reason
+    /// changed loses its old series, and a ship or role that is no longer in <paramref name="roles"/> loses its own.
+    /// </summary>
+    void Roles(IReadOnlyCollection<RoleMetricsSample> roles);
+}
+
+/// <summary>One ship on the role board as the metrics show it (slice 6.9).</summary>
+public sealed record RoleMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RoleMetricsSample(string Ship, string Role, string Reason, IReadOnlyDictionary<string, long> CreditsPerHour)
+    {
+        this.Ship = Ship;
+        this.Role = Role;
+        this.Reason = Reason;
+        this.CreditsPerHour = CreditsPerHour;
+    }
+
+    /// <summary>The ship.</summary>
+    public required string Ship { get; init; }
+
+    /// <summary>Its role: <c>Survey</c>, <c>Mine</c>, <c>Siphon</c>, <c>Trade</c> or <c>None</c>.</summary>
+    public required string Role { get; init; }
+
+    /// <summary>Why it has it, as the board says (<c>survey_first</c>, <c>most_profitable</c>, ...).</summary>
+    public required string Reason { get; init; }
+
+    /// <summary>For each role it could take but surveying, what its best trip earns per hour.</summary>
+    public required IReadOnlyDictionary<string, long> CreditsPerHour { get; init; }
 }
 
 /// <summary>One of the agent's settings as the metrics show it (slice 2.9).</summary>

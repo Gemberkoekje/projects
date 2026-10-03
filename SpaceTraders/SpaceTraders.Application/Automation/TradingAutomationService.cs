@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.SpareTime;
 using SpaceTraders.Application.Trading;
@@ -56,6 +57,8 @@ public sealed class TradingAutomationService(
     IShipyardRepository shipyards,
     IShipPurchaseService shipPurchases,
     SpareTimeInterruption interruption,
+    IContractMineralPlanRepository contractPlans,
+    ICargoJettison cargoJettison,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -72,8 +75,8 @@ public sealed class TradingAutomationService(
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
-        var surveyOn = await settings.IsPlanEnabledAsync(AutomationPlan.Survey, cancellationToken);
-        var spareTimeOn = await settings.IsPlanEnabledAsync(AutomationPlan.SpareTime, cancellationToken);
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
+        var earmarked = await ContractOreAsync(cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -85,20 +88,21 @@ public sealed class TradingAutomationService(
 
         // Ships that gather in their spare time (slice 6.8), free or on a spare-time trip that fills its hold, while
         // the spare-time plan is on: the survey plan, which goes first, had nothing for them, and they trade only for
-        // a route that waits for them (D34). Any other surveyor surveys, and only that (D20).
+        // a route that waits for them (D34). Any other surveyor surveys, and only that (D20), but for selling or
+        // jettisoning a hold nothing else will (D42).
         var gatherers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var onTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var surveyorsWithCargo = new List<ShipModel>();
         foreach (var ship in fleet)
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
             var hasAssignment = withAssignment.Contains(ship.Symbol);
-            var gathers = spareTimeOn && FleetRoles.GathersInSpareTime(ship, surveyOn);
+            var gathers = board.SpareTimeOn && board.GathersInSpareTime(ship);
             if (goal is TradeBetweenMarketsGoal trade && trade.Status != GoalStatus.Blocked)
             {
                 held.Add(new HeldRoute(ship.Symbol, trade));
             }
-            else if (ship.IsTradingCapable
-                && (gathers || !FleetRoles.IsSurveyor(ship, surveyOn))
+            else if ((gathers ? ship.IsTradingCapable : board.IsTrader(ship))
                 && FleetRoles.IsFree(ship, goal, hasAssignment))
             {
                 free.Add(ship);
@@ -112,6 +116,12 @@ public sealed class TradingAutomationService(
                 free.Add(ship);
                 gatherers.Add(ship.Symbol);
                 onTrip.Add(ship.Symbol);
+            }
+            else if (board.IsSurveyor(ship)
+                && ship.CargoCurrent > 0
+                && FleetRoles.IsFree(ship, goal, hasAssignment))
+            {
+                surveyorsWithCargo.Add(ship);
             }
         }
 
@@ -132,7 +142,8 @@ public sealed class TradingAutomationService(
                 }
                 else
                 {
-                    traders.Add(ship);
+                    // Cargo that doesn't pay for its sale would only take room from the route (D42).
+                    traders.Add(await JettisonDeadCargoAsync(context.Map, ship, board, earmarked, cancellationToken));
                 }
             }
 
@@ -146,6 +157,25 @@ public sealed class TradingAutomationService(
             }
         }
 
+        // A surveyor with nothing to survey and no spare-time trip to fill its hold on sells it where that pays, and
+        // jettisons the rest (D42): it would otherwise carry it for good.
+        foreach (var system in surveyorsWithCargo.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+        {
+            var map = (await tradeContexts.ReadAsync(system.Key, cancellationToken)).Map;
+            foreach (var ship in system)
+            {
+                if (TradeRoutePlanner.TryFindBestCargoSale(map, ship, mustSell: false, out var cargo, out var sale))
+                {
+                    held.Add(new HeldRoute(ship.Symbol, await SellHeldCargoAsync(map, ship, cargo, sale, cancellationToken)));
+                    heldKeys.Add(held[^1].Key);
+                }
+                else
+                {
+                    await JettisonDeadCargoAsync(map, ship, board, earmarked, cancellationToken);
+                }
+            }
+        }
+
         // A new cargo ship only when every trader has a trip (D21).
         if (idle == 0)
         {
@@ -153,6 +183,44 @@ public sealed class TradingAutomationService(
         }
 
         await SaveStateAsync(held, pending, cancellationToken);
+    }
+
+    /// <summary>
+    /// The contract's ore while the contract wants it (D23, D40): a ship that will deliver it keeps it aboard. Empty
+    /// otherwise.
+    /// </summary>
+    private async Task<string> ContractOreAsync(CancellationToken cancellationToken)
+        => await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken)
+            && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
+            && contract.UnitsFulfilled < contract.UnitsRequired
+                ? contract.TradeSymbol
+                : string.Empty;
+
+    /// <summary>
+    /// Jettisons what a free ship holds that nothing will sell or use (D42), when no good aboard pays for its sale:
+    /// everything but the contract's ore on a ship that mines for the contract.
+    /// </summary>
+    /// <returns>The ship with the hold it has left.</returns>
+    private async Task<ShipModel> JettisonDeadCargoAsync(
+        TradeMarketMap map,
+        ShipModel ship,
+        FleetRoleBoard board,
+        string contractOre,
+        CancellationToken cancellationToken)
+    {
+        var current = ship;
+        foreach (var (cargo, reason) in HeldCargo.ToJettison(
+            map,
+            ship,
+            good => contractOre.Length > 0 && good.Equals(contractOre, StringComparison.OrdinalIgnoreCase) && board.MinesForContract(ship)))
+        {
+            if (await cargoJettison.JettisonAsync(current, cargo, reason, cancellationToken) is { } left)
+            {
+                current = current with { CargoInventory = left.Inventory, CargoCurrent = left.Units };
+            }
+        }
+
+        return current;
     }
 
     /// <summary>

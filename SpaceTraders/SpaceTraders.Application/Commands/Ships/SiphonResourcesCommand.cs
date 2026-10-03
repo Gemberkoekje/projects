@@ -4,6 +4,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Siphoning;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
@@ -51,6 +52,7 @@ public sealed class SiphonResourcesHandler(
     IOrbitSubCommand orbit,
     IMessageBus bus,
     IAutomationMetrics metrics,
+    IGatheringRates rates,
     ILogger<SiphonResourcesHandler> logger)
 {
     /// <summary>Wolverine's entry point.</summary>
@@ -118,6 +120,7 @@ public sealed class SiphonResourcesHandler(
         var siphoned = await port.SiphonResourcesAsync(ship.Symbol, cancellationToken);
         await ships.UpdateCargoAsync(ship.Symbol, siphoned.Cargo, cancellationToken);
         metrics.Extracted(ship.Symbol, siphoned.YieldSymbol, siphoned.YieldUnits);
+        rates.Record(ship.Symbol, GatheringKind.Siphoning, siphoned.YieldUnits, siphoned.CooldownSeconds);
         await ships.UpdateCooldownAsync(ship.Symbol, siphoned.CooldownExpiresAt ?? now.AddSeconds(siphoned.CooldownSeconds), cancellationToken);
 
         logger.LogInformation(

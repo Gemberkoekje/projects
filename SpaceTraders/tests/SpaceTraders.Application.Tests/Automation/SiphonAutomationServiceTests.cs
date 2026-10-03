@@ -4,7 +4,9 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -28,6 +30,7 @@ public sealed class SiphonAutomationServiceTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private MiningAutomationPlanState? _state;
@@ -178,6 +181,22 @@ public sealed class SiphonAutomationServiceTests
         _activeGoals.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task WithTheRoleBoardOn_ADroneIsBought_OnlyWhenTheBoardWouldHaveItSiphon(bool wouldSiphon, int purchases)
+    {
+        // Slice 6.9: as for the miners, a drone that would trade instead isn't bought.
+        RoleBoardTestSupport.RolesAre(_settings, _plans);
+        _roleAdvisor.WouldTakeAsync(Arg.Is<ShipModel>(ship => ship.ShipType == "SHIP_SIPHON_DRONE"), FleetRole.Siphon, Arg.Any<CancellationToken>())
+            .Returns(wouldSiphon);
+        Fleet(CommandShip(waypoint: "X1-DC53-H51"));
+
+        await RunAsync();
+
+        await _purchases.Received(purchases).TryPurchaseAsync("SHIP_SIPHON_DRONE", C39, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task WithEveryMarketShortOfAGasServed_NoDroneIsBought_ThoughThereIsMoreToSiphon()
     {
@@ -260,6 +279,7 @@ public sealed class SiphonAutomationServiceTests
                 _settings,
                 _plans,
                 _purchases,
+                _roleAdvisor,
                 _log.For<SiphonAutomationService>())
             .EnsureBootstrappedAsync();
 }

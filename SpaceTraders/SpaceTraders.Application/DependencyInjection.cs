@@ -10,6 +10,7 @@ using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Orchestration;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using Wolverine;
@@ -64,6 +65,18 @@ public static class DependencyInjection
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();
         services.AddScoped<ISiphonAutomationService, SiphonAutomationService>();
         services.AddScoped<ITradingAutomationService, TradingAutomationService>();
+
+        // The role board (slice 6.9): every ship's role by what it and the others can do, and what each role pays
+        // per hour; how fast each ship fills its hold, as its extractions showed; and what the board remembers
+        // between passes.
+        services.AddScoped<IRolePlanService, RolePlanService>();
+        services.AddScoped<IRoleAdvisor, RoleAdvisor>();
+        services.AddSingleton<IGatheringRates, GatheringRates>();
+        services.AddSingleton<RoleBoardMemory>();
+
+        // Cargo nothing will sell or use is sold where that pays, else jettisoned (D42).
+        services.AddScoped<ICargoJettison, CargoJettison>();
+        services.AddSingleton<JettisonRetries>();
 
         // Spare time (slice 6.8): the command ship mines or siphons when it has nothing to survey or trade.
         services.AddScoped<ISpareTimePlanService, SpareTimePlanService>();

@@ -86,6 +86,9 @@
   plans at 21:40–21:42Z; the first minutes' journal matched the plan.
 - Slice 2.9 (a settings table on the dashboard) is built on branch `ccr-212dac2b-p2ent0`, in projects and
   gembernodes, asked on 2026-10-02: which settings exist, and which are on.
+- Slice 6.9 (roles by what pays most, and cargo nothing will sell) is built on branch
+  `claude/ship-role-profitability-ghjzlb`, in projects and gembernodes, asked on 2026-10-02, with your decisions D38–D42.
+  The role board stays off until you switch it on (D9); D42, cargo nothing will sell, works whether it is on or not.
 
 ## Known issues
 
@@ -175,7 +178,7 @@ get the next D-number.
 | D17 | Slice 6.5: may cargo use `FleetExpansion.MinCreditReserve`? | **Yes** (2026-10-02): cargo turns back into credits when it is sold. Credits for the trip's fuel are kept back. |
 | D18 | Slice 6.5: may two traders share a route? | **No, for now** (2026-10-02, "to keep everything simple"): a route, the good with its buy and sell market, that one trader holds isn't offered to another. |
 | D19 | How do reads (GET: a market refresh) and writes (anything else: moving a ship, trading) share the API's rate limit? | **Writes first** (2026-10-02): "I'd rather have a POST to move a ship or trade goods than a market refresh that can be done 10 seconds later without penalty." A read gives way while a write waits for the budget, leaves the last 10 of the 30-request burst to writes, and stops giving way after 10 seconds, so reads can't starve. The market watch runs last in the tick, one market a tick. |
-| D20 | Slice 6.4: the command ship can both survey (MOUNT_SURVEYOR_II) and mine (MOUNT_MINING_LASER_II). With surveying on, which does a ship that can do both do? | **Survey only** (2026-10-02): "Let's start with survey only. I think we'll end up with too many surveys, but we'll start simple and iterate." Its laser stays unused; the drones mine with its surveys. **Amended by D34** while the spare-time plan is on. |
+| D20 | Slice 6.4: the command ship can both survey (MOUNT_SURVEYOR_II) and mine (MOUNT_MINING_LASER_II). With surveying on, which does a ship that can do both do? | **Survey only** (2026-10-02): "Let's start with survey only. I think we'll end up with too many surveys, but we'll start simple and iterate." Its laser stays unused; the drones mine with its surveys. **Amended by D34** while the spare-time plan is on, and **by D38** while the role board is on. |
 | D21 | Slice 6.4: mining comes before trading, so the command ship no longer trades. Which cargo ships does the trading plan buy, and how many? | **A light shuttle first, then up to 2 light haulers** (2026-10-02): "start with a light shuttle to get things going, then pick up, for now, up to 2 light haulers once funds become available." Only when a lucrative route waits and every trader has a trip, within the credit reserve. The list is the setting `Trade.ShipPurchases`. Replaces D16. |
 | D22 | Slice 6.4: which supply counts as "low supply" for mining an ore to sell at that market? | **SCARCE and LIMITED** (2026-10-02). |
 | D23 | Slice 6.4: how many ships may mine for the contract? | **Every free miner** (2026-10-02), the contract before market mining; ore left over is sold. The contract plan still buys at most one drone, and the mining plan buys none while the contract takes the miners. |
@@ -189,10 +192,15 @@ get the next D-number.
 | D31 | Slice 6.7 (asked on 2026-10-02): miners work an ore contract before anything else (D23), but gas contracts (HYDROCARBON, LIQUID_HYDROGEN, LIQUID_NITROGEN) are parked as unsupported (D2). Should siphons take them? | **Keep D2 for now:** siphons only siphon and sell to the markets. With one contract per reset (D1) a gas contract rarely comes up; it can be a slice of its own. |
 | D32 | Slice 6.7 (asked on 2026-10-02): when does the siphon plan buy siphon drones? | **The miners' rule (D28), with a cap of their own:** one a tick, only when its first trip would serve a market where the gas is SCARCE or LIMITED, within the credit reserve, up to `Siphon.MaxDrones`, "max 10 default". |
 | D33 | Slice 6.7 (asked on 2026-10-02): miners jettison every ore but their trip's (6.4, Noticed). A gas giant can't be surveyed, so a siphon drone would jettison about two siphons in three. Do siphons do the same? | **Keep every gas:** a trip keeps every gas it siphons, which fills the hold about three times faster; it sells its own gas at its market, and the plan sells the others on the following trips. |
-| D34 | Slice 6.8 (asked on 2026-10-02): "I'd like my command ship not to be idle. So can we add a interuptable mining/siphoning task that just fills up the cargo with whatever and sells it where it's relevant. If a more important job comes up such as trading or surveying it should stop mining, sell it's inventory and start on the new job." With the survey plan on, the command ship never trades (D20): should it trade when it has nothing to survey? | **Survey, then trade, then mine** (2026-10-02): with nothing to survey it takes a lucrative route that waits for it (`Trade.MinProfitPerUnit` after fuel), after the other traders; it mines or siphons only when there is neither, and a route that turns up interrupts that, its hold sold first. Amends D20 while the spare-time plan is on; with it off, D20 holds, so the switch brings all of slice 6.8 (D9). |
+| D34 | Slice 6.8 (asked on 2026-10-02): "I'd like my command ship not to be idle. So can we add a interuptable mining/siphoning task that just fills up the cargo with whatever and sells it where it's relevant. If a more important job comes up such as trading or surveying it should stop mining, sell it's inventory and start on the new job." With the survey plan on, the command ship never trades (D20): should it trade when it has nothing to survey? | **Survey, then trade, then mine** (2026-10-02): with nothing to survey it takes a lucrative route that waits for it (`Trade.MinProfitPerUnit` after fuel), after the other traders; it mines or siphons only when there is neither, and a route that turns up interrupts that, its hold sold first. Amends D20 while the spare-time plan is on; with it off, D20 holds, so the switch brings all of slice 6.8 (D9). **Amended by D38** while the role board is on. |
 | D35 | Slice 6.8 (asked on 2026-10-02): where does the command ship mine or siphon? It has a mining laser, a gas siphon and a 40-unit hold; XB5C, where it surveys, is 19 from H51, and the only gas giant, C38, about 170 away. | **The nearest source:** the nearest asteroid or gas giant it can work, that it can reach and that yields a good a market it can carry it to buys: it stays near its surveys, so an interruption costs little. Without surveys, which stay for the drones. |
-| D36 | Slice 6.8 (asked on 2026-10-02): "sells it where it's relevant": which market does each good go to? | **Best price after fuel:** each good where it fetches most after the fuel to get there, the rule miners, siphoners and traders sell cargo they hold by. |
+| D36 | Slice 6.8 (asked on 2026-10-02): "sells it where it's relevant": which market does each good go to? | **Best price after fuel:** each good where it fetches most after the fuel to get there, the rule miners, siphoners and traders sell cargo they hold by. **Amended by D42**: a good no market buys, or whose sale doesn't pay for the fuel, goes overboard. |
 | D37 | Slice 6.8 (asked on 2026-10-02): a survey usually comes up at the asteroid the command ship mines at. Sell first, as asked for D34, or survey straight away? Surveying needs no room in the hold. | **Survey first:** it surveys on the spot with its hold aboard, then carries on filling, and sells once full. Only a trade makes it sell first, as a trade needs the room. |
+| D38 | Slice 6.9 (asked on 2026-10-02): "Each ship should have a set of potential roles. A ship with a mining laser can have the mining role. A ship with a surveyor can have the surveyor role. A ship with a cargo hold and fuel can have the trader role. Etcetera. A ship should occasionally consider whether it's role is still the best thing it can do. This is not only based on it's own potential roles but also of other ships." | **Roles by what earns the fleet most, surveys first:** "If there is only 1 ship that can survey, then that ship should prioritize surveying. But if there are 2 ships that can survey, but one of them can only survey and the other can survey, mine, trade and siphon, the ship that can only survey should take the job. Goal is to have every ship be the most profitable it can be by comparing each role it has with the potential profits it can make." Each role is valued per hour by the trips its plan would offer; the work is shared for the most per hour across the fleet. Amends D20 and D34 while the role board is on. |
+| D39 | Slice 6.9 (asked on 2026-10-02): "Some profits are not direct: mining iron ore isn't that profitable by itself, but iron ore gettting refined to iron getting made to machinery is very profitable." How does that count when roles are compared? | **A share of the next steps:** of the options, "selling a good to a market that makes something pricier from it adds a share (setting, default 50%) of the price difference, and that share again for the step after (iron ore → iron → machinery). Full while the market is SCARCE of the good, less as its supply grows, nothing at ABUNDANT." (`Roles.ChainValueSharePercent`) |
+| D40 | Slice 6.9 (asked on 2026-10-02): should contract work stay first for every ship that can mine (D23), or compete on profit? | **Contract first:** "Every ship that can mine, except the survey-role holder, joins the contract while units remain, as now. Roles are compared for the rest of the reset, so a contract can't stall because drones found trading more profitable." D23 kept. |
+| D41 | Slice 6.9 (asked on 2026-10-02): how often does a ship reconsider its role? | **Every 10 minutes, with a head start:** "The whole fleet is re-evaluated every 10 minutes, and at once for a ship whose role has no work for it. A ship's current role gets a 20% head start in the comparison, so close calls don't flip back and forth. Both numbers become settings." (`Roles.ReconsiderMinutes`, `Roles.HeadStartPercent`) A new role takes effect when the ship's trip ends. |
+| D42 | Slice 6.9 (asked on 2026-10-02, during the work): what happens to cargo nothing will sell? Surveyors carried theirs for good (6.4's Noticed), and traders kept what didn't pay for its fuel. | **Sell it, or jettison it:** "if a ship's cargo hold isn't empty and the goods aren't going to be sold or earmarked for another reason, the ship should either go to a waypoint to sell it or, if that's not profitable, jettison it." The contract's ore on a ship that mines for the contract is earmarked; so is a spare-time hold, which the next trip fills on (D37), unless no market it can reach buys it. |
 
 ## Phases
 
@@ -1727,6 +1735,117 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `FleetStatusQueryServiceTests`, `ShipGoalSerializationTests` (Domain), `DiValidationTests` and
       `PrometheusMetricsTests` (API).
 
+- **6.9 Roles** (built 2026-10-02 on branch `claude/ship-role-profitability-ghjzlb`, in projects and gembernodes, with your
+  decisions D38–D42). Asked that day: "Please help me do some refinement on the ship's behavior. Each ship should have a
+  set of potential roles. … A ship should occasionally consider whether it's role is still the best thing it can do. …
+  Goal is to have every ship be the most profitable it can be by comparing each role it has with the potential profits it
+  can make." And, during the work, D42: cargo nothing will sell is sold where that pays, or jettisoned.
+  - Done:
+    - **Potential roles** (`FleetRoles.PotentialRoles`): survey with a surveyor (or a bought `SHIP_SURVEYOR`, whose mounts
+      startup sync records later); mine with a mining laser, a hold and a tank; siphon with a gas siphon, a hold and a tank;
+      trade with a hold and a tank. A probe has none. A role counts only while its plan is on; mining also while the
+      contract wants ore.
+    - **The role board** (`RolePlanService`, new switch `Automation.Plan.Roles.Enabled`, off; bootstrapped after the scout
+      plan and before the others) gives every ship one role (`RolePlanner`, no I/O):
+      1. a ship with one role takes it (`only_role`);
+      2. surveys first (D38): in a system with a ship that can only survey, it surveys and the others don't; otherwise the
+         ship that can survey with the least to lose (its best other trip earns least per hour) surveys, while another
+         ship there can mine, since surveys are for miners (`survey_first`). It keeps the role unless another would lose
+         less by more than the head start. With the spare-time plan on it trades or gathers when it has nothing to survey
+         (D34), as the command ship does now;
+      3. while the contract wants ore, every other ship that can mine mines (`contract`, D40);
+      4. the rest share the work for the most credits per hour across the fleet: each takes one trip (or none), no two the
+         same trade route (D18) or the same mining or siphon opening (`most_profitable`). It is the assignment problem,
+         solved exactly (`Assignment`, the Hungarian method), so the work goes where it earns the fleet most, not to the
+         first ship that wants it. A ship's current role counts `Roles.HeadStartPercent` (20) more (D41). A ship without a
+         trip keeps its role (`no_work`).
+    - **The estimates** (`RoleEstimator`, no I/O): for each role a ship could take but surveying, the trips its plan would
+      offer, best per hour first: every lucrative route (D14), its profit after fuel; every mining target (D28's), a full
+      hold of the target ore, filled at the ship's rate times the ore's share of the extractions (its survey's, or one of
+      the asteroid's ores), less fuel; every siphon target, a full hold of the gases a market buys (D33), each at the best
+      price it fetches. Each adds the production chains' share (D39, `ChainValues`): a good sold to a market that imports it
+      and exports a pricier good made from it counts `Roles.ChainValueSharePercent` (50%) of the price difference (what the
+      market charges for each, as D15 compares them), and that share again of the next step at the market in the system that
+      makes the most of it; each step times how short its market is of the input (SCARCE 1, LIMITED ¾, MODERATE ½, HIGH ¼,
+      ABUNDANT 0). Time: the flights in CRUISE as the API reckons them (15 seconds plus the distance times 25 over the
+      engine's speed, 9 when it isn't cached), 10 seconds a landing, and the cooldowns to fill the hold, half a tick after
+      each.
+    - **How fast a ship fills its hold** (`GatheringRates`): every extraction and siphon records its yield and cooldown; a
+      ship's last 10 give its rate, else the average of the other ships of the kind, else 3 units every 70 seconds (the soak
+      test's drone extracted every 71 seconds; the command ship's Mining Laser II has strength 5). In memory; the plan state
+      keeps them, and the first evaluation after a restart takes them back.
+    - **When** (D41): at the first pass after a start, every `Roles.ReconsiderMinutes` (10), and at once when a ship joins,
+      a plan is switched, the contract starts or stops wanting ore, or a ship with a choice of roles (not the one that
+      surveys, which waits for surveys by design) has had no work for a minute, at most once a minute. A new role takes
+      effect when the ship's trip ends: the plans only give work to free ships.
+    - **The plans** read one board (`FleetRoleBoard`): with the board on, the survey plan gives surveys to the survey role,
+      the mining plan trips to the mining role, the siphon plan to the siphon role, and the trading plan routes to the trade
+      role and to a miner or siphoner its plan had no trip for, as before; the spare-time plan takes the survey role's ship.
+      The contract takes every ship that can mine but the one that surveys (D40), whatever its role, so it never waits for
+      the next evaluation. A ship bought this tick waits one tick for its role. With the board off, the fixed rules of D20
+      and D34 hold, unchanged.
+    - **Purchases:** with the board on, the mining and siphon plans buy a drone only when the board would give it their
+      role (`RoleAdvisor`: its best trip in the role earns at least as much per hour as in any other, from the shipyard). A
+      drone that would earn more trading would trade, and the plan, finding no free miner, would buy the next, and the next.
+    - **Dead cargo** (D42, `HeldCargo`, `CargoJettison`): a free trader whose hold has nothing that pays for its sale after
+      fuel jettisons it before it takes a route (it used to stay aboard for good), but for the contract's ore on a ship that
+      mines for the contract. A surveyor with nothing to survey and no spare-time trip to fill its hold on sells its hold
+      where that pays (a held-cargo trip), and jettisons the rest: the 7 copper SPECTER-1 carried since its contract work
+      (6.4's Noticed). A spare-time ship with a full hold that no market it can reach buys jettisons it, and gathers again.
+      Journal `CargoJettisoned` (`Reason` `no_buyer` or `not_worth_the_fuel`); counted in
+      `spacetraders_jettisoned_units_total`. A jettison the API refuses is a warning, and waits 10 minutes before the next
+      try (`JettisonRetries`).
+    - **Visibility:** journal kind `RoleChanged` (`OldRole`, `NewRole`, `Reason`, and for a role chosen by profit
+      `CreditsPerHour` and the `Job` that decided it). The state (`plan_states`, `Roles`) lists every ship's role, why,
+      since when, what each role it could take would earn it per hour with the trip, and the rates it used. Metrics
+      `spacetraders_ship_role_info{ship,role,reason}` and `spacetraders_ship_role_credits_per_hour{ship,role}`, exported
+      while the board is on (switched off, the plans no longer read its roles); the dashboard's new "Roles" table shows
+      them (gembernodes).
+  - Noticed (not changed):
+    - **The estimates are estimates:** prices as last seen; a full hold sold at one price, while each sale lowers it; a
+      siphon trip as if each gas sells at its best price, while the trip sells its own at its market; a ship's first
+      evaluations use the default rate until it extracts. The state and the dashboard show every estimate, so a wrong one
+      shows.
+    - **Within a role the plans still choose by their own rules** (D15: a route to a market that makes a pricier good
+      first; D28: the market shortest of its ore first), so the trip a ship gets may not be the one its role was valued by. The chain value only weighs roles; ranking the plans' own trips
+      by it would change D15 and D28. Yours to call.
+    - **One ship surveys per system** (besides every ship that can only survey), and only while another ship there can
+      mine. With many drones far apart, one surveyor may not keep up; the board doesn't measure that.
+    - **Spare time:** what doesn't pay for its fuel after a spare-time sale stays aboard for the next trip, as D36 has it;
+      D42 jettisons a spare-time hold only when it is full and no market it can reach buys any of it.
+    - **With the trading plan off,** nothing sells or jettisons a free ship's cargo: D42 runs in the trading plan.
+    - **Jettisoning while docked:** the API's documentation names no state for it, and the archived ship planner allowed it
+      anywhere but in flight; the bot never did it docked before. A refusal would show as a warning, once every 10 minutes.
+    - No plan buys a `SHIP_SURVEYOR`; one bought by hand reaches the bot at its next startup sync.
+    - The board writes its state at each evaluation: every 10 minutes, and at most once a minute while a ship with a choice
+      of roles has no work.
+  - To switch it on: `PUT /settings/Automation.Plan.Roles.Enabled` with `{"value": "true"}`. The first evaluation follows
+    at the next tick, and the "Roles" table and the journal's `RoleChanged` lines show what it decided.
+  - Done when: a full reset period with the role board on and no open anomaly for it.
+  - **To understand this,** start with `SpaceTraders.Application/Roles/RolePlanner.cs`, then `RoleEstimator.cs` and
+    `ChainValues.cs`, `Automation/RolePlanService.cs` and `Roles/FleetRoleBoard.cs`; for D42, `Trading/HeldCargo.cs` and
+    `TradeInsteadOfGatheringAsync`'s neighbours in `Automation/TradingAutomationService.cs`.
+    `tests/SpaceTraders.Application.Tests/Roles/RolePlannerTests.cs` has your two examples.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Roles/FleetRole.cs`, `FleetRoleBoard.cs`, `RolePlanner.cs`, `RoleEstimator.cs`, `ChainValues.cs`,
+      `Assignment.cs`, `GatheringRates.cs`, `RoleSettings.cs`, `RoleAdvisor.cs`; `Automation/RolePlanService.cs` (with
+      `RoleBoardMemory`), `RolePlanState.cs`; `Trading/HeldCargo.cs`; `Services/CargoJettison.cs` (with
+      `JettisonRetries`);
+    - changed: `Automation/FleetRoles.cs` (`PotentialRoles`, `CanSurvey`, `CanMine`, `CanSiphon`, `EngineSpeed`),
+      `AutomationSwitches.cs` (the Roles plan), `GameLoopService.cs`, `ContractPlanService.cs`, `SurveyPlanService.cs`,
+      `MiningAutomationService.cs`, `SiphonAutomationService.cs`, `TradingAutomationService.cs`, `SpareTimePlanService.cs`,
+      `ProbeDeploymentPlanService.cs`, `Health/ShipLeftIdleRule.cs`, `Commands/Ships/MineResourceVolumeCommand.cs`,
+      `ExtractResourcesCommand.cs`, `SiphonResourcesCommand.cs`, `JournalEvents.cs`, `Interfaces/IAutomationMetrics.cs`,
+      `DependencyInjection.cs`; `PrometheusAutomationMetrics`, `PrometheusMetricsService` (API); `DefaultSettingsSeed`
+      (Persistence);
+    - tests: `Roles/RolePlannerTests`, `RoleEstimatorTests`, `ChainValuesTests`, `AssignmentTests`, `GatheringRatesTests`,
+      `FleetRoleBoardTests`, `RoleAdvisorTests`, `RoleBoardTestSupport`, `Automation/RolePlanServiceTests`,
+      `Trading/HeldCargoTests`, `Services/CargoJettisonTests` (new); additions to `TradingAutomationServiceTests` (one
+      rewritten: cargo no market buys is jettisoned now), `SpareTimePlanServiceTests` (one rewritten),
+      `MiningAutomationServiceTests`, `SiphonAutomationServiceTests`, `SurveyPlanServiceTests`, `ContractMinersTests`,
+      `ShipRuleTests`, `ExtractResourcesHandlerTests`, `SiphonResourcesHandlerTests`, `AutomationSwitchesTests`,
+      `DefaultSettingsSeedTests`; `PrometheusMetricsTests` and `MetricsEndpointTests` (API).
+
 ## Changes in gembernodes
 
 Changes to files are made on a branch there, and Flux deploys them once merged. The rest needs
@@ -1744,3 +1863,4 @@ your PC, 1Password or kubectl:
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
 | 2.9 | The settings table on the SpaceTraders dashboard (branch `ccr-212dac2b-p2ent0`, not merged). It shows data once the bot runs a build with `spacetraders_setting_info`: deploy that build with it |
+| 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (branch `claude/ship-role-profitability-ghjzlb`, not merged). It shows data once the bot runs a build with the role board switched on |

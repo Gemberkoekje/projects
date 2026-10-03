@@ -15,6 +15,7 @@ public sealed class DefaultSettingsSeedTests
         // The kill switch and the plan switches: the tick, goal steps, startup recovery.
         "Automation.Enabled",
         "Automation.Plan.Scout.Enabled",
+        "Automation.Plan.Roles.Enabled",
         "Automation.Plan.Contract.Enabled",
         "Automation.Plan.ProbeDeployment.Enabled",
         "Automation.Plan.Survey.Enabled",
@@ -58,6 +59,11 @@ public sealed class DefaultSettingsSeedTests
 
         // Siphoning (slice 6.7): SiphonAutomationService's cap on siphon drones (D32).
         "Siphon.MaxDrones",
+
+        // The role board (slice 6.9): RoleSettings, read by RolePlanService and RoleAdvisor (D39, D41).
+        "Roles.ReconsiderMinutes",
+        "Roles.HeadStartPercent",
+        "Roles.ChainValueSharePercent",
 
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).

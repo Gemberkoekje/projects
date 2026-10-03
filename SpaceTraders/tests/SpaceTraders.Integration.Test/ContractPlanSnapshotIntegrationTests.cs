@@ -167,6 +167,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);

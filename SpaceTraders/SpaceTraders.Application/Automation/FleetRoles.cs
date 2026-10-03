@@ -1,4 +1,6 @@
+using System.Text.Json;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -120,6 +122,104 @@ public static class FleetRoles
         return ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
             || ship.ShipType.Equals("SATELLITE", StringComparison.OrdinalIgnoreCase)
             || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_PROBE\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The roles a ship could take, by what it carries (slice 6.9, D38), whichever plans are on: survey with a
+    /// surveyor; mine with a mining laser, a hold and a tank; siphon with a gas siphon, a hold and a tank; trade with
+    /// a hold and a tank. A probe has none: the probe plan flies it.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>Its potential roles, in the order survey, mine, siphon, trade.</returns>
+    public static IReadOnlyList<FleetRole> PotentialRoles(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+
+        var roles = new List<FleetRole>();
+        if (IsProbe(ship))
+        {
+            return roles;
+        }
+
+        if (CanSurvey(ship))
+        {
+            roles.Add(FleetRole.Survey);
+        }
+
+        if (CanMine(ship))
+        {
+            roles.Add(FleetRole.Mine);
+        }
+
+        if (CanSiphon(ship))
+        {
+            roles.Add(FleetRole.Siphon);
+        }
+
+        if (ship.IsTradingCapable)
+        {
+            roles.Add(FleetRole.Trade);
+        }
+
+        return roles;
+    }
+
+    /// <summary>
+    /// Whether the ship can survey: a surveyor mount, or a bought <c>SHIP_SURVEYOR</c>, whose mounts are recorded only at
+    /// the next startup sync.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship that can take the survey role.</returns>
+    public static bool CanSurvey(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.HasSurveyEquipment || ship.ShipType.Equals("SHIP_SURVEYOR", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Whether the ship can mine: a mining laser (<see cref="HasMiningLaser"/>), a hold and a tank.</summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship that can take the mining role.</returns>
+    public static bool CanMine(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return HasMiningLaser(ship) && ship.IsTradingCapable;
+    }
+
+    /// <summary>Whether the ship can siphon: a gas siphon, a hold and a tank.</summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship that can take the siphon role.</returns>
+    public static bool CanSiphon(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.HasGasSiphonEquipment && ship.IsTradingCapable;
+    }
+
+    /// <summary>
+    /// The engine's speed, from the cached engine; <paramref name="whenUnknown"/> for a ship bought since the last
+    /// restart, whose engine startup sync hasn't recorded yet.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <param name="whenUnknown">The speed to assume without a cached engine.</param>
+    /// <returns>The speed, more than 0.</returns>
+    public static int EngineSpeed(ShipModel ship, int whenUnknown)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        if (string.IsNullOrWhiteSpace(ship.EngineJson))
+        {
+            return whenUnknown;
+        }
+
+        try
+        {
+            using var engine = JsonDocument.Parse(ship.EngineJson);
+            return engine.RootElement.TryGetProperty("speed", out var speed) && speed.TryGetInt32(out var value) && value > 0
+                ? value
+                : whenUnknown;
+        }
+        catch (JsonException)
+        {
+            return whenUnknown;
+        }
     }
 
     /// <summary>

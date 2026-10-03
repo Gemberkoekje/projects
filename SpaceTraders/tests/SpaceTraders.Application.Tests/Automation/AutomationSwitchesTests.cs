@@ -23,6 +23,7 @@ public sealed class AutomationSwitchesTests
         {
             ["Automation.Enabled"] = "true",
             ["Automation.Plan.Scout.Enabled"] = "true",
+            ["Automation.Plan.Roles.Enabled"] = "false",
             ["Automation.Plan.Contract.Enabled"] = "true",
             ["Automation.Plan.ProbeDeployment.Enabled"] = "false",
             ["Automation.Plan.Survey.Enabled"] = "false",
@@ -40,6 +41,7 @@ public sealed class AutomationSwitchesTests
             .Select(AutomationSwitches.PlanEnabledSetting)
             .Should().Equal(
                 "Automation.Plan.Scout.Enabled",
+                "Automation.Plan.Roles.Enabled",
                 "Automation.Plan.Contract.Enabled",
                 "Automation.Plan.ProbeDeployment.Enabled",
                 "Automation.Plan.Survey.Enabled",

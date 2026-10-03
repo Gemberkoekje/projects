@@ -8,9 +8,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Prometheus;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -348,6 +350,43 @@ public sealed class PrometheusMetricsServiceTests
         });
     }
 
+    /// <summary>
+    /// The roles table (slice 6.9) shows the role board while it is on. Switched off, the plans no longer read the roles
+    /// its state keeps, so the table shows none rather than roles nobody follows.
+    /// </summary>
+    [Theory]
+    [InlineData("true", 1)]
+    [InlineData("false", 0)]
+    public async Task SampleAsync_ExportsTheRoleBoard_OnlyWhileItIsOn(string boardSwitch, int ships)
+    {
+        var state = new RolePlanState
+        {
+            EvaluatedAt = TimeProvider.System.GetUtcNow(),
+            Ships = [new RoleShipState { ShipSymbol = "AGENT-1", Role = FleetRole.Survey, Reason = "survey_first", Since = TimeProvider.System.GetUtcNow() }],
+        };
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Settings.Add(Setting(AgentId, "Automation.Plan.Roles.Enabled", boardSwitch, "Run the role board"));
+            db.PlanStates.Add(new PlanStateRecord { AgentId = AgentId, PlanType = PlanTypes.Roles, StateJson = JsonSerializer.Serialize(state) });
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<RoleMetricsSample>? roles = null;
+        _metrics.When(m => m.Roles(Arg.Any<IReadOnlyCollection<RoleMetricsSample>>()))
+            .Do(call => roles = call.Arg<IReadOnlyCollection<RoleMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        roles.Should().NotBeNull().And.HaveCount(ships);
+    }
+
     private static AgentSetting Setting(string agentId, string key, string value, string description)
         => new() { AgentId = agentId, Key = key, Value = value, Type = "string", Description = description };
 
@@ -636,6 +675,60 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"true\",description=\"Run the mining plan\"} 1\n");
         text.Should().NotContain("current=\"false\"");
         text.Should().NotContain("setting=\"Trade.MinProfitPerUnit\"");
+    }
+
+    /// <summary>
+    /// The roles table (slice 6.9): one row per ship with its role and why, and what each role it could take would earn
+    /// it per hour; a ship whose role changes loses its old row, and a role it can no longer take its estimate.
+    /// </summary>
+    [Fact]
+    public async Task AShipsRole_IsOneSeries_WithAnEstimatePerRoleItCouldTake()
+    {
+        _metrics.Roles(
+        [
+            new RoleMetricsSample("AGENT-1", "Survey", "survey_first", new Dictionary<string, long> { ["Mine"] = 4_000, ["Trade"] = 21_000 }),
+            new RoleMetricsSample("AGENT-3", "Mine", "most_profitable", new Dictionary<string, long> { ["Mine"] = 2_500, ["Trade"] = 0 }),
+        ]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-1\",role=\"Survey\",reason=\"survey_first\"} 1\n");
+        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-3\",role=\"Mine\",reason=\"most_profitable\"} 1\n");
+        text.Should().Contain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Trade\"} 21000\n");
+        text.Should().Contain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-3\",role=\"Mine\"} 2500\n");
+
+        _metrics.Roles([new RoleMetricsSample("AGENT-1", "Trade", "most_profitable", new Dictionary<string, long> { ["Trade"] = 21_000 })]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-1\",role=\"Trade\",reason=\"most_profitable\"} 1\n");
+        text.Should().NotContain("role=\"Survey\"");
+        text.Should().NotContain("ship=\"AGENT-3\"");
+        text.Should().NotContain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Mine\"}");
+    }
+
+    [Fact]
+    public void TheRoleBoardsState_GivesTheRoleSamples_AndNoStateGivesNone()
+    {
+        var state = new RolePlanState
+        {
+            EvaluatedAt = Start,
+            Ships =
+            [
+                new RoleShipState
+                {
+                    ShipSymbol = "AGENT-1",
+                    Role = FleetRole.Trade,
+                    Reason = "most_profitable",
+                    Since = Start,
+                    Estimates = [new RoleEstimateState { Role = FleetRole.Mine, CreditsPerHour = 4_000 }, new RoleEstimateState { Role = FleetRole.Trade, CreditsPerHour = 21_000 }],
+                },
+            ],
+        };
+
+        var sample = PrometheusMetricsService.RoleSamples(JsonSerializer.Serialize(state)).Should().ContainSingle().Subject;
+        (sample.Ship, sample.Role, sample.Reason).Should().Be(("AGENT-1", "Trade", "most_profitable"));
+        sample.CreditsPerHour.Should().BeEquivalentTo(new Dictionary<string, long> { ["Mine"] = 4_000, ["Trade"] = 21_000 });
+        PrometheusMetricsService.RoleSamples(null).Should().BeEmpty();
+        PrometheusMetricsService.RoleSamples("{not json").Should().BeEmpty();
     }
 
     [Fact]

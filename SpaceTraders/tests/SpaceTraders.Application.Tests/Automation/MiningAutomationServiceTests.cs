@@ -5,7 +5,9 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -29,6 +31,7 @@ public sealed class MiningAutomationServiceTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private MiningAutomationPlanState? _state;
@@ -212,6 +215,35 @@ public sealed class MiningAutomationServiceTests
         await _purchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task WithTheRoleBoardOn_ADroneIsBought_OnlyWhenTheBoardWouldHaveItMine(bool wouldMine, int purchases)
+    {
+        // Slice 6.9: a drone that would earn more trading would trade, and the next pass would buy another for the same
+        // opening, and the next.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine));
+        _roleAdvisor.WouldTakeAsync(Arg.Is<ShipModel>(ship => ship.ShipType == "SHIP_MINING_DRONE"), FleetRole.Mine, Arg.Any<CancellationToken>())
+            .Returns(wouldMine);
+        HeldBy("SHIP-3", H51, "COPPER_ORE");
+        Fleet(Drone());
+
+        await RunAsync();
+
+        await _purchases.Received(purchases).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_ADroneWithTheTradeRole_GetsNoMiningTrip()
+    {
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Trade), ("SHIP-4", FleetRole.Mine));
+        Fleet(Drone(), Drone("SHIP-4"));
+
+        await RunAsync();
+
+        _activeGoals.Keys.Should().Equal("SHIP-4");
+    }
+
     [Fact]
     public async Task NoDroneIsBought_WhileTheContractTakesTheMiners()
     {
@@ -287,6 +319,7 @@ public sealed class MiningAutomationServiceTests
                 _settings,
                 _plans,
                 _purchases,
+                _roleAdvisor,
                 _log.For<MiningAutomationService>())
             .EnsureBootstrappedAsync();
 }

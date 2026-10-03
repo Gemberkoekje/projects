@@ -5,6 +5,7 @@ using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Trading;
 using static SpaceTraders.Application.Tests.SpareTime.SpareTimeFixture;
 
@@ -24,6 +25,7 @@ public sealed class ExtractResourcesHandlerTests
     private readonly IOrbitSubCommand _orbit = Substitute.For<IOrbitSubCommand>();
     private readonly Wolverine.IMessageBus _bus = Substitute.For<Wolverine.IMessageBus>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly GatheringRates _rates = new();
     private readonly LogRecorder _log = new();
 
     public ExtractResourcesHandlerTests()
@@ -56,6 +58,9 @@ public sealed class ExtractResourcesHandlerTests
         // What the dashboard shows as mined; not an extraction for the survey statistics.
         _metrics.Received(1).Extracted("SHIP-1", "QUARTZ_SAND", 6);
         _metrics.DidNotReceiveWithAnyArgs().Extraction(default!, default);
+
+        // How fast the ship fills its hold, for the role board's estimates (slice 6.9).
+        _rates.For("SHIP-1", GatheringKind.Mining).Should().Be(new GatheringRate(6, 70, Observed: true));
 
         var extracted = _log.Journal.Should().ContainSingle().Subject;
         extracted.EventKind.Should().Be("Extracted");
@@ -135,5 +140,6 @@ public sealed class ExtractResourcesHandlerTests
             _orbit,
             _bus,
             _metrics,
+            _rates,
             _log.For<ExtractResourcesHandler>());
 }
