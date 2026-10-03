@@ -29,7 +29,7 @@ public sealed class RolePlannerTests
             headStart: 0.2);
 
         Role(decisions, "SHIP-1").Should().Be((FleetRole.Survey, RolePlanner.SurveyFirst));
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class RolePlannerTests
         Role(decisions, "SHIP-5").Should().Be((FleetRole.Survey, RolePlanner.OnlyRole));
         Role(decisions, "SHIP-1").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
         decisions.Single(decision => decision.ShipSymbol == "SHIP-1").Option!.JobKey.Should().Be("trade|A");
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
     }
 
     [Fact]
@@ -116,19 +116,19 @@ public sealed class RolePlannerTests
     [Fact]
     public void TheWorkGoesWhereItEarnsTheFleetMost_NotToTheFirstShipThatWantsIt()
     {
-        // One route: the command ship earns 20,000 an hour on it and the drone 4,000. The drone would rather trade than mine
-        // (3,000), but the fleet earns 23,000 with the command ship trading and the drone mining, against 9,000 the other
-        // way round.
+        // One route: SHIP-1 earns 20,000 an hour on it and SHIP-2 4,000. SHIP-2 would rather trade than mine (3,000), but the
+        // fleet earns 23,000 with SHIP-1 trading and SHIP-2 mining, against 9,000 the other way round. (Ships that can survey:
+        // a drone gathers whatever trading would pay, D58.)
         var decisions = RolePlanner.Decide(
             [
-                Candidate(Drone(), DroneRoles, Trade("trade|R", 4_000), Mine("mine|F49|SILICON_CRYSTALS", 3_000)),
+                Candidate(CommandShip(symbol: "SHIP-2"), [FleetRole.Mine, FleetRole.Trade], Trade("trade|R", 4_000), Mine("mine|F49|SILICON_CRYSTALS", 3_000)),
                 Candidate(CommandShip(), [FleetRole.Mine, FleetRole.Trade], Trade("trade|R", 20_000), Mine("mine|H51|COPPER_ORE", 5_000)),
             ],
             contractWantsOre: false,
             headStart: 0.2);
 
         Role(decisions, "SHIP-1").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-2").Should().Be((FleetRole.Mine, RolePlanner.MostProfitable));
     }
 
     [Theory]
@@ -138,7 +138,7 @@ public sealed class RolePlannerTests
     {
         // D41: trading pays 3,000 an hour, so with a 20% head start mining must beat 3,600.
         var decisions = RolePlanner.Decide(
-            [Candidate(Drone(), DroneRoles, FleetRole.Trade, Trade("trade|R", 3_000), Mine("mine|F49|SILICON_CRYSTALS", minePerHour))],
+            [Candidate(CommandShip(), [FleetRole.Mine, FleetRole.Trade], FleetRole.Trade, Trade("trade|R", 3_000), Mine("mine|F49|SILICON_CRYSTALS", minePerHour))],
             contractWantsOre: false,
             headStart: 0.2);
 
@@ -150,21 +150,46 @@ public sealed class RolePlannerTests
     {
         var decisions = RolePlanner.Decide(
             [
-                Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Trade),
-                Candidate(Drone("SHIP-4"), DroneRoles),
+                Candidate(CommandShip(), [FleetRole.Mine, FleetRole.Trade], FleetRole.Trade),
+                Candidate(CommandShip(symbol: "SHIP-2"), [FleetRole.Mine, FleetRole.Trade]),
             ],
             contractWantsOre: false,
             headStart: 0.2);
 
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Trade, RolePlanner.NoWork));
-        Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.NoWork));
+        Role(decisions, "SHIP-1").Should().Be((FleetRole.Trade, RolePlanner.NoWork));
+        Role(decisions, "SHIP-2").Should().Be((FleetRole.Mine, RolePlanner.NoWork));
+    }
+
+    [Fact]
+    public void ADrone_GathersFirst_ThoughTradingWouldPayItMore()
+    {
+        // D58, asked on 2026-10-03: "Mining drones should be mining drones first, and traders second, and they should not leave
+        // gaps when trading in a way that results in endless drones being bought." Seen that day: the board moved drones between
+        // gathering and trading every 10 minutes (SPECTER-3: Mine to Trade at 19:33Z, back at 19:51Z, to Trade again at
+        // 20:01Z), the ores they no longer mined went short, and the mining plan bought a drone for them (SPECTER-15 at 18:52Z,
+        // for the middle's copper). A drone takes its gathering role whatever trading would pay, one without a trip or a role
+        // too; it trades only when its plan has no trip for it. The command ship still takes what pays it most.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(CommandShip(), [FleetRole.Mine, FleetRole.Trade], Trade("trade|A", 20_000), Mine("mine|H51|COPPER_ORE", 5_000)),
+                Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Trade, Trade("trade|B", 10_000), Mine("mine|F49|SILICON_CRYSTALS", 2_000)),
+                Candidate(Drone("SHIP-4"), DroneRoles, FleetRole.Trade),
+                Candidate(Drone("SHIP-5"), SiphonRoles, Trade("trade|C", 8_000), Siphon("siphon|G50|HYDROCARBON", 1_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2);
+
+        Role(decisions, "SHIP-1").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
+        Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
+        Role(decisions, "SHIP-5").Should().Be((FleetRole.Siphon, RolePlanner.GathersFirst));
     }
 
     [Fact]
     public void ADroneWorkingOnAScarceMineral_KeepsGatheringIt_ThoughTradingPaysItMore()
     {
         // Slice 6.10b (D48): "at least 1 drone per mineral that is scarce or limited". Without it SHIP-4 would trade, and the
-        // mining plan would buy a drone for copper, and another.
+        // mining plan would buy a drone for copper, and another. SHIP-3 mines too, as every drone gathers first (D58).
         var decisions = RolePlanner.Decide(
             [
                 Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Mine, Trade("trade|A", 10_000), Mine("mine|H51|IRON_ORE", 2_000)),
@@ -175,7 +200,7 @@ public sealed class RolePlannerTests
             [new MineralCoverage("COPPER_ORE", FleetRole.Mine, ["SHIP-3", "SHIP-4"], ["SHIP-4"])]);
 
         Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
     }
 
     [Fact]
@@ -191,14 +216,14 @@ public sealed class RolePlannerTests
             [new MineralCoverage("QUARTZ_SAND", FleetRole.Mine, ["SHIP-3", "SHIP-4"], [])]);
 
         Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
-        Role(decisions, "SHIP-3").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
     }
 
     [Fact]
-    public void EachScarceMineral_KeepsOneDrone_AndTheRestShareTheWork()
+    public void EachScarceMineral_KeepsOneDrone_AndTheRestGatherToo()
     {
-        // Two scarce gases and three siphon drones: the two with the least to lose keep siphoning, the third takes what pays
-        // it most.
+        // Two scarce gases and three siphon drones: the two with the least to lose keep siphoning for them, and the third
+        // siphons too, as every drone gathers first (D58).
         var decisions = RolePlanner.Decide(
             [
                 Candidate(Drone("SHIP-5"), SiphonRoles, Trade("trade|A", 6_000), Siphon("siphon|G50|LIQUID_HYDROGEN", 3_000)),
@@ -214,7 +239,7 @@ public sealed class RolePlannerTests
 
         decisions.Where(decision => decision.Reason == RolePlanner.Coverage).Select(decision => (decision.ShipSymbol, decision.Role))
             .Should().BeEquivalentTo([("SHIP-5", FleetRole.Siphon), ("SHIP-6", FleetRole.Siphon)]);
-        Role(decisions, "SHIP-7").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-7").Should().Be((FleetRole.Siphon, RolePlanner.GathersFirst));
     }
 
     [Fact]

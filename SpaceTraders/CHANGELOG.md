@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-03, D58)
+- Drones gather first (D58), as asked on 2026-10-03: "Mining drones should be mining drones first, and traders second, and they should not leave gaps when trading in a way that results in endless drones being bought." The role board gives every mining drone the mining role and every siphon drone the siphon role (`gathers_first`), whatever trading would pay; a drone trades only when its plan has no trip for it. The board had moved drones between gathering and trading every 10 minutes, and the ores and gases they no longer gathered went short, so the coverage tier bought drones for them. The command ship still takes what pays it most.
+
+### Docs – Changed (2026-10-03, D58)
+- `PLAN.md`: D58 and its follow-up under 6.10c; D57 merged. `docs/HOW_IT_WORKS.md`: the role board's order, the reasons in `RoleChanged` and `spacetraders_ship_role_info`, and the board's say in drone purchases.
+
 ### Code – Added (2026-10-03, D57)
 - Credits held back for a trade trip (D57), as asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at the price it was chosen with (`TradeBetweenMarketsGoal.ReservedCredits`, `TripReservations`) from the moment it starts until its cargo is aboard. The trading plan gives other traders only the credits no trip holds back, the trip at its buy market spends its own and those no other trip holds back, and every ship purchase leaves them (`BudgetPolicy`, `spacetraders_credit_reserve`). A trader that sets off for the hold it saved up for (D56) saves up no more: the trip's hold takes its place. The goal store reads the fleet's trade trips at once (`GetActiveTradeGoalsAsync`). At 19:29Z SPECTER-8 had dropped its EQUIPMENT trip at K85 with nothing bought, because another trader spent the credits on the way.
 

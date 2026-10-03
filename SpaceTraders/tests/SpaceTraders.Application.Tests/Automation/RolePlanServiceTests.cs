@@ -69,8 +69,8 @@ public sealed class RolePlanServiceTests
     public async Task OneDronePerScarceOreAndArea_KeepsMining_AndTheRestShareTheWork()
     {
         // Slice 6.10b (D48): six ores and areas are SCARCE or LIMITED for a drone, four near the middle, and B7's gold and
-        // copper, a drift away (D45); copper counts in each area (D53). There are seven drones. The seventh takes what pays
-        // it most: in the middle of X1-DC53, with no lucrative route, mining.
+        // copper, a drift away (D45); copper counts in each area (D53). There are seven drones. The seventh mines too: a drone
+        // gathers first (D58).
         Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"), Drone("SHIP-9"));
 
         await RunAsync();
@@ -78,7 +78,7 @@ public sealed class RolePlanServiceTests
         _state!.Ships.Where(ship => ship.Reason == RolePlanner.Coverage).Select(ship => ship.ShipSymbol)
             .Should().Equal("SHIP-3", "SHIP-4", "SHIP-5", "SHIP-6", "SHIP-7", "SHIP-8");
         _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-9").Should().Match<RoleShipState>(
-            ship => ship.Role == FleetRole.Mine && ship.Reason == RolePlanner.MostProfitable && ship.CreditsPerHour > 0 && ship.Job.Length > 0);
+            ship => ship.Role == FleetRole.Mine && ship.Reason == RolePlanner.GathersFirst);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Roles;
@@ -116,6 +117,9 @@ public sealed record MineralCoverage
 ///   <item>one drone per SCARCE or LIMITED mineral and area keeps gathering it (<see cref="Coverage"/>, D48, D53): the
 ///   drone whose trip covers it, else one that has the role, else the one with the least to lose. Without that, a drone
 ///   that earns more trading would leave its mineral, and the plan would buy the next;</item>
+///   <item>every other drone gathers too (<see cref="GathersFirst"/>, D58): a drone, which can mine or siphon and trade and
+///   nothing else, takes its gathering role whatever trading would pay, and trades only when its plan has no trip for it.
+///   Moved to trading for profit, drones left the minerals they had mined short, and the plans bought drones for them;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
 ///   takes one trip, and no two the same trade route (D18) or the same mining or siphon opening. A ship's current role
 ///   counts the head start more (D41), so a close call doesn't flip back and forth. A ship left without a trip keeps
@@ -135,6 +139,12 @@ public static class RolePlanner
 
     /// <summary>The drone keeps gathering a SCARCE or LIMITED mineral, one drone each per area (D48, D53).</summary>
     public const string Coverage = "coverage";
+
+    /// <summary>
+    /// The drone gathers, whatever trading would pay (D58): "Mining drones should be mining drones first, and traders
+    /// second". It trades only when its plan has no trip for it.
+    /// </summary>
+    public const string GathersFirst = "gathers_first";
 
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
     public const string MostProfitable = "most_profitable";
@@ -198,6 +208,11 @@ public static class RolePlanner
             decisions[keeper.Ship.Symbol] = new RoleDecision(keeper.Ship.Symbol, role, Coverage, null);
         }
 
+        foreach (var drone in ships.Where(ship => !decisions.ContainsKey(ship.Ship.Symbol) && IsDrone(ship)))
+        {
+            decisions[drone.Ship.Symbol] = new RoleDecision(drone.Ship.Symbol, GatheringRole(drone), GathersFirst, null);
+        }
+
         foreach (var decision in ShareTheWork([.. ships.Where(ship => !decisions.ContainsKey(ship.Ship.Symbol))], bonus))
         {
             decisions[decision.ShipSymbol] = decision;
@@ -238,6 +253,17 @@ public static class RolePlanner
             yield return current is not null && current.BestPerHour <= cheapest.BestPerHour * bonus ? current : cheapest;
         }
     }
+
+    /// <summary>
+    /// Whether the ship is a drone (D58): it can mine or siphon, whichever plan of those is on, and can't survey, so not the
+    /// command ship, whatever role that has.
+    /// </summary>
+    private static bool IsDrone(RoleCandidate ship)
+        => !FleetRoles.CanSurvey(ship.Ship) && ship.Roles.Any(role => role is FleetRole.Mine or FleetRole.Siphon);
+
+    /// <summary>A drone's gathering role (D58): mining for a mining drone, siphoning for a siphon drone.</summary>
+    private static FleetRole GatheringRole(RoleCandidate drone)
+        => drone.Roles.Contains(FleetRole.Mine) ? FleetRole.Mine : FleetRole.Siphon;
 
     /// <summary>
     /// A drone to keep gathering each SCARCE or LIMITED mineral in each area (D48, D53), one each, the minerals the fewest
