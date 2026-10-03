@@ -1,9 +1,13 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -16,7 +20,8 @@ namespace SpaceTraders.API.Services;
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
 /// every ship (role, state, goal, why its goal is blocked, where it is, what it does, what it can do, its hold, what it cost), the
-/// accepted contracts' deliverables and the usable surveys; and the bot's settings. What happens (API calls, goal steps, credits earned and spent) is counted where
+/// accepted contracts' deliverables and the usable surveys; the bot's settings; and what each plan would buy, in the order ships
+/// are bought in (slice 6.10b, from <see cref="PurchaseNeeds"/>). What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
 /// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
 /// </summary>
@@ -24,6 +29,7 @@ public sealed class PrometheusMetricsService(
     IServiceScopeFactory serviceScopeFactory,
     IAutomationMetrics metrics,
     ShipStateJournal shipJournal,
+    PurchaseNeeds purchaseNeeds,
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
@@ -95,7 +101,28 @@ public sealed class PrometheusMetricsService(
                 .Select(plan => plan.StateJson)
                 .FirstOrDefaultAsync(cancellationToken)
             : null;
-        metrics.Roles(RoleSamples(roles));
+        var roleSamples = RoleSamples(roles);
+        metrics.Roles(roleSamples);
+
+        // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits.
+        var roleOf = roleSamples.ToDictionary(
+            sample => sample.Ship,
+            sample => Enum.TryParse<FleetRole>(sample.Role, out var role) ? role : FleetRole.None,
+            StringComparer.Ordinal);
+        var floor = settings.Find(setting => setting.Key == CreditReserve.FloorSetting)?.Value;
+        metrics.ReservedCredits(CreditReserve.Of(
+            long.TryParse(floor, NumberStyles.Integer, CultureInfo.InvariantCulture, out var floorCredits) ? floorCredits : 0,
+            CreditReserve.PerTradingCargoUnit(settings.Find(setting => setting.Key == CreditReserve.PerTradingCargoUnitSetting)?.Value ?? string.Empty),
+            CreditReserve.TradingCargo(ships.Select(ShipRepository.MapToModel), ship => roleOf.GetValueOrDefault(ship.Symbol, FleetRole.None))));
+
+        // Slice 6.10b (D43): what the credits are saved up for, and what waits behind it.
+        metrics.PurchaseNeeds([.. purchaseNeeds.Open(now).Select(open => new PurchaseNeedMetricsSample(
+            open.Plan.ToString(),
+            open.Need.Tier.ToString(),
+            (int)open.Need.Tier,
+            open.Need.ShipType,
+            open.Need.ShipyardWaypointSymbol,
+            open.Need.Price))]);
     }
 
     /// <summary>The role board's ships, from its state's JSON; none without a readable state.</summary>

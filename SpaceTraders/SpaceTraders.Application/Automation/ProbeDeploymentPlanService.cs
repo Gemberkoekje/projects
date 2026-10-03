@@ -27,7 +27,9 @@ public interface IProbeDeploymentPlanService
 /// probe of its own, which the market watch uses to keep its prices fresh. Each pass:
 /// <list type="number">
 ///   <item>while there are fewer probes than markets, it buys a SHIP_PROBE at the shipyard that sells it for
-///   the least, as long as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29);</item>
+///   the least, as long as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29), and nothing
+///   comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>, D43): the contract's drone, a
+///   surveyor, a drone for each scarce mineral and the cargo ships of <c>Trade.ShipPurchases</c> go first;</item>
 ///   <item>it flies the free probes (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
 ///   waits for one of our ships (<see cref="ShipyardCalls"/>, D30), the others between nearby markets, the
 ///   one whose prices are oldest first, until there is a probe at every market.</item>
@@ -46,6 +48,7 @@ public sealed class ProbeDeploymentPlanService(
     IShipPurchaseService shipPurchases,
     ShipyardCalls calls,
     ISettingsRepository settings,
+    IPurchaseOrder purchaseOrder,
     ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
 {
     /// <summary>The ship the plan buys (D29).</summary>
@@ -59,6 +62,9 @@ public sealed class ProbeDeploymentPlanService(
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
+        // Slice 6.10b (D43): a pass that buys no probe says so; one that would, says so where it would buy.
+        await purchaseOrder.ReportAsync(AutomationPlan.ProbeDeployment, PurchaseNeed.None, cancellationToken);
+
         var agent = await agents.GetAsync(cancellationToken);
         if (agent is null || string.IsNullOrWhiteSpace(agent.HeadquartersSymbol))
         {
@@ -161,8 +167,9 @@ public sealed class ProbeDeploymentPlanService(
 
     /// <summary>
     /// Buys the next probe (D29) while the system has more markets than probes, at the shipyard that sells it
-    /// for the least. <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when
-    /// none of ours is at the shipyard (D30).
+    /// for the least, when nothing comes before it in the order ships are bought in (D43).
+    /// <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when none of ours is at the
+    /// shipyard (D30).
     /// </summary>
     private async Task<(ProbePurchaseStatus Status, string Shipyard, long Price)> BuyProbeAsync(
         string systemSymbol,
@@ -187,6 +194,14 @@ public sealed class ProbeDeploymentPlanService(
         if (offer.Count == 0)
         {
             return (ProbePurchaseStatus.NoShipyardSellsProbes, shipyard, price);
+        }
+
+        if (!await purchaseOrder.ReportAsync(
+            AutomationPlan.ProbeDeployment,
+            new PurchaseNeed(PurchaseTier.Probes, ProbeShipType, shipyard, price),
+            cancellationToken))
+        {
+            return (ProbePurchaseStatus.WaitingForAnotherPurchase, shipyard, price);
         }
 
         ShipPurchaseResult result;

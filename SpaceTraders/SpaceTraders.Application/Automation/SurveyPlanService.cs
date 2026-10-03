@@ -5,6 +5,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -14,8 +15,8 @@ namespace SpaceTraders.Application.Automation;
 public interface ISurveyPlanService
 {
     /// <summary>
-    /// One pass of the plan: ends the surveys that expired, and gives every free surveyor its next
-    /// survey.
+    /// One pass of the plan: ends the surveys that expired, gives every free surveyor its next survey, and with the role
+    /// board on buys a surveyor for a system with mining drones that has none.
     /// </summary>
     /// <param name="cancellationToken">Stops the pass.</param>
     /// <returns>A task that completes when the pass is done.</returns>
@@ -37,6 +38,11 @@ public interface ISurveyPlanService
 /// (slice 6.8): a survey that needs taking takes it off its spare-time trip at once, with its hold aboard (D37). A
 /// surveyor takes the best target no other surveyor works on, or the best one when all are taken. The plan also ends
 /// the surveys that expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey dashboard.
+/// <para>
+/// With the role board on, it buys a designated surveyor (D47): a <c>SHIP_SURVEYOR</c> for each system with mining drones
+/// and no ship that can only survey, first in the order ships are bought in after the contract's drone (D43). The board
+/// gives it the survey role (D38), which frees the command ship for what pays it most.
+/// </para>
 /// </summary>
 public sealed class SurveyPlanService(
     IShipRepository ships,
@@ -48,8 +54,14 @@ public sealed class SurveyPlanService(
     IPlanRepository plans,
     ISettingsRepository settings,
     SpareTimeInterruption interruption,
+    IShipyardRepository shipyards,
+    IShipPurchaseService shipPurchases,
+    IPurchaseOrder purchaseOrder,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
+    /// <summary>The ship the plan buys to survey (D47): a drone frame with a surveyor, and no hold.</summary>
+    public const string SurveyorShipType = "SHIP_SURVEYOR";
+
     /// <summary>The setting that holds the usable surveys to keep of each ore (D27).</summary>
     public const string StockPerOreSetting = "Survey.StockPerOre";
 
@@ -163,7 +175,73 @@ public sealed class SurveyPlanService(
             }));
         }
 
+        await BuySurveyorAsync(fleet, board, cancellationToken);
         await SaveStateAsync(targets, now, cancellationToken);
+    }
+
+    /// <summary>
+    /// Says what the plan would buy (<see cref="SurveyorNeedAsync"/>), and buys it when the order ships are bought in lets
+    /// it (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. With the role board off the command ship surveys
+    /// (D20), and no surveyor is bought.
+    /// </summary>
+    private async Task BuySurveyorAsync(IReadOnlyList<ShipModel> fleet, FleetRoleBoard board, CancellationToken cancellationToken)
+    {
+        var need = board.RolesOn ? await SurveyorNeedAsync(fleet, cancellationToken) : PurchaseNeed.None;
+        if (!await purchaseOrder.ReportAsync(AutomationPlan.Survey, need, cancellationToken))
+        {
+            return;
+        }
+
+        var purchased = await shipPurchases.TryPurchaseAsync(need.ShipType, need.ShipyardWaypointSymbol, cancellationToken);
+        if (!purchased.IsSuccess)
+        {
+            logger.LogDebug(
+                "Survey plan: surveyor purchase denied at {Shipyard} — {Reason}.",
+                need.ShipyardWaypointSymbol,
+                purchased.FailureReason ?? "Purchase failed.");
+        }
+    }
+
+    /// <summary>
+    /// A designated surveyor (D47) for the first system, by symbol, with a mining drone (<see cref="FleetRoles.IsMiningDrone"/>)
+    /// and no ship that can only survey, at the system's shipyard that sells a <c>SHIP_SURVEYOR</c> for the least; none when
+    /// no shipyard there is known to sell one.
+    /// </summary>
+    private async Task<PurchaseNeed> SurveyorNeedAsync(IReadOnlyList<ShipModel> fleet, CancellationToken cancellationToken)
+    {
+        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        foreach (var systemSymbol in fleet
+            .Where(FleetRoles.IsMiningDrone)
+            .Select(ship => ship.SystemSymbol)
+            .OfType<string>()
+            .Where(system => system.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal))
+        {
+            if (fleet.Any(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)
+                && FleetRoles.PotentialRoles(ship) is [FleetRole.Survey]))
+            {
+                continue;
+            }
+
+            var offer = shipyardList
+                .Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(shipyard => shipyard.Ships
+                    .Where(ship => ship.Type.Equals(SurveyorShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
+                    .Select(ship => (Shipyard: shipyard.WaypointSymbol, Price: ship.PurchasePrice)))
+                .OrderBy(candidate => candidate.Price)
+                .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
+                .ToList();
+            if (offer.Count == 0)
+            {
+                logger.LogDebug("Survey plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, SurveyorShipType);
+                continue;
+            }
+
+            return new PurchaseNeed(PurchaseTier.Surveyor, SurveyorShipType, offer[0].Shipyard, offer[0].Price);
+        }
+
+        return PurchaseNeed.None;
     }
 
     /// <summary>The contract's ore, while the contract plan mines it in this system.</summary>

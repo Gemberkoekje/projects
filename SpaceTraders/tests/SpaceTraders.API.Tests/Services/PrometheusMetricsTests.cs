@@ -13,6 +13,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -92,6 +93,7 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -247,6 +249,7 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -299,6 +302,7 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -341,6 +345,7 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -384,6 +389,7 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -428,10 +434,78 @@ public sealed class PrometheusMetricsServiceTests
             provider.GetRequiredService<IServiceScopeFactory>(),
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
         roles.Should().NotBeNull().And.HaveCount(ships);
+    }
+
+    /// <summary>
+    /// Slice 6.10b (D43): the dashboard shows what each plan would buy, so that credits saved up for a cargo ship, while
+    /// probes and drones wait, read as the order the user asked for and not as a bot that stopped buying.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_ExportsWhatEachPlanWouldBuy_InTheOrderShipsAreBoughtIn()
+    {
+        using var provider = BuildProvider();
+        var needs = new PurchaseNeeds();
+        needs.Report(AutomationPlan.ProbeDeployment, new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", "X1-AB-A2", 77_117), TimeProvider.System.GetUtcNow());
+        needs.Report(AutomationPlan.Mining, PurchaseNeed.None, TimeProvider.System.GetUtcNow());
+        IReadOnlyCollection<PurchaseNeedMetricsSample> exported = [];
+        _metrics.When(m => m.PurchaseNeeds(Arg.Any<IReadOnlyCollection<PurchaseNeedMetricsSample>>()))
+            .Do(call => exported = call.Arg<IReadOnlyCollection<PurchaseNeedMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            needs,
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 5, "SHIP_PROBE", "X1-AB-A2", 77_117));
+    }
+
+    /// <summary>
+    /// D51: the dashboard shows the credit reserve next to the credits: the floor, and 1,000 a unit of what the ships that
+    /// trade can carry. The command ship and a light shuttle carry 40 each; a mining drone counts only while the role board
+    /// has it trading.
+    /// </summary>
+    [Theory]
+    [InlineData("false", 140_000)]
+    [InlineData("true", 155_000)]
+    public async Task SampleAsync_ExportsTheCreditReserve_ByWhatTheShipsThatTradeCanCarry(string boardSwitch, long reserve)
+    {
+        var state = new RolePlanState
+        {
+            EvaluatedAt = TimeProvider.System.GetUtcNow(),
+            Ships = [new RoleShipState { ShipSymbol = "AGENT-3", Role = FleetRole.Trade, Reason = "most_profitable", Since = TimeProvider.System.GetUtcNow() }],
+        };
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Ships.Add(Equipped("AGENT-1", "COMMAND", ["MOUNT_SURVEYOR_II", "MOUNT_MINING_LASER_II"], 40, 400));
+            db.Ships.Add(Equipped("AGENT-2", "SATELLITE", [], 0, 0));
+            db.Ships.Add(Equipped("AGENT-3", "EXCAVATOR", ["MOUNT_MINING_LASER_I"], 15, 80));
+            db.Ships.Add(Equipped("AGENT-4", "SHIP_LIGHT_SHUTTLE", ["MOUNT_TURRET_I"], 40, 300));
+            db.Settings.Add(Setting(AgentId, "FleetExpansion.MinCreditReserve", "60000", "The floor"));
+            db.Settings.Add(Setting(AgentId, "FleetExpansion.ReservePerTradingCargoUnit", "1000", "A unit"));
+            db.Settings.Add(Setting(AgentId, "Automation.Plan.Roles.Enabled", boardSwitch, "Run the role board"));
+            db.PlanStates.Add(new PlanStateRecord { AgentId = AgentId, PlanType = PlanTypes.Roles, StateJson = JsonSerializer.Serialize(state) });
+            await db.SaveChangesAsync();
+        }
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        _metrics.Received(1).ReservedCredits(reserve);
     }
 
     private static AgentSetting Setting(string agentId, string key, string value, string description)
@@ -510,6 +584,7 @@ public sealed class PrometheusAutomationMetricsTests
     public static TheoryData<string, Action<IAutomationMetrics>, string> UnlabelledGauges => new()
     {
         { "spacetraders_agent_credits", metrics => metrics.Credits(145_028), "spacetraders_agent_credits 145028\n" },
+        { "spacetraders_credit_reserve", metrics => metrics.ReservedCredits(100_000), "spacetraders_credit_reserve 100000\n" },
         { "spacetraders_db_size_bytes", metrics => metrics.DatabaseSize(15_742_655), "spacetraders_db_size_bytes 15742655\n" },
         { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds 1791118800\n" },
     };
@@ -841,6 +916,31 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().NotContain("role=\"Survey\"");
         text.Should().NotContain("ship=\"AGENT-3\"");
         text.Should().NotContain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Mine\"}");
+    }
+
+    /// <summary>
+    /// What each plan would buy (slice 6.10b, D43): one series per plan, worth what the ship costs; a plan whose need
+    /// changes loses its old series, and one that needs nothing loses its own.
+    /// </summary>
+    [Fact]
+    public async Task APlansPurchaseNeed_IsOneSeries_WorthWhatTheShipCosts()
+    {
+        _metrics.PurchaseNeeds(
+        [
+            new PurchaseNeedMetricsSample("Survey", "Surveyor", 2, "SHIP_SURVEYOR", "X1-DC53-H52", 33_905),
+            new PurchaseNeedMetricsSample("Trading", "CargoShips", 4, "SHIP_LIGHT_SHUTTLE", "X1-DC53-A2", 114_225),
+        ]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Survey\",tier=\"Surveyor\",position=\"2\",ship_type=\"SHIP_SURVEYOR\",shipyard=\"X1-DC53-H52\"} 33905\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"4\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
+
+        _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 6, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"6\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
+        text.Should().NotContain("plan=\"Survey\"");
+        text.Should().NotContain("SHIP_LIGHT_SHUTTLE");
     }
 
     [Fact]

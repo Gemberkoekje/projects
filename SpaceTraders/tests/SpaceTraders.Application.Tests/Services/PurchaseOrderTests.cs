@@ -1,0 +1,272 @@
+using FluentAssertions;
+using NSubstitute;
+using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Enums;
+
+namespace SpaceTraders.Application.Tests.Services;
+
+/// <summary>
+/// Slice 6.10b (D43): ships are bought in a fixed order. Asked on 2026-10-03: "I'd like at least 1 drone per mineral that
+/// is scarce or limited, then save up for cargo ships, then a mix based on if the minerals aren't going above LIMITED", the
+/// mix being "Alternate drones and cargo ships, but probes first"; a designated surveyor comes first (D47), and the
+/// contract's drone stays before everything (D23, D40).
+/// </summary>
+public sealed class PurchaseOrderTests
+{
+    private const string List = "SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER";
+
+    /// <summary>When the ledger's purchases were made: before anything this process buys during a test.</summary>
+    private static readonly DateTimeOffset Start = DateTimeOffset.UtcNow.AddDays(-1);
+
+    private readonly PurchaseNeeds _needs = new();
+    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
+    private readonly LogRecorder _log = new();
+
+    public PurchaseOrderTests()
+    {
+        foreach (var plan in PurchaseOrder.BuyingPlans.Keys)
+        {
+            PlanIs(plan, on: true);
+        }
+
+        _settings.GetAsync<string>(TradingAutomationService.ShipPurchasesSetting, Arg.Any<CancellationToken>()).Returns(List);
+        LedgerHolds();
+    }
+
+    [Fact]
+    public async Task TheContractsDrone_ComesFirst()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Survey, Need(PurchaseTier.Surveyor, "SHIP_SURVEYOR"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Contract, Need(PurchaseTier.Contract, "SHIP_MINING_DRONE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AProbe_WaitsWhileACargoShipOfTheListIsStillToBuy_SoTheCreditsAreSavedUpForIt()
+    {
+        // "then save up for cargo ships": while a ship in Trade.ShipPurchases is still to buy, no probe is bought.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UntilAPlanThatIsOnHasSaidWhatItNeeds_NothingItCouldNeedEarlierIsPassed()
+    {
+        // After a start the probe plan runs before the survey, mining, siphon and trading plans; it waits for their first
+        // word, as any of them could need something that comes first.
+        _needs.Report(AutomationPlan.Contract, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Survey, Need(PurchaseTier.Surveyor, "SHIP_SURVEYOR"))).Should().BeTrue("only the contract plan could need something earlier");
+    }
+
+    [Fact]
+    public async Task APlanThatIsOff_DoesNotHoldAnyoneBack()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), DateTimeOffset.UtcNow);
+        PlanIs(AutomationPlan.Trading, on: false);
+        PlanIs(AutomationPlan.Siphon, on: false);
+        _needs.Report(AutomationPlan.Siphon, PurchaseNeed.None, DateTimeOffset.UtcNow.AddHours(-1));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ANeedNotSaidAgainWithinItsLifetime_NoLongerCounts()
+    {
+        // A plan that fails before it says what it needs lets the others buy.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), DateTimeOffset.UtcNow - PurchaseNeeds.Lifetime - TimeSpan.FromSeconds(1));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TheMiningAndSiphonPlansDrones_ForScarceMinerals_DoNotWaitForEachOther()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Siphon, Need(PurchaseTier.Coverage, "SHIP_SIPHON_DRONE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Coverage, "SHIP_MINING_DRONE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ADroneForAScarceMineral_ComesBeforeTheCargoShips_AndTheSurveyorBeforeThat()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Mining, Need(PurchaseTier.Coverage, "SHIP_MINING_DRONE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Survey, Need(PurchaseTier.Surveyor, "SHIP_SURVEYOR"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Coverage, "SHIP_MINING_DRONE"))).Should().BeFalse();
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("waits for the Survey plan's SHIP_SURVEYOR (Surveyor)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task OnceEverythingElseIsBought_DronesAndCargoShipsTakeTurns_ADroneFirst()
+    {
+        // The list's last cargo ship was bought, then nothing: a drone's turn.
+        LedgerHolds(
+            ("SHIP-3", ShipType.ShipMiningDrone),
+            ("SHIP-4", ShipType.ShipLightShuttle),
+            ("SHIP-5", ShipType.ShipLightHauler),
+            ("SHIP-6", ShipType.ShipSiphonDrone),
+            ("SHIP-7", ShipType.ShipLightHauler));
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"))).Should().BeFalse("the drone's turn comes first");
+    }
+
+    [Fact]
+    public async Task AfterADrone_ACargoShipsTurn_AndAPurchaseCountsAtOnce_ThoughTheLedgerHasNotGotItYet()
+    {
+        // The mining plan bought a drone this tick; the siphon plan, a moment later in the same tick, must not buy
+        // another: the ledger's row comes after the purchase.
+        LedgerHolds(
+            ("SHIP-4", ShipType.ShipLightShuttle),
+            ("SHIP-5", ShipType.ShipLightHauler),
+            ("SHIP-7", ShipType.ShipLightHauler));
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"))).Should().BeTrue();
+
+        _needs.Bought("SHIP-8", ShipType.ShipMiningDrone, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Siphon, Need(PurchaseTier.Alternating, "SHIP_SIPHON_DRONE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"))).Should().BeTrue();
+        await _ledger.ReceivedWithAnyArgs(1).GetRangeAsync();
+    }
+
+    [Fact]
+    public async Task ATurnPasses_WhenTheOtherKindHasNothingToBuy()
+    {
+        // A cargo ship's turn, but no new cargo ship would have a lucrative route: a drone may go.
+        LedgerHolds(
+            ("SHIP-4", ShipType.ShipLightShuttle),
+            ("SHIP-5", ShipType.ShipLightHauler),
+            ("SHIP-7", ShipType.ShipLightHauler),
+            ("SHIP-8", ShipType.ShipMiningDrone));
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Siphon, Need(PurchaseTier.Alternating, "SHIP_SIPHON_DRONE"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Siphon, Need(PurchaseTier.Alternating, "SHIP_SIPHON_DRONE"))).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("", PurchaseKind.Drone)]
+    [InlineData("D", PurchaseKind.CargoShip)]
+    [InlineData("DC", PurchaseKind.Drone)]
+    [InlineData("DDC", PurchaseKind.CargoShip)]
+    [InlineData("DDCC", PurchaseKind.Drone)]
+    [InlineData("PSD", PurchaseKind.CargoShip)]
+    public void TheTurn_CountsTheDronesAndCargoShipsBoughtSinceTheListsLastCargoShip(string since, PurchaseKind turn)
+    {
+        // D: a drone, C: a hauler, P: a probe, S: a surveyor. Probes and surveyors don't take turns.
+        List<PurchaseRecord> purchases =
+        [
+            Bought("SHIP-3", ShipType.ShipMiningDrone, 0),
+            Bought("SHIP-4", ShipType.ShipLightShuttle, 1),
+            Bought("SHIP-5", ShipType.ShipSiphonDrone, 2),
+            Bought("SHIP-6", ShipType.ShipLightHauler, 3),
+            Bought("SHIP-7", ShipType.ShipLightHauler, 4),
+        ];
+        foreach (var (letter, index) in since.Select((letter, index) => (letter, index)))
+        {
+            var type = letter switch
+            {
+                'D' => ShipType.ShipSiphonDrone,
+                'C' => ShipType.ShipLightHauler,
+                'P' => ShipType.ShipProbe,
+                _ => ShipType.ShipSurveyor,
+            };
+            purchases.Add(Bought($"NEW-{index}", type, 10 + index));
+        }
+
+        PurchaseOrder.Turn(purchases, [ShipType.ShipLightShuttle, ShipType.ShipLightHauler, ShipType.ShipLightHauler]).Should().Be(turn);
+    }
+
+    [Fact]
+    public void BeforeTheListsLastCargoShip_OrWithoutIt_ItIsTheDronesTurn()
+    {
+        PurchaseOrder.Turn(
+            [Bought("SHIP-3", ShipType.ShipMiningDrone, 0), Bought("SHIP-4", ShipType.ShipMiningDrone, 1), Bought("SHIP-5", ShipType.ShipLightShuttle, 2)],
+            [ShipType.ShipLightShuttle, ShipType.ShipLightHauler])
+            .Should().Be(PurchaseKind.Drone);
+    }
+
+    [Fact]
+    public void WithAnEmptyList_EveryDroneBoughtCounts()
+    {
+        // With nothing in Trade.ShipPurchases the trading plan buys nothing, so the turn always passes back to the drones.
+        PurchaseOrder.Turn([Bought("SHIP-3", ShipType.ShipMiningDrone, 0)], []).Should().Be(PurchaseKind.CargoShip);
+    }
+
+    [Fact]
+    public async Task NothingToBuy_IsNeverABuy_AndClearsWhatThePlanSaidBefore()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, PurchaseNeed.None)).Should().BeFalse();
+
+        _needs.Open(DateTimeOffset.UtcNow).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TheOpenNeeds_ComeFirstInTheOrderFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _needs.Report(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"), now);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), now);
+        _needs.Report(AutomationPlan.Mining, PurchaseNeed.None, now);
+        _needs.Report(AutomationPlan.Survey, Need(PurchaseTier.Surveyor, "SHIP_SURVEYOR"), now - PurchaseNeeds.Lifetime - TimeSpan.FromSeconds(1));
+
+        _needs.Open(now).Select(open => open.Plan).Should().Equal(AutomationPlan.Trading, AutomationPlan.ProbeDeployment);
+    }
+
+    private static PurchaseNeed Need(PurchaseTier tier, string shipType) => new(tier, shipType, "X1-DC53-A2", 50_000);
+
+    private static PurchaseRecord Bought(string ship, ShipType type, int minute) => new(ship, type, Start.AddMinutes(minute));
+
+    private void EveryoneSays(PurchaseNeed need)
+    {
+        foreach (var plan in PurchaseOrder.BuyingPlans.Keys)
+        {
+            _needs.Report(plan, need, DateTimeOffset.UtcNow);
+        }
+    }
+
+    private void PlanIs(AutomationPlan plan, bool on)
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(plan), Arg.Any<CancellationToken>()).Returns(on);
+
+    /// <summary>The ledger's ship purchases, the newest first as it returns them, a minute apart.</summary>
+    private void LedgerHolds(params (string Ship, ShipType Type)[] purchases)
+        => _ledger.GetRangeAsync().ReturnsForAnyArgs(
+            [
+                .. purchases
+                    .Select((purchase, index) => new LedgerEntryDto(index, Start.AddMinutes(index), purchase.Ship, null, nameof(LedgerCategory.ShipPurchase), -50_000, purchase.Type.ToString(), null, null, null))
+                    .Reverse(),
+            ]);
+
+    private Task<bool> MayBuyAsync(AutomationPlan plan, PurchaseNeed need)
+        => new PurchaseOrder(_needs, _settings, _ledger, _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
+}

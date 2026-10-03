@@ -61,6 +61,7 @@ public sealed class PurchaseShipHandlerTests
             shipyards,
             budget,
             new ShipyardCalls(),
+            new PurchaseNeeds(),
             bus,
             NullLogger<PurchaseShipHandler>.Instance);
 

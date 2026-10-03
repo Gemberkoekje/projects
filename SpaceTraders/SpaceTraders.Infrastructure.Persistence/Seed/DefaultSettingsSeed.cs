@@ -11,7 +11,8 @@ public static class DefaultSettingsSeed
 {
     private static readonly IReadOnlyList<AgentSetting> Defaults =
     [
-        new AgentSetting { Key = "FleetExpansion.MinCreditReserve",       Value = "100000",              Type = "long",    Description = "Credits to always keep in bank" },
+        new AgentSetting { Key = "FleetExpansion.MinCreditReserve",       Value = "60000",               Type = "long",    Description = "Credits every ship purchase leaves with no ship that trades: the floor of the credit reserve, which grows by FleetExpansion.ReservePerTradingCargoUnit for every unit the trading ships can carry (D51)" },
+        new AgentSetting { Key = "FleetExpansion.ReservePerTradingCargoUnit", Value = "1000",            Type = "long",    Description = "Credits the credit reserve grows by for every unit of hold on the ships that trade: cargo ships, the command ship and ships the role board has trading, so they can still buy their loads after a purchase (D51; 0 = the floor only)" },
         new AgentSetting { Key = "FleetExpansion.PreferredShipType",      Value = "SHIP_MINING_DRONE",   Type = "string",  Description = "Default ship type to buy" },
         new AgentSetting { Key = "Trade.MinProfitPerUnit",                Value = "200",                 Type = "int",     Description = "Credits per unit, after fuel, a trade trip must earn to be started, and to be carried on when prices change (0 = any profit)" },
         new AgentSetting { Key = "Trade.FuelReserveCredits",              Value = "5000",                Type = "long",    Description = "Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24)" },

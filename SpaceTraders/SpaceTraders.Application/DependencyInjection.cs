@@ -55,6 +55,10 @@ public static class DependencyInjection
         // A purchase that waits for one of our ships at a shipyard, from tick to tick, for the probe plan
         // to answer (slice 6.3, D30).
         services.AddSingleton<ShipyardCalls>();
+
+        // The order ships are bought in (slice 6.10b, D43): what each plan would buy, from tick to tick.
+        services.AddSingleton<PurchaseNeeds>();
+        services.AddScoped<IPurchaseOrder, PurchaseOrder>();
         services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
         services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();
         services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();

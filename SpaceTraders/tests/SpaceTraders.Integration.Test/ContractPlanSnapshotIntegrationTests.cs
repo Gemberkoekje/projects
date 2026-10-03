@@ -168,6 +168,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
             Substitute.For<IPlanRepository>(),
+            new PurchaseOrder(new PurchaseNeeds(), Substitute.For<ISettingsRepository>(), Substitute.For<ILedgerRepository>(), NullLogger<PurchaseOrder>.Instance),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);

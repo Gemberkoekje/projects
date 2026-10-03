@@ -120,6 +120,12 @@ public interface IAutomationMetrics
     void Credits(long credits);
 
     /// <summary>
+    /// Records the credits a ship purchase must leave (<c>spacetraders_credit_reserve</c>, D51): the floor, and the credits
+    /// per unit the ships that trade can carry. A purchase waits until the credits are its price above this.
+    /// </summary>
+    void ReservedCredits(long credits);
+
+    /// <summary>
     /// Records every ship's state (<c>spacetraders_ships{role,state}</c> and
     /// <c>spacetraders_ship_status_since_timestamp_seconds{ship,role,state,goal,reason}</c>), where it
     /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), what it can do
@@ -181,6 +187,48 @@ public interface IAutomationMetrics
     /// changed loses its old series, and a ship or role that is no longer in <paramref name="roles"/> loses its own.
     /// </summary>
     void Roles(IReadOnlyCollection<RoleMetricsSample> roles);
+
+    /// <summary>
+    /// Records the order ships are bought in (slice 6.10b, D43): what each plan that buys ships would buy now, one series per
+    /// plan, its value what the ship costs as cached
+    /// (<c>spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}</c>). <c>position</c> is the tier's
+    /// place in the order, 1 for the contract's drone to 6 for drones and cargo ships in turn; the lowest is what the
+    /// credits are saved up for. A plan that needs nothing, or whose need changed, loses its old series.
+    /// </summary>
+    void PurchaseNeeds(IReadOnlyCollection<PurchaseNeedMetricsSample> needs);
+}
+
+/// <summary>What one plan would buy, as the metrics show it (slice 6.10b, D43).</summary>
+public sealed record PurchaseNeedMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public PurchaseNeedMetricsSample(string Plan, string Tier, int Position, string ShipType, string Shipyard, long Price)
+    {
+        this.Plan = Plan;
+        this.Tier = Tier;
+        this.Position = Position;
+        this.ShipType = ShipType;
+        this.Shipyard = Shipyard;
+        this.Price = Price;
+    }
+
+    /// <summary>The plan that would buy, such as <c>Survey</c>.</summary>
+    public required string Plan { get; init; }
+
+    /// <summary>Its place in the order by name, such as <c>Surveyor</c>.</summary>
+    public required string Tier { get; init; }
+
+    /// <summary>Its place in the order by number: 1 comes first.</summary>
+    public required int Position { get; init; }
+
+    /// <summary>The ship, such as <c>SHIP_SURVEYOR</c>.</summary>
+    public required string ShipType { get; init; }
+
+    /// <summary>Where it would be bought.</summary>
+    public required string Shipyard { get; init; }
+
+    /// <summary>What it costs, as cached.</summary>
+    public required long Price { get; init; }
 }
 
 /// <summary>One ship on the role board as the metrics show it (slice 6.9).</summary>

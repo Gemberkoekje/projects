@@ -21,6 +21,7 @@ public sealed class ShipPurchaseServiceTests
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
     private readonly ShipyardCalls _calls = new();
+    private readonly PurchaseNeeds _purchases = new();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly LogRecorder _log = new();
 
@@ -98,6 +99,17 @@ public sealed class ShipPurchaseServiceTests
     }
 
     [Fact]
+    public async Task APurchase_CountsInThePurchaseOrderAtOnce()
+    {
+        // Slice 6.10b (D43): drones and cargo ships take turns, counted from the purchases; the ledger's row comes after
+        // the purchase, so a plan later in the same tick would otherwise buy another of the same kind.
+        await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        _purchases.Purchases().Should().ContainSingle()
+            .Which.Should().Match<PurchaseRecord>(purchase => purchase.ShipSymbol == "AGENT-2" && purchase.Type == ShipType.ShipMiningDrone);
+    }
+
+    [Fact]
     public async Task APurchase_AnswersTheCall()
     {
         _calls.Call(Shipyard, "SHIP_MINING_DRONE", TimeProvider.System.GetUtcNow());
@@ -166,6 +178,7 @@ public sealed class ShipPurchaseServiceTests
         _shipyards,
         _budget,
         _calls,
+        _purchases,
         _bus,
         _log.For<ShipPurchaseService>());
 }

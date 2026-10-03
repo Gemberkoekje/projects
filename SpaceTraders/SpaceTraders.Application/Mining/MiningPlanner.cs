@@ -235,6 +235,60 @@ public static class MiningPlanner
     }
 
     /// <summary>
+    /// What a miner can mine, best first, with the ores no miner works on first (D48): of its SCARCE or LIMITED targets
+    /// (D22) whose ore isn't in <paramref name="coveredOres"/>, the nearest asteroid first ("near before far"); then the
+    /// rest, in <see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>'s order (D28).
+    /// </summary>
+    /// <param name="context">The miner's system.</param>
+    /// <param name="miner">The miner.</param>
+    /// <param name="heldKeys">The opportunities other miners hold (<see cref="OpportunityKey"/>).</param>
+    /// <param name="coveredOres">The ores a miner's trip works on.</param>
+    /// <returns>The targets, best first.</returns>
+    public static IReadOnlyList<MiningTarget> MiningTargets(MiningContext context, ShipModel miner, IReadOnlySet<string> heldKeys, IReadOnlySet<string> coveredOres)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return UncoveredFirst(context.Map, miner, MiningTargets(context, miner, heldKeys), coveredOres);
+    }
+
+    /// <summary>
+    /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) whose ore isn't in
+    /// <paramref name="coveredOres"/>, the nearest asteroid first; then the rest, each group in the order given.
+    /// </summary>
+    /// <param name="map">The miner's system.</param>
+    /// <param name="miner">The miner.</param>
+    /// <param name="targets">Its targets, in D28's order (<see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>).</param>
+    /// <param name="coveredOres">The ores a miner's trip works on.</param>
+    /// <returns>The targets, best first.</returns>
+    public static IReadOnlyList<MiningTarget> UncoveredFirst(TradeMarketMap map, ShipModel miner, IReadOnlyList<MiningTarget> targets, IReadOnlySet<string> coveredOres)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(targets);
+        ArgumentNullException.ThrowIfNull(coveredOres);
+
+        var position = Position(miner);
+        return [.. targets
+            .Select((target, rank) => (Target: target, Rank: rank, Uncovered: target.LowSupply && !coveredOres.Contains(target.Ore)))
+            .OrderByDescending(entry => entry.Uncovered)
+            .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.AsteroidSymbol, out var distance) ? distance : double.MaxValue)
+            .ThenBy(entry => entry.Rank)
+            .Select(entry => entry.Target)];
+    }
+
+    /// <summary>
+    /// The SCARCE or LIMITED ores a ship could serve (D48): the ores of its low-supply targets (D22), whichever miner
+    /// holds them. An ore that no asteroid it can reach yields, or that no market it can carry it to is short of, isn't
+    /// one.
+    /// </summary>
+    /// <param name="context">The ship's system.</param>
+    /// <param name="ship">The ship, as it is or as it would be bought.</param>
+    /// <returns>The ores, by symbol.</returns>
+    public static IReadOnlySet<string> ScarceOres(MiningContext context, ShipModel ship)
+        => MiningTargets(context, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Where(target => target.LowSupply)
+            .Select(target => target.Ore)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// The low-supply opportunities of a system (D22): each market with an ore in low supply, and the asteroid
     /// nearest it whose traits yield the ore. A ship that can reach the asteroid can take the opportunity.
     /// </summary>

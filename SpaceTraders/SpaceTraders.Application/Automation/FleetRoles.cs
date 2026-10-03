@@ -94,6 +94,14 @@ public static class FleetRoles
     }
 
     /// <summary>
+    /// Whether the ship is a mining drone (slice 6.10b, D48): it can mine (<see cref="CanMine"/>) and can't survey, so not
+    /// the command ship, whichever role it has. The mining plan keeps one per SCARCE or LIMITED ore.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a mining drone, or another ship that mines and doesn't survey.</returns>
+    public static bool IsMiningDrone(ShipModel ship) => CanMine(ship) && !CanSurvey(ship);
+
+    /// <summary>
     /// Whether the ship is a cargo ship, as the trading plan buys them (D21): a hold and a tank, and nothing
     /// to mine, siphon or survey with. Judged by what it carries rather than its cached type, which startup
     /// sync replaces with the registration role (B25).

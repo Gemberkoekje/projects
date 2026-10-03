@@ -14,7 +14,7 @@ namespace SpaceTraders.Application.Automation;
 /// <summary>The mining plan (PLAN.md slice 6.4).</summary>
 public interface IMiningAutomationService
 {
-    /// <summary>One pass of the plan: gives every free miner a trip, and buys a drone when one would serve a market short of an ore.</summary>
+    /// <summary>One pass of the plan: gives every free miner a trip, and buys a drone for a scarce ore or a market short of one.</summary>
     /// <param name="cancellationToken">Stops the pass.</param>
     /// <returns>A task that completes when the pass is done.</returns>
     Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default);
@@ -28,14 +28,16 @@ public interface IMiningAutomationService
 ///   <see cref="FleetRoles"/>);</item>
 ///   <item>a miner that holds ore a market buys sells it first, where it fetches most after fuel: the ore
 ///   left over from a contract, for one;</item>
-///   <item>otherwise it takes the best of <see cref="MiningPlanner.MiningTargets"/>: the market shortest of
-///   an ore first (D28), SCARCE, then LIMITED, and once none is short, the lowest supply there is; within a
-///   supply level, a surveyed ore first. One miner per sell market and ore;</item>
-///   <item>when no miner was free, it buys a drone when the drone's first trip, by the same ranking, would
-///   serve a market short of its ore (D22, D28): one a pass, so the next pass counts its trip, up to
-///   <c>Mining.MaxDrones</c> and within the credit reserve; not while the contract plan mines, which would
-///   take the drone (D23). A drone that would mine for a market that isn't short is not bought: the
-///   opening that paid for it would stay open and pay for the next.</item>
+///   <item>otherwise it takes the best of its mining targets (<see cref="MiningPlanner"/>): a SCARCE or LIMITED ore no
+///   miner works on first, the nearest asteroid first (D48); then the market shortest of an ore (D28), SCARCE, then
+///   LIMITED, and once none is short, the lowest supply there is; within a supply level, a surveyed ore first. One miner
+///   per sell market and ore;</item>
+///   <item>it buys mining drones, one a pass, up to <c>Mining.MaxDrones</c>, within the credit reserve and when the order
+///   ships are bought in lets it (D43); not while the contract plan mines, which would take the drone (D23). First a
+///   drone for each SCARCE or LIMITED ore a new drone could serve (D48); then, when no miner was free, a drone whose
+///   first trip, by the same ranking, would serve a market short of its ore (D22, D28), in turn with the cargo ships. A
+///   drone that would mine for a market that isn't short is not bought: the opening that paid for it would stay open
+///   and pay for the next.</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -51,6 +53,7 @@ public sealed class MiningAutomationService(
     IPlanRepository plans,
     IShipPurchaseService shipPurchases,
     IRoleAdvisor roles,
+    IPurchaseOrder purchaseOrder,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
@@ -71,6 +74,9 @@ public sealed class MiningAutomationService(
 
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // The ores a miner's trip works on: a free miner takes a scarce ore that has none first (D48).
+        var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var free = new List<ShipModel>();
         foreach (var ship in fleet)
         {
@@ -80,6 +86,7 @@ public sealed class MiningAutomationService(
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
+                covered.Add(trip.TradeSymbol);
             }
             else if (board.IsMiner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
@@ -98,7 +105,7 @@ public sealed class MiningAutomationService(
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var miner in candidates)
             {
-                if (await GiveTripAsync(context, miner, heldKeys, heldBy, cancellationToken))
+                if (await GiveTripAsync(context, miner, heldKeys, heldBy, covered, cancellationToken))
                 {
                     withTrip.Add(miner.Symbol);
                 }
@@ -127,25 +134,26 @@ public sealed class MiningAutomationService(
             }
         }
 
-        if (!freeAtStart && !await ContractTakesMinersAsync(cancellationToken))
-        {
-            await BuyDroneAsync(fleet, board, heldKeys, cancellationToken);
-        }
-
+        await BuyDroneAsync(fleet, board, heldKeys, covered, freeAtStart, cancellationToken);
         await SaveStateAsync(opportunities, cancellationToken);
     }
 
-    /// <summary>Gives a free miner its next trip: selling ore it holds, else the best mining target.</summary>
+    /// <summary>
+    /// Gives a free miner its next trip: selling ore it holds, else the best mining target, a scarce ore no miner works on
+    /// first (D48). The reason says <c>uncovered</c> when that came before D28's choice.
+    /// </summary>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
         MiningContext context,
         ShipModel miner,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
+        HashSet<string> covered,
         CancellationToken cancellationToken)
     {
         if (TryFindHeldOreSale(context.Map, miner, out var ore, out var sale))
         {
+            covered.Add(ore.Symbol);
             await StartAsync(miner, new MineAndSellGoal
             {
                 TradeSymbol = ore.Symbol,
@@ -156,22 +164,24 @@ public sealed class MiningAutomationService(
             return true;
         }
 
-        var targets = MiningPlanner.MiningTargets(context, miner, heldKeys);
-        if (targets.Count == 0)
+        var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
+        if (ranked.Count == 0)
         {
             logger.LogDebug("Mining plan: nothing to mine that ship {ShipSymbol} can reach and sell.", miner.Symbol);
             return false;
         }
 
-        var target = targets[0];
+        var target = MiningPlanner.UncoveredFirst(context.Map, miner, ranked, covered)[0];
+        var reason = target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = miner.Symbol;
+        covered.Add(target.Ore);
         await StartAsync(miner, new MineAndSellGoal
         {
             TradeSymbol = target.Ore,
             SourceWaypointSymbol = target.AsteroidSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
-        }, target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply", cancellationToken);
+        }, reason, cancellationToken);
         return true;
     }
 
@@ -219,17 +229,58 @@ public sealed class MiningAutomationService(
             && contract.UnitsFulfilled < contract.UnitsRequired;
 
     /// <summary>
-    /// Buys a drone when every miner works and the drone's first trip, by the miners' own ranking
-    /// (<see cref="MiningPlanner.MiningTargets"/>, the trips under way held), would serve a market short of its
-    /// ore (D22, D28). One a pass: the next pass counts its trip. Up to <c>Mining.MaxDrones</c> and within the
-    /// credit reserve.
+    /// Says what the plan would buy (<see cref="DroneNeedAsync"/>), and buys it when the order ships are bought in lets it
+    /// (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new drone.
     /// </summary>
     private async Task BuyDroneAsync(
         IReadOnlyList<ShipModel> fleet,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
+        IReadOnlySet<string> covered,
+        bool freeAtStart,
         CancellationToken cancellationToken)
     {
+        var need = await DroneNeedAsync(fleet, board, heldKeys, covered, freeAtStart, cancellationToken);
+        if (!await purchaseOrder.ReportAsync(AutomationPlan.Mining, need, cancellationToken))
+        {
+            return;
+        }
+
+        var purchased = await shipPurchases.TryPurchaseAsync(need.ShipType, need.ShipyardWaypointSymbol, cancellationToken);
+        if (!purchased.IsSuccess)
+        {
+            logger.LogDebug(
+                "Mining plan: mining drone purchase denied at {Shipyard} — {Reason}.",
+                need.ShipyardWaypointSymbol,
+                purchased.FailureReason ?? "Purchase failed.");
+        }
+    }
+
+    /// <summary>
+    /// The mining drone the plan would buy, at the shipyard of a system where our ships are that sells it for the least,
+    /// up to <c>Mining.MaxDrones</c>, and none while the contract takes the miners (D23):
+    /// <list type="bullet">
+    ///   <item>a drone for a scarce ore (<see cref="PurchaseTier.Coverage"/>, D48), while the system has fewer mining drones
+    ///   than SCARCE or LIMITED ores a new drone could serve (<see cref="MiningPlanner.ScarceOres"/>): one drone per scarce
+    ///   mineral, which the role board keeps mining. It doesn't ask the board what pays most;</item>
+    ///   <item>otherwise, when every miner works, a drone whose first trip by the miners' own ranking (the trips under way
+    ///   held) would serve a market short of its ore (<see cref="PurchaseTier.Alternating"/>, D22, D28), which, with the
+    ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>).</item>
+    /// </list>
+    /// </summary>
+    private async Task<PurchaseNeed> DroneNeedAsync(
+        IReadOnlyList<ShipModel> fleet,
+        FleetRoleBoard board,
+        IReadOnlySet<string> heldKeys,
+        IReadOnlySet<string> covered,
+        bool freeAtStart,
+        CancellationToken cancellationToken)
+    {
+        if (await ContractTakesMinersAsync(cancellationToken))
+        {
+            return PurchaseNeed.None;
+        }
+
         var maxDrones = await settings.GetAsync<int>(MaxMiningDronesSettingKey, cancellationToken);
         if (maxDrones <= 0)
         {
@@ -240,15 +291,11 @@ public sealed class MiningAutomationService(
         if (drones >= maxDrones)
         {
             logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
-            return;
+            return PurchaseNeed.None;
         }
 
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
-        foreach (var systemSymbol in fleet
-            .Where(ship => board.IsMiner(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
-            .Select(ship => ship.SystemSymbol!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.Ordinal))
+        foreach (var systemSymbol in Systems(fleet))
         {
             var shipyard = shipyardList
                 .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
@@ -274,7 +321,20 @@ public sealed class MiningAutomationService(
                 forSale.FuelCapacity,
                 CargoCapacity: forSale.CargoCapacity,
                 ShipType: MiningDroneShipType);
-            var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys);
+            var need = new PurchaseNeed(PurchaseTier.Coverage, MiningDroneShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
+
+            var miningDrones = fleet.Count(ship => FleetRoles.IsMiningDrone(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
+            if (miningDrones < MiningPlanner.ScarceOres(context, newDrone).Count)
+            {
+                return need;
+            }
+
+            if (freeAtStart)
+            {
+                continue;
+            }
+
+            var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys, covered);
             if (targets.Count == 0 || !targets[0].LowSupply)
             {
                 logger.LogDebug(
@@ -294,18 +354,20 @@ public sealed class MiningAutomationService(
                 continue;
             }
 
-            var purchased = await shipPurchases.TryPurchaseAsync(MiningDroneShipType, shipyard.WaypointSymbol, cancellationToken);
-            if (!purchased.IsSuccess)
-            {
-                logger.LogDebug(
-                    "Mining plan: mining drone purchase denied at {Shipyard} — {Reason}.",
-                    shipyard.WaypointSymbol,
-                    purchased.FailureReason ?? "Purchase failed.");
-            }
-
-            return;
+            return need with { Tier = PurchaseTier.Alternating };
         }
+
+        return PurchaseNeed.None;
     }
+
+    /// <summary>The systems where our ships are, by symbol.</summary>
+    private static IReadOnlyList<string> Systems(IReadOnlyList<ShipModel> fleet)
+        => [.. fleet
+            .Select(ship => ship.SystemSymbol)
+            .OfType<string>()
+            .Where(system => system.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal)];
 
     /// <summary>Records the openings. Only a change is written: the tick runs every 5 seconds.</summary>
     private async Task SaveStateAsync(IReadOnlyList<MiningAutomationOpportunityState> opportunities, CancellationToken cancellationToken)

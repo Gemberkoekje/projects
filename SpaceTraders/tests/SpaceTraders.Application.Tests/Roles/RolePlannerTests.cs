@@ -15,6 +15,7 @@ public sealed class RolePlannerTests
 {
     private static readonly FleetRole[] CommandRoles = [FleetRole.Survey, FleetRole.Mine, FleetRole.Siphon, FleetRole.Trade];
     private static readonly FleetRole[] DroneRoles = [FleetRole.Mine, FleetRole.Trade];
+    private static readonly FleetRole[] SiphonRoles = [FleetRole.Siphon, FleetRole.Trade];
 
     [Fact]
     public void TheOnlyShipThatCanSurvey_Surveys_ThoughTradingPaysItMore()
@@ -160,6 +161,80 @@ public sealed class RolePlannerTests
     }
 
     [Fact]
+    public void ADroneWorkingOnAScarceMineral_KeepsGatheringIt_ThoughTradingPaysItMore()
+    {
+        // Slice 6.10b (D48): "at least 1 drone per mineral that is scarce or limited". Without it SHIP-4 would trade, and the
+        // mining plan would buy a drone for copper, and another.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Mine, Trade("trade|A", 10_000), Mine("mine|H51|IRON_ORE", 2_000)),
+                Candidate(Drone("SHIP-4"), DroneRoles, FleetRole.Mine, Trade("trade|B", 9_000), Mine("mine|H51|COPPER_ORE", 2_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2,
+            [new MineralCoverage("COPPER_ORE", FleetRole.Mine, ["SHIP-3", "SHIP-4"], ["SHIP-4"])]);
+
+        Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+    }
+
+    [Fact]
+    public void ForAScarceMineralNobodyWorksOn_TheDroneWithTheLeastToLose_IsKept()
+    {
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Trade, Trade("trade|A", 10_000), Mine("mine|F49|QUARTZ_SAND", 1_000)),
+                Candidate(Drone("SHIP-4"), DroneRoles, FleetRole.Trade, Trade("trade|B", 4_000), Mine("mine|F49|QUARTZ_SAND", 1_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2,
+            [new MineralCoverage("QUARTZ_SAND", FleetRole.Mine, ["SHIP-3", "SHIP-4"], [])]);
+
+        Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+    }
+
+    [Fact]
+    public void EachScarceMineral_KeepsOneDrone_AndTheRestShareTheWork()
+    {
+        // Two scarce gases and three siphon drones: the two with the least to lose keep siphoning, the third takes what pays
+        // it most.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(Drone("SHIP-5"), SiphonRoles, Trade("trade|A", 6_000), Siphon("siphon|G50|LIQUID_HYDROGEN", 3_000)),
+                Candidate(Drone("SHIP-6"), SiphonRoles, Trade("trade|B", 5_000), Siphon("siphon|E47|LIQUID_NITROGEN", 3_000)),
+                Candidate(Drone("SHIP-7"), SiphonRoles, Trade("trade|C", 7_000), Siphon("siphon|G50|HYDROCARBON", 3_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2,
+            [
+                new MineralCoverage("LIQUID_HYDROGEN", FleetRole.Siphon, ["SHIP-5", "SHIP-6", "SHIP-7"], []),
+                new MineralCoverage("LIQUID_NITROGEN", FleetRole.Siphon, ["SHIP-5", "SHIP-6", "SHIP-7"], []),
+            ]);
+
+        decisions.Where(decision => decision.Reason == RolePlanner.Coverage).Select(decision => (decision.ShipSymbol, decision.Role))
+            .Should().BeEquivalentTo([("SHIP-5", FleetRole.Siphon), ("SHIP-6", FleetRole.Siphon)]);
+        Role(decisions, "SHIP-7").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+    }
+
+    [Fact]
+    public void TheCommandShip_IsNoDroneToKeep_AndTheContractsMinersComeFirst()
+    {
+        // The command ship can survey; while the contract wants ore, the drone mines for it already (D40).
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(CommandShip(), CommandRoles, Trade("trade|A", 20_000), Mine("mine|H51|COPPER_ORE", 5_000)),
+                Candidate(Drone(), DroneRoles, Trade("trade|B", 10_000), Mine("mine|F49|SILICON_CRYSTALS", 2_000)),
+            ],
+            contractWantsOre: true,
+            headStart: 0.2,
+            [new MineralCoverage("COPPER_ORE", FleetRole.Mine, ["SHIP-1", "SHIP-3"], ["SHIP-1"])]);
+
+        Role(decisions, "SHIP-1").Should().Be((FleetRole.Survey, RolePlanner.SurveyFirst));
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.Contract));
+    }
+
+    [Fact]
     public void AShipWithNoRoleWhosePlanIsOn_HasNone()
     {
         var decisions = RolePlanner.Decide([Candidate(Drone(), [])], contractWantsOre: false, headStart: 0.2);
@@ -180,6 +255,8 @@ public sealed class RolePlannerTests
     private static RoleOption Trade(string key, int perHour) => new(FleetRole.Trade, key, key, perHour, 3_600);
 
     private static RoleOption Mine(string key, int perHour) => new(FleetRole.Mine, key, key, perHour, 3_600);
+
+    private static RoleOption Siphon(string key, int perHour) => new(FleetRole.Siphon, key, key, perHour, 3_600);
 
     /// <summary>A survey ship: a surveyor and nothing to carry anything in.</summary>
     private static ShipModel Surveyor()

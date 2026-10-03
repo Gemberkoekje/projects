@@ -66,6 +66,38 @@ public sealed record RoleDecision
 }
 
 /// <summary>
+/// A SCARCE or LIMITED mineral, an ore or a gas, as the role board keeps a drone gathering it (PLAN.md slice 6.10b, D48).
+/// </summary>
+public sealed record MineralCoverage
+{
+    /// <summary>Creates a mineral to keep a drone for.</summary>
+    /// <param name="Good">The ore or gas.</param>
+    /// <param name="Role">The role that gathers it: <see cref="FleetRole.Mine"/> or <see cref="FleetRole.Siphon"/>.</param>
+    /// <param name="AbleShipSymbols">The drones that could serve a market short of it.</param>
+    /// <param name="WorkingShipSymbols">The ships whose trip works on it now.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MineralCoverage(string Good, FleetRole Role, IReadOnlyList<string> AbleShipSymbols, IReadOnlyList<string> WorkingShipSymbols)
+    {
+        this.Good = Good;
+        this.Role = Role;
+        this.AbleShipSymbols = AbleShipSymbols;
+        this.WorkingShipSymbols = WorkingShipSymbols;
+    }
+
+    /// <summary>The ore or gas.</summary>
+    public required string Good { get; init; }
+
+    /// <summary>The role that gathers it.</summary>
+    public required FleetRole Role { get; init; }
+
+    /// <summary>The drones that could serve a market short of it.</summary>
+    public required IReadOnlyList<string> AbleShipSymbols { get; init; }
+
+    /// <summary>The ships whose trip works on it now.</summary>
+    public required IReadOnlyList<string> WorkingShipSymbols { get; init; }
+}
+
+/// <summary>
 /// Which role each ship takes (PLAN.md slice 6.9), without any I/O, so the board and its tests decide alike. Asked on
 /// 2026-10-02: "If there is only 1 ship that can survey, then that ship should prioritize surveying. But if there are 2
 /// ships that can survey, but one of them can only survey and the other can survey, mine, trade and siphon, the ship
@@ -77,6 +109,9 @@ public sealed record RoleDecision
 ///   to lose surveys (<see cref="SurveyFirst"/>): the one whose best other trip earns least per hour. The one that
 ///   surveys now keeps it unless another would lose less by more than the head start;</item>
 ///   <item>while the contract wants ore (D40, D23 kept), every other ship that can mine mines (<see cref="Contract"/>);</item>
+///   <item>one drone per SCARCE or LIMITED mineral keeps gathering it (<see cref="Coverage"/>, D48): the drone whose trip
+///   works on it, else one that has the role, else the one with the least to lose. Without that, a drone that earns more
+///   trading would leave its mineral, and the plan would buy the next;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
 ///   takes one trip, and no two the same trade route (D18) or the same mining or siphon opening. A ship's current role
 ///   counts the head start more (D41), so a close call doesn't flip back and forth. A ship left without a trip keeps
@@ -94,6 +129,9 @@ public static class RolePlanner
     /// <summary>The ship mines for the contract, which comes first (D40).</summary>
     public const string Contract = "contract";
 
+    /// <summary>The drone keeps gathering a SCARCE or LIMITED mineral, one drone each (D48).</summary>
+    public const string Coverage = "coverage";
+
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
     public const string MostProfitable = "most_profitable";
 
@@ -106,14 +144,28 @@ public static class RolePlanner
     /// <summary>The most trips per ship and role the assignment weighs: enough for every ship to find one, within reason.</summary>
     public const int MaxOptionsPerRole = 20;
 
-    /// <summary>Decides every ship's role.</summary>
+    /// <summary>Decides every ship's role, with no mineral to keep a drone for.</summary>
     /// <param name="ships">The fleet, but for its probes.</param>
     /// <param name="contractWantsOre">Whether the contract plan is on and its contract still wants ore (D40).</param>
     /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
     /// <returns>A decision per ship, by symbol.</returns>
     public static IReadOnlyList<RoleDecision> Decide(IReadOnlyList<RoleCandidate> ships, bool contractWantsOre, double headStart)
+        => Decide(ships, contractWantsOre, headStart, []);
+
+    /// <summary>Decides every ship's role.</summary>
+    /// <param name="ships">The fleet, but for its probes.</param>
+    /// <param name="contractWantsOre">Whether the contract plan is on and its contract still wants ore (D40).</param>
+    /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
+    /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
+    /// <returns>A decision per ship, by symbol.</returns>
+    public static IReadOnlyList<RoleDecision> Decide(
+        IReadOnlyList<RoleCandidate> ships,
+        bool contractWantsOre,
+        double headStart,
+        IReadOnlyList<MineralCoverage> coverage)
     {
         ArgumentNullException.ThrowIfNull(ships);
+        ArgumentNullException.ThrowIfNull(coverage);
 
         var bonus = 1 + Math.Max(0, headStart);
         var decisions = new Dictionary<string, RoleDecision>(StringComparer.OrdinalIgnoreCase);
@@ -135,6 +187,11 @@ public static class RolePlanner
             {
                 decisions[miner.Ship.Symbol] = new RoleDecision(miner.Ship.Symbol, FleetRole.Mine, Contract, null);
             }
+        }
+
+        foreach (var (keeper, role) in Keepers(ships, coverage, decisions).ToList())
+        {
+            decisions[keeper.Ship.Symbol] = new RoleDecision(keeper.Ship.Symbol, role, Coverage, null);
         }
 
         foreach (var decision in ShareTheWork([.. ships.Where(ship => !decisions.ContainsKey(ship.Ship.Symbol))], bonus))
@@ -175,6 +232,43 @@ public static class RolePlanner
             var cheapest = withMiners.MinBy(candidate => candidate.BestPerHour)!;
             var current = withMiners.FirstOrDefault(candidate => candidate.Current == FleetRole.Survey);
             yield return current is not null && current.BestPerHour <= cheapest.BestPerHour * bonus ? current : cheapest;
+        }
+    }
+
+    /// <summary>
+    /// A drone to keep gathering each SCARCE or LIMITED mineral (D48), one each, the minerals the fewest drones could serve
+    /// first: of the drones not yet decided that could serve it and have its role, the one whose trip works on it, else one
+    /// that has the role now, else the one with the least to lose (its best trip in another role earns least per hour). A
+    /// ship that can survey is no drone: the command ship takes what pays it most.
+    /// </summary>
+    private static IEnumerable<(RoleCandidate Keeper, FleetRole Role)> Keepers(
+        IReadOnlyList<RoleCandidate> ships,
+        IReadOnlyList<MineralCoverage> coverage,
+        IReadOnlyDictionary<string, RoleDecision> decided)
+    {
+        var kept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mineral in coverage
+            .OrderBy(mineral => mineral.AbleShipSymbols.Count)
+            .ThenBy(mineral => mineral.Good, StringComparer.Ordinal))
+        {
+            var able = mineral.AbleShipSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var working = mineral.WorkingShipSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var keeper = ships
+                .Where(ship => able.Contains(ship.Ship.Symbol)
+                    && !decided.ContainsKey(ship.Ship.Symbol)
+                    && !kept.Contains(ship.Ship.Symbol)
+                    && ship.Roles.Contains(mineral.Role)
+                    && !ship.Roles.Contains(FleetRole.Survey))
+                .OrderByDescending(ship => working.Contains(ship.Ship.Symbol))
+                .ThenByDescending(ship => ship.Current == mineral.Role)
+                .ThenBy(ship => ship.Options.Where(option => option.Role != mineral.Role && option.Role != FleetRole.Survey).Select(option => option.CreditsPerHour).DefaultIfEmpty(0).Max())
+                .ThenBy(ship => ship.Ship.Symbol, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (keeper is not null)
+            {
+                kept.Add(keeper.Ship.Symbol);
+                yield return (keeper, mineral.Role);
+            }
         }
     }
 

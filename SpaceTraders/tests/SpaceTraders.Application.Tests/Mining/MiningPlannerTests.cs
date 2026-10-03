@@ -1,5 +1,7 @@
 using FluentAssertions;
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
+using SpaceTraders.Application.Trading;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
 namespace SpaceTraders.Application.Tests.Mining;
@@ -191,6 +193,51 @@ public sealed class MiningPlannerTests
             (H51, "COPPER_ORE", XB5C),
             (H51, "IRON_ORE", XB5C),
         ]);
+    }
+
+    [Fact]
+    public void AScarceOreNoMinerWorksOn_ComesFirst_ThoughAnOreAMinerWorksOnIsShorter()
+    {
+        // Slice 6.10b (D48): H52 is SCARCE of silicon too, but a miner works on silicon for F49. Quartz, copper and iron
+        // have nobody; aluminum is MODERATE, which no drone is kept for.
+        var map = Map(
+        [
+            .. Markets().Where(market => market.WaypointSymbol != H52),
+            Market(H52, Good("SILICON_CRYSTALS", "IMPORT", 100, 50, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 76, 69, 180, "MODERATE")),
+        ]);
+        var held = new HashSet<string> { MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS") };
+        var covered = new HashSet<string> { "SILICON_CRYSTALS" };
+
+        var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), held, covered);
+
+        targets.Select(target => (target.Ore, target.SellWaypointSymbol)).Should().Equal(
+            ("QUARTZ_SAND", F49),
+            ("COPPER_ORE", H51),
+            ("IRON_ORE", H51),
+            ("SILICON_CRYSTALS", H52),
+            ("ALUMINUM_ORE", H51));
+    }
+
+    [Fact]
+    public void OfTheScarceOresNoMinerWorksOn_TheNearestAsteroidComesFirst()
+    {
+        // D48, "near before far": an asteroid with mineral deposits 5 from H51 yields iron, which D28 alone would put after
+        // copper, as copper fetches more; copper comes from XB5C, 19 away.
+        var nearby = new WaypointCacheModel("X1-DC53-XN1", SystemSymbol, "ASTEROID", -18, 45, false, false, DateTimeOffset.UnixEpoch, TraitsJson: """[{"symbol":"MINERAL_DEPOSITS"}]""");
+        var map = new TradeMarketMap([.. Waypoints, nearby], Markets(), new Dictionary<string, IReadOnlyList<string>>());
+        var covered = new HashSet<string> { "SILICON_CRYSTALS", "QUARTZ_SAND" };
+
+        var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), new HashSet<string>(), covered);
+
+        targets.Select(target => (target.Ore, target.AsteroidSymbol)).Take(2).Should().Equal(("IRON_ORE", "X1-DC53-XN1"), ("COPPER_ORE", XB5C));
+    }
+
+    [Fact]
+    public void TheScarceOres_AreThoseADroneCouldServeAMarketShortOf_WhoeverWorksOnThem()
+    {
+        // B7's gold and copper are beyond a drone's tank, so they don't count for it; the command ship reaches them.
+        MiningPlanner.ScarceOres(Context(), Drone()).Should().BeEquivalentTo(["SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE", "IRON_ORE"]);
+        MiningPlanner.ScarceOres(Context(), CommandShip()).Should().Contain("GOLD_ORE");
     }
 
     [Fact]
