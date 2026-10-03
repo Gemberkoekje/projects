@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -16,6 +17,7 @@ public sealed class ShipGoalExecutorService(
     IGoalStepCircuitBreaker circuitBreaker,
     IShipGoalStepGuard stepGuard,
     IAutomationMetrics metrics,
+    ITripBook trips,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
     private const string MaxGoalStepsPerMinuteSetting = "Automation.CircuitBreaker.MaxGoalStepsPerMinute";
@@ -108,6 +110,13 @@ public sealed class ShipGoalExecutorService(
                 maxStepsPerMinute,
                 activeGoal.Kind,
                 RunawayReason);
+
+            // A blocked goal stays blocked until its plan replaces it, so a trip ends here (D46).
+            if (activeGoal is TripGoal trip)
+            {
+                await trips.BookAsync(shipSymbol, trip, TripBook.Runaway, ct);
+            }
+
             return GoalExecutionResult.Blocked($"{RunawayReason}: more than {maxStepsPerMinute} goal steps in a minute.");
         }
 

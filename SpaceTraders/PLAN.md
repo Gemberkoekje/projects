@@ -84,11 +84,16 @@
   command ship trades, and with no trade either it mines or siphons whatever sells at the nearest place it
   can, and sells it; a survey or a trade interrupts that. You switched on the siphon, probe and spare-time
   plans at 21:40–21:42Z; the first minutes' journal matched the plan.
-- Slice 2.9 (a settings table on the dashboard) is built on branch `ccr-212dac2b-p2ent0`, in projects and
-  gembernodes, asked on 2026-10-02: which settings exist, and which are on.
-- Slice 6.9 (roles by what pays most, and cargo nothing will sell) is built on branch
-  `claude/ship-role-profitability-ghjzlb`, in projects and gembernodes, asked on 2026-10-02, with your decisions D38–D42.
-  The role board stays off until you switch it on (D9); D42, cargo nothing will sell, works whether it is on or not.
+- Slice 2.9 (a settings table on the dashboard) was merged as projects#132 and deployed by gembernodes#31 on
+  2026-10-02: which settings exist, and which are on.
+- Slice 6.9 (roles by what pays most, and cargo nothing will sell) was merged as projects#133 with your decisions
+  D38–D42, and deployed by gembernodes#32 on 2026-10-03 at 07:27Z; the role board is on.
+- The health check of 2026-10-03, after the bot's first day on the cluster, found B52 (projects#134, deployed by
+  gembernodes#33) and B53 (projects#135). gembernodes#34 makes the log budget a number per ship and stays open until
+  slice 6.10a is merged, so it deploys both.
+- Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D50) is split in three: 6.10a (visibility and
+  the role board's rates) is built, its dashboards in gembernodes#34; 6.10b (the order ships are bought in, a designated surveyor, one drone per
+  scarce mineral) and 6.10c (drones drifting to minerals out of fuel range) are planned, with their designs below.
 
 ## Known issues
 
@@ -199,10 +204,18 @@ get the next D-number.
 | D36 | Slice 6.8 (asked on 2026-10-02): "sells it where it's relevant": which market does each good go to? | **Best price after fuel:** each good where it fetches most after the fuel to get there, the rule miners, siphoners and traders sell cargo they hold by. **Amended by D42**: a good no market buys, or whose sale doesn't pay for the fuel, goes overboard. |
 | D37 | Slice 6.8 (asked on 2026-10-02): a survey usually comes up at the asteroid the command ship mines at. Sell first, as asked for D34, or survey straight away? Surveying needs no room in the hold. | **Survey first:** it surveys on the spot with its hold aboard, then carries on filling, and sells once full. Only a trade makes it sell first, as a trade needs the room. |
 | D38 | Slice 6.9 (asked on 2026-10-02): "Each ship should have a set of potential roles. A ship with a mining laser can have the mining role. A ship with a surveyor can have the surveyor role. A ship with a cargo hold and fuel can have the trader role. Etcetera. A ship should occasionally consider whether it's role is still the best thing it can do. This is not only based on it's own potential roles but also of other ships." | **Roles by what earns the fleet most, surveys first:** "If there is only 1 ship that can survey, then that ship should prioritize surveying. But if there are 2 ships that can survey, but one of them can only survey and the other can survey, mine, trade and siphon, the ship that can only survey should take the job. Goal is to have every ship be the most profitable it can be by comparing each role it has with the potential profits it can make." Each role is valued per hour by the trips its plan would offer; the work is shared for the most per hour across the fleet. Amends D20 and D34 while the role board is on. |
-| D39 | Slice 6.9 (asked on 2026-10-02): "Some profits are not direct: mining iron ore isn't that profitable by itself, but iron ore gettting refined to iron getting made to machinery is very profitable." How does that count when roles are compared? | **A share of the next steps:** of the options, "selling a good to a market that makes something pricier from it adds a share (setting, default 50%) of the price difference, and that share again for the step after (iron ore → iron → machinery). Full while the market is SCARCE of the good, less as its supply grows, nothing at ABUNDANT." (`Roles.ChainValueSharePercent`) |
+| D39 | Slice 6.9 (asked on 2026-10-02): "Some profits are not direct: mining iron ore isn't that profitable by itself, but iron ore gettting refined to iron getting made to machinery is very profitable." How does that count when roles are compared? | **A share of the next steps:** of the options, "selling a good to a market that makes something pricier from it adds a share (setting, default 50%) of the price difference, and that share again for the step after (iron ore → iron → machinery). Full while the market is SCARCE of the good, less as its supply grows, nothing at ABUNDANT." (`Roles.ChainValueSharePercent`) **Amended by D49:** at most what the trip earns on a unit. |
 | D40 | Slice 6.9 (asked on 2026-10-02): should contract work stay first for every ship that can mine (D23), or compete on profit? | **Contract first:** "Every ship that can mine, except the survey-role holder, joins the contract while units remain, as now. Roles are compared for the rest of the reset, so a contract can't stall because drones found trading more profitable." D23 kept. |
 | D41 | Slice 6.9 (asked on 2026-10-02): how often does a ship reconsider its role? | **Every 10 minutes, with a head start:** "The whole fleet is re-evaluated every 10 minutes, and at once for a ship whose role has no work for it. A ship's current role gets a 20% head start in the comparison, so close calls don't flip back and forth. Both numbers become settings." (`Roles.ReconsiderMinutes`, `Roles.HeadStartPercent`) A new role takes effect when the ship's trip ends. |
 | D42 | Slice 6.9 (asked on 2026-10-02, during the work): what happens to cargo nothing will sell? Surveyors carried theirs for good (6.4's Noticed), and traders kept what didn't pay for its fuel. | **Sell it, or jettison it:** "if a ship's cargo hold isn't empty and the goods aren't going to be sold or earmarked for another reason, the ship should either go to a waypoint to sell it or, if that's not profitable, jettison it." The contract's ore on a ship that mines for the contract is earmarked; so is a spare-time hold, which the next trip fills on (D37), unless no market it can reach buys it. |
+| D43 | Slice 6.10 (asked on 2026-10-03): "I feel there are too many siphoning drones and not enough other ship types." Each plan buys on its own: drones (~50k) are affordable at ~150k credits, so a light shuttle (114k, needs 214k with the reserve) or a probe (77k, 177k) never was. In what order are ships bought? | **A fixed order** (slice 6.10b): first a designated surveyor (D47); then "at least 1 drone per mineral that is scarce or limited" (D48); "then save up for cargo ships": while a ship in `Trade.ShipPurchases` is still to buy, no probes and no other drones are bought; then probes until every market has one (D29); then "alternate drones and cargo ships": a drone by today's rules (D28, D32), then one more cargo ship of the list's last type, and so on, while minerals stay at or below LIMITED. The contract's drone stays first (D23, D40). |
+| D44 | Slice 6.10 (asked on 2026-10-03): "I feel like there should be more profitable trades." In a day, 102 of 176 trades were taken because they feed production (D15), at a median 538 credits against 3,386 for the others; with `Trade.MinProfitPerUnit` at 5 almost any feeding route wins. Change D15? | **Keep D15:** "I feel like there aren't many trades to begin with. I'm not too worried about trades that don't have a lot of profit, as they should feed into trades that are more profitable, and make ships more affordable (by making more of them so the availability becomes better)." Only the command ship trades; more trades come from cargo ships (D43) and from the command ship once a surveyor takes over (D47). |
+| D45 | Slice 6.10 (asked on 2026-10-03): "I'd like a way to add mining/siphoning drones for the minerals outside of fuel range, e.g. by having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal behavior." Which drones drift where? | **New and free drones, near first** (slice 6.10c): a target out of a drone's CRUISE reach counts when its asteroid is within a CRUISE round trip of the market that buys the ore; it ranks after every reachable target of the same supply level (D28). The drone drifts there once (1 fuel, about ten times slower), refuels, switches back to CRUISE and mines from that market. |
+| D46 | Slice 6.10 (asked on 2026-10-03): "I'd like to see the actual trade profits, so the actual sell − buy − fuel … offset in the same graph by other profit sources such as mining profits (− fuel) and contract profits (preferably − fuel)." Book profit per transaction or per trip? | **Per trip, at its end** (slice 6.10a): a trade, mining, siphon or spare-time trip books its sales − purchases − fuel when it ends, with a journal line; contracts book their payments, and the fuel their ships bought on contract work. No dips from a purchase and its sale landing in different hours. |
+| D47 | Slice 6.10 (asked on 2026-10-03): "I'd like to add the purchase of a designated surveyor ship, so that the COMMAND ship is freed up to use it's considerable cargo for trading and mining." Where in the order, and what does the command ship do then? | **First in the order** (slice 6.10b): one SHIP_SURVEYOR (33,905) for each system with miners, while the survey plan and the role board are on; the board gives it the survey role (D38, a ship that can only survey). The command ship then gets the role the board finds most profitable (D38), once its rates are fixed (D49). |
+| D48 | Slice 6.10 (asked on 2026-10-03): buying "one drone per scarce mineral" ends only if those drones work on those minerals; otherwise each new drone takes the best-paying opening. | **Uncovered minerals first** (slice 6.10b): a free drone first takes a SCARCE or LIMITED mineral that no drone works on, near before far, then D28's order; the role board keeps one drone in its gathering role for each such mineral, as the contract keeps its miners (D40). A mineral no drone can reach, or that no asteroid yields, doesn't count. |
+| D49 | Slice 6.10 (asked on 2026-10-03): the board valued a siphon drone at ~274,000 credits an hour (it earns 7–10k), mining drones at 80–95k (1–3k), the command ship's trades at up to 4.7M (13k): D39's second step counts, for every unit of gas, a quarter of a price difference such as PLASTICS → EQUIPMENT (~3,200), and a siphon trip's gases were valued at the best market anywhere. How are the rates fixed? | **Cap the chain value, at the trip's own market** (slice 6.10a), "for now"; amends D39: goods are valued where the trip sells them, and the chain's share (both D39 steps kept) is capped so that feeding a factory at most doubles what a trip earns per unit: its price for mined and siphoned goods, its margin for trades. |
+| D50 | Slice 6.10 (asked on 2026-10-03): "we should visualize the actual correlation between the amount of goods sold and the amount of processed goods added, and what that does to the price. Because a unit of hydrocarbons might make a unit of plastics, but we don't know how many … (we also don't know at what rate a hydrocarbon gets converted to plastics per unit of time)." | **Measure it** (slice 6.10a): the bot counts the units it sells and buys per market and good; the dashboard plots what we sell into a market per hour against the supply, trade volume and price of what that market makes from it, so the rate and the delay can be read off. D49's cap stands until those numbers say better. |
 
 ## Phases
 
@@ -1764,12 +1777,13 @@ How credits are split stays your call; Claude only fixes deviations from intende
     - **The estimates** (`RoleEstimator`, no I/O): for each role a ship could take but surveying, the trips its plan would
       offer, best per hour first: every lucrative route (D14), its profit after fuel; every mining target (D28's), a full
       hold of the target ore, filled at the ship's rate times the ore's share of the extractions (its survey's, or one of
-      the asteroid's ores), less fuel; every siphon target, a full hold of the gases a market buys (D33), each at the best
-      price it fetches. Each adds the production chains' share (D39, `ChainValues`): a good sold to a market that imports it
+      the asteroid's ores), less fuel; every siphon target, a full hold of the gases a market buys (D33), the trip's own gas
+      at its market and each other gas where it counts most (D49). Each adds the production chains' share (D39, `ChainValues`): a good sold to a market that imports it
       and exports a pricier good made from it counts `Roles.ChainValueSharePercent` (50%) of the price difference (what the
       market charges for each, as D15 compares them), and that share again of the next step at the market in the system that
       makes the most of it; each step times how short its market is of the input (SCARCE 1, LIMITED ¾, MODERATE ½, HIGH ¼,
-      ABUNDANT 0). Time: the flights in CRUISE as the API reckons them (15 seconds plus the distance times 25 over the
+      ABUNDANT 0); at most what the trip earns on a unit, its price for a mined or siphoned good, its margin for a traded one
+      (D49). Time: the flights in CRUISE as the API reckons them (15 seconds plus the distance times 25 over the
       engine's speed, 9 when it isn't cached), 10 seconds a landing, and the cooldowns to fill the hold, half a tick after
       each.
     - **How fast a ship fills its hold** (`GatheringRates`): every extraction and siphon records its yield and cooldown; a
@@ -1805,9 +1819,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
       them (gembernodes).
   - Noticed (not changed):
     - **The estimates are estimates:** prices as last seen; a full hold sold at one price, while each sale lowers it; a
-      siphon trip as if each gas sells at its best price, while the trip sells its own at its market; a ship's first
-      evaluations use the default rate until it extracts. The state and the dashboard show every estimate, so a wrong one
-      shows.
+      ship's first evaluations use the default rate until it extracts. The state and the dashboard show every estimate, so
+      a wrong one shows: on the first day they were 30 to 300 times what ships earned, fixed for now by D49.
     - **Within a role the plans still choose by their own rules** (D15: a route to a market that makes a pricier good
       first; D28: the market shortest of its ore first), so the trip a ship gets may not be the one its role was valued by. The chain value only weighs roles; ranking the plans' own trips
       by it would change D15 and D28. Yours to call.
@@ -1847,6 +1860,78 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `MiningAutomationServiceTests`, `SiphonAutomationServiceTests`, `SurveyPlanServiceTests`, `ContractMinersTests`,
       `ShipRuleTests`, `ExtractResourcesHandlerTests`, `SiphonResourcesHandlerTests`, `AutomationSwitchesTests`,
       `DefaultSettingsSeedTests`; `PrometheusMetricsTests` and `MetricsEndpointTests` (API).
+
+- **6.10 The fleet's shape** (asked 2026-10-03, after the bot's first day on the cluster, with your decisions D43–D50).
+  Asked: too many siphon drones and too few other ships; more trades; drones for minerals out of fuel range; the actual
+  profit of each source; the price gap per good in the market tree; what each ship can do next to its role; a designated
+  surveyor; and what selling an input does to what a market makes from it. Split in three, so each part stays reviewable.
+  - **What the data said** (2026-10-03, the last 12 to 24 hours):
+    - Net credits an hour after fuel (ledger): the command ship trading about 13,000; siphon drones 2,000–4,000;
+      mining drones 1,000–3,000. A few drones made one-off trades of goods worth 50,000 with a 15-unit hold; some lost.
+    - Each plan buys on its own, and every purchase keeps the 100,000 reserve: a drone (49,011–51,411) is affordable at
+      about 150,000 credits, a probe (77,117) at 177,000, a light shuttle (114,225) at 214,000, a light hauler (354,210) at
+      454,000. The credits peaked at 150,000–166,000 before each drone purchase, so 5 siphon drones and 2 mining drones
+      were bought overnight, and no probe or cargo ship.
+    - The role board's estimates were 30 to 300 times what the ships earned (D49).
+    - 176 trades in 24 hours, 159 of them by the command ship; 102 taken because they feed production (D15), at a median
+      538 credits against 3,386 (D44 keeps D15). Price gaps are thin: most goods under 50 a unit, SHIP_PLATING, SHIP_PARTS
+      and MEDICINE excepted.
+    - SCARCE or LIMITED minerals, and what a drone could do about them: near, COPPER_ORE (H51), SILICON_CRYSTALS (A3,
+      H53) and QUARTZ_SAND (F49), all from XB5C; far, ALUMINUM, COPPER, IRON, QUARTZ and SILICON at B7, from asteroid B14
+      (25 from B7); out of any drone's round trip, AMMONIA_ICE, GOLD_ORE, SILVER_ORE, PLATINUM_ORE and PRECIOUS_STONES
+      (their nearest asteroids are 68 to 476 from their markets); DIAMONDS, which no asteroid yields; and the three gases,
+      all from C38. The drones worked on four of the ores.
+  - **6.10a Visibility and the role board's rates** (built 2026-10-03; dashboards in gembernodes#34):
+    - What each ship can do, whatever the switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine,
+      Siphon, Trade`, or `none`); the fleet and roles tables show it next to the role (gembernodes#34), as drones of both
+      kinds report the registration role EXCAVATOR.
+    - Profit per trip (D46): journal kind `TripEnded`; counters `spacetraders_trip_profit_credits_total`,
+      `spacetraders_trip_loss_credits_total` and `spacetraders_trips_total` by `activity`; sales and purchases from the
+      trip's own figures (`TripGoal.Earned`, `Spent`: a ledger row lands after the trip has ended), fuel from the ledger
+      (`TripBook`). Every end books: sold, each early stop, `interrupted` (spare time taken over) and `runaway` (the
+      circuit breaker). Contracts: deposit and payout as profit, each delivery's round-trip fuel as a loss. Not booked:
+      contract round trips released without a delivery, goals an agent reset wipes, the earlier batches of a sale that
+      fails partway; a trade bought before the deploy books its whole sale once; a trade that sells a held spare-time
+      hold books it under `trade`. Dashboard: profit an hour by activity, stacked.
+    - Units sold and bought per market and good (D50); dashboard: what we sell into a market an hour against the supply,
+      trade volume and price of what it makes from it.
+    - The role board's rates (D49).
+    - The market tree's price gap per good, where to buy, where to sell (dashboard only, in gembernodes#34).
+  - **6.10b The order ships are bought in** (planned; D43, D47, D48). Design notes from the code survey:
+    - Contract, probe, mining, siphon and trading plans buy in that order each tick, each on its own checks and in its
+      own scope (`ShipPurchaseService`, `BudgetPolicy`). The order needs a singleton, like `ShipyardCalls`, that each plan
+      tells its need every pass and asks before it buys; until every buying plan that is on has reported once since the
+      start, nothing of lower priority is bought.
+    - A need counts only while it can be met (its plan on, its cap not reached, a known shipyard selling the type), or
+      nothing after it would ever be bought.
+    - The ledger is the lasting record of purchases: `ShipPurchase` rows carry the type's enum name in `GoodSymbol`
+      (`ShipMiningDrone`, `ShipSiphonDrone`, `ShipSurveyor`, `ShipProbe`, `ShipLightShuttle`, `ShipLightHauler`); a cached
+      ship's `ShipType` turns into its registration role at the next startup sync. The alternation counts the drones and
+      cargo ships bought since the list's last cargo ship; a turn passes when the other kind has nothing to buy.
+    - Coverage (D48): the mining and siphon plans give free drones an uncovered SCARCE or LIMITED mineral first; the role
+      board keeps one drone in its gathering role per uncovered mineral, after the contract (D40). Without that, a drone
+      that earns more trading would leave its mineral and the plan would buy the next. A coverage purchase doesn't ask
+      `RoleAdvisor`.
+    - The surveyor: bought by the survey plan; `FleetRoles.CanSurvey` already reads a bought SHIP_SURVEYOR by its type
+      until startup sync records its mounts. With the board off, D20 holds and no surveyor is bought.
+  - **6.10c Drift to minerals out of fuel range** (planned; D45). Design notes from the code survey:
+    - Reach today: `MiningPlanner.CanReach` (CRUISE through markets that sell fuel) is the only check, and
+      `TradeRoutePlanner` never plans DRIFT.
+    - A far target: a market that buys the ore and sells fuel, an asteroid that yields it within a CRUISE round trip of
+      that market, and a drone that can't reach the market in CRUISE. It ranks after every reachable target of the same
+      supply level. Because supply comes first in D28, B7's SCARCE ores will outrank every near target that isn't SCARCE,
+      so free drones on LIMITED or MODERATE work will drift there: about 2.5 hours at a drone's engine speed of 9.
+    - The trip: a relocation goal switches to DRIFT (`PatchShipNavCommand`, as `DeployProbeGoalExecutor` switches a probe
+      back to CRUISE), flies to the market, docks and switches back to CRUISE; the next departure there refuels. It must
+      not run into B47: with no CRUISE chain, `GoalFlight` asks for the destination itself, and the navigation's fuel
+      fallback would drift straight to the asteroid and stay in DRIFT.
+    - `MiningFixture` already holds the far pair: B7 (47,343) buys GOLD_ORE and COPPER_ORE, SCARCE; B14 (precious metal
+      deposits) is 24.5 from it; the middle of the system is 274 to 328 away. Tests that assume no drone reaches B7 change:
+      `MiningPlannerTests`, `MiningAutomationServiceTests`, `ShipLeftIdleRuleTests`.
+    - Siphoning: X1-DC53's one gas giant, C38, has all its buyers in reach, so no siphon drone would drift there now.
+  - **To understand this,** start with the decisions D43–D50, then this slice's notes; for 6.10b,
+    `Automation/MiningAutomationService.cs` (`BuyDroneAsync`), `Services/ShipPurchaseService.cs` and
+    `Automation/GameLoopService.cs`; for 6.10c, `Mining/MiningPlanner.cs` and `Goals/Executors/GoalFlight.cs`.
 
 ## Changes in gembernodes
 

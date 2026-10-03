@@ -102,6 +102,7 @@ public sealed class CommandShipAfterScoutingTests
             Substitute.For<IGoalStepCircuitBreaker>(),
             new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
+            Substitute.For<ITripBook>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         for (var tick = 0; tick < TicksPerMinute; tick++)

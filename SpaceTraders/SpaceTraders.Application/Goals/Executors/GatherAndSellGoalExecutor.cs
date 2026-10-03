@@ -22,7 +22,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// records it in the goal, flies there, docks, sells in batches of the market's trade volume and fetches the market
 /// again (D25). What doesn't pay for its fuel stays aboard for the next trip, and the goal ends: the plans choose
 /// again. Before the hold is full, a survey or a trade may take the ship off the trip (D34, D37): the survey and
-/// trading plans do that.
+/// trading plans do that. The goal keeps what each sale brought in, and however the trip ends, it is booked with that
+/// (<see cref="ITripBook"/>, D46).
 /// </summary>
 public sealed class GatherAndSellGoalExecutor(
     IShipRepository ships,
@@ -33,6 +34,7 @@ public sealed class GatherAndSellGoalExecutor(
     IMarketRefresher marketRefresher,
     IDockSubCommand dock,
     IMessageBus bus,
+    ITripBook trips,
     ILogger<GatherAndSellGoalExecutor> logger) : IShipGoalExecutor
 {
     /// <inheritdoc />
@@ -79,7 +81,7 @@ public sealed class GatherAndSellGoalExecutor(
         // Everything it would get there would go overboard: the plan chooses another place.
         if (!GatherPlanner.YieldsSellable(map, ship, trip.SourceWaypointSymbol))
         {
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            await EndTripAsync(ship.Symbol, trip, TripBook.NoBuyer, ct);
             return GoalExecutionResult.Completed($"No market buys what {trip.SourceWaypointSymbol} yields any more; the trip ends.");
         }
 
@@ -90,13 +92,13 @@ public sealed class GatherAndSellGoalExecutor(
         if (gathered is null || !gathered.Accepted)
         {
             // The plan chooses again on the next tick; a trip that keeps failing shows as RepeatingError.
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
             logger.LogWarning(
                 "GatherAndSellGoalExecutor: ship {ShipSymbol} can't {Action} at {WaypointSymbol} (state {Status}); the trip is dropped.",
                 ship.Symbol,
                 trip.Siphoning ? "siphon" : "mine",
                 trip.SourceWaypointSymbol,
                 gathered?.Status ?? ShipLocalStatus.None);
+            await EndTripAsync(ship.Symbol, trip, TripBook.Rejected, ct);
             return GoalExecutionResult.Blocked($"Gathering rejected at {trip.SourceWaypointSymbol}.");
         }
 
@@ -112,7 +114,7 @@ public sealed class GatherAndSellGoalExecutor(
             // would have no room.
             if (!TradeRoutePlanner.TryFindBestCargoSale(map, ship, mustSell: IsFull(ship), out var cargo, out var sale))
             {
-                await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+                await EndTripAsync(ship.Symbol, trip, TripBook.Sold, ct);
                 return GoalExecutionResult.Completed(ship.CargoCurrent > 0
                     ? $"Sold what pays for its fuel; {ship.CargoCurrent} units stay aboard for the next trip."
                     : "The hold is sold; the trip is done.");
@@ -143,6 +145,7 @@ public sealed class GatherAndSellGoalExecutor(
 
         // One sale may not exceed the market's trade volume, so a larger load goes in several.
         var batchSize = good.TradeVolume > 0 ? good.TradeVolume : units;
+        var earned = 0L;
         for (var left = units; left > 0;)
         {
             var batch = Math.Min(left, batchSize);
@@ -150,13 +153,14 @@ public sealed class GatherAndSellGoalExecutor(
             await ships.UpdateCargoAsync(ship.Symbol, sold.Cargo, ct);
             await agents.SetCreditsAsync(bus, sold.AgentCredits, ct);
 
-            // The ledger and the credits-earned metric (B7).
+            // The ledger and the credits-earned metric (B7), and the units sold to this market.
             await bus.PublishAsync(new ShipCargoSoldEvent(
                 ship.Symbol,
                 new TradeSymbol(trip.SellTradeSymbol),
                 batch,
                 sold.Revenue,
-                sold.AgentCredits));
+                sold.AgentCredits,
+                trip.SellWaypointSymbol));
 
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
@@ -166,15 +170,23 @@ public sealed class GatherAndSellGoalExecutor(
                 trip.SellTradeSymbol,
                 trip.SellWaypointSymbol,
                 sold.Revenue);
+            earned += sold.Revenue;
             left -= batch;
         }
 
         // The sale moved the price: the market again, while the ship is still there (D25).
         await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trip.SellWaypointSymbol, ship.Symbol, ct);
 
-        // The next step chooses the next sale, from here, or ends the trip.
-        await goals.SetActiveGoalAsync(ship.Symbol, Unchosen(trip), ct);
+        // The next step chooses the next sale, from here, or ends the trip; the goal keeps what this one brought in.
+        await goals.SetActiveGoalAsync(ship.Symbol, Unchosen(trip) with { Earned = trip.Earned + earned }, ct);
         return GoalExecutionResult.Progressing($"Sold {units} {trip.SellTradeSymbol} at {trip.SellWaypointSymbol}.");
+    }
+
+    /// <summary>Ends the trip: clears its goal, so the plans choose again, and books what it made (D46).</summary>
+    private async Task EndTripAsync(string shipSymbol, GatherAndSellGoal trip, string reason, CancellationToken ct)
+    {
+        await goals.ClearActiveGoalAsync(shipSymbol, ct);
+        await trips.BookAsync(shipSymbol, trip, reason, ct);
     }
 
     private static GatherAndSellGoal Unchosen(GatherAndSellGoal trip)

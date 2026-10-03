@@ -29,7 +29,7 @@ public sealed class LedgerWiringTests
         using var scope = factory.Services.CreateScope();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
-        await bus.InvokeAsync(new ShipCargoSoldEvent("AGENT-1", new TradeSymbol("IRON_ORE"), 10, 450, 175_450));
+        await bus.InvokeAsync(new ShipCargoSoldEvent("AGENT-1", new TradeSymbol("IRON_ORE"), 10, 450, 175_450, "X1-AB-SELL"));
         await bus.InvokeAsync(new CargoPurchasedEvent("AGENT-1", new TradeSymbol("FOOD"), 40, 8_000, 167_450, "X1-AB-BUY"));
         await bus.InvokeAsync(new ContractAcceptedEvent("C-1", 1_136));
         await bus.InvokeAsync(new ContractFulfilledEvent("C-1", 6_620));
@@ -47,6 +47,8 @@ public sealed class LedgerWiringTests
         metrics.Received(1).CreditsEarned("ContractDeposit", 1_136);
         metrics.Received(1).CreditsEarned("ContractPayout", 6_620);
         metrics.Received(1).CreditsSpent("ShipPurchase", 12_000);
+        metrics.Received(1).GoodsSold("X1-AB-SELL", "IRON_ORE", 10);
+        metrics.Received(1).GoodsBought("X1-AB-BUY", "FOOD", 40);
         metrics.Received(1).MessageHandled("ShipCargoSoldEvent");
     }
 }

@@ -10,8 +10,8 @@ namespace SpaceTraders.Application.Roles;
 /// production chains, as D15 reads them), a unit counts a share of the price difference, and that share again of the
 /// next step: the pricier good at the market in the system that makes the most of it in turn. A step counts fully
 /// while its market is SCARCE of the input, less as the supply grows, and not at all at ABUNDANT, where more of it
-/// doesn't raise production. Only the role board's comparison reads it: the plans still choose within a role by D15
-/// and D28.
+/// doesn't raise production. Only the role board's comparison reads it, and counts it at most at what the trip itself
+/// earns on a unit (<see cref="PerUnitAtMost"/>, D49): the plans still choose within a role by D15 and D28.
 /// </summary>
 /// <remarks>Built per system and pass; it remembers each market and good it has worked out.</remarks>
 public sealed class ChainValues
@@ -67,6 +67,25 @@ public sealed class ChainValues
 
         return value;
     }
+
+    /// <summary>
+    /// What the role board counts for one unit of a good sold at a market, beyond what the trip earns on it (D49):
+    /// <see cref="PerUnit"/>, but no more than <paramref name="earned"/>, so feeding a factory at most doubles what a trip
+    /// earns per unit; and never less than nothing.
+    /// </summary>
+    /// <remarks>
+    /// Each step's price difference counts for every unit of the input, while nobody knows yet how many units of the input
+    /// make one of the output, or how fast. Uncapped, the second step outweighed all else: on 2026-10-03 the gases counted
+    /// some 870 a unit more than their price, nearly all of it PLASTICS (about 215) feeding EQUIPMENT (about 3,400), and the
+    /// board valued at about 274,000 an hour a siphon drone that sold its hydrocarbon for about 44 a unit, under 10,000 an
+    /// hour. The cap holds until that is measured.
+    /// </remarks>
+    /// <param name="market">The market it is sold at.</param>
+    /// <param name="good">The good.</param>
+    /// <param name="earned">What the trip earns on a unit: the price a gathered unit fetches at the market, a traded unit's margin.</param>
+    /// <returns>Credits per unit, from 0 to <paramref name="earned"/>.</returns>
+    public double PerUnitAtMost(string market, string good, double earned)
+        => Math.Clamp(PerUnit(market, good), 0, Math.Max(0, earned));
 
     /// <summary>
     /// One step: at a market that imports the good and makes a pricier good from it, the price difference (what the

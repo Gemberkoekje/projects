@@ -32,6 +32,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly LogRecorder _log = new();
 
     public TradeBetweenMarketsGoalExecutorTests()
@@ -108,6 +109,18 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task APurchase_IsKeptWithTheTrip_AsWhatItsCargoCost()
+    {
+        // D46: the trip is booked when it ends, with what its cargo cost.
+        BuyReturns(units: 20, total: 65_080);
+
+        await StepAsync(CommandShip(K85), Trip());
+
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(g => g.Spent == 65_080 && g.Earned == 0), Arg.Any<CancellationToken>());
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
+    }
+
+    [Fact]
     public async Task AtTheBuyMarket_ItBuysOnlyWhatTheCreditsAboveTheFuelReservePayFor()
     {
         // D24: 37,692 credits, 5,000 of them kept for fuel and 152 for the trip's own fuel, buy 10 units
@@ -131,6 +144,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
         _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(booked => booked.Spent == 0 && booked.Earned == 0), "not_possible", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -170,6 +184,9 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         dropped.EventKind.Should().Be("TradeDropped");
         dropped.Properties["Reason"].Should().Be("not_lucrative");
         dropped.Properties["BuyPrice"].Should().Be(3_300L);
+
+        // D46: the flight to the buy market is the trip's loss.
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(booked => booked.Spent == 0 && booked.Earned == 0), "not_lucrative", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -222,6 +239,21 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task ASoldTrip_IsBooked_WithAllItsSales_AndWhatItsCargoCost()
+    {
+        // D46: "the actual sell - buy - fuel", booked when the trip ends; the trip book adds the fuel.
+        SellReturns(total: 69_740);
+
+        await StepAsync(Loaded(D41, units: 40), Trip(bought: true) with { Spent = 130_160 });
+
+        await _trips.Received(1).BookAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(booked => booked.Earned == 139_480 && booked.Spent == 130_160),
+            "sold",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AtTheSellMarket_ItTakesTheCargoElsewhere_WhenSellingThereNoLongerPays_AndAnotherMarketPaysMore()
     {
         // D41 now pays 3,300: 46 a unit over what the cargo cost. A1 pays 3,499, for 90 of fuel.
@@ -237,6 +269,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             Arg.Any<CancellationToken>());
         await _bus.Received(1).InvokeAsync(Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == A1), Arg.Any<CancellationToken>());
         _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeRerouted" && Equals(e.Properties["SellWaypoint"], A1));
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
     }
 
     [Fact]
@@ -271,11 +304,14 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     {
         PricesAre(Map(K85Market(), Market(D41, Good("FUEL", "EXCHANGE", 76, 69, 180))));
 
-        var result = await StepAsync(Loaded(D41), Trip(bought: true, moved: true));
+        var result = await StepAsync(Loaded(D41), Trip(bought: true, moved: true) with { Spent = 65_080 });
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
         _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_bought_here"));
+
+        // D46: booked as a loss of what the cargo cost; the trading plan sells the cargo on a trip of its own.
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(booked => booked.Spent == 65_080 && booked.Earned == 0), "not_bought_here", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -286,6 +322,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>());
         await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Any<TradeBetweenMarketsGoal>(), "nothing_aboard", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -313,7 +350,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await StepAsync(Loaded(D41), Trip(bought: true));
 
         await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "SHIP-1" && e.Good.Value == "EQUIPMENT" && e.Units == 20 && e.Revenue == 69_740),
+            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "SHIP-1" && e.Good.Value == "EQUIPMENT" && e.Units == 20 && e.Revenue == 69_740 && e.WaypointSymbol == D41),
             Arg.Any<DeliveryOptions>());
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == Credits && e.NewCredits == Credits + 69_740),
@@ -342,6 +379,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
                 _refresher,
                 _dock,
                 _bus,
+                _trips,
                 _log.For<TradeBetweenMarketsGoalExecutor>())
             .ExecuteStepAsync(ship, trip, new ShipGoalContext(), CancellationToken.None);
 }

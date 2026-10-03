@@ -48,6 +48,40 @@ public interface IAutomationMetrics
     void CreditsSpent(string category, long amount);
 
     /// <summary>
+    /// Adds units of a good our ships sold to a market (<c>spacetraders_goods_sold_units_total{system,waypoint,good}</c>),
+    /// whoever sold them: traders, miners, siphoners and the command ship in its spare time. Next to the market's prices
+    /// and supply, it shows what our sales do to a market and to the goods it makes from them. The system is the
+    /// waypoint's: its symbol up to the last dash.
+    /// </summary>
+    /// <param name="waypointSymbol">The market, such as <c>X1-DC53-H51</c>.</param>
+    /// <param name="tradeSymbol">The good sold.</param>
+    /// <param name="units">The units sold.</param>
+    void GoodsSold(string waypointSymbol, string tradeSymbol, int units);
+
+    /// <summary>
+    /// Adds units of a good our ships bought from a market (<c>spacetraders_goods_bought_units_total{system,waypoint,good}</c>).
+    /// The system is the waypoint's: its symbol up to the last dash.
+    /// </summary>
+    /// <param name="waypointSymbol">The market, such as <c>X1-DC53-K85</c>.</param>
+    /// <param name="tradeSymbol">The good bought.</param>
+    /// <param name="units">The units bought.</param>
+    void GoodsBought(string waypointSymbol, string tradeSymbol, int units);
+
+    /// <summary>
+    /// Counts a trip that ended (<c>spacetraders_trips_total{activity}</c>, D46): a <c>trade</c>, <c>mining</c>,
+    /// <c>siphoning</c> or <c>spare_time</c> trip, or a <c>contract</c> round trip.
+    /// </summary>
+    void TripEnded(string activity);
+
+    /// <summary>
+    /// Adds what a trip made after fuel, by activity (D46): a profit to <c>spacetraders_trip_profit_credits_total{activity}</c>,
+    /// a loss, as a positive amount, to <c>spacetraders_trip_loss_credits_total{activity}</c>, and 0 to the other, so both
+    /// series exist. A counter can't go down, so the two are apart; profit minus loss is what the activity made. A
+    /// contract's deposit and payout count as its profit when they come.
+    /// </summary>
+    void TripProfit(string activity, long profit);
+
+    /// <summary>
     /// Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>): a mining laser's yield,
     /// or a gas siphon's (slice 6.7). Neither a siphon nor a spare-time extraction (slice 6.8, which takes no survey
     /// by design) is counted by <see cref="Extraction"/>, which the survey statistics read.
@@ -88,7 +122,8 @@ public interface IAutomationMetrics
     /// <summary>
     /// Records every ship's state (<c>spacetraders_ships{role,state}</c> and
     /// <c>spacetraders_ship_status_since_timestamp_seconds{ship,role,state,goal,reason}</c>), where it
-    /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), when it arrives
+    /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), what it can do
+    /// (<c>spacetraders_ship_capabilities_info{ship,can}</c>), when it arrives
     /// (<c>spacetraders_ship_arrival_timestamp_seconds{ship}</c>, while in transit) and its hold
     /// (<c>spacetraders_ship_cargo_units{ship,good}</c>, <c>spacetraders_ship_cargo_capacity_units{ship}</c>).
     /// A ship whose labels changed since the last call entered its state at <paramref name="now"/>;
@@ -313,6 +348,13 @@ public sealed record ShipMetricsSample
 
     /// <summary>What the bot has it do, in a few words, such as <c>mining COPPER_ORE</c>, <c>scouting</c> or <c>idle</c>.</summary>
     public string Activity { get; init; } = string.Empty;
+
+    /// <summary>
+    /// What its equipment lets it do, whichever plans are on: <c>Survey</c>, <c>Mine</c>, <c>Siphon</c> and <c>Trade</c>,
+    /// in that order, such as <c>Siphon, Trade</c> for a siphon drone; <c>none</c> for a probe or a ship that can do none
+    /// of them.
+    /// </summary>
+    public string Capabilities { get; init; } = string.Empty;
 
     /// <summary>When it arrives, while in transit; <c>default</c> otherwise.</summary>
     public DateTimeOffset ArrivesAt { get; init; }

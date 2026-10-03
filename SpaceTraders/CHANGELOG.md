@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, slice 6.10a)
+- What each ship can do, whatever the plan switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine, Siphon, Trade`, or `none`), from its equipment. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role; this tells them apart. The metrics sample maps each cached ship once (`ShipRepository.MapToModel`, now public).
+- Units sold to and bought from each market, per good (`spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total`, labels `system`, `waypoint`, `good`), whoever traded them (D50): what we sell into a market can be set against what it makes. `ShipCargoSoldEvent` carries the market it was sold to.
+
+- What each trip made after fuel (D46): a trade, mining, siphon or spare-time trip books its sales − purchases − fuel when it ends, whichever way it ends (sold, stopped early, interrupted by a survey or a trade, or blocked by the circuit breaker), with a `TripEnded` journal line and the counters `spacetraders_trips_total`, `spacetraders_trip_profit_credits_total` and `spacetraders_trip_loss_credits_total` by `activity`. The trip goals keep what they earned and spent (`TripGoal`); fuel is read from the ledger (`TripBook`). A contract's deposit and payout count as its profit, and each delivery's round-trip fuel as its loss.
+
+### Code – Changed (2026-10-03, slice 6.10a, D49)
+- The role board's production-chain share counts at most what a trip earns on a unit (`ChainValues.PerUnitAtMost`): a mined or siphoned unit's price at its market, a traded unit's margin, so feeding a factory at most doubles a trip. A siphon trip values its own gas at the market it sells it to, and each other gas it keeps where it counts most. On the first day the board valued a siphon drone at ~274,000 credits an hour that earned 7–10k, mining drones at 80–95k that earned 1–3k, and the command ship's trades at up to 4.7M an hour that earned ~13k: D39's second step counted a price difference such as PLASTICS → EQUIPMENT for every unit of gas. The setting's description says so.
+
+### Docs – Changed (2026-10-03, slice 6.10)
+- `PLAN.md`: slice 6.10 and your decisions D43–D50; 6.10a built, 6.10b and 6.10c planned with design notes; "Where things stand" brought up to date. `docs/HOW_IT_WORKS.md`: the new metrics and events.
+
 ### Code – Fixed (2026-10-03, B53)
 - A flight logs two lines at Information: one when it leaves (`NavigateSubCommand`, now saying where from) and one when it lands (`ShipNavigationCompletedHandler`, with what its goal did next, or that it had none), besides its refuel. The ten or so steps between, each saying the ship had left or arrived, log at Debug. They were about 80% of the bot's lines, and with twelve ships the log budget would have been passed on normal running. Replaying the day's logs without them gives about 2,300 lines a ship a day instead of 6,000.
 

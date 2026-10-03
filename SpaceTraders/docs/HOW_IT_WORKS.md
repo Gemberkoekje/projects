@@ -326,15 +326,21 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   - mine: every mining target (D28's), a full hold of the target ore, filled at the ship's rate times the
     ore's share of the extractions (its survey's deposits, or one of the asteroid's ores without one), less
     the fuel there and on to the market;
-  - siphon: every siphon target, a full hold of the gases a market buys (a trip keeps them all, D33), each
-    at the best price it fetches, less the fuel;
+  - siphon: every siphon target, a full hold of the gases a market buys (a trip keeps them all, D33): the
+    trip's own gas at the market it sells it to, each other gas where it counts most among the markets the
+    ship can carry it to from the gas giant, less the fuel;
   - each with the production chains' share (D39, `ChainValues`): a good sold to a market that makes a
     pricier good from it (it imports the good and exports something made from it, by the game's production
     chains, as D15 reads them) counts `Roles.ChainValueSharePercent` (50) of the price difference, and that
     share again of the next step, at the market in the system that makes the most of the pricier good in
     turn (iron ore → iron → machinery). A step counts fully while its market is SCARCE of the input, three
-    quarters at LIMITED, half at MODERATE, a quarter at HIGH, and not at all at ABUNDANT. Only the
-    comparison of roles reads it: within a role the plans still choose by D15 and D28;
+    quarters at LIMITED, half at MODERATE, a quarter at HIGH, and not at all at ABUNDANT. A market that only
+    exchanges the good adds nothing. The share counts at most what the trip earns on a unit (D49,
+    `ChainValues.PerUnitAtMost`): a mined or siphoned unit's price at its market, a traded unit's margin; so
+    feeding a factory at most doubles a trip. Each step's price difference counts for every unit of input,
+    while nobody knows how many units of input make one of output, or how fast: uncapped, the second step
+    (PLASTICS → EQUIPMENT, ~3,200) valued a siphon drone at ~274,000 credits an hour that earned 7–10k. Only
+    the comparison of roles reads it: within a role the plans still choose by D15 and D28;
   - a trip's time is its flights in CRUISE as the API reckons them (15 seconds plus the distance times 25
     over the engine's speed, 9 for an engine not cached yet), 10 seconds a landing, and for mining and
     siphoning the cooldowns to fill the hold, with half a tick after each.
@@ -757,6 +763,17 @@ scout and probe plans don't read the roles.
     `SurveyWaypointGoalExecutor` after each survey (slice 6.4; B16's survey part, fixed: survey goals
     were never cleared);
   - the scout plan, when its last stop is done.
+- **A trip books what it made** (D46, slice 6.10a): the four trip goals (`TradeBetweenMarkets`, `MineAndSell`,
+  `SiphonAndSell`, `GatherAndSell`) derive from `TripGoal`, which keeps `Earned` (sales) and `Spent` (cargo bought)
+  as the executor records them (a goal stored before has both at 0). Every end of a trip clears the goal and then books
+  it (`TripBook`): fuel is the ship's `FuelPurchase` ledger rows since the goal's `StartedAt`, profit is earned − spent −
+  fuel, logged as a `TripEnded` line and counted by activity. Sales and purchases come from the goal because a sale's
+  ledger row is written after the goal has ended; fuel, bought at departures minutes earlier, is in the ledger by then.
+  The ends: sold, and every way a trip stops early (`rejected`, `nothing_aboard`, `not_bought_here`, `no_buyer`, and a
+  trade's `not_lucrative` and `not_possible`), `interrupted` when the survey or trading plan takes a spare-time trip
+  over, and `runaway` when the circuit breaker blocks a trip. Not booked: a contract round trip closed without a
+  delivery (released at a restart, or when the contract is fulfilled), goals an agent reset wipes, and the earlier
+  batches of a sale that fails partway; a trade bought before slice 6.10a's deploy books its whole sale once.
 
 ### `ShipGoalExecutorService`
 
@@ -883,8 +900,8 @@ wait for a cooldown simply run again on a later tick.
 | `MarketDataRefreshedEvent` | Arrival at a market; the market watch; a refresh after a trade (D25) | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
-| `ShipCargoSoldEvent` | Mining and trade executors | `LedgerEntryHandler` (TradeSell); `activity_logs` row |
-| `CargoPurchasedEvent` | Trade executor | `LedgerEntryHandler` (TradeBuy) |
+| `ShipCargoSoldEvent` | Mining, siphon, spare-time and trade executors; carries the market it was sold to (`WaypointSymbol`) | `LedgerEntryHandler` (TradeSell, and `spacetraders_goods_sold_units_total`); `activity_logs` row |
+| `CargoPurchasedEvent` | Trade executor | `LedgerEntryHandler` (TradeBuy, and `spacetraders_goods_bought_units_total`) |
 | `NewShipPurchasedEvent` | `ShipPurchaseService` | `LedgerEntryHandler` (ShipPurchase); `activity_logs` row |
 | `ContractAcceptedEvent` | Contract plan | `LedgerEntryHandler` (ContractDeposit, unless it paid nothing); `activity_logs` row |
 | `ContractFulfilledEvent` | `FulfillContractDeliveryCommand` | `LedgerEntryHandler` (ContractPayout); `activity_logs` row |
@@ -1036,7 +1053,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.Roles.Enabled`, `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37). With the role board on, every ship works for the plan of the role the board gives it instead (D38–D41) |
 | `Roles.ReconsiderMinutes` (10) | Minutes between the role board's evaluations of the whole fleet; a new ship, a plan switched, the contract starting or stopping to want ore, or a ship left without work weighs the roles at once (D41) |
 | `Roles.HeadStartPercent` (20) | Percent more a ship's current role counts on the role board, so close calls don't flip back and forth (D41); 0 means none |
-| `Roles.ChainValueSharePercent` (50) | Percent of the price difference to the pricier good a market makes from what a ship sells it that the role board counts, and that share again of the step after; fully while the market is SCARCE of it, not at ABUNDANT (D39); 0 means none |
+| `Roles.ChainValueSharePercent` (50) | Percent of the price difference to the pricier good a market makes from what a ship sells it that the role board counts, and that share again of the step after; fully while the market is SCARCE of it, not at ABUNDANT (D39); at most what the trip earns on a unit (D49); 0 means none |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
@@ -1240,6 +1257,7 @@ The seven pages in `src/Future` are not routed.
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
   | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
   | `CargoJettisoned` | `CargoJettison`: the trading and spare-time plans, for cargo nothing will sell or use (D42) | `ShipSymbol`, `Units`, `TradeSymbol`, `WaypointSymbol`, `Reason` (`no_buyer`, `not_worth_the_fuel`) |
+  | `TripEnded` | `TripBook`, when a trade, mining, siphon or spare-time trip ends, and at each contract delivery (D46) | `ShipSymbol`, `Activity` (`trade`, `mining`, `siphoning`, `spare_time`, `contract`), `Earned`, `Spent`, `FuelCost`, `Profit`, `Minutes`, `Reason` (`sold`, `delivered`, `interrupted`, `runaway`, `rejected`, `nothing_aboard`, `no_buyer`, `not_bought_here`, `not_lucrative`, `not_possible`) |
   | `ProbeCalled` | Probe plan, when it sends a probe to a shipyard where a purchase waits for one of our ships (D30) | `ShipSymbol`, `WaypointSymbol`, `ShipType` the purchase is for |
   | `PlanStarted`, `PlanCompleted` | Scout, contract and probe plans | `Plan`, and the plan's ship, contract or system |
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`) | `Plan`, `Reason` |
@@ -1256,7 +1274,8 @@ The seven pages in `src/Future` are not routed.
   `SurveyEnded`); siphoning each trip (`SiphonStarted`, `Siphoned` per siphon, `CargoSold`); spare time
   each trip (`GatheringStarted`, `Extracted` or `Siphoned`, `CargoSold`, or `GatheringInterrupted`);
   trading journals each trip: `TradeStarted`, then `CargoBought` and `CargoSold`, with
-  `TradeRerouted` or `TradeDropped` when prices change. The role board journals each role that changes
+  `TradeRerouted` or `TradeDropped` when prices change. Each of those trips ends with a `TripEnded` line: what it
+  made after fuel (D46). The role board journals each role that changes
   (`RoleChanged`), and cargo that goes overboard because nothing will sell or use it is a
   `CargoJettisoned` line (D42).
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
@@ -1317,6 +1336,9 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `None`) and why (`survey_first`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
   | `spacetraders_ship_role_credits_per_hour` | `ship`, `role` | What each role a ship could take but surveying would earn it per hour, by the board's estimate of its best trip; 0 for a role without a trip. Only while the board is on | Every 10 s |
   | `spacetraders_setting_info` | `setting`, `current`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`) and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
+  | `spacetraders_ship_capabilities_info` | `ship`, `can` | One series per ship, always 1: the roles its equipment allows whichever plans are on (`FleetRoles.PotentialRoles`), in the order `Survey` (a surveyor mount, or a bought SHIP_SURVEYOR), `Mine` (a mining laser, or a bought mining drone or ore hound, with a hold and a tank), `Siphon` (a gas siphon, or a bought siphon drone, with a hold and a tank), `Trade` (a hold and a tank); `none` for a probe or a ship with none. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role, which the `role` label of `spacetraders_ships` shows; this tells them apart (slice 6.10a). The fleet and roles tables' "can do" column | Every 10 s |
+  | `spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total` | `system`, `waypoint`, `good` | Units our ships sold to, or bought from, a market, whoever traded them (trade, mining, siphon and spare-time trips; only traders buy). The same labels as the market gauges without `kind`, so what we sell into a market can be set against the supply, trade volume and price of what it makes (D50) | Per sale or purchase (`LedgerEntryHandler`) |
+  | `spacetraders_trips_total`, `spacetraders_trip_profit_credits_total`, `spacetraders_trip_loss_credits_total` | `activity` | Trips that ended, and what they made or lost after fuel, by `trade`, `mining`, `siphoning`, `spare_time` or `contract` (D46): a trip adds its profit to one counter and 0 to the other, so both series exist and profit − loss is what the activity made. A contract's deposit and payout count as its profit; each delivery's round trip, its fuel as a loss | Per trip end (`TripBook`); contract payments in `LedgerEntryHandler` |
 
 ---
 

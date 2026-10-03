@@ -106,6 +106,38 @@ public sealed class ShipGoalSerializationTests
         result.Kind.Should().Be(ShipGoalKind.GatherAndSell);
     }
 
+    /// <summary>The four trips, each with what it sold for and paid for cargo so far.</summary>
+    public static TheoryData<TripGoal> Trips => new()
+    {
+        new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-D41", CargoBought = true, Earned = 69_740, Spent = 65_080 },
+        new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = "X1-AB-XB5C", SellWaypointSymbol = "X1-AB-H51", Selling = true, Earned = 1_005 },
+        new SiphonAndSellGoal { TradeSymbol = "LIQUID_HYDROGEN", SourceWaypointSymbol = "X1-AB-C38", SellWaypointSymbol = "X1-AB-G50", Selling = true, Earned = 330 },
+        new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-XB5C", Selling = true, Earned = 1_340 },
+    };
+
+    [Theory]
+    [MemberData(nameof(Trips))]
+    public void ATrip_RoundTrip_KeepsWhatItEarnedAndSpent(TripGoal trip)
+    {
+        // D46: a trip is booked when it ends, with what its sales brought in and its cargo cost, which it keeps with its goal.
+        var json = JsonSerializer.Serialize<ShipGoal>(trip);
+        var result = JsonSerializer.Deserialize<ShipGoal>(json);
+
+        result.Should().BeOfType(trip.GetType()).And.BeEquivalentTo(trip, options => options.PreferringRuntimeMemberTypes());
+    }
+
+    [Fact]
+    public void ATripStoredBeforeItKeptItsMoney_LoadsWithNothingEarnedOrSpent()
+    {
+        // D46: a trip stored before the goals kept what they earned and spent still loads.
+        const string Stored = """{"$type":"TradeBetweenMarkets","TradeSymbol":"EQUIPMENT","BuyWaypointSymbol":"X1-AB-K85","SellWaypointSymbol":"X1-AB-D41","Units":20,"ExpectedProfit":4508,"FeedsTradeSymbol":"","CargoBought":true,"PricePaidPerUnit":3254,"SellWaypointChanged":false,"GoalId":"0f8fad5b-d9cb-469f-a165-70867728950e","Status":0,"StatusReason":null,"StartedAt":"2026-10-02T14:14:00+00:00"}""";
+
+        var trip = JsonSerializer.Deserialize<ShipGoal>(Stored).Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+
+        (trip.Earned, trip.Spent).Should().Be((0L, 0L));
+        trip.PricePaidPerUnit.Should().Be(3_254);
+    }
+
     [Fact]
     public void SellCargoGoal_RoundTrip_PreservesTradeSymbolList()
     {
