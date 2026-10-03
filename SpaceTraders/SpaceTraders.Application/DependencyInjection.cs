@@ -116,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, GatherAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
         services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
         services.AddSingleton<IShipGoalStepGuard, ShipGoalStepGuard>();

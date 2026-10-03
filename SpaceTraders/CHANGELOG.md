@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, D54)
+- The survey ship works where most drones mine (D54), as asked on 2026-10-03: "Please add the option for the survey ship to get to the mining location without surveys." A ship that can only survey counts the mining drones by where they work (their trip's market, a drone drifting there included; between trips, where they are), and when an area out of its CRUISE reach has more of them than its own, it drifts there before it surveys again (`MoveToWaypointGoal` with `Drifting`, and its first executor); a tie keeps it where it is. On the cluster, four drones worked for B7, out of the survey ship's reach, against two in the middle, and B7's mined without surveys.
+
+### Docs – Changed (2026-10-03, D54)
+- `PLAN.md`: D54 and its follow-up under 6.10c; D53 deployed. `docs/HOW_IT_WORKS.md`: where the survey ship works, the move executor, `DriftStarted` for a move, and the fleet view's words.
+
 ### Code – Changed (2026-10-03, D53)
 - Coverage per area (D53), as asked on 2026-10-03: "A drone covers a mineral only for the markets it can reach in CRUISE from where it works (the middle, or B7). The middle's scarce silicon gets a drone of its own; the coverage tier may buy a drone per scarce mineral per area (more drones)." A mining or siphon trip covers its mineral at the markets its ship reaches in CRUISE from the market it sells at, so a free drone takes a SCARCE or LIMITED mineral that no trip covers there, though a drone works on it for a far market (`CoveringTrip`). The coverage tier counts each such mineral once per area, the markets a drone flies between in CRUISE (`MiningPlanner.Areas`), and the role board keeps one drone per mineral and area. On the cluster, four of the five mining drones had drifted to B7 while the middle's silicon, SCARCE at H53, had none.
 

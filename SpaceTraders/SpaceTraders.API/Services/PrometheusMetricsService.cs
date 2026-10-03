@@ -271,6 +271,7 @@ public sealed class PrometheusMetricsService(
                 DeployProbeGoal { ForPurchase: true } => "called to a shipyard",
                 DeployProbeGoal => "scouting",
                 PatrolMarketGoal => "watching its market",
+                MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",
                 MoveToWaypointGoal => "moving",
                 IdleGoal => "idle",
                 _ => goal.Kind.ToString(),

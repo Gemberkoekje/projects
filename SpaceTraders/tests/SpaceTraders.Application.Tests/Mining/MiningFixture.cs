@@ -87,6 +87,10 @@ internal static class MiningFixture
             MountSymbols: ["MOUNT_SENSOR_ARRAY_II", "MOUNT_GAS_SIPHON_II", "MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"],
             CargoInventory: []);
 
+    /// <summary>A survey ship, as bought (D47): a surveyor, an 80-unit tank, and nothing to carry anything in.</summary>
+    public static ShipModel SurveyShip(string waypoint = XB5C, string symbol = "SHIP-5")
+        => new(symbol, SystemSymbol, waypoint, "IN_ORBIT", "CRUISE", 80, 80, ShipType: "SHIP_SURVEYOR", MountSymbols: ["MOUNT_SURVEYOR_I"]);
+
     /// <summary>A mining drone: a 15-unit hold and an 80-unit tank.</summary>
     public static ShipModel Drone(string symbol = "SHIP-3", string waypoint = H51, string status = "DOCKED", IReadOnlyList<CargoItemModel>? cargo = null)
         => new(

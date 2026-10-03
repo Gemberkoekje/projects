@@ -424,31 +424,55 @@ public static class MiningPlanner
             .GroupBy(area => area.Good, StringComparer.OrdinalIgnoreCase)
             .OrderBy(mineral => mineral.Key, StringComparer.Ordinal))
         {
-            var groups = new List<List<string>>();
-            foreach (var market in mineral
-                .SelectMany(area => area.MarketSymbols)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Order(StringComparer.Ordinal))
-            {
-                var joined = groups
-                    .Where(group => group.Any(other => Covers(map, fuelCapacity, other, market) || Covers(map, fuelCapacity, market, other)))
-                    .ToList();
-                var area = new List<string> { market };
-                foreach (var group in joined)
-                {
-                    area.AddRange(group);
-                    groups.Remove(group);
-                }
-
-                groups.Add(area);
-            }
-
-            areas.AddRange(groups
-                .Select(group => new MineralArea(mineral.Key, [.. group.Order(StringComparer.Ordinal)]))
-                .OrderBy(area => area.MarketSymbols[0], StringComparer.Ordinal));
+            areas.AddRange(Groups(map, fuelCapacity, mineral.SelectMany(area => area.MarketSymbols))
+                .Select(group => new MineralArea(mineral.Key, group)));
         }
 
         return areas;
+    }
+
+    /// <summary>
+    /// Where a ship that can only survey should work (D54): where most mining drones work. Its own area is what it reaches in
+    /// CRUISE from where it is; the drones beyond that group into areas as it would fly between them (<see cref="Areas"/>).
+    /// When an area has more drones than its own (a tie keeps it where it is), it moves there: to the market in it, among
+    /// those that sell fuel, where the most drones work, which it drifts to (D45). Asked on 2026-10-03: "Please add the option
+    /// for the survey ship to get to the mining location without surveys", to work "where most drones mine".
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="surveyor">The ship that can only survey.</param>
+    /// <param name="droneWaypoints">Where each mining drone works, one entry a drone: its trip's market, else where it is.</param>
+    /// <param name="move">Where it would move to, with the drones there and in its own area.</param>
+    /// <returns>True when it should move.</returns>
+    public static bool TryFindBusierArea(TradeMarketMap map, ShipModel surveyor, IReadOnlyList<string> droneWaypoints, out SurveyorMove move)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(surveyor);
+        ArgumentNullException.ThrowIfNull(droneWaypoints);
+
+        move = new SurveyorMove(string.Empty, 0, 0);
+        var own = droneWaypoints.Count(waypoint => CanReach(map, surveyor, waypoint));
+        var away = droneWaypoints.Where(waypoint => !CanReach(map, surveyor, waypoint)).ToList();
+        int DronesAt(string waypoint) => away.Count(other => other.Equals(waypoint, StringComparison.OrdinalIgnoreCase));
+
+        foreach (var (area, drones) in Groups(map, surveyor.FuelCapacity, away)
+            .Select(area => (Area: area, Drones: area.Sum(DronesAt)))
+            .Where(area => area.Drones > own)
+            .OrderByDescending(area => area.Drones)
+            .ThenBy(area => area.Area[0], StringComparer.Ordinal))
+        {
+            var market = area
+                .Where(waypoint => CanDriftTo(map, surveyor, waypoint))
+                .OrderByDescending(DronesAt)
+                .ThenBy(waypoint => waypoint, StringComparer.Ordinal)
+                .FirstOrDefault() ?? string.Empty;
+            if (market.Length > 0)
+            {
+                move = new SurveyorMove(market, drones, own);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -510,6 +534,34 @@ public static class MiningPlanner
 
         var value = y.ExpectedValue.CompareTo(x.ExpectedValue);
         return value != 0 ? value : string.CompareOrdinal(x.Key, y.Key);
+    }
+
+    /// <summary>
+    /// Groups waypoints by area (D53): two share an area when a ship with this tank flies from one to the other in CRUISE
+    /// (<see cref="Covers"/>), and so does a waypoint that shares one with either. Each group by symbol, the groups by their
+    /// first.
+    /// </summary>
+    private static IReadOnlyList<IReadOnlyList<string>> Groups(TradeMarketMap map, int fuelCapacity, IEnumerable<string> waypoints)
+    {
+        var groups = new List<List<string>>();
+        foreach (var waypoint in waypoints.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
+        {
+            var joined = groups
+                .Where(group => group.Any(other => Covers(map, fuelCapacity, other, waypoint) || Covers(map, fuelCapacity, waypoint, other)))
+                .ToList();
+            var area = new List<string> { waypoint };
+            foreach (var group in joined)
+            {
+                area.AddRange(group);
+                groups.Remove(group);
+            }
+
+            groups.Add(area);
+        }
+
+        return [.. groups
+            .Select(group => (IReadOnlyList<string>)[.. group.Order(StringComparer.Ordinal)])
+            .OrderBy(group => group[0], StringComparer.Ordinal)];
     }
 
     /// <summary>Every market in the system that buys an ore, with what it pays, by symbol.</summary>
@@ -844,4 +896,32 @@ public sealed record MineralArea
 
     /// <summary>The markets, by symbol.</summary>
     public required IReadOnlyList<string> MarketSymbols { get; init; }
+}
+
+/// <summary>
+/// Where a ship that can only survey moves to (D54, <see cref="MiningPlanner.TryFindBusierArea"/>): a market in the area where
+/// more mining drones work than in its own.
+/// </summary>
+public sealed record SurveyorMove
+{
+    /// <summary>Creates a move.</summary>
+    /// <param name="MarketSymbol">The market it drifts to: one that sells fuel.</param>
+    /// <param name="Drones">The mining drones that work in that area.</param>
+    /// <param name="OwnDrones">The mining drones that work in its own.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SurveyorMove(string MarketSymbol, int Drones, int OwnDrones)
+    {
+        this.MarketSymbol = MarketSymbol;
+        this.Drones = Drones;
+        this.OwnDrones = OwnDrones;
+    }
+
+    /// <summary>The market it drifts to: one that sells fuel.</summary>
+    public required string MarketSymbol { get; init; }
+
+    /// <summary>The mining drones that work in that area.</summary>
+    public required int Drones { get; init; }
+
+    /// <summary>The mining drones that work in its own.</summary>
+    public required int OwnDrones { get; init; }
 }

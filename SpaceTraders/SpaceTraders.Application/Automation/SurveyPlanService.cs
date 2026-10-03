@@ -43,6 +43,11 @@ public interface ISurveyPlanService
 /// and no ship that can only survey, first in the order ships are bought in after the contract's drone (D43). The board
 /// gives it the survey role (D38), which frees the command ship for what pays it most.
 /// </para>
+/// <para>
+/// A ship that can only survey works where most mining drones work (D54, <see cref="MiningPlanner.TryFindBusierArea"/>):
+/// when an area out of its CRUISE reach has more drones than its own, it drifts there (<see cref="MoveToWaypointGoal"/>)
+/// before it surveys again; a tie keeps it where it is.
+/// </para>
 /// </summary>
 public sealed class SurveyPlanService(
     IShipRepository ships,
@@ -115,9 +120,29 @@ public sealed class SurveyPlanService(
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             var miners = await MinersAsync(fleet, board, system.Key, cancellationToken);
             var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);
+            var freeHere = free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)).ToList();
+            var droneWaypoints = freeHere.Any(FleetRoles.CanOnlySurvey)
+                ? await DroneWaypointsAsync(fleet, system.Key, cancellationToken)
+                : [];
 
-            foreach (var surveyor in free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)))
+            foreach (var surveyor in freeHere)
             {
+                // D54: a ship that can only survey works where most drones mine, and drifts to an area that has more.
+                if (FleetRoles.CanOnlySurvey(surveyor) && MiningPlanner.TryFindBusierArea(context.Map, surveyor, droneWaypoints, out var move))
+                {
+                    await goals.SetActiveGoalAsync(
+                        surveyor.Symbol,
+                        new MoveToWaypointGoal { TargetWaypointSymbol = move.MarketSymbol, Drifting = true },
+                        cancellationToken);
+                    logger.LogInformation(
+                        "Survey plan: ship {ShipSymbol} moves to {WaypointSymbol}, where {Drones} mining drones work, against {OwnDrones} in its own area (D54).",
+                        surveyor.Symbol,
+                        move.MarketSymbol,
+                        move.Drones,
+                        move.OwnDrones);
+                    continue;
+                }
+
                 var reachable = systemTargets
                     .Where(target => target.NeedsSurvey && MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
                     .ToList();
@@ -286,6 +311,30 @@ public sealed class SurveyPlanService(
         }
 
         return miners;
+    }
+
+    /// <summary>
+    /// Where each mining drone in a system works (D54): the market its trip sells at, a drone still drifting there included;
+    /// between trips, where it is. A drone on other work doesn't count.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> DroneWaypointsAsync(IReadOnlyList<ShipModel> fleet, string systemSymbol, CancellationToken cancellationToken)
+    {
+        var waypoints = new List<string>();
+        foreach (var drone in fleet.Where(ship => FleetRoles.IsMiningDrone(ship)
+            && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
+        {
+            var goal = await goals.GetActiveGoalAsync(drone.Symbol, cancellationToken);
+            if (goal is MineAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                waypoints.Add(trip.SellWaypointSymbol);
+            }
+            else if (goal is null || goal.Status is GoalStatus.Blocked or GoalStatus.Completed)
+            {
+                waypoints.Add(MiningPlanner.Position(drone));
+            }
+        }
+
+        return waypoints;
     }
 
     /// <summary>The contract's ore, while the contract plan mines it in this system.</summary>

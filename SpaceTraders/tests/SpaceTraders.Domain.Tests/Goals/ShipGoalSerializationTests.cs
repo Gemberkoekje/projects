@@ -102,6 +102,18 @@ public sealed class ShipGoalSerializationTests
     }
 
     [Fact]
+    public void AMoveThatDrifts_RoundTrip_KeepsItsDrift()
+    {
+        // D54: the survey ship drifts to the area where most drones mine, for hours; a restart in between must not lose that.
+        var goal = new MoveToWaypointGoal { TargetWaypointSymbol = "X1-AB-B7", Drifting = true };
+
+        var result = JsonSerializer.Deserialize<ShipGoal>(JsonSerializer.Serialize<ShipGoal>(goal));
+
+        result.Should().BeOfType<MoveToWaypointGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Kind.Should().Be(ShipGoalKind.MoveToWaypoint);
+    }
+
+    [Fact]
     public void ATripStoredBeforeItCouldDrift_LoadsWithoutADrift()
     {
         const string Stored = """{"$type":"MineAndSell","TradeSymbol":"COPPER_ORE","SourceWaypointSymbol":"X1-AB-XB5C","SellWaypointSymbol":"X1-AB-H51","Selling":false,"Earned":0,"Spent":0,"GoalId":"0f8fad5b-d9cb-469f-a165-70867728950e","Status":0,"StatusReason":null,"StartedAt":"2026-10-03T09:00:00+00:00"}""";
