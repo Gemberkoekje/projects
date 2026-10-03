@@ -723,7 +723,9 @@ last, gives it something to do then; your decisions are D34–D37.
      next startup sync. Mining capability also follows from the ship type, so a purchased
      `SHIP_MINING_DRONE` still counts as a miner. With the role board on, the new ship waits a tick for
      its role (slice 6.9).
-  6. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`.
+  6. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`, and records the
+     purchase for the order ships are bought in at once (`PurchaseNeeds.Bought`): the ledger's row comes a
+     moment later.
   - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`
     or `NoShipAtShipyard`.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus the credit reserve (slice 6.10b,
@@ -763,11 +765,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
 - **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
   pass what it would buy now, or nothing, and asks before it buys (`IPurchaseOrder.ReportAsync`). A plan
   may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,
-  the turn. A need counts while its plan is on, for 2 minutes after the plan last said it, and only while
-  it can be met: its plan's cap not reached, a known shipyard selling the ship. Until each plan that is on,
-  and could need something earlier, has said what it needs once since the start, nothing after it is
-  bought: after a start the probe plan, which runs before the survey, mining, siphon and trading plans,
-  waits a tick.
+  the turn. A need counts while its plan is on, and only while it can be met: its plan's cap not reached, a
+  known shipyard selling the ship. Until each plan that is on, and could need something earlier, has said
+  what it needs within the last 2 minutes, nothing after it is bought: after a start, or a pause in which
+  no plan ran (a 502 pauses them for 3 minutes), the probe plan, which runs before the survey, mining,
+  siphon and trading plans, waits a tick; a plan that fails before it says holds the purchases after it.
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it
   waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the

@@ -1908,11 +1908,12 @@ How credits are split stays your call; Claude only fixes deviations from intende
       - **The order** (`PurchaseOrder`, `PurchaseNeeds`, D43): every plan that buys says on each pass what it would buy
         (`PurchaseNeed`: a tier, the ship, the shipyard, the price) and buys only when nothing comes first: the contract's
         drone, a surveyor, a drone per scarce mineral, the cargo ships of `Trade.ShipPurchases`, probes, then drones and
-        cargo ships of the list's last type in turn. A need counts while its plan is on, for 2 minutes after the plan last
-        said it, and only while it can be met (its cap not reached, a known shipyard with a price for it). Until each plan
-        that is on and could need something earlier has said what it needs once since the start, nothing after it is
-        bought: after a start the probe plan, which runs before the survey, mining, siphon and trading plans, waits a tick.
-        The order says who may buy; the reserve stays the purchase's own check.
+        cargo ships of the list's last type in turn. A need counts while its plan is on, and only while it can be met (its
+        cap not reached, a known shipyard with a price for it). Until each plan that is on and could need something earlier
+        has said what it needs within the last 2 minutes, nothing after it is bought: after a start, or a pause in which no
+        plan ran (a 502 pauses them for 3 minutes), the probe plan, which runs before the survey, mining, siphon and trading
+        plans, waits a tick; a plan that fails before it says holds the purchases after it. The order says who may buy; the
+        reserve stays the purchase's own check.
       - **The turn** between drones and cargo ships counts the drones and cargo ships bought since the list's last cargo
         ship: the ledger's `ShipPurchase` rows (read once a start) and the purchases of this process, which
         `ShipPurchaseService` records at once, as the ledger's row comes a moment later and the siphon plan, later in the

@@ -83,11 +83,17 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
-    public async Task ANeedNotSaidAgainWithinItsLifetime_NoLongerCounts()
+    public async Task AfterAPause_APlanNotHeardFromLately_HoldsBackWhatComesAfterIt_UntilItSaysAgain()
     {
-        // A plan that fails before it says what it needs lets the others buy.
+        // A 502 pauses every plan for 3 minutes. The probe plan runs early in the first tick after it, when the trading
+        // plan's word is older than its lifetime: the shuttle it saves up for still comes first.
         EveryoneSays(PurchaseNeed.None);
         _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"), DateTimeOffset.UtcNow - PurchaseNeeds.Lifetime - TimeSpan.FromSeconds(1));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("the Trading plan, not heard from lately", StringComparison.Ordinal));
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
 
         (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
     }

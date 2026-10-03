@@ -18,11 +18,11 @@ namespace SpaceTraders.Application.Services;
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
 ///   ship, and so on. A turn passes when the other kind has nothing to buy.</item>
 /// </list>
-/// A need counts while its plan is on, for <see cref="PurchaseNeeds.Lifetime"/> after the plan last said it, and only
-/// while it can be met (its plan's cap not reached, a known shipyard selling the ship): a need that never can be would stop
-/// everything after it. Until each plan that is on, and could need something earlier, has said what it needs once since
-/// the start, nothing after it is bought. The order says who may buy; the credit reserve stays the purchase's own check
-/// (<see cref="IShipPurchaseService"/>).
+/// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
+/// the ship): a need that never can be would stop everything after it. Until each plan that is on, and could need
+/// something earlier, has said what it needs within <see cref="PurchaseNeeds.Lifetime"/>, nothing after it is bought: after
+/// a start, and after a pause in which no plan ran (a 502 pauses them for 3 minutes), the plans say again before anything
+/// is bought. The order says who may buy; the credit reserve stays the purchase's own check (<see cref="IShipPurchaseService"/>).
 /// </summary>
 public interface IPurchaseOrder
 {
@@ -65,7 +65,7 @@ public sealed class PurchaseOrder(
     /// <summary>
     /// What comes before a plan's need in the order (D43): each other plan that is on whose need comes earlier, or, between
     /// drones and cargo ships, is of the kind whose turn it is; and each other plan that is on, could need something
-    /// earlier, and hasn't said what it needs since the start.
+    /// earlier, and hasn't said what it needs within <see cref="PurchaseNeeds.Lifetime"/>.
     /// </summary>
     /// <param name="plan">The plan that would buy.</param>
     /// <param name="need">What it would buy.</param>
@@ -90,17 +90,18 @@ public sealed class PurchaseOrder(
         var ahead = new List<string>();
         foreach (var other in plansOn.Where(other => other != plan).Order())
         {
-            if (!reported.TryGetValue(other, out var report))
+            if (!reported.TryGetValue(other, out var report) || now - report.At > PurchaseNeeds.Lifetime)
             {
+                // Not heard from since the start, or since a pause: what it needs could come first.
                 if (BuyingPlans.TryGetValue(other, out var earliest) && earliest < need.Tier)
                 {
-                    ahead.Add($"the {other} plan, not heard from since the start");
+                    ahead.Add($"the {other} plan, not heard from lately");
                 }
 
                 continue;
             }
 
-            var open = now - report.At <= PurchaseNeeds.Lifetime ? report.Need : PurchaseNeed.None;
+            var open = report.Need;
             if (open.Tier == PurchaseTier.None)
             {
                 continue;
@@ -245,7 +246,11 @@ public sealed class PurchaseOrder(
 /// <remarks>Thread-safe: a purchase through the control endpoint can come at any time.</remarks>
 public sealed class PurchaseNeeds
 {
-    /// <summary>How long a need counts after its plan last said it: a plan that is switched off, or fails before it says, lets the others buy.</summary>
+    /// <summary>
+    /// How long what a plan said counts. A plan that is on and hasn't said what it needs for longer holds back what could come
+    /// after it, as at a start, until it says again: after a pause every plan says again before anything is bought, and a
+    /// plan that fails before it says holds the purchases after it. A plan that is switched off holds back nothing.
+    /// </summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(2);
 
     private readonly Lock _gate = new();
