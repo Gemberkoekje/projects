@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, slice 2.10)
+- The bot counts every request it initiates to the game API, once, as it starts: before the pause after a 502 and the local budget, and without the retries of a 429 (`spacetraders_api_requests_initiated_total{method,endpoint}`, from a new outermost handler, `ApiRequestInitiatedHandler`). It feeds the dashboard's new "API request rates" graph, asked on 2026-10-03: "For spacetraders, can we add a graph similar to this?" Next to the requests that went out, it shows requests waiting for the budget, and retries.
+
+### Docs – Changed (2026-10-03, slice 2.10)
+- `PLAN.md`: slice 2.10; `docs/HOW_IT_WORKS.md`: the new handler and metric; the `st-investigate` skill: a query for the request rates.
+
 ### Code – Changed (2026-10-03, D58)
 - Drones gather first (D58), as asked on 2026-10-03: "Mining drones should be mining drones first, and traders second, and they should not leave gaps when trading in a way that results in endless drones being bought." The role board gives every mining drone the mining role and every siphon drone the siphon role (`gathers_first`), whatever trading would pay; a drone trades only when its plan has no trip for it. The board had moved drones between gathering and trading every 10 minutes, and the ores and gases they no longer gathered went short, so the coverage tier bought drones for them. The command ship still takes what pays it most.
 

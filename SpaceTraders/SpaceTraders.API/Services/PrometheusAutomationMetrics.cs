@@ -15,6 +15,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly ZeroFirstCounter _goalBreakerTrips;
     private readonly Gauge _databaseSizeBytes;
     private readonly ZeroFirstCounter _goalSteps;
+    private readonly ZeroFirstCounter _apiRequestsInitiated;
     private readonly ZeroFirstCounter _apiRequests;
     private readonly ZeroFirstCounter _apiThrottled;
     private readonly ZeroFirstCounter _rateLimitWaitSeconds;
@@ -99,6 +100,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_goal_steps_total",
             "Goal steps run, by goal kind.",
             "kind");
+        _apiRequestsInitiated = ZeroFirst(
+            "spacetraders_api_requests_initiated_total",
+            "Requests the bot initiated to the SpaceTraders API, by method and route template: once each, as it starts, before the pause after a 502 and the local request budget. Retries of a 429 don't count again.",
+            "method",
+            "endpoint");
         _apiRequests = ZeroFirst(
             "spacetraders_api_requests_total",
             "Responses from the SpaceTraders API, by method, route template and status code ('error' when none came). Every attempt counts, retries included.",
@@ -345,6 +351,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void GoalStep(string goalKind) => _goalSteps.Inc(1, goalKind);
+
+    /// <inheritdoc />
+    public void ApiRequestInitiated(string method, string endpoint) => _apiRequestsInitiated.Inc(1, method, endpoint);
 
     /// <inheritdoc />
     public void ApiRequest(string method, string endpoint, string status) => _apiRequests.Inc(1, method, endpoint, status);

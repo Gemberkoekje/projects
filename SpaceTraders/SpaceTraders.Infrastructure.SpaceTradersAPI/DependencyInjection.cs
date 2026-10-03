@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddSingleton<ApiAvailabilityState>();
         services.AddSingleton<IApiAvailabilityState>(sp => sp.GetRequiredService<ApiAvailabilityState>());
         services.AddSingleton<RequestBudget>();
+        services.AddTransient<ApiRequestInitiatedHandler>();
         services.AddTransient<RateLimitingHandler>();
         services.AddTransient<RateLimitResponseHandler>();
         services.AddTransient<OutagePauseHandler>();
@@ -55,6 +56,7 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         })
+        .AddHttpMessageHandler<ApiRequestInitiatedHandler>()
         .AddHttpMessageHandler<OutagePauseHandler>()
         .AddHttpMessageHandler<RateLimitResponseHandler>()
         .AddHttpMessageHandler<RateLimitingHandler>()

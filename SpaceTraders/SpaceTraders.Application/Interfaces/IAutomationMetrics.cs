@@ -19,6 +19,13 @@ public interface IAutomationMetrics
     void GoalStep(string goalKind);
 
     /// <summary>
+    /// Counts a request the bot initiated to the SpaceTraders API (<c>spacetraders_api_requests_initiated_total{method,endpoint}</c>,
+    /// slice 2.10): once, as it starts, before the pause after a 502 and the local request budget. A request the pause
+    /// refuses counts here but never in <see cref="ApiRequest"/>, and a retry of a 429 counts again there but not here.
+    /// </summary>
+    void ApiRequestInitiated(string method, string endpoint);
+
+    /// <summary>
     /// Counts a response from the SpaceTraders API (<c>spacetraders_api_requests_total{method,endpoint,status}</c>).
     /// Every attempt counts, retries of a 429 included; <paramref name="endpoint"/> is the route
     /// template, and <paramref name="status"/> the status code, or <c>error</c> when no response came.

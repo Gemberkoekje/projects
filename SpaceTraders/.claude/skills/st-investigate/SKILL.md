@@ -141,6 +141,11 @@ spacetraders_setting_info
 # API calls that failed, and real 429s
 sum by (endpoint, status) (increase(spacetraders_api_requests_total{status!~"2.."}[1h]))
 sum by (source) (increase(spacetraders_api_throttled_total[1h]))
+
+# Requests initiated per second, and those that went out (slice 2.10): initiated above it means
+# requests wait for the budget (or the pause after a 502 refuses them); below it, 429s are retried
+sum(rate(spacetraders_api_requests_initiated_total[5m]))
+sum(rate(spacetraders_api_requests_total[5m]))
 ```
 
 ```sql

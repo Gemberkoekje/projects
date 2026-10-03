@@ -1293,26 +1293,32 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 
 **Handler pipeline,** outermost first:
 
-The first three follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
+Steps 2 to 4 follow the API guide (https://spacetraders.io/api-guide/rate-limits, D3).
 
-1. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
+1. **`ApiRequestInitiatedHandler`** (slice 2.10): counts every request the bot initiates, once, as
+   it starts, in `spacetraders_api_requests_initiated_total{method,endpoint}`, by route template
+   like step 5. It comes before the pause and the budget, so a request still waiting for the
+   budget, or one the pause refuses, counts here before step 5 counts it going out, or without it
+   ever going out; a retry of a 429 counts again in step 5, not here. The dashboard's "API request
+   rates" sets the two side by side.
+2. **`OutagePauseHandler`:** a 502 comes from the API's DDoS protection, and the guide asks to
    wait a few minutes. So after a 502 no call goes out for `Api.BadGatewayPauseMinutes`
    (default 3): calls in that time fail at once with `ApiPausedException`. The first call after
    the pause goes out as usual; a success marks the API available, another 502 pauses again.
-2. **`RateLimitResponseHandler`:** a 429 with `x-ratelimit-*` headers comes from the API's rate
+3. **`RateLimitResponseHandler`:** a 429 with `x-ratelimit-*` headers comes from the API's rate
    limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute)
    and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
    and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
    Warning with the limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them,
    B59), and the headers are recorded for `/status/rate-limit`.
-3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
+4. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
    both are used. Writes (anything but GET: moving a ship, trading) go before reads (D19): a read
    gives way while a write waits for the budget, leaves the last 10 of the burst to writes
    (`WriteReserve`), and stops giving way after 10 seconds (`MaxReadDelay`), so reads can't
    starve. Time spent waiting is counted in `spacetraders_api_rate_limit_wait_seconds_total`, by
    `kind`: `read` or `write`.
-4. **`ApiRequestMetricsHandler`:** counts every request that goes out, retries included, in
+5. **`ApiRequestMetricsHandler`:** counts every request that goes out, retries included, in
    `spacetraders_api_requests_total{method,endpoint,status}`, with the route template as
    `endpoint` (`my/ships/{shipSymbol}/navigate`, `ApiEndpointTemplate`) and `error` as status when
    no response came. A 429 is also counted in `spacetraders_api_throttled_total{source}`:
@@ -1500,6 +1506,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_contract_deadline_timestamp_seconds` | `contract` | An accepted contract's deadline (Unix time) | Every 10 s |
   | `spacetraders_credits_earned_total` | `source` | Credits earned, by ledger category | With each ledger row (`LedgerEntryHandler`) |
   | `spacetraders_credits_spent_total` | `category` | Credits spent, by ledger category | With each ledger row |
+  | `spacetraders_api_requests_initiated_total` | `method`, `endpoint` | Requests the bot initiated to the game API, by route template: once each, as it starts, before the pause after a 502 and the local budget, so retries don't count again (slice 2.10). Above `spacetraders_api_requests_total`, requests wait for the budget or the pause refuses them; below it, 429s are retried | Per request, as it starts |
   | `spacetraders_api_requests_total` | `method`, `endpoint`, `status` | Requests to the game API by route template, retries included | Per request |
   | `spacetraders_api_throttled_total` | `source` | 429s: `rate_limiter` or `infrastructure` | Per 429 |
   | `spacetraders_api_rate_limit_wait_seconds_total` | `kind` | Time requests waited for the local budget: `read` (GET, which gives way to writes, D19) or `write` | Per request that waited |

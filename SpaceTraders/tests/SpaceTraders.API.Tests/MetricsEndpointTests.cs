@@ -53,6 +53,7 @@ public sealed class MetricsEndpointTests
         "spacetraders_contract_units_required",
         "spacetraders_contract_units_fulfilled",
         "spacetraders_contract_deadline_timestamp_seconds",
+        "spacetraders_api_requests_initiated_total",
         "spacetraders_api_requests_total",
         "spacetraders_api_throttled_total",
         "spacetraders_api_rate_limit_wait_seconds_total",

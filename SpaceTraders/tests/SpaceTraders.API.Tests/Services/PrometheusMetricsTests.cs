@@ -686,6 +686,7 @@ public sealed class PrometheusAutomationMetricsTests
         { "credits earned", metrics => metrics.CreditsEarned("ContractDeposit", 4_267), "spacetraders_credits_earned_total{source=\"ContractDeposit\"} " },
         { "credits spent", metrics => metrics.CreditsSpent("ShipPurchase", 46_885), "spacetraders_credits_spent_total{category=\"ShipPurchase\"} " },
         { "429s", metrics => metrics.ApiThrottled("rate_limiter"), "spacetraders_api_throttled_total{source=\"rate_limiter\"} " },
+        { "API requests initiated", metrics => metrics.ApiRequestInitiated("POST", "my/ships/{shipSymbol}/extract"), "spacetraders_api_requests_initiated_total{method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\"} " },
         { "API responses", metrics => metrics.ApiRequest("POST", "my/ships/{shipSymbol}/extract", "429"), "spacetraders_api_requests_total{method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\",status=\"429\"} " },
         { "breaker trips", metrics => metrics.GoalBreakerTripped("AGENT-3"), "spacetraders_goal_breaker_trips_total{ship=\"AGENT-3\"} " },
         { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{kind=\"ScoutWaypoint\"} " },
