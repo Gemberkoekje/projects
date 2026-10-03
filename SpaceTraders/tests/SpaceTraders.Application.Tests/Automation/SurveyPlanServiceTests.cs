@@ -10,6 +10,7 @@ using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Tests.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -24,6 +25,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// </summary>
 public sealed class SurveyPlanServiceTests
 {
+    private const string B37 = "X1-DC53-B37";
+
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
@@ -307,6 +310,27 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task ASurveyor_SurveysOnlyWhereItCanFlyOnFrom_ToAMarketThatSellsFuel()
+    {
+        // B58, seen on the cluster on 2026-10-03: the survey ship SPECTER-F reached B7 at 18:40:10Z (D54) and at once flew to
+        // B37 for gold, 68 away with its 80-unit tank (the command ship's 400-unit tank makes B37 a target for B7). It got there
+        // with 12 fuel and no market that sells fuel within reach, and the area rule drifted it back to B7, 32 minutes; at B7,
+        // gold at B37 was again the best paid ore without a survey. B14, where the drones mine for B7, got none. Here, as
+        // there: B14, 25 from B7, has copper; B37, 68 from B7, gold.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-1", FleetRole.Trade), ("SHIP-4", FleetRole.Mine));
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(FarSideMap(), [], 129_357, Now));
+        _activeGoals["SHIP-4"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: B7), CommandShip(B7), Drone("SHIP-4", B7));
+
+        await RunAsync();
+
+        var survey = _activeGoals["SHIP-5"].Should().BeOfType<SurveyWaypointGoal>().Subject;
+        (survey.TargetWaypointSymbol, survey.TargetDepositSymbol).Should().Be((B14, "COPPER_ORE"));
+        _state!.Targets.Where(target => target.WaypointSymbol == B37).Should().NotBeEmpty()
+            .And.OnlyContain(target => target.CandidateShipSymbols.Count == 0, "no surveyor gets away from B37");
+    }
+
+    [Fact]
     public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
     {
         // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.
@@ -501,6 +525,20 @@ public sealed class SurveyPlanServiceTests
 
         _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>();
     }
+
+    /// <summary>
+    /// The far side of X1-DC53 as it was on 2026-10-03 (B58): B14, 25 from B7, has the common metals, copper among them;
+    /// B37, 68 from B7 and further from any other market, the precious ones, gold among them.
+    /// </summary>
+    private static TradeMarketMap FarSideMap()
+        => new(
+            [
+                .. Waypoints.Where(waypoint => waypoint.Symbol is not B13 and not B14),
+                new WaypointCacheModel(B14, SystemSymbol, "ASTEROID", 23, 348, false, false, DateTimeOffset.UnixEpoch, TraitsJson: """[{"symbol":"COMMON_METAL_DEPOSITS"}]"""),
+                new WaypointCacheModel(B37, SystemSymbol, "ASTEROID", -9, 382, false, false, DateTimeOffset.UnixEpoch, TraitsJson: """[{"symbol":"PRECIOUS_METAL_DEPOSITS"}]"""),
+            ],
+            Markets(),
+            new Dictionary<string, IReadOnlyList<string>>());
 
     private void Stored(ShipModel ship) => _ships.FindAsync(ship.Symbol, Arg.Any<CancellationToken>()).Returns(ship);
 

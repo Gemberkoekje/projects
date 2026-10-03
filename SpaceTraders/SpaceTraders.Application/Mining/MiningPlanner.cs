@@ -90,6 +90,26 @@ public static class MiningPlanner
     }
 
     /// <summary>
+    /// Whether a surveyor can survey at an asteroid and fly on from there (B58): it reaches the asteroid, as
+    /// <see cref="CanReach"/>, and from there, with the fuel left, a market that sells fuel, as a mining trip must get on to
+    /// its market. Otherwise a survey there leaves it where no flight in CRUISE takes it anywhere.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="surveyor">The surveyor.</param>
+    /// <param name="asteroid">Where it would survey.</param>
+    /// <returns>True when it can survey there and fly on in CRUISE.</returns>
+    public static bool CanSurveyAt(TradeMarketMap map, ShipModel surveyor, string asteroid)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(surveyor);
+
+        var arrival = Arrival(map, surveyor, asteroid);
+        return arrival.Reached
+            && (map.SellsFuel(asteroid) || map.MarketWaypoints.Any(market => map.SellsFuel(market)
+                && TradeRoutePlanner.TryPlanFlight(map, asteroid, market, arrival.Fuel, surveyor.FuelCapacity, out _)));
+    }
+
+    /// <summary>
     /// Whether a ship would drift to a market to gather from there (D45): it can't reach the market in CRUISE, it has the 1
     /// fuel a drift burns, and the market sells fuel, as the ship flies on in CRUISE from there.
     /// </summary>

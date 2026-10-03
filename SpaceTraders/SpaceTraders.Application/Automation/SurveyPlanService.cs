@@ -37,7 +37,8 @@ public interface ISurveyPlanService
 /// </list>
 /// With the stock for every ore, a surveyor waits until a survey runs out, or mines and siphons in its spare time
 /// (slice 6.8): a survey that needs taking takes it off its spare-time trip at once, with its hold aboard (D37). A
-/// surveyor takes the best target no other surveyor works on, or the best one when all are taken. The plan also ends
+/// surveyor takes the best target no other surveyor works on, or the best one when all are taken, among those it can survey
+/// at and fly on from to a market that sells fuel (B58: <see cref="MiningPlanner.CanSurveyAt"/>). The plan also ends
 /// the surveys that expired (<see cref="ISurveyKeeper.ExpireAsync"/>), for the survey dashboard.
 /// <para>
 /// With the role board on, it buys a designated surveyor (D47): a <c>SHIP_SURVEYOR</c> for each system with mining drones
@@ -162,7 +163,7 @@ public sealed class SurveyPlanService(
                 }
 
                 var reachable = systemTargets
-                    .Where(target => target.NeedsSurvey && MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
+                    .Where(target => target.NeedsSurvey && MiningPlanner.CanSurveyAt(context.Map, surveyor, target.AsteroidSymbol))
                     .ToList();
                 var beyondStock = reachable.Count == 0 && FleetRoles.CanOnlySurvey(surveyor);
                 if (beyondStock)
@@ -170,7 +171,7 @@ public sealed class SurveyPlanService(
                     // D52: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is
                     // lowest": with every ore it reaches at its stock, the ore with the fewest usable surveys first.
                     reachable = [.. systemTargets
-                        .Where(target => MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
+                        .Where(target => MiningPlanner.CanSurveyAt(context.Map, surveyor, target.AsteroidSymbol))
                         .OrderBy(target => target.UsableSurveys)
                         .ThenByDescending(target => target.ForContract)
                         .ThenByDescending(target => target.SellPrice)
@@ -216,13 +217,14 @@ public sealed class SurveyPlanService(
                     beyondStock ? " beyond its stock (D52)" : string.Empty);
             }
 
-            // The surveyors that can reach each asteroid: only for those is a target work the plan could give (B55).
+            // The surveyors that can survey at each asteroid and fly on: only for those is a target work the plan could give
+            // (B55, B58).
             var reachedBy = systemTargets
                 .Select(target => target.AsteroidSymbol)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     asteroid => asteroid,
-                    asteroid => (IReadOnlyList<string>)[.. system.Where(surveyor => MiningPlanner.CanReach(context.Map, surveyor, asteroid)).Select(surveyor => surveyor.Symbol).Order(StringComparer.Ordinal)],
+                    asteroid => (IReadOnlyList<string>)[.. system.Where(surveyor => MiningPlanner.CanSurveyAt(context.Map, surveyor, asteroid)).Select(surveyor => surveyor.Symbol).Order(StringComparer.Ordinal)],
                     StringComparer.OrdinalIgnoreCase);
             targets.AddRange(systemTargets.Select(target => new SurveyPlanTarget
             {
