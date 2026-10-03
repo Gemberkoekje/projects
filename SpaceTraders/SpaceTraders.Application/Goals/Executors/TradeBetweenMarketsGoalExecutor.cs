@@ -21,7 +21,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// refreshed (and the newest prices known for the other market):
 /// <list type="bullet">
 ///   <item>at the buy market, before buying: when the trip is no longer lucrative, or the markets no longer trade its
-///   full hold in one go (D56), it gives it up (<c>TradeDropped</c>) and the trading plan chooses again from there;</item>
+///   full hold in one go (D56), or the credits no other trip holds back (D57, <see cref="TripReservations"/>) don't pay for
+///   it, it gives it up (<c>TradeDropped</c>) and the trading plan chooses again from there;</item>
 ///   <item>at the sell market, before selling: when selling there is no longer lucrative and another
 ///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
 /// </list>
@@ -85,13 +86,16 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         }
 
         var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+
+        // D57: what the other trips hold back on their way to buy is theirs; what this one holds back is its own to spend.
+        var heldByOthers = TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(ct), ship.Symbol);
         if (!TradeRoutePlanner.TryEvaluate(
                 context.Map,
                 ship,
                 trade.TradeSymbol,
                 trade.BuyWaypointSymbol,
                 trade.SellWaypointSymbol,
-                context.CreditsForCargo,
+                Math.Max(0, context.CreditsForCargo - heldByOthers),
                 out var route))
         {
             // D56: a full hold in one purchase and one sale, as the markets trade now, or no trip.

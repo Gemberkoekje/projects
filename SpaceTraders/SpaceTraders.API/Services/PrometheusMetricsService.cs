@@ -106,8 +106,8 @@ public sealed class PrometheusMetricsService(
         var roleSamples = RoleSamples(roles);
         metrics.Roles(roleSamples);
 
-        // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; and the dearest full
-        // hold a trader saves up for (D56).
+        // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; the dearest full
+        // hold a trader saves up for (D56); and what the trade trips on their way to buy hold back (D57).
         var roleOf = roleSamples.ToDictionary(
             sample => sample.Ship,
             sample => Enum.TryParse<FleetRole>(sample.Role, out var role) ? role : FleetRole.None,
@@ -117,7 +117,8 @@ public sealed class PrometheusMetricsService(
             long.TryParse(floor, NumberStyles.Integer, CultureInfo.InvariantCulture, out var floorCredits) ? floorCredits : 0,
             CreditReserve.PerTradingCargoUnit(settings.Find(setting => setting.Key == CreditReserve.PerTradingCargoUnitSetting)?.Value ?? string.Empty),
             CreditReserve.TradingCargo(ships.Select(ShipRepository.MapToModel), ship => roleOf.GetValueOrDefault(ship.Symbol, FleetRole.None)))
-            + fullHoldSavings.Largest());
+            + fullHoldSavings.Largest()
+            + TripHolds(ships));
 
         // Slice 6.10b (D43): what the credits are saved up for, and what waits behind it.
         metrics.PurchaseNeeds([.. purchaseNeeds.Open(now).Select(open => new PurchaseNeedMetricsSample(
@@ -182,6 +183,24 @@ public sealed class PrometheusMetricsService(
 
             await Task.Delay(SampleInterval, stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// What the trade trips on their way to buy hold back for their cargo (D57), from the goals cached with the ships, with
+    /// the stored status as the goal store reads it.
+    /// </summary>
+    private static long TripHolds(IEnumerable<CachedShip> ships)
+    {
+        var trips = new List<KeyValuePair<string, TradeBetweenMarketsGoal>>();
+        foreach (var ship in ships.Where(ship => ship.GoalKind == nameof(ShipGoalKind.TradeBetweenMarkets)))
+        {
+            if (ship.GoalPayloadJson is { } json && JsonSerializer.Deserialize<ShipGoal>(json) is TradeBetweenMarketsGoal trip)
+            {
+                trips.Add(new(ship.Symbol, ship.GoalStatus is { } status ? trip with { Status = (GoalStatus)status } : trip));
+            }
+        }
+
+        return TripReservations.HeldBack(trips);
     }
 
     private static ShipMetricsSample ToSample(

@@ -11,8 +11,9 @@ namespace SpaceTraders.Application.Orchestration;
 /// <remarks>
 /// The reserve grows with what the ships that trade can carry (D51, <see cref="CreditReserve"/>):
 /// <c>FleetExpansion.MinCreditReserve</c> and <c>FleetExpansion.ReservePerTradingCargoUnit</c> a unit, judged from the
-/// cached fleet and the role board on every evaluation; and, while a trader saves up for a full hold the credits don't pay
-/// for yet, by the dearest such hold (D56, <see cref="FullHoldSavings"/>), so ships are bought after it.
+/// cached fleet and the role board on every evaluation; while a trader saves up for a full hold the credits don't pay
+/// for yet, by the dearest such hold (D56, <see cref="FullHoldSavings"/>), so ships are bought after it; and by what the
+/// trade trips on their way to buy hold back for their cargo (D57, <see cref="TripReservations"/>).
 /// </remarks>
 public interface IBudgetPolicy
 {
@@ -24,7 +25,8 @@ public sealed class BudgetPolicy(
     ISettingsRepository settings,
     IShipRepository ships,
     IPlanRepository plans,
-    FullHoldSavings savings) : IBudgetPolicy
+    FullHoldSavings savings,
+    IShipGoalRepository goals) : IBudgetPolicy
 {
     private const string FabMatsBuyThresholdSetting = "Construction.FabMatsBuyThreshold";
     private const string FabMatsTransactionSizeSetting = "Construction.FabMatsTransactionSize";
@@ -83,8 +85,8 @@ public sealed class BudgetPolicy(
     }
 
     /// <summary>
-    /// The credit reserve now (D51): the floor, and the credits per unit the ships that trade can carry; and the dearest full
-    /// hold a trader saves up for (D56).
+    /// The credit reserve now (D51): the floor, and the credits per unit the ships that trade can carry; the dearest full
+    /// hold a trader saves up for (D56); and what the trade trips on their way to buy hold back (D57).
     /// </summary>
     private async Task<long> ReserveAsync(CancellationToken cancellationToken)
     {
@@ -92,6 +94,8 @@ public sealed class BudgetPolicy(
         var perUnit = CreditReserve.PerTradingCargoUnit(await settings.GetRawAsync(CreditReserve.PerTradingCargoUnitSetting, cancellationToken) ?? string.Empty);
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
-        return CreditReserve.Of(floor, perUnit, CreditReserve.TradingCargo(fleet, board.RoleOf)) + savings.Largest();
+        return CreditReserve.Of(floor, perUnit, CreditReserve.TradingCargo(fleet, board.RoleOf))
+            + savings.Largest()
+            + TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(cancellationToken));
     }
 }

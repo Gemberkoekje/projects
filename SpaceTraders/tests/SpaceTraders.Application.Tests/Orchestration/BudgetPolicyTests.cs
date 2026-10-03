@@ -6,6 +6,8 @@ using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
 namespace SpaceTraders.Application.Tests.Orchestration;
@@ -16,6 +18,7 @@ public sealed class BudgetPolicyTests
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly ISettingsRepository _settings = ReserveSettings();
     private readonly FullHoldSavings _savings = new();
+    private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
 
     public BudgetPolicyTests() => Fleet();
 
@@ -139,6 +142,25 @@ public sealed class BudgetPolicyTests
     }
 
     [Fact]
+    public async Task WhileATripIsOnItsWayToBuy_TheReserveGrowsByWhatItHoldsBack()
+    {
+        // D57, asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it": a ship purchase
+        // leaves them too. A trip that has bought, or is blocked, holds back nothing.
+        Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
+        IReadOnlyDictionary<string, TradeBetweenMarketsGoal> trips = new Dictionary<string, TradeBetweenMarketsGoal>
+        {
+            ["SHIP-1"] = Trip(130_160),
+            ["SHIP-5"] = Trip(194_680) with { CargoBought = true },
+            ["SHIP-6"] = Trip(49_485) with { Status = GoalStatus.Blocked },
+        };
+        _goals.GetActiveTradeGoalsAsync(Arg.Any<CancellationToken>()).Returns(trips);
+
+        var decision = await Policy(MakeAgent(1_000_000), _settings).EvaluateAsync(50_000, CancellationToken.None);
+
+        decision.ReservedCredits.Should().Be(60_000 + 130_160);
+    }
+
+    [Fact]
     public async Task WithoutAShipThatTrades_TheReserveIsTheFloor()
     {
         Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
@@ -178,5 +200,9 @@ public sealed class BudgetPolicyTests
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
-    private BudgetPolicy Policy(IAgentRepository agents, ISettingsRepository settings) => new(agents, settings, _ships, _plans, _savings);
+    private BudgetPolicy Policy(IAgentRepository agents, ISettingsRepository settings) => new(agents, settings, _ships, _plans, _savings, _goals);
+
+    /// <summary>A trade trip on its way to buy, holding back <paramref name="credits"/> (D57).</summary>
+    private static TradeBetweenMarketsGoal Trip(long credits)
+        => new() { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-D41", Units = 40, ReservedCredits = credits };
 }

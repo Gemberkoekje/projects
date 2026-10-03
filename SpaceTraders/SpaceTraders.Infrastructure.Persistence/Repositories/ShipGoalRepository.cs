@@ -125,4 +125,26 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
         return targets;
     }
+
+    public async Task<IReadOnlyDictionary<string, TradeBetweenMarketsGoal>> GetActiveTradeGoalsAsync(CancellationToken cancellationToken = default)
+    {
+        var kind = ShipGoalKind.TradeBetweenMarkets.ToString();
+        var rows = await db.Ships
+            .Where(s => s.GoalKind == kind && s.GoalPayloadJson != null)
+            .Select(s => new { s.Symbol, s.GoalPayloadJson, s.GoalStatus })
+            .ToListAsync(cancellationToken);
+
+        var trips = new Dictionary<string, TradeBetweenMarketsGoal>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (row.GoalPayloadJson is not null
+                && JsonSerializer.Deserialize<ShipGoal>(row.GoalPayloadJson, JsonOptions) is TradeBetweenMarketsGoal trip)
+            {
+                // The GoalStatus column is the authoritative status, as in GetActiveGoalAsync.
+                trips[row.Symbol] = row.GoalStatus.HasValue ? trip with { Status = (GoalStatus)row.GoalStatus.Value } : trip;
+            }
+        }
+
+        return trips;
+    }
 }
