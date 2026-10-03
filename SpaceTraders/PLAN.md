@@ -93,9 +93,9 @@
   slice 6.10a is merged, so it deploys both.
 - Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D51) is split in three: 6.10a (visibility and
   the role board's rates) is merged and deployed (projects#136, gembernodes#34); 6.10b (the order ships are bought in, a designated
-  surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged (projects#137 and
-  #138, its dashboard gembernodes#35) but not deployed: the cluster still runs `83023a0`; 6.10c (drones drifting to minerals out
-  of fuel range) is built.
+  surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged and deployed
+  (projects#137, gembernodes#35 and #36: the cluster runs `04b6b18`), and its turn fix projects#138 is merged, not yet deployed;
+  6.10c (drones drifting to minerals out of fuel range) is built.
 
 ## Known issues
 
@@ -2032,8 +2032,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
       ores a drone could serve go from three to five: with four mining drones, the coverage tier buys one more, ahead of
       the cargo ships (D43), and one drone for each of the two ends up at B7 after a drift of about 2.5 hours. Siphon drones
       don't drift in X1-DC53: C38 has every buyer in reach.
-    - Not deployed yet: gembernodes#35 merged 6.10b's dashboard without an image bump, so the cluster still runs `83023a0`
-      (6.10a); a deploy of this branch's merge brings 6.10b, projects#138 and 6.10c together.
+    - Deploy: the cluster runs `04b6b18` (6.10b, gembernodes#36); a deploy of this branch's merge brings projects#138 and
+      6.10c together.
     - Noticed (not changed):
       - **Drift back and forth:** supply comes first (D28), so a drone at B7 whose ores there have risen to MODERATE drifts
         back to a SCARCE market in the middle, and a free drone in the middle drifts to a SCARCE one at B7, 2.5 hours each
