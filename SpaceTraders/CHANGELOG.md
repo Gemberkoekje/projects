@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, slice 6.10a)
+- What each ship can do, whatever the plan switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine, Siphon, Trade`, or `none`), from its equipment. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role; this tells them apart. The metrics sample maps each cached ship once (`ShipRepository.MapToModel`, now public).
+- Units sold to and bought from each market, per good (`spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total`, labels `system`, `waypoint`, `good`), whoever traded them (D50): what we sell into a market can be set against what it makes. `ShipCargoSoldEvent` carries the market it was sold to.
+
+### Docs – Changed (2026-10-03, slice 6.10)
+- `PLAN.md`: slice 6.10 and your decisions D43–D50; 6.10a built, 6.10b and 6.10c planned with design notes; "Where things stand" brought up to date. `docs/HOW_IT_WORKS.md`: the new metrics and events.
+
 ### Code – Fixed (2026-10-03, B53)
 - A flight logs two lines at Information: one when it leaves (`NavigateSubCommand`, now saying where from) and one when it lands (`ShipNavigationCompletedHandler`, with what its goal did next, or that it had none), besides its refuel. The ten or so steps between, each saying the ship had left or arrived, log at Debug. They were about 80% of the bot's lines, and with twelve ships the log budget would have been passed on normal running. Replaying the day's logs without them gives about 2,300 lines a ship a day instead of 6,000.
 
