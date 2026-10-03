@@ -92,7 +92,7 @@
   gembernodes#33) and B53 (projects#135). gembernodes#34 makes the log budget a number per ship and stays open until
   slice 6.10a is merged, so it deploys both.
 - Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D50) is split in three: 6.10a (visibility and
-  the role board's rates) is being built; 6.10b (the order ships are bought in, a designated surveyor, one drone per
+  the role board's rates) is built, its dashboards in gembernodes#34; 6.10b (the order ships are bought in, a designated surveyor, one drone per
   scarce mineral) and 6.10c (drones drifting to minerals out of fuel range) are planned, with their designs below.
 
 ## Known issues
@@ -1881,14 +1881,18 @@ How credits are split stays your call; Claude only fixes deviations from intende
       (25 from B7); out of any drone's round trip, AMMONIA_ICE, GOLD_ORE, SILVER_ORE, PLATINUM_ORE and PRECIOUS_STONES
       (their nearest asteroids are 68 to 476 from their markets); DIAMONDS, which no asteroid yields; and the three gases,
       all from C38. The drones worked on four of the ores.
-  - **6.10a Visibility and the role board's rates** (being built):
+  - **6.10a Visibility and the role board's rates** (built 2026-10-03; dashboards in gembernodes#34):
     - What each ship can do, whatever the switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine,
       Siphon, Trade`, or `none`); the fleet and roles tables show it next to the role (gembernodes#34), as drones of both
       kinds report the registration role EXCAVATOR.
     - Profit per trip (D46): journal kind `TripEnded`; counters `spacetraders_trip_profit_credits_total`,
       `spacetraders_trip_loss_credits_total` and `spacetraders_trips_total` by `activity`; sales and purchases from the
-      trip's own figures (a ledger row lands after the trip has ended), fuel from the ledger. Dashboard: profit an hour
-      by activity, stacked.
+      trip's own figures (`TripGoal.Earned`, `Spent`: a ledger row lands after the trip has ended), fuel from the ledger
+      (`TripBook`). Every end books: sold, each early stop, `interrupted` (spare time taken over) and `runaway` (the
+      circuit breaker). Contracts: deposit and payout as profit, each delivery's round-trip fuel as a loss. Not booked:
+      contract round trips released without a delivery, goals an agent reset wipes, the earlier batches of a sale that
+      fails partway; a trade bought before the deploy books its whole sale once; a trade that sells a held spare-time
+      hold books it under `trade`. Dashboard: profit an hour by activity, stacked.
     - Units sold and bought per market and good (D50); dashboard: what we sell into a market an hour against the supply,
       trade volume and price of what it makes from it.
     - The role board's rates (D49).
