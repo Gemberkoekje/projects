@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B55)
+- `ShipLeftIdle` counts a survey target as work only for the surveyors that can reach it, which the survey plan now lists per target (`CandidateShipSymbols`), as the mining, siphon and trading branches do. The designated surveyor, with an 80-unit tank in the middle of X1-DC53, waited by design while the targets that needed a survey were far out, for the command ship's mining, and the rule raised an anomaly on it.
+
+### Docs – Changed (2026-10-03, B55)
+- `PLAN.md`: B55. `docs/HOW_IT_WORKS.md`: the survey plan's state, and the survey work the idle rule counts.
+
 ### Code – Fixed (2026-10-03, B54)
 - The survey plan surveys an asteroid for a market only where a miner could mine it for that market: a trip in CRUISE from where the miner is, to the asteroid and on to the market with the fuel left, as the mining plan reckons it. A drone still drifting to a far market (D45) counts once it is there. At the first drift on the cluster, the command ship left its trading to survey B37, which no drone can mine for B7 (136 there and back on an 80-unit tank), and would have surveyed B14 hours before the drone got there.
 

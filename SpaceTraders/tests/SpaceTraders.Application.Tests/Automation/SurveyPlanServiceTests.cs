@@ -180,6 +180,22 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task TheState_ListsTheSurveyorsThatCanReachEachTarget()
+    {
+        // B55: the command ship mines (its 400-unit tank takes it to B14 for B7), the surveyor's 80-unit tank keeps it in the
+        // middle. B14's targets are no work the plan could give the surveyor, and the ShipLeftIdle rule reads that here.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Mine), ("SHIP-5", FleetRole.Survey));
+        Fleet(CommandShip(), SurveyShip());
+
+        await RunAsync();
+
+        _state!.Targets.Where(target => target.WaypointSymbol == B14).Should().NotBeEmpty()
+            .And.OnlyContain(target => target.CandidateShipSymbols.Count == 0);
+        _state.Targets.Where(target => target.WaypointSymbol == XB5C).Should().NotBeEmpty()
+            .And.OnlyContain(target => target.CandidateShipSymbols.SequenceEqual(new[] { "SHIP-5" }));
+    }
+
+    [Fact]
     public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
     {
         // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.

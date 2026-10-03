@@ -506,8 +506,11 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   what pays it most. A bought surveyor counts by its type until startup sync records its mount. With the
   board off the command ship surveys (D20) and no surveyor is bought.
 - **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
-  each has, whether it needs one, and the surveyors on each; it is written only when it changes. The
-  `ShipLeftIdle` rule reads it: only targets that need a survey are work waiting for a surveyor.
+  each has, whether it needs one, the surveyors on each, and the surveyors that can reach each in CRUISE
+  (`CandidateShipSymbols`); it is written only when it changes. The `ShipLeftIdle` rule reads it: only
+  targets that need a survey are work waiting, and only for the surveyors that can reach them (B55). A
+  designated surveyor's 80-unit tank keeps it in the middle of X1-DC53, while a miner's targets can be far
+  out: the command ship's, when it mines, or a drone's at a market it drifted to.
 
 **What an asteroid yields** (`AsteroidDeposits`): the game doesn't publish it, so this is the table
 community bots use, from the trait descriptions and what extractions have shown: common metal
@@ -1505,7 +1508,7 @@ treats as free (section 3):
   miner (D23); while the plan waits for a ship or budget, any miner. With the role board on, a miner is
   any ship that can mine and doesn't have the survey role (D40);
 - survey: a target to survey, for a ship that can survey (D20), or, with the role board on, a ship with
-  the survey role (slice 6.9);
+  the survey role (slice 6.9), that the plan lists as able to reach it (B55);
 - probe deployment: a market whose prices are due, with no probe at it or on its way and no other
   ship of ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25). A probe parked
   at its market while every market is watched is idle by design;

@@ -50,4 +50,10 @@ public sealed record SurveyPlanTarget
 
     /// <summary>The surveyors working on it.</summary>
     public IReadOnlyList<string> SurveyorShipSymbols { get; init; } = [];
+
+    /// <summary>
+    /// The surveyors that can reach it in CRUISE, so the plan could give it to them: work waiting for those only (D13,
+    /// <c>ShipLeftIdle</c>; B55). A target a designated surveyor's tank doesn't reach may still be one a miner can work.
+    /// </summary>
+    public IReadOnlyList<string> CandidateShipSymbols { get; init; } = [];
 }
