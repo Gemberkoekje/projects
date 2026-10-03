@@ -54,7 +54,7 @@ public sealed record RoleOption
     /// <param name="Role">The role the trip belongs to.</param>
     /// <param name="JobKey">What only one ship can take at a time: a trade route (D18), a mining or siphon opening.</param>
     /// <param name="Job">The trip, in a few words.</param>
-    /// <param name="Credits">What the trip earns: after fuel, with the production chains' share (D39).</param>
+    /// <param name="Credits">What the trip earns: after fuel, with the production chains' share (D39), at most as much again as the goods earn (D49).</param>
     /// <param name="Seconds">How long it takes.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public RoleOption(FleetRole Role, string JobKey, string Job, long Credits, double Seconds)
@@ -75,7 +75,7 @@ public sealed record RoleOption
     /// <summary>The trip, in a few words.</summary>
     public required string Job { get; init; }
 
-    /// <summary>What the trip earns: after fuel, with the production chains' share (D39).</summary>
+    /// <summary>What the trip earns: after fuel, with the production chains' share (D39), at most as much again as the goods earn (D49).</summary>
     public required long Credits { get; init; }
 
     /// <summary>How long it takes.</summary>
@@ -92,11 +92,13 @@ public sealed record RoleOption
 ///   <item>trade: every lucrative route (D14) from where the ship is, its profit after fuel;</item>
 ///   <item>mine: every mining target (D28's targets), a full hold of the target ore, as the trip keeps only that,
 ///   filled at the ship's rate times the ore's share of the extractions (its survey's, or one of the asteroid's ores
-///   without one), less the fuel there and on to the market;</item>
-///   <item>siphon: every siphon target, a full hold of the gases a market buys, as the trip keeps them all (D33),
-///   each at the best price it fetches from the gas giant, less the fuel;</item>
+///   without one), at the price the target's market pays, less the fuel there and on to the market;</item>
+///   <item>siphon: every siphon target, a full hold of the gases a market buys, as the trip keeps them all (D33): its
+///   own gas at the price its market pays (D49), each other gas at the best price it fetches from the gas giant, where
+///   the trips after sell it, less the fuel;</item>
 /// </list>
-/// each with what the production chains add (D39). A trip's time is its flights in CRUISE, as the API reckons them
+/// each with what the production chains add (D39), at most what the trip earns on a unit (D49): a gathered unit's
+/// price there, a traded unit's margin. A trip's time is its flights in CRUISE, as the API reckons them
 /// (15 seconds plus the distance times 25 over the engine's speed), <see cref="StopSeconds"/> at each landing, and for
 /// mining and siphoning the cooldowns to fill the hold, half a tick after each. Surveying has no estimate: it comes
 /// first (D38).
@@ -203,7 +205,8 @@ public static class RoleEstimator
             var seconds = FlightSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, speed)
                 + FlightSeconds(map, route.BuyWaypointSymbol, haul.Stops, speed)
                 + (StopSeconds * (Math.Max(1, approach.Stops.Count) + haul.Stops.Count));
-            var chain = route.Units * context.Chains.PerUnit(route.SellWaypointSymbol, route.TradeSymbol);
+            // The chains add at most the route's own margin a unit (D49).
+            var chain = route.Units * context.Chains.PerUnitAtMost(route.SellWaypointSymbol, route.TradeSymbol, route.SellPrice - route.BuyPrice);
             options.Add(new RoleOption(
                 FleetRole.Trade,
                 "trade|" + route.Key,
@@ -225,7 +228,7 @@ public static class RoleEstimator
             if (kept > 0
                 && TryGatherTrip(context, ship, target.AsteroidSymbol, target.SellWaypointSymbol, kept, rate, out var seconds, out var fuel))
             {
-                var perUnit = target.SellPrice + context.Chains.PerUnit(target.SellWaypointSymbol, target.Ore);
+                var perUnit = UnitValue(context, target.SellWaypointSymbol, target.Ore, target.SellPrice);
                 options.Add(new RoleOption(
                     FleetRole.Mine,
                     "mine|" + target.Key,
@@ -242,16 +245,17 @@ public static class RoleEstimator
     {
         var map = context.Map;
         var rate = context.Rates.For(ship.Symbol, GatheringKind.Siphoning);
-        var perUnitAt = new Dictionary<string, (double Share, double PerUnit)>(StringComparer.OrdinalIgnoreCase);
+        var gasesAt = new Dictionary<string, IReadOnlyList<(string Gas, double Value)>>(StringComparer.OrdinalIgnoreCase);
         var options = new List<RoleOption>();
         foreach (var target in SiphonPlanner.SiphonTargets(map, ship, NoneHeld))
         {
-            if (!perUnitAt.TryGetValue(target.GasGiantSymbol, out var kept))
+            if (!gasesAt.TryGetValue(target.GasGiantSymbol, out var gases))
             {
-                kept = KeptGases(context, ship, target.GasGiantSymbol);
-                perUnitAt[target.GasGiantSymbol] = kept;
+                gases = GasValues(context, ship, target.GasGiantSymbol);
+                gasesAt[target.GasGiantSymbol] = gases;
             }
 
+            var kept = KeptGases(context, target, gases);
             if (kept.Share > 0
                 && TryGatherTrip(context, ship, target.GasGiantSymbol, target.SellWaypointSymbol, rate.UnitsPerAction * kept.Share, rate, out var seconds, out var fuel))
             {
@@ -268,32 +272,53 @@ public static class RoleEstimator
     }
 
     /// <summary>
-    /// What a siphon trip keeps at a gas giant (D33): every gas a market the ship can carry it to buys. Its share of the
-    /// siphons, and what a unit of it fetches on average, each gas at the best price it gets, with the chains' share.
+    /// What each gas a gas giant yields counts for on the trips after a siphon trip, which sell the gases it keeps where
+    /// each fetches most (D33): the most it counts for at a market the ship can carry it to from the gas giant, its price
+    /// there with the chains' share at most as much again (<see cref="UnitValue"/>, D49); 0 for a gas no such market buys.
     /// </summary>
-    private static (double Share, double PerUnit) KeptGases(RoleContext context, ShipModel ship, string gasGiantSymbol)
+    private static IReadOnlyList<(string Gas, double Value)> GasValues(RoleContext context, ShipModel ship, string gasGiantSymbol)
     {
         var map = context.Map;
         var giant = map.Waypoints.FirstOrDefault(waypoint => waypoint.Symbol.Equals(gasGiantSymbol, StringComparison.OrdinalIgnoreCase));
         var gases = giant is null ? [] : GasGiants.GasesAt(giant);
-        var values = new List<double>();
+        var values = new List<(string Gas, double Value)>();
         foreach (var gas in gases)
         {
             var best = map.MarketWaypoints
                 .Where(market => map.TryGetGood(market, gas, out var good)
                     && good.SellPrice > 0
                     && MiningPlanner.CanSellFrom(map, ship, gasGiantSymbol, market))
-                .Select(market => map.TryGetGood(market, gas, out var good) ? good.SellPrice + context.Chains.PerUnit(market, gas) : 0)
+                .Select(market => map.TryGetGood(market, gas, out var good) ? UnitValue(context, market, gas, good.SellPrice) : 0)
                 .DefaultIfEmpty(0)
                 .Max();
-            if (best > 0)
-            {
-                values.Add(best);
-            }
+            values.Add((gas, best));
         }
 
+        return values;
+    }
+
+    /// <summary>
+    /// What a siphon trip keeps (D33): every gas a market the ship can carry it to buys. Its share of the siphons, and
+    /// what a unit of it fetches on average: the trip's own gas where the trip sells it (D49), each other gas at the most
+    /// it fetches on the trips after (<see cref="GasValues"/>).
+    /// </summary>
+    private static (double Share, double PerUnit) KeptGases(RoleContext context, SiphonTarget target, IReadOnlyList<(string Gas, double Value)> gases)
+    {
+        var values = gases
+            .Select(gas => gas.Gas.Equals(target.Gas, StringComparison.OrdinalIgnoreCase)
+                ? UnitValue(context, target.SellWaypointSymbol, target.Gas, target.SellPrice)
+                : gas.Value)
+            .Where(value => value > 0)
+            .ToList();
         return gases.Count == 0 || values.Count == 0 ? (0, 0) : (values.Count / (double)gases.Count, values.Average());
     }
+
+    /// <summary>
+    /// What a unit of a gathered good counts for at the market it is sold at: its price there, with the chains' share,
+    /// at most as much again (<see cref="ChainValues.PerUnitAtMost"/>, D49).
+    /// </summary>
+    private static double UnitValue(RoleContext context, string market, string good, long price)
+        => price + context.Chains.PerUnitAtMost(market, good, price);
 
     /// <summary>
     /// A trip that fills the hold at a source and sells at a market: the flight there, the cooldowns to fill the hold at

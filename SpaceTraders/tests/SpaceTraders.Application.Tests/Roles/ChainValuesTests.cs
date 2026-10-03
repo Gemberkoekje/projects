@@ -62,6 +62,19 @@ public sealed class ChainValuesTests
         chains.PerUnit(Refinery, "IRON").Should().Be(0);
     }
 
+    [Fact]
+    public void TheRoleBoard_CountsTheChainAtMostWhatTheTripEarnsOnAUnit_AndNeverLessThanNothing()
+    {
+        // D49. Iron ore at the refinery counts 468.25 (as above), while the refinery pays 58 for it.
+        var chains = new ChainValues(Map("LIMITED", "SCARCE"), share: 0.5);
+
+        chains.PerUnitAtMost(Refinery, "IRON_ORE", 58).Should().Be(58);
+        chains.PerUnitAtMost(Refinery, "IRON_ORE", 1_000).Should().BeApproximately(0.5 * (136.5 + (0.5 * 1_600)), 0.001);
+        chains.PerUnitAtMost(Refinery, "IRON_ORE", 0).Should().Be(0);
+        chains.PerUnitAtMost(Refinery, "IRON_ORE", -25).Should().Be(0);
+        chains.PerUnitAtMost(Factory, "IRON_ORE", 58).Should().Be(0);
+    }
+
     [Theory]
     [InlineData("SCARCE", 1)]
     [InlineData("LIMITED", 0.75)]
