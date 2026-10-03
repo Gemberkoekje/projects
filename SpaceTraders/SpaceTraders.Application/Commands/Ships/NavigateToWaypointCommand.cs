@@ -72,7 +72,7 @@ public sealed class NavigateToWaypointHandler(
 {
     public async Task Handle(NavigateToWaypointCommand command, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
+        logger.LogDebug(
             "NavigateToWaypointHandler: ship {ShipSymbol} → {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
@@ -153,7 +153,7 @@ public sealed class NavigateToWaypointArrivedHandler(
 {
     public async Task Handle(NavigateToWaypointArrivedCommand command, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
+        logger.LogDebug(
             "NavigateToWaypointArrivedHandler: ship {ShipSymbol} arrived at {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
@@ -173,7 +173,7 @@ public sealed class NavigateToWaypointArrivedHandler(
                 await bus.PublishAsync(new MarketDataRefreshedEvent(
                     new WaypointSymbol(command.DestinationWaypoint),
                     market.TradeGoodsJson));
-                logger.LogInformation(
+                logger.LogDebug(
                     "NavigateToWaypointArrivedHandler: market data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
@@ -189,7 +189,7 @@ public sealed class NavigateToWaypointArrivedHandler(
             {
                 var shipyard = await port.GetShipyardAsync(systemSymbol, command.DestinationWaypoint, cancellationToken);
                 await shipyards.UpsertAsync(shipyard, cancellationToken);
-                logger.LogInformation(
+                logger.LogDebug(
                     "NavigateToWaypointArrivedHandler: shipyard data updated for {WaypointSymbol}.",
                     command.DestinationWaypoint);
             }
@@ -208,7 +208,7 @@ public sealed class NavigateToWaypointArrivedHandler(
             command.DestinationWaypoint,
             command.GoalId));
 
-        logger.LogInformation(
+        logger.LogDebug(
             "NavigateToWaypointArrivedHandler: ship {ShipSymbol} docked at {Destination}; navigation complete.",
             command.ShipSymbol,
             command.DestinationWaypoint);

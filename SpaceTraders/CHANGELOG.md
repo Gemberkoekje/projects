@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B53)
+- A flight logs two lines at Information: one when it leaves (`NavigateSubCommand`, now saying where from) and one when it lands (`ShipNavigationCompletedHandler`, with what its goal did next, or that it had none), besides its refuel. The ten or so steps between, each saying the ship had left or arrived, log at Debug. They were about 80% of the bot's lines, and with twelve ships the log budget would have been passed on normal running. Replaying the day's logs without them gives about 2,300 lines a ship a day instead of 6,000.
+
+### Docs – Changed (2026-10-03, B53)
+- `PLAN.md`: B53; `docs/HOW_IT_WORKS.md`: what a flight logs; the `st-investigate` skill: a flight is two lines.
+
 ### Code – Fixed (2026-10-03, B52)
 - The credits, the database size and the next server reset no longer read 0 before the bot knows them. prometheus-net published every gauge without labels at 0 from the start, and Prometheus's first scrape of a new pod could come before the first sample: after a deploy the dashboard read 0 credits for a minute, which "Value gained per hour" showed as a loss of the whole fleet's value (−517,672 on 2026-10-03 at 07:28:30Z), and an hour later as the same gain. These gauges are listed from the start and have a series once they are set, so that minute is a gap now.
 

@@ -18,7 +18,7 @@ public sealed class ShipNavigationCompletedHandler(
 {
     public async Task Handle(ShipNavigationCompletedEvent @event, CancellationToken cancellationToken)
     {
-        logger.LogInformation(
+        logger.LogDebug(
             "ShipNavigationCompletedHandler: navigation complete for ship {ShipSymbol} at {Destination}; resuming goal.",
             @event.ShipSymbol,
             @event.DestinationWaypoint);
@@ -31,13 +31,22 @@ public sealed class ShipNavigationCompletedHandler(
         dashboardNotifier.Notify("fleet-assignments", @event.ShipSymbol);
         dashboardNotifier.Notify("fleet-goal-chains", @event.ShipSymbol);
 
+        // A flight's one line at Information when it lands, with what its goal did next (B53).
         if (result is not null)
         {
             logger.LogInformation(
-                "ShipNavigationCompletedHandler: ship {ShipSymbol} goal resumed; outcome={Outcome} reason={Reason}.",
+                "ShipNavigationCompletedHandler: ship {ShipSymbol} arrived at {Destination}; goal resumed, outcome={Outcome} reason={Reason}.",
                 @event.ShipSymbol,
+                @event.DestinationWaypoint,
                 result.Outcome,
                 result.Reason);
+        }
+        else
+        {
+            logger.LogInformation(
+                "ShipNavigationCompletedHandler: ship {ShipSymbol} arrived at {Destination}; no goal to resume.",
+                @event.ShipSymbol,
+                @event.DestinationWaypoint);
         }
     }
 }

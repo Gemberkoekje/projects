@@ -30,7 +30,7 @@ public sealed class OrbitSubCommand(
         {
             if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity)
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "OrbitSubCommand: refueling ship {ShipSymbol} to full before undocking from fuel market {WaypointSymbol}.",
                     shipSymbol,
                     ship.WaypointSymbol ?? string.Empty);
@@ -48,7 +48,7 @@ public sealed class OrbitSubCommand(
         logger.LogDebug("OrbitSubCommand: orbiting ship {ShipSymbol}.", shipSymbol);
         var nav = await port.OrbitShipAsync(shipSymbol, cancellationToken);
         await ships.UpdateNavAsync(shipSymbol, nav, null, cancellationToken);
-        logger.LogInformation("OrbitSubCommand: ship {ShipSymbol} now in orbit at {WaypointSymbol}.", shipSymbol, nav.WaypointSymbol);
+        logger.LogDebug("OrbitSubCommand: ship {ShipSymbol} now in orbit at {WaypointSymbol}.", shipSymbol, nav.WaypointSymbol);
     }
 
     private async Task<bool> ShouldRefuelBeforeUndockingAsync(ShipModel ship, CancellationToken cancellationToken)

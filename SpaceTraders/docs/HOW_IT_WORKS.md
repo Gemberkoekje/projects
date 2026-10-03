@@ -1203,6 +1203,12 @@ The seven pages in `src/Future` are not routed.
     completes or starts waiting. What a tick finds when nothing changed (no idle ship, no budget,
     a plan already complete) goes to Debug, and so does the "starting" line of a ship command
     whose result line follows. An idle bot logs nothing at Information.
+  - A flight logs two lines at Information (B53): `NavigateSubCommand` when it leaves (from, to,
+    when it arrives) and `ShipNavigationCompletedHandler` when it lands (with what its goal did
+    next), plus `RefuelSubCommand` when it refuels, which is a purchase. The steps between, each
+    handler and sub-command saying the ship left, orbited, was woken, arrived, docked or had its
+    market refreshed, log at Debug: they were about 80% of the bot's lines with twelve ships. A
+    flight that fails still logs its warning or error.
   - One property name per concept: `ShipSymbol`, `ContractId`, `WaypointSymbol` (unless the
     message names a role, such as `Destination` or `SellWaypoint`), `GoalKind`.
   - Wolverine logs each handled message ("Successfully processed message …") under the message
