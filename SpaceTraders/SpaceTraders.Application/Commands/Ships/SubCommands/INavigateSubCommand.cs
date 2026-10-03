@@ -57,10 +57,11 @@ public sealed class NavigateSubCommand(
         await ships.UpdateNavAsync(shipSymbol, result.Nav, result.Fuel, cancellationToken);
 
         var arrivalTime = result.Nav.ArrivesAt ?? now;
+        var origin = ship?.WaypointSymbol ?? result.Nav.WaypointSymbol;
 
         await bus.PublishAsync(new ShipInTransitEvent(
             shipSymbol,
-            ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
+            origin,
             actualDestination,
             arrivalTime,
             Guid.Empty,
@@ -73,9 +74,12 @@ public sealed class NavigateSubCommand(
 
         await scheduler.ScheduleArrivalAsync(shipSymbol, goalId, arrivalTime, cancellationToken);
 
+        // A flight logs one line at Information when it leaves (this one) and one when it lands
+        // (ShipNavigationCompletedHandler), besides its refuel; the steps between log at Debug (B53).
         logger.LogInformation(
-            "NavigateSubCommand: ship {ShipSymbol} in transit to {Destination}, arrives at {Arrival}.",
+            "NavigateSubCommand: ship {ShipSymbol} in transit from {Origin} to {Destination}, arrives at {Arrival}.",
             shipSymbol,
+            origin,
             actualDestination,
             arrivalTime);
     }

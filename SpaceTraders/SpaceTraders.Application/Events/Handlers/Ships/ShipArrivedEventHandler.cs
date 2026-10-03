@@ -33,7 +33,7 @@ public sealed class ShipArrivedEventHandler(
             return;
         }
 
-        logger.LogInformation(
+        logger.LogDebug(
             "ShipArrivedEventHandler: ship {ShipSymbol} arrived; dispatching post-arrival command.",
             @event.ShipSymbol);
 

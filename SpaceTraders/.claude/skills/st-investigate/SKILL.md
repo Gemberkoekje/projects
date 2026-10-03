@@ -77,6 +77,12 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 - **Who logged it:** a line written during a tick carries `Tick` (and its `Plan`, or `ShipSymbol`);
   lines from handlers, such as an arrival's, carry no `Tick`. Two code paths acting on one ship at
   the same moment show as lines with and without `Tick`, interleaved (B45).
+- **A flight is two lines** (B53): `NavigateSubCommand: … in transit from … to …, arrives at …`
+  when it leaves and `ShipNavigationCompletedHandler: … arrived at …; goal resumed, outcome=…` when
+  it lands, plus a `RefuelSubCommand` line for each refuel. Orbiting, docking, the scheduler's
+  wake-up and the market refresh on arrival log at Debug and never reach Loki. A departure with no
+  arrival line after its arrival time means the arrival chain didn't finish: a wake-up it ignored as
+  stale (Debug), or a failure, whose error is logged.
 - **Starts and deploys:** `|= "Deferred startup initialization completed"` lists every start. When
   lines come from several pods, `logs` prefixes each with the pod's suffix, so a restart or a deploy
   shows as a new suffix. `check` shows the running image; earlier ones are in gembernodes' history.

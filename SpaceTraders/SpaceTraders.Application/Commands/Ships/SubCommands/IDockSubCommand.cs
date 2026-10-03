@@ -28,6 +28,6 @@ public sealed class DockSubCommand(
         dashboardNotifier.Notify("ships", shipSymbol);
         dashboardNotifier.Notify("fleet-activity", shipSymbol);
         dashboardNotifier.Notify("activity", shipSymbol);
-        logger.LogInformation("DockSubCommand: ship {ShipSymbol} docked at {WaypointSymbol}.", shipSymbol, nav.WaypointSymbol);
+        logger.LogDebug("DockSubCommand: ship {ShipSymbol} docked at {WaypointSymbol}.", shipSymbol, nav.WaypointSymbol);
     }
 }

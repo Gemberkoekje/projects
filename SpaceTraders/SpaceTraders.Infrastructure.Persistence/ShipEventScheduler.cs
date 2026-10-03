@@ -223,7 +223,7 @@ public sealed class ShipEventScheduler(
             if (entry.EventKind == "Arrival")
             {
                 await bus.PublishAsync(new ShipArrivedEvent(entry.ShipSymbol, entry.GoalId, now));
-                logger.LogInformation("ShipEventScheduler: fired ShipArrivedEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
+                logger.LogDebug("ShipEventScheduler: fired ShipArrivedEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
             }
             else
             {
