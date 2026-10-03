@@ -390,8 +390,8 @@ public sealed class ShipLeftIdleRuleTests
             PlanId = Guid.NewGuid(),
             Targets =
             [
-                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", NeedsSurvey = true },
-                new SurveyPlanTarget { TradeSymbol = "IRON_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2 },
+                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", NeedsSurvey = true, CandidateShipSymbols = ["SHIP-1"] },
+                new SurveyPlanTarget { TradeSymbol = "IRON_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2, CandidateShipSymbols = ["SHIP-1"] },
             ],
             CreatedAt = Start,
             UpdatedAt = Start,
@@ -402,6 +402,31 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Details.Should().Contain("the Survey plan has work it could do: 1 targets to survey");
+    }
+
+    [Fact]
+    public async Task ASurveyor_OutOfReachOfEveryTargetThatNeedsASurvey_IsIdleByDesign()
+    {
+        // B55, seen on the cluster on 2026-10-03 at 13:15Z: SPECTER-F, the designated surveyor (an 80-unit tank), waited at
+        // XB5C while the targets that needed a survey were at B14, B37, B8 and J72, which only the command ship's 400-unit
+        // tank reaches, now that it mines. The plan gives a surveyor only targets it can reach, so that is no work it could
+        // give SPECTER-F (D13), as for the mining and siphon openings.
+        _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Targets =
+            [
+                new SurveyPlanTarget { TradeSymbol = "GOLD_ORE", WaypointSymbol = "X1-AB-B37", BuyerWaypointSymbol = "X1-AB-B7", NeedsSurvey = true },
+                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2, CandidateShipSymbols = ["SHIP-F"] },
+            ],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-F", Start) with { ShipType = "SHIP_SURVEYOR", MountSymbols = ["MOUNT_SURVEYOR_I"], CargoCapacity = 0 });
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
     }
 
     [Fact]

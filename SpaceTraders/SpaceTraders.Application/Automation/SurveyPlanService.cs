@@ -159,6 +159,14 @@ public sealed class SurveyPlanService(
                     target.ForContract ? " (the contract's)" : string.Empty);
             }
 
+            // The surveyors that can reach each asteroid: only for those is a target work the plan could give (B55).
+            var reachedBy = systemTargets
+                .Select(target => target.AsteroidSymbol)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    asteroid => asteroid,
+                    asteroid => (IReadOnlyList<string>)[.. system.Where(surveyor => MiningPlanner.CanReach(context.Map, surveyor, asteroid)).Select(surveyor => surveyor.Symbol).Order(StringComparer.Ordinal)],
+                    StringComparer.OrdinalIgnoreCase);
             targets.AddRange(systemTargets.Select(target => new SurveyPlanTarget
             {
                 TradeSymbol = target.Ore,
@@ -169,6 +177,7 @@ public sealed class SurveyPlanService(
                 UsableSurveys = target.UsableSurveys,
                 NeedsSurvey = target.NeedsSurvey,
                 SurveyorShipSymbols = [.. surveying.Where(entry => Targets(entry.Value, target)).Select(entry => entry.Key).Order(StringComparer.Ordinal)],
+                CandidateShipSymbols = reachedBy[target.AsteroidSymbol],
             }));
         }
 

@@ -22,7 +22,7 @@ namespace SpaceTraders.Application.Health;
 ///   <item>probes: a market whose prices are due, with no probe at it or on its way and no other ship of
 ///   ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25);</item>
 ///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4), or, with the role board on, the ship
-///   with the survey role (slice 6.9);</item>
+///   with the survey role (slice 6.9), that the plan lists as able to reach it (B55);</item>
 ///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
 ///   to reach it (slice 6.4);</item>
 ///   <item>siphon: likewise, a gas in low supply without a ship, for a siphoner the plan lists as able to
@@ -115,15 +115,18 @@ public sealed class ShipLeftIdleRule(
             }
         }
 
-        // Only the targets short of their stock of surveys: with the stock for every ore, a surveyor waits (D27).
+        // Only the targets short of their stock of surveys: with the stock for every ore, a surveyor waits (D27). And only for
+        // the surveyors that can reach them, which the plan lists: a designated surveyor's tank doesn't reach every asteroid
+        // a miner works (B55).
         if (surveyOn
             && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { } survey
-            && survey.Targets.Count(target => target.NeedsSurvey) is > 0 and var toSurvey)
+            && survey.Targets.Where(target => target.NeedsSurvey && target.CandidateShipSymbols.Count > 0).ToList() is { Count: > 0 } toSurvey)
         {
             waiting.Add(new WaitingWork(
                 AutomationPlan.Survey,
-                string.Create(CultureInfo.InvariantCulture, $"{toSurvey} targets to survey"),
-                ship => board.IsSurveyor(ship.Ship)));
+                string.Create(CultureInfo.InvariantCulture, $"{toSurvey.Count} targets to survey"),
+                ship => board.IsSurveyor(ship.Ship)
+                    && toSurvey.Any(target => target.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
         }
 
         // The plan gives every free probe a due market that nothing watches (D29), so a probe can only be left
