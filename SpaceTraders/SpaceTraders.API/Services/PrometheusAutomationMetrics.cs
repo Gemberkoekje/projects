@@ -6,7 +6,8 @@ namespace SpaceTraders.API.Services;
 /// <summary>
 /// Exports <see cref="IAutomationMetrics"/> to Prometheus. It defines every <c>spacetraders_*</c>
 /// metric when it is created, so a scrape lists them all, also before they have a value. Every
-/// counter series reaches Prometheus at 0 before it counts (<see cref="ZeroFirstCounter"/>, B43).
+/// counter series reaches Prometheus at 0 before it counts (<see cref="ZeroFirstCounter"/>, B43); a
+/// gauge without labels has no series until it has a value (B52), as 0 would be read as one.
 /// </summary>
 /// <remarks>Thread-safe: the per-ship and per-contract series it tracks are guarded by a lock.</remarks>
 public sealed class PrometheusAutomationMetrics : IAutomationMetrics
@@ -81,7 +82,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_goal_breaker_trips_total",
             "Goals blocked by the per-ship circuit breaker for taking too many steps in a minute.",
             "ship");
-        _databaseSizeBytes = metrics.CreateGauge(
+        _databaseSizeBytes = UntilSet(
             "spacetraders_db_size_bytes",
             "Size of the bot's Postgres database (pg_database_size), read every 5 minutes.");
         _goalSteps = ZeroFirst(
@@ -119,10 +120,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "1 while an anomaly is active, 0 once it cleared.",
             "rule",
             "subject");
-        _nextServerReset = metrics.CreateGauge(
+        _nextServerReset = UntilSet(
             "spacetraders_server_next_reset_timestamp_seconds",
             "When the SpaceTraders server resets next (Unix time), as the server said at startup.");
-        _credits = metrics.CreateGauge(
+        _credits = UntilSet(
             "spacetraders_agent_credits",
             "The agent's credits, as cached.");
         _ships = metrics.CreateGauge(
@@ -279,6 +280,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
             => new(metrics.CreateCounter(name, help, labelNames), registry);
+
+        // A gauge without labels would be published at 0 at once, and the first scrape of a new pod could read the
+        // credits as 0 before the first sample (B52). It is listed from the start, with a series once it is set.
+        Gauge UntilSet(string name, string help)
+            => metrics.CreateGauge(name, help, new GaugeConfiguration { SuppressInitialValue = true });
     }
 
     /// <inheritdoc />
