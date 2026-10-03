@@ -326,15 +326,21 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   - mine: every mining target (D28's), a full hold of the target ore, filled at the ship's rate times the
     ore's share of the extractions (its survey's deposits, or one of the asteroid's ores without one), less
     the fuel there and on to the market;
-  - siphon: every siphon target, a full hold of the gases a market buys (a trip keeps them all, D33), each
-    at the best price it fetches, less the fuel;
+  - siphon: every siphon target, a full hold of the gases a market buys (a trip keeps them all, D33): the
+    trip's own gas at the market it sells it to, each other gas where it counts most among the markets the
+    ship can carry it to from the gas giant, less the fuel;
   - each with the production chains' share (D39, `ChainValues`): a good sold to a market that makes a
     pricier good from it (it imports the good and exports something made from it, by the game's production
     chains, as D15 reads them) counts `Roles.ChainValueSharePercent` (50) of the price difference, and that
     share again of the next step, at the market in the system that makes the most of the pricier good in
     turn (iron ore → iron → machinery). A step counts fully while its market is SCARCE of the input, three
-    quarters at LIMITED, half at MODERATE, a quarter at HIGH, and not at all at ABUNDANT. Only the
-    comparison of roles reads it: within a role the plans still choose by D15 and D28;
+    quarters at LIMITED, half at MODERATE, a quarter at HIGH, and not at all at ABUNDANT. A market that only
+    exchanges the good adds nothing. The share counts at most what the trip earns on a unit (D49,
+    `ChainValues.PerUnitAtMost`): a mined or siphoned unit's price at its market, a traded unit's margin; so
+    feeding a factory at most doubles a trip. Each step's price difference counts for every unit of input,
+    while nobody knows how many units of input make one of output, or how fast: uncapped, the second step
+    (PLASTICS → EQUIPMENT, ~3,200) valued a siphon drone at ~274,000 credits an hour that earned 7–10k. Only
+    the comparison of roles reads it: within a role the plans still choose by D15 and D28;
   - a trip's time is its flights in CRUISE as the API reckons them (15 seconds plus the distance times 25
     over the engine's speed, 9 for an engine not cached yet), 10 seconds a landing, and for mining and
     siphoning the cooldowns to fill the hold, with half a tick after each.
@@ -1036,7 +1042,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.Roles.Enabled`, `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37). With the role board on, every ship works for the plan of the role the board gives it instead (D38–D41) |
 | `Roles.ReconsiderMinutes` (10) | Minutes between the role board's evaluations of the whole fleet; a new ship, a plan switched, the contract starting or stopping to want ore, or a ship left without work weighs the roles at once (D41) |
 | `Roles.HeadStartPercent` (20) | Percent more a ship's current role counts on the role board, so close calls don't flip back and forth (D41); 0 means none |
-| `Roles.ChainValueSharePercent` (50) | Percent of the price difference to the pricier good a market makes from what a ship sells it that the role board counts, and that share again of the step after; fully while the market is SCARCE of it, not at ABUNDANT (D39); 0 means none |
+| `Roles.ChainValueSharePercent` (50) | Percent of the price difference to the pricier good a market makes from what a ship sells it that the role board counts, and that share again of the step after; fully while the market is SCARCE of it, not at ABUNDANT (D39); at most what the trip earns on a unit (D49); 0 means none |
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |

@@ -11,6 +11,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - What each ship can do, whatever the plan switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine, Siphon, Trade`, or `none`), from its equipment. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role; this tells them apart. The metrics sample maps each cached ship once (`ShipRepository.MapToModel`, now public).
 - Units sold to and bought from each market, per good (`spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total`, labels `system`, `waypoint`, `good`), whoever traded them (D50): what we sell into a market can be set against what it makes. `ShipCargoSoldEvent` carries the market it was sold to.
 
+### Code – Changed (2026-10-03, slice 6.10a, D49)
+- The role board's production-chain share counts at most what a trip earns on a unit (`ChainValues.PerUnitAtMost`): a mined or siphoned unit's price at its market, a traded unit's margin, so feeding a factory at most doubles a trip. A siphon trip values its own gas at the market it sells it to, and each other gas it keeps where it counts most. On the first day the board valued a siphon drone at ~274,000 credits an hour that earned 7–10k, mining drones at 80–95k that earned 1–3k, and the command ship's trades at up to 4.7M an hour that earned ~13k: D39's second step counted a price difference such as PLASTICS → EQUIPMENT for every unit of gas. The setting's description says so.
+
 ### Docs – Changed (2026-10-03, slice 6.10)
 - `PLAN.md`: slice 6.10 and your decisions D43–D50; 6.10a built, 6.10b and 6.10c planned with design notes; "Where things stand" brought up to date. `docs/HOW_IT_WORKS.md`: the new metrics and events.
 
