@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, D55)
+- A survey ship per area with mining drones (D55), as asked on 2026-10-03: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." While a system has fewer ships that can only survey than areas with mining drones, the survey plan buys one more, in a new place in the order after the drones per scarce mineral and before the cargo ships (`SurveyorPerArea`; the cargo ships, probes and turns move one place down, and so does `position` in `spacetraders_purchase_need_credits`). Each area with drones gets a survey ship of its own: an area another one works in, or moves to, is taken, and of two in one area, one drifts to an area with drones that has none.
+
+### Docs – Changed (2026-10-03, D55)
+- `PLAN.md`: D55 and its follow-up under 6.10c. `docs/HOW_IT_WORKS.md`: a survey ship per area, the order ships are bought in, and the purchase-need metric's tiers.
+
 ### Code – Added (2026-10-03, D54)
 - The survey ship works where most drones mine (D54), as asked on 2026-10-03: "Please add the option for the survey ship to get to the mining location without surveys." A ship that can only survey counts the mining drones by where they work (their trip's market, a drone drifting there included; between trips, where they are), and when an area out of its CRUISE reach has more of them than its own, it drifts there before it surveys again (`MoveToWaypointGoal` with `Drifting`, and its first executor); a tie keeps it where it is. On the cluster, four drones worked for B7, out of the survey ship's reach, against two in the middle, and B7's mined without surveys.
 

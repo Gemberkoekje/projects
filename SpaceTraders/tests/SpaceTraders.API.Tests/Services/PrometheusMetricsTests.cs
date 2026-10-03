@@ -503,7 +503,7 @@ public sealed class PrometheusMetricsServiceTests
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
-        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 5, "SHIP_PROBE", "X1-AB-A2", 77_117));
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 6, "SHIP_PROBE", "X1-AB-A2", 77_117));
     }
 
     /// <summary>
@@ -967,17 +967,17 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.PurchaseNeeds(
         [
             new PurchaseNeedMetricsSample("Survey", "Surveyor", 2, "SHIP_SURVEYOR", "X1-DC53-H52", 33_905),
-            new PurchaseNeedMetricsSample("Trading", "CargoShips", 4, "SHIP_LIGHT_SHUTTLE", "X1-DC53-A2", 114_225),
+            new PurchaseNeedMetricsSample("Trading", "CargoShips", 5, "SHIP_LIGHT_SHUTTLE", "X1-DC53-A2", 114_225),
         ]);
 
         var text = await ExportAsync();
         text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Survey\",tier=\"Surveyor\",position=\"2\",ship_type=\"SHIP_SURVEYOR\",shipyard=\"X1-DC53-H52\"} 33905\n");
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"4\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"5\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
 
-        _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 6, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
+        _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 7, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"6\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"7\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
         text.Should().NotContain("plan=\"Survey\"");
         text.Should().NotContain("SHIP_LIGHT_SHUTTLE");
     }

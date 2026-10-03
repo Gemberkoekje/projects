@@ -11,7 +11,8 @@ namespace SpaceTraders.Application.Services;
 /// <list type="number">
 ///   <item>the contract's drone (D23, D40);</item>
 ///   <item>a designated surveyor for each system with miners (D47);</item>
-///   <item>a drone for each SCARCE or LIMITED mineral, until there is one per mineral (D48);</item>
+///   <item>a drone for each SCARCE or LIMITED mineral, until there is one per mineral and area (D48, D53);</item>
+///   <item>one more surveyor for each area with mining drones that has none (D55);</item>
 ///   <item>the cargo ships of <c>Trade.ShipPurchases</c> (D21), saved up for: while one is still to buy, no probe and no
 ///   other drone is bought;</item>
 ///   <item>a probe for every market (D29);</item>
@@ -347,17 +348,20 @@ public enum PurchaseTier
     /// <summary>A designated surveyor for a system with miners (D47).</summary>
     Surveyor = 2,
 
-    /// <summary>A drone for a SCARCE or LIMITED mineral, until there is one drone per such mineral (D48).</summary>
+    /// <summary>A drone for a SCARCE or LIMITED mineral, until there is one drone per such mineral and area (D48, D53).</summary>
     Coverage = 3,
 
+    /// <summary>One more surveyor, until each area with mining drones has one (D55).</summary>
+    SurveyorPerArea = 4,
+
     /// <summary>The next cargo ship of <c>Trade.ShipPurchases</c> (D21), saved up for.</summary>
-    CargoShips = 4,
+    CargoShips = 5,
 
     /// <summary>A probe, until every market has one (D29).</summary>
-    Probes = 5,
+    Probes = 6,
 
     /// <summary>A drone by the miners' rule (D28, D32), or one more cargo ship of the list's last type, in turn.</summary>
-    Alternating = 6,
+    Alternating = 7,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

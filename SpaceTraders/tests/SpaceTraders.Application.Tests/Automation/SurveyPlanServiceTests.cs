@@ -235,6 +235,62 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task ASecondSurveyShip_IsBought_ForAnAreaWithDronesThatHasNone_AfterTheCoverageDrones()
+    {
+        // D55, asked on 2026-10-03: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys?
+        // The second surveyor is lower priority than the first on the buy order": after the drones per scarce mineral and
+        // area (D53), before the cargo ships. Drones mine in the middle and for B7; the one survey ship works at B7.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-3", FleetRole.Mine), ("SHIP-4", FleetRole.Mine));
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        _activeGoals["SHIP-4"] = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: B7), Drone("SHIP-3"), Drone("SHIP-4", B7));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(new PurchaseNeed(PurchaseTier.SurveyorPerArea, "SHIP_SURVEYOR", H52, 33_905));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WithASurveyShipInEachAreaWithDrones_NoneIsBought()
+    {
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-7", FleetRole.Survey), ("SHIP-3", FleetRole.Mine), ("SHIP-4", FleetRole.Mine));
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        _activeGoals["SHIP-4"] = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: B7), SurveyShip(symbol: "SHIP-7"), Drone("SHIP-3"), Drone("SHIP-4", B7));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task OfTwoSurveyShipsInOneArea_TheFreeOneDriftsToAnAreaWithDronesThatHasNone()
+    {
+        // D55: "When two survey ships share an area, one drifts to an area that has none", here though fewer drones mine there:
+        // the survey ship just bought, at H52, joined the one in the middle.
+        RoleBoardTestSupport.RolesAre(
+            _settings,
+            _plans,
+            ("SHIP-5", FleetRole.Survey),
+            ("SHIP-7", FleetRole.Survey),
+            ("SHIP-3", FleetRole.Mine),
+            ("SHIP-4", FleetRole.Mine),
+            ("SHIP-6", FleetRole.Mine));
+        _activeGoals["SHIP-7"] = new SurveyWaypointGoal { TargetWaypointSymbol = XB5C, TargetDepositSymbol = "COPPER_ORE" };
+        _activeGoals["SHIP-3"] = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
+        _activeGoals["SHIP-6"] = new MineAndSellGoal { TradeSymbol = "SILICON_CRYSTALS", SourceWaypointSymbol = XB5C, SellWaypointSymbol = F49 };
+        _activeGoals["SHIP-4"] = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: H52), SurveyShip(symbol: "SHIP-7"), Drone("SHIP-3"), Drone("SHIP-4", B7), Drone("SHIP-6"));
+
+        await RunAsync();
+
+        var move = _activeGoals["SHIP-5"].Should().BeOfType<MoveToWaypointGoal>().Subject;
+        (move.TargetWaypointSymbol, move.Drifting).Should().Be((B7, true));
+    }
+
+    [Fact]
     public async Task TheState_ListsTheSurveyorsThatCanReachEachTarget()
     {
         // B55: the command ship mines (its 400-unit tank takes it to B14 for B7), the surveyor's 80-unit tank keeps it in the
