@@ -38,6 +38,7 @@ public sealed class ContractPlanService(
     IShipGoalRepository goals,
     ISettingsRepository settings,
     IPlanRepository planStates,
+    IPurchaseOrder purchaseOrder,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
     private const string ContractAssignmentType = "Contract";
@@ -61,6 +62,10 @@ public sealed class ContractPlanService(
 
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
+        // The contract's drone comes first in the order ships are bought in (slice 6.10b, D43): a pass that needs none
+        // says so, and one that needs it says so where it would buy.
+        await purchaseOrder.ReportAsync(AutomationPlan.Contract, PurchaseNeed.None, cancellationToken);
+
         var existing = await contractPlans.GetAsync(cancellationToken);
         if (existing is not null)
         {
@@ -590,6 +595,10 @@ public sealed class ContractPlanService(
         return null;
     }
 
+    /// <summary>
+    /// Buys the contract's drone when no miner is free for it (D23): first in the order ships are bought in (D43), so the
+    /// plans after it save up for it, at a shipyard whose price for it is known; without a price nothing could buy it.
+    /// </summary>
     private async Task<ShipModel?> TryPurchaseMinerDroneAsync(CancellationToken cancellationToken)
     {
         var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(MinerShipType, cancellationToken);
@@ -598,6 +607,25 @@ public sealed class ContractPlanService(
             logger.LogDebug(
                 "Contract plan purchase fallback: no shipyard waypoint found for ship type {ShipType}.",
                 MinerShipType);
+            return null;
+        }
+
+        var price = (await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken))?.Ships
+            .FirstOrDefault(ship => ship.Type.Equals(MinerShipType, StringComparison.OrdinalIgnoreCase))?.PurchasePrice ?? 0;
+        if (price <= 0)
+        {
+            logger.LogDebug(
+                "Contract plan purchase fallback: the price of a {ShipType} at {WaypointSymbol} isn't known yet.",
+                MinerShipType,
+                shipyardWaypoint);
+            return null;
+        }
+
+        if (!await purchaseOrder.ReportAsync(
+            AutomationPlan.Contract,
+            new PurchaseNeed(PurchaseTier.Contract, MinerShipType, shipyardWaypoint, price),
+            cancellationToken))
+        {
             return null;
         }
 

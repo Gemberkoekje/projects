@@ -1,4 +1,5 @@
 using FluentAssertions;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Siphoning;
 using SpaceTraders.Application.Trading;
@@ -51,6 +52,37 @@ public sealed class SiphonPlannerTests
 
         targets.Should().NotContain(target => target.Key == MiningPlanner.OpportunityKey(G50, "LIQUID_HYDROGEN"));
         (targets[0].Gas, targets[0].SellWaypointSymbol).Should().Be(("LIQUID_NITROGEN", E47));
+    }
+
+    [Fact]
+    public void AScarceGasNoSiphonerWorksOn_ComesFirst_ThoughAGasASiphonerWorksOnIsShorter()
+    {
+        // Slice 6.10b (D48): C39 is SCARCE of hydrocarbon here, and pays most for it, but a siphoner works on hydrocarbon
+        // for G50. Hydrogen and nitrogen have nobody.
+        MarketSnapshot[] markets =
+        [
+            .. Markets().Where(market => market.WaypointSymbol != C39),
+            Market(
+                C39,
+                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "SCARCE"),
+                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+        ];
+        var held = new HashSet<string> { MiningPlanner.OpportunityKey(G50, "HYDROCARBON") };
+
+        var targets = SiphonPlanner.SiphonTargets(Map(markets), SiphonDrone(), held, new HashSet<string> { "HYDROCARBON" });
+
+        targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Take(3).Should().Equal(
+            ("LIQUID_HYDROGEN", G50),
+            ("LIQUID_NITROGEN", E47),
+            ("HYDROCARBON", C39));
+    }
+
+    [Fact]
+    public void TheScarceGases_AreThoseADroneCouldServeAMarketShortOf()
+    {
+        SiphonPlanner.ScarceGases(Map(), SiphonDrone()).Should().BeEquivalentTo(["LIQUID_HYDROGEN", "LIQUID_NITROGEN", "HYDROCARBON"]);
     }
 
     [Fact]

@@ -8,6 +8,7 @@ using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
+using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -250,5 +251,6 @@ public sealed class ContractMinersTests
             _goals,
             _settings,
             _planStates,
+            new OpenPurchaseOrder(),
             _log.For<ContractPlanService>());
 }

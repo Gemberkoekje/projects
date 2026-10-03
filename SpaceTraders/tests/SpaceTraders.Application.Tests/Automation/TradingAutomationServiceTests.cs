@@ -8,6 +8,7 @@ using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
+using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -34,6 +35,7 @@ public sealed class TradingAutomationServiceTests
     private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly IContractMineralPlanRepository _contractPlans = Substitute.For<IContractMineralPlanRepository>();
     private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
+    private readonly OpenPurchaseOrder _order = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -430,8 +432,9 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
-    public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_UpToTwo()
+    public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_AndThenOneMoreOfTheLastType_InTurnWithTheDrones()
     {
+        // D21's list, then D43: "alternate drones and cargo ships", one more cargo ship of the list's last type at a time.
         SurveyPlanOn();
         CreditsAre(1_000_000);
         var shuttle = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
@@ -440,6 +443,7 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER", A1, 354_210));
         await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
 
         _purchases.ClearReceivedCalls();
@@ -447,6 +451,48 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ACargoShipOfTheList_IsSavedUpFor_ThoughATraderHasNoTripYet()
+    {
+        // D43: "then save up for cargo ships". The drone has no lucrative route, so nothing is bought now, but nothing after
+        // the shuttle in the order is bought either.
+        CreditsAre(300_000);
+        Fleet(Drone());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE", A1, 117_273));
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task BeyondTheList_ACargoShipIsNoNeed_WhileATraderHasNoTrip_SoTheDronesTurnMayCome()
+    {
+        // D43: "a turn passes when the other kind has nothing to buy".
+        Fleet(Drone(), Shuttle("SHIP-5"), Shuttle("SHIP-6"), Shuttle("SHIP-7"));
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(), 1_000_000, minProfitPerUnit: 100_000));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
+    public async Task WhileSomethingComesFirstInTheOrder_NoCargoShipIsBought()
+    {
+        // D43: the contract's drone, a surveyor and a drone for each scarce mineral come before the cargo ships.
+        SurveyPlanOn();
+        Fleet(CommandShip());
+        CreditsAre(300_000);
+        _order.Allows = false;
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Tier.Should().Be(PurchaseTier.CargoShips);
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
@@ -527,6 +573,7 @@ public sealed class TradingAutomationServiceTests
                 new SpareTimeInterruption(_ships, _goals, _stepGuard, Substitute.For<ITripBook>(), _log.For<SpareTimeInterruption>()),
                 _contractPlans,
                 _jettison,
+                _order,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

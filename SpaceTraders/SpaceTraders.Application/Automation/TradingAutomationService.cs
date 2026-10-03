@@ -45,7 +45,8 @@ public interface ITradingAutomationService
 /// The trip itself, with its check against the newest prices at each market, is the
 /// <c>TradeBetweenMarketsGoalExecutor</c>'s. The plan buys its own cargo ships (D21, which replaced D16):
 /// when no trader is left without a trip and a new ship would have a lucrative route from the shipyard, it
-/// buys the next type in <c>Trade.ShipPurchases</c>, one at a time and within the credit reserve.
+/// buys the next type in <c>Trade.ShipPurchases</c>, and once the list is bought one more of its last type, one at a
+/// time and within the credit reserve, when the order ships are bought in lets it (D43, <see cref="IPurchaseOrder"/>).
 /// </remarks>
 public sealed class TradingAutomationService(
     IShipRepository ships,
@@ -59,6 +60,7 @@ public sealed class TradingAutomationService(
     SpareTimeInterruption interruption,
     IContractMineralPlanRepository contractPlans,
     ICargoJettison cargoJettison,
+    IPurchaseOrder purchaseOrder,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -69,6 +71,9 @@ public sealed class TradingAutomationService(
     /// fleet has fewer than N cargo ships; empty buys none.
     /// </summary>
     public const string ShipPurchasesSetting = "Trade.ShipPurchases";
+
+    /// <summary>Credits that buy a full hold of anything: whether a new cargo ship would have work, whatever the credits now.</summary>
+    private const long AnyCredits = long.MaxValue / 4;
 
     private static readonly JsonSerializerOptions CompareOptions = new();
 
@@ -176,11 +181,7 @@ public sealed class TradingAutomationService(
             }
         }
 
-        // A new cargo ship only when every trader has a trip (D21).
-        if (idle == 0)
-        {
-            await BuyCargoShipAsync(fleet, heldKeys, cancellationToken);
-        }
+        await BuyCargoShipAsync(fleet, heldKeys, idle, cancellationToken);
 
         await SaveStateAsync(held, pending, cancellationToken);
     }
@@ -224,22 +225,27 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// Buys the next cargo ship in <c>Trade.ShipPurchases</c> (D21), at the shipyard that sells it for the
-    /// least, when it would have a lucrative route from there that no trader holds. The purchase keeps the
-    /// credit reserve (<c>FleetExpansion.MinCreditReserve</c>, <see cref="IShipPurchaseService"/>), and the
-    /// route is judged with the credits left after it.
+    /// Buys cargo ships (D21): the next in <c>Trade.ShipPurchases</c>, and once the list is bought, one more of its last type
+    /// (D43), at the shipyard that sells it for the least, when every trader has a trip and the new ship would have a
+    /// lucrative route from there that no trader holds, judged with the credits left after it. The purchase keeps the credit
+    /// reserve (<c>FleetExpansion.MinCreditReserve</c>, <see cref="IShipPurchaseService"/>). The order ships are bought in
+    /// decides when (<see cref="IPurchaseOrder"/>): a ship of the list is saved up for, whatever the routes, after the
+    /// contract's drone, a surveyor and a drone for each scarce mineral; a ship beyond the list takes turns with the drones,
+    /// and needs nothing while a trader has no trip or no new ship would have a route.
     /// </summary>
-    private async Task BuyCargoShipAsync(IReadOnlyList<ShipModel> fleet, IReadOnlySet<string> heldKeys, CancellationToken cancellationToken)
+    private async Task BuyCargoShipAsync(IReadOnlyList<ShipModel> fleet, IReadOnlySet<string> heldKeys, int idle, CancellationToken cancellationToken)
     {
         var purchases = (await settings.GetAsync<string>(ShipPurchasesSetting, cancellationToken) ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
-        if (cargoShips >= purchases.Length)
+        if (purchases.Length == 0)
         {
+            await purchaseOrder.ReportAsync(AutomationPlan.Trading, PurchaseNeed.None, cancellationToken);
             return;
         }
 
-        var shipType = purchases[cargoShips];
+        var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
+        var inList = cargoShips < purchases.Length;
+        var shipType = inList ? purchases[cargoShips] : purchases[^1];
         var systems = fleet
             .Select(ship => ship.SystemSymbol)
             .OfType<string>()
@@ -259,6 +265,7 @@ public sealed class TradingAutomationService(
         if (offer.Count == 0)
         {
             logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType}.", shipType);
+            await purchaseOrder.ReportAsync(AutomationPlan.Trading, PurchaseNeed.None, cancellationToken);
             return;
         }
 
@@ -273,6 +280,17 @@ public sealed class TradingAutomationService(
             forSale.FuelCapacity,
             forSale.FuelCapacity,
             CargoCapacity: forSale.CargoCapacity);
+
+        // Beyond the list a ship has nothing to buy while no new one would have work, so the drones' turn comes (D43).
+        var hasWork = idle == 0 && TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys).Count > 0;
+        var need = inList || hasWork
+            ? new PurchaseNeed(inList ? PurchaseTier.CargoShips : PurchaseTier.Alternating, shipType, shipyard.WaypointSymbol, forSale.PurchasePrice)
+            : PurchaseNeed.None;
+        if (!await purchaseOrder.ReportAsync(AutomationPlan.Trading, need, cancellationToken) || idle > 0)
+        {
+            return;
+        }
+
         var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
         var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys);
         if (routes.Count == 0)

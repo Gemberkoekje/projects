@@ -1,4 +1,5 @@
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Roles;
 
 namespace SpaceTraders.Application.Orchestration;
 
@@ -7,7 +8,9 @@ namespace SpaceTraders.Application.Orchestration;
 /// while preserving the configured credit reserve.
 /// </summary>
 /// <remarks>
-/// Reads the reserve from the <c>FleetExpansion.MinCreditReserve</c> setting.
+/// The reserve grows with what the ships that trade can carry (D51, <see cref="CreditReserve"/>):
+/// <c>FleetExpansion.MinCreditReserve</c> and <c>FleetExpansion.ReservePerTradingCargoUnit</c> a unit, judged from the
+/// cached fleet and the role board on every evaluation.
 /// </remarks>
 public interface IBudgetPolicy
 {
@@ -16,9 +19,10 @@ public interface IBudgetPolicy
 
 public sealed class BudgetPolicy(
     IAgentRepository agents,
-    ISettingsRepository settings) : IBudgetPolicy
+    ISettingsRepository settings,
+    IShipRepository ships,
+    IPlanRepository plans) : IBudgetPolicy
 {
-    private const string MinCreditReserveSetting = "FleetExpansion.MinCreditReserve";
     private const string FabMatsBuyThresholdSetting = "Construction.FabMatsBuyThreshold";
     private const string FabMatsTransactionSizeSetting = "Construction.FabMatsTransactionSize";
     private const string ConstructionHourlyBudgetCapEnabledSetting = "Construction.HourlyBudgetCapEnabled";
@@ -27,14 +31,10 @@ public sealed class BudgetPolicy(
     {
         var agent = await agents.GetAsync(cancellationToken);
         var available = agent?.Credits ?? 0;
-        var reserved = await settings.GetAsync<long>(MinCreditReserveSetting, cancellationToken);
+        var reserved = await ReserveAsync(cancellationToken);
         var fabMatsBuyThreshold = await settings.GetAsync<int>(FabMatsBuyThresholdSetting, cancellationToken);
         var fabMatsTransactionSize = await settings.GetAsync<int>(FabMatsTransactionSizeSetting, cancellationToken);
         var hourlyConstructionBudgetCapEnabled = await settings.GetAsync<bool>(ConstructionHourlyBudgetCapEnabledSetting, cancellationToken);
-        if (reserved < 0)
-        {
-            reserved = 0;
-        }
 
         if (fabMatsBuyThreshold <= 0)
         {
@@ -77,5 +77,15 @@ public sealed class BudgetPolicy(
             FabMatsBuyThreshold: fabMatsBuyThreshold,
             FabMatsTransactionSize: fabMatsTransactionSize,
             HourlyConstructionBudgetCapEnabled: hourlyConstructionBudgetCapEnabled);
+    }
+
+    /// <summary>The credit reserve now (D51): the floor, and the credits per unit the ships that trade can carry.</summary>
+    private async Task<long> ReserveAsync(CancellationToken cancellationToken)
+    {
+        var floor = await settings.GetAsync<long>(CreditReserve.FloorSetting, cancellationToken);
+        var perUnit = CreditReserve.PerTradingCargoUnit(await settings.GetRawAsync(CreditReserve.PerTradingCargoUnitSetting, cancellationToken) ?? string.Empty);
+        var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
+        var fleet = await ships.GetAllAsync(cancellationToken);
+        return CreditReserve.Of(floor, perUnit, CreditReserve.TradingCargo(fleet, board.RoleOf));
     }
 }

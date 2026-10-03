@@ -41,8 +41,9 @@ public sealed class DefaultSettingsSeedTests
         "Health.Credits.MaxHoursUnchanged",
         "Health.Api.Max429sPerHour",
 
-        // BudgetPolicy, MiningAutomationService, DataRetention, WebhookAlertNotifier.
+        // BudgetPolicy (with the credit reserve's growth, D51), MiningAutomationService, DataRetention, WebhookAlertNotifier.
         "FleetExpansion.MinCreditReserve",
+        "FleetExpansion.ReservePerTradingCargoUnit",
         "Mining.MaxDrones",
         "ActivityLog.RetentionDays",
         "Alerts.WebhookUrl",

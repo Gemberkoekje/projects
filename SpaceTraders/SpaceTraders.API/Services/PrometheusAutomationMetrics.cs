@@ -60,6 +60,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _settingInfo;
     private readonly Gauge _roleInfo;
     private readonly Gauge _roleCreditsPerHour;
+    private readonly Gauge _purchaseNeed;
+    private readonly Gauge _creditReserve;
 
     private readonly Lock _lock = new();
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
@@ -78,6 +80,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
     private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Role, string Reason)> _roleLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string[]> _purchaseNeedLabels = new(StringComparer.Ordinal);
     private readonly HashSet<(string Ship, string Role)> _roleEstimates = [];
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
@@ -312,6 +315,17 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "What each role a ship could take would earn it per hour, by the role board's estimate: its best trip, after fuel, with the production chains' share.",
             "ship",
             "role");
+        _creditReserve = UntilSet(
+            "spacetraders_credit_reserve",
+            "The credits a ship purchase must leave (D51): FleetExpansion.MinCreditReserve, and FleetExpansion.ReservePerTradingCargoUnit for every unit the ships that trade can carry.");
+        _purchaseNeed = metrics.CreateGauge(
+            "spacetraders_purchase_need_credits",
+            "What each plan that buys ships would buy now, by its place in the order ships are bought in (position 1 first): what the ship costs, as cached.",
+            "plan",
+            "tier",
+            "position",
+            "ship_type",
+            "shipyard");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -418,6 +432,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void Credits(long credits) => _credits.Set(credits);
+
+    /// <inheritdoc />
+    public void ReservedCredits(long credits) => _creditReserve.Set(credits);
 
     /// <inheritdoc />
     public void Fleet(IReadOnlyCollection<ShipMetricsSample> ships, DateTimeOffset now)
@@ -696,6 +713,38 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
                 _roleEstimates.Add((ship, role));
             }
         }
+    }
+
+    /// <inheritdoc />
+    public void PurchaseNeeds(IReadOnlyCollection<PurchaseNeedMetricsSample> needs)
+    {
+        var current = needs
+            .GroupBy(sample => sample.Plan, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First(),
+                StringComparer.Ordinal);
+
+        lock (_lock)
+        {
+            foreach (var (plan, labels) in _purchaseNeedLabels
+                .Where(series => !current.TryGetValue(series.Key, out var sample) || !Labels(sample).SequenceEqual(series.Value))
+                .ToList())
+            {
+                _purchaseNeed.RemoveLabelled(labels);
+                _purchaseNeedLabels.Remove(plan);
+            }
+
+            foreach (var sample in current.Values)
+            {
+                var labels = Labels(sample);
+                _purchaseNeed.WithLabels(labels).Set(sample.Price);
+                _purchaseNeedLabels[sample.Plan] = labels;
+            }
+        }
+
+        static string[] Labels(PurchaseNeedMetricsSample sample)
+            => [sample.Plan, sample.Tier, sample.Position.ToString(System.Globalization.CultureInfo.InvariantCulture), sample.ShipType, sample.Shipyard];
     }
 
     /// <summary>A yes-or-no label: <c>true</c> or <c>false</c>.</summary>

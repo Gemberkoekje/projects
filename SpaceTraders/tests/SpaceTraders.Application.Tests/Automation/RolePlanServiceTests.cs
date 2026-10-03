@@ -47,23 +47,49 @@ public sealed class RolePlanServiceTests
     [Fact]
     public async Task TheFirstPass_GivesEveryShipItsRole_JournalsIt_AndWritesTheBoard()
     {
-        // The command ship is the only ship that can survey, and a drone can mine: it surveys (D38). The drone has no
-        // lucrative route in the middle of X1-DC53, so it mines.
+        // The command ship is the only ship that can survey, and a drone can mine: it surveys (D38). Silicon, quartz,
+        // copper and iron are SCARCE or LIMITED near the middle of X1-DC53, and the drone is the only one to mine them: it
+        // keeps mining (D48).
         Fleet(CommandShip(), Drone());
 
         await RunAsync();
 
         _state!.Ships.Select(ship => (ship.ShipSymbol, ship.Role, ship.Reason)).Should().Equal(
             ("SHIP-1", FleetRole.Survey, RolePlanner.SurveyFirst),
-            ("SHIP-3", FleetRole.Mine, RolePlanner.MostProfitable));
-        _state.Ships[1].CreditsPerHour.Should().BeGreaterThan(0);
-        _state.Ships[1].Job.Should().NotBeEmpty();
+            ("SHIP-3", FleetRole.Mine, RolePlanner.Coverage));
         _state.Ships[1].Estimates.Select(estimate => estimate.Role).Should().Equal(FleetRole.Mine, FleetRole.Trade);
         _state.Ships[1].Rates.Should().ContainSingle().Which.Should().Be(new RoleRateState { Kind = GatheringKind.Mining, UnitsPerAction = 3, SecondsPerAction = 70, Observed = false });
 
         _log.Journal.Select(entry => (entry.EventKind, entry.Properties["ShipSymbol"], entry.Properties["NewRole"])).Should().Equal(
             ("RoleChanged", "SHIP-1", (object)FleetRole.Survey),
             ("RoleChanged", "SHIP-3", (object)FleetRole.Mine));
+    }
+
+    [Fact]
+    public async Task OneDronePerScarceOre_KeepsMining_AndTheRestShareTheWork()
+    {
+        // Slice 6.10b (D48): four ores are SCARCE or LIMITED near the middle, and there are five drones. The fifth takes what
+        // pays it most: in the middle of X1-DC53, with no lucrative route, mining.
+        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+
+        await RunAsync();
+
+        _state!.Ships.Where(ship => ship.Reason == RolePlanner.Coverage).Select(ship => ship.ShipSymbol)
+            .Should().Equal("SHIP-3", "SHIP-4", "SHIP-5", "SHIP-6");
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Should().Match<RoleShipState>(
+            ship => ship.Role == FleetRole.Mine && ship.Reason == RolePlanner.MostProfitable && ship.CreditsPerHour > 0 && ship.Job.Length > 0);
+    }
+
+    [Fact]
+    public async Task ADroneWorkingOnAScarceOre_IsTheOneKeptForIt()
+    {
+        HeldBy("SHIP-7", H51, "COPPER_ORE");
+        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+
+        await RunAsync();
+
+        _state!.Ships.Where(ship => ship.Reason == RolePlanner.Coverage).Select(ship => ship.ShipSymbol)
+            .Should().BeEquivalentTo(["SHIP-7", "SHIP-3", "SHIP-4", "SHIP-5"]);
     }
 
     [Fact]
@@ -204,6 +230,9 @@ public sealed class RolePlanServiceTests
     }
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
+
+    private void HeldBy(string ship, string market, string ore)
+        => _activeGoals[ship] = new MineAndSellGoal { TradeSymbol = ore, SourceWaypointSymbol = XB5C, SellWaypointSymbol = market };
 
     private void On(params AutomationPlan[] plans)
     {

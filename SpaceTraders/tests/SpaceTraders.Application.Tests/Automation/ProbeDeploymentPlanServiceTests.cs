@@ -6,6 +6,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -36,6 +37,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly ShipyardCalls _calls = new();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly OpenPurchaseOrder _order = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private readonly DateTimeOffset _now = TimeProvider.System.GetUtcNow();
@@ -98,6 +100,22 @@ public sealed class ProbeDeploymentPlanServiceTests
     }
 
     [Fact]
+    public async Task AProbe_IsANeedInTheOrderShipsAreBoughtIn_AndWaitsWhileSomethingComesFirst()
+    {
+        // Slice 6.10b (D43): the contract's drone, a surveyor, a drone for each scarce mineral and the cargo ships of
+        // Trade.ShipPurchases come first; the probes still fly.
+        _order.Allows = false;
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.WaitingForAnotherPurchase);
+        _activeGoals["SPECTER-2"].Should().BeOfType<DeployProbeGoal>();
+        _log.Journal.Should().NotContain(entry => entry.EventKind == "PlanBlocked");
+    }
+
+    [Fact]
     public async Task WithAProbeAtEveryMarket_ItBuysNone_AndTheProbesStay()
     {
         // D29's long-term goal. Each probe watches its own market; the market watch keeps them fresh.
@@ -111,6 +129,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
         _activeGoals.Should().BeEmpty();
         _state!.Purchase.Should().Be(ProbePurchaseStatus.EveryMarketHasOne);
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(PurchaseNeed.None, "nothing after the probes waits for them");
         _state.Markets.Select(market => market.ProbeSymbol).Should().Equal("SPECTER-5", "SPECTER-2");
     }
 
@@ -256,6 +275,7 @@ public sealed class ProbeDeploymentPlanServiceTests
                 _purchases,
                 _calls,
                 _settings,
+                _order,
                 _log.For<ProbeDeploymentPlanService>())
             .EnsureBootstrappedAsync();
 }

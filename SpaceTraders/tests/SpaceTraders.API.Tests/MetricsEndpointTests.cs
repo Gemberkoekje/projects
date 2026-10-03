@@ -65,6 +65,8 @@ public sealed class MetricsEndpointTests
         "spacetraders_setting_info",
         "spacetraders_ship_role_info",
         "spacetraders_ship_role_credits_per_hour",
+        "spacetraders_purchase_need_credits",
+        "spacetraders_credit_reserve",
     ];
 
     [Fact]

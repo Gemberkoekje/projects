@@ -94,4 +94,10 @@ public enum ProbePurchaseStatus
 
     /// <summary>A probe was bought.</summary>
     Bought = 5,
+
+    /// <summary>
+    /// A purchase that comes first in the order ships are bought in waits (D43): the contract's drone, a surveyor, a drone
+    /// for a scarce mineral, or a cargo ship of <c>Trade.ShipPurchases</c>, which the credits are saved up for.
+    /// </summary>
+    WaitingForAnotherPurchase = 6,
 }

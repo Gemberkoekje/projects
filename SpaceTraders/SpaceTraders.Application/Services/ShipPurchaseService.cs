@@ -18,7 +18,9 @@ namespace SpaceTraders.Application.Services;
 /// purchase makes no API call: it calls for a ship (<see cref="ShipyardCalls"/>), which the probe plan
 /// answers with its nearest free probe, and the plan's next attempt buys. With one there, the price is
 /// fetched again first, so the reserve is kept with the price the shipyard asks now: a cached price can be
-/// hours old, and every purchase moves it.
+/// hours old, and every purchase moves it. Whether a plan may buy at all is the purchase order's
+/// (<see cref="IPurchaseOrder"/>, D43), which counts each purchase at once (<see cref="PurchaseNeeds"/>): the
+/// ledger's row comes a moment later.
 /// </remarks>
 public sealed class ShipPurchaseService(
     ISpaceTradersPort port,
@@ -27,6 +29,7 @@ public sealed class ShipPurchaseService(
     IShipyardRepository shipyards,
     IBudgetPolicy budget,
     ShipyardCalls calls,
+    PurchaseNeeds purchases,
     IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
@@ -80,6 +83,7 @@ public sealed class ShipPurchaseService(
 
         var result = await port.PurchaseShipAsync(shipType, shipyardWaypoint, cancellationToken);
         calls.Answer(shipyardWaypoint);
+        purchases.Bought(result.ShipSymbol, ToShipType(shipType), TimeProvider.System.GetUtcNow());
 
         await agents.SetAgentAsync(bus, result.Agent, cancellationToken);
 

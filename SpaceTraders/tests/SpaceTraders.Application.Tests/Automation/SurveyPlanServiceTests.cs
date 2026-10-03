@@ -9,6 +9,7 @@ using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
+using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -18,7 +19,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// <summary>
 /// Slice 6.4: every ship that can survey surveys (D20): the contract's ore at the contract's asteroid
 /// first, otherwise ores the markets buy, at the asteroid nearest their buyer that the miners can reach;
-/// each until it has a stock of usable surveys, and then nothing (D27).
+/// each until it has a stock of usable surveys, and then nothing (D27). Slice 6.10b: with the role board on, the plan
+/// buys a designated surveyor for a system with mining drones (D47), first in the order after the contract's drone (D43).
 /// </summary>
 public sealed class SurveyPlanServiceTests
 {
@@ -31,6 +33,9 @@ public sealed class SurveyPlanServiceTests
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly ShipGoalStepGuard _stepGuard = new();
+    private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
+    private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly OpenPurchaseOrder _order = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -46,6 +51,88 @@ public sealed class SurveyPlanServiceTests
         _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(_ => _state);
         _plans.When(plans => plans.UpsertAsync(PlanTypes.Survey, Arg.Any<SurveyPlanState>(), Arg.Any<CancellationToken>()))
             .Do(call => _state = call.ArgAt<SurveyPlanState>(1));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE", "SHIP_SURVEYOR"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 49_011, FuelCapacity = 80, CargoCapacity = 15 },
+                    new ShipyardShipDto { Type = "SHIP_SURVEYOR", PurchasePrice = 33_905, FuelCapacity = 80 },
+                ],
+            },
+        ]);
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true });
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOn_ItBuysASurveyor_ForASystemWithMiningDrones()
+    {
+        // Slice 6.10b (D47): "the purchase of a designated surveyor ship, so that the COMMAND ship is freed up to use it's
+        // considerable cargo for trading and mining". First in the order after the contract's drone (D43).
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(new PurchaseNeed(PurchaseTier.Surveyor, "SHIP_SURVEYOR", H52, 33_905));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("SHIP_SURVEYOR", new string[0])]
+    [InlineData("SURVEYOR", new[] { "MOUNT_SURVEYOR_I" })]
+    public async Task WithASurveyorInTheSystem_NoneIsBought(string shipType, string[] mounts)
+    {
+        // One bought since the last restart is known by its type; after startup sync, by its mount (B25).
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone(), SurveyShip() with { ShipType = shipType, MountSymbols = mounts });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOff_TheCommandShipSurveys_AndNoSurveyorIsBought()
+    {
+        // D20 holds without the board: the command ship surveys, and nothing would give a surveyor's role away.
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task WithoutAMiningDrone_NoSurveyorIsBought()
+    {
+        // Surveys are for miners; the command ship alone has no one to survey for.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
+    public async Task WhileTheContractsDroneWaits_NoSurveyorIsBought()
+    {
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+        _order.Allows = false;
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Tier.Should().Be(PurchaseTier.Surveyor);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]
@@ -306,6 +393,9 @@ public sealed class SurveyPlanServiceTests
                 _plans,
                 _settings,
                 new SpareTimeInterruption(_ships, _goals, _stepGuard, Substitute.For<ITripBook>(), _log.For<SpareTimeInterruption>()),
+                _shipyards,
+                _purchases,
+                _order,
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }
