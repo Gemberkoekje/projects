@@ -37,11 +37,22 @@ public sealed class LedgerEntryHandlerTests
     }
 
     [Fact]
-    public async Task ASale_IsALedgerRow_AndCreditsEarned()
+    public async Task ASale_IsALedgerRow_WithItsMarketAndUnitPrice_AndCreditsEarned()
     {
+        // B57, found on 2026-10-03: all 1,336 sale rows since the first, on 2026-10-02 at 13:20Z, had no market and no unit
+        // price, while every purchase row has both. The event carries the market; the handler passed it to the units-sold
+        // metric but not to the row.
         await _handler.Handle(new ShipCargoSoldEvent("AGENT-1", new TradeSymbol("IRON_ORE"), 10, 450, 175_450, "X1-AB-SELL"), CancellationToken.None);
 
-        await _ledger.Received(1).AppendAsync("AGENT-1", LedgerCategory.TradeSell, 450, goodSymbol: "IRON_ORE", units: 10, cancellationToken: Arg.Any<CancellationToken>());
+        await _ledger.Received(1).AppendAsync(
+            "AGENT-1",
+            LedgerCategory.TradeSell,
+            450,
+            goodSymbol: "IRON_ORE",
+            unitPrice: 45,
+            units: 10,
+            waypointSymbol: "X1-AB-SELL",
+            cancellationToken: Arg.Any<CancellationToken>());
         _metrics.Received(1).CreditsEarned("TradeSell", 450);
     }
 

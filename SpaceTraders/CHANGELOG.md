@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B57)
+- A sale's ledger row records the market it was sold to and its unit price, as a purchase's does. Every `TradeSell` row since the first, on 2026-10-02, had neither, though the sale event carried the market. The rows already written stay without them.
+
+### Docs – Changed (2026-10-03, B57)
+- `PLAN.md`: B57; B56 deployed. `docs/HOW_IT_WORKS.md`: what a ledger row of a sale holds.
+
 ### Code – Fixed (2026-10-03, B56)
 - The survey ship's move to where most drones mine (D54) runs: `ShipGoalExecutorService` stepped only the goal types it listed, and the move wasn't one of them, so SPECTER-F, sent to B7 at 15:55:03Z, stayed at XB5C with a goal that never ended. A move belongs to the survey plan's switch, as its other goals do. The plan's "moves to" log line no longer renders its empty phrase as `""`.
 

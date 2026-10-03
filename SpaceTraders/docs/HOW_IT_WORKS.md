@@ -1046,7 +1046,7 @@ wait for a cooldown simply run again on a later tick.
 | `MarketDataRefreshedEvent` | Arrival at a market; the market watch; a refresh after a trade (D25) | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
-| `ShipCargoSoldEvent` | Mining, siphon, spare-time and trade executors; carries the market it was sold to (`WaypointSymbol`) | `LedgerEntryHandler` (TradeSell, and `spacetraders_goods_sold_units_total`); `activity_logs` row |
+| `ShipCargoSoldEvent` | Mining, siphon, spare-time and trade executors; carries the market it was sold to (`WaypointSymbol`) | `LedgerEntryHandler` (TradeSell, with that market and the unit price since B57, and `spacetraders_goods_sold_units_total`); `activity_logs` row |
 | `CargoPurchasedEvent` | Trade executor | `LedgerEntryHandler` (TradeBuy, and `spacetraders_goods_bought_units_total`) |
 | `NewShipPurchasedEvent` | `ShipPurchaseService` | `LedgerEntryHandler` (ShipPurchase); `activity_logs` row |
 | `ContractAcceptedEvent` | Contract plan | `LedgerEntryHandler` (ContractDeposit, unless it paid nothing); `activity_logs` row |
@@ -1151,7 +1151,7 @@ other app (D8):
 | `plan_states` | Plan JSON per plan type | All nine plans, the role board included | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
 | `activity_logs` | Activity log | `LogActivityHandler`: transit, state mismatch, token reset | `ActivityLog.RetentionDays` (30) |
-| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments | 30 days |
+| `ledger_entries` | Credit ledger | `LedgerEntryHandler`: refuels, sales, cargo and ship purchases, contract payments; a sale and a cargo purchase with their market, good, units and unit price (sales since B57) | 30 days |
 | `cached_surveys` | Surveys, with who took them, when, and how many extractions used them (`Extractions`, slice 6.4) | `SurveyKeeper`: the survey executor stores, extractions count, refusals remove | bounded: the survey plan removes expired surveys on every pass (journaling each), and an extraction refusal removes its survey |
 | `leader_leases` | Leader lease | Leader election | bounded: one row |
 | `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
