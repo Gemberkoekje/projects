@@ -263,12 +263,12 @@ it and the other ships can do and what each role would earn: see
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
 | Scout | Visit every marketplace in the starting system once | The one ship with fuel | Active → Completed | Nothing |
-| Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral, the rest by an assignment (slice 6.9, D38–D42, D48) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral must be worth their role |
+| Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral and area, the rest by an assignment (slice 6.9, D38–D42, D48, D53) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral and area must be worth their role |
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
 | ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47) |
-| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore (D48), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
-| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas (D48), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
+| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
+| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
 | SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
 
@@ -313,12 +313,15 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      In X1-DC53 that is the command ship, the only ship that can survey, once a drone can mine;
   3. while the contract plan is on and its contract still wants ore (D40, D23 kept), every other ship that
      can mine mines for it (`contract`);
-  4. one drone per SCARCE or LIMITED mineral keeps gathering it (`coverage`, slice 6.10b, D48): for every ore
-     a mining drone, and every gas a siphon drone, could serve a market short of (`MiningPlanner.ScarceOres`,
-     `SiphonPlanner.ScarceGases`), the drone whose trip works on it, else one that has the role, else the one
+  4. one drone per SCARCE or LIMITED mineral and area keeps gathering it (`coverage`, slice 6.10b, D48, D53): for
+     every ore a mining drone, and every gas a siphon drone, could serve a market short of
+     (`MiningPlanner.ScarceOres`, `SiphonPlanner.ScarceGases`), in each area, the markets short of it that the
+     drones fly between in CRUISE (`MiningPlanner.Areas`, with the smallest tank among the drones of the kind;
+     in X1-DC53 the middle and B7), the drone whose trip covers it, else one that has the role, else the one
      whose best trip in another role earns least; the minerals the fewest drones could serve first. A ship
      that can survey is no drone. Without that, a drone that earns more trading would leave its mineral,
-     and the plan would buy the next, as one drone per scarce mineral is bought whatever trading pays;
+     and the plan would buy the next, as one drone per scarce mineral and area is bought whatever trading
+     pays;
   5. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
      takes one trip or none, no two the same trade route (D18) or the same mining or siphon opening, by the
      assignment that earns most in total (the Hungarian method, `Assignment`). A ship's current role counts
@@ -354,7 +357,7 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
     out of the ship's CRUISE reach (slice 6.10c, D45) adds its drift there, ten times as long (the distance
     times 250 over the speed), and the unit of fuel bought back where it lands: about 2.5 hours from the middle
     of X1-DC53 to B7 for a drone, so such a trip rarely wins on its own per hour; the drone kept for a far
-    scarce mineral (`coverage`, above) takes it whatever it earns.
+    scarce mineral (`coverage`, above, one per area) takes it whatever it earns.
 
   Surveying has no estimate: it comes first.
 - **Rates** (`GatheringRates`, in memory): each extraction (for the contract, the mining plan or in spare
@@ -378,7 +381,7 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
     trades when its plan has no trip for it, as before;
   - the trading plan to the ships with the trade role, and those with the mining or siphon role that their
     plan left free;
-  - the mining and siphon plans buy a drone beyond one per scarce mineral only when the board would give it
+  - the mining and siphon plans buy a drone beyond one per scarce mineral and area only when the board would give it
     their role (`RoleAdvisor`): a drone that would earn more trading would trade, and the plan would buy the
     next for the same opening.
 - **Off** (the default), the fixed rules hold, as before slice 6.9 (D20, D34).
@@ -448,7 +451,7 @@ The goal is a probe at every market of the HQ system, where the market watch kee
 - **Buying** (D29): while the system has fewer probes than markets, it buys a `SHIP_PROBE` at the
   shipyard that sells it for the least, at most one a pass, through `ShipPurchaseService`: the
   purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30).
-  Probes in flight count (B15). The contract's drone, a surveyor, a drone per scarce mineral and the
+  Probes in flight count (B15). The contract's drone, a surveyor, a drone per scarce mineral and area, and the
   cargo ships of `Trade.ShipPurchases` come first (D43): while one of them waits, the probe waits
   too (`Purchase` `WaitingForAnotherPurchase`), and the probes fly on.
 - **Flights** (`ProbePlanner`, no I/O):
@@ -536,8 +539,11 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      nearest the market whose traits yield it, and sold there; only trips the miner can make in CRUISE,
      through refuelling stops: to the asteroid, and on to the market with the fuel it has left there (a
      full tank where the asteroid sells fuel, as XB5C does; slice 6.10c). A SCARCE or LIMITED ore no
-     miner's trip works on comes first, the nearest asteroid first (slice 6.10b, D48, "near before
-     far"); then the market shortest of its ore (D28): SCARCE, then LIMITED (low supply, D22), and once
+     miner's trip covers comes first, the nearest asteroid first (slice 6.10b, D48, "near before far"). A
+     trip covers its ore at the markets its ship reaches in CRUISE from the market it sells at, through
+     refuelling stops, leaving with a full tank (D53, `CoveringTrip`): a drone mining for B7 doesn't cover
+     the middle, nor one in the middle B7, while the command ship's 400-unit tank reaches both. Then the
+     market shortest of its ore (D28): SCARCE, then LIMITED (low supply, D22), and once
      no market is short, the lowest supply there is, even when it pays less. Within a supply level, a
      surveyed ore first, then the most a single extraction is expected to fetch: the ore's share of the
      survey's deposits (without a survey, one of the asteroid's ores) times its price. One miner per
@@ -555,11 +561,13 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   contract plan mines: the contract would take the drone, and the contract plan buys at most one
   (D23). The plan says what it would buy on every pass, whether it may buy it or not:
   1. a drone for a scarce ore (D48), while the system has fewer mining drones (ships that can mine and
-     can't survey) than SCARCE or LIMITED ores a drone from the shipyard could serve
-     (`MiningPlanner.ScarceOres`): "at least 1 drone per mineral that is scarce or limited". It doesn't
-     ask the role board, which keeps one drone mining per scarce ore. Since slice 6.10c an ore a drift away
-     counts (D45: "new and free drones"), so each ore that only a far market is short of adds a drone (on
-     2026-10-03, B7's aluminum and iron);
+     can't survey) than SCARCE or LIMITED ores a drone from the shipyard could serve, each counted once per
+     area (`MiningPlanner.ScarceOres`, D53): "at least 1 drone per mineral that is scarce or limited", and
+     "the coverage tier may buy a drone per scarce mineral per area (more drones)". An area is the markets
+     short of the ore that such a drone flies between in CRUISE (`MiningPlanner.Areas`): in X1-DC53, the
+     middle and B7. It doesn't ask the role board, which keeps one drone mining per scarce ore and area.
+     Since slice 6.10c an ore a drift away counts (D45: "new and free drones"), so each ore a far market is
+     short of adds a drone (on 2026-10-03, B7's five);
   2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
@@ -588,7 +596,8 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
   2. otherwise the best of `SiphonPlanner.SiphonTargets`: every market that buys a gas (imported or
      exchanged), siphoned at the gas giant nearest the market from which the siphoner can make the trip
      in CRUISE (there, and on to the market with the fuel left, slice 6.10c), and sold there. A SCARCE or
-     LIMITED gas no siphoner's trip works on comes first, the nearest gas giant first (D48); then the
+     LIMITED gas no siphoner's trip covers (D53, as for the miners) comes first, the nearest gas giant first
+     (D48); then the
      market shortest of its gas (D28): SCARCE, then LIMITED (low supply, D22), and once no market is
      short, the lowest supply there is. Within a supply level, the most a single siphon is expected to
      fetch (one of the gas giant's three gases times the price), then the nearest gas giant. One siphoner
@@ -599,8 +608,9 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
      none: its one gas giant, C38, has every buyer in reach of a siphon drone.
 - **Drones** (D32, the miners' rule): one a tick, at the shipyard that sells `SHIP_SIPHON_DRONE` for the
   least in a system where our ships are, up to `Siphon.MaxDrones` (default 10), within the credit reserve
-  and when the order ships are bought in lets it (D43): first one per SCARCE or LIMITED gas a drone from the
-  shipyard could serve (D48, `SiphonPlanner.ScarceGases`), without asking the role board; then, when no
+  and when the order ships are bought in lets it (D43): first one per SCARCE or LIMITED gas and area a drone
+  from the shipyard could serve (D48, D53, `SiphonPlanner.ScarceGases`; X1-DC53's gas markets are one area, all
+  in reach from C38), without asking the role board; then, when no
   siphoner was free, a drone whose first trip by the same ranking (its tank and hold from the shipyard's
   listing, the trips under way held) would serve a market short of its gas, in turn with the cargo ships,
   and with the role board on only when the board would give it the siphon role (`RoleAdvisor`). In X1-DC53
@@ -779,7 +789,7 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   1. `Contract`: the contract's drone, while no miner is free for the contract (D23, D40);
   2. `Surveyor`: a designated surveyor for each system with mining drones (D47);
   3. `Coverage`: a drone for each SCARCE or LIMITED mineral, ore or gas, until there is one drone per
-     such mineral (D48);
+     such mineral and area (D48, D53);
   4. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
   5. `Probes`: a probe for every market (D29);
   6. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,

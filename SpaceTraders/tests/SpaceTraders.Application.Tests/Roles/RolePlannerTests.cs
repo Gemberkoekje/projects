@@ -218,6 +218,27 @@ public sealed class RolePlannerTests
     }
 
     [Fact]
+    public void AMineralShortInTwoAreas_KeepsADroneInEach()
+    {
+        // D53: copper is short in the middle and at B7, which a drone doesn't fly between in CRUISE. SHIP-4 mines it for B7;
+        // the middle's copper keeps a drone of its own, though trading pays SHIP-3 more.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(Drone("SHIP-3"), DroneRoles, FleetRole.Mine, Trade("trade|A", 10_000), Mine("mine|H51|COPPER_ORE", 2_000)),
+                Candidate(Drone("SHIP-4"), DroneRoles, FleetRole.Mine, Trade("trade|B", 9_000), Mine("mine|B7|COPPER_ORE", 1_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2,
+            [
+                new MineralCoverage("COPPER_ORE", FleetRole.Mine, ["SHIP-3", "SHIP-4"], ["SHIP-4"]) { MarketSymbols = ["X1-DC53-B7"] },
+                new MineralCoverage("COPPER_ORE", FleetRole.Mine, ["SHIP-3", "SHIP-4"], []) { MarketSymbols = ["X1-DC53-H51"] },
+            ]);
+
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
+        Role(decisions, "SHIP-4").Should().Be((FleetRole.Mine, RolePlanner.Coverage));
+    }
+
+    [Fact]
     public void TheCommandShip_IsNoDroneToKeep_AndTheContractsMinersComeFirst()
     {
         // The command ship can survey; while the contract wants ore, the drone mines for it already (D40).

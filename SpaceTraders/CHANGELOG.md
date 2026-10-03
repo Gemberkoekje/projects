@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-03, D53)
+- Coverage per area (D53), as asked on 2026-10-03: "A drone covers a mineral only for the markets it can reach in CRUISE from where it works (the middle, or B7). The middle's scarce silicon gets a drone of its own; the coverage tier may buy a drone per scarce mineral per area (more drones)." A mining or siphon trip covers its mineral at the markets its ship reaches in CRUISE from the market it sells at, so a free drone takes a SCARCE or LIMITED mineral that no trip covers there, though a drone works on it for a far market (`CoveringTrip`). The coverage tier counts each such mineral once per area, the markets a drone flies between in CRUISE (`MiningPlanner.Areas`), and the role board keeps one drone per mineral and area. On the cluster, four of the five mining drones had drifted to B7 while the middle's silicon, SCARCE at H53, had none.
+
+### Docs – Changed (2026-10-03, D53)
+- `PLAN.md`: D53 and its follow-up under 6.10c, with what to expect; D52 deployed. `docs/HOW_IT_WORKS.md`: coverage per area in the mining and siphon plans, the role board and the order ships are bought in.
+
 ### Code – Changed (2026-10-03, D52)
 - A ship that can only survey surveys on (D52), as asked on 2026-10-03: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is lowest." Once every ore it reaches has its stock of surveys (D27), it surveys the target it reaches with the fewest usable surveys, then the contract's, then the best paid, instead of waiting. The command ship, which can do more, still waits, or trades and mines in its spare time. `ShipLeftIdle` counts any target a ship that can only survey reaches as work for it.
 

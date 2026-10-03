@@ -71,7 +71,7 @@ public sealed class SiphonPlannerTests
         ];
         var held = new HashSet<string> { MiningPlanner.OpportunityKey(G50, "HYDROCARBON") };
 
-        var targets = SiphonPlanner.SiphonTargets(Map(markets), SiphonDrone(), held, new HashSet<string> { "HYDROCARBON" });
+        var targets = SiphonPlanner.SiphonTargets(Map(markets), SiphonDrone(), held, [Covering("HYDROCARBON", G50)]);
 
         targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Take(3).Should().Equal(
             ("LIQUID_HYDROGEN", G50),
@@ -82,7 +82,43 @@ public sealed class SiphonPlannerTests
     [Fact]
     public void TheScarceGases_AreThoseADroneCouldServeAMarketShortOf()
     {
-        SiphonPlanner.ScarceGases(Map(), SiphonDrone()).Should().BeEquivalentTo(["LIQUID_HYDROGEN", "LIQUID_NITROGEN", "HYDROCARBON"]);
+        SiphonPlanner.ScarceGases(Map(), SiphonDrone()).Select(area => (area.Good, string.Join(',', area.MarketSymbols))).Should().Equal(
+            ("HYDROCARBON", G50),
+            ("LIQUID_HYDROGEN", G50),
+            ("LIQUID_NITROGEN", E47));
+    }
+
+    [Fact]
+    public void TheScarceGases_CountOncePerArea()
+    {
+        // D53: with D90 near F48, F48's nitrogen and hydrogen count too, a drift away (D45). F48 is beyond a drone's tank from
+        // G50 and E47: another area, so each of its gases counts again.
+        SiphonPlanner.ScarceGases(MapWithAGasGiantNearF48(), SiphonDrone()).Select(area => (area.Good, string.Join(',', area.MarketSymbols))).Should().Equal(
+            ("HYDROCARBON", G50),
+            ("LIQUID_HYDROGEN", F48),
+            ("LIQUID_HYDROGEN", G50),
+            ("LIQUID_NITROGEN", E47),
+            ("LIQUID_NITROGEN", F48));
+    }
+
+    [Fact]
+    public void AGasASiphonerWorksOnForAFarMarket_IsStillUncoveredInReach()
+    {
+        // D53: "A drone covers a mineral only for the markets it can reach in CRUISE from where it works." A drone siphons
+        // nitrogen for F48, beyond a drone's tank from E47, so E47's SCARCE nitrogen still has nobody, and comes before G50's
+        // LIMITED hydrocarbon.
+        var held = new HashSet<string> { MiningPlanner.OpportunityKey(G50, "LIQUID_HYDROGEN"), MiningPlanner.OpportunityKey(F48, "LIQUID_NITROGEN") };
+
+        var targets = SiphonPlanner.SiphonTargets(
+            MapWithAGasGiantNearF48(),
+            SiphonDrone(),
+            held,
+            [Covering("LIQUID_HYDROGEN", G50), Covering("LIQUID_NITROGEN", F48)]);
+
+        targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Take(3).Should().Equal(
+            ("LIQUID_NITROGEN", E47),
+            ("HYDROCARBON", G50),
+            ("LIQUID_HYDROGEN", F48));
     }
 
     [Fact]
@@ -129,7 +165,7 @@ public sealed class SiphonPlannerTests
             MapWithAGasGiantNearF48(markets),
             SiphonDrone(),
             new HashSet<string>(),
-            new HashSet<string> { "HYDROCARBON", "LIQUID_HYDROGEN" });
+            [Covering("HYDROCARBON", G50), Covering("LIQUID_HYDROGEN", G50)]);
 
         (targets[0].Gas, targets[0].SellWaypointSymbol, targets[0].Far).Should().Be(("LIQUID_NITROGEN", F48, true));
     }
@@ -138,7 +174,7 @@ public sealed class SiphonPlannerTests
     public void OfTheGasesNoSiphonerWorksOn_ThoseInReach_ComeBeforeThoseADriftAway()
     {
         // D48's "near before far", and D45's far targets after the reachable ones.
-        var targets = SiphonPlanner.SiphonTargets(MapWithAGasGiantNearF48(), SiphonDrone(), new HashSet<string>(), new HashSet<string>());
+        var targets = SiphonPlanner.SiphonTargets(MapWithAGasGiantNearF48(), SiphonDrone(), new HashSet<string>(), Array.Empty<CoveringTrip>());
 
         targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Take(5).Should().Equal(
             ("LIQUID_HYDROGEN", G50),
@@ -209,4 +245,7 @@ public sealed class SiphonPlannerTests
         GasGiants.CanYield(c38, "LIQUID_NITROGEN").Should().BeTrue();
         GasGiants.CanYield(c38, "COPPER_ORE").Should().BeFalse();
     }
+
+    /// <summary>A siphoner's trip on a gas for a market, by a drone with an 80-unit tank.</summary>
+    private static CoveringTrip Covering(string gas, string market) => new(gas, market, 80);
 }

@@ -31,15 +31,16 @@ public interface ISiphonAutomationService
 ///   <item>a siphoner that holds goods a market buys sells them first, one good a trip, where each fetches most
 ///   after fuel: a trip keeps every gas it siphons (D33), and sells only its own;</item>
 ///   <item>otherwise it takes the best of its siphon targets (<see cref="SiphonPlanner"/>): a SCARCE or LIMITED gas no
-///   siphoner works on first, the nearest gas giant first (D48); then the market shortest of a gas (D28), SCARCE, then
-///   LIMITED, and once none is short, the lowest supply there is. One siphoner per sell market and gas. There are no
-///   surveys: a siphon takes none. A market out of the siphoner's CRUISE reach counts after the reachable ones of its
-///   supply level: the trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
+///   siphoner works on first, the nearest gas giant first (D48), where a trip covers its gas only at the markets its ship
+///   reaches in CRUISE from where it sells (D53); then the market shortest of a gas (D28), SCARCE, then LIMITED, and once
+///   none is short, the lowest supply there is. One siphoner per sell market and gas. There are no surveys: a siphon takes
+///   none. A market out of the siphoner's CRUISE reach counts after the reachable ones of its supply level: the trip
+///   drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
 ///   <item>it buys <c>SHIP_SIPHON_DRONE</c>s, one a pass, up to <c>Siphon.MaxDrones</c>, within the credit reserve and when
 ///   the order ships are bought in lets it (D43), at the shipyard that sells it for the least in a system where our ships
-///   are: first a drone for each SCARCE or LIMITED gas a new drone could serve (D48); then, when no siphoner was free, a
-///   drone whose first trip, by the same ranking, would serve a market short of its gas (D22, D28, D32), in turn with the
-///   cargo ships. Gas contracts stay unsupported (D2, D31), so no contract takes the drones.</item>
+///   are: first a drone for each SCARCE or LIMITED gas a new drone could serve, once per area (D48, D53); then, when no
+///   siphoner was free, a drone whose first trip, by the same ranking, would serve a market short of its gas (D22, D28,
+///   D32), in turn with the cargo ships. Gas contracts stay unsupported (D2, D31), so no contract takes the drones.</item>
 /// </list>
 /// Its state lists the low-supply openings of those systems, with the siphoners that could take one
 /// (<c>ShipLeftIdle</c> reads them, D13), and is written only when it changes.
@@ -80,8 +81,8 @@ public sealed class SiphonAutomationService(
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // The gases a siphoner's trip works on: a free siphoner takes a scarce gas that has none first (D48).
-        var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // The siphoners' trips: a free siphoner takes a scarce gas that has none near its market first (D48, D53).
+        var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
         foreach (var ship in fleet)
         {
@@ -91,7 +92,7 @@ public sealed class SiphonAutomationService(
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
-                covered.Add(trip.TradeSymbol);
+                covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
             else if (board.IsSiphoner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
@@ -155,9 +156,9 @@ public sealed class SiphonAutomationService(
 
     /// <summary>
     /// Gives a free siphoner its next trip: selling goods it holds, else the best siphon target, a scarce gas no siphoner
-    /// works on first (D48); the reason says <c>uncovered</c> when that came before D28's choice. A full hold only sells,
-    /// even where the sale doesn't pay for its fuel: a siphon trip would turn to selling at once, and end without its gas
-    /// aboard, on every tick.
+    /// works on near its market first (D48, D53); the reason says <c>uncovered</c> when that came before D28's choice. A
+    /// full hold only sells, even where the sale doesn't pay for its fuel: a siphon trip would turn to selling at once, and
+    /// end without its gas aboard, on every tick.
     /// </summary>
     /// <returns>False when there is nothing it can siphon and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -165,13 +166,13 @@ public sealed class SiphonAutomationService(
         ShipModel siphoner,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
-        HashSet<string> covered,
+        List<CoveringTrip> covered,
         CancellationToken cancellationToken)
     {
         var holdIsFull = siphoner.CargoCapacity > 0 && siphoner.CargoCurrent >= siphoner.CargoCapacity;
         if (TryFindHeldCargoSale(map, siphoner, holdIsFull, out var cargo, out var sale))
         {
-            covered.Add(cargo.Symbol);
+            covered.Add(new CoveringTrip(cargo.Symbol, sale.WaypointSymbol, siphoner.FuelCapacity));
             await StartAsync(siphoner, new SiphonAndSellGoal
             {
                 TradeSymbol = cargo.Symbol,
@@ -199,7 +200,7 @@ public sealed class SiphonAutomationService(
         var reason = target != ranked[0] ? "uncovered" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = siphoner.Symbol;
-        covered.Add(target.Gas);
+        covered.Add(new CoveringTrip(target.Gas, target.SellWaypointSymbol, siphoner.FuelCapacity));
         await StartAsync(siphoner, new SiphonAndSellGoal
         {
             TradeSymbol = target.Gas,
@@ -256,7 +257,7 @@ public sealed class SiphonAutomationService(
         IReadOnlyList<ShipModel> fleet,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
-        IReadOnlySet<string> covered,
+        IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         CancellationToken cancellationToken)
     {
@@ -281,8 +282,9 @@ public sealed class SiphonAutomationService(
     /// up to <c>Siphon.MaxDrones</c> (D32):
     /// <list type="bullet">
     ///   <item>a drone for a scarce gas (<see cref="PurchaseTier.Coverage"/>, D48), while the system has fewer siphon drones
-    ///   than SCARCE or LIMITED gases a new drone could serve (<see cref="SiphonPlanner.ScarceGases"/>): one drone per
-    ///   scarce mineral, which the role board keeps siphoning. It doesn't ask the board what pays most;</item>
+    ///   than SCARCE or LIMITED gases a new drone could serve, each counted once per area (<see cref="SiphonPlanner.ScarceGases"/>,
+    ///   D53): one drone per scarce mineral and area, which the role board keeps siphoning. It doesn't ask the board what
+    ///   pays most;</item>
     ///   <item>otherwise, when every siphoner works, a drone whose first trip by the siphoners' own ranking (the trips under
     ///   way held) would serve a market short of its gas (<see cref="PurchaseTier.Alternating"/>, D22, D28, D32), which,
     ///   with the role board on, the board would have siphon (<see cref="IRoleAdvisor"/>).</item>
@@ -292,7 +294,7 @@ public sealed class SiphonAutomationService(
         IReadOnlyList<ShipModel> fleet,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
-        IReadOnlySet<string> covered,
+        IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         CancellationToken cancellationToken)
     {

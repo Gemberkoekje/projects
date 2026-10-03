@@ -20,7 +20,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// a gas first (D28); gases it holds are sold first, as a trip keeps every gas it siphons (D33). Only a ship that
 /// can neither mine nor survey siphons, and a drone is bought only when its first trip would serve a market short
 /// of a gas, up to <c>Siphon.MaxDrones</c> (D32). Slice 6.10b: a scarce gas no siphoner works on comes first, and a drone
-/// is bought for each scarce gas first (D48), when the order ships are bought in lets it (D43).
+/// is bought for each scarce gas first (D48), when the order ships are bought in lets it (D43). D53: a trip covers its gas
+/// only near the market it sells at, and a drone is bought for each scarce gas in each area.
 /// </summary>
 public sealed class SiphonAutomationServiceTests
 {
@@ -270,6 +271,23 @@ public sealed class SiphonAutomationServiceTests
         (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("LIQUID_HYDROGEN", G50));
         _log.Journal.Should().ContainSingle(entry => entry.EventKind == "SiphonStarted")
             .Which.Properties["Reason"].Should().Be("uncovered");
+    }
+
+    [Fact]
+    public async Task ADroneIsBought_ForAGasShortInASecondArea()
+    {
+        // D53: with D90 near F48, F48's SCARCE nitrogen and LIMITED hydrogen count, a drift away (D45). The drones on E47's
+        // nitrogen and G50's hydrogen don't cover F48, beyond a drone's tank: five gases and areas for three drones, so a
+        // drone is bought for coverage, before the cargo ships (D43).
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(MapWithAGasGiantNearF48(), 250_000, 200));
+        HeldBy("SHIP-5", G50, "LIQUID_HYDROGEN");
+        HeldBy("SHIP-6", E47, "LIQUID_NITROGEN");
+        HeldBy("SHIP-7", G50, "HYDROCARBON");
+        Fleet(SiphonDrone("SHIP-5"), SiphonDrone("SHIP-6"), SiphonDrone("SHIP-7"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(new PurchaseNeed(PurchaseTier.Coverage, "SHIP_SIPHON_DRONE", C39, 42_000));
     }
 
     [Fact]

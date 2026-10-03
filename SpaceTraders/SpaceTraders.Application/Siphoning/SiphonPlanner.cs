@@ -92,36 +92,40 @@ public static class SiphonPlanner
 
     /// <summary>
     /// What a siphoner can siphon, best first, with the gases no siphoner works on first (D48): of its SCARCE or LIMITED
-    /// targets (D22) whose gas isn't in <paramref name="coveredGases"/>, the nearest gas giant first ("near before far");
-    /// then the rest, in <see cref="SiphonTargets(TradeMarketMap, ShipModel, IReadOnlySet{string})"/>'s order (D28).
+    /// targets (D22) that no trip in <paramref name="covering"/> covers (D53), the nearest gas giant first ("near before
+    /// far"); then the rest, in <see cref="SiphonTargets(TradeMarketMap, ShipModel, IReadOnlySet{string})"/>'s order (D28).
     /// </summary>
     /// <param name="map">The siphoner's system.</param>
     /// <param name="siphoner">The siphoner.</param>
     /// <param name="heldKeys">The openings other siphoners hold.</param>
-    /// <param name="coveredGases">The gases a siphoner's trip works on.</param>
+    /// <param name="covering">The siphoners' trips, each covering its gas near the market it sells at.</param>
     /// <returns>The targets, best first.</returns>
-    public static IReadOnlyList<SiphonTarget> SiphonTargets(TradeMarketMap map, ShipModel siphoner, IReadOnlySet<string> heldKeys, IReadOnlySet<string> coveredGases)
-        => UncoveredFirst(map, siphoner, SiphonTargets(map, siphoner, heldKeys), coveredGases);
+    public static IReadOnlyList<SiphonTarget> SiphonTargets(TradeMarketMap map, ShipModel siphoner, IReadOnlySet<string> heldKeys, IReadOnlyCollection<CoveringTrip> covering)
+        => UncoveredFirst(map, siphoner, SiphonTargets(map, siphoner, heldKeys), covering);
 
     /// <summary>
-    /// Puts the targets whose gas no siphoner works on first (D48): the SCARCE or LIMITED ones (D22) whose gas isn't in
-    /// <paramref name="coveredGases"/>, those in CRUISE reach before those a drift away (D45), the nearest gas giant first;
-    /// then the rest, each group in the order given.
+    /// Puts the targets whose gas no siphoner works on first (D48): the SCARCE or LIMITED ones (D22) that no trip in
+    /// <paramref name="covering"/> covers, as a trip covers its gas only at the markets its ship reaches in CRUISE from
+    /// where it sells (D53, <see cref="CoveringTrip.Covers"/>); those in CRUISE reach before those a drift away (D45), the
+    /// nearest gas giant first; then the rest, each group in the order given.
     /// </summary>
     /// <param name="map">The siphoner's system.</param>
     /// <param name="siphoner">The siphoner.</param>
     /// <param name="targets">Its targets, in D28's order (<see cref="SiphonTargets(TradeMarketMap, ShipModel, IReadOnlySet{string})"/>).</param>
-    /// <param name="coveredGases">The gases a siphoner's trip works on.</param>
+    /// <param name="covering">The siphoners' trips, each covering its gas near the market it sells at.</param>
     /// <returns>The targets, best first.</returns>
-    public static IReadOnlyList<SiphonTarget> UncoveredFirst(TradeMarketMap map, ShipModel siphoner, IReadOnlyList<SiphonTarget> targets, IReadOnlySet<string> coveredGases)
+    public static IReadOnlyList<SiphonTarget> UncoveredFirst(TradeMarketMap map, ShipModel siphoner, IReadOnlyList<SiphonTarget> targets, IReadOnlyCollection<CoveringTrip> covering)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(targets);
-        ArgumentNullException.ThrowIfNull(coveredGases);
+        ArgumentNullException.ThrowIfNull(covering);
 
         var position = MiningPlanner.Position(siphoner);
         return [.. targets
-            .Select((target, rank) => (Target: target, Rank: rank, Uncovered: target.LowSupply && !coveredGases.Contains(target.Gas)))
+            .Select((target, rank) => (
+                Target: target,
+                Rank: rank,
+                Uncovered: target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Gas, target.SellWaypointSymbol))))
             .OrderByDescending(entry => entry.Uncovered)
             .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.GasGiantSymbol, out var distance) ? distance : double.MaxValue)
@@ -130,17 +134,25 @@ public static class SiphonPlanner
     }
 
     /// <summary>
-    /// The SCARCE or LIMITED gases a ship could serve (D48): the gases of its low-supply targets (D22), whichever siphoner
-    /// holds them. A gas that no gas giant it can reach yields, or that no market it can carry it to is short of, isn't one.
+    /// The SCARCE or LIMITED gases a ship could serve (D48), each once per area (D53): the gases of its low-supply targets
+    /// (D22), whichever siphoner holds them, with the markets short of each grouped by the ship's CRUISE reach
+    /// (<see cref="MiningPlanner.Areas"/>). A gas that no gas giant it can reach yields, or that no market it can carry it
+    /// to is short of, isn't one.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, as it is or as it would be bought.</param>
-    /// <returns>The gases, by symbol.</returns>
-    public static IReadOnlySet<string> ScarceGases(TradeMarketMap map, ShipModel ship)
-        => SiphonTargets(map, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-            .Where(target => target.LowSupply)
-            .Select(target => target.Gas)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    /// <returns>The gases and their areas, by gas and first market.</returns>
+    public static IReadOnlyList<MineralArea> ScarceGases(TradeMarketMap map, ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return MiningPlanner.Areas(
+            map,
+            ship.FuelCapacity,
+            SiphonTargets(map, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+                .Where(target => target.LowSupply)
+                .Select(target => new MineralArea(target.Gas, [target.SellWaypointSymbol])));
+    }
 
     /// <summary>
     /// The low-supply openings of a system (D22): each market with a gas in low supply, and the gas giant nearest

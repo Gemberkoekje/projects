@@ -66,7 +66,8 @@ public sealed record RoleDecision
 }
 
 /// <summary>
-/// A SCARCE or LIMITED mineral, an ore or a gas, as the role board keeps a drone gathering it (PLAN.md slice 6.10b, D48).
+/// A SCARCE or LIMITED mineral, an ore or a gas, in one area, as the role board keeps a drone gathering it (PLAN.md slice
+/// 6.10b, D48, D53).
 /// </summary>
 public sealed record MineralCoverage
 {
@@ -74,7 +75,7 @@ public sealed record MineralCoverage
     /// <param name="Good">The ore or gas.</param>
     /// <param name="Role">The role that gathers it: <see cref="FleetRole.Mine"/> or <see cref="FleetRole.Siphon"/>.</param>
     /// <param name="AbleShipSymbols">The drones that could serve a market short of it.</param>
-    /// <param name="WorkingShipSymbols">The ships whose trip works on it now.</param>
+    /// <param name="WorkingShipSymbols">The ships whose trip covers it now.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public MineralCoverage(string Good, FleetRole Role, IReadOnlyList<string> AbleShipSymbols, IReadOnlyList<string> WorkingShipSymbols)
     {
@@ -93,8 +94,11 @@ public sealed record MineralCoverage
     /// <summary>The drones that could serve a market short of it.</summary>
     public required IReadOnlyList<string> AbleShipSymbols { get; init; }
 
-    /// <summary>The ships whose trip works on it now.</summary>
+    /// <summary>The ships whose trip covers it now.</summary>
     public required IReadOnlyList<string> WorkingShipSymbols { get; init; }
+
+    /// <summary>The area's markets short of it, by symbol (D53): none where the area doesn't matter.</summary>
+    public IReadOnlyList<string> MarketSymbols { get; init; } = [];
 }
 
 /// <summary>
@@ -109,9 +113,9 @@ public sealed record MineralCoverage
 ///   to lose surveys (<see cref="SurveyFirst"/>): the one whose best other trip earns least per hour. The one that
 ///   surveys now keeps it unless another would lose less by more than the head start;</item>
 ///   <item>while the contract wants ore (D40, D23 kept), every other ship that can mine mines (<see cref="Contract"/>);</item>
-///   <item>one drone per SCARCE or LIMITED mineral keeps gathering it (<see cref="Coverage"/>, D48): the drone whose trip
-///   works on it, else one that has the role, else the one with the least to lose. Without that, a drone that earns more
-///   trading would leave its mineral, and the plan would buy the next;</item>
+///   <item>one drone per SCARCE or LIMITED mineral and area keeps gathering it (<see cref="Coverage"/>, D48, D53): the
+///   drone whose trip covers it, else one that has the role, else the one with the least to lose. Without that, a drone
+///   that earns more trading would leave its mineral, and the plan would buy the next;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
 ///   takes one trip, and no two the same trade route (D18) or the same mining or siphon opening. A ship's current role
 ///   counts the head start more (D41), so a close call doesn't flip back and forth. A ship left without a trip keeps
@@ -129,7 +133,7 @@ public static class RolePlanner
     /// <summary>The ship mines for the contract, which comes first (D40).</summary>
     public const string Contract = "contract";
 
-    /// <summary>The drone keeps gathering a SCARCE or LIMITED mineral, one drone each (D48).</summary>
+    /// <summary>The drone keeps gathering a SCARCE or LIMITED mineral, one drone each per area (D48, D53).</summary>
     public const string Coverage = "coverage";
 
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
@@ -236,10 +240,10 @@ public static class RolePlanner
     }
 
     /// <summary>
-    /// A drone to keep gathering each SCARCE or LIMITED mineral (D48), one each, the minerals the fewest drones could serve
-    /// first: of the drones not yet decided that could serve it and have its role, the one whose trip works on it, else one
-    /// that has the role now, else the one with the least to lose (its best trip in another role earns least per hour). A
-    /// ship that can survey is no drone: the command ship takes what pays it most.
+    /// A drone to keep gathering each SCARCE or LIMITED mineral in each area (D48, D53), one each, the minerals the fewest
+    /// drones could serve first: of the drones not yet decided that could serve it and have its role, the one whose trip
+    /// covers it, else one that has the role now, else the one with the least to lose (its best trip in another role earns
+    /// least per hour). A ship that can survey is no drone: the command ship takes what pays it most.
     /// </summary>
     private static IEnumerable<(RoleCandidate Keeper, FleetRole Role)> Keepers(
         IReadOnlyList<RoleCandidate> ships,
@@ -249,7 +253,8 @@ public static class RolePlanner
         var kept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var mineral in coverage
             .OrderBy(mineral => mineral.AbleShipSymbols.Count)
-            .ThenBy(mineral => mineral.Good, StringComparer.Ordinal))
+            .ThenBy(mineral => mineral.Good, StringComparer.Ordinal)
+            .ThenBy(mineral => string.Join(',', mineral.MarketSymbols), StringComparer.Ordinal))
         {
             var able = mineral.AbleShipSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
             var working = mineral.WorkingShipSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);

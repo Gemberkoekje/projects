@@ -29,16 +29,17 @@ public interface IMiningAutomationService
 ///   <item>a miner that holds ore a market buys sells it first, where it fetches most after fuel: the ore
 ///   left over from a contract, for one;</item>
 ///   <item>otherwise it takes the best of its mining targets (<see cref="MiningPlanner"/>): a SCARCE or LIMITED ore no
-///   miner works on first, the nearest asteroid first (D48); then the market shortest of an ore (D28), SCARCE, then
-///   LIMITED, and once none is short, the lowest supply there is; within a supply level, a surveyed ore first. One miner
-///   per sell market and ore. A market out of the miner's CRUISE reach counts after the reachable ones of its supply
-///   level: the trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
+///   miner works on first, the nearest asteroid first (D48), where a trip covers its ore only at the markets its ship
+///   reaches in CRUISE from where it sells (D53); then the market shortest of an ore (D28), SCARCE, then LIMITED, and
+///   once none is short, the lowest supply there is; within a supply level, a surveyed ore first. One miner per sell
+///   market and ore. A market out of the miner's CRUISE reach counts after the reachable ones of its supply level: the
+///   trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
 ///   <item>it buys mining drones, one a pass, up to <c>Mining.MaxDrones</c>, within the credit reserve and when the order
 ///   ships are bought in lets it (D43); not while the contract plan mines, which would take the drone (D23). First a
-///   drone for each SCARCE or LIMITED ore a new drone could serve (D48); then, when no miner was free, a drone whose
-///   first trip, by the same ranking, would serve a market short of its ore (D22, D28), in turn with the cargo ships. A
-///   drone that would mine for a market that isn't short is not bought: the opening that paid for it would stay open
-///   and pay for the next.</item>
+///   drone for each SCARCE or LIMITED ore a new drone could serve, once per area (D48, D53); then, when no miner was
+///   free, a drone whose first trip, by the same ranking, would serve a market short of its ore (D22, D28), in turn with
+///   the cargo ships. A drone that would mine for a market that isn't short is not bought: the opening that paid for it
+///   would stay open and pay for the next.</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -76,8 +77,8 @@ public sealed class MiningAutomationService(
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // The ores a miner's trip works on: a free miner takes a scarce ore that has none first (D48).
-        var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // The miners' trips: a free miner takes a scarce ore that has none near its market first (D48, D53).
+        var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
         foreach (var ship in fleet)
         {
@@ -87,7 +88,7 @@ public sealed class MiningAutomationService(
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
-                covered.Add(trip.TradeSymbol);
+                covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
             else if (board.IsMiner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
@@ -142,7 +143,7 @@ public sealed class MiningAutomationService(
 
     /// <summary>
     /// Gives a free miner its next trip: selling ore it holds, else the best mining target, a scarce ore no miner works on
-    /// first (D48). The reason says <c>uncovered</c> when that came before D28's choice.
+    /// near its market first (D48, D53). The reason says <c>uncovered</c> when that came before D28's choice.
     /// </summary>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -150,12 +151,12 @@ public sealed class MiningAutomationService(
         ShipModel miner,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
-        HashSet<string> covered,
+        List<CoveringTrip> covered,
         CancellationToken cancellationToken)
     {
         if (TryFindHeldOreSale(context.Map, miner, out var ore, out var sale))
         {
-            covered.Add(ore.Symbol);
+            covered.Add(new CoveringTrip(ore.Symbol, sale.WaypointSymbol, miner.FuelCapacity));
             await StartAsync(miner, new MineAndSellGoal
             {
                 TradeSymbol = ore.Symbol,
@@ -177,7 +178,7 @@ public sealed class MiningAutomationService(
         var reason = target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = miner.Symbol;
-        covered.Add(target.Ore);
+        covered.Add(new CoveringTrip(target.Ore, target.SellWaypointSymbol, miner.FuelCapacity));
         await StartAsync(miner, new MineAndSellGoal
         {
             TradeSymbol = target.Ore,
@@ -239,7 +240,7 @@ public sealed class MiningAutomationService(
         IReadOnlyList<ShipModel> fleet,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
-        IReadOnlySet<string> covered,
+        IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         CancellationToken cancellationToken)
     {
@@ -264,8 +265,9 @@ public sealed class MiningAutomationService(
     /// up to <c>Mining.MaxDrones</c>, and none while the contract takes the miners (D23):
     /// <list type="bullet">
     ///   <item>a drone for a scarce ore (<see cref="PurchaseTier.Coverage"/>, D48), while the system has fewer mining drones
-    ///   than SCARCE or LIMITED ores a new drone could serve (<see cref="MiningPlanner.ScarceOres"/>): one drone per scarce
-    ///   mineral, which the role board keeps mining. It doesn't ask the board what pays most;</item>
+    ///   than SCARCE or LIMITED ores a new drone could serve, each counted once per area (<see cref="MiningPlanner.ScarceOres"/>,
+    ///   D53): one drone per scarce mineral and area, which the role board keeps mining. It doesn't ask the board what pays
+    ///   most;</item>
     ///   <item>otherwise, when every miner works, a drone whose first trip by the miners' own ranking (the trips under way
     ///   held) would serve a market short of its ore (<see cref="PurchaseTier.Alternating"/>, D22, D28), which, with the
     ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>).</item>
@@ -275,7 +277,7 @@ public sealed class MiningAutomationService(
         IReadOnlyList<ShipModel> fleet,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
-        IReadOnlySet<string> covered,
+        IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         CancellationToken cancellationToken)
     {
