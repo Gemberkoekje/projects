@@ -162,6 +162,24 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task ADroneStillDriftingToAFarMarket_DoesNotCountForTheSurveysThere()
+    {
+        // B54, seen on the cluster on 2026-10-03: SPECTER-4 set off at 12:35 on a drift of 2 hours 25 to B7 (D45), and the
+        // survey plan at once wanted surveys at B14 for B7's ores, which would expire long before the drone got there, and
+        // sent the command ship out to the far side of the system. A drone counts for the surveys once its drift is over.
+        _activeGoals["SHIP-4"] = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7, Drifting = true };
+        Fleet(
+            CommandShip(),
+            Drone(),
+            Drone("SHIP-4", B7, "IN_TRANSIT") with { DestWaypointSymbol = B7, ArrivesAt = DateTimeOffset.UtcNow.AddHours(2), FlightMode = "DRIFT" });
+
+        await RunAsync();
+
+        _state!.Targets.Should().NotContain(target => target.WaypointSymbol == B14);
+        _activeGoals["SHIP-1"].Should().BeOfType<SurveyWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(XB5C);
+    }
+
+    [Fact]
     public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
     {
         // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.

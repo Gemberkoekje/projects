@@ -113,10 +113,7 @@ public sealed class SurveyPlanService(
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
-            var miners = fleet
-                .Where(ship => board.MinesForContract(ship)
-                    && string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            var miners = await MinersAsync(fleet, board, system.Key, cancellationToken);
             var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);
 
             foreach (var surveyor in free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)))
@@ -242,6 +239,30 @@ public sealed class SurveyPlanService(
         }
 
         return PurchaseNeed.None;
+    }
+
+    /// <summary>
+    /// The ships in a system that mine with the surveys: those that may mine. A drone still drifting to a market out of its
+    /// CRUISE reach (D45) counts once it is there: until then it shows at that market, and surveys for it would expire
+    /// during its drift of hours (B54).
+    /// </summary>
+    private async Task<IReadOnlyList<ShipModel>> MinersAsync(
+        IReadOnlyList<ShipModel> fleet,
+        FleetRoleBoard board,
+        string systemSymbol,
+        CancellationToken cancellationToken)
+    {
+        var miners = new List<ShipModel>();
+        foreach (var ship in fleet.Where(ship => board.MinesForContract(ship)
+            && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
+        {
+            if (await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken) is not MineAndSellGoal { Drifting: true })
+            {
+                miners.Add(ship);
+            }
+        }
+
+        return miners;
     }
 
     /// <summary>The contract's ore, while the contract plan mines it in this system.</summary>

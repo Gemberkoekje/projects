@@ -482,9 +482,11 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   1. the contract's ore at the contract's asteroid, while the contract plan mines it;
   2. each ore a market in the system buys, at the asteroid nearest each market that buys it (D27,
      refined: surveys close to wherever the ore is sold), among those whose traits yield the ore
-     (`AsteroidDeposits`) and that one of the miners can reach (any asteroid while there are no
-     miners). One target per ore and asteroid, for the market that pays most of those it is nearest;
-     each keeps its own stock.
+     (`AsteroidDeposits`) and where one of the miners could mine it for that market: a trip in CRUISE
+     from where the miner is, to the asteroid and on to the market with the fuel left, as the mining plan
+     reckons it (any asteroid while there are no miners). A drone still drifting to a far market (slice
+     6.10c) counts once it is there (B54). One target per ore and asteroid, for the market that pays most
+     of those it is nearest; each keeps its own stock.
 
   A target needs a survey while it has fewer usable surveys holding its ore than
   `Survey.StockPerOre` (2, D27). Among those, the contract's ore comes first, then the ore with the

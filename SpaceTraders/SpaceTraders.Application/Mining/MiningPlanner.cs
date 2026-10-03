@@ -138,15 +138,17 @@ public static class MiningPlanner
 
     /// <summary>
     /// What surveyors survey: the contract's ore, and each ore a market in the system buys, at the asteroid
-    /// nearest each market that buys it, among those whose traits yield it and that one of the miners can
-    /// reach (any asteroid while there are no miners): one target per ore and asteroid, for the market that
-    /// pays most of those it is nearest (D27). An ore needs a survey at an asteroid while it has fewer usable
-    /// surveys there than <paramref name="stock"/>. Those come first: the contract's ore, then the fewest
-    /// usable surveys, then the best paid. The targets with their stock follow, for the plan's view.
+    /// nearest each market that buys it, among those whose traits yield it and where one of the miners could
+    /// mine it for that market: a trip in CRUISE from where the miner is, to the asteroid and on to the market
+    /// with the fuel left (any asteroid while there are no miners; B54: a miner that reached an asteroid but
+    /// couldn't bring its ore back counted). One target per ore and asteroid, for the market that pays most of
+    /// those it is nearest (D27). An ore needs a survey at an asteroid while it has fewer usable surveys there
+    /// than <paramref name="stock"/>. Those come first: the contract's ore, then the fewest usable surveys, then
+    /// the best paid. The targets with their stock follow, for the plan's view.
     /// </summary>
     /// <param name="context">The system.</param>
     /// <param name="contracts">The contract's ore and asteroid, while the contract plan mines; else none.</param>
-    /// <param name="miners">The ships that mine with the surveys.</param>
+    /// <param name="miners">The ships that mine with the surveys; a drone still drifting to a far market doesn't yet.</param>
     /// <param name="stock">The usable surveys to keep of each ore.</param>
     /// <returns>The targets, best first.</returns>
     public static IReadOnlyList<SurveyTarget> SurveyTargets(
@@ -174,6 +176,18 @@ public static class MiningPlanner
                 NeedsSurvey: usable < stock));
         }
 
+        var arrivals = new Dictionary<(string Ship, string Asteroid), (bool Reached, int Fuel)>();
+        bool Mines(ShipModel miner, string asteroid, string market)
+        {
+            if (!arrivals.TryGetValue((miner.Symbol, asteroid), out var arrival))
+            {
+                arrival = Arrival(map, miner, asteroid);
+                arrivals[(miner.Symbol, asteroid)] = arrival;
+            }
+
+            return arrival.Reached && TradeRoutePlanner.TryPlanFlight(map, asteroid, market, arrival.Fuel, miner.FuelCapacity, out _);
+        }
+
         // Surveys close to wherever the ore is sold (D27, refined): every market that buys it, not only the
         // one that pays most. Markets that share their nearest asteroid share its target.
         var sellable = new Dictionary<(string Ore, string Asteroid), SurveyTarget>();
@@ -181,7 +195,7 @@ public static class MiningPlanner
         {
             foreach (var (buyer, price) in Buyers(map, ore))
             {
-                if (!TryFindNearestAsteroid(map, ore, buyer, asteroid => miners.Count == 0 || miners.Any(miner => CanReach(map, miner, asteroid)), out var asteroid)
+                if (!TryFindNearestAsteroid(map, ore, buyer, asteroid => miners.Count == 0 || miners.Any(miner => Mines(miner, asteroid, buyer)), out var asteroid)
                     || (sellable.TryGetValue((ore, asteroid), out var known) && known.SellPrice >= price))
                 {
                     continue;
