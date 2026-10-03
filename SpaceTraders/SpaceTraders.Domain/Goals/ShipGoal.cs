@@ -174,7 +174,8 @@ public abstract record TripGoal : ShipGoal
 /// One mining trip (PLAN.md slice 6.4): the ship mines <see cref="TradeSymbol"/> at
 /// <see cref="SourceWaypointSymbol"/> until its hold is full, with the best survey there when there is
 /// one, then sells it at <see cref="SellWaypointSymbol"/>; then the goal ends, and the mining plan
-/// chooses the next trip.
+/// chooses the next trip. A trip to a market out of the ship's CRUISE reach drifts there first
+/// (<see cref="Drifting"/>, slice 6.10c).
 /// </summary>
 public sealed record MineAndSellGoal : TripGoal
 {
@@ -186,6 +187,12 @@ public sealed record MineAndSellGoal : TripGoal
 
     /// <summary>Where it sells.</summary>
     public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True while the trip drifts to <see cref="SellWaypointSymbol"/>, out of the ship's CRUISE reach (D45): 1 fuel
+    /// whatever the distance, about ten times slower. Once there, it mines from that market in CRUISE.
+    /// </summary>
+    public bool Drifting { get; init; }
 
     /// <summary>
     /// True once the trip sells: its hold is full, or it was given ore the ship already held to sell.
@@ -201,7 +208,8 @@ public sealed record MineAndSellGoal : TripGoal
 /// <see cref="SourceWaypointSymbol"/> until its hold is full, keeping every gas a market buys (D33), then
 /// sells <see cref="TradeSymbol"/> at <see cref="SellWaypointSymbol"/>; then the goal ends, and the siphon
 /// plan sells the other gases and chooses the next trip. A siphon takes no survey: the API's siphon call
-/// has none.
+/// has none. A trip to a market out of the ship's CRUISE reach drifts there first (<see cref="Drifting"/>,
+/// slice 6.10c).
 /// </summary>
 public sealed record SiphonAndSellGoal : TripGoal
 {
@@ -213,6 +221,12 @@ public sealed record SiphonAndSellGoal : TripGoal
 
     /// <summary>Where it sells <see cref="TradeSymbol"/>.</summary>
     public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True while the trip drifts to <see cref="SellWaypointSymbol"/>, out of the ship's CRUISE reach (D45): 1 fuel
+    /// whatever the distance, about ten times slower. Once there, it siphons from that market in CRUISE.
+    /// </summary>
+    public bool Drifting { get; init; }
 
     /// <summary>
     /// True once the trip sells: its hold is full, or it was given gas the ship already held to sell.

@@ -15,7 +15,8 @@ namespace SpaceTraders.Application.Tests.Siphoning;
 ///   gases: LIQUID_HYDROGEN SCARCE, HYDROCARBON LIMITED) and E47 (LIQUID_NITROGEN SCARCE);</item>
 ///   <item>F48, far south, which imports LIQUID_NITROGEN (SCARCE, and pays most) and LIQUID_HYDROGEN (LIMITED).
 ///   This fixture leaves out the middle of the system, through which a drone could refuel on the way, so only
-///   the command ship's 400-unit tank gets there.</item>
+///   the command ship's 400-unit tank gets there. C38 is 228 from it, so no drone drifts there to siphon (D45);
+///   with <see cref="MapWithAGasGiantNearF48"/>, one does.</item>
 /// </list>
 /// </summary>
 internal static class SiphonFixture
@@ -27,6 +28,9 @@ internal static class SiphonFixture
     public const string G50 = "X1-DC53-G50";
     public const string E47 = "X1-DC53-E47";
     public const string F48 = "X1-DC53-F48";
+
+    /// <summary>A gas giant X1-DC53 doesn't have, 13 from F48 (<see cref="MapWithAGasGiantNearF48"/>).</summary>
+    public const string D90 = "X1-DC53-D90";
 
     public static IReadOnlyList<WaypointCacheModel> Waypoints =>
     [
@@ -67,6 +71,16 @@ internal static class SiphonFixture
 
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? Markets() : markets, new Dictionary<string, IReadOnlyList<string>>());
+
+    /// <summary>
+    /// The system with a second gas giant, D90, 13 from F48: F48, beyond a drone's tank, sells fuel, and D90 is there and
+    /// back on one tank, so a drone would drift to F48 to siphon from there (D45).
+    /// </summary>
+    public static TradeMarketMap MapWithAGasGiantNearF48(params MarketSnapshot[] markets)
+        => new(
+            [.. Waypoints, Waypoint(D90, "GAS_GIANT", 30, 82, """[{"symbol":"STRONG_MAGNETOSPHERE"}]""")],
+            markets.Length == 0 ? Markets() : markets,
+            new Dictionary<string, IReadOnlyList<string>>());
 
     public static TradeContext Context(params MarketSnapshot[] markets) => new(Map(markets), 250_000, 200);
 

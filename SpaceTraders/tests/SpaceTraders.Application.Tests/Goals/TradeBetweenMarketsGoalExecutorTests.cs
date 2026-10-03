@@ -69,6 +69,18 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task ItsFlights_AskForCruise()
+    {
+        // Slice 6.10c: a ship left in DRIFT, a drone after its drift to a far market (D45) or a ship the navigation's fuel
+        // fallback switched (B47), would trade in DRIFT, ten times slower; a trade's planned flights switch it back.
+        await StepAsync(CommandShip(A1) with { FlightMode = "DRIFT" }, Trip());
+
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == K85 && c.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BeyondOneTank_ItFliesToTheFirstMarketWhereItCanRefuel()
     {
         // J57 is 496 from K85; the tank holds 400. I56 is 368 away, and 128 from K85.
@@ -267,7 +279,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             "SHIP-1",
             Arg.Is<TradeBetweenMarketsGoal>(g => g.SellWaypointSymbol == A1 && g.SellWaypointChanged),
             Arg.Any<CancellationToken>());
-        await _bus.Received(1).InvokeAsync(Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == A1), Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == A1 && c.FlightMode == "CRUISE"), Arg.Any<CancellationToken>());
         _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeRerouted" && Equals(e.Properties["SellWaypoint"], A1));
         await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
     }

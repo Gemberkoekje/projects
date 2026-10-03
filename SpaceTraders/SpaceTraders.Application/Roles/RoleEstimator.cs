@@ -100,8 +100,9 @@ public sealed record RoleOption
 /// each with what the production chains add (D39), at most what the trip earns on a unit (D49): a gathered unit's
 /// price there, a traded unit's margin. A trip's time is its flights in CRUISE, as the API reckons them
 /// (15 seconds plus the distance times 25 over the engine's speed), <see cref="StopSeconds"/> at each landing, and for
-/// mining and siphoning the cooldowns to fill the hold, half a tick after each. Surveying has no estimate: it comes
-/// first (D38).
+/// mining and siphoning the cooldowns to fill the hold, half a tick after each. A mining or siphon trip to a market out
+/// of the ship's CRUISE reach drifts there first (slice 6.10c, D45): ten times as long as in CRUISE, and the 1 fuel it
+/// burns is bought back there. Surveying has no estimate: it comes first (D38).
 /// </summary>
 public static class RoleEstimator
 {
@@ -170,6 +171,24 @@ public static class RoleEstimator
     }
 
     /// <summary>
+    /// The seconds a flight takes in DRIFT (slice 6.10c, D45), as the API reckons it: 15 seconds plus the distance times 250
+    /// over the engine's speed, ten times what CRUISE takes.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="from">Where the flight starts.</param>
+    /// <param name="to">Where it ends.</param>
+    /// <param name="speed">The engine's speed.</param>
+    /// <returns>The seconds in flight; 0 for a position the map doesn't know.</returns>
+    public static double DriftSeconds(TradeMarketMap map, string from, string to, int speed)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+
+        return map.TryGetDistance(from, to, out var distance)
+            ? 15 + (Math.Max(1, Math.Round(distance)) * 250 / Math.Max(1, speed))
+            : 0;
+    }
+
+    /// <summary>
     /// The ship as the estimates take it: docked where it is, or where it is going, with the fuel it has, so a flight
     /// from a market that sells fuel leaves with a full tank, as the navigation refuels there.
     /// </summary>
@@ -226,13 +245,13 @@ public static class RoleEstimator
         {
             var kept = rate.UnitsPerAction * target.Share;
             if (kept > 0
-                && TryGatherTrip(context, ship, target.AsteroidSymbol, target.SellWaypointSymbol, kept, rate, out var seconds, out var fuel))
+                && TryGatherTrip(context, ship, target.AsteroidSymbol, target.SellWaypointSymbol, target.Far, kept, rate, out var seconds, out var fuel))
             {
                 var perUnit = UnitValue(context, target.SellWaypointSymbol, target.Ore, target.SellPrice);
                 options.Add(new RoleOption(
                     FleetRole.Mine,
                     "mine|" + target.Key,
-                    $"{target.Ore} at {target.AsteroidSymbol} for {target.SellWaypointSymbol}",
+                    Job(target.Ore, target.AsteroidSymbol, target.SellWaypointSymbol, target.Far),
                     (long)Math.Round((ship.CargoCapacity * perUnit) - fuel),
                     seconds));
             }
@@ -257,12 +276,12 @@ public static class RoleEstimator
 
             var kept = KeptGases(context, target, gases);
             if (kept.Share > 0
-                && TryGatherTrip(context, ship, target.GasGiantSymbol, target.SellWaypointSymbol, rate.UnitsPerAction * kept.Share, rate, out var seconds, out var fuel))
+                && TryGatherTrip(context, ship, target.GasGiantSymbol, target.SellWaypointSymbol, target.Far, rate.UnitsPerAction * kept.Share, rate, out var seconds, out var fuel))
             {
                 options.Add(new RoleOption(
                     FleetRole.Siphon,
                     "siphon|" + target.Key,
-                    $"{target.Gas} at {target.GasGiantSymbol} for {target.SellWaypointSymbol}",
+                    Job(target.Gas, target.GasGiantSymbol, target.SellWaypointSymbol, target.Far),
                     (long)Math.Round((ship.CargoCapacity * kept.PerUnit) - fuel),
                     seconds));
             }
@@ -320,15 +339,22 @@ public static class RoleEstimator
     private static double UnitValue(RoleContext context, string market, string good, long price)
         => price + context.Chains.PerUnitAtMost(market, good, price);
 
+    /// <summary>A gathering trip in a few words; one that drifts to its market first says so (D45).</summary>
+    private static string Job(string good, string source, string market, bool drift)
+        => drift ? $"{good} at {source} for {market}, drifting there first" : $"{good} at {source} for {market}";
+
     /// <summary>
     /// A trip that fills the hold at a source and sells at a market: the flight there, the cooldowns to fill the hold at
-    /// <paramref name="keptPerAction"/> units an extraction, and the flight on to the market, with their fuel.
+    /// <paramref name="keptPerAction"/> units an extraction, and the flight on to the market, with their fuel. A trip that
+    /// drifts (<paramref name="drift"/>, D45) first drifts to the market, out of the ship's CRUISE reach, lands, buys back
+    /// the 1 fuel it burned, and leaves there with a full tank.
     /// </summary>
     private static bool TryGatherTrip(
         RoleContext context,
         ShipModel ship,
         string source,
         string market,
+        bool drift,
         double keptPerAction,
         GatheringRate rate,
         out double seconds,
@@ -337,20 +363,22 @@ public static class RoleEstimator
         var map = context.Map;
         seconds = 0;
         fuel = 0;
+        var speed = FleetRoles.EngineSpeed(ship, DefaultEngineSpeed);
+        var departing = drift ? ship with { WaypointSymbol = market, FuelCurrent = ship.FuelCapacity } : ship;
         if (ship.CargoCapacity <= 0
-            || !TradeRoutePlanner.TryPlanFlight(map, ship, source, out var approach)
+            || !TradeRoutePlanner.TryPlanFlight(map, departing, source, out var approach)
             || !TradeRoutePlanner.TryPlanFlight(map, source, market, ship.FuelCapacity, ship.FuelCapacity, out var haul))
         {
             return false;
         }
 
-        var speed = FleetRoles.EngineSpeed(ship, DefaultEngineSpeed);
         var actions = Math.Ceiling(ship.CargoCapacity / keptPerAction);
-        seconds = FlightSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, speed)
+        seconds = (drift ? DriftSeconds(map, ship.WaypointSymbol ?? string.Empty, market, speed) + StopSeconds : 0)
+            + FlightSeconds(map, departing.WaypointSymbol ?? string.Empty, approach.Stops, speed)
             + (actions * (rate.SecondsPerAction + (TickSeconds / 2)))
             + FlightSeconds(map, source, haul.Stops, speed)
             + (StopSeconds * (approach.Stops.Count + haul.Stops.Count));
-        fuel = approach.FuelCost + haul.FuelCost;
+        fuel = (drift ? map.FuelPrice(market) : 0) + approach.FuelCost + haul.FuelCost;
         return true;
     }
 }

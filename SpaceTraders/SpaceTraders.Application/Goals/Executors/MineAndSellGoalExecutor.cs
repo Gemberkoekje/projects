@@ -19,7 +19,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// there for its ore when there is one (<see cref="MineResourceVolumeCommand"/>), until its hold is full.
 /// Then it flies to the sell market, docks and sells, in batches of the market's trade volume, and the
 /// goal ends: the mining plan chooses the next trip. However the trip ends, it is booked with what its sale
-/// brought in (<see cref="ITripBook"/>, D46).
+/// brought in (<see cref="ITripBook"/>, D46). A trip to a market out of the ship's CRUISE reach drifts to
+/// that market first, and mines from there in CRUISE (slice 6.10c, D45).
 /// </summary>
 public sealed class MineAndSellGoalExecutor(
     IShipRepository ships,
@@ -50,6 +51,11 @@ public sealed class MineAndSellGoalExecutor(
             return GoalExecutionResult.WaitingForArrival("Mining ship is in transit.");
         }
 
+        if (trip.Drifting)
+        {
+            return await DriftStepAsync(ship, trip, ct);
+        }
+
         if (!trip.Selling && ship.CargoCapacity > 0 && ship.CargoCurrent >= ship.CargoCapacity)
         {
             await goals.SetActiveGoalAsync(ship.Symbol, trip with { Selling = true }, ct);
@@ -59,6 +65,30 @@ public sealed class MineAndSellGoalExecutor(
         return trip.Selling
             ? await SellStepAsync(ship, trip, ct)
             : await MineStepAsync(ship, trip, ct);
+    }
+
+    /// <summary>
+    /// The trip's drift to its market, out of the ship's CRUISE reach (D45): "having a drone drift to the marketplace that
+    /// buys the mineral first, then refueling and resuming normal behavior". Once there, it mines from that market.
+    /// </summary>
+    private async Task<GoalExecutionResult> DriftStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)
+    {
+        if (!IsAt(ship, trip.SellWaypointSymbol))
+        {
+            var drifting = await GoalFlight.DriftAsync(ship, trip.SellWaypointSymbol, bus, ct);
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {SellWaypoint}, out of its CRUISE reach, to mine {TradeSymbol} at {SourceWaypoint} from there.",
+                JournalEvents.DriftStarted,
+                ship.Symbol,
+                ship.WaypointSymbol ?? string.Empty,
+                trip.SellWaypointSymbol,
+                trip.TradeSymbol,
+                trip.SourceWaypointSymbol);
+            return drifting;
+        }
+
+        await goals.SetActiveGoalAsync(ship.Symbol, trip with { Drifting = false }, ct);
+        return GoalExecutionResult.Progressing($"At {trip.SellWaypointSymbol}: mining {trip.TradeSymbol} at {trip.SourceWaypointSymbol} from here, in CRUISE.");
     }
 
     private async Task<GoalExecutionResult> MineStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)

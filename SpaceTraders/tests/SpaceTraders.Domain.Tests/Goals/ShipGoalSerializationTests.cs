@@ -85,6 +85,30 @@ public sealed class ShipGoalSerializationTests
         result.Kind.Should().Be(ShipGoalKind.SiphonAndSell);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ATripThatDrifts_RoundTrip_KeepsItsDrift(bool siphon)
+    {
+        // Slice 6.10c (D45): a trip to a market out of the ship's CRUISE reach drifts there first, which takes hours; a
+        // restart in between must not lose that.
+        ShipGoal goal = siphon
+            ? new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-D90", SellWaypointSymbol = "X1-AB-F48", Drifting = true }
+            : new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = "X1-AB-B14", SellWaypointSymbol = "X1-AB-B7", Drifting = true };
+
+        var result = JsonSerializer.Deserialize<ShipGoal>(JsonSerializer.Serialize(goal));
+
+        result.Should().BeOfType(goal.GetType()).And.BeEquivalentTo(goal, options => options.PreferringRuntimeMemberTypes());
+    }
+
+    [Fact]
+    public void ATripStoredBeforeItCouldDrift_LoadsWithoutADrift()
+    {
+        const string Stored = """{"$type":"MineAndSell","TradeSymbol":"COPPER_ORE","SourceWaypointSymbol":"X1-AB-XB5C","SellWaypointSymbol":"X1-AB-H51","Selling":false,"Earned":0,"Spent":0,"GoalId":"0f8fad5b-d9cb-469f-a165-70867728950e","Status":0,"StatusReason":null,"StartedAt":"2026-10-03T09:00:00+00:00"}""";
+
+        JsonSerializer.Deserialize<ShipGoal>(Stored).Should().BeOfType<MineAndSellGoal>().Which.Drifting.Should().BeFalse();
+    }
+
     [Fact]
     public void GatherAndSellGoal_RoundTrip_PreservesAllFields()
     {

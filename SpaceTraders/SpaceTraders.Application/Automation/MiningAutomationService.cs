@@ -31,7 +31,8 @@ public interface IMiningAutomationService
 ///   <item>otherwise it takes the best of its mining targets (<see cref="MiningPlanner"/>): a SCARCE or LIMITED ore no
 ///   miner works on first, the nearest asteroid first (D48); then the market shortest of an ore (D28), SCARCE, then
 ///   LIMITED, and once none is short, the lowest supply there is; within a supply level, a surveyed ore first. One miner
-///   per sell market and ore;</item>
+///   per sell market and ore. A market out of the miner's CRUISE reach counts after the reachable ones of its supply
+///   level: the trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
 ///   <item>it buys mining drones, one a pass, up to <c>Mining.MaxDrones</c>, within the credit reserve and when the order
 ///   ships are bought in lets it (D43); not while the contract plan mines, which would take the drone (D23). First a
 ///   drone for each SCARCE or LIMITED ore a new drone could serve (D48); then, when no miner was free, a drone whose
@@ -115,7 +116,8 @@ public sealed class MiningAutomationService(
             {
                 var held = heldBy.TryGetValue(opportunity.Key, out var holder);
                 var able = candidates
-                    .Where(miner => !withTrip.Contains(miner.Symbol) && MiningPlanner.CanReach(context.Map, miner, opportunity.AsteroidSymbol))
+                    .Where(miner => !withTrip.Contains(miner.Symbol)
+                        && MiningPlanner.CanTake(context.Map, miner, opportunity.AsteroidSymbol, opportunity.SellWaypointSymbol))
                     .Select(miner => miner.Symbol)
                     .Order(StringComparer.Ordinal)
                     .ToList();
@@ -181,6 +183,7 @@ public sealed class MiningAutomationService(
             TradeSymbol = target.Ore,
             SourceWaypointSymbol = target.AsteroidSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
+            Drifting = target.Far,
         }, reason, cancellationToken);
         return true;
     }

@@ -299,8 +299,9 @@ public sealed class ShipLeftIdleRuleTests
     [Fact]
     public async Task AMinerOutOfReachOfEveryOpening_IsIdleByDesign()
     {
-        // Slice 6.4: an opening is work only for the miners the plan lists as able to reach it; a drone's
-        // tank doesn't get it to B7's asteroids.
+        // Slice 6.4: an opening is work only for the miners the plan lists as able to take it: those that reach its
+        // asteroid, or since slice 6.10c, that would drift to its market, with the asteroid within a CRUISE round trip of
+        // it (D45). Here the plan lists none.
         _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
         {
             PlanId = Guid.NewGuid(),

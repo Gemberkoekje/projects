@@ -254,8 +254,12 @@ public sealed class PrometheusMetricsService(
             {
                 ScoutWaypointGoal => "scouting",
                 MineResourceGoal mine => $"mining {mine.TradeSymbol}",
+
+                // A trip to a market out of the ship's CRUISE reach drifts there first, for hours (slice 6.10c, D45).
+                MineAndSellGoal { Drifting: true } far => $"drifting to {far.SellWaypointSymbol} to mine {far.TradeSymbol}",
                 MineAndSellGoal mineAndSell => mineAndSell.Selling ? $"selling {mineAndSell.TradeSymbol}" : $"mining {mineAndSell.TradeSymbol}",
                 SiphonResourceGoal siphon => $"siphoning {siphon.TradeSymbol}",
+                SiphonAndSellGoal { Drifting: true } far => $"drifting to {far.SellWaypointSymbol} to siphon for {far.TradeSymbol}",
                 SiphonAndSellGoal siphonAndSell => siphonAndSell.Selling ? $"selling {siphonAndSell.TradeSymbol}" : $"siphoning for {siphonAndSell.TradeSymbol}",
                 GatherAndSellGoal { Selling: true } gather => gather.SellTradeSymbol.Length > 0 ? $"selling {gather.SellTradeSymbol}" : "selling its hold",
                 GatherAndSellGoal gather => gather.Siphoning ? "siphoning in its spare time" : "mining in its spare time",

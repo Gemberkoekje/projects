@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<INavigateSubCommand, NavigateSubCommand>();
         services.AddScoped<IDockSubCommand, DockSubCommand>();
         services.AddScoped<IRefuelSubCommand, RefuelSubCommand>();
+        services.AddScoped<IFlightModeSubCommand, FlightModeSubCommand>();
 
         // Phase 15a/15b: observability read-model (FleetStatusQueryService is the concrete implementation from Phase 15b).
         // Phase 16c: wrap with a short-lived in-memory cache so dashboard polling does not overload the database.

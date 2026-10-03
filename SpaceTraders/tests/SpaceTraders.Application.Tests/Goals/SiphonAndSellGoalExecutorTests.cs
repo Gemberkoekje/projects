@@ -55,6 +55,29 @@ public sealed class SiphonAndSellGoalExecutorTests
     }
 
     [Fact]
+    public async Task ATripToAMarketOutOfReach_DriftsToTheMarket_ThenSiphonsFromThereInCruise()
+    {
+        // D45, slice 6.10c, as for a mining trip: the drone drifts to F48, beyond its tank, and siphons at D90, 13 from it.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(MapWithAGasGiantNearF48(), 250_000, 200));
+        var far = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = D90, SellWaypointSymbol = F48, Drifting = true };
+
+        (await StepAsync(SiphonDrone(), far)).Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == F48 && command.FlightMode == "DRIFT"),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().ContainSingle().Which.EventKind.Should().Be("DriftStarted");
+
+        var atF48 = SiphonDrone(waypoint: F48) with { FlightMode = "DRIFT", FuelCurrent = 79 };
+        (await StepAsync(atF48, far)).Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(goal => !goal.Drifting && goal.GoalId == far.GoalId), Arg.Any<CancellationToken>());
+
+        await StepAsync(atF48, far with { Drifting = false });
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == D90 && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AtTheGasGiant_ItSiphonsOnce_UntilTheHoldIsFull()
     {
         var result = await StepAsync(SiphonDrone(waypoint: C38, status: "IN_ORBIT"), Trip);
