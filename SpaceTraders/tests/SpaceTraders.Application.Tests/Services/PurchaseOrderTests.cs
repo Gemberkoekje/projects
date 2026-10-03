@@ -181,12 +181,14 @@ public sealed class PurchaseOrderTests
     [InlineData("", PurchaseKind.Drone)]
     [InlineData("D", PurchaseKind.CargoShip)]
     [InlineData("DC", PurchaseKind.Drone)]
-    [InlineData("DDC", PurchaseKind.CargoShip)]
-    [InlineData("DDCC", PurchaseKind.Drone)]
+    [InlineData("DDC", PurchaseKind.Drone)]
+    [InlineData("CCD", PurchaseKind.CargoShip)]
     [InlineData("PSD", PurchaseKind.CargoShip)]
-    public void TheTurn_CountsTheDronesAndCargoShipsBoughtSinceTheListsLastCargoShip(string since, PurchaseKind turn)
+    [InlineData("DCP", PurchaseKind.Drone)]
+    public void TheTurn_GoesToTheKindNotBoughtLast_ADroneFirstAfterTheList(string since, PurchaseKind turn)
     {
-        // D: a drone, C: a hauler, P: a probe, S: a surveyor. Probes and surveyors don't take turns.
+        // D: a drone, C: a hauler, P: a probe, S: a surveyor. Probes and surveyors don't take turns, and a turn that passed
+        // because one kind had nothing to buy isn't made up later: after two drones in a row, a hauler, then a drone again.
         List<PurchaseRecord> purchases =
         [
             Bought("SHIP-3", ShipType.ShipMiningDrone, 0),
@@ -211,19 +213,25 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
-    public void BeforeTheListsLastCargoShip_OrWithoutIt_ItIsTheDronesTurn()
+    public void AListChangedSinceItsShipsWereBought_StillGivesTheTurns()
     {
-        PurchaseOrder.Turn(
-            [Bought("SHIP-3", ShipType.ShipMiningDrone, 0), Bought("SHIP-4", ShipType.ShipMiningDrone, 1), Bought("SHIP-5", ShipType.ShipLightShuttle, 2)],
-            [ShipType.ShipLightShuttle, ShipType.ShipLightHauler])
-            .Should().Be(PurchaseKind.Drone);
+        // Found in review: counting from the list's last cargo ship, three shuttles bought before the list was changed to
+        // light haulers left the haulers' turn waiting for good. The shuttles are cargo ships whatever the list says now.
+        List<PurchaseRecord> purchases =
+        [
+            Bought("SHIP-4", ShipType.ShipLightShuttle, 0),
+            Bought("SHIP-5", ShipType.ShipLightShuttle, 1),
+            Bought("SHIP-6", ShipType.ShipLightShuttle, 2),
+        ];
+
+        PurchaseOrder.Turn(purchases, [ShipType.ShipLightHauler]).Should().Be(PurchaseKind.Drone);
+        PurchaseOrder.Turn([.. purchases, Bought("SHIP-7", ShipType.ShipMiningDrone, 3)], [ShipType.ShipLightHauler]).Should().Be(PurchaseKind.CargoShip);
     }
 
     [Fact]
-    public void WithAnEmptyList_EveryDroneBoughtCounts()
+    public void WithoutAnyDroneOrCargoShipBought_ItIsTheDronesTurn()
     {
-        // With nothing in Trade.ShipPurchases the trading plan buys nothing, so the turn always passes back to the drones.
-        PurchaseOrder.Turn([Bought("SHIP-3", ShipType.ShipMiningDrone, 0)], []).Should().Be(PurchaseKind.CargoShip);
+        PurchaseOrder.Turn([Bought("SHIP-2", ShipType.ShipProbe, 0)], []).Should().Be(PurchaseKind.Drone);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ namespace SpaceTraders.Application.Services;
 ///   other drone is bought;</item>
 ///   <item>a probe for every market (D29);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
-///   ship, and so on. A turn passes when the other kind has nothing to buy.</item>
+///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy.</item>
 /// </list>
 /// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
 /// the ship): a need that never can be would stop everything after it. Until each plan that is on, and could need
@@ -54,6 +54,12 @@ public sealed class PurchaseOrder(
 
     /// <summary>The drones the plans buy, which take turns with the cargo ships.</summary>
     private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipSiphonDrone };
+
+    /// <summary>
+    /// The cargo ships that take turns with the drones, besides the list's own types: the game's freighters, so the ones
+    /// bought before the list was changed still count.
+    /// </summary>
+    private static readonly IReadOnlySet<ShipType> CargoShipTypes = new HashSet<ShipType> { ShipType.ShipLightShuttle, ShipType.ShipLightHauler, ShipType.ShipHeavyFreighter };
 
     /// <inheritdoc />
     public Task<bool> ReportAsync(AutomationPlan plan, PurchaseNeed need, CancellationToken cancellationToken)
@@ -122,54 +128,35 @@ public sealed class PurchaseOrder(
     }
 
     /// <summary>
-    /// Whose turn it is between drones and cargo ships (D43): counting the drones and the cargo ships bought since the
-    /// list's last cargo ship, the drones' while no more drones than cargo ships were bought, so a drone comes first; the
-    /// cargo ships' otherwise. Before the list's last cargo ship, or when none of the purchases is it, the drones'.
+    /// Whose turn it is between drones and cargo ships (D43): the kind not bought last, so after the list's last cargo ship a
+    /// drone comes first, then a cargo ship, and so on; the drones' when neither was ever bought. Any drone counts, the
+    /// contract's and a scarce mineral's too; probes and surveyors don't take turns. A turn that passed because one kind
+    /// had nothing to buy isn't made up later, so a kind never gets a run of turns, and an edited list or a lost ledger row
+    /// can't keep one kind waiting.
     /// </summary>
     /// <param name="purchases">The ships bought, the oldest first.</param>
-    /// <param name="list">The types in <c>Trade.ShipPurchases</c>, in order.</param>
+    /// <param name="list">The types in <c>Trade.ShipPurchases</c>, in order: cargo ships, besides the game's freighters.</param>
     /// <returns>The kind whose turn it is.</returns>
     internal static PurchaseKind Turn(IReadOnlyList<PurchaseRecord> purchases, IReadOnlyList<ShipType> list)
     {
         ArgumentNullException.ThrowIfNull(purchases);
         ArgumentNullException.ThrowIfNull(list);
 
-        var cargoTypes = list.Where(type => type != ShipType.None).ToHashSet();
-        var start = 0;
-        if (list.Count > 0)
+        var cargoTypes = CargoShipTypes.Concat(list.Where(type => type != ShipType.None)).ToHashSet();
+        for (var index = purchases.Count - 1; index >= 0; index--)
         {
-            start = -1;
-            var cargoShips = 0;
-            for (var index = 0; index < purchases.Count; index++)
+            if (DroneTypes.Contains(purchases[index].Type))
             {
-                if (cargoTypes.Contains(purchases[index].Type) && ++cargoShips == list.Count)
-                {
-                    start = index + 1;
-                    break;
-                }
+                return PurchaseKind.CargoShip;
             }
 
-            if (start < 0)
+            if (cargoTypes.Contains(purchases[index].Type))
             {
                 return PurchaseKind.Drone;
             }
         }
 
-        var drones = 0;
-        var cargo = 0;
-        foreach (var purchase in purchases.Skip(start))
-        {
-            if (DroneTypes.Contains(purchase.Type))
-            {
-                drones++;
-            }
-            else if (cargoTypes.Contains(purchase.Type))
-            {
-                cargo++;
-            }
-        }
-
-        return drones <= cargo ? PurchaseKind.Drone : PurchaseKind.CargoShip;
+        return PurchaseKind.Drone;
     }
 
     /// <summary>The kind of ship a plan buys when drones and cargo ships take turns.</summary>
