@@ -68,6 +68,20 @@ public interface IAutomationMetrics
     void GoodsBought(string waypointSymbol, string tradeSymbol, int units);
 
     /// <summary>
+    /// Counts a trip that ended (<c>spacetraders_trips_total{activity}</c>, D46): a <c>trade</c>, <c>mining</c>,
+    /// <c>siphoning</c> or <c>spare_time</c> trip, or a <c>contract</c> round trip.
+    /// </summary>
+    void TripEnded(string activity);
+
+    /// <summary>
+    /// Adds what a trip made after fuel, by activity (D46): a profit to <c>spacetraders_trip_profit_credits_total{activity}</c>,
+    /// a loss, as a positive amount, to <c>spacetraders_trip_loss_credits_total{activity}</c>, and 0 to the other, so both
+    /// series exist. A counter can't go down, so the two are apart; profit minus loss is what the activity made. A
+    /// contract's deposit and payout count as its profit when they come.
+    /// </summary>
+    void TripProfit(string activity, long profit);
+
+    /// <summary>
     /// Adds units a ship extracted (<c>spacetraders_extracted_units_total{ship,good}</c>): a mining laser's yield,
     /// or a gas siphon's (slice 6.7). Neither a siphon nor a spare-time extraction (slice 6.8, which takes no survey
     /// by design) is counted by <see cref="Extraction"/>, which the survey statistics read.

@@ -31,6 +31,7 @@ public sealed class SiphonAndSellGoalExecutorTests
     private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly LogRecorder _log = new();
 
     private static readonly SiphonAndSellGoal Trip = new() { TradeSymbol = "LIQUID_HYDROGEN", SourceWaypointSymbol = C38, SellWaypointSymbol = G50 };
@@ -83,6 +84,7 @@ public sealed class SiphonAndSellGoalExecutorTests
         await StepAsync(full, Trip);
 
         await _goals.Received(1).SetActiveGoalAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(goal => goal.Selling), Arg.Any<CancellationToken>());
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
     }
 
     [Fact]
@@ -130,6 +132,24 @@ public sealed class SiphonAndSellGoalExecutorTests
     }
 
     [Fact]
+    public async Task ASoldTrip_IsBooked_WithWhatItsSaleBroughtIn()
+    {
+        // D46: what each trip made after fuel, booked when it ends. The other gases are sold on trips of their own.
+        _port.SellCargoAsync("SHIP-5", "LIQUID_HYDROGEN", 6, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult("AGENT", 250_330, new CargoModel(9, 15, [new CargoItemModel("HYDROCARBON", 9)]), 330));
+
+        await StepAsync(
+            SiphonDrone(waypoint: G50, cargo: [new CargoItemModel("LIQUID_HYDROGEN", 6), new CargoItemModel("HYDROCARBON", 9)]),
+            Trip with { Selling = true });
+
+        await _trips.Received(1).BookAsync(
+            "SHIP-5",
+            Arg.Is<SiphonAndSellGoal>(booked => booked.GoalId == Trip.GoalId && booked.Earned == 330 && booked.Spent == 0),
+            "sold",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task WithNoneOfTheTripsGasAboard_TheTripEnds_AndThePlanSellsTheOthers()
     {
         var result = await StepAsync(SiphonDrone(waypoint: C38, status: "IN_ORBIT", cargo: [new CargoItemModel("HYDROCARBON", 15)]), Trip with { Selling = true });
@@ -137,6 +157,7 @@ public sealed class SiphonAndSellGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-5", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(booked => booked.GoalId == Trip.GoalId), "nothing_aboard", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -148,6 +169,7 @@ public sealed class SiphonAndSellGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-5", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(booked => booked.Earned == 0), "not_bought_here", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -160,6 +182,7 @@ public sealed class SiphonAndSellGoalExecutorTests
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Blocked);
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-5", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(booked => booked.GoalId == Trip.GoalId), "rejected", Arg.Any<CancellationToken>());
     }
 
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, SiphonAndSellGoal trip)
@@ -172,6 +195,7 @@ public sealed class SiphonAndSellGoalExecutorTests
                 _refresher,
                 _dock,
                 _bus,
+                _trips,
                 _log.For<SiphonAndSellGoalExecutor>())
             .ExecuteStepAsync(ship, trip, new ShipGoalContext(), CancellationToken.None);
 }

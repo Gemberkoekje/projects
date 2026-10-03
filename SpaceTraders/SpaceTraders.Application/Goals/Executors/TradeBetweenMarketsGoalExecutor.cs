@@ -25,6 +25,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 ///   <item>at the sell market, before selling: when selling there is no longer lucrative and another
 ///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
 /// </list>
+/// The goal keeps what the cargo cost, and however the trip ends, sold or dropped, it is booked with what its
+/// sales brought in (<see cref="ITripBook"/>, D46).
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
     IShipRepository ships,
@@ -35,6 +37,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     IMarketRefresher marketRefresher,
     IDockSubCommand dock,
     IMessageBus bus,
+    ITripBook trips,
     ILogger<TradeBetweenMarketsGoalExecutor> logger) : IShipGoalExecutor
 {
     private const string NotLucrative = "not_lucrative";
@@ -91,7 +94,6 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
         if (!route.IsLucrative(context.MinProfitPerUnit))
         {
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: buying {Units} at {BuyPrice} and selling at {SellPrice} at {SellWaypoint} earns {ExpectedProfit} after fuel, under {MinProfitPerUnit} a unit ({Reason}).",
                 JournalEvents.TradeDropped,
@@ -105,6 +107,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 route.Profit,
                 context.MinProfitPerUnit,
                 NotLucrative);
+            await EndTripAsync(ship.Symbol, trade, NotLucrative, ct);
             return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip is no longer lucrative; dropped.");
         }
 
@@ -141,6 +144,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 CargoBought = true,
                 Units = route.Units,
                 PricePaidPerUnit = result.Revenue / route.Units,
+                Spent = trade.Spent + result.Revenue,
             },
             ct);
         return GoalExecutionResult.Progressing(
@@ -154,7 +158,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             .Sum(item => item.Units);
         if (units <= 0)
         {
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            await EndTripAsync(ship.Symbol, trade, TripBook.NothingAboard, ct);
             return GoalExecutionResult.Completed($"No {trade.TradeSymbol} aboard; nothing left to sell.");
         }
 
@@ -189,6 +193,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
         // One sale may not exceed the market's trade volume, so a larger load goes in several.
         var batchSize = here.TradeVolume > 0 ? here.TradeVolume : units;
+        var earned = 0L;
         for (var left = units; left > 0;)
         {
             var batch = Math.Min(left, batchSize);
@@ -213,13 +218,14 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 trade.TradeSymbol,
                 trade.SellWaypointSymbol,
                 result.Revenue);
+            earned += result.Revenue;
             left -= batch;
         }
 
         // The sale moved the price: the market again, while the ship is still there (D25).
         await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.SellWaypointSymbol, ship.Symbol, ct);
 
-        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+        await EndTripAsync(ship.Symbol, trade with { Earned = trade.Earned + earned }, TripBook.Sold, ct);
         return GoalExecutionResult.Completed(
             $"Sold {units} {trade.TradeSymbol} at {trade.SellWaypointSymbol}; the trip is done.");
     }
@@ -272,7 +278,6 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     /// <summary>Gives the trip up: the trading plan chooses again, and sells any cargo where it fetches most.</summary>
     private async Task<GoalExecutionResult> DropAsync(ShipModel ship, TradeBetweenMarketsGoal trade, string reason, CancellationToken ct)
     {
-        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: it can't be carried on to {SellWaypoint} ({Reason}).",
             JournalEvents.TradeDropped,
@@ -281,7 +286,18 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             ship.WaypointSymbol,
             trade.SellWaypointSymbol,
             reason);
+        await EndTripAsync(ship.Symbol, trade, reason, ct);
         return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip can't be carried on ({reason}); dropped.");
+    }
+
+    /// <summary>
+    /// Ends the trip: clears its goal, so the trading plan chooses the next, and books what it made (D46). A trip dropped
+    /// with its cargo aboard books what the cargo cost; the trip that sells it books what it fetches.
+    /// </summary>
+    private async Task EndTripAsync(string shipSymbol, TradeBetweenMarketsGoal trade, string reason, CancellationToken ct)
+    {
+        await goals.ClearActiveGoalAsync(shipSymbol, ct);
+        await trips.BookAsync(shipSymbol, trade, reason, ct);
     }
 
     private static bool IsAt(ShipModel ship, string waypointSymbol)

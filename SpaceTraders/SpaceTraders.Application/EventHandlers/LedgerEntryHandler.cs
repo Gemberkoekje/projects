@@ -1,5 +1,6 @@
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 
@@ -8,7 +9,9 @@ namespace SpaceTraders.Application.EventHandlers;
 /// <summary>
 /// Records credit-affecting domain events into the ledger for financial analytics, counts them in
 /// the credits earned and spent metrics, and notifies dashboard clients via SignalR. A sale or a
-/// purchase of cargo also counts its units, by market and good, whichever ship made it.
+/// purchase of cargo also counts its units, by market and good, whichever ship made it. A contract's
+/// deposit and payout also count as its profit (D46); every other trip is booked when it ends
+/// (<see cref="ITripBook"/>).
 /// </summary>
 public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetrics metrics, IDashboardNotifier notifier)
 {
@@ -118,6 +121,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
             sourceEventId: @event.ContractId,
             cancellationToken: cancellationToken);
         CountCredits(LedgerCategory.ContractDeposit, @event.Payment);
+        metrics.TripProfit(TripBook.Contract, @event.Payment);
         notifier.Notify("contract", @event.ContractId);
     }
 
@@ -130,6 +134,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
             sourceEventId: @event.ContractId,
             cancellationToken: cancellationToken);
         CountCredits(LedgerCategory.ContractPayout, @event.Payment);
+        metrics.TripProfit(TripBook.Contract, @event.Payment);
         notifier.Notify("contract", @event.ContractId);
     }
 

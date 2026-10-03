@@ -6,6 +6,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Goals;
@@ -19,6 +20,7 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IGoalStepCircuitBreaker _circuitBreaker = Substitute.For<IGoalStepCircuitBreaker>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly LogRecorder _log = new();
 
@@ -41,6 +43,7 @@ public sealed class ShipGoalExecutorServiceTests
             _circuitBreaker,
             _stepGuard,
             _metrics,
+            _trips,
             _log.For<ShipGoalExecutorService>());
 
     [Fact]
@@ -58,6 +61,24 @@ public sealed class ShipGoalExecutorServiceTests
         blocked.EventKind.Should().Be("ShipBlocked");
         blocked.Properties["ShipSymbol"].Should().Be("SHIP-1");
         blocked.Properties["Reason"].Should().Be("runaway");
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ATripTheBreakerBlocks_IsBooked()
+    {
+        // D46: a blocked goal stays blocked until its plan replaces it, so the trip ends here. Unbooked, its purchase
+        // would be missing, and the trip that sells its cargo after would look like profit.
+        var trade = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-001", SellWaypointSymbol = "X1-AB-002", CargoBought = true, Spent = 8_000 };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(trade);
+        _executor.CanExecute(trade).Returns(true);
+        _circuitBreaker.RecordStep("SHIP-1", Arg.Any<int>(), Arg.Any<DateTimeOffset>()).Returns(true);
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _goals.Received(1).BlockGoalAsync("SHIP-1", trade.GoalId, "runaway", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-1", trade, "runaway", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -162,6 +183,7 @@ public sealed class ShipGoalExecutorServiceTests
             new GoalStepCircuitBreaker(),
             _stepGuard,
             Substitute.For<IAutomationMetrics>(),
+            _trips,
             log.For<ShipGoalExecutorService>());
 
         for (var tick = 0; tick < 12; tick++)

@@ -7,6 +7,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -304,7 +305,7 @@ public sealed class SurveyPlanServiceTests
                 _surveyKeeper,
                 _plans,
                 _settings,
-                new SpareTimeInterruption(_ships, _goals, _stepGuard, _log.For<SpareTimeInterruption>()),
+                new SpareTimeInterruption(_ships, _goals, _stepGuard, Substitute.For<ITripBook>(), _log.For<SpareTimeInterruption>()),
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }

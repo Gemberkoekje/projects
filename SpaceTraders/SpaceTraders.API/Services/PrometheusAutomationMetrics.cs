@@ -23,6 +23,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly ZeroFirstCounter _creditsSpent;
     private readonly ZeroFirstCounter _goodsSold;
     private readonly ZeroFirstCounter _goodsBought;
+    private readonly ZeroFirstCounter _trips;
+    private readonly ZeroFirstCounter _tripProfit;
+    private readonly ZeroFirstCounter _tripLoss;
     private readonly Gauge _anomalyActive;
     private readonly Gauge _nextServerReset;
     private readonly Gauge _credits;
@@ -131,6 +134,18 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "system",
             "waypoint",
             "good");
+        _trips = ZeroFirst(
+            "spacetraders_trips_total",
+            "Trips that ended, by activity: trade, mining, siphoning and spare_time trips, and contract round trips.",
+            "activity");
+        _tripProfit = ZeroFirst(
+            "spacetraders_trip_profit_credits_total",
+            "What trips made after fuel, by activity: each trip's sales less its cargo and fuel, when that isn't negative, and a contract's deposit and payout. Less spacetraders_trip_loss_credits_total, what the activity made.",
+            "activity");
+        _tripLoss = ZeroFirst(
+            "spacetraders_trip_loss_credits_total",
+            "What trips lost after fuel, by activity: each trip's cargo and fuel less its sales, when that is more; a contract round trip's fuel.",
+            "activity");
         _anomalyActive = metrics.CreateGauge(
             "spacetraders_anomaly_active",
             "1 while an anomaly is active, 0 once it cleared.",
@@ -342,6 +357,20 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     /// <inheritdoc />
     public void GoodsBought(string waypointSymbol, string tradeSymbol, int units)
         => _goodsBought.Inc(units, SystemOf(waypointSymbol), waypointSymbol, tradeSymbol);
+
+    /// <inheritdoc />
+    public void TripEnded(string activity) => _trips.Inc(1, activity);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Both counters get the activity's series, the one that doesn't count it at 0: PromQL's <c>profit - loss</c> drops
+    /// an activity that has only one of the two.
+    /// </remarks>
+    public void TripProfit(string activity, long profit)
+    {
+        _tripProfit.Inc(Math.Max(profit, 0), activity);
+        _tripLoss.Inc(Math.Max(-profit, 0), activity);
+    }
 
     /// <inheritdoc />
     public void Extracted(string shipSymbol, string tradeSymbol, int units) => _extractedUnits.Inc(units, shipSymbol, tradeSymbol);

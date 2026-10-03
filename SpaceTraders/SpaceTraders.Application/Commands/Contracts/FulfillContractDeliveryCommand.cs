@@ -41,6 +41,7 @@ public sealed class FulfillContractDeliveryHandler(
     IMessageBus bus,
     IAgentRepository agents,
     IShipAssignmentRepository assignments,
+    ITripBook trips,
     ILogger<FulfillContractDeliveryHandler> logger)
 {
     private const string ContractAssignmentType = "Contract";
@@ -203,7 +204,8 @@ public sealed class FulfillContractDeliveryHandler(
     /// <summary>
     /// Closes the ship's contract assignment at its delivery (D26): the assignment lasts one round trip,
     /// and the plans assign the ship again on the next tick, in their order, so work that matters more
-    /// comes first. A ship that can survey, for one, surveys once the survey plan is on (D20).
+    /// comes first. A ship that can survey, for one, surveys once the survey plan is on (D20). The round
+    /// trip is booked with the fuel it took (D46).
     /// </summary>
     private async Task EndTripAsync(FulfillContractDeliveryCommand command, CancellationToken cancellationToken)
     {
@@ -220,6 +222,7 @@ public sealed class FulfillContractDeliveryHandler(
             "Contract trip over: ship {ShipSymbol} delivered for contract {ContractId}, and the plans assign it again on the next tick.",
             command.ShipSymbol,
             command.ContractId);
+        await trips.BookContractTripAsync(command.ShipSymbol, assignment.AssignedAt, cancellationToken);
     }
 
     private async Task<ShipModel> ApplyArrivalDeadReckoningIfDueAsync(ShipModel ship, CancellationToken cancellationToken)

@@ -6,6 +6,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -152,6 +153,7 @@ public sealed class GoalStepCircuitBreakerTests
             new GoalStepCircuitBreaker(),
             new NoStepGuard(),
             _metrics,
+            Substitute.For<ITripBook>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 
     /// <summary>

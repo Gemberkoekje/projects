@@ -31,6 +31,7 @@ public sealed class MineAndSellGoalExecutorTests
     private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly LogRecorder _log = new();
 
     private static readonly MineAndSellGoal Trip = new() { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
@@ -82,6 +83,7 @@ public sealed class MineAndSellGoalExecutorTests
         await StepAsync(full, Trip);
 
         await _goals.Received(1).SetActiveGoalAsync("SHIP-3", Arg.Is<MineAndSellGoal>(goal => goal.Selling), Arg.Any<CancellationToken>());
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
     }
 
     [Fact]
@@ -124,6 +126,32 @@ public sealed class MineAndSellGoalExecutorTests
     }
 
     [Fact]
+    public async Task ASoldTrip_IsBooked_WithWhatItsSaleBroughtIn()
+    {
+        // D46: what each trip made after fuel, booked when it ends.
+        _port.SellCargoAsync("SHIP-3", "COPPER_ORE", 15, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult("AGENT", 130_362, new CargoModel(0, 15, []), 1_005));
+
+        await StepAsync(Drone(cargo: [new CargoItemModel("COPPER_ORE", 15)]), Trip with { Selling = true });
+
+        await _trips.Received(1).BookAsync(
+            "SHIP-3",
+            Arg.Is<MineAndSellGoal>(booked => booked.GoalId == Trip.GoalId && booked.Earned == 1_005 && booked.Spent == 0),
+            "sold",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WithNoneOfItsOreAboard_TheTripEnds_AndIsBooked()
+    {
+        var result = await StepAsync(Drone(cargo: []), Trip with { Selling = true });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-3", Arg.Is<MineAndSellGoal>(booked => booked.GoalId == Trip.GoalId), "nothing_aboard", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AMarketThatNoLongerBuysTheOre_EndsTheTrip()
     {
         // The mining plan then sells the ore where it fetches most.
@@ -132,6 +160,7 @@ public sealed class MineAndSellGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-3", Arg.Is<MineAndSellGoal>(booked => booked.Earned == 0), "not_bought_here", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -144,6 +173,7 @@ public sealed class MineAndSellGoalExecutorTests
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Blocked);
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-3", Arg.Is<MineAndSellGoal>(booked => booked.GoalId == Trip.GoalId), "rejected", Arg.Any<CancellationToken>());
     }
 
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, MineAndSellGoal trip)
@@ -156,6 +186,7 @@ public sealed class MineAndSellGoalExecutorTests
                 _refresher,
                 _dock,
                 _bus,
+                _trips,
                 _log.For<MineAndSellGoalExecutor>())
             .ExecuteStepAsync(ship, trip, new ShipGoalContext(), CancellationToken.None);
 }

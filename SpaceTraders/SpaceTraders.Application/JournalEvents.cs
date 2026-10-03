@@ -104,6 +104,17 @@ public static class JournalEvents
     public const string GatheringInterrupted = nameof(GatheringInterrupted);
 
     /// <summary>
+    /// A trip ended, with what it made after fuel (D46: <c>ShipSymbol</c>; <c>Activity</c>: <c>trade</c>, <c>mining</c>,
+    /// <c>siphoning</c>, <c>spare_time</c> or <c>contract</c>; <c>Earned</c>, what its sales brought in; <c>Spent</c>, what
+    /// its cargo cost; <c>FuelCost</c>, the fuel its ship bought since it started; <c>Profit</c>, the first less the other
+    /// two, negative for a loss; <c>Minutes</c> it took; <c>Reason</c>: <c>sold</c>, <c>delivered</c> for a contract round
+    /// trip, <c>interrupted</c>, <c>runaway</c>, <c>rejected</c>, <c>nothing_aboard</c>, <c>no_buyer</c>,
+    /// <c>not_bought_here</c>, <c>not_lucrative</c> or <c>not_possible</c>). A contract's deposit and payout aren't in its
+    /// round trips: they count as its profit when they come.
+    /// </summary>
+    public const string TripEnded = nameof(TripEnded);
+
+    /// <summary>
     /// The role board gave a ship another role (slice 6.9, D38: <c>ShipSymbol</c>, <c>OldRole</c>, <c>NewRole</c>,
     /// <c>Reason</c>: <c>only_role</c>, <c>survey_first</c>, <c>contract</c>, <c>most_profitable</c>, <c>no_work</c> or
     /// <c>no_role</c>; for a role chosen by profit also <c>CreditsPerHour</c> and the <c>Job</c> that decided it). It takes

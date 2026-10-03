@@ -78,6 +78,10 @@ public static class DependencyInjection
         services.AddScoped<ICargoJettison, CargoJettison>();
         services.AddSingleton<JettisonRetries>();
 
+        // What each trip made after fuel, booked when it ends (D46).
+        services.AddScoped<TripBook>();
+        services.AddScoped<ITripBook>(sp => sp.GetRequiredService<TripBook>());
+
         // Spare time (slice 6.8): the command ship mines or siphons when it has nothing to survey or trade.
         services.AddScoped<ISpareTimePlanService, SpareTimePlanService>();
         services.AddScoped<SpareTimeInterruption>();

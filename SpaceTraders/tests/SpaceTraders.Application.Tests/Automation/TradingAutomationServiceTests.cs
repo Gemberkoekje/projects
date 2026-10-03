@@ -524,7 +524,7 @@ public sealed class TradingAutomationServiceTests
                 _settings,
                 _shipyards,
                 _purchases,
-                new SpareTimeInterruption(_ships, _goals, _stepGuard, _log.For<SpareTimeInterruption>()),
+                new SpareTimeInterruption(_ships, _goals, _stepGuard, Substitute.For<ITripBook>(), _log.For<SpareTimeInterruption>()),
                 _contractPlans,
                 _jettison,
                 _log.For<TradingAutomationService>())

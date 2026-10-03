@@ -19,6 +19,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// must, and siphons once per cooldown (<see cref="SiphonResourcesCommand"/>), keeping every gas a market buys
 /// (D33), until its hold is full. Then it flies to the sell market, docks and sells the trip's gas, in batches of
 /// the market's trade volume, and the goal ends: the siphon plan sells the other gases and chooses the next trip.
+/// However the trip ends, it is booked with what its sale brought in (<see cref="ITripBook"/>, D46).
 /// </summary>
 public sealed class SiphonAndSellGoalExecutor(
     IShipRepository ships,
@@ -29,6 +30,7 @@ public sealed class SiphonAndSellGoalExecutor(
     IMarketRefresher marketRefresher,
     IDockSubCommand dock,
     IMessageBus bus,
+    ITripBook trips,
     ILogger<SiphonAndSellGoalExecutor> logger) : IShipGoalExecutor
 {
     /// <inheritdoc />
@@ -79,12 +81,12 @@ public sealed class SiphonAndSellGoalExecutor(
         if (siphoned is null || !siphoned.Accepted)
         {
             // The plan chooses again on the next tick; a trip that keeps failing shows as RepeatingError.
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
             logger.LogWarning(
                 "SiphonAndSellGoalExecutor: ship {ShipSymbol} can't siphon at {WaypointSymbol} (state {Status}); the trip is dropped.",
                 ship.Symbol,
                 trip.SourceWaypointSymbol,
                 siphoned?.Status ?? ShipLocalStatus.None);
+            await EndTripAsync(ship.Symbol, trip, TripBook.Rejected, ct);
             return GoalExecutionResult.Blocked($"Siphoning rejected at {trip.SourceWaypointSymbol}.");
         }
 
@@ -99,7 +101,7 @@ public sealed class SiphonAndSellGoalExecutor(
         if (units <= 0)
         {
             // A hold of other gases: the siphon plan sells them where each fetches most.
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            await EndTripAsync(ship.Symbol, trip, TripBook.NothingAboard, ct);
             return GoalExecutionResult.Completed($"No {trip.TradeSymbol} aboard; the trip is done.");
         }
 
@@ -120,12 +122,13 @@ public sealed class SiphonAndSellGoalExecutor(
         if (!map.TryGetGood(trip.SellWaypointSymbol, trip.TradeSymbol, out var good) || good.SellPrice <= 0)
         {
             // The market no longer buys it: the siphon plan sells the gas where it fetches most.
-            await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+            await EndTripAsync(ship.Symbol, trip, TripBook.NotBoughtHere, ct);
             return GoalExecutionResult.Completed($"{trip.SellWaypointSymbol} doesn't buy {trip.TradeSymbol} any more; the trip ends.");
         }
 
         // One sale may not exceed the market's trade volume, so a larger load goes in several.
         var batchSize = good.TradeVolume > 0 ? good.TradeVolume : units;
+        var earned = 0L;
         for (var left = units; left > 0;)
         {
             var batch = Math.Min(left, batchSize);
@@ -150,14 +153,22 @@ public sealed class SiphonAndSellGoalExecutor(
                 trip.TradeSymbol,
                 trip.SellWaypointSymbol,
                 sale.Revenue);
+            earned += sale.Revenue;
             left -= batch;
         }
 
         // The sale moved the price: the market again, while the ship is still there (D25).
         await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trip.SellWaypointSymbol, ship.Symbol, ct);
 
-        await goals.ClearActiveGoalAsync(ship.Symbol, ct);
+        await EndTripAsync(ship.Symbol, trip with { Earned = trip.Earned + earned }, TripBook.Sold, ct);
         return GoalExecutionResult.Completed($"Sold {units} {trip.TradeSymbol} at {trip.SellWaypointSymbol}; the trip is done.");
+    }
+
+    /// <summary>Ends the trip: clears its goal, so the siphon plan chooses the next, and books what it made (D46).</summary>
+    private async Task EndTripAsync(string shipSymbol, SiphonAndSellGoal trip, string reason, CancellationToken ct)
+    {
+        await goals.ClearActiveGoalAsync(shipSymbol, ct);
+        await trips.BookAsync(shipSymbol, trip, reason, ct);
     }
 
     private static bool IsAt(ShipModel ship, string waypointSymbol)

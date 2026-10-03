@@ -555,7 +555,31 @@ public sealed class PrometheusAutomationMetricsTests
         { "surveys ended", metrics => metrics.SurveyEnded("X1-AB-XB5C", "expired", used: false), "spacetraders_surveys_ended_total{waypoint=\"X1-AB-XB5C\",reason=\"expired\",used=\"false\"} " },
         { "units sold", metrics => metrics.GoodsSold("X1-DC53-H51", "HYDROCARBON", 18), "spacetraders_goods_sold_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-H51\",good=\"HYDROCARBON\"} " },
         { "units bought", metrics => metrics.GoodsBought("X1-DC53-K85", "PLASTICS", 20), "spacetraders_goods_bought_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-K85\",good=\"PLASTICS\"} " },
+        { "trips", metrics => metrics.TripEnded("trade"), "spacetraders_trips_total{activity=\"trade\"} " },
+        { "trip profit", metrics => metrics.TripProfit("contract", 4_267), "spacetraders_trip_profit_credits_total{activity=\"contract\"} " },
+        { "trip loss", metrics => metrics.TripProfit("trade", -65_232), "spacetraders_trip_loss_credits_total{activity=\"trade\"} " },
     };
+
+    /// <summary>
+    /// D46: a counter can't go down, so what trips lose is counted apart from what they make, and profit minus loss is
+    /// what an activity made after fuel. Both series exist once an activity has a trip: PromQL's <c>profit - loss</c>
+    /// would drop an activity that had no loss series yet.
+    /// </summary>
+    [Fact]
+    public async Task WhatTripsMake_AndWhatTheyLose_AreCountedApart_ByActivity()
+    {
+        _metrics.TripProfit("trade", 4_320);
+        _metrics.TripProfit("trade", -2_152);
+        _metrics.TripProfit("mining", 1_005);
+        await ExportAsync();
+
+        var text = await ExportAsync();
+
+        text.Should().Contain("spacetraders_trip_profit_credits_total{activity=\"trade\"} 4320\n");
+        text.Should().Contain("spacetraders_trip_loss_credits_total{activity=\"trade\"} 2152\n");
+        text.Should().Contain("spacetraders_trip_profit_credits_total{activity=\"mining\"} 1005\n");
+        text.Should().Contain("spacetraders_trip_loss_credits_total{activity=\"mining\"} 0\n");
+    }
 
     /// <summary>
     /// B43: Prometheus's increase() and rate() count what a series gains between two scrapes, never

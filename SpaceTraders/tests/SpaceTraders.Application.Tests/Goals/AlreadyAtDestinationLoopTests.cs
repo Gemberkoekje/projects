@@ -99,6 +99,7 @@ public sealed class AlreadyAtDestinationLoopTests
             Substitute.For<IMarketRefresher>(),
             _dock,
             _bus,
+            Substitute.For<ITripBook>(),
             NullLogger<MineAndSellGoalExecutor>.Instance);
 
         await RunOneStepAsync(
@@ -129,6 +130,7 @@ public sealed class AlreadyAtDestinationLoopTests
             Substitute.For<IGoalStepCircuitBreaker>(),
             new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
+            Substitute.For<ITripBook>(),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         var navigateHandler = new NavigateToWaypointHandler(

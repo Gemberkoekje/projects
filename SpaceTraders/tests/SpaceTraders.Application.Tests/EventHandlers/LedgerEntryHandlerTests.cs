@@ -91,6 +91,30 @@ public sealed class LedgerEntryHandlerTests
         await _handler.Handle(new ContractAcceptedEvent("C-1"), CancellationToken.None);
 
         _ledger.ReceivedCalls().Should().BeEmpty();
+        _metrics.DidNotReceiveWithAnyArgs().TripProfit(default!, default);
+    }
+
+    [Fact]
+    public async Task AContractsDepositAndPayout_AreTheContractsProfit()
+    {
+        // D46: contract work is booked as activity contract: its payments as profit when they come, and the fuel of each
+        // round trip as its loss, at the delivery.
+        await _handler.Handle(new ContractAcceptedEvent("C-1", 1_136), CancellationToken.None);
+        await _handler.Handle(new ContractFulfilledEvent("C-1", 6_620), CancellationToken.None);
+
+        _metrics.Received(1).TripProfit("contract", 1_136);
+        _metrics.Received(1).TripProfit("contract", 6_620);
+    }
+
+    [Fact]
+    public async Task ASaleOrAPurchase_IsNoTripsProfitOnItsOwn()
+    {
+        // D46: a trip is booked when it ends, with all its sales and purchases (TripBook).
+        await _handler.Handle(new ShipCargoSoldEvent("AGENT-1", new TradeSymbol("IRON_ORE"), 10, 450, 175_450, "X1-AB-SELL"), CancellationToken.None);
+        await _handler.Handle(new CargoPurchasedEvent("AGENT-1", new TradeSymbol("FOOD"), 40, 8_000, 167_450, "X1-AB-BUY"), CancellationToken.None);
+        await _handler.Handle(new ShipRefueledEvent("AGENT-1", 720, 166_730, "X1-AB-2"), CancellationToken.None);
+
+        _metrics.DidNotReceiveWithAnyArgs().TripProfit(default!, default);
     }
 
     [Fact]

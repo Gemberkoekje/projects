@@ -157,12 +157,26 @@ public sealed record DeployProbeGoal : ShipGoal
 }
 
 /// <summary>
+/// A trip that buys or sells cargo: a trade, mining, siphon or spare-time trip. It keeps what its sales brought in and
+/// what its cargo cost, so that what it made can be booked when it ends (D46), with the fuel its ship bought meanwhile.
+/// A trip stored before it kept them loads with neither.
+/// </summary>
+public abstract record TripGoal : ShipGoal
+{
+    /// <summary>The credits the trip's sales brought in so far.</summary>
+    public long Earned { get; init; }
+
+    /// <summary>The credits the trip paid for cargo so far.</summary>
+    public long Spent { get; init; }
+}
+
+/// <summary>
 /// One mining trip (PLAN.md slice 6.4): the ship mines <see cref="TradeSymbol"/> at
 /// <see cref="SourceWaypointSymbol"/> until its hold is full, with the best survey there when there is
 /// one, then sells it at <see cref="SellWaypointSymbol"/>; then the goal ends, and the mining plan
 /// chooses the next trip.
 /// </summary>
-public sealed record MineAndSellGoal : ShipGoal
+public sealed record MineAndSellGoal : TripGoal
 {
     /// <summary>The ore the trip mines; other ores are jettisoned.</summary>
     public required string TradeSymbol { get; init; }
@@ -189,7 +203,7 @@ public sealed record MineAndSellGoal : ShipGoal
 /// plan sells the other gases and chooses the next trip. A siphon takes no survey: the API's siphon call
 /// has none.
 /// </summary>
-public sealed record SiphonAndSellGoal : ShipGoal
+public sealed record SiphonAndSellGoal : TripGoal
 {
     /// <summary>The gas the trip is for; the other gases it siphons are kept too (D33).</summary>
     public required string TradeSymbol { get; init; }
@@ -215,7 +229,7 @@ public sealed record SiphonAndSellGoal : ShipGoal
 /// until its hold is full; then it sells each good where it fetches most after fuel (D36), and the goal ends. A
 /// survey or a trade may take the ship off the trip while it fills (D37).
 /// </summary>
-public sealed record GatherAndSellGoal : ShipGoal
+public sealed record GatherAndSellGoal : TripGoal
 {
     /// <summary>The asteroid it mines at, or the gas giant it siphons at.</summary>
     public required string SourceWaypointSymbol { get; init; }
@@ -241,7 +255,7 @@ public sealed record GatherAndSellGoal : ShipGoal
 /// and sells it at <see cref="SellWaypointSymbol"/>. It checks the trip again with the newest prices when
 /// it gets to each market: before it buys, and before it sells (PLAN.md slice 6.5).
 /// </summary>
-public sealed record TradeBetweenMarketsGoal : ShipGoal
+public sealed record TradeBetweenMarketsGoal : TripGoal
 {
     /// <summary>The good the trip carries.</summary>
     public required string TradeSymbol { get; init; }

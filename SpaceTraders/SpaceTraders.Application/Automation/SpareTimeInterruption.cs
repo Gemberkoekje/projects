@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -17,11 +18,14 @@ namespace SpaceTraders.Application.Automation;
 ///   <item>the ship as stored isn't in flight: its arrival matches the goal that flew it (B17), and with another goal
 ///   nothing would record it.</item>
 /// </list>
+/// That ends the trip, so it is booked (<see cref="ITripBook"/>, D46). It hasn't sold anything yet: the hold it gathered
+/// is sold, and booked, by a trip after it.
 /// </summary>
 public sealed class SpareTimeInterruption(
     IShipRepository ships,
     IShipGoalRepository goals,
     IShipGoalStepGuard stepGuard,
+    ITripBook trips,
     ILogger<SpareTimeInterruption> logger)
 {
     /// <summary>Whether a ship is on a spare-time trip that more important work may take it off: it fills its hold, and isn't in flight.</summary>
@@ -74,6 +78,7 @@ public sealed class SpareTimeInterruption(
                 trip.SourceWaypointSymbol,
                 reason,
                 ship.CargoCurrent);
+            await trips.BookAsync(shipSymbol, trip, TripBook.Interrupted, cancellationToken);
             return true;
         }
         finally
