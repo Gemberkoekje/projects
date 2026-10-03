@@ -305,9 +305,8 @@ public sealed class MiningPlannerTests
             Market(H52, Good("SILICON_CRYSTALS", "IMPORT", 100, 50, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 76, 69, 180, "MODERATE")),
         ]);
         var held = new HashSet<string> { MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS") };
-        var covered = new HashSet<string> { "SILICON_CRYSTALS" };
 
-        var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), held, covered);
+        var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), held, [Covering("SILICON_CRYSTALS", F49)]);
 
         // B7's gold and copper have nobody either, but are a drift away (D45): after the reachable ones.
         targets.Select(target => (target.Ore, target.SellWaypointSymbol)).Should().Equal(
@@ -325,9 +324,7 @@ public sealed class MiningPlannerTests
     {
         // D48 with D45: every ore near the middle has a drone, and nobody mines gold. A free drone takes B7's gold, a drift
         // away, before the ores the others work on: "at least 1 drone per mineral that is scarce or limited".
-        var covered = new HashSet<string> { "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE", "IRON_ORE" };
-
-        var targets = MiningPlanner.MiningTargets(Context(), Drone(), new HashSet<string>(), covered);
+        var targets = MiningPlanner.MiningTargets(Context(), Drone(), new HashSet<string>(), MiddleCovered());
 
         targets[0].Should().BeEquivalentTo(new MiningTarget("GOLD_ORE", B14, B7, 114, 1 / 8.0, Surveyed: false, Supply: "SCARCE", Far: true));
     }
@@ -339,20 +336,69 @@ public sealed class MiningPlannerTests
         // copper, as copper fetches more; copper comes from XB5C, 19 away.
         var nearby = new WaypointCacheModel("X1-DC53-XN1", SystemSymbol, "ASTEROID", -18, 45, false, false, DateTimeOffset.UnixEpoch, TraitsJson: """[{"symbol":"MINERAL_DEPOSITS"}]""");
         var map = new TradeMarketMap([.. Waypoints, nearby], Markets(), new Dictionary<string, IReadOnlyList<string>>());
-        var covered = new HashSet<string> { "SILICON_CRYSTALS", "QUARTZ_SAND" };
 
-        var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), new HashSet<string>(), covered);
+        var targets = MiningPlanner.MiningTargets(
+            new MiningContext(map, [], 129_357, Now),
+            Drone(),
+            new HashSet<string>(),
+            [Covering("SILICON_CRYSTALS", F49), Covering("QUARTZ_SAND", F49)]);
 
         targets.Select(target => (target.Ore, target.AsteroidSymbol)).Take(2).Should().Equal(("IRON_ORE", "X1-DC53-XN1"), ("COPPER_ORE", XB5C));
     }
 
     [Fact]
-    public void TheScarceOres_AreThoseADroneCouldServeAMarketShortOf_WhoeverWorksOnThem()
+    public void TheScarceOres_AreThoseADroneCouldServeAMarketShortOf_WhoeverWorksOnThem_OncePerArea()
     {
-        // B7's gold and copper are beyond a drone's tank, but a drift away (D45), so B7's gold counts for it too; the command
-        // ship reaches them.
-        MiningPlanner.ScarceOres(Context(), Drone()).Should().BeEquivalentTo(["SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE", "IRON_ORE", "GOLD_ORE"]);
-        MiningPlanner.ScarceOres(Context(), CommandShip()).Should().Contain("GOLD_ORE");
+        // B7's gold and copper are beyond a drone's tank, but a drift away (D45), so they count for it too. D53: copper is
+        // short at H51 in the middle and at B7, which a drone doesn't fly between in CRUISE: two areas, so it counts twice.
+        MiningPlanner.ScarceOres(Context(), Drone()).Select(area => (area.Good, string.Join(',', area.MarketSymbols))).Should().Equal(
+            ("COPPER_ORE", B7),
+            ("COPPER_ORE", H51),
+            ("GOLD_ORE", B7),
+            ("IRON_ORE", H51),
+            ("QUARTZ_SAND", F49),
+            ("SILICON_CRYSTALS", F49));
+    }
+
+    [Fact]
+    public void MarketsADroneFliesBetweenInCruise_ShareAnArea()
+    {
+        // D53: H52 is SCARCE of silicon too, 39 from F49: one area with it. The command ship's 400-unit tank flies from H51 to
+        // B7 in CRUISE, so for it copper has a single area.
+        var map = Map(
+        [
+            .. Markets().Where(market => market.WaypointSymbol != H52),
+            Market(H52, Good("SILICON_CRYSTALS", "IMPORT", 100, 50, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 76, 69, 180, "MODERATE")),
+        ]);
+
+        MiningPlanner.ScarceOres(new MiningContext(map, [], 129_357, Now), Drone())
+            .Single(area => area.Good == "SILICON_CRYSTALS").MarketSymbols.Should().Equal(F49, H52);
+        MiningPlanner.ScarceOres(Context(), CommandShip())
+            .Single(area => area.Good == "COPPER_ORE").MarketSymbols.Should().Equal(B7, H51);
+    }
+
+    [Fact]
+    public void AnOreADroneMinesForAFarMarket_IsStillUncoveredInTheMiddle()
+    {
+        // D53, seen on the cluster on 2026-10-03: with SPECTER-10 bound for B7's silicon, silicon counted as covered, and the
+        // middle's SCARCE silicon had no drone while four of five mining drones went to B7. "A drone covers a mineral only
+        // for the markets it can reach in CRUISE from where it works (the middle, or B7)." Here a drone mines copper for B7,
+        // and H51's LIMITED copper, in reach, comes before B7's gold, a drift away.
+        var covering = new[] { Covering("SILICON_CRYSTALS", F49), Covering("QUARTZ_SAND", F49), Covering("IRON_ORE", H51), Covering("COPPER_ORE", B7) };
+
+        var targets = MiningPlanner.MiningTargets(Context(), Drone(), new HashSet<string>(), covering);
+
+        (targets[0].Ore, targets[0].SellWaypointSymbol, targets[0].Far).Should().Be(("COPPER_ORE", H51, false));
+    }
+
+    [Fact]
+    public void ATripCoversItsOre_AtTheMarketsItsShipReachesInCruise_FromWhereItSells()
+    {
+        // D53: a drone that sells at B7 covers B7, not H51; the command ship's 400-unit tank reaches H51 from B7.
+        Covering("COPPER_ORE", B7).Covers(Map(), "COPPER_ORE", B7).Should().BeTrue();
+        Covering("COPPER_ORE", B7).Covers(Map(), "COPPER_ORE", H51).Should().BeFalse();
+        Covering("COPPER_ORE", B7, tank: 400).Covers(Map(), "COPPER_ORE", H51).Should().BeTrue();
+        Covering("COPPER_ORE", H51).Covers(Map(), "IRON_ORE", H51).Should().BeFalse();
     }
 
     [Fact]
@@ -362,6 +408,13 @@ public sealed class MiningPlannerTests
         MiningPlanner.CanReach(Map(), Drone(), B14).Should().BeFalse();
         MiningPlanner.CanReach(Map(), CommandShip(), B14).Should().BeTrue();
     }
+
+    /// <summary>A miner's trip on an ore for a market, by a ship with an 80-unit tank unless said otherwise.</summary>
+    private static CoveringTrip Covering(string ore, string market, int tank = 80) => new(ore, market, tank);
+
+    /// <summary>Drones on silicon and quartz for F49, and on copper and iron for H51: every ore short near the middle.</summary>
+    private static CoveringTrip[] MiddleCovered()
+        => [Covering("SILICON_CRYSTALS", F49), Covering("QUARTZ_SAND", F49), Covering("COPPER_ORE", H51), Covering("IRON_ORE", H51)];
 
     /// <summary>The fixture's markets, with B7 importing iron as well, which only B13, 48 from B7, yields near it.</summary>
     private static TradeMarketMap MapWithIronAtB7()

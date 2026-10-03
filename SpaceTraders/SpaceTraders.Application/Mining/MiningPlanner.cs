@@ -326,39 +326,43 @@ public static class MiningPlanner
 
     /// <summary>
     /// What a miner can mine, best first, with the ores no miner works on first (D48): of its SCARCE or LIMITED targets
-    /// (D22) whose ore isn't in <paramref name="coveredOres"/>, the nearest asteroid first ("near before far"); then the
-    /// rest, in <see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>'s order (D28).
+    /// (D22) that no trip in <paramref name="covering"/> covers (D53), the nearest asteroid first ("near before far"); then
+    /// the rest, in <see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>'s order (D28).
     /// </summary>
     /// <param name="context">The miner's system.</param>
     /// <param name="miner">The miner.</param>
     /// <param name="heldKeys">The opportunities other miners hold (<see cref="OpportunityKey"/>).</param>
-    /// <param name="coveredOres">The ores a miner's trip works on.</param>
+    /// <param name="covering">The miners' trips, each covering its ore near the market it sells at.</param>
     /// <returns>The targets, best first.</returns>
-    public static IReadOnlyList<MiningTarget> MiningTargets(MiningContext context, ShipModel miner, IReadOnlySet<string> heldKeys, IReadOnlySet<string> coveredOres)
+    public static IReadOnlyList<MiningTarget> MiningTargets(MiningContext context, ShipModel miner, IReadOnlySet<string> heldKeys, IReadOnlyCollection<CoveringTrip> covering)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return UncoveredFirst(context.Map, miner, MiningTargets(context, miner, heldKeys), coveredOres);
+        return UncoveredFirst(context.Map, miner, MiningTargets(context, miner, heldKeys), covering);
     }
 
     /// <summary>
-    /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) whose ore isn't in
-    /// <paramref name="coveredOres"/>, those in CRUISE reach before those a drift away (D45), the nearest asteroid first;
-    /// then the rest, each group in the order given.
+    /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) that no trip in
+    /// <paramref name="covering"/> covers, as a trip covers its ore only at the markets its ship reaches in CRUISE from
+    /// where it sells (D53, <see cref="CoveringTrip.Covers"/>); those in CRUISE reach before those a drift away (D45), the
+    /// nearest asteroid first; then the rest, each group in the order given.
     /// </summary>
     /// <param name="map">The miner's system.</param>
     /// <param name="miner">The miner.</param>
     /// <param name="targets">Its targets, in D28's order (<see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>).</param>
-    /// <param name="coveredOres">The ores a miner's trip works on.</param>
+    /// <param name="covering">The miners' trips, each covering its ore near the market it sells at.</param>
     /// <returns>The targets, best first.</returns>
-    public static IReadOnlyList<MiningTarget> UncoveredFirst(TradeMarketMap map, ShipModel miner, IReadOnlyList<MiningTarget> targets, IReadOnlySet<string> coveredOres)
+    public static IReadOnlyList<MiningTarget> UncoveredFirst(TradeMarketMap map, ShipModel miner, IReadOnlyList<MiningTarget> targets, IReadOnlyCollection<CoveringTrip> covering)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(targets);
-        ArgumentNullException.ThrowIfNull(coveredOres);
+        ArgumentNullException.ThrowIfNull(covering);
 
         var position = Position(miner);
         return [.. targets
-            .Select((target, rank) => (Target: target, Rank: rank, Uncovered: target.LowSupply && !coveredOres.Contains(target.Ore)))
+            .Select((target, rank) => (
+                Target: target,
+                Rank: rank,
+                Uncovered: target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Ore, target.SellWaypointSymbol))))
             .OrderByDescending(entry => entry.Uncovered)
             .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.AsteroidSymbol, out var distance) ? distance : double.MaxValue)
@@ -367,18 +371,85 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// The SCARCE or LIMITED ores a ship could serve (D48): the ores of its low-supply targets (D22), whichever miner
-    /// holds them. An ore that no asteroid it can reach yields, or that no market it can carry it to is short of, isn't
-    /// one.
+    /// The SCARCE or LIMITED ores a ship could serve (D48), each once per area (D53): the ores of its low-supply targets
+    /// (D22), whichever miner holds them, with the markets short of each grouped by the ship's CRUISE reach
+    /// (<see cref="Areas"/>). An ore that no asteroid it can reach yields, or that no market it can carry it to is short
+    /// of, isn't one. In X1-DC53 a drone's areas are the middle and B7: an ore short in both counts twice.
     /// </summary>
     /// <param name="context">The ship's system.</param>
     /// <param name="ship">The ship, as it is or as it would be bought.</param>
-    /// <returns>The ores, by symbol.</returns>
-    public static IReadOnlySet<string> ScarceOres(MiningContext context, ShipModel ship)
-        => MiningTargets(context, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-            .Where(target => target.LowSupply)
-            .Select(target => target.Ore)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    /// <returns>The ores and their areas, by ore and first market.</returns>
+    public static IReadOnlyList<MineralArea> ScarceOres(MiningContext context, ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return Areas(
+            context.Map,
+            ship.FuelCapacity,
+            MiningTargets(context, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+                .Where(target => target.LowSupply)
+                .Select(target => new MineralArea(target.Ore, [target.SellWaypointSymbol])));
+    }
+
+    /// <summary>
+    /// Whether a ship that works from a market covers another market (D53): it reaches it in CRUISE, through refuelling
+    /// stops, leaving with a full tank. Asked on 2026-10-03: "A drone covers a mineral only for the markets it can reach in
+    /// CRUISE from where it works (the middle, or B7)."
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="fuelCapacity">The ship's tank.</param>
+    /// <param name="from">Where it works: the market it sells at.</param>
+    /// <param name="market">The market it would cover.</param>
+    /// <returns>True when a flight there exists; always for the market itself.</returns>
+    public static bool Covers(TradeMarketMap map, int fuelCapacity, string from, string market)
+        => TradeRoutePlanner.TryPlanFlight(map, from, market, fuelCapacity, fuelCapacity, out _);
+
+    /// <summary>
+    /// Groups each mineral's markets by area (D53): two markets share an area when a ship with this tank flies from one to
+    /// the other in CRUISE (<see cref="Covers"/>), and so does a market that shares one with either. How the markets come
+    /// grouped doesn't matter.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="fuelCapacity">The tank of the ships that would cover them.</param>
+    /// <param name="markets">Each mineral's markets.</param>
+    /// <returns>The areas, by mineral and first market; each area's markets by symbol.</returns>
+    public static IReadOnlyList<MineralArea> Areas(TradeMarketMap map, int fuelCapacity, IEnumerable<MineralArea> markets)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(markets);
+
+        var areas = new List<MineralArea>();
+        foreach (var mineral in markets
+            .GroupBy(area => area.Good, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(mineral => mineral.Key, StringComparer.Ordinal))
+        {
+            var groups = new List<List<string>>();
+            foreach (var market in mineral
+                .SelectMany(area => area.MarketSymbols)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.Ordinal))
+            {
+                var joined = groups
+                    .Where(group => group.Any(other => Covers(map, fuelCapacity, other, market) || Covers(map, fuelCapacity, market, other)))
+                    .ToList();
+                var area = new List<string> { market };
+                foreach (var group in joined)
+                {
+                    area.AddRange(group);
+                    groups.Remove(group);
+                }
+
+                groups.Add(area);
+            }
+
+            areas.AddRange(groups
+                .Select(group => new MineralArea(mineral.Key, [.. group.Order(StringComparer.Ordinal)]))
+                .OrderBy(area => area.MarketSymbols[0], StringComparer.Ordinal));
+        }
+
+        return areas;
+    }
 
     /// <summary>
     /// The low-supply opportunities of a system (D22): each market with an ore in low supply, and the asteroid
@@ -710,4 +781,67 @@ public sealed record MiningOpportunity
 
     /// <summary>The opportunity's key (<see cref="MiningPlanner.OpportunityKey"/>).</summary>
     public string Key => MiningPlanner.OpportunityKey(SellWaypointSymbol, Ore);
+}
+
+/// <summary>
+/// A trip that works on a mineral, an ore or a gas (D48): what it gathers, where it sells it, and the tank of its ship,
+/// which says where the trip covers the mineral (D53).
+/// </summary>
+public sealed record CoveringTrip
+{
+    /// <summary>Creates a covering trip.</summary>
+    /// <param name="Good">The ore or gas the trip gathers.</param>
+    /// <param name="SellWaypointSymbol">Where it sells it.</param>
+    /// <param name="FuelCapacity">The tank of the ship on the trip.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CoveringTrip(string Good, string SellWaypointSymbol, int FuelCapacity)
+    {
+        this.Good = Good;
+        this.SellWaypointSymbol = SellWaypointSymbol;
+        this.FuelCapacity = FuelCapacity;
+    }
+
+    /// <summary>The ore or gas the trip gathers.</summary>
+    public required string Good { get; init; }
+
+    /// <summary>Where it sells it.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>The tank of the ship on the trip.</summary>
+    public required int FuelCapacity { get; init; }
+
+    /// <summary>
+    /// Whether the trip covers a mineral at a market (D53): it gathers the mineral, and its ship reaches the market in
+    /// CRUISE from where it sells (<see cref="MiningPlanner.Covers"/>). A drone that mines for B7 doesn't cover the middle;
+    /// the command ship's 400-unit tank reaches both.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="good">The ore or gas.</param>
+    /// <param name="market">The market short of it.</param>
+    /// <returns>True when the trip covers the mineral there.</returns>
+    public bool Covers(TradeMarketMap map, string good, string market)
+        => Good.Equals(good, StringComparison.OrdinalIgnoreCase) && MiningPlanner.Covers(map, FuelCapacity, SellWaypointSymbol, market);
+}
+
+/// <summary>
+/// A mineral, an ore or a gas, and the markets of one area that buy it (D53): markets a drone flies between in CRUISE. The
+/// coverage tier counts one drone for each, and the role board keeps one gathering it (D48).
+/// </summary>
+public sealed record MineralArea
+{
+    /// <summary>Creates a mineral's area.</summary>
+    /// <param name="Good">The ore or gas.</param>
+    /// <param name="MarketSymbols">The markets, by symbol.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MineralArea(string Good, IReadOnlyList<string> MarketSymbols)
+    {
+        this.Good = Good;
+        this.MarketSymbols = MarketSymbols;
+    }
+
+    /// <summary>The ore or gas.</summary>
+    public required string Good { get; init; }
+
+    /// <summary>The markets, by symbol.</summary>
+    public required IReadOnlyList<string> MarketSymbols { get; init; }
 }

@@ -4,6 +4,7 @@ using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Siphoning;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -32,8 +33,8 @@ public interface IRolePlanService
 /// </list>
 /// A new role takes effect when the ship's trip ends: the plans only give work to free ships. Each change is
 /// journaled (<c>RoleChanged</c>); the state lists every ship's role, why, and what each role would earn it. One drone
-/// per SCARCE or LIMITED mineral keeps gathering it (slice 6.10b, D48), as the mining and siphon plans buy one per such
-/// mineral.
+/// per SCARCE or LIMITED mineral and area keeps gathering it (slice 6.10b, D48, D53), as the mining and siphon plans buy
+/// one per such mineral and area.
 /// </summary>
 public sealed class RolePlanService(
     IShipRepository ships,
@@ -198,14 +199,32 @@ public sealed class RolePlanService(
     }
 
     /// <summary>
-    /// The SCARCE or LIMITED minerals of each system with drones (D48): the ores its mining drones could serve a market short
-    /// of, and the gases its siphon drones could, each with those drones and the ships whose trip works on it now.
+    /// The SCARCE or LIMITED minerals of each system with drones, per area (D48, D53): the ores its mining drones could serve
+    /// a market short of, and the gases its siphon drones could, each with those drones and the ships whose trip covers it
+    /// now.
     /// </summary>
     private async Task<IReadOnlyList<MineralCoverage>> CoverageAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyDictionary<string, ShipGoal> trips,
         CancellationToken cancellationToken)
     {
+        var tanks = fleet
+            .GroupBy(ship => ship.Symbol, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().FuelCapacity, StringComparer.OrdinalIgnoreCase);
+        List<(string Ship, CoveringTrip Trip)> mining = [];
+        List<(string Ship, CoveringTrip Trip)> siphoning = [];
+        foreach (var (ship, goal) in trips)
+        {
+            if (goal is MineAndSellGoal mine)
+            {
+                mining.Add((ship, new CoveringTrip(mine.TradeSymbol, mine.SellWaypointSymbol, tanks.GetValueOrDefault(ship))));
+            }
+            else if (goal is SiphonAndSellGoal siphon)
+            {
+                siphoning.Add((ship, new CoveringTrip(siphon.TradeSymbol, siphon.SellWaypointSymbol, tanks.GetValueOrDefault(ship))));
+            }
+        }
+
         var coverage = new List<MineralCoverage>();
         foreach (var system in fleet
             .Where(ship => (FleetRoles.IsMiningDrone(ship) || FleetRoles.IsSiphoner(ship)) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
@@ -214,50 +233,52 @@ public sealed class RolePlanService(
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             coverage.AddRange(Minerals(
+                context.Map,
                 FleetRole.Mine,
-                system.Where(FleetRoles.IsMiningDrone),
+                [.. system.Where(FleetRoles.IsMiningDrone)],
                 drone => MiningPlanner.ScarceOres(context, drone),
-                trips.Where(trip => trip.Value is MineAndSellGoal).Select(trip => (trip.Key, ((MineAndSellGoal)trip.Value).TradeSymbol))));
+                mining));
             coverage.AddRange(Minerals(
+                context.Map,
                 FleetRole.Siphon,
-                system.Where(FleetRoles.IsSiphoner),
+                [.. system.Where(FleetRoles.IsSiphoner)],
                 drone => SiphonPlanner.ScarceGases(context.Map, drone),
-                trips.Where(trip => trip.Value is SiphonAndSellGoal).Select(trip => (trip.Key, ((SiphonAndSellGoal)trip.Value).TradeSymbol))));
+                siphoning));
         }
 
         return coverage;
     }
 
-    /// <summary>Each mineral some drone could serve a market short of, with those drones and the ships working on it.</summary>
+    /// <summary>
+    /// Each mineral and area some drone could serve a market short of (D53), with those drones and the ships whose trip
+    /// covers it. The areas are the drones' own: markets they fly between in CRUISE, with the smallest of their tanks.
+    /// </summary>
     private static IEnumerable<MineralCoverage> Minerals(
+        TradeMarketMap map,
         FleetRole role,
-        IEnumerable<ShipModel> drones,
-        Func<ShipModel, IReadOnlySet<string>> scarce,
-        IEnumerable<(string Ship, string Good)> working)
+        IReadOnlyList<ShipModel> drones,
+        Func<ShipModel, IReadOnlyList<MineralArea>> scarce,
+        IReadOnlyList<(string Ship, CoveringTrip Trip)> working)
     {
-        var able = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var drone in drones.OrderBy(drone => drone.Symbol, StringComparer.Ordinal))
+        if (drones.Count == 0)
         {
-            foreach (var good in scarce(drone))
-            {
-                if (!able.TryGetValue(good, out var ships))
-                {
-                    ships = [];
-                    able[good] = ships;
-                }
-
-                ships.Add(drone.Symbol);
-            }
+            return [];
         }
 
-        var workers = working.ToList();
-        return able
-            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => new MineralCoverage(
-                entry.Key,
+        var serves = drones.ToDictionary(drone => drone.Symbol, scarce, StringComparer.OrdinalIgnoreCase);
+        bool Serves(ShipModel drone, MineralArea area)
+            => serves[drone.Symbol].Any(served => served.Good.Equals(area.Good, StringComparison.OrdinalIgnoreCase)
+                && served.MarketSymbols.Any(market => area.MarketSymbols.Contains(market, StringComparer.OrdinalIgnoreCase)));
+
+        return MiningPlanner.Areas(map, drones.Min(drone => drone.FuelCapacity), serves.Values.SelectMany(areas => areas))
+            .Select(area => new MineralCoverage(
+                area.Good,
                 role,
-                entry.Value,
-                [.. workers.Where(worker => worker.Good.Equals(entry.Key, StringComparison.OrdinalIgnoreCase)).Select(worker => worker.Ship)]));
+                [.. drones.Where(drone => Serves(drone, area)).Select(drone => drone.Symbol).Order(StringComparer.Ordinal)],
+                [.. working.Where(worker => area.MarketSymbols.Any(market => worker.Trip.Covers(map, area.Good, market))).Select(worker => worker.Ship)])
+            {
+                MarketSymbols = area.MarketSymbols,
+            });
     }
 
     /// <summary>Takes the rates the state kept from before a restart, for ships with no extraction since.</summary>

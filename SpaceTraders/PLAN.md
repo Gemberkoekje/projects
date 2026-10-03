@@ -96,8 +96,9 @@
   surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged and deployed
   (projects#137, its turn fix projects#138, gembernodes#35, #36 and #37); 6.10c (drones drifting to minerals out of fuel range)
   is merged and deployed (projects#139, gembernodes#37, 12:13Z on 2026-10-03). Its first drift (SPECTER-4 to B7, 12:35Z)
-  found B54 (projects#140, gembernodes#38), and the designated surveyor's first wait found B55 (projects#141, gembernodes#39:
-  the cluster runs `29c0b9a` since 13:42Z) and your decision D52: a ship that can only survey surveys on.
+  found B54 (projects#140, gembernodes#38), and the designated surveyor's first wait found B55 (projects#141, gembernodes#39)
+  and your decision D52, a ship that can only survey surveys on (projects#142, gembernodes#40: the cluster runs `6c9f8cc`
+  since 14:00Z). Your decision D53, coverage per area, is built on branch `claude/spacetraders-coverage-per-area`.
 
 ## Known issues
 
@@ -224,6 +225,7 @@ get the next D-number.
 | D50 | Slice 6.10 (asked on 2026-10-03): "we should visualize the actual correlation between the amount of goods sold and the amount of processed goods added, and what that does to the price. Because a unit of hydrocarbons might make a unit of plastics, but we don't know how many … (we also don't know at what rate a hydrocarbon gets converted to plastics per unit of time)." | **Measure it** (slice 6.10a): the bot counts the units it sells and buys per market and good; the dashboard plots what we sell into a market per hour against the supply, trade volume and price of what that market makes from it, so the rate and the delay can be read off. D49's cap stands until those numbers say better. |
 | D51 | Slice 6.10b (asked on 2026-10-03, in another session): "What if we made the amount of credits for trade wider based on the amount of cargo total in the fleet? Something like: 60.000 hard minimum, 1.000 per cargo hold. … This might ramp it up a bit too much. Which defaults would you recommend?" In 24 hours the command ship made 150 trade purchases, 51,610 credits on average (median 54,331, 27 units): an expensive good's trade volume (often 20 units) caps a load, so a trip's cost barely grows with the hold; the drones' few trades cost 45–67k. Counting every hold (11 drones and the command ship, 205 units) would ask 265,000, above the ~150,000 the credits peak at, and freeze every purchase. | **Grow the reserve with the trading holds:** the credits every ship purchase keeps are `FleetExpansion.MinCreditReserve` (the floor, seeded at 60,000) plus `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit of hold on the ships that trade: the cargo ships, the command ship (it trades whenever it isn't surveying, D34, D38) and any other ship the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo. The command ship alone keeps 100,000 (as today); with a light shuttle (40) 140,000, so the first light hauler needs 354,210 + 140,000; with one light hauler (80) 220,000, with two 300,000; a drone in the trade role adds 15,000 while it has it; no ship that trades, 60,000. The recommended defaults, yours unchanged. |
 | D52 | Slice 6.10c's first watch (2026-10-03): with every ore it reached at its stock of surveys (D27), the designated surveyor SPECTER-F (D47), which can do nothing else, waited at XB5C (and B55's false anomaly fired on it). | **Survey on:** "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is lowest." A ship that can only survey, once every ore it reaches has its stock, surveys the target it reaches with the fewest usable surveys, then the contract's, then the best paid. The command ship, which can do more, still waits, or trades and mines in its spare time (D27, D34). Amends D27 for ships that can only survey. ("Lowest" read as the fewest usable surveys, D27's own order.) |
+| D53 | Slice 6.10c's watch (2026-10-03): coverage (D48) counted a mineral for the whole system. With SPECTER-10 bound for B7's silicon, silicon counted as covered: the middle's SCARCE silicon (H53) had no drone, and by 14:01Z four of the five mining drones were drifting to B7 (SPECTER-4, -10, -A and -9), with SPECTER-3 alone in the middle. How does coverage treat far markets? | **Cover per area:** "A drone covers a mineral only for the markets it can reach in CRUISE from where it works (the middle, or B7). The middle's scarce silicon gets a drone of its own; the coverage tier may buy a drone per scarce mineral per area (more drones)." A trip covers its mineral at the markets its ship reaches in CRUISE, through refuelling stops, from the market it sells at; the coverage tier counts each SCARCE or LIMITED mineral once per area (the markets a drone flies between in CRUISE: in X1-DC53 the middle and B7); the role board keeps one drone per mineral and area. Amends D48. |
 
 ## Phases
 
@@ -2050,7 +2052,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
         It happened at the first drift, worse than noted: the command ship also surveyed B37, where no drone can mine.
         That is B54, fixed in the follow-up below.
       - **Coverage counts a mineral, not a market** (D48): with SPECTER-10 bound for B7's silicon, silicon counted as
-        covered, and SPECTER-A left the middle's silicon markets for B7's iron. Yours to call.
+        covered, and SPECTER-A left the middle's silicon markets for B7's iron. Your call was D53, coverage per area: see the
+        follow-up below.
       - **The contract plan takes any free miner** without checking that it can reach the contract's asteroid in CRUISE,
         and the contract's commands fly with the fallback (B47). Under D1 (one contract per reset) and D23 (no drone is
         bought while the contract mines) no drone has drifted while a contract wants ore; a slice that takes the next
@@ -2089,12 +2092,41 @@ How credits are split stays your call; Claude only fixes deviations from intende
     - **Follow-up, B55** (projects#141, deployed by gembernodes#39): the survey plan's state lists the surveyors that can
       reach each target (`CandidateShipSymbols`), and `ShipLeftIdle` counts a target as work only for those. Tests:
       `ShipRuleTests`, `SurveyPlanServiceTests` (one new each).
-    - **Follow-up, D52** (branch `claude/spacetraders-surveyor-surveys-on`): a ship that can only survey
+    - **Follow-up, D52** (projects#142, deployed by gembernodes#40 at 14:00Z): a ship that can only survey
       (`FleetRoles.CanOnlySurvey`), with every ore it reaches at its stock, surveys on: the target it reaches with the
       fewest usable surveys first. `ShipLeftIdle` counts any target it reaches as work for it. Start with the surveyor
       loop in `Automation/SurveyPlanService.cs`. Tests: `SurveyPlanServiceTests`, `ShipRuleTests` (one new each; B55's
       test keeps its point without a target the surveyor reaches).
-  - **To understand this,** start with the decisions D43–D52, then this slice's notes; 6.10b and 6.10c each have their own
+    - **Follow-up, D53** (branch `claude/spacetraders-coverage-per-area`): coverage per area.
+      - **A trip covers its mineral near the market it sells at** (`CoveringTrip`, `MiningPlanner.Covers`): at the markets
+        its ship reaches in CRUISE from there, through refuelling stops, leaving with a full tank. The mining and siphon
+        plans list the trips under way as `CoveringTrip`s (the mineral, the market, the ship's tank), and `UncoveredFirst`
+        puts first the SCARCE or LIMITED targets no trip covers. A drone at B7 doesn't cover the middle, nor one in the
+        middle B7; the command ship's 400-unit tank reaches both, so its trip covers both.
+      - **The coverage tier counts areas** (`ScarceOres`, `ScarceGases`, `MiningPlanner.Areas`): each SCARCE or LIMITED
+        mineral once per area, an area being the markets short of it that a new drone flies between in CRUISE (two markets
+        share one when either reaches the other). So it buys a drone per scarce mineral and area, ahead of the cargo ships
+        (D43), as before without asking the role board.
+      - **The role board keeps one drone per mineral and area** (`MineralCoverage.MarketSymbols`): the areas are those of
+        the system's drones of the kind (the smallest tank among them); the drone kept for one is the one whose trip covers
+        it, else as before.
+      - **What to expect,** from the markets as the bot last saw them at 14:30Z (B7's at 13:30Z): the middle is short of
+        aluminum (H51) and silicon (A3, F49, H53), and B7 of aluminum, copper, iron, quartz and silicon, all from B14 (B7's
+        gold, silver and platinum come from B37 or B10, beyond a drone's round trip; nothing in a drone's reach yields the
+        ammonia ice, diamonds or precious stones that H53, J58 and H54 want). That is seven ores and areas for five mining
+        drones, against five ores before, so the coverage tier wants two more drones; a free drone in the middle, or a new
+        one, takes whichever of the middle's two ores has no drone, and the drones at B7 keep to B7's ores, as uncovered ores
+        in reach come before those a drift away. Siphon drones reach every gas market in X1-DC53 from C38, one area, so nothing
+        changes for them.
+      - To understand it, start with `UncoveredFirst` and `Areas` in `Mining/MiningPlanner.cs` (`CoveringTrip` and
+        `MineralArea` at the end of the file), then `Minerals` in `Automation/RolePlanService.cs`.
+      - Tests: App 832 (9 new: `MiningPlannerTests` 3, `SiphonPlannerTests` 2, `MiningAutomationServiceTests` 2,
+        `SiphonAutomationServiceTests` 1, `RolePlannerTests` 1; rewritten to keep their point with the extra area:
+        `MiningAutomationServiceTests` 3, `RolePlanServiceTests` 2; the scarce ores and gases are listed per area), Domain
+        71, API 161 (and 4 skipped, as on main).
+        On the old code the new tests of the plans and the board fail as the cluster did: the free drone drifts to B7's
+        gold instead of mining the middle's copper, and the purchase comes as `Alternating`, not `Coverage`.
+  - **To understand this,** start with the decisions D43–D53, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes

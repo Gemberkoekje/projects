@@ -21,7 +21,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// mine while the survey plan is on (D20), no drone is bought while the contract takes the miners (D23), and
 /// a drone is bought only when its first trip would serve a market short of an ore (D22, D28). Slice 6.10b: a
 /// scarce ore no miner works on comes first, and a drone is bought for each scarce ore before anything else that
-/// mines (D48), when the order ships are bought in lets it (D43).
+/// mines (D48), when the order ships are bought in lets it (D43). D53: a trip covers its ore only near the market it sells
+/// at, and a drone is bought for each scarce ore in each area.
 /// </summary>
 public sealed class MiningAutomationServiceTests
 {
@@ -215,10 +216,10 @@ public sealed class MiningAutomationServiceTests
     [Fact]
     public async Task WithNoMinerFree_ItBuysOneDrone_WhoseFirstTripServesAMarketShortOfAnOre()
     {
-        // Every scarce ore has a drone (D48), every miner works, and H51's iron waits: SHIP-6 trades. One a pass: it used to
-        // buy one for each opening, and the next pass counts the new drone's trip (D28). It takes turns with the cargo
-        // ships (D43).
-        FiveDronesOneTrading();
+        // Every scarce ore in each area has a drone (D48, D53), every miner works, and H51's iron waits: SHIP-6 trades. One a
+        // pass: it used to buy one for each opening, and the next pass counts the new drone's trip (D28). It takes turns with
+        // the cargo ships (D43).
+        SixDronesOneTrading();
 
         await RunAsync();
 
@@ -233,10 +234,18 @@ public sealed class MiningAutomationServiceTests
     {
         // Slice 6.9: a drone that would earn more trading would trade, and the next pass would buy another for the same
         // opening, and the next.
-        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine), ("SHIP-4", FleetRole.Mine), ("SHIP-5", FleetRole.Mine), ("SHIP-6", FleetRole.Trade), ("SHIP-7", FleetRole.Mine));
+        RoleBoardTestSupport.RolesAre(
+            _settings,
+            _plans,
+            ("SHIP-3", FleetRole.Mine),
+            ("SHIP-4", FleetRole.Mine),
+            ("SHIP-5", FleetRole.Mine),
+            ("SHIP-6", FleetRole.Trade),
+            ("SHIP-7", FleetRole.Mine),
+            ("SHIP-8", FleetRole.Mine));
         _roleAdvisor.WouldTakeAsync(Arg.Is<ShipModel>(ship => ship.ShipType == "SHIP_MINING_DRONE"), FleetRole.Mine, Arg.Any<CancellationToken>())
             .Returns(wouldMine);
-        FiveDronesOneTrading();
+        SixDronesOneTrading();
 
         await RunAsync();
 
@@ -263,13 +272,15 @@ public sealed class MiningAutomationServiceTests
     [Fact]
     public async Task WithADroneForEachScarceOre_AndAMinerFree_NoDroneIsBought()
     {
-        // D28: a drone beyond one per scarce ore waits until every miner works; until then its turn passes to the cargo
-        // ships (D43). Five ores are scarce for a drone, B7's gold a drift away (D45), and there are five drones.
+        // D28: a drone beyond one per scarce ore and area waits until every miner works; until then its turn passes to the
+        // cargo ships (D43). Six ores and areas are scarce for a drone: four near the middle, and B7's gold and copper, a
+        // drift away (D45, D53). There are six drones.
         HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
         HeldBy("SHIP-4", F49, "QUARTZ_SAND");
         HeldBy("SHIP-5", H51, "COPPER_ORE");
         HeldBy("SHIP-7", B7, "GOLD_ORE", B14);
-        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7));
+        HeldBy("SHIP-8", B7, "COPPER_ORE", B14);
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7), Drone("SHIP-8", B7));
 
         await RunAsync();
 
@@ -360,6 +371,46 @@ public sealed class MiningAutomationServiceTests
         HeldBy("SHIP-5", H51, "COPPER_ORE");
         HeldBy("SHIP-6", H51, "IRON_ORE");
         Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.Coverage, "SHIP_MINING_DRONE", H52, 48_328));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AFreeDrone_TakesAnOreShortInTheMiddle_ThoughADroneMinesItForAFarMarket()
+    {
+        // D53, seen on the cluster on 2026-10-03: SPECTER-10 drifted to B7 for silicon, so silicon counted as covered, and the
+        // middle's SCARCE silicon had no drone while four of five mining drones went to B7. "A drone covers a mineral only for
+        // the markets it can reach in CRUISE from where it works (the middle, or B7)." Here SHIP-4 mines copper for B7:
+        // H51's LIMITED copper, in reach, still has nobody, and comes before B7's SCARCE gold, a drift away.
+        HeldBy("SHIP-4", B7, "COPPER_ORE", B14);
+        HeldBy("SHIP-5", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-6", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-7", H51, "IRON_ORE");
+        Fleet(Drone(), Drone("SHIP-4", B7), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol, trip.Drifting).Should().Be(("COPPER_ORE", H51, false));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("uncovered");
+    }
+
+    [Fact]
+    public async Task ADroneIsBought_ForAnOreShortInASecondArea()
+    {
+        // D53: "the coverage tier may buy a drone per scarce mineral per area (more drones)". Copper is short at H51 and at
+        // B7, and a drone on H51's copper doesn't cover B7's. Five drones work on five ores; B7's copper waits for a drone,
+        // which comes before the cargo ships (D43), without asking the role board.
+        HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-4", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-5", H51, "COPPER_ORE");
+        HeldBy("SHIP-6", H51, "IRON_ORE");
+        HeldBy("SHIP-7", B7, "GOLD_ORE", B14);
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7));
 
         await RunAsync();
 
@@ -464,17 +515,18 @@ public sealed class MiningAutomationServiceTests
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
     /// <summary>
-    /// Five drones: four on silicon, quartz, copper and B7's gold, a drift away (D45), and SHIP-6 on a trade, so H51's iron
-    /// waits.
+    /// Six drones: five on silicon, quartz, copper, and B7's gold and copper, a drift away (D45, D53), and SHIP-6 on a trade,
+    /// so H51's iron waits.
     /// </summary>
-    private void FiveDronesOneTrading()
+    private void SixDronesOneTrading()
     {
         HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
         HeldBy("SHIP-4", F49, "QUARTZ_SAND");
         HeldBy("SHIP-5", H51, "COPPER_ORE");
         _activeGoals["SHIP-6"] = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = H51, SellWaypointSymbol = F49 };
         HeldBy("SHIP-7", B7, "GOLD_ORE", B14);
-        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7));
+        HeldBy("SHIP-8", B7, "COPPER_ORE", B14);
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7), Drone("SHIP-8", B7));
     }
 
     private void HeldBy(string ship, string market, string ore, string asteroid = XB5C)
