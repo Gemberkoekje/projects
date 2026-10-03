@@ -96,8 +96,8 @@
   surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged and deployed
   (projects#137, its turn fix projects#138, gembernodes#35, #36 and #37); 6.10c (drones drifting to minerals out of fuel range)
   is merged and deployed (projects#139, gembernodes#37, 12:13Z on 2026-10-03). Its first drift (SPECTER-4 to B7, 12:35Z)
-  found B54 (projects#140, gembernodes#38: the cluster runs `bde1387` since 13:01Z), and the designated surveyor's first
-  wait found B55.
+  found B54 (projects#140, gembernodes#38), and the designated surveyor's first wait found B55 (projects#141, gembernodes#39:
+  the cluster runs `29c0b9a` since 13:42Z) and your decision D52: a ship that can only survey surveys on.
 
 ## Known issues
 
@@ -223,6 +223,7 @@ get the next D-number.
 | D49 | Slice 6.10 (asked on 2026-10-03): the board valued a siphon drone at ~274,000 credits an hour (it earns 7–10k), mining drones at 80–95k (1–3k), the command ship's trades at up to 4.7M (13k): D39's second step counts, for every unit of gas, a quarter of a price difference such as PLASTICS → EQUIPMENT (~3,200), and a siphon trip's gases were valued at the best market anywhere. How are the rates fixed? | **Cap the chain value, at the trip's own market** (slice 6.10a), "for now"; amends D39: goods are valued where the trip sells them, and the chain's share (both D39 steps kept) is capped so that feeding a factory at most doubles what a trip earns per unit: its price for mined and siphoned goods, its margin for trades. |
 | D50 | Slice 6.10 (asked on 2026-10-03): "we should visualize the actual correlation between the amount of goods sold and the amount of processed goods added, and what that does to the price. Because a unit of hydrocarbons might make a unit of plastics, but we don't know how many … (we also don't know at what rate a hydrocarbon gets converted to plastics per unit of time)." | **Measure it** (slice 6.10a): the bot counts the units it sells and buys per market and good; the dashboard plots what we sell into a market per hour against the supply, trade volume and price of what that market makes from it, so the rate and the delay can be read off. D49's cap stands until those numbers say better. |
 | D51 | Slice 6.10b (asked on 2026-10-03, in another session): "What if we made the amount of credits for trade wider based on the amount of cargo total in the fleet? Something like: 60.000 hard minimum, 1.000 per cargo hold. … This might ramp it up a bit too much. Which defaults would you recommend?" In 24 hours the command ship made 150 trade purchases, 51,610 credits on average (median 54,331, 27 units): an expensive good's trade volume (often 20 units) caps a load, so a trip's cost barely grows with the hold; the drones' few trades cost 45–67k. Counting every hold (11 drones and the command ship, 205 units) would ask 265,000, above the ~150,000 the credits peak at, and freeze every purchase. | **Grow the reserve with the trading holds:** the credits every ship purchase keeps are `FleetExpansion.MinCreditReserve` (the floor, seeded at 60,000) plus `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit of hold on the ships that trade: the cargo ships, the command ship (it trades whenever it isn't surveying, D34, D38) and any other ship the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo. The command ship alone keeps 100,000 (as today); with a light shuttle (40) 140,000, so the first light hauler needs 354,210 + 140,000; with one light hauler (80) 220,000, with two 300,000; a drone in the trade role adds 15,000 while it has it; no ship that trades, 60,000. The recommended defaults, yours unchanged. |
+| D52 | Slice 6.10c's first watch (2026-10-03): with every ore it reached at its stock of surveys (D27), the designated surveyor SPECTER-F (D47), which can do nothing else, waited at XB5C (and B55's false anomaly fired on it). | **Survey on:** "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is lowest." A ship that can only survey, once every ore it reaches has its stock, surveys the target it reaches with the fewest usable surveys, then the contract's, then the best paid. The command ship, which can do more, still waits, or trades and mines in its spare time (D27, D34). Amends D27 for ships that can only survey. ("Lowest" read as the fewest usable surveys, D27's own order.) |
 
 ## Phases
 
@@ -2036,8 +2037,10 @@ How credits are split stays your call; Claude only fixes deviations from intende
       ores a drone could serve go from three to five: with four mining drones, the coverage tier buys one more, ahead of
       the cargo ships (D43), and one drone for each of the two ends up at B7 after a drift of about 2.5 hours. Siphon drones
       don't drift in X1-DC53: C38 has every buyer in reach.
-    - Deploy: the cluster runs `04b6b18` (6.10b, gembernodes#36); a deploy of this branch's merge brings projects#138 and
-      6.10c together.
+    - Deployed by gembernodes#37 at 12:13Z on 2026-10-03, with projects#138. On the cluster the whole cycle ran by 13:30Z:
+      the command ship, left with 14 fuel at B14 by B54's surveys, drifted to B7 (12:51Z), switched back to CRUISE there
+      (12:54:29Z), mined iron at B14 and sold it at B7 (1,616 after fuel). SPECTER-4 (12:35Z), SPECTER-10, the coverage
+      drone bought at 13:09Z, and SPECTER-A (13:36Z) drifted to B7.
     - Noticed (not changed):
       - **Drift back and forth:** supply comes first (D28), so a drone at B7 whose ores there have risen to MODERATE drifts
         back to a SCARCE market in the middle, and a free drone in the middle drifts to a SCARCE one at B7, 2.5 hours each
@@ -2046,12 +2049,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
         B7 the survey plan may survey B14 for it, if the surveyor reaches B14 in CRUISE; those surveys can expire first.
         It happened at the first drift, worse than noted: the command ship also surveyed B37, where no drone can mine.
         That is B54, fixed in the follow-up below.
-    - **Follow-up, B54** (2026-10-03, branch `claude/spacetraders-b54`): the survey plan counts an asteroid where a miner
-      could mine it for the market, as the mining plan reckons the trip (in CRUISE, there and on to the market with the
-      fuel left), not where a miner merely reaches it; and a drone still drifting to a far market counts once it is there.
-      To understand it, start with `SurveyTargets` in `Mining/MiningPlanner.cs`, then `MinersAsync` in
-      `Automation/SurveyPlanService.cs`. Tests: `MiningPlannerTests` and `SurveyPlanServiceTests` (one new each). The
-      surveys already taken at B37 expire by themselves (13:26Z).
+      - **Coverage counts a mineral, not a market** (D48): with SPECTER-10 bound for B7's silicon, silicon counted as
+        covered, and SPECTER-A left the middle's silicon markets for B7's iron. Yours to call.
       - **The contract plan takes any free miner** without checking that it can reach the contract's asteroid in CRUISE,
         and the contract's commands fly with the fallback (B47). Under D1 (one contract per reset) and D23 (no drone is
         bought while the contract mines) no drone has drifted while a contract wants ore; a slice that takes the next
@@ -2082,7 +2081,20 @@ How credits are split stays your call; Claude only fixes deviations from intende
         `NavigateToWaypointHandlerTests`, `FlightLogLinesTests`, `AlreadyAtDestinationLoopTests`,
         `FleetStatusQueryServiceTests`, `ShipRuleTests` (a comment); `ShipGoalSerializationTests` (Domain);
         `PrometheusMetricsTests` (API); docs: `docs/HOW_IT_WORKS.md`, the `st-investigate` skill (a drift takes hours).
-  - **To understand this,** start with the decisions D43–D51, then this slice's notes; 6.10b and 6.10c each have their own
+    - **Follow-up, B54** (projects#140, deployed by gembernodes#38): the survey plan counts an asteroid where a miner could
+      mine it for the market, as the mining plan reckons the trip (in CRUISE, there and on to the market with the fuel
+      left), not where a miner merely reaches it; and a drone still drifting to a far market counts once it is there. To
+      understand it, start with `SurveyTargets` in `Mining/MiningPlanner.cs`, then `MinersAsync` in
+      `Automation/SurveyPlanService.cs`. Tests: `MiningPlannerTests` and `SurveyPlanServiceTests` (one new each).
+    - **Follow-up, B55** (projects#141, deployed by gembernodes#39): the survey plan's state lists the surveyors that can
+      reach each target (`CandidateShipSymbols`), and `ShipLeftIdle` counts a target as work only for those. Tests:
+      `ShipRuleTests`, `SurveyPlanServiceTests` (one new each).
+    - **Follow-up, D52** (branch `claude/spacetraders-surveyor-surveys-on`): a ship that can only survey
+      (`FleetRoles.CanOnlySurvey`), with every ore it reaches at its stock, surveys on: the target it reaches with the
+      fewest usable surveys first. `ShipLeftIdle` counts any target it reaches as work for it. Start with the surveyor
+      loop in `Automation/SurveyPlanService.cs`. Tests: `SurveyPlanServiceTests`, `ShipRuleTests` (one new each; B55's
+      test keeps its point without a target the surveyor reaches).
+  - **To understand this,** start with the decisions D43–D52, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes

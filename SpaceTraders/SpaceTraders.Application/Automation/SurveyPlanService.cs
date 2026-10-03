@@ -121,6 +121,19 @@ public sealed class SurveyPlanService(
                 var reachable = systemTargets
                     .Where(target => target.NeedsSurvey && MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
                     .ToList();
+                var beyondStock = reachable.Count == 0 && FleetRoles.CanOnlySurvey(surveyor);
+                if (beyondStock)
+                {
+                    // D52: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is
+                    // lowest": with every ore it reaches at its stock, the ore with the fewest usable surveys first.
+                    reachable = [.. systemTargets
+                        .Where(target => MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
+                        .OrderBy(target => target.UsableSurveys)
+                        .ThenByDescending(target => target.ForContract)
+                        .ThenByDescending(target => target.SellPrice)
+                        .ThenBy(target => target.Ore, StringComparer.Ordinal)];
+                }
+
                 if (reachable.Count == 0)
                 {
                     if (!gathering.Contains(surveyor.Symbol))
@@ -152,11 +165,12 @@ public sealed class SurveyPlanService(
 
                 surveying[surveyor.Symbol] = goal;
                 logger.LogDebug(
-                    "Survey plan: ship {ShipSymbol} surveys {WaypointSymbol} for {TradeSymbol}{ForContract}.",
+                    "Survey plan: ship {ShipSymbol} surveys {WaypointSymbol} for {TradeSymbol}{ForContract}{BeyondStock}.",
                     surveyor.Symbol,
                     target.AsteroidSymbol,
                     target.Ore,
-                    target.ForContract ? " (the contract's)" : string.Empty);
+                    target.ForContract ? " (the contract's)" : string.Empty,
+                    beyondStock ? " beyond its stock (D52)" : string.Empty);
             }
 
             // The surveyors that can reach each asteroid: only for those is a target work the plan could give (B55).
@@ -225,7 +239,7 @@ public sealed class SurveyPlanService(
             .Order(StringComparer.Ordinal))
         {
             if (fleet.Any(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)
-                && FleetRoles.PotentialRoles(ship) is [FleetRole.Survey]))
+                && FleetRoles.CanOnlySurvey(ship)))
             {
                 continue;
             }

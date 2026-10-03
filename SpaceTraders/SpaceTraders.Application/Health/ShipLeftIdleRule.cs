@@ -118,15 +118,26 @@ public sealed class ShipLeftIdleRule(
         // Only the targets short of their stock of surveys: with the stock for every ore, a surveyor waits (D27). And only for
         // the surveyors that can reach them, which the plan lists: a designated surveyor's tank doesn't reach every asteroid
         // a miner works (B55).
-        if (surveyOn
-            && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { } survey
-            && survey.Targets.Where(target => target.NeedsSurvey && target.CandidateShipSymbols.Count > 0).ToList() is { Count: > 0 } toSurvey)
+        if (surveyOn && await plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, cancellationToken) is { } survey)
         {
-            waiting.Add(new WaitingWork(
-                AutomationPlan.Survey,
-                string.Create(CultureInfo.InvariantCulture, $"{toSurvey.Count} targets to survey"),
-                ship => board.IsSurveyor(ship.Ship)
-                    && toSurvey.Any(target => target.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase))));
+            var toSurvey = survey.Targets.Where(target => target.NeedsSurvey && target.CandidateShipSymbols.Count > 0).ToList();
+            if (toSurvey.Count > 0)
+            {
+                waiting.Add(new WaitingWork(
+                    AutomationPlan.Survey,
+                    string.Create(CultureInfo.InvariantCulture, $"{toSurvey.Count} targets to survey"),
+                    ship => board.IsSurveyor(ship.Ship) && Lists(toSurvey, ship)));
+            }
+
+            // A ship that can only survey surveys on once every ore has its stock (D52): any target it reaches is work.
+            var surveyable = survey.Targets.Where(target => target.CandidateShipSymbols.Count > 0).ToList();
+            if (surveyable.Count > 0)
+            {
+                waiting.Add(new WaitingWork(
+                    AutomationPlan.Survey,
+                    string.Create(CultureInfo.InvariantCulture, $"{surveyable.Count} targets to survey on"),
+                    ship => board.IsSurveyor(ship.Ship) && FleetRoles.CanOnlySurvey(ship.Ship) && Lists(surveyable, ship)));
+            }
         }
 
         // The plan gives every free probe a due market that nothing watches (D29), so a probe can only be left
@@ -213,6 +224,10 @@ public sealed class ShipLeftIdleRule(
 
         return waiting;
     }
+
+    /// <summary>Whether a ship is one the survey plan lists as able to reach one of the targets (B55).</summary>
+    private static bool Lists(IReadOnlyList<SurveyPlanTarget> targets, FleetShip ship)
+        => targets.Any(target => target.CandidateShipSymbols.Contains(ship.Symbol, StringComparer.OrdinalIgnoreCase));
 
     /// <summary>Work a plan has waiting, and which ships could take it.</summary>
     private sealed record WaitingWork(AutomationPlan Plan, string What, Func<FleetShip, bool> CanTake);

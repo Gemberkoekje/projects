@@ -133,6 +133,14 @@ public static class FleetRoles
     }
 
     /// <summary>
+    /// Whether the ship can only survey (<see cref="PotentialRoles"/>): a surveyor and no hold, such as a bought
+    /// <c>SHIP_SURVEYOR</c> (D47). With nothing else to do, it surveys on once every ore has its stock (D52).
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship whose one role is surveying.</returns>
+    public static bool CanOnlySurvey(ShipModel ship) => PotentialRoles(ship) is [FleetRole.Survey];
+
+    /// <summary>
     /// The roles a ship could take, by what it carries (slice 6.9, D38), whichever plans are on: survey with a
     /// surveyor; mine with a mining laser, a hold and a tank; siphon with a gas siphon, a hold and a tank; trade with
     /// a hold and a tank. A probe has none: the probe plan flies it.

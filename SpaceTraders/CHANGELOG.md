@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-03, D52)
+- A ship that can only survey surveys on (D52), as asked on 2026-10-03: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is lowest." Once every ore it reaches has its stock of surveys (D27), it surveys the target it reaches with the fewest usable surveys, then the contract's, then the best paid, instead of waiting. The command ship, which can do more, still waits, or trades and mines in its spare time. `ShipLeftIdle` counts any target a ship that can only survey reaches as work for it.
+
+### Docs – Changed (2026-10-03, D52)
+- `PLAN.md`: D52, 6.10c's watch and follow-ups. `docs/HOW_IT_WORKS.md`: the survey plan's surveying on, and the survey work the idle rule counts.
+
 ### Code – Fixed (2026-10-03, B55)
 - `ShipLeftIdle` counts a survey target as work only for the surveyors that can reach it, which the survey plan now lists per target (`CandidateShipSymbols`), as the mining, siphon and trading branches do. The designated surveyor, with an 80-unit tank in the middle of X1-DC53, waited by design while the targets that needed a survey were far out, for the command ship's mining, and the rule raised an anomaly on it.
 

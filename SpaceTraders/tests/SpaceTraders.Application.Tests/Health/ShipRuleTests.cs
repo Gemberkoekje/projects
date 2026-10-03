@@ -405,19 +405,39 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
+    public async Task AShipThatCanOnlySurvey_LeftIdleWhileATargetItReachesHasItsStock_IsAnAnomaly()
+    {
+        // D52: a ship that can only survey surveys on once every ore has its stock, so a target it reaches is work for it.
+        _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2, CandidateShipSymbols = ["SHIP-F"] }],
+            CreatedAt = Start,
+            UpdatedAt = Start,
+        });
+        _fleet.Have(FleetFixture.Drone("SHIP-F", Start) with { ShipType = "SHIP_SURVEYOR", MountSymbols = ["MOUNT_SURVEYOR_I"], CargoCapacity = 0 });
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        violations.Should().ContainSingle().Which.Details.Should().Contain("the Survey plan has work it could do: 1 targets to survey on");
+    }
+
+    [Fact]
     public async Task ASurveyor_OutOfReachOfEveryTargetThatNeedsASurvey_IsIdleByDesign()
     {
         // B55, seen on the cluster on 2026-10-03 at 13:15Z: SPECTER-F, the designated surveyor (an 80-unit tank), waited at
         // XB5C while the targets that needed a survey were at B14, B37, B8 and J72, which only the command ship's 400-unit
         // tank reaches, now that it mines. The plan gives a surveyor only targets it can reach, so that is no work it could
-        // give SPECTER-F (D13), as for the mining and siphon openings.
+        // give SPECTER-F (D13), as for the mining and siphon openings. (A target it reaches would be work for it, stocked or
+        // not: it surveys on, D52.)
         _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
         {
             PlanId = Guid.NewGuid(),
             Targets =
             [
                 new SurveyPlanTarget { TradeSymbol = "GOLD_ORE", WaypointSymbol = "X1-AB-B37", BuyerWaypointSymbol = "X1-AB-B7", NeedsSurvey = true },
-                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2, CandidateShipSymbols = ["SHIP-F"] },
+                new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-B14", BuyerWaypointSymbol = "X1-AB-B7", UsableSurveys = 2 },
             ],
             CreatedAt = Start,
             UpdatedAt = Start,
@@ -482,11 +502,12 @@ public sealed class ShipLeftIdleRuleTests
     [Fact]
     public async Task ASurveyorWaiting_WhileEveryOreHasItsStockOfSurveys_IsNotAnAnomaly()
     {
-        // D27: with a stock of usable surveys for every ore, there is nothing to survey; the surveyor waits.
+        // D27: with a stock of usable surveys for every ore, there is nothing to survey; the surveyor waits. The command ship can
+        // do more than survey, so it doesn't survey on (D52 is for a ship that can only survey).
         _plans.GetAsync<SurveyPlanState>(PlanTypes.Survey, Arg.Any<CancellationToken>()).Returns(new SurveyPlanState
         {
             PlanId = Guid.NewGuid(),
-            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2 }],
+            Targets = [new SurveyPlanTarget { TradeSymbol = "COPPER_ORE", WaypointSymbol = "X1-AB-XB5C", BuyerWaypointSymbol = "X1-AB-H51", UsableSurveys = 2, CandidateShipSymbols = ["SHIP-1"] }],
             CreatedAt = Start,
             UpdatedAt = Start,
         });

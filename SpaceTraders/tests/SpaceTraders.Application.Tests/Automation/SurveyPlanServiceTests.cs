@@ -180,6 +180,27 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task AShipThatCanOnlySurvey_SurveysOn_OnceEveryOreHasItsStock_TheOreWithTheFewestUsableSurveysFirst()
+    {
+        // D52, asked on 2026-10-03: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever
+        // ore is lowest." Every ore at XB5C has its stock of two; aluminum and iron have two, the others three, and aluminum
+        // pays more at H51.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        SurveysAre(
+            Survey("S-1", XB5C, "COPPER_ORE", "ALUMINUM_ORE", "IRON_ORE"),
+            Survey("S-2", XB5C, "SILICON_CRYSTALS", "QUARTZ_SAND", "COPPER_ORE"),
+            Survey("S-3", XB5C, "ALUMINUM_ORE", "IRON_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND"),
+            Survey("S-4", XB5C, "COPPER_ORE", "SILICON_CRYSTALS", "QUARTZ_SAND"));
+        Fleet(SurveyShip(), Drone());
+
+        await RunAsync();
+
+        _state!.Targets.Should().NotBeEmpty().And.OnlyContain(target => !target.NeedsSurvey);
+        var survey = _activeGoals["SHIP-5"].Should().BeOfType<SurveyWaypointGoal>().Subject;
+        (survey.TargetWaypointSymbol, survey.TargetDepositSymbol).Should().Be((XB5C, "ALUMINUM_ORE"));
+    }
+
+    [Fact]
     public async Task TheState_ListsTheSurveyorsThatCanReachEachTarget()
     {
         // B55: the command ship mines (its 400-unit tank takes it to B14 for B7), the surveyor's 80-unit tank keeps it in the
@@ -261,6 +282,8 @@ public sealed class SurveyPlanServiceTests
     [Fact]
     public async Task WithEveryOreStocked_TheSurveyorWaits()
     {
+        // D27. The command ship can do more than survey: it waits, or trades and mines in its spare time (D34); a ship that
+        // can only survey surveys on (D52).
         ContractMines("COPPER_ORE", XB5C, H51);
         SurveysAre(
             Survey("S-1", XB5C, "COPPER_ORE", "ALUMINUM_ORE", "IRON_ORE"),

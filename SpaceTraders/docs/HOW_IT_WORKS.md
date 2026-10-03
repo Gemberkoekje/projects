@@ -492,7 +492,9 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   `Survey.StockPerOre` (2, D27). Among those, the contract's ore comes first, then the ore with the
   fewest usable surveys, then the best paid. With the stock for every ore, the surveyor waits until
   a survey expires or is used up, or, with the spare-time plan on, mines or siphons in the meantime
-  (slice 6.8).
+  (slice 6.8). A ship that can only survey (`FleetRoles.CanOnlySurvey`: a bought `SHIP_SURVEYOR`) surveys on
+  instead (D52): of the targets it reaches, the one with the fewest usable surveys, then the contract's, then
+  the best paid.
 - **A spare-time trip that fills its hold** counts as free: a survey that needs taking takes the ship off it
   at once, with its hold aboard (D37), when that is safe (`SpareTimeInterruption`, see
   [Spare time](#spare-time-sparetimeplanservice-slice-68)), and logs `GatheringInterrupted` (`Reason`
@@ -1508,7 +1510,8 @@ treats as free (section 3):
   miner (D23); while the plan waits for a ship or budget, any miner. With the role board on, a miner is
   any ship that can mine and doesn't have the survey role (D40);
 - survey: a target to survey, for a ship that can survey (D20), or, with the role board on, a ship with
-  the survey role (slice 6.9), that the plan lists as able to reach it (B55);
+  the survey role (slice 6.9), that the plan lists as able to reach it (B55); for a ship that can only
+  survey, any target it can reach, as it surveys on (D52);
 - probe deployment: a market whose prices are due, with no probe at it or on its way and no other
   ship of ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25). A probe parked
   at its market while every market is watched is idle by design;
