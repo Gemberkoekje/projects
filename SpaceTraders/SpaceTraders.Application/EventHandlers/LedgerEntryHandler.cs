@@ -22,7 +22,9 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
             LedgerCategory.TradeSell,
             @event.Revenue,
             goodSymbol: @event.Good.Value,
+            unitPrice: @event.Units > 0 ? (int)(@event.Revenue / @event.Units) : null,
             units: @event.Units,
+            waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
         CountCredits(LedgerCategory.TradeSell, @event.Revenue);
         metrics.GoodsSold(@event.WaypointSymbol, @event.Good.Value, @event.Units);
