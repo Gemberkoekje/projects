@@ -323,7 +323,13 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      that can survey is no drone. Without that, a drone that earns more trading would leave its mineral,
      and the plan would buy the next, as one drone per scarce mineral and area is bought whatever trading
      pays;
-  5. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
+  5. every other drone gathers too (`gathers_first`, D58): "Mining drones should be mining drones first, and
+     traders second, and they should not leave gaps when trading in a way that results in endless drones being
+     bought." A drone (it can mine or siphon, and trade, and nothing else: no surveyor) takes its gathering role
+     whatever trading would pay, and trades only when its plan has no trip for it. Moved to trading for profit,
+     drones left the ores they had mined short, and the plans bought drones for them (on 2026-10-03 the board
+     moved SPECTER-3 between mining and trading three times in 30 minutes);
+  6. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
      takes one trip or none, no two the same trade route (D18) or the same mining or siphon opening, by the
      assignment that earns most in total (the Hungarian method, `Assignment`). A ship's current role counts
      `Roles.HeadStartPercent` (20) more (D41), so close calls don't flip back and forth. A ship left
@@ -384,7 +390,7 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
     plan left free;
   - the mining and siphon plans buy a drone beyond one per scarce mineral and area only when the board would give it
     their role (`RoleAdvisor`): a drone that would earn more trading would trade, and the plan would buy the
-    next for the same opening.
+    next for the same opening. Since D58 a drone always gathers first, so the board always would.
 - **Off** (the default), the fixed rules hold, as before slice 6.9 (D20, D34).
 - **The state** (`plan_states`, `Roles`), written at each evaluation: when it ran, the plans that were on and
   whether the contract wanted ore, and per ship its role, why, since when, the trip that decided it and what
@@ -590,8 +596,7 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
-     the drone the mining role (`RoleAdvisor`): a drone that would earn more trading would trade, and the
-     plan would buy the next for the same opening.
+     the drone the mining role (`RoleAdvisor`), which, since a drone gathers first (D58), it does.
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
   miner's trip sells there, Pending otherwise, with the free miners that could take it (they reach its
   asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. It is written only when it
@@ -632,7 +637,8 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
   in reach from C38), without asking the role board; then, when no
   siphoner was free, a drone whose first trip by the same ranking (its tank and hold from the shipyard's
   listing, the trips under way held) would serve a market short of its gas, in turn with the cargo ships,
-  and with the role board on only when the board would give it the siphon role (`RoleAdvisor`). In X1-DC53
+  and with the role board on only when the board would give it the siphon role (`RoleAdvisor`, which it does since
+  D58: a drone gathers first). In X1-DC53
   the shipyard is C39, the station at the gas giant C38, where none of our ships stays: the purchase calls
   for a probe (D30), which only the probe plan answers, so with the probe plan off no siphon drone is bought
   until one of our ships happens to be at C39.
@@ -1435,7 +1441,7 @@ The seven pages in `src/Future` are not routed.
   | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45); the move executor, when a ship that can only survey sets off to where most drones mine (D54) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there; for a move, `Destination` |
   | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
-  | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
+  | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `coverage`, `gathers_first`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
   | `CargoJettisoned` | `CargoJettison`: the trading and spare-time plans, for cargo nothing will sell or use (D42) | `ShipSymbol`, `Units`, `TradeSymbol`, `WaypointSymbol`, `Reason` (`no_buyer`, `not_worth_the_fuel`) |
   | `TripEnded` | `TripBook`, when a trade, mining, siphon or spare-time trip ends, and at each contract delivery (D46) | `ShipSymbol`, `Activity` (`trade`, `mining`, `siphoning`, `spare_time`, `contract`), `Earned`, `Spent`, `FuelCost`, `Profit`, `Minutes`, `Reason` (`sold`, `delivered`, `interrupted`, `runaway`, `rejected`, `nothing_aboard`, `no_buyer`, `not_bought_here`, `not_lucrative`, `not_possible`) |
   | `ProbeCalled` | Probe plan, when it sends a probe to a shipyard where a purchase waits for one of our ships (D30) | `ShipSymbol`, `WaypointSymbol`, `ShipType` the purchase is for |
@@ -1516,7 +1522,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_shipyard_ship_type` | `system`, `waypoint`, `ship_type` | 1 for each ship type a shipyard sells | Every minute |
   | `spacetraders_shipyard_ship_price`, `_ship_supply` | `system`, `waypoint`, `ship_type` | A ship type's price and supply (1 to 5) as last seen, once a ship has been there | Every minute |
   | `spacetraders_good_supply_chain` | `good`, `made_from`, `used_for` | One series per good, always 1: the goods it is made from and the goods made from it, comma-separated (`GET market/supply-chain`) | Once per start |
-  | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `None`) and why (`survey_first`, `coverage`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
+  | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `None`) and why (`survey_first`, `coverage`, `gathers_first`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
   | `spacetraders_ship_role_credits_per_hour` | `ship`, `role` | What each role a ship could take but surveying would earn it per hour, by the board's estimate of its best trip; 0 for a role without a trip. Only while the board is on | Every 10 s |
   | `spacetraders_setting_info` | `setting`, `current`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`) and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
   | `spacetraders_ship_capabilities_info` | `ship`, `can` | One series per ship, always 1: the roles its equipment allows whichever plans are on (`FleetRoles.PotentialRoles`), in the order `Survey` (a surveyor mount, or a bought SHIP_SURVEYOR), `Mine` (a mining laser, or a bought mining drone or ore hound, with a hold and a tank), `Siphon` (a gas siphon, or a bought siphon drone, with a hold and a tank), `Trade` (a hold and a tank); `none` for a probe or a ship with none. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role, which the `role` label of `spacetraders_ships` shows; this tells them apart (slice 6.10a). The fleet and roles tables' "can do" column | Every 10 s |

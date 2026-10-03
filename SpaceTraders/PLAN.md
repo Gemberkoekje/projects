@@ -109,8 +109,9 @@
   get away from (projects#148, gembernodes#46: the cluster runs `e17a765` since 19:03Z; SPECTER-F surveys B14 since
   19:17Z). B59, 429s from the API's rate limiter while the bot keeps to its budget: its first step, logging the
   limiter's headers with each 429, is merged and deployed (projects#149, gembernodes#47: the cluster runs `5ef42bd`
-  since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is built
-  on branch `claude/spacetraders-reserve-trip-credits`.
+  since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is merged
+  (projects#150); its deploy is gembernodes#48. Your decision D58, drones gather first, is built on branch
+  `claude/spacetraders-drones-gather-first`.
 
 ## Known issues
 
@@ -246,6 +247,7 @@ get the next D-number.
 | D55 | After D54 (2026-10-03): one survey ship serves one area at a time, so the area with fewer drones mines without surveys (at 15:45Z three drones in the middle, four for B7). Asked: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." Where in the order? | **A survey ship per area, after the coverage drones:** while a system has fewer ships that can only survey than areas with mining drones (as the survey ships fly between them), one more is bought, after the drones per scarce mineral and area (D48, D53) and before the cargo ships; the first stays second in the order (D47). Each area with drones gets a survey ship of its own: one already there or on its way takes it, and of two in one area, one drifts to an area with drones that has none. Amends D54. |
 | D56 | Slice 6.10 (asked on 2026-10-03): "Can we add the rule that only full cargo holds can be traded? As the price changes after the buy, it's much more effective if 40 units are bought compared to 6 or 7." A market trades at most its trade volume at once, and each trade moves its price: on 2026-10-03 a purchase raised it 4% (under half the trade volume), 7% (half or more) or 9% (all of it), a sale lowered it 1 to 3%; a unit costs the price quoted for its purchase. The drones bought SHIP_PARTS 6 or 7 at a time at D41 (15 at once) and sold them at C39 and H52 (7 and 6 at once); a trip took as many units as the free hold, both trade volumes and the credits allowed, in one purchase. How should a trade fill a hold, and with what credits? | **Full hold or nothing, in one purchase and one sale:** "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits pay for all of it (the trip's fuel and `Trade.FuelReserveCredits` kept back, D24); otherwise the ship takes other work, and drones keep trading when a full hold is there (D37's spare time). The credits: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships are bought." While a trader's best route is a full hold the credits don't pay for yet, the credit reserve every ship purchase keeps (D51) grows by the dearest such hold, until it is bought. Amends D51; replaces "as many units as the credits allow". |
 | D57 | After D56 (2026-10-03): traders share one pot of credits, and nothing held back the credits of a trip already on its way to buy. At 19:29Z SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85; by the time it got there another trader had spent about 121,000, leaving 54,596, too little once the fuel reserve was kept back, and it dropped the trip as `not_possible` with nothing bought (before D56 it would have bought what the credits paid for). | **Hold the credits back from the start:** "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at the price it was chosen with, from the moment it starts until the cargo is aboard: the other traders get only the credits no trip holds back, the trip at its buy market spends its own, and ship purchases leave them, as they leave a saving (D56); a trader that sets off for the hold it saved up for saves up no more, as the trip's hold takes its place. A price that rose meanwhile is paid from the credits no trip holds back. |
+| D58 | After D57 (2026-10-03): asked why a drone (SPECTER-15, 18:52Z) was bought while the light shuttle waited, we found the role board moving drones between gathering and trading every 10 minutes for profit (SPECTER-3: Mine to Trade at 19:33Z, back at 19:51Z, to Trade at 20:01Z; siphon drones the same). The ores and gases they no longer gathered went short, and the coverage tier (D48, D53) bought drones for them: SPECTER-15's first trip was the middle's copper, "uncovered". Asked: "I feel it's wrong if the drone buying system feels like there are not enough mining drones, but the mining drones themselves are trading. Mining drones should be mining drones first, and traders second, and they should not leave gaps when trading in a way that results in endless drones being bought." | **Drones gather first, mining and siphon drones alike:** the role board gives every drone (it can mine or siphon, and trade, and nothing else) its gathering role, whatever trading would pay; a drone trades only when its plan has no trip for it, as it already could, so its trading leaves no mineral without a drone. The command ship, which can survey, still takes what pays it most (D38). Amends D38's "most profitable" for drones. |
 
 ## Phases
 
@@ -2237,7 +2239,24 @@ How credits are split stays your call; Claude only fixes deviations from intende
       - Tests: App 863 (4 new: `TradingAutomationServiceTests` 1, `TradeBetweenMarketsGoalExecutorTests` 2,
         `BudgetPolicyTests` 1; D56's saving test now ends in the trip's hold), Domain 72, API 164 (and 4 skipped; two
         credit-reserve cases with a trip's hold), and `ShipGoalRepositoryTests` 13 against Postgres (1 new).
-  - **To understand this,** start with the decisions D43–D57, then this slice's notes; 6.10b and 6.10c each have their own
+    - **Follow-up, D58** (branch `claude/spacetraders-drones-gather-first`): drones gather first.
+      - **The board** (`RolePlanner`, reason `gathers_first`): after the coverage keepers (D48, D53), every other drone
+        takes its gathering role, Mine for a mining drone and Siphon for a siphon drone, whatever trading would pay. A
+        drone is a ship whose roles include mining or siphoning and that has no surveyor (`FleetRoles.CanSurvey`), so
+        the command ship still shares the work by profit. Nothing changes in the plans: a drone with the mining or
+        siphon role already trades when its plan has no trip for it.
+      - **Purchases:** the coverage tier counts as before; the last tier's check that the board would have a new drone
+        gather (`RoleAdvisor`) now always passes, so such a drone is bought when its first trip would serve a market
+        short of its ore or gas, and no miner (or siphoner) is free.
+      - **What to expect:** no more `RoleChanged` lines moving a drone to Trade "most_profitable"; drones that traded
+        (SPECTER-3, and at times all seven siphon drones) gather at the next evaluation, within 10 minutes
+        of the deploy, as their trips end (D41). With the minerals they mine supplied, fewer go short, so the coverage
+        tier should stop buying drones for them.
+      - To understand it, start with `Decide` and `GathersFirst` in `Roles/RolePlanner.cs`.
+      - Tests: App 864 (1 new, `RolePlannerTests.ADrone_GathersFirst_ThoughTradingWouldPayItMore`; the tests of the
+        fleet-wide assignment, the head start and "no work" now use ships that can survey, and the coverage tests expect
+        the other drones to gather), Domain 72, API 164 (and 4 skipped).
+  - **To understand this,** start with the decisions D43–D58, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes
