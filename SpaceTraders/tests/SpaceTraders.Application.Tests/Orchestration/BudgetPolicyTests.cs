@@ -5,6 +5,7 @@ using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Tests.Roles;
+using SpaceTraders.Application.Trading;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
 namespace SpaceTraders.Application.Tests.Orchestration;
@@ -14,6 +15,7 @@ public sealed class BudgetPolicyTests
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly ISettingsRepository _settings = ReserveSettings();
+    private readonly FullHoldSavings _savings = new();
 
     public BudgetPolicyTests() => Fleet();
 
@@ -119,6 +121,24 @@ public sealed class BudgetPolicyTests
     }
 
     [Fact]
+    public async Task WhileATraderSavesUpForAFullHold_TheReserveGrowsByTheDearest_UntilItIsBought()
+    {
+        // D56: "the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought".
+        Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
+        _savings.SaveFor("SHIP-1", "X1-AB-K85|X1-AB-D41|EQUIPMENT", 130_312);
+        _savings.SaveFor("SHIP-5", "X1-AB-D41|X1-AB-A1|MEDICINE", 194_922);
+
+        var decision = await Policy(MakeAgent(1_000_000), _settings).EvaluateAsync(50_000, CancellationToken.None);
+
+        decision.ReservedCredits.Should().Be(60_000 + 194_922);
+
+        _savings.Clear("SHIP-5");
+        _savings.Clear("SHIP-1");
+
+        (await Policy(MakeAgent(1_000_000), _settings).EvaluateAsync(50_000, CancellationToken.None)).ReservedCredits.Should().Be(60_000);
+    }
+
+    [Fact]
     public async Task WithoutAShipThatTrades_TheReserveIsTheFloor()
     {
         Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
@@ -158,5 +178,5 @@ public sealed class BudgetPolicyTests
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
-    private BudgetPolicy Policy(IAgentRepository agents, ISettingsRepository settings) => new(agents, settings, _ships, _plans);
+    private BudgetPolicy Policy(IAgentRepository agents, ISettingsRepository settings) => new(agents, settings, _ships, _plans, _savings);
 }
