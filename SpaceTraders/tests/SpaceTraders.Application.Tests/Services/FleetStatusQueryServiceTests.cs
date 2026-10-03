@@ -658,6 +658,23 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     }
 
     [Fact]
+    public async Task GetAssignmentsAsync_ATripThatDrifts_SaysSo()
+    {
+        // Slice 6.10c (D45): a trip to a market out of the ship's CRUISE reach drifts there first, for hours.
+        var svc = Build(
+            shipRepo: ShipsWith("DRONE-1", "SIPHON-1"),
+            shipGoalRepo: ShipGoalsWith(
+                ("DRONE-1", new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = "X1-DC53-B14", SellWaypointSymbol = "X1-DC53-B7", Drifting = true }),
+                ("SIPHON-1", new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-DC53-D90", SellWaypointSymbol = "X1-DC53-F48", Drifting = true })));
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Select(snapshot => snapshot.GoalDescription).Should().BeEquivalentTo(
+            "Drifting to X1-DC53-B7, then mining GOLD_ORE at X1-DC53-B14 and selling at X1-DC53-B7",
+            "Drifting to X1-DC53-F48, then siphoning at X1-DC53-D90 for LIQUID_NITROGEN and selling at X1-DC53-F48");
+    }
+
+    [Fact]
     public async Task GetAssignmentsAsync_GatherAndSellGoal_SaysWhatTheShipDoesInItsSpareTime()
     {
         // Slice 6.8: the command ship's spare-time trip, siphoning; then selling a good of its hold.

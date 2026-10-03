@@ -21,6 +21,12 @@ public sealed record NavigateToWaypointCommand
 
     public required string DestinationWaypoint { get; init; }
 
+    /// <summary>
+    /// The flight mode to fly in, set in orbit before the flight (PLAN.md slice 6.10c): DRIFT to a market out of the
+    /// ship's CRUISE reach (D45), CRUISE for a flight a goal plans. Empty keeps the ship's mode.
+    /// </summary>
+    public string FlightMode { get; init; } = string.Empty;
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public NavigateToWaypointCommand(string ShipSymbol, string DestinationWaypoint)
     {
@@ -57,7 +63,7 @@ public sealed record NavigateToWaypointArrivedCommand
 /// 1. Check if ship is already at destination — nothing to do; return without publishing anything.
 ///    Callers dock or orbit at their target themselves.
 /// 2. If docked: refuel (if at fuel market), then orbit.
-/// 3. If in orbit: navigate.
+/// 3. If in orbit: set the flight mode asked for, if any; then navigate.
 /// 4. If neither: publish mismatch and return.
 /// </summary>
 public sealed class NavigateToWaypointHandler(
@@ -67,6 +73,7 @@ public sealed class NavigateToWaypointHandler(
     IOrbitSubCommand orbit,
     INavigateSubCommand navigate,
     IRefuelSubCommand refuel,
+    IFlightModeSubCommand flightMode,
     IMessageBus bus,
     ILogger<NavigateToWaypointHandler> logger)
 {
@@ -123,6 +130,13 @@ public sealed class NavigateToWaypointHandler(
                 command.ShipSymbol,
                 ship?.Status ?? "UNKNOWN");
             return;
+        }
+
+        // The flight mode asked for (slice 6.10c), set in orbit, after the orbit's refuel: DRIFT to a market out of
+        // CRUISE reach, CRUISE for a goal's planned flight.
+        if (command.FlightMode.Length > 0)
+        {
+            await flightMode.EnsureAsync(ship!, command.FlightMode, cancellationToken);
         }
 
         var activeGoalForNav = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);

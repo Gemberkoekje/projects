@@ -26,7 +26,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 ///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
 /// </list>
 /// The goal keeps what the cargo cost, and however the trip ends, sold or dropped, it is booked with what its
-/// sales brought in (<see cref="ITripBook"/>, D46).
+/// sales brought in (<see cref="ITripBook"/>, D46). Its flights are in CRUISE, which the arithmetic assumes: a ship
+/// left in DRIFT is switched back before it flies (slice 6.10c).
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
     IShipRepository ships,
@@ -43,6 +44,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     private const string NotLucrative = "not_lucrative";
     private const string NotPossible = "not_possible";
     private const string NotBoughtHere = "not_bought_here";
+    private const string CruiseMode = "CRUISE";
 
     /// <inheritdoc />
     public bool CanExecute(ShipGoal goal) => goal is TradeBetweenMarketsGoal;
@@ -255,7 +257,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             elsewhere.FuelCost,
             NotLucrative);
 
-        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, TradeRoutePlanner.NextStop(map, ship, elsewhere.WaypointSymbol)), ct);
+        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, TradeRoutePlanner.NextStop(map, ship, elsewhere.WaypointSymbol)) { FlightMode = CruiseMode }, ct);
         return GoalExecutionResult.WaitingForArrival(
             $"Selling at {elsewhere.WaypointSymbol} instead of {trade.SellWaypointSymbol}.");
     }
@@ -268,7 +270,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     {
         var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
         var stop = TradeRoutePlanner.NextStop(context.Map, ship, destination);
-        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, stop), ct);
+        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, stop) { FlightMode = CruiseMode }, ct);
         return GoalExecutionResult.WaitingForArrival(
             stop.Equals(destination, StringComparison.OrdinalIgnoreCase)
                 ? $"Navigating to {destination}."

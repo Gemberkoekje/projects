@@ -72,7 +72,8 @@ public static class JournalEvents
     /// A miner took mining work (slice 6.4): a trip to mine and sell, or a place in the contract's work
     /// (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it mines at, <c>SellWaypoint</c>,
     /// <c>Reason</c>: <c>contract</c>, <c>surveyed</c>, <c>low_supply</c>, <c>lowest_supply</c> (no market is
-    /// short of an ore, D28) or <c>held_cargo</c>).
+    /// short of an ore, D28), <c>uncovered</c> (an ore no miner works on, D48) or <c>held_cargo</c>). A trip to a
+    /// market out of the ship's CRUISE reach logs <see cref="DriftStarted"/> when it sets off (D45).
     /// </summary>
     public const string MiningStarted = nameof(MiningStarted);
 
@@ -85,9 +86,18 @@ public static class JournalEvents
     /// <summary>
     /// A siphoner took a siphon trip (slice 6.7: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it
     /// siphons at, <c>SellWaypoint</c>, <c>Reason</c>: <c>low_supply</c>, <c>lowest_supply</c> (no market is short
-    /// of a gas, D28) or <c>held_cargo</c>).
+    /// of a gas, D28), <c>uncovered</c> (a gas no siphoner works on, D48) or <c>held_cargo</c>). A trip to a market
+    /// out of the ship's CRUISE reach logs <see cref="DriftStarted"/> when it sets off (D45).
     /// </summary>
     public const string SiphonStarted = nameof(SiphonStarted);
+
+    /// <summary>
+    /// A mining or siphon trip set off in DRIFT to its market, out of the ship's CRUISE reach (slice 6.10c, D45:
+    /// <c>ShipSymbol</c>, <c>WaypointSymbol</c> it leaves, <c>SellWaypoint</c> it drifts to, <c>TradeSymbol</c>,
+    /// <c>SourceWaypoint</c> it gathers at from there). The drift burns 1 fuel whatever the distance and takes about ten
+    /// times as long as in CRUISE; the trip's next flight, from that market, is in CRUISE.
+    /// </summary>
+    public const string DriftStarted = nameof(DriftStarted);
 
     /// <summary>
     /// A ship with nothing to survey or trade took a spare-time trip (slice 6.8: <c>ShipSymbol</c>, <c>WaypointSymbol</c>

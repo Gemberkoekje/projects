@@ -236,6 +236,30 @@ public sealed class PrometheusMetricsServiceTests
                 });
             }
 
+            // A mining drone and a siphon drone drifting to markets out of their CRUISE reach (slice 6.10c, D45): hours away.
+            var mineFar = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = "X1-AB-B14", SellWaypointSymbol = "X1-AB-B7", Drifting = true };
+            var siphonFar = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-D90", SellWaypointSymbol = "X1-AB-F48", Drifting = true };
+            foreach (var (symbol, shipType, goal) in new (string, string, ShipGoal)[] { ("AGENT-11", "SHIP_MINING_DRONE", mineFar), ("AGENT-12", "SHIP_SIPHON_DRONE", siphonFar) })
+            {
+                var market = goal is MineAndSellGoal mine ? mine.SellWaypointSymbol : ((SiphonAndSellGoal)goal).SellWaypointSymbol;
+                db.Ships.Add(new CachedShip
+                {
+                    AgentId = AgentId,
+                    Symbol = symbol,
+                    ShipType = shipType,
+                    Status = "IN_TRANSIT",
+                    WaypointSymbol = market,
+                    DestWaypointSymbol = market,
+                    ArrivesAt = now.AddHours(2),
+                    FlightMode = "DRIFT",
+                    CargoCapacity = 15,
+                    GoalId = goal.GoalId,
+                    GoalKind = goal.Kind.ToString(),
+                    GoalPayloadJson = JsonSerializer.Serialize(goal),
+                    GoalStatus = (int)goal.Status,
+                });
+            }
+
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -264,6 +288,8 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-8", "X1-AB-C38 (GAS_GIANT)", "siphoning for LIQUID_HYDROGEN"),
             ("AGENT-9", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining in its spare time"),
             ("AGENT-10", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "selling QUARTZ_SAND"),
+            ("AGENT-11", "→ X1-AB-B7", "drifting to X1-AB-B7 to mine GOLD_ORE"),
+            ("AGENT-12", "→ X1-AB-F48", "drifting to X1-AB-F48 to siphon for LIQUID_NITROGEN"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);

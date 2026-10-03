@@ -96,6 +96,23 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task AFreeSiphoner_TakesAScarceMarketADriftAway_AndItsTripDriftsThereFirst()
+    {
+        // D45 for gases (slice 6.10c): with a gas giant 13 from F48, which is beyond a drone's tank, F48's scarce nitrogen
+        // comes before the markets that aren't short. X1-DC53 has no such gas giant.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(MapWithAGasGiantNearF48(), 250_000, 200));
+        HeldBy("SHIP-6", G50, "LIQUID_HYDROGEN");
+        HeldBy("SHIP-7", E47, "LIQUID_NITROGEN");
+        HeldBy("SHIP-8", G50, "HYDROCARBON");
+        Fleet(SiphonDrone(), SiphonDrone("SHIP-6"), SiphonDrone("SHIP-7"), SiphonDrone("SHIP-8"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SourceWaypointSymbol, trip.SellWaypointSymbol, trip.Drifting).Should().Be(("LIQUID_NITROGEN", D90, F48, true));
+    }
+
+    [Fact]
     public async Task TwoSiphoners_NeverShareASellMarketAndGas()
     {
         Fleet(SiphonDrone("SHIP-5"), SiphonDrone("SHIP-6"));

@@ -86,6 +86,69 @@ public sealed class SiphonPlannerTests
     }
 
     [Fact]
+    public void AFarMarketWithoutAGasGiantWithinARoundTripOfIt_IsNoTarget()
+    {
+        // D45: F48 is beyond a drone's tank and sells fuel, but C38, the one gas giant, is 228 from it: X1-DC53's siphon
+        // drones have no reason to drift.
+        SiphonPlanner.SiphonTargets(Map(), SiphonDrone(), new HashSet<string>()).Should().NotContain(target => target.SellWaypointSymbol == F48);
+    }
+
+    [Fact]
+    public void AMarketBeyondADronesTank_IsAFarTarget_WithAGasGiantWithinARoundTripOfIt()
+    {
+        // D45, "a way to add mining/siphoning drones for the minerals outside of fuel range": with D90 13 from F48, F48's
+        // gases count, a drift away. A far target ranks after the reachable ones of its supply level: F48's SCARCE
+        // nitrogen after G50's and E47's SCARCE gases, though it pays most; its LIMITED hydrogen after G50's hydrocarbon.
+        var targets = SiphonPlanner.SiphonTargets(MapWithAGasGiantNearF48(), SiphonDrone(), new HashSet<string>());
+
+        targets.Select(target => (target.Gas, target.SellWaypointSymbol, target.Far)).Take(5).Should().Equal(
+            ("LIQUID_HYDROGEN", G50, false),
+            ("LIQUID_NITROGEN", E47, false),
+            ("LIQUID_NITROGEN", F48, true),
+            ("HYDROCARBON", G50, false),
+            ("LIQUID_HYDROGEN", F48, true));
+        targets.Where(target => target.Far).Should().OnlyContain(target => target.GasGiantSymbol == D90);
+        targets.Where(target => !target.Far).Should().OnlyContain(target => target.GasGiantSymbol == C38);
+    }
+
+    [Fact]
+    public void AScarceGasNoSiphonerWorksOn_ComesFirst_ThoughADriftAway()
+    {
+        // D48 with D45: siphoners work on hydrogen and hydrocarbon, and only F48, a drift away, is short of nitrogen.
+        MarketSnapshot[] markets =
+        [
+            .. Markets().Where(market => market.WaypointSymbol != E47),
+            Market(
+                E47,
+                Good("LIQUID_NITROGEN", "IMPORT", 100, 50, 60, "MODERATE"),
+                Good("LIQUID_HYDROGEN", "IMPORT", 96, 48, 60, "MODERATE"),
+                Good("FUEL", "EXCHANGE", 81, 71, 180, "MODERATE")),
+        ];
+
+        var targets = SiphonPlanner.SiphonTargets(
+            MapWithAGasGiantNearF48(markets),
+            SiphonDrone(),
+            new HashSet<string>(),
+            new HashSet<string> { "HYDROCARBON", "LIQUID_HYDROGEN" });
+
+        (targets[0].Gas, targets[0].SellWaypointSymbol, targets[0].Far).Should().Be(("LIQUID_NITROGEN", F48, true));
+    }
+
+    [Fact]
+    public void OfTheGasesNoSiphonerWorksOn_ThoseInReach_ComeBeforeThoseADriftAway()
+    {
+        // D48's "near before far", and D45's far targets after the reachable ones.
+        var targets = SiphonPlanner.SiphonTargets(MapWithAGasGiantNearF48(), SiphonDrone(), new HashSet<string>(), new HashSet<string>());
+
+        targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Take(5).Should().Equal(
+            ("LIQUID_HYDROGEN", G50),
+            ("LIQUID_NITROGEN", E47),
+            ("HYDROCARBON", G50),
+            ("LIQUID_NITROGEN", F48),
+            ("LIQUID_HYDROGEN", F48));
+    }
+
+    [Fact]
     public void ALongRangeShip_ReachesTheFarMarkets()
     {
         var targets = SiphonPlanner.SiphonTargets(Map(), CommandShip(), new HashSet<string>());

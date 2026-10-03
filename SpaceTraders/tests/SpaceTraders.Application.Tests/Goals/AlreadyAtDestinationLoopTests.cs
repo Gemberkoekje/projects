@@ -140,6 +140,7 @@ public sealed class AlreadyAtDestinationLoopTests
             _orbit,
             _navigate,
             Substitute.For<IRefuelSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             _bus,
             NullLogger<NavigateToWaypointHandler>.Instance);
 

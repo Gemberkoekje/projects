@@ -68,28 +68,29 @@ public sealed class RolePlanServiceTests
     [Fact]
     public async Task OneDronePerScarceOre_KeepsMining_AndTheRestShareTheWork()
     {
-        // Slice 6.10b (D48): four ores are SCARCE or LIMITED near the middle, and there are five drones. The fifth takes what
-        // pays it most: in the middle of X1-DC53, with no lucrative route, mining.
-        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+        // Slice 6.10b (D48): five ores are SCARCE or LIMITED for a drone, four near the middle and B7's gold, a drift away
+        // (D45), and there are six drones. The sixth takes what pays it most: in the middle of X1-DC53, with no lucrative
+        // route, mining.
+        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"));
 
         await RunAsync();
 
         _state!.Ships.Where(ship => ship.Reason == RolePlanner.Coverage).Select(ship => ship.ShipSymbol)
-            .Should().Equal("SHIP-3", "SHIP-4", "SHIP-5", "SHIP-6");
-        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Should().Match<RoleShipState>(
+            .Should().Equal("SHIP-3", "SHIP-4", "SHIP-5", "SHIP-6", "SHIP-7");
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-8").Should().Match<RoleShipState>(
             ship => ship.Role == FleetRole.Mine && ship.Reason == RolePlanner.MostProfitable && ship.CreditsPerHour > 0 && ship.Job.Length > 0);
     }
 
     [Fact]
     public async Task ADroneWorkingOnAScarceOre_IsTheOneKeptForIt()
     {
-        HeldBy("SHIP-7", H51, "COPPER_ORE");
-        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"));
+        HeldBy("SHIP-8", H51, "COPPER_ORE");
+        Fleet(CommandShip(), Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"));
 
         await RunAsync();
 
         _state!.Ships.Where(ship => ship.Reason == RolePlanner.Coverage).Select(ship => ship.ShipSymbol)
-            .Should().BeEquivalentTo(["SHIP-7", "SHIP-3", "SHIP-4", "SHIP-5"]);
+            .Should().BeEquivalentTo(["SHIP-8", "SHIP-3", "SHIP-4", "SHIP-5", "SHIP-6"]);
     }
 
     [Fact]

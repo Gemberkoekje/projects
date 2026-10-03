@@ -17,8 +17,11 @@ namespace SpaceTraders.Application.Mining;
 ///   and once no market is short, the lowest supply there is. It mines at an asteroid with a usable survey
 ///   holding the ore, else at the asteroid nearest the market, and sells there. Within a supply level,
 ///   surveyed ores first, then the most a single extraction is expected to fetch;</item>
-///   <item>only asteroids a ship can reach count, through refuelling stops (the drones' 80-unit tanks keep
-///   them near the markets that sell fuel).</item>
+///   <item>only trips a ship can make in CRUISE count, through refuelling stops (the drones' 80-unit tanks keep
+///   them near the markets that sell fuel): to the asteroid, and on to the market with the fuel left;</item>
+///   <item>a market out of that reach that sells fuel counts too (slice 6.10c, D45): the ship drifts there first,
+///   1 fuel whatever the distance, and mines from there, at an asteroid within a CRUISE round trip of it. Such a far
+///   target ranks after every reachable one of its supply level.</item>
 /// </list>
 /// </summary>
 public static class MiningPlanner
@@ -83,10 +86,55 @@ public static class MiningPlanner
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
 
-        var from = Position(ship);
-        var fuel = map.SellsFuel(from) ? ship.FuelCapacity : ship.FuelCurrent;
-        return TradeRoutePlanner.TryPlanFlight(map, from, destination, fuel, ship.FuelCapacity, out _);
+        return Arrival(map, ship, destination).Reached;
     }
+
+    /// <summary>
+    /// Whether a ship would drift to a market to gather from there (D45): it can't reach the market in CRUISE, it has the 1
+    /// fuel a drift burns, and the market sells fuel, as the ship flies on in CRUISE from there.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The miner or siphoner.</param>
+    /// <param name="market">Where it would drift to and sell.</param>
+    /// <returns>True when the ship would drift there.</returns>
+    public static bool CanDriftTo(TradeMarketMap map, ShipModel ship, string market)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return ship.FuelCapacity > 0 && ship.FuelCurrent > 0 && map.SellsFuel(market) && !CanReach(map, ship, market);
+    }
+
+    /// <summary>
+    /// Whether a ship that fills its tank at a market can fly from there to a source and back in CRUISE, with the fuel it
+    /// has left at the source, or a full tank where the source sells fuel (D45: "only targets whose asteroid is within a
+    /// CRUISE round trip of that market").
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The miner or siphoner.</param>
+    /// <param name="market">Where it fills its tank and sells.</param>
+    /// <param name="source">Where it fills its hold: an asteroid or a gas giant.</param>
+    /// <returns>True when both flights exist.</returns>
+    public static bool IsWithinRoundTrip(TradeMarketMap map, ShipModel ship, string market, string source)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return TradeRoutePlanner.TryPlanFlight(map, market, source, ship.FuelCapacity, ship.FuelCapacity, out var outward)
+            && TradeRoutePlanner.TryPlanFlight(map, source, market, map.SellsFuel(source) ? ship.FuelCapacity : outward.FuelLeft, ship.FuelCapacity, out _);
+    }
+
+    /// <summary>
+    /// Whether a ship can take an opening: it reaches the source in CRUISE, or would drift to the market and gather from
+    /// there (D45, <see cref="CanDriftTo"/>, <see cref="IsWithinRoundTrip"/>).
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The miner or siphoner.</param>
+    /// <param name="source">Where the opening is gathered: an asteroid or a gas giant.</param>
+    /// <param name="market">Where it is sold.</param>
+    /// <returns>True when the ship can take the opening.</returns>
+    public static bool CanTake(TradeMarketMap map, ShipModel ship, string source, string market)
+        => CanReach(map, ship, source) || (CanDriftTo(map, ship, market) && IsWithinRoundTrip(map, ship, market, source));
 
     /// <summary>
     /// What surveyors survey: the contract's ore, and each ore a market in the system buys, at the asteroid
@@ -160,10 +208,13 @@ public static class MiningPlanner
     /// What a miner can mine, best first (D28): for every market that buys an ore, mined at an asteroid with a
     /// usable survey holding it, or else at the asteroid nearest the market, and sold there. The markets shortest
     /// of their ore come first, so a miner serves a SCARCE market before a LIMITED one, and once no market is
-    /// short, the one with the lowest supply, even when it pays less. Within a supply level, surveyed ores first,
-    /// then the most a single extraction is expected to fetch (the ore's share of the deposits times its price),
-    /// then the nearest asteroid. Opportunities other miners hold are left out: one miner per sell market and ore.
-    /// The mining plan buys a drone only when its first trip here would serve a market short of its ore.
+    /// short, the one with the lowest supply, even when it pays less. Within a supply level, the targets in CRUISE
+    /// reach first, then surveyed ores, then the most a single extraction is expected to fetch (the ore's share of
+    /// the deposits times its price), then the nearest asteroid. A market out of the miner's CRUISE reach that sells
+    /// fuel is a far target (D45, <see cref="MiningTarget.Far"/>): the miner drifts there first, and mines at the
+    /// asteroid nearest it within a CRUISE round trip. Opportunities other miners hold are left out: one miner per
+    /// sell market and ore. The mining plan buys a drone only when its first trip here would serve a market short
+    /// of its ore.
     /// </summary>
     /// <param name="context">The miner's system.</param>
     /// <param name="miner">The miner.</param>
@@ -190,41 +241,66 @@ public static class MiningPlanner
             }
         }
 
-        var reaches = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        bool Reaches(string asteroid)
+        var arrivals = new Dictionary<string, (bool Reached, int Fuel)>(StringComparer.OrdinalIgnoreCase);
+        (bool Reached, int Fuel) ArrivalAt(string asteroid)
         {
-            if (!reaches.TryGetValue(asteroid, out var reachable))
+            if (!arrivals.TryGetValue(asteroid, out var arrival))
             {
-                reachable = CanReach(map, miner, asteroid);
-                reaches[asteroid] = reachable;
+                arrival = Arrival(map, miner, asteroid);
+                arrivals[asteroid] = arrival;
             }
 
-            return reachable;
+            return arrival;
+        }
+
+        // The trip in CRUISE: to the asteroid, and on to the market with the fuel left there (slice 6.10c).
+        bool Gathers(string asteroid, string market)
+            => ArrivalAt(asteroid) is { Reached: true } arrival
+                && TradeRoutePlanner.TryPlanFlight(map, asteroid, market, arrival.Fuel, miner.FuelCapacity, out _);
+
+        // A far market's ores share its asteroids: each round trip is worked out once.
+        var roundTrips = new Dictionary<(string Market, string Asteroid), bool>();
+        bool RoundTrip(string market, string asteroid)
+        {
+            if (!roundTrips.TryGetValue((market, asteroid), out var within))
+            {
+                within = IsWithinRoundTrip(map, miner, market, asteroid);
+                roundTrips[(market, asteroid)] = within;
+            }
+
+            return within;
         }
 
         var surveyed = context.Surveys
             .Select(survey => survey.WaypointSymbol)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(asteroid => IsExtractable(map, asteroid) && Reaches(asteroid))
+            .Where(asteroid => IsExtractable(map, asteroid) && ArrivalAt(asteroid).Reached)
             .ToList();
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
-            foreach (var good in map.GoodsAt(market).Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good)))
+            var ores = map.GoodsAt(market).Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good)).ToList();
+            var driftsThere = ores.Count > 0 && CanDriftTo(map, miner, market);
+            foreach (var good in ores)
             {
                 foreach (var asteroid in surveyed)
                 {
                     if (SurveySelection.TryPickBest(context.Surveys, asteroid, good.Symbol, context.Now, out var best)
-                        && CanSellFrom(map, miner, asteroid, market))
+                        && Gathers(asteroid, market))
                     {
                         Offer(new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, SurveySelection.Share(best, good.Symbol), Surveyed: true, good.Supply));
                     }
                 }
 
-                if (TryFindNearestAsteroid(map, good.Symbol, market, asteroid => Reaches(asteroid) && CanSellFrom(map, miner, asteroid, market), out var nearest))
+                if (TryFindNearestAsteroid(map, good.Symbol, market, asteroid => Gathers(asteroid, market), out var nearest))
                 {
-                    var isSurveyed = SurveySelection.TryPickBest(context.Surveys, nearest, good.Symbol, context.Now, out var best);
-                    var share = isSurveyed ? SurveySelection.Share(best, good.Symbol) : UnguidedShare(map, nearest);
-                    Offer(new MiningTarget(good.Symbol, nearest, market, good.SellPrice, share, isSurveyed, good.Supply));
+                    Offer(Nearest(context, good, nearest, market, far: false));
+                }
+
+                // Out of CRUISE reach (D45): the miner drifts to the market, which sells fuel, and mines from there.
+                if (driftsThere
+                    && TryFindNearestAsteroid(map, good.Symbol, market, asteroid => RoundTrip(market, asteroid), out var far))
+                {
+                    Offer(Nearest(context, good, far, market, far: true));
                 }
             }
         }
@@ -252,7 +328,8 @@ public static class MiningPlanner
 
     /// <summary>
     /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) whose ore isn't in
-    /// <paramref name="coveredOres"/>, the nearest asteroid first; then the rest, each group in the order given.
+    /// <paramref name="coveredOres"/>, those in CRUISE reach before those a drift away (D45), the nearest asteroid first;
+    /// then the rest, each group in the order given.
     /// </summary>
     /// <param name="map">The miner's system.</param>
     /// <param name="miner">The miner.</param>
@@ -269,6 +346,7 @@ public static class MiningPlanner
         return [.. targets
             .Select((target, rank) => (Target: target, Rank: rank, Uncovered: target.LowSupply && !coveredOres.Contains(target.Ore)))
             .OrderByDescending(entry => entry.Uncovered)
+            .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.AsteroidSymbol, out var distance) ? distance : double.MaxValue)
             .ThenBy(entry => entry.Rank)
             .Select(entry => entry.Target)];
@@ -316,8 +394,8 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// Orders two mining targets (<see cref="MiningTargets"/>): surveyed first, then the most an extraction is
-    /// expected to fetch, then by key.
+    /// Orders two mining targets (<see cref="MiningTargets"/>): the lower supply first (D28), then the one in CRUISE
+    /// reach before a far one (D45), then surveyed first, then the most an extraction is expected to fetch, then by key.
     /// </summary>
     /// <param name="x">One target.</param>
     /// <param name="y">The other target.</param>
@@ -331,6 +409,12 @@ public static class MiningPlanner
         if (supply != 0)
         {
             return supply;
+        }
+
+        var far = x.Far.CompareTo(y.Far);
+        if (far != 0)
+        {
+            return far;
         }
 
         var surveyed = y.Surveyed.CompareTo(x.Surveyed);
@@ -422,6 +506,28 @@ public static class MiningPlanner
         var ores = waypoint is null ? 0 : AsteroidDeposits.OresAt(waypoint).Count;
         return ores == 0 ? 0 : 1.0 / ores;
     }
+
+    /// <summary>A market's ore mined at an asteroid: with the best usable survey there for it, else unguided.</summary>
+    private static MiningTarget Nearest(MiningContext context, TradeGoodSnapshot good, string asteroid, string market, bool far)
+    {
+        var isSurveyed = SurveySelection.TryPickBest(context.Surveys, asteroid, good.Symbol, context.Now, out var best);
+        var share = isSurveyed ? SurveySelection.Share(best, good.Symbol) : UnguidedShare(context.Map, asteroid);
+        return new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, share, isSurveyed, good.Supply, far);
+    }
+
+    /// <summary>
+    /// Whether a ship gets to a waypoint in CRUISE, through refuelling stops, and the fuel it has there: a full tank where
+    /// the waypoint sells fuel. It leaves where it is (or goes) with a full tank where that sells fuel, else with the fuel
+    /// aboard.
+    /// </summary>
+    internal static (bool Reached, int Fuel) Arrival(TradeMarketMap map, ShipModel ship, string destination)
+    {
+        var from = Position(ship);
+        var fuel = map.SellsFuel(from) ? ship.FuelCapacity : ship.FuelCurrent;
+        return TradeRoutePlanner.TryPlanFlight(map, from, destination, fuel, ship.FuelCapacity, out var flight)
+            ? (true, map.SellsFuel(destination) ? ship.FuelCapacity : flight.FuelLeft)
+            : (false, 0);
+    }
 }
 
 /// <summary>The contract's ore, the asteroid it is mined at and where it is delivered.</summary>
@@ -508,8 +614,9 @@ public sealed record MiningTarget
     /// <param name="Share">The share of extractions expected to yield the ore: the best survey's, or one ore of the asteroid's without one.</param>
     /// <param name="Surveyed">Whether a usable survey of the asteroid holds the ore.</param>
     /// <param name="Supply">The sell market's supply of the ore, as last seen (SCARCE to ABUNDANT).</param>
+    /// <param name="Far">Whether the market is out of the miner's CRUISE reach, so the miner drifts there first (D45).</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MiningTarget(string Ore, string AsteroidSymbol, string SellWaypointSymbol, long SellPrice, double Share, bool Surveyed, string Supply)
+    public MiningTarget(string Ore, string AsteroidSymbol, string SellWaypointSymbol, long SellPrice, double Share, bool Surveyed, string Supply, bool Far = false)
     {
         this.Ore = Ore;
         this.AsteroidSymbol = AsteroidSymbol;
@@ -518,6 +625,7 @@ public sealed record MiningTarget
         this.Share = Share;
         this.Surveyed = Surveyed;
         this.Supply = Supply;
+        this.Far = Far;
     }
 
     /// <summary>The ore.</summary>
@@ -540,6 +648,12 @@ public sealed record MiningTarget
 
     /// <summary>The sell market's supply of the ore, as last seen (SCARCE to ABUNDANT).</summary>
     public required string Supply { get; init; }
+
+    /// <summary>
+    /// Whether the market is out of the miner's CRUISE reach (D45): the miner drifts there first, 1 fuel whatever the
+    /// distance and about ten times slower, refuels, and mines from there in CRUISE.
+    /// </summary>
+    public bool Far { get; init; }
 
     /// <summary>Whether the sell market has the ore in low supply (D22): SCARCE or LIMITED.</summary>
     public bool LowSupply => MiningPlanner.IsLowSupply(Supply);

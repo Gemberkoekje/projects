@@ -36,6 +36,9 @@ public sealed class MineAndSellGoalExecutorTests
 
     private static readonly MineAndSellGoal Trip = new() { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
 
+    /// <summary>B7's gold, out of a drone's CRUISE reach: the trip drifts to B7 first (D45), and mines B14, 25 from it.</summary>
+    private static readonly MineAndSellGoal FarTrip = new() { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = B14, SellWaypointSymbol = B7, Drifting = true };
+
     public MineAndSellGoalExecutorTests()
     {
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(Map(), 129_357, 200));
@@ -51,6 +54,59 @@ public sealed class MineAndSellGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(command => command.ShipSymbol == "SHIP-3" && command.DestinationWaypoint == XB5C),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ItsFlights_AskForCruise()
+    {
+        // Slice 6.10c: a ship left in DRIFT, after a drift (D45) or by the navigation's fuel fallback (B47), would fly on in
+        // DRIFT, ten times slower; a trip's planned flights switch it back to CRUISE.
+        await StepAsync(Drone() with { FlightMode = "DRIFT" }, Trip);
+
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == XB5C && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ATripToAMarketOutOfReach_DriftsToTheMarket_NotToTheAsteroid()
+    {
+        // D45: "having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal
+        // behavior". Drifting straight to B14 would leave the drone at an asteroid without the fuel to sell there, in
+        // DRIFT (B47).
+        var result = await StepAsync(Drone(), FarTrip);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B7 && command.FlightMode == "DRIFT"),
+            Arg.Any<CancellationToken>());
+        var drift = _log.Journal.Should().ContainSingle().Subject;
+        drift.EventKind.Should().Be("DriftStarted");
+        drift.Message.Should().Contain(H51).And.Contain(B7).And.Contain("GOLD_ORE");
+    }
+
+    [Fact]
+    public async Task AtTheMarketItDriftedTo_TheTripMinesFromThere()
+    {
+        // Its arrival docked it at B7. The trip's next flight leaves with a full tank and in CRUISE.
+        var result = await StepAsync(Drone(waypoint: B7) with { FlightMode = "DRIFT", FuelCurrent = 79 }, FarTrip);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-3",
+            Arg.Is<MineAndSellGoal>(goal => !goal.Drifting && goal.GoalId == FarTrip.GoalId && goal.SourceWaypointSymbol == B14),
+            Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>());
+    }
+
+    [Fact]
+    public async Task AfterItsDrift_TheTripFliesToTheAsteroidInCruise()
+    {
+        await StepAsync(Drone(waypoint: B7) with { FlightMode = "DRIFT", FuelCurrent = 79 }, FarTrip with { Drifting = false });
+
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B14 && command.FlightMode == "CRUISE"),
             Arg.Any<CancellationToken>());
     }
 

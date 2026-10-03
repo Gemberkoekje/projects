@@ -61,6 +61,49 @@ public sealed class RoleEstimatorTests
     }
 
     [Fact]
+    public void ADrift_TakesTenTimesWhatCruiseDoes()
+    {
+        // Slice 6.10c (D45): 15 seconds plus the distance times 250 over the engine's speed. XB5C to B7 is 327.9 (328).
+        RoleEstimator.DriftSeconds(MiningFixture.Map(), MiningFixture.XB5C, MiningFixture.B7, 9).Should().BeApproximately(15 + (328 * 250 / 9.0), 0.001);
+    }
+
+    [Fact]
+    public void AFarMiningTrip_CountsItsDrift_AndTheFuelBoughtWhereItLands()
+    {
+        // Slice 6.10c (D45): a drone at XB5C would drift to B7, beyond its tank (1 fuel, bought back at B7 for 79), then mine
+        // gold at B14, 25 from B7, and sell it there. One of B14's eight ores comes up an extraction: at 3 units every 70
+        // seconds, the 15-unit hold takes 40. Each CRUISE leg is one unit of fuel: 86, the system's average, at B14, which
+        // sells none, and 79 at B7.
+        var map = MiningFixture.Map();
+        var drone = MiningFixture.Drone(waypoint: MiningFixture.XB5C);
+
+        var option = RoleEstimator.Options(Context(map), drone, FleetRole.Mine, 20)
+            .Single(candidate => candidate.JobKey == "mine|" + MiningPlanner.OpportunityKey(MiningFixture.B7, "GOLD_ORE"));
+
+        var drift = RoleEstimator.DriftSeconds(map, MiningFixture.XB5C, MiningFixture.B7, RoleEstimator.DefaultEngineSpeed);
+        var leg = RoleEstimator.FlightSeconds(map, MiningFixture.B7, [MiningFixture.B14], RoleEstimator.DefaultEngineSpeed);
+        option.Seconds.Should().BeApproximately(
+            drift + RoleEstimator.StopSeconds + leg + (40 * (70 + (RoleEstimator.TickSeconds / 2))) + leg + (2 * RoleEstimator.StopSeconds),
+            0.001);
+        option.Credits.Should().Be((15 * 114) - (79 + 86 + 79));
+        option.Job.Should().Be($"GOLD_ORE at {MiningFixture.B14} for {MiningFixture.B7}, drifting there first");
+    }
+
+    [Fact]
+    public void AFarSiphonTrip_CountsItsDrift()
+    {
+        // As a mining trip: a drone at C38 would drift to F48, beyond its tank, and siphon at D90, 13 from it.
+        var map = SiphonFixture.MapWithAGasGiantNearF48();
+        var drone = SiphonFixture.SiphonDrone(waypoint: SiphonFixture.C38, status: "IN_ORBIT");
+
+        var option = RoleEstimator.Options(Context(map), drone, FleetRole.Siphon, 20)
+            .Single(candidate => candidate.JobKey == "siphon|" + MiningPlanner.OpportunityKey(SiphonFixture.F48, "LIQUID_NITROGEN"));
+
+        option.Seconds.Should().BeGreaterThan(RoleEstimator.DriftSeconds(map, SiphonFixture.C38, SiphonFixture.F48, RoleEstimator.DefaultEngineSpeed));
+        option.Job.Should().EndWith("drifting there first");
+    }
+
+    [Fact]
     public void AFasterMiner_EarnsMorePerHour_ForTheSameTrip()
     {
         var map = MiningFixture.Map();

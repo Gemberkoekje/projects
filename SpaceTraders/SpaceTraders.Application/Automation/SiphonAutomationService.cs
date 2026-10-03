@@ -33,7 +33,8 @@ public interface ISiphonAutomationService
 ///   <item>otherwise it takes the best of its siphon targets (<see cref="SiphonPlanner"/>): a SCARCE or LIMITED gas no
 ///   siphoner works on first, the nearest gas giant first (D48); then the market shortest of a gas (D28), SCARCE, then
 ///   LIMITED, and once none is short, the lowest supply there is. One siphoner per sell market and gas. There are no
-///   surveys: a siphon takes none;</item>
+///   surveys: a siphon takes none. A market out of the siphoner's CRUISE reach counts after the reachable ones of its
+///   supply level: the trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
 ///   <item>it buys <c>SHIP_SIPHON_DRONE</c>s, one a pass, up to <c>Siphon.MaxDrones</c>, within the credit reserve and when
 ///   the order ships are bought in lets it (D43), at the shipyard that sells it for the least in a system where our ships
 ///   are: first a drone for each SCARCE or LIMITED gas a new drone could serve (D48); then, when no siphoner was free, a
@@ -119,7 +120,8 @@ public sealed class SiphonAutomationService(
             {
                 var held = heldBy.TryGetValue(opportunity.Key, out var holder);
                 var able = candidates
-                    .Where(siphoner => !withTrip.Contains(siphoner.Symbol) && MiningPlanner.CanReach(map, siphoner, opportunity.GasGiantSymbol))
+                    .Where(siphoner => !withTrip.Contains(siphoner.Symbol)
+                        && MiningPlanner.CanTake(map, siphoner, opportunity.GasGiantSymbol, opportunity.SellWaypointSymbol))
                     .Select(siphoner => siphoner.Symbol)
                     .Order(StringComparer.Ordinal)
                     .ToList();
@@ -203,6 +205,7 @@ public sealed class SiphonAutomationService(
             TradeSymbol = target.Gas,
             SourceWaypointSymbol = target.GasGiantSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
+            Drifting = target.Far,
         }, reason, cancellationToken);
         return true;
     }

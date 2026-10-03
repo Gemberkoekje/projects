@@ -90,9 +90,11 @@ public sealed class FlightLogLinesTests
         var orbit = new OrbitSubCommand(_port, _ships, _markets, refuel, _log.For<OrbitSubCommand>());
         var navigate = new NavigateSubCommand(_port, _ships, _waypoints, Substitute.For<IShipEventScheduler>(), _dashboard, _bus, _log.For<NavigateSubCommand>());
         var dock = new DockSubCommand(_port, _ships, _dashboard, _log.For<DockSubCommand>());
+        var flightMode = new FlightModeSubCommand(_port, _ships, _log.For<FlightModeSubCommand>());
 
-        await new NavigateToWaypointHandler(_ships, _goals, _waypoints, orbit, navigate, refuel, _bus, _log.For<NavigateToWaypointHandler>())
-            .Handle(new NavigateToWaypointCommand(ShipSymbol, Destination), CancellationToken.None);
+        // A goal's flight asks for CRUISE (slice 6.10c); a ship already in it makes no call and logs nothing.
+        await new NavigateToWaypointHandler(_ships, _goals, _waypoints, orbit, navigate, refuel, flightMode, _bus, _log.For<NavigateToWaypointHandler>())
+            .Handle(new NavigateToWaypointCommand(ShipSymbol, Destination) { FlightMode = "CRUISE" }, CancellationToken.None);
 
         // At its arrival time the scheduler wakes the ship, and the handlers below run in turn.
         _ship = _ship with { Status = "IN_ORBIT", ArrivesAt = null, DestWaypointSymbol = null };
