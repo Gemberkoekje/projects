@@ -350,7 +350,11 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
     the comparison of roles reads it: within a role the plans still choose by D15 and D28;
   - a trip's time is its flights in CRUISE as the API reckons them (15 seconds plus the distance times 25
     over the engine's speed, 9 for an engine not cached yet), 10 seconds a landing, and for mining and
-    siphoning the cooldowns to fill the hold, with half a tick after each.
+    siphoning the cooldowns to fill the hold, with half a tick after each. A mining or siphon trip to a market
+    out of the ship's CRUISE reach (slice 6.10c, D45) adds its drift there, ten times as long (the distance
+    times 250 over the speed), and the unit of fuel bought back where it lands: about 2.5 hours from the middle
+    of X1-DC53 to B7 for a drone, so such a trip rarely wins on its own per hour; the drone kept for a far
+    scarce mineral (`coverage`, above) takes it whatever it earns.
 
   Surveying has no estimate: it comes first.
 - **Rates** (`GatheringRates`, in memory): each extraction (for the contract, the mining plan or in spare
@@ -521,15 +525,24 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   1. a miner that holds ore a market buys sells it first, where it fetches most after fuel (reason
      `held_cargo`): ore left over from the contract, for one;
   2. otherwise the best of `MiningPlanner.MiningTargets`: every market that buys an ore (imported or
-     exchanged), mined at an asteroid it can reach with a usable survey holding the ore, or else at
-     the asteroid nearest the market whose traits yield it, and sold there. A SCARCE or LIMITED ore no
+     exchanged), mined at an asteroid with a usable survey holding the ore, or else at the asteroid
+     nearest the market whose traits yield it, and sold there; only trips the miner can make in CRUISE,
+     through refuelling stops: to the asteroid, and on to the market with the fuel it has left there (a
+     full tank where the asteroid sells fuel, as XB5C does; slice 6.10c). A SCARCE or LIMITED ore no
      miner's trip works on comes first, the nearest asteroid first (slice 6.10b, D48, "near before
      far"); then the market shortest of its ore (D28): SCARCE, then LIMITED (low supply, D22), and once
      no market is short, the lowest supply there is, even when it pays less. Within a supply level, a
      surveyed ore first, then the most a single extraction is expected to fetch: the ore's share of the
      survey's deposits (without a survey, one of the asteroid's ores) times its price. One miner per
      sell market and ore. It logs `MiningStarted`, reason `uncovered` (D48 chose it over D28's first),
-     `surveyed`, `low_supply` or `lowest_supply`.
+     `surveyed`, `low_supply` or `lowest_supply`;
+  3. **far targets** (slice 6.10c, D45): a market out of the miner's CRUISE reach that sells fuel counts
+     too, mined at the asteroid nearest it within a CRUISE round trip of it (out with a full tank, back
+     with what is left): the trip (`Drifting`) drifts to the market first, 1 fuel whatever the distance and
+     about ten times slower, and mines from there in CRUISE. A far target ranks after every reachable one of
+     its supply level, and among D48's uncovered ores after those in reach. In X1-DC53 on 2026-10-03 that was
+     B7, SCARCE or LIMITED in five ores that B14, 25 from it, yields; from the middle a drone drifts there in
+     about 2.5 hours. Once it is there, B7's ores are in reach, and the middle is the drift away.
 - **Drones,** one a tick, so the next tick counts the new drone; up to `Mining.MaxDrones` (default 20),
   within the credit reserve and when the order ships are bought in lets it (D43). Not while the
   contract plan mines: the contract would take the drone, and the contract plan buys at most one
@@ -537,15 +550,18 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   1. a drone for a scarce ore (D48), while the system has fewer mining drones (ships that can mine and
      can't survey) than SCARCE or LIMITED ores a drone from the shipyard could serve
      (`MiningPlanner.ScarceOres`): "at least 1 drone per mineral that is scarce or limited". It doesn't
-     ask the role board, which keeps one drone mining per scarce ore;
+     ask the role board, which keeps one drone mining per scarce ore. Since slice 6.10c an ore a drift away
+     counts (D45: "new and free drones"), so each ore that only a far market is short of adds a drone (on
+     2026-10-03, B7's aluminum and iron);
   2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
      the drone the mining role (`RoleAdvisor`): a drone that would earn more trading would trade, and the
      plan would buy the next for the same opening.
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
-  miner's trip sells there, Pending otherwise, with the free miners that could reach it, for the
-  `ShipLeftIdle` rule. It is written only when it changes.
+  miner's trip sells there, Pending otherwise, with the free miners that could take it (they reach its
+  asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. It is written only when it
+  changes.
 
 ### Siphon (`SiphonAutomationService`, slice 6.7)
 
@@ -563,13 +579,17 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
      own. A full hold only sells, even where the sale doesn't pay for its fuel: a siphon trip would turn
      to selling at once and end without its gas aboard, on every tick;
   2. otherwise the best of `SiphonPlanner.SiphonTargets`: every market that buys a gas (imported or
-     exchanged) and that the siphoner can carry its hold to, siphoned at the gas giant nearest the
-     market that it can reach, and sold there. A SCARCE or LIMITED gas no siphoner's trip works on comes
-     first, the nearest gas giant first (D48); then the market shortest of its gas (D28): SCARCE, then
-     LIMITED (low supply, D22), and once no market is short, the lowest supply there is. Within a supply
-     level, the most a single siphon is expected to fetch (one of the gas giant's three gases times the
-     price), then the nearest gas giant. One siphoner per sell market and gas. It logs `SiphonStarted`,
-     reason `uncovered`, `low_supply` or `lowest_supply`.
+     exchanged), siphoned at the gas giant nearest the market from which the siphoner can make the trip
+     in CRUISE (there, and on to the market with the fuel left, slice 6.10c), and sold there. A SCARCE or
+     LIMITED gas no siphoner's trip works on comes first, the nearest gas giant first (D48); then the
+     market shortest of its gas (D28): SCARCE, then LIMITED (low supply, D22), and once no market is
+     short, the lowest supply there is. Within a supply level, the most a single siphon is expected to
+     fetch (one of the gas giant's three gases times the price), then the nearest gas giant. One siphoner
+     per sell market and gas. It logs `SiphonStarted`, reason `uncovered`, `low_supply` or
+     `lowest_supply`;
+  3. **far targets** (slice 6.10c, D45), as for the miners: a market out of the siphoner's CRUISE reach that
+     sells fuel, with a gas giant within a CRUISE round trip of it; the trip drifts there first. X1-DC53 has
+     none: its one gas giant, C38, has every buyer in reach of a siphon drone.
 - **Drones** (D32, the miners' rule): one a tick, at the shipyard that sells `SHIP_SIPHON_DRONE` for the
   least in a system where our ships are, up to `Siphon.MaxDrones` (default 10), within the credit reserve
   and when the order ships are bought in lets it (D43): first one per SCARCE or LIMITED gas a drone from the
@@ -583,8 +603,8 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
 - **Gas contracts** stay unsupported (D2, D31): no contract takes the siphoners.
 - **The state** (`plan_states`, `SiphonAutomation`, as the mining plan's) lists the low-supply openings
   of every system where our ships are, before the first drone too: Assigned while a siphoner's trip
-  sells there, Pending otherwise, with the free siphoners that could reach the gas giant, for the
-  `ShipLeftIdle` rule. It is written only when it changes.
+  sells there, Pending otherwise, with the free siphoners that could take it (they reach the gas giant, or
+  would drift to the market, D45), for the `ShipLeftIdle` rule. It is written only when it changes.
 
 **What a gas giant yields** (`GasGiants`): the game doesn't publish it, and a gas giant's traits name no
 gas (X1-DC53's C38 has only STRONG_MAGNETOSPHERE), so every gas giant counts as yielding the game's
@@ -831,8 +851,9 @@ scout and probe plans don't read the roles.
 - **Set by:**
   - the scout, probe, survey, mining, siphon, trading and spare-time plans; the survey and trading plans
     also replace a spare-time trip that fills its hold (`SpareTimeInterruption`, slice 6.8);
-  - `MineAndSellGoalExecutor` and `SiphonAndSellGoalExecutor`, which record that their trip turns to
-    selling, `GatherAndSellGoalExecutor`, which records that too and each sale it chooses, and
+  - `MineAndSellGoalExecutor` and `SiphonAndSellGoalExecutor`, which record that their trip's drift has
+    ended (slice 6.10c) and that it turns to selling, `GatherAndSellGoalExecutor`, which records that its
+    trip turns to selling and each sale it chooses, and
     `TradeBetweenMarketsGoalExecutor`, which records its purchase, and a sale it moves, in their own goal
     (the goal id stays, so the arrival still matches).
 - **Cleared by:**
@@ -895,10 +916,10 @@ step does the work.
 |---|---|
 | `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
 | `DeployProbe` | One flight of a probe (slice 6.3). At the target (the arrival fetched its market and shipyard, and docked): clear the goal and complete; the probe plan chooses again. Elsewhere: in DRIFT, [cmd] switch to CRUISE first (a probe has no tank, so no flight costs it fuel); then [cmd] navigate. |
-| `MineAndSell` | One trip (slice 6.4). **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
-| `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`. **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
+| `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
+| `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
 | `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
-| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative: [API] buy and publish `CargoPurchasedEvent`, and record the purchase in the goal; otherwise clear the goal (`TradeDropped`), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
+| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative: [API] buy and publish `CargoPurchasedEvent`, and record the purchase in the goal; otherwise clear the goal (`TradeDropped`), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `Idle` | Unreachable. |
 
@@ -909,12 +930,18 @@ step does the work.
     `ShipNavigationCompletedEvent`, because that would run the caller's goal step again without
     progress (B1, fixed).
   - Docked: it refuels if the waypoint sells fuel, then orbits.
+  - In orbit, it sets the flight mode the command asks for, if any (`FlightMode`, slice 6.10c;
+    `FlightModeSubCommand`, which calls the API only when the ship's mode differs): DRIFT for a mining or
+    siphon trip's drift to a market out of CRUISE reach (D45), CRUISE for every flight of the mining,
+    siphon, survey, spare-time and trade executors. Scouting, probes and the contract's commands ask for
+    none.
   - Then it navigates. Navigate tries DRIFT mode and intermediate markets when fuel is short,
-    then schedules the arrival and publishes `ShipInTransitEvent`.
+    then schedules the arrival and publishes `ShipInTransitEvent`. That fallback leaves the ship in
+    DRIFT (B47); a goal flight that asks for CRUISE switches it back.
 - **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market (publishing
   `MarketDataRefreshedEvent`) and the shipyard, docks, and publishes
   `ShipNavigationCompletedEvent`.
-- **Orbit, Navigate, Dock and Refuel** are DI sub-commands, not bus messages. Refuel publishes
+- **Orbit, Navigate, Dock, Refuel and FlightMode** are DI sub-commands, not bus messages. Refuel publishes
   `ShipRefueledEvent`.
 - **`MineResourceVolumeCommand`** extracts once per call at an ASTEROID, ASTEROID_FIELD or
   ENGINEERED_ASTEROID waypoint (B48, fixed: only the last two were accepted, so 56 of X1-DC53's 57
@@ -946,7 +973,8 @@ step does the work.
   work, dead-reckon arrival themselves and navigate without a goal id (B17). The mining and survey
   goals navigate with `NavigateToWaypointCommand`, which carries the goal id, so their arrivals wake
   them.
-- **`PatchShipNavCommand`** changes the flight mode.
+- **`PatchShipNavCommand`** changes the flight mode; the probe executor sends it (a navigation that asks
+  for a mode sets it itself).
 - **Selling and buying** are direct API calls from the executors, which publish what they did.
 - **Credits:** whatever changes the credits stores them in the cached agent and publishes
   `AgentCreditsChangedEvent` (`AgentCreditsUpdates`): refuels, sales, cargo and ship purchases,
@@ -1330,9 +1358,10 @@ The seven pages in `src/Future` are not routed.
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
   | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
-  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `contract`); `ContractId` for the contract |
+  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `contract`); `ContractId` for the contract |
   | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |
-  | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`) |
+  | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`, `uncovered`) |
+  | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there |
   | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
   | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
@@ -1350,8 +1379,9 @@ The seven pages in `src/Future` are not routed.
   | `AnomalyCleared` | The health monitor and the size guard | `Rule`, `Subject`; the monitor's also `ActiveMinutes` |
 
   Mining, siphoning, trading and spare time have no plan to start or complete. Mining journals each trip
-  (`MiningStarted`, `Extracted` per extraction, `CargoSold`), and each survey's life (`Surveyed`, then
-  `SurveyEnded`); siphoning each trip (`SiphonStarted`, `Siphoned` per siphon, `CargoSold`); spare time
+  (`MiningStarted`, `DriftStarted` for a trip to a market out of CRUISE reach, `Extracted` per extraction,
+  `CargoSold`), and each survey's life (`Surveyed`, then `SurveyEnded`); siphoning each trip
+  (`SiphonStarted`, `DriftStarted` likewise, `Siphoned` per siphon, `CargoSold`); spare time
   each trip (`GatheringStarted`, `Extracted` or `Siphoned`, `CargoSold`, or `GatheringInterrupted`);
   trading journals each trip: `TradeStarted`, then `CargoBought` and `CargoSold`, with
   `TradeRerouted` or `TradeDropped` when prices change. Each of those trips ends with a `TripEnded` line: what it
@@ -1386,7 +1416,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `CargoShips`, `Probes`, `Alternating`) and `position` the same as a number, 1 first. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
-  | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
+  | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
   | `spacetraders_ship_arrival_timestamp_seconds` | `ship` | When a ship in transit arrives (Unix time); no series otherwise | Every 10 s |
   | `spacetraders_ship_cargo_units`, `spacetraders_ship_cargo_capacity_units` | `ship`, `good`; `ship` | A ship's hold per good aboard, and what it takes | Every 10 s |
   | `spacetraders_contract_units_required`, `_units_fulfilled` | `contract`, `trade_symbol` | The accepted contracts' deliverables | Every 10 s |

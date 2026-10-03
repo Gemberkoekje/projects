@@ -83,6 +83,11 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
   wake-up and the market refresh on arrival log at Debug and never reach Loki. A departure with no
   arrival line after its arrival time means the arrival chain didn't finish: a wake-up it ignored as
   stale (Debug), or a failure, whose error is logged.
+- **A drift takes hours** (slice 6.10c, D45): a mining or siphon trip to a market out of the drone's
+  CRUISE reach drifts there first, with a `DriftStarted` journal line, an `arrives at` hours away (about
+  2.5 from the middle of X1-DC53 to B7), and `drifting to … to mine …` in `spacetraders_ship_info`. A ship
+  in transit is never `ShipStuck`. Its next flight logs `FlightModeSubCommand: … switches from DRIFT to
+  CRUISE`; a drone that keeps flying in DRIFT after its drift is a bug.
 - **Starts and deploys:** `|= "Deferred startup initialization completed"` lists every start. When
   lines come from several pods, `logs` prefixes each with the pod's suffix, so a restart or a deploy
   shows as a new suffix. `check` shows the running image; earlier ones are in gembernodes' history.

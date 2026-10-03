@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, slice 6.10c: D45)
+- Drones for minerals out of fuel range (D45), as asked on 2026-10-03: "I'd like a way to add mining/siphoning drones for the minerals outside of fuel range, e.g. by having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal behavior." A market out of a drone's CRUISE reach that sells fuel is a far target, gathered at the asteroid (or gas giant) nearest it within a CRUISE round trip of it; it ranks after every reachable target of its supply level (D28), and among the ores no drone works on (D48) after those in reach. Its trip (`Drifting`) drifts to the market first, 1 fuel whatever the distance and about ten times slower, logging `DriftStarted`; from there it mines or siphons in CRUISE. New and free drones both take far targets: an ore only a far market is short of counts for "a drone per scarce mineral" (D48), and the role board keeps a drone gathering it. The board values a far trip with its drift. The fleet view says `drifting to … to mine …`.
+- A navigation can ask for a flight mode (`NavigateToWaypointCommand.FlightMode`, `FlightModeSubCommand`), set in orbit before it flies, with an API call only when the ship's mode differs: DRIFT for a drift, CRUISE for every flight of the mining, siphon, survey, spare-time and trade executors.
+
+### Code – Changed (2026-10-03, slice 6.10c)
+- A mining or siphon trip counts the fuel its ship has left where it fills its hold: it is offered only when the ship can carry the hold on to the market in CRUISE from there, as it can from XB5C, which sells fuel. The haul was planned with a full tank, so a drone at a far market could have been sent to an asteroid there and back beyond one tank, and would have drifted back (B47).
+
+### Code – Fixed (2026-10-03, slice 6.10c, B47 in part)
+- A ship left in DRIFT, by the navigation's fuel fallback or after a drift, flies its next mining, siphon, survey, spare-time or trade flight in CRUISE again; every one of its flights was ten times slower before. The fallback itself, and the scouting and contract flights, are unchanged.
+
+### Docs – Changed (2026-10-03, slice 6.10c)
+- `PLAN.md`: 6.10c built, with what was noticed; B47 partly fixed. `docs/HOW_IT_WORKS.md`: far targets and the drift, the flight mode a navigation asks for, `DriftStarted`, and the fleet view's words. The `st-investigate` skill: a drift takes hours, and isn't a stuck ship.
+
 ### Code – Added (2026-10-03, slice 6.10b: D43, D47, D48)
 - The order ships are bought in (D43), as asked on 2026-10-03: "I'd like at least 1 drone per mineral that is scarce or limited, then save up for cargo ships, then a mix based on if the minerals aren't going above LIMITED", the mix being "Alternate drones and cargo ships, but probes first". Every plan that buys says on each pass what it would buy (`PurchaseNeed`), and buys only when nothing comes first (`IPurchaseOrder`): the contract's drone, a designated surveyor, a drone per scarce mineral, the cargo ships of `Trade.ShipPurchases` (saved up for), probes, then drones and cargo ships of the list's last type in turn. A need counts while its plan is on and can meet it; until every plan that is on has said what it needs lately (after a start, or a pause), nothing it could come before is bought. The turn goes to the kind not bought last, from the ledger and this process's purchases; a turn passes when the other kind has nothing to buy, and isn't made up later. Past the list, the trading plan buys one more of its last type at a time.
 - A designated surveyor (D47): with the role board on, the survey plan buys a `SHIP_SURVEYOR` for each system with a mining drone and no ship that can only survey; the board gives it the survey role, which frees the command ship.

@@ -93,8 +93,9 @@
   slice 6.10a is merged, so it deploys both.
 - Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D51) is split in three: 6.10a (visibility and
   the role board's rates) is merged and deployed (projects#136, gembernodes#34); 6.10b (the order ships are bought in, a designated
-  surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is built; 6.10c (drones
-  drifting to minerals out of fuel range) is planned, with its design below.
+  surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is merged (projects#137 and
+  #138, its dashboard gembernodes#35) but not deployed: the cluster still runs `83023a0`; 6.10c (drones drifting to minerals out
+  of fuel range) is built.
 
 ## Known issues
 
@@ -152,7 +153,7 @@ the misbehaviour.
 | B44 | **The error-log alert fires on the bot's ordinary lines** (found in 4.3). Gembernodes' "Error logs detected" rule matches `(?i)error` anywhere in a line, and 2.5 added `spacetraders` to it. The bot's JSON lines contain the word without being errors: the startup settings dump (`Health.Errors.MaxRepeatsIn10Minutes`), Wolverine's "…this is an error" (B42) and a `RepeatingError` anomaly's own lines. It fired five minutes after the first start. | gembernodes `infrastructure/monitoring/grafana-alerting-provisioning.yaml` (`loki-error-logs`) | 4.3 (done: gembernodes PR #13) |
 | B45 | **The scout plan can skip a stop** (found in 5.1, on the cluster). When the ship docks at a stop, the tick and the arrival can both run its goal step. On 2026-10-02 at 09:18:58 the arrival's step moved the plan from stop 25 to stop 26, X1-DC53-J58. In the same second the tick's resume check read the plan from before that advance and the assignment from after it, took the assignment for missing and set the ship's goal back to stop 25; and the visit to stop 25 completed a second time, in the tick's goal step, which moved the plan past stop 26. The plan logged "all 26 waypoints visited", but J58's market was never fetched, and markets aren't scouted again. Any stop can be skipped this way, whenever a tick coincides with an arrival. | `ScoutAllMarketplacesPlanService.cs` (`ResumeIfAssignmentMissingAsync`, `AdvanceAsync`), `ShipGoalExecutorService.cs`; Loki, 09:18:58Z (`Tick` 326) | 5.1 (done) |
 | B46 | **Two goal steps can run for one ship at once** (found in 6.5, from the code; B45 was the scout plan's case). The tick steps every ship every 5 s, and an arrival steps the ship it docks, on a thread of its own. Both read the ship before either acts, so a trade step would buy twice, or try to sell cargo that is already sold. | `GameLoopService.cs` (goal steps), `ShipNavigationCompletedHandler.cs`, `ShipGoalExecutorService.cs` | 6.5 (done) |
-| B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting and contract flights still can. A probe has no tank, so no flight of its runs short of fuel, and the probe executor switches a probe it finds in DRIFT back to CRUISE (6.3). | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | open |
+| B47 | **The navigation's fuel fallback leaves a ship in DRIFT** (found in 6.5, from the code). When a flight needs more fuel than the ship has, `NavigateSubCommand` switches it to DRIFT, which burns 1 fuel whatever the distance, and flies there. Nothing switches it back, so every later flight of that ship is DRIFT, about ten times slower than CRUISE. Trade trips plan refuelling stops and never need the fallback (6.5); scouting and contract flights still can. A probe has no tank, so no flight of its runs short of fuel, and the probe executor switches a probe it finds in DRIFT back to CRUISE (6.3). | `INavigateSubCommand.cs` (`TrySwitchToDriftForFuelEfficiencyAsync`) | 6.10c (in part: the flights of mining, siphon, survey, spare-time and trade trips ask for CRUISE, so a ship left in DRIFT flies them in CRUISE again; scouting and the contract's flights don't, and the fallback still switches to DRIFT) |
 | B48 | **Only two of three asteroid types can be mined** (found in 6.4, from the code and the live waypoints). `MineResourceVolumeCommand` accepted only `ASTEROID_FIELD` and `ENGINEERED_ASTEROID`; 56 of X1-DC53's 57 asteroids are of type `ASTEROID`, so a drone sent to any of them got a state mismatch instead of ore, on every step. | `MineResourceVolumeCommand.cs` (`IsValidExtractionWaypoint`) | 6.4 (done) |
 | B49 | **A used-up survey is tried again and again** (found in 6.4, from the code). An extraction with a survey that is exhausted, expired or doesn't verify fails with 4224, 4221 or 4220, and nothing removed the survey from the cache, so the miner picked it again on every step; only its expiry ended that. | `MineAndSellGoalExecutor.cs` (`GetBestActiveSurveyAsync`), `SurveyRepository.cs` | 6.4 (done) |
 | B50 | **The command ship stays on the contract after the survey plan is switched on** (found in 6.4's first watch, on the cluster). The contract plan gave SPECTER-1 a contract assignment at 14:14:29Z, 23 s before the survey switch, and a contract assignment lasted until the contract was fulfilled. The survey plan takes only free ships, so SPECTER-1 went on mining copper (7 units in its first 22 minutes) instead of surveying (D20). The plan also gave its first ship its assignment back on every tick, whatever that ship did or had become. | `ContractPlanService.cs` (`EnsureActivePlanAssignmentAsync`), `FulfillContractDeliveryCommand.cs` | 6.4 (fixed with D26) |
@@ -1990,23 +1991,87 @@ How credits are split stays your call; Claude only fixes deviations from intende
         (one rewritten: the only drone is kept for a scarce ore), `RolePlannerTests`, `MiningPlannerTests`,
         `SiphonPlannerTests`, `ShipPurchaseServiceTests`, `BudgetPolicyTests`, `DefaultSettingsSeedTests`;
         `PrometheusMetricsTests`, `MetricsEndpointTests` (API).
-  - **6.10c Drift to minerals out of fuel range** (planned; D45). Design notes from the code survey:
-    - Reach today: `MiningPlanner.CanReach` (CRUISE through markets that sell fuel) is the only check, and
-      `TradeRoutePlanner` never plans DRIFT.
-    - A far target: a market that buys the ore and sells fuel, an asteroid that yields it within a CRUISE round trip of
-      that market, and a drone that can't reach the market in CRUISE. It ranks after every reachable target of the same
-      supply level. Because supply comes first in D28, B7's SCARCE ores will outrank every near target that isn't SCARCE,
-      so free drones on LIMITED or MODERATE work will drift there: about 2.5 hours at a drone's engine speed of 9.
-    - The trip: a relocation goal switches to DRIFT (`PatchShipNavCommand`, as `DeployProbeGoalExecutor` switches a probe
-      back to CRUISE), flies to the market, docks and switches back to CRUISE; the next departure there refuels. It must
-      not run into B47: with no CRUISE chain, `GoalFlight` asks for the destination itself, and the navigation's fuel
-      fallback would drift straight to the asteroid and stay in DRIFT.
-    - `MiningFixture` already holds the far pair: B7 (47,343) buys GOLD_ORE and COPPER_ORE, SCARCE; B14 (precious metal
-      deposits) is 24.5 from it; the middle of the system is 274 to 328 away. Tests that assume no drone reaches B7 change:
-      `MiningPlannerTests`, `MiningAutomationServiceTests`, `ShipLeftIdleRuleTests`.
-    - Siphoning: X1-DC53's one gas giant, C38, has all its buyers in reach, so no siphon drone would drift there now.
-  - **To understand this,** start with the decisions D43–D51, then this slice's notes; for 6.10b, see its own entry; for
-    6.10c, `Mining/MiningPlanner.cs` and `Goals/Executors/GoalFlight.cs`.
+  - **6.10c Drift to minerals out of fuel range** (built 2026-10-03 on branch `claude/spacetraders-drift`; D45). Asked: "I'd
+    like a way to add mining/siphoning drones for the minerals outside of fuel range, e.g. by having a drone drift to the
+    marketplace that buys the mineral first, then refueling and resuming normal behavior."
+    - Done:
+      - **Far targets** (`MiningPlanner.MiningTargets`, `SiphonPlanner.SiphonTargets`): a market out of the ship's CRUISE
+        reach (no chain of fuel markets gets it there) that sells fuel counts, gathered at the asteroid or gas giant
+        nearest it within a CRUISE round trip of it (`IsWithinRoundTrip`: out with a full tank, back with what is left, or
+        a full tank where the source sells fuel), marked `Far`. It ranks after every reachable target of its supply level
+        (D28), and among the minerals no drone works on (D48) after those in reach. In `MiningFixture` B7's gold and copper,
+        from B14, now come after F49's SCARCE silicon and quartz and before H51's LIMITED copper; iron at B7, whose nearest
+        asteroid (B13) is 48 away, 96 there and back, doesn't count.
+      - **The trip** (`MineAndSellGoal.Drifting`, `SiphonAndSellGoal.Drifting`, `DriftStepAsync`, `GoalFlight.DriftAsync`):
+        it navigates to the market asking for DRIFT (1 fuel, about ten times slower) and journals `DriftStarted`; the
+        arrival docks it there and refreshes the market; the next step records that the drift has ended, and the trip goes
+        on from there. Its next flight refuels (the orbit fills the tank at a fuel market) and asks for CRUISE. Never to
+        the asteroid in DRIFT: the fallback would have left the drone there, in DRIFT (B47).
+      - **The flight mode a navigation asks for** (`NavigateToWaypointCommand.FlightMode`, `FlightModeSubCommand`): set in
+        orbit, after the orbit's refuel, just before the flight, so it never depends on whether the API lets a docked ship
+        change mode; the API is called only when the cached mode differs. `GoalFlight` (mining, siphon, survey, spare time)
+        and the trade executor ask for CRUISE, so a ship left in DRIFT, after a drift or by the fallback (B47, in part),
+        flies in CRUISE again. The API's spec lists no restriction on the call; its response is `{nav, fuel, events}`, as
+        the client reads it.
+      - **A trip counts the fuel left at its source** (`MiningPlanner.Arrival`): the haul was checked with a full tank at
+        the asteroid (`CanSellFrom`), true from XB5C, which sells fuel, but not from a far market's asteroids: from B7 a
+        drone could have been sent to an asteroid 48 away, with 32 left for the 48 back, and drifted back. A trip now counts
+        only when the ship can carry its hold to the market in CRUISE with the fuel it has there, as D45's "mines from
+        that market in CRUISE" needs. In X1-DC53's middle nothing changes.
+      - **New and free drones** (D45): `ScarceOres` and `ScarceGases` count the far minerals, so the coverage tier (D48)
+        buys a drone for an ore only a far market is short of, and the role board keeps one gathering it (`coverage`). The
+        plans' openings list a free drone that would drift to them (`MiningPlanner.CanTake`, read by `ShipLeftIdle`).
+      - **The role board's estimate** (`RoleEstimator`): a far trip adds its drift (`DriftSeconds`: 15 seconds plus the
+        distance times 250 over the engine's speed) and the unit of fuel bought back where it lands, so the board neither
+        skips it nor counts it as near. Its job reads `…, drifting there first`. From the middle to B7 that is about 2.5
+        hours, so a far trip rarely wins on its rate; the drone kept for a far mineral takes it anyway.
+      - **Visibility:** the fleet view says `drifting to X1-DC53-B7 to mine GOLD_ORE`, as does the WebUI's fleet status;
+        the journal has `DriftStarted`, and `FlightModeSubCommand` logs each change of mode.
+    - What to expect, from the data of 2026-10-03 (not checked against the live markets): B7 was SCARCE or LIMITED in
+      aluminum, copper, iron, quartz and silicon, all from B14. Aluminum and iron weren't short near the middle, so the
+      ores a drone could serve go from three to five: with four mining drones, the coverage tier buys one more, ahead of
+      the cargo ships (D43), and one drone for each of the two ends up at B7 after a drift of about 2.5 hours. Siphon drones
+      don't drift in X1-DC53: C38 has every buyer in reach.
+    - Not deployed yet: gembernodes#35 merged 6.10b's dashboard without an image bump, so the cluster still runs `83023a0`
+      (6.10a); a deploy of this branch's merge brings 6.10b, projects#138 and 6.10c together.
+    - Noticed (not changed):
+      - **Drift back and forth:** supply comes first (D28), so a drone at B7 whose ores there have risen to MODERATE drifts
+        back to a SCARCE market in the middle, and a free drone in the middle drifts to a SCARCE one at B7, 2.5 hours each
+        way. That is the rule as decided; the coverage keepers keep one drone at each far mineral.
+      - **Surveys before the drone gets there:** a ship in transit counts as at its destination, so while a drone drifts to
+        B7 the survey plan may survey B14 for it, if the surveyor reaches B14 in CRUISE; those surveys can expire first.
+      - **The contract plan takes any free miner** without checking that it can reach the contract's asteroid in CRUISE,
+        and the contract's commands fly with the fallback (B47). Under D1 (one contract per reset) and D23 (no drone is
+        bought while the contract mines) no drone has drifted while a contract wants ore; a slice that takes the next
+        contract should check.
+      - **B47 remains** for scouting and the contract's flights; the fallback itself still switches to DRIFT.
+      - **Cost:** the far-target search adds about 20 ms to each ranking of mining targets on an 85-waypoint system (timed
+        on a synthetic one, Release build; the ranking before it took about 30 ms), a few rankings a tick. The bot waits
+        on the API's rate limit, not its CPU.
+      - The analyzers ask for strongly typed ids on `ShipGoal.GoalId`, `DeliverCargoGoal.ContractId` and
+        `NavigateToWaypointArrivedCommand.GoalId` (QW0028, QW0029): a change across the goal model, left.
+    - Done when: a drone drifts to B7, mines there and sells there in CRUISE, and its later trips leave B7 in CRUISE.
+    - Tests: App 817, Domain 71, API 163.
+    - **To understand this,** start with `MiningTargets` in `Mining/MiningPlanner.cs` (the far targets, `CanDriftTo` and
+      `IsWithinRoundTrip`), then `DriftStepAsync` in `Goals/Executors/MineAndSellGoalExecutor.cs` with `GoalFlight.cs`,
+      then the flight mode in `Commands/Ships/NavigateToWaypointCommand.cs` and `SubCommands/IFlightModeSubCommand.cs`.
+    - Files, in `SpaceTraders.Application` unless named:
+      - new: `Commands/Ships/SubCommands/IFlightModeSubCommand.cs`;
+      - changed: `Mining/MiningPlanner.cs`, `Siphoning/SiphonPlanner.cs`, `Goals/Executors/GoalFlight.cs`,
+        `MineAndSellGoalExecutor.cs`, `SiphonAndSellGoalExecutor.cs`, `TradeBetweenMarketsGoalExecutor.cs`,
+        `Commands/Ships/NavigateToWaypointCommand.cs`, `Automation/MiningAutomationService.cs`,
+        `SiphonAutomationService.cs`, `Roles/RoleEstimator.cs`, `Services/FleetStatusQueryService.cs`, `JournalEvents.cs`
+        (`DriftStarted`), `DependencyInjection.cs`; `ShipGoal.cs` (Domain: `Drifting`); `PrometheusMetricsService` (API);
+      - tests: `Commands/FlightModeSubCommandTests` (new); additions to `MiningPlannerTests` (three expectations rewritten:
+        B7's ores count now, a drift away), `SiphonPlannerTests` and `SiphonFixture` (`MapWithAGasGiantNearF48`),
+        `MiningAutomationServiceTests` (four rewritten: B7's gold and copper get drones too, so each keeps its point),
+        `SiphonAutomationServiceTests`, `RolePlanServiceTests` (two rewritten: a sixth drone), `RoleEstimatorTests`,
+        `MineAndSellGoalExecutorTests`, `SiphonAndSellGoalExecutorTests`, `TradeBetweenMarketsGoalExecutorTests`,
+        `NavigateToWaypointHandlerTests`, `FlightLogLinesTests`, `AlreadyAtDestinationLoopTests`,
+        `FleetStatusQueryServiceTests`, `ShipRuleTests` (a comment); `ShipGoalSerializationTests` (Domain);
+        `PrometheusMetricsTests` (API); docs: `docs/HOW_IT_WORKS.md`, the `st-investigate` skill (a drift takes hours).
+  - **To understand this,** start with the decisions D43–D51, then this slice's notes; 6.10b and 6.10c each have their own
+    entry.
 
 ## Changes in gembernodes
 
