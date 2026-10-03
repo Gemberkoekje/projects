@@ -1286,7 +1286,8 @@ The first three follow the API guide (https://spacetraders.io/api-guide/rate-lim
    limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute)
    and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
    and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
-   Warning, and the headers are recorded for `/status/rate-limit`.
+   Warning with the limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them,
+   B59), and the headers are recorded for `/status/rate-limit`.
 3. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
    both are used. Writes (anything but GET: moving a ship, trading) go before reads (D19): a read

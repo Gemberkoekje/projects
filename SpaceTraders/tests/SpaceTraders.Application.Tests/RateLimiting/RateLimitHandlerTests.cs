@@ -198,6 +198,7 @@ public sealed class RateLimitResponseHandlerTests
     private static readonly TimeSpan[] ShortBackoff = [TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(4), TimeSpan.FromMilliseconds(8), TimeSpan.FromMilliseconds(16)];
 
     private readonly RateLimitStatus _status = new();
+    private readonly LogRecorder _log = new();
 
     [Fact]
     public async Task Handle_NonThrottled_ReturnsResponse()
@@ -223,6 +224,25 @@ public sealed class RateLimitResponseHandlerTests
         stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(150));
         _status.ThrottledCount.Should().Be(1);
         _status.LimitType.Should().Be("Account");
+    }
+
+    [Fact]
+    public async Task A429FromTheRateLimiter_IsLoggedWithWhatTheLimiterCounted()
+    {
+        // B59, seen on the cluster on 2026-10-03: from 10:30Z the rate limiter answered 429 about four times an hour, each time
+        // while the bot's own budget was in full use (writes waited 3 and 9 seconds in the minutes of the bursts at 19:07Z and
+        // 19:14Z), each retried once after about 35 ms. The warning named the endpoint and the wait, not what the limiter had
+        // counted, so the budget can't be held against the server's count. It now carries the limiter's headers.
+        var reset = TimeProvider.System.GetUtcNow().AddMilliseconds(20);
+
+        await SendAsync(call => call == 1 ? RateLimiter429(reset) : new HttpResponseMessage(HttpStatusCode.OK));
+
+        _log.Kept.Should().ContainSingle().Which.Should()
+            .Contain("x-ratelimit-type=Account")
+            .And.Contain("x-ratelimit-limit-per-second=2")
+            .And.Contain("x-ratelimit-limit-burst=30")
+            .And.Contain("x-ratelimit-remaining=0")
+            .And.Contain("x-ratelimit-reset=" + reset.ToString("O"));
     }
 
     [Fact]
@@ -278,7 +298,7 @@ public sealed class RateLimitResponseHandlerTests
     private async Task<(HttpResponseMessage Response, int Calls)> SendAsync(Func<int, HttpResponseMessage> respond)
     {
         var calls = 0;
-        using var handler = new RateLimitResponseHandler(_status, NullLogger<RateLimitResponseHandler>.Instance, ShortBackoff)
+        using var handler = new RateLimitResponseHandler(_status, _log.For<RateLimitResponseHandler>(), ShortBackoff)
         {
             InnerHandler = new CallbackMessageHandler(_ => respond(++calls)),
         };

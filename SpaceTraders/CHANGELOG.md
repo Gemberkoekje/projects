@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-03, B59)
+- Every 429 warning carries the rate limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them), so the request budget can be held against what the server counted. From 10:30Z on 2026-10-03 the limiter answered 429 about four times an hour, each time while the budget was in full use; which window it counted wasn't logged.
+
+### Docs – Changed (2026-10-03, B59)
+- `PLAN.md`: B59; D56 and B58 deployed. `docs/HOW_IT_WORKS.md`: what a 429 warning holds.
+
 ### Code – Fixed (2026-10-03, B58)
 - A surveyor takes a survey target only where it can get on, with the fuel left, to a market that sells fuel (`MiningPlanner.CanSurveyAt`), as a mining trip must get on to its market. A target it could reach only one way left it stranded: on 2026-10-03 SPECTER-F flew from B7 to B37 (68 of its 80 fuel) for gold, and the area rule drifted it back to B7 (32 minutes), where gold at B37 came round again, while B14, where the drones mine, got no survey. The survey plan's state lists only such surveyors for each target, so the `ShipLeftIdle` rule counts the same.
 

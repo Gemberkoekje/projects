@@ -8,7 +8,8 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// Retries a 429 the way the API guide asks. A 429 from the API's rate limiter carries
 /// <c>x-ratelimit-*</c> headers: wait until <c>x-ratelimit-reset</c> (or <c>retry-after</c>), then
 /// retry. A 429 without them comes from the cloud infrastructure: back off exponentially. Either
-/// way it gives up after <see cref="MaxRetries"/> retries and returns the 429.
+/// way it gives up after <see cref="MaxRetries"/> retries and returns the 429. Each 429 is logged with the limiter's
+/// headers (<see cref="RateLimitHeaders"/>, B59): what the server counted, to hold the local budget against.
 /// </summary>
 public sealed class RateLimitResponseHandler : DelegatingHandler
 {
@@ -45,6 +46,25 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
 
     /// <summary>True when a 429 came from the API's rate limiter rather than the cloud infrastructure.</summary>
     public static bool IsFromRateLimiter(HttpResponseMessage response) => response.Headers.Contains("x-ratelimit-type");
+
+    /// <summary>
+    /// The rate limiter's headers on a response, as <c>name=value</c> pairs by name (B59): the <c>x-ratelimit-*</c> headers
+    /// and <c>retry-after</c>, whatever the server sends. "none" without any.
+    /// </summary>
+    /// <param name="response">The response.</param>
+    /// <returns>The headers, for a log line.</returns>
+    public static string RateLimitHeaders(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        var headers = response.Headers
+            .Where(header => header.Key.StartsWith("x-ratelimit-", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("retry-after", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(header => header.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(header => $"{header.Key}={string.Join(',', header.Value)}")
+            .ToList();
+        return headers.Count == 0 ? "none" : string.Join(", ", headers);
+    }
 
     /// <summary>
     /// How long the rate limiter asks to wait: until <c>x-ratelimit-reset</c>, else <c>retry-after</c>,
@@ -85,10 +105,11 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
             if (retry == MaxRetries)
             {
                 _logger.LogWarning(
-                    "429 from {Source} for {Endpoint}; giving up after {Retries} retries.",
+                    "429 from {Source} for {Endpoint}; giving up after {Retries} retries. The limiter's headers: {RateLimitHeaders:l}.",
                     fromRateLimiter ? "the API's rate limiter" : "the cloud infrastructure",
                     request.RequestUri?.AbsolutePath,
-                    MaxRetries);
+                    MaxRetries,
+                    RateLimitHeaders(response));
                 return response;
             }
 
@@ -96,12 +117,13 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
                 ? RateLimiterWait(response, TimeProvider.System.GetUtcNow())
                 : _backoff[Math.Min(retry, _backoff.Count - 1)];
             _logger.LogWarning(
-                "429 from {Source} for {Endpoint}; retrying in {Wait} ({Retry} of {MaxRetries}).",
+                "429 from {Source} for {Endpoint}; retrying in {Wait} ({Retry} of {MaxRetries}). The limiter's headers: {RateLimitHeaders:l}.",
                 fromRateLimiter ? "the API's rate limiter" : "the cloud infrastructure",
                 request.RequestUri?.AbsolutePath,
                 wait,
                 retry + 1,
-                MaxRetries);
+                MaxRetries,
+                RateLimitHeaders(response));
 
             response.Dispose();
             await Task.Delay(wait, cancellationToken);
