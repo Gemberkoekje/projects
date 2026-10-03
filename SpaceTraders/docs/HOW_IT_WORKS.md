@@ -249,7 +249,8 @@ switched off:
   state still holds.
 
 The plans are bootstrapped in the order of the table, so a plan higher up claims the ships it wants
-first. Which plan a ship works for follows from what it can do (`FleetRoles`, slice 6.4): with the
+first. Ships are bought in an order of their own, whichever plan buys them (slice 6.10b, D43): see
+[The order ships are bought in](#the-order-ships-are-bought-in-purchaseorder-slice-610b). Which plan a ship works for follows from what it can do (`FleetRoles`, slice 6.4): with the
 survey plan on, a ship that can survey surveys, and only that (D20), unless the spare-time plan is on
 too: then the command ship, with nothing to survey, trades (D34), and with no trade either mines or
 siphons in its spare time (slice 6.8); a ship that can mine mines (the contract first, D23, then the
@@ -262,13 +263,13 @@ it and the other ships can do and what each role would earn: see
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
 | Scout | Visit every marketplace in the starting system once | The one ship with fuel | Active → Completed | Nothing |
-| Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, the rest by an assignment (slice 6.9, D38–D42) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy must be worth their role |
-| Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE` |
-| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets |
-| Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | Nothing |
-| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`, up to `Mining.MaxDrones` |
-| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`, up to `Siphon.MaxDrones` (D32) |
-| Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21) |
+| Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral, the rest by an assignment (slice 6.9, D38–D42, D48) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral must be worth their role |
+| Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
+| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
+| Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47) |
+| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore (D48), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
+| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas (D48), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
+| Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
 | SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
 
 ### Scout (`ScoutAllMarketplacesPlanService`)
@@ -312,7 +313,13 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      In X1-DC53 that is the command ship, the only ship that can survey, once a drone can mine;
   3. while the contract plan is on and its contract still wants ore (D40, D23 kept), every other ship that
      can mine mines for it (`contract`);
-  4. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
+  4. one drone per SCARCE or LIMITED mineral keeps gathering it (`coverage`, slice 6.10b, D48): for every ore
+     a mining drone, and every gas a siphon drone, could serve a market short of (`MiningPlanner.ScarceOres`,
+     `SiphonPlanner.ScarceGases`), the drone whose trip works on it, else one that has the role, else the one
+     whose best trip in another role earns least; the minerals the fewest drones could serve first. A ship
+     that can survey is no drone. Without that, a drone that earns more trading would leave its mineral,
+     and the plan would buy the next, as one drone per scarce mineral is bought whatever trading pays;
+  5. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
      takes one trip or none, no two the same trade route (D18) or the same mining or siphon opening, by the
      assignment that earns most in total (the Hungarian method, `Assignment`). A ship's current role counts
      `Roles.HeadStartPercent` (20) more (D41), so close calls don't flip back and forth. A ship left
@@ -367,8 +374,9 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
     trades when its plan has no trip for it, as before;
   - the trading plan to the ships with the trade role, and those with the mining or siphon role that their
     plan left free;
-  - the mining and siphon plans buy a drone only when the board would give it their role (`RoleAdvisor`): a
-    drone that would earn more trading would trade, and the plan would buy the next for the same opening.
+  - the mining and siphon plans buy a drone beyond one per scarce mineral only when the board would give it
+    their role (`RoleAdvisor`): a drone that would earn more trading would trade, and the plan would buy the
+    next for the same opening.
 - **Off** (the default), the fixed rules hold, as before slice 6.9 (D20, D34).
 - **The state** (`plan_states`, `Roles`), written at each evaluation: when it ran, the plans that were on and
   whether the contract wanted ore, and per ship its role, why, since when, the trip that decided it and what
@@ -435,8 +443,10 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   No other plan uses them.
 - **Buying** (D29): while the system has fewer probes than markets, it buys a `SHIP_PROBE` at the
   shipyard that sells it for the least, at most one a pass, through `ShipPurchaseService`: the
-  purchase must leave `FleetExpansion.MinCreditReserve` (100,000), and needs one of our ships at the
-  shipyard (D30). Probes in flight count (B15).
+  purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30).
+  Probes in flight count (B15). The contract's drone, a surveyor, a drone per scarce mineral and the
+  cargo ships of `Trade.ShipPurchases` come first (D43): while one of them waits, the probe waits
+  too (`Purchase` `WaitingForAnotherPurchase`), and the probes fly on.
 - **Flights** (`ProbePlanner`, no I/O):
   1. a shipyard where a purchase waits for one of our ships (`ShipyardCalls`, D30) gets the nearest
      free probe (`ProbeCalled`), which stays there while the call is open;
@@ -483,6 +493,12 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   `survey`). A survey isn't ore-specific: the API surveys the whole asteroid and
   returns random deposits, so "for" an ore is the plan's label, and one survey often counts for
   several ores. Within the drones' reach every target is XB5C.
+- **A designated surveyor** (slice 6.10b, D47): with the role board on, the plan buys a `SHIP_SURVEYOR`
+  (33,905 at H52 on 2026-10-03) for each system with a mining drone and no ship that can only survey, at
+  the system's shipyard that sells it for the least, second in the order ships are bought in (D43). The
+  board gives it the survey role, as a ship that can only survey (D38), which frees the command ship for
+  what pays it most. A bought surveyor counts by its type until startup sync records its mount. With the
+  board off the command ship surveys (D20) and no surveyor is bought.
 - **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
   each has, whether it needs one, and the surveyors on each; it is written only when it changes. The
   `ShipLeftIdle` rule reads it: only targets that need a survey are work waiting for a surveyor.
@@ -506,20 +522,27 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      `held_cargo`): ore left over from the contract, for one;
   2. otherwise the best of `MiningPlanner.MiningTargets`: every market that buys an ore (imported or
      exchanged), mined at an asteroid it can reach with a usable survey holding the ore, or else at
-     the asteroid nearest the market whose traits yield it, and sold there. The market shortest of its
-     ore comes first (D28): SCARCE, then LIMITED (low supply, D22), and once no market is short, the
-     lowest supply there is, even when it pays less. Within a supply level, a surveyed ore first, then
-     the most a single extraction is expected to fetch: the ore's share of the survey's deposits
-     (without a survey, one of the asteroid's ores) times its price. One miner per sell market and
-     ore. It logs `MiningStarted`, reason `surveyed`, `low_supply` or `lowest_supply`.
-- **Drones:** when no miner was free, it asks the same ranking what a drone from the shipyard would
-  mine (its tank from the shipyard's listing, the trips under way held), and buys one only if that
-  trip would serve a market short of its ore (SCARCE or LIMITED, D28). One a tick, so the next tick
-  counts its trip; up to `Mining.MaxDrones` (default 20), within the credit reserve. Not while the
+     the asteroid nearest the market whose traits yield it, and sold there. A SCARCE or LIMITED ore no
+     miner's trip works on comes first, the nearest asteroid first (slice 6.10b, D48, "near before
+     far"); then the market shortest of its ore (D28): SCARCE, then LIMITED (low supply, D22), and once
+     no market is short, the lowest supply there is, even when it pays less. Within a supply level, a
+     surveyed ore first, then the most a single extraction is expected to fetch: the ore's share of the
+     survey's deposits (without a survey, one of the asteroid's ores) times its price. One miner per
+     sell market and ore. It logs `MiningStarted`, reason `uncovered` (D48 chose it over D28's first),
+     `surveyed`, `low_supply` or `lowest_supply`.
+- **Drones,** one a tick, so the next tick counts the new drone; up to `Mining.MaxDrones` (default 20),
+  within the credit reserve and when the order ships are bought in lets it (D43). Not while the
   contract plan mines: the contract would take the drone, and the contract plan buys at most one
-  (D23). With the role board on, only when the board would give the drone the mining role
-  (`RoleAdvisor`): a drone that would earn more trading would trade, and the plan would buy the next for
-  the same opening.
+  (D23). The plan says what it would buy on every pass, whether it may buy it or not:
+  1. a drone for a scarce ore (D48), while the system has fewer mining drones (ships that can mine and
+     can't survey) than SCARCE or LIMITED ores a drone from the shipyard could serve
+     (`MiningPlanner.ScarceOres`): "at least 1 drone per mineral that is scarce or limited". It doesn't
+     ask the role board, which keeps one drone mining per scarce ore;
+  2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
+     shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
+     LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
+     the drone the mining role (`RoleAdvisor`): a drone that would earn more trading would trade, and the
+     plan would buy the next for the same opening.
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
   miner's trip sells there, Pending otherwise, with the free miners that could reach it, for the
   `ShipLeftIdle` rule. It is written only when it changes.
@@ -541,20 +564,22 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
      to selling at once and end without its gas aboard, on every tick;
   2. otherwise the best of `SiphonPlanner.SiphonTargets`: every market that buys a gas (imported or
      exchanged) and that the siphoner can carry its hold to, siphoned at the gas giant nearest the
-     market that it can reach, and sold there. The market shortest of its
-     gas comes first (D28): SCARCE, then LIMITED (low supply, D22), and once no market is short, the
-     lowest supply there is. Within a supply level, the most a single siphon is expected to fetch (one
-     of the gas giant's three gases times the price), then the nearest gas giant. One siphoner per
-     sell market and gas. It logs `SiphonStarted`, reason `low_supply` or `lowest_supply`.
-- **Drones** (D32, the miners' rule): when no siphoner was free, it asks the same ranking what a
-  `SHIP_SIPHON_DRONE` from the shipyard would siphon (its tank and hold from the shipyard's listing, the
-  trips under way held), and buys one only if that trip would serve a market short of its gas (SCARCE
-  or LIMITED). One a tick, at the shipyard that sells it for the least in a system where our ships
-  are, up to `Siphon.MaxDrones` (default 10), within the credit reserve. In X1-DC53 that is C39, the
-  station at the gas giant C38, where none of our ships stays: the purchase calls for a probe (D30),
-  which only the probe plan answers, so with the probe plan off no siphon drone is bought until one of
-  our ships happens to be at C39. With the role board on, a drone is bought only when the board would give
-  it the siphon role (`RoleAdvisor`), as for the mining plan's drones.
+     market that it can reach, and sold there. A SCARCE or LIMITED gas no siphoner's trip works on comes
+     first, the nearest gas giant first (D48); then the market shortest of its gas (D28): SCARCE, then
+     LIMITED (low supply, D22), and once no market is short, the lowest supply there is. Within a supply
+     level, the most a single siphon is expected to fetch (one of the gas giant's three gases times the
+     price), then the nearest gas giant. One siphoner per sell market and gas. It logs `SiphonStarted`,
+     reason `uncovered`, `low_supply` or `lowest_supply`.
+- **Drones** (D32, the miners' rule): one a tick, at the shipyard that sells `SHIP_SIPHON_DRONE` for the
+  least in a system where our ships are, up to `Siphon.MaxDrones` (default 10), within the credit reserve
+  and when the order ships are bought in lets it (D43): first one per SCARCE or LIMITED gas a drone from the
+  shipyard could serve (D48, `SiphonPlanner.ScarceGases`), without asking the role board; then, when no
+  siphoner was free, a drone whose first trip by the same ranking (its tank and hold from the shipyard's
+  listing, the trips under way held) would serve a market short of its gas, in turn with the cargo ships,
+  and with the role board on only when the board would give it the siphon role (`RoleAdvisor`). In X1-DC53
+  the shipyard is C39, the station at the gas giant C38, where none of our ships stays: the purchase calls
+  for a probe (D30), which only the probe plan answers, so with the probe plan off no siphon drone is bought
+  until one of our ships happens to be at C39.
 - **Gas contracts** stay unsupported (D2, D31): no contract takes the siphoners.
 - **The state** (`plan_states`, `SiphonAutomation`, as the mining plan's) lists the low-supply openings
   of every system where our ships are, before the first drone too: Assigned while a siphoner's trip
@@ -618,8 +643,11 @@ siphoned.
   ship in `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`): the Nth
   while the fleet has fewer than N cargo ships (a hold and a tank, nothing to mine, siphon or survey
   with), at the shipyard that sells it for the least, and only when the new ship would have a
-  lucrative route from the shipyard with the credits left after the purchase. `ShipPurchaseService`
-  keeps the credit reserve. One purchase a pass.
+  lucrative route from the shipyard with the credits left after the purchase. Once the list is bought,
+  one more of its last type at a time, in turn with the drones (D43). `ShipPurchaseService` keeps the
+  credit reserve. One purchase a pass, when the order ships are bought in lets it: a ship of the list is
+  saved up for, whatever the routes; a ship beyond it needs nothing while a trader has no trip or no new
+  ship would have a lucrative route, so the drones' turn comes.
 - **The state** (`plan_states`, `TradingAutomation`) lists the held routes (Assigned) and up to 20
   lucrative routes no trader holds (Pending), each with the free traders that could have taken it,
   for the `ShipLeftIdle` rule. It is written only when it changes.
@@ -698,9 +726,57 @@ last, gives it something to do then; your decisions are D34–D37.
   6. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`.
   - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`
     or `NoShipAtShipyard`.
-- **`BudgetPolicy`:** spendable credits are the cached credits minus
-  `FleetExpansion.MinCreditReserve`.
-- **Buying order within a tick:** contract, probe, mining, siphon, trading. There is no other priority.
+- **`BudgetPolicy`:** spendable credits are the cached credits minus the credit reserve (slice 6.10b,
+  D51, `CreditReserve`): `FleetExpansion.MinCreditReserve` (60,000) and
+  `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit the ships that trade can carry, so
+  the traders can still buy their loads after a purchase. The ships that trade are the cargo ships, the
+  command ship (cached as `COMMAND`; it trades whenever it isn't surveying, D34, D38) and any other ship
+  the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo: with every
+  hold counted, the 205 units of 2026-10-03 would have asked 265,000, above what the credits peaked at.
+  With the command ship alone the reserve is 100,000; a light shuttle (40) makes it 140,000, a light hauler
+  (80) 220,000, a second 300,000. It is judged from the cached fleet and the role board at every
+  evaluation, and exported as `spacetraders_credit_reserve`.
+
+### The order ships are bought in (`PurchaseOrder`, slice 6.10b)
+
+Asked on 2026-10-03: "I feel there are too many siphoning drones and not enough other ship types." Each
+plan bought on its own, and a drone (~50k) was affordable long before a light shuttle (114k) or a probe
+(77k): five siphon drones and two mining drones were bought overnight, and no probe or cargo ship. Your
+decisions are D43, D47 and D48: "I'd like at least 1 drone per mineral that is scarce or limited, then
+save up for cargo ships, then a mix based on if the minerals aren't going above LIMITED", the mix being
+"Alternate drones and cargo ships, but probes first".
+
+- **The order** (`PurchaseTier`), first first:
+  1. `Contract`: the contract's drone, while no miner is free for the contract (D23, D40);
+  2. `Surveyor`: a designated surveyor for each system with mining drones (D47);
+  3. `Coverage`: a drone for each SCARCE or LIMITED mineral, ore or gas, until there is one drone per
+     such mineral (D48);
+  4. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
+  5. `Probes`: a probe for every market (D29);
+  6. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
+     in turn: a drone, a cargo ship, and so on. The turn counts the drones and cargo ships bought since
+     the list's last cargo ship (the ledger's `ShipPurchase` rows, which carry the type, and this process's
+     purchases, which the ledger gets a moment later): the drones' while no more drones than cargo ships
+     were bought. A turn passes when the other kind has nothing to buy: no drone's first trip would serve a
+     market short of its mineral, or a miner is free; no new cargo ship would have a lucrative route, or a
+     trader has no trip.
+- **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
+  pass what it would buy now, or nothing, and asks before it buys (`IPurchaseOrder.ReportAsync`). A plan
+  may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,
+  the turn. A need counts while its plan is on, for 2 minutes after the plan last said it, and only while
+  it can be met: its plan's cap not reached, a known shipyard selling the ship. Until each plan that is on,
+  and could need something earlier, has said what it needs once since the start, nothing after it is
+  bought: after a start the probe plan, which runs before the survey, mining, siphon and trading plans,
+  waits a tick.
+- **What it means:** the credits pile up for the purchase first in the order, while everything after it
+  waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
+  may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the
+  plans in their order (contract, probe, survey, mining, siphon, trading), so after a purchase the next
+  one in line may come in the same tick.
+- **Visibility:** `spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}`, one series
+  per plan that needs something, worth the ship's price: the lowest `position` is what the credits are
+  saved up for. A purchase is journaled as before (`ShipPurchased`); a purchase held back by the order logs
+  only at Debug.
 
 ### Which ships a plan considers free
 
@@ -1043,7 +1119,7 @@ other app (D8):
 
 ### What each setting does
 
-The seed holds 50 settings: the 35 that change what the bot does (8 of them the health rules'
+The seed holds 51 settings: the 36 that change what the bot does (8 of them the health rules'
 thresholds), 3 that are read without changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
 removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
@@ -1057,7 +1133,8 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Automation.CircuitBreaker.MaxGoalStepsPerMinute` (60) | Goal steps per ship per minute above which the circuit breaker blocks the goal |
 | `Api.BadGatewayPauseMinutes` (3) | Minutes without any API call after a 502 |
 | `Database.SoftLimitMegabytes` (1024), `Database.HardLimitMegabytes` (3072) | Database size above which the size guard warns, or switches automation off (D8) |
-| `FleetExpansion.MinCreditReserve` (100000) | Credits every purchase must leave untouched |
+| `FleetExpansion.MinCreditReserve` (60000) | Credits every ship purchase must leave with no ship that trades: the floor of the credit reserve (D51). Seeded at 100,000 before slice 6.10b; a stored value stays as it is |
+| `FleetExpansion.ReservePerTradingCargoUnit` (1000) | Credits the credit reserve grows by for every unit of hold on the ships that trade: the cargo ships, the command ship and any ship the role board has trading (D51); 0 means the floor only |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
 | `Siphon.MaxDrones` (10) | Cap on the siphon drones the siphon plan keeps; it buys one only for a market short of a gas (D32) |
 | `Survey.StockPerOre` (2) | Usable surveys the survey plan keeps of each ore at its asteroid; with that many for every ore, the surveyors wait until one runs out (D27) |
@@ -1292,7 +1369,7 @@ The seven pages in `src/Future` are not routed.
   until a scrape has exported that 0: up to two scrape intervals (2 minutes on the cluster). Locally,
   a new series shows its count from the second `curl` of `/metrics` after it appeared.
 
-  A gauge without labels (`spacetraders_agent_credits`, `spacetraders_db_size_bytes`,
+  A gauge without labels (`spacetraders_agent_credits`, `spacetraders_credit_reserve`, `spacetraders_db_size_bytes`,
   `spacetraders_server_next_reset_timestamp_seconds`) is the opposite: its 0 would be read as a
   value, so it has no series until the bot first sets it (B52); its `# TYPE` line is there from the
   start. Prometheus's first scrape of a new pod can come before the first sample, and the dashboard
@@ -1302,6 +1379,8 @@ The seven pages in `src/Future` are not routed.
   | Metric | Labels | What it counts or shows | Updated |
   |---|---|---|---|
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
+  | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry | Every 10 s |
+  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `CargoShips`, `Probes`, `Alternating`) and `position` the same as a number, 1 first. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
   | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
@@ -1333,7 +1412,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_shipyard_ship_type` | `system`, `waypoint`, `ship_type` | 1 for each ship type a shipyard sells | Every minute |
   | `spacetraders_shipyard_ship_price`, `_ship_supply` | `system`, `waypoint`, `ship_type` | A ship type's price and supply (1 to 5) as last seen, once a ship has been there | Every minute |
   | `spacetraders_good_supply_chain` | `good`, `made_from`, `used_for` | One series per good, always 1: the goods it is made from and the goods made from it, comma-separated (`GET market/supply-chain`) | Once per start |
-  | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `None`) and why (`survey_first`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
+  | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `None`) and why (`survey_first`, `coverage`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
   | `spacetraders_ship_role_credits_per_hour` | `ship`, `role` | What each role a ship could take but surveying would earn it per hour, by the board's estimate of its best trip; 0 for a role without a trip. Only while the board is on | Every 10 s |
   | `spacetraders_setting_info` | `setting`, `current`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`) and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
   | `spacetraders_ship_capabilities_info` | `ship`, `can` | One series per ship, always 1: the roles its equipment allows whichever plans are on (`FleetRoles.PotentialRoles`), in the order `Survey` (a surveyor mount, or a bought SHIP_SURVEYOR), `Mine` (a mining laser, or a bought mining drone or ore hound, with a hold and a tank), `Siphon` (a gas siphon, or a bought siphon drone, with a hold and a tank), `Trade` (a hold and a tank); `none` for a probe or a ship with none. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role, which the `role` label of `spacetraders_ships` shows; this tells them apart (slice 6.10a). The fleet and roles tables' "can do" column | Every 10 s |

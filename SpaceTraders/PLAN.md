@@ -91,9 +91,10 @@
 - The health check of 2026-10-03, after the bot's first day on the cluster, found B52 (projects#134, deployed by
   gembernodes#33) and B53 (projects#135). gembernodes#34 makes the log budget a number per ship and stays open until
   slice 6.10a is merged, so it deploys both.
-- Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D50) is split in three: 6.10a (visibility and
-  the role board's rates) is built, its dashboards in gembernodes#34; 6.10b (the order ships are bought in, a designated surveyor, one drone per
-  scarce mineral) and 6.10c (drones drifting to minerals out of fuel range) are planned, with their designs below.
+- Slice 6.10 (the fleet's shape, asked on 2026-10-03, with your decisions D43–D51) is split in three: 6.10a (visibility and
+  the role board's rates) is merged and deployed (projects#136, gembernodes#34); 6.10b (the order ships are bought in, a designated
+  surveyor, one drone per scarce mineral, and a credit reserve that grows with the trading holds, D51) is built; 6.10c (drones
+  drifting to minerals out of fuel range) is planned, with its design below.
 
 ## Known issues
 
@@ -216,6 +217,7 @@ get the next D-number.
 | D48 | Slice 6.10 (asked on 2026-10-03): buying "one drone per scarce mineral" ends only if those drones work on those minerals; otherwise each new drone takes the best-paying opening. | **Uncovered minerals first** (slice 6.10b): a free drone first takes a SCARCE or LIMITED mineral that no drone works on, near before far, then D28's order; the role board keeps one drone in its gathering role for each such mineral, as the contract keeps its miners (D40). A mineral no drone can reach, or that no asteroid yields, doesn't count. |
 | D49 | Slice 6.10 (asked on 2026-10-03): the board valued a siphon drone at ~274,000 credits an hour (it earns 7–10k), mining drones at 80–95k (1–3k), the command ship's trades at up to 4.7M (13k): D39's second step counts, for every unit of gas, a quarter of a price difference such as PLASTICS → EQUIPMENT (~3,200), and a siphon trip's gases were valued at the best market anywhere. How are the rates fixed? | **Cap the chain value, at the trip's own market** (slice 6.10a), "for now"; amends D39: goods are valued where the trip sells them, and the chain's share (both D39 steps kept) is capped so that feeding a factory at most doubles what a trip earns per unit: its price for mined and siphoned goods, its margin for trades. |
 | D50 | Slice 6.10 (asked on 2026-10-03): "we should visualize the actual correlation between the amount of goods sold and the amount of processed goods added, and what that does to the price. Because a unit of hydrocarbons might make a unit of plastics, but we don't know how many … (we also don't know at what rate a hydrocarbon gets converted to plastics per unit of time)." | **Measure it** (slice 6.10a): the bot counts the units it sells and buys per market and good; the dashboard plots what we sell into a market per hour against the supply, trade volume and price of what that market makes from it, so the rate and the delay can be read off. D49's cap stands until those numbers say better. |
+| D51 | Slice 6.10b (asked on 2026-10-03, in another session): "What if we made the amount of credits for trade wider based on the amount of cargo total in the fleet? Something like: 60.000 hard minimum, 1.000 per cargo hold. … This might ramp it up a bit too much. Which defaults would you recommend?" In 24 hours the command ship made 150 trade purchases, 51,610 credits on average (median 54,331, 27 units): an expensive good's trade volume (often 20 units) caps a load, so a trip's cost barely grows with the hold; the drones' few trades cost 45–67k. Counting every hold (11 drones and the command ship, 205 units) would ask 265,000, above the ~150,000 the credits peak at, and freeze every purchase. | **Grow the reserve with the trading holds:** the credits every ship purchase keeps are `FleetExpansion.MinCreditReserve` (the floor, seeded at 60,000) plus `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit of hold on the ships that trade: the cargo ships, the command ship (it trades whenever it isn't surveying, D34, D38) and any other ship the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo. The command ship alone keeps 100,000 (as today); with a light shuttle (40) 140,000, so the first light hauler needs 354,210 + 140,000; with one light hauler (80) 220,000, with two 300,000; a drone in the trade role adds 15,000 while it has it; no ship that trades, 60,000. The recommended defaults, yours unchanged. |
 
 ## Phases
 
@@ -1897,23 +1899,91 @@ How credits are split stays your call; Claude only fixes deviations from intende
       trade volume and price of what it makes from it.
     - The role board's rates (D49).
     - The market tree's price gap per good, where to buy, where to sell (dashboard only, in gembernodes#34).
-  - **6.10b The order ships are bought in** (planned; D43, D47, D48). Design notes from the code survey:
-    - Contract, probe, mining, siphon and trading plans buy in that order each tick, each on its own checks and in its
-      own scope (`ShipPurchaseService`, `BudgetPolicy`). The order needs a singleton, like `ShipyardCalls`, that each plan
-      tells its need every pass and asks before it buys; until every buying plan that is on has reported once since the
-      start, nothing of lower priority is bought.
-    - A need counts only while it can be met (its plan on, its cap not reached, a known shipyard selling the type), or
-      nothing after it would ever be bought.
-    - The ledger is the lasting record of purchases: `ShipPurchase` rows carry the type's enum name in `GoodSymbol`
-      (`ShipMiningDrone`, `ShipSiphonDrone`, `ShipSurveyor`, `ShipProbe`, `ShipLightShuttle`, `ShipLightHauler`); a cached
-      ship's `ShipType` turns into its registration role at the next startup sync. The alternation counts the drones and
-      cargo ships bought since the list's last cargo ship; a turn passes when the other kind has nothing to buy.
-    - Coverage (D48): the mining and siphon plans give free drones an uncovered SCARCE or LIMITED mineral first; the role
-      board keeps one drone in its gathering role per uncovered mineral, after the contract (D40). Without that, a drone
-      that earns more trading would leave its mineral and the plan would buy the next. A coverage purchase doesn't ask
-      `RoleAdvisor`.
-    - The surveyor: bought by the survey plan; `FleetRoles.CanSurvey` already reads a bought SHIP_SURVEYOR by its type
-      until startup sync records its mounts. With the board off, D20 holds and no surveyor is bought.
+  - **6.10b The order ships are bought in** (built 2026-10-03 on branch `claude/spacetraders-purchase-order`; D43, D47, D48,
+    D51). Asked: "I feel there are too many siphoning drones and not enough other ship types"; "I'd like at least 1 drone per
+    mineral that is scarce or limited, then save up for cargo ships, then a mix based on if the minerals aren't going above
+    LIMITED", the mix being "Alternate drones and cargo ships, but probes first"; a designated surveyor first (D47); and,
+    during the work, a reserve that grows with the trading holds (D51).
+    - Done:
+      - **The order** (`PurchaseOrder`, `PurchaseNeeds`, D43): every plan that buys says on each pass what it would buy
+        (`PurchaseNeed`: a tier, the ship, the shipyard, the price) and buys only when nothing comes first: the contract's
+        drone, a surveyor, a drone per scarce mineral, the cargo ships of `Trade.ShipPurchases`, probes, then drones and
+        cargo ships of the list's last type in turn. A need counts while its plan is on, for 2 minutes after the plan last
+        said it, and only while it can be met (its cap not reached, a known shipyard with a price for it). Until each plan
+        that is on and could need something earlier has said what it needs once since the start, nothing after it is
+        bought: after a start the probe plan, which runs before the survey, mining, siphon and trading plans, waits a tick.
+        The order says who may buy; the reserve stays the purchase's own check.
+      - **The turn** between drones and cargo ships counts the drones and cargo ships bought since the list's last cargo
+        ship: the ledger's `ShipPurchase` rows (read once a start) and the purchases of this process, which
+        `ShipPurchaseService` records at once, as the ledger's row comes a moment later and the siphon plan, later in the
+        same tick, would otherwise buy a second drone. A turn passes when the other kind has nothing to buy: a drone's
+        first trip wouldn't serve a market short of its mineral, or a miner is free; a new cargo ship would have no
+        lucrative route (judged with any credits, so a hauler that isn't affordable yet keeps its turn), or a trader has
+        no trip. Probes and surveyors don't take turns.
+      - **A cargo ship of the list is saved up for** whatever the routes (D43, "then save up for cargo ships"); it is
+        bought, as before (D21), when every trader has a trip and the new ship would have a lucrative route with the
+        credits left after it. Past the list, one more of its last type at a time, in turn with the drones: D21's "up to 2
+        light haulers" became that.
+      - **The surveyor** (D47): with the role board on, the survey plan buys a `SHIP_SURVEYOR` (33,905 at H52) for each
+        system with a mining drone and no ship that can only survey. The board gives it the survey role (D38), which
+        frees the command ship. The survey executor makes no check of its own, so a surveyor bought since the last restart,
+        whose mount startup sync hasn't recorded, surveys.
+      - **Coverage** (D48): the mining and siphon plans give a free drone a SCARCE or LIMITED mineral no drone's trip works
+        on first, near before far, then D28's order; the journal's `MiningStarted` and `SiphonStarted` say `uncovered` when
+        that came before D28's choice. They buy a drone (tier `Coverage`, without asking `RoleAdvisor`) while the system
+        has fewer drones of the kind than SCARCE or LIMITED minerals a new drone could serve (`MiningPlanner.ScarceOres`,
+        `SiphonPlanner.ScarceGases`): a count, so a drone between trips doesn't buy another. The role board keeps one
+        drone gathering per such mineral after the contract (`coverage`): the drone whose trip works on it, else one that
+        has the role, else the one with the least to lose. A drone beyond one per mineral is bought by D28's and D32's
+        rules, in turn with the cargo ships, and asks `RoleAdvisor` as before.
+      - **The reserve** (D51, `CreditReserve`): `BudgetPolicy` keeps the floor plus 1,000 a unit of hold on the ships that
+        trade, read from the cached fleet and the role board at every evaluation. New setting
+        `FleetExpansion.ReservePerTradingCargoUnit` (1,000); `FleetExpansion.MinCreditReserve` is seeded at 60,000.
+      - **Visibility:** `spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}`, one series per plan
+        that needs something, worth the ship's price (the lowest position is what the credits are saved for);
+        `spacetraders_credit_reserve`; the probe plan's state says `WaitingForAnotherPurchase`; the role board's
+        `coverage` reason.
+    - After the deploy (yours): **set `FleetExpansion.MinCreditReserve` to 60,000.** The seed adds missing keys at every
+      start, so `FleetExpansion.ReservePerTradingCargoUnit` arrives by itself, but a stored value is never overwritten: until
+      then the reserve is 100,000 plus the command ship's 40,000, 140,000.
+    - Noticed (not changed):
+      - **A long saving phase:** after the surveyor (33,905), the list is 114,225 + 2 × 354,210 = 822,645, with the reserve
+        rising to 140,000, 220,000 and then 300,000; then 25 probes for X1-DC53's 26 markets (77,117 at A2, more as each
+        purchase moves the price) above a 300,000 reserve, before any drone beyond one per scarce mineral. Today one per
+        scarce mineral is already there (four mining drones for COPPER, SILICON and QUARTZ near the middle; seven siphon
+        drones for three gases), so the next purchases are the surveyor, then the shuttle.
+      - **A trader without a trip holds the list back:** a cargo ship is bought only when every trader has a trip (D21),
+        and nothing after it while it is to buy. Freed by the surveyor, the command ship trades: while it finds no lucrative
+        route, the shuttle waits, and so do probes and drones.
+      - **During a contract** the mining plan buys nothing (D23), so a drone for a scarce ore waits for the contract's end,
+        while cargo ships and probes, after it in the order, may be bought.
+      - **Coverage counts drones, not trips:** a drone kept for a mineral may be on another trip; the trip-level rule moves
+        drones to uncovered minerals as their trips end, so with as many drones as minerals they rotate rather than stay.
+      - **One system:** needs are per plan, not per system; with ships in several systems a plan reports its first need.
+      - `ContractPlanService` holds a `LegacyContractShipPurchaseService` that nothing constructs (dead code).
+    - Done when: the surveyor and the shuttle are bought in that order, the probes after the list, and no drone beyond one
+      per scarce mineral before the probes; `spacetraders_purchase_need_credits` shows what waits.
+    - **To understand this,** start with `SpaceTraders.Application/Services/PurchaseOrder.cs`, then each plan's need:
+      `DroneNeedAsync` in `Automation/MiningAutomationService.cs` and `SiphonAutomationService.cs`, `BuyCargoShipAsync` in
+      `TradingAutomationService.cs`, `SurveyorNeedAsync` in `SurveyPlanService.cs`; for coverage, `UncoveredFirst` in
+      `Mining/MiningPlanner.cs` and `Keepers` in `Roles/RolePlanner.cs`; for D51, `Orchestration/CreditReserve.cs`.
+    - Files, in `SpaceTraders.Application` unless named:
+      - new: `Services/PurchaseOrder.cs` (`IPurchaseOrder`, `PurchaseOrder`, `PurchaseNeeds`, `PurchaseTier`,
+        `PurchaseKind`, `PurchaseNeed`, `ReportedNeed`, `PurchaseRecord`), `Orchestration/CreditReserve.cs`;
+      - changed: `Automation/ContractPlanService.cs`, `ProbeDeploymentPlanService.cs`, `ProbeDeploymentPlanState.cs`
+        (`WaitingForAnotherPurchase`), `SurveyPlanService.cs`, `MiningAutomationService.cs`, `SiphonAutomationService.cs`,
+        `TradingAutomationService.cs`, `RolePlanService.cs`, `FleetRoles.cs` (`IsMiningDrone`); `Mining/MiningPlanner.cs`,
+        `Siphoning/SiphonPlanner.cs` (`UncoveredFirst`, `ScarceOres`, `ScarceGases`); `Roles/RolePlanner.cs`
+        (`MineralCoverage`, `coverage`); `Orchestration/BudgetPolicy.cs`; `Services/ShipPurchaseService.cs`;
+        `Commands/Fleet/PurchaseShipCommand.cs`; `Interfaces/IAutomationMetrics.cs`; `DependencyInjection.cs`;
+        `PrometheusAutomationMetrics`, `PrometheusMetricsService` (API); `DefaultSettingsSeed` (Persistence);
+      - tests: `Services/PurchaseOrderTests` and `OpenPurchaseOrder` (new); additions to `ContractPlanServiceTests`,
+        `ProbeDeploymentPlanServiceTests`, `SurveyPlanServiceTests`, `MiningAutomationServiceTests` (two rewritten: the D28
+        purchase now needs a drone per scarce ore first), `SiphonAutomationServiceTests` (two rewritten, the same),
+        `TradingAutomationServiceTests` (one rewritten: past the list, one more hauler in turn), `RolePlanServiceTests`
+        (one rewritten: the only drone is kept for a scarce ore), `RolePlannerTests`, `MiningPlannerTests`,
+        `SiphonPlannerTests`, `ShipPurchaseServiceTests`, `BudgetPolicyTests`, `DefaultSettingsSeedTests`;
+        `PrometheusMetricsTests`, `MetricsEndpointTests` (API).
   - **6.10c Drift to minerals out of fuel range** (planned; D45). Design notes from the code survey:
     - Reach today: `MiningPlanner.CanReach` (CRUISE through markets that sell fuel) is the only check, and
       `TradeRoutePlanner` never plans DRIFT.
@@ -1929,9 +1999,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
       deposits) is 24.5 from it; the middle of the system is 274 to 328 away. Tests that assume no drone reaches B7 change:
       `MiningPlannerTests`, `MiningAutomationServiceTests`, `ShipLeftIdleRuleTests`.
     - Siphoning: X1-DC53's one gas giant, C38, has all its buyers in reach, so no siphon drone would drift there now.
-  - **To understand this,** start with the decisions D43–D50, then this slice's notes; for 6.10b,
-    `Automation/MiningAutomationService.cs` (`BuyDroneAsync`), `Services/ShipPurchaseService.cs` and
-    `Automation/GameLoopService.cs`; for 6.10c, `Mining/MiningPlanner.cs` and `Goals/Executors/GoalFlight.cs`.
+  - **To understand this,** start with the decisions D43–D51, then this slice's notes; for 6.10b, see its own entry; for
+    6.10c, `Mining/MiningPlanner.cs` and `Goals/Executors/GoalFlight.cs`.
 
 ## Changes in gembernodes
 

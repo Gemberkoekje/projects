@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, slice 6.10b: D43, D47, D48)
+- The order ships are bought in (D43), as asked on 2026-10-03: "I'd like at least 1 drone per mineral that is scarce or limited, then save up for cargo ships, then a mix based on if the minerals aren't going above LIMITED", the mix being "Alternate drones and cargo ships, but probes first". Every plan that buys says on each pass what it would buy (`PurchaseNeed`), and buys only when nothing comes first (`IPurchaseOrder`): the contract's drone, a designated surveyor, a drone per scarce mineral, the cargo ships of `Trade.ShipPurchases` (saved up for), probes, then drones and cargo ships of the list's last type in turn. A need counts while its plan is on and can meet it; until every plan that is on has said what it needs once since the start, nothing it could come before is bought. The turn counts the drones and cargo ships bought since the list's last cargo ship, from the ledger and this process's purchases; a turn passes when the other kind has nothing to buy. Past the list, the trading plan buys one more of its last type at a time.
+- A designated surveyor (D47): with the role board on, the survey plan buys a `SHIP_SURVEYOR` for each system with a mining drone and no ship that can only survey; the board gives it the survey role, which frees the command ship.
+- One drone per scarce mineral (D48): the mining and siphon plans give a free drone a SCARCE or LIMITED ore or gas no drone works on first, the nearest first (journal reason `uncovered` when that came before D28's choice), and buy a drone, without asking the role board, while the system has fewer drones of the kind than such minerals a new drone could serve. The role board keeps one drone gathering per such mineral (reason `coverage`).
+- Metrics: `spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}`, what each plan would buy, worth the ship's price; `spacetraders_credit_reserve`. The probe plan's state says `WaitingForAnotherPurchase` while something comes first.
+
+### Code – Changed (2026-10-03, slice 6.10b, D51)
+- The credit reserve every ship purchase keeps grows with what the ships that trade can carry: `FleetExpansion.MinCreditReserve` (now seeded at 60,000) plus `FleetExpansion.ReservePerTradingCargoUnit` (new, 1,000) a unit of hold on the cargo ships, the command ship and any ship the role board has trading. The command ship alone keeps 100,000, as before; a light shuttle makes it 140,000, a light hauler 220,000, a second 300,000. A stored `FleetExpansion.MinCreditReserve` keeps its value: set it to 60,000 after the deploy.
+
+### Docs – Changed (2026-10-03, slice 6.10b)
+- `PLAN.md`: D51; 6.10b built, with what to do after the deploy and what was noticed. `docs/HOW_IT_WORKS.md`: the order ships are bought in, the surveyor, coverage, the credit reserve, the new setting and metrics.
+
 ### Code – Added (2026-10-03, slice 6.10a)
 - What each ship can do, whatever the plan switches: `spacetraders_ship_capabilities_info{ship,can}` (`Survey, Mine, Siphon, Trade`, or `none`), from its equipment. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role; this tells them apart. The metrics sample maps each cached ship once (`ShipRepository.MapToModel`, now public).
 - Units sold to and bought from each market, per good (`spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total`, labels `system`, `waypoint`, `good`), whoever traded them (D50): what we sell into a market can be set against what it makes. `ShipCargoSoldEvent` carries the market it was sold to.
