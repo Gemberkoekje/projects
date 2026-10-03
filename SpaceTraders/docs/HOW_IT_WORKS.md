@@ -481,7 +481,9 @@ The goal is a probe at every market of the HQ system, where the market watch kee
 - **Each tick** it first ends the surveys that expired (`SurveyKeeper`: removed from `cached_surveys`,
   `SurveyEnded` journaled with how often each was used, `spacetraders_surveys_ended_total`). Then
   each free surveyor gets one survey to take (`SurveyWaypointGoal`), the best target it can reach that
-  no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`.
+  no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`. It
+  reaches a target when it gets there in CRUISE and, with the fuel left, on to a market that sells fuel
+  (`MiningPlanner.CanSurveyAt`, B58), as a mining trip must get on to its market.
   The targets are:
   1. the contract's ore at the contract's asteroid, while the contract plan mines it;
   2. each ore a market in the system buys, at the asteroid nearest each market that buys it (D27,
@@ -529,7 +531,7 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   B7; the new one, bought at H52, drifts to B7 when the first is in the middle.
 - **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
   each has, whether it needs one, the surveyors on each, and the surveyors that can reach each in CRUISE
-  (`CandidateShipSymbols`); it is written only when it changes. The `ShipLeftIdle` rule reads it: only
+  and fly on from it to fuel (`CandidateShipSymbols`, B58); it is written only when it changes. The `ShipLeftIdle` rule reads it: only
   targets that need a survey are work waiting, and only for the surveyors that can reach them (B55). A
   designated surveyor's 80-unit tank keeps it in the middle of X1-DC53, while a miner's targets can be far
   out: the command ship's, when it mines, or a drone's at a market it drifted to.

@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B58)
+- A surveyor takes a survey target only where it can get on, with the fuel left, to a market that sells fuel (`MiningPlanner.CanSurveyAt`), as a mining trip must get on to its market. A target it could reach only one way left it stranded: on 2026-10-03 SPECTER-F flew from B7 to B37 (68 of its 80 fuel) for gold, and the area rule drifted it back to B7 (32 minutes), where gold at B37 came round again, while B14, where the drones mine, got no survey. The survey plan's state lists only such surveyors for each target, so the `ShipLeftIdle` rule counts the same.
+
+### Docs – Changed (2026-10-03, B58)
+- `PLAN.md`: B58; D56 merged. `docs/HOW_IT_WORKS.md`: which targets a surveyor reaches.
+
 ### Code – Changed (2026-10-03, D56)
 - Trades are full holds, in one purchase and one sale (D56), as asked on 2026-10-03: "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits, the trip's fuel kept back, pay for all of it. Each trade moves the price (a whole trade volume bought raised it 9% on 2026-10-03), so smaller loads, such as the drones' SHIP_PARTS 6 or 7 at a time, no longer count. At the buy market a trip whose markets no longer trade the full hold at once is dropped (`TradeDropped`, `Reason` `not_full_hold`).
 
