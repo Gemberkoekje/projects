@@ -310,6 +310,53 @@ public sealed class PrometheusMetricsServiceTests
     }
 
     /// <summary>
+    /// The fleet table shows what each ship can do next to what it does. Its cached type is the registration role after
+    /// startup sync, EXCAVATOR for a mining drone and a siphon drone alike, though a siphon drone can't mine: what a ship
+    /// can do is what its mounts, hold and tank allow, whichever plans are on.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_SaysWhatEachShipCanDo_ByItsEquipment_NotItsCachedType()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Ships.Add(Equipped("AGENT-1", "COMMAND", ["MOUNT_SENSOR_ARRAY_II", "MOUNT_GAS_SIPHON_II", "MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"], cargo: 40, fuel: 400));
+            db.Ships.Add(Equipped("AGENT-2", "SATELLITE", [], cargo: 0, fuel: 0));
+            db.Ships.Add(Equipped("AGENT-3", "EXCAVATOR", ["MOUNT_MINING_LASER_I"], cargo: 15, fuel: 80));
+            db.Ships.Add(Equipped("AGENT-4", "EXCAVATOR", ["MOUNT_GAS_SIPHON_I"], cargo: 15, fuel: 80));
+            db.Ships.Add(Equipped("AGENT-5", "SURVEYOR", ["MOUNT_SURVEYOR_I"], cargo: 0, fuel: 80));
+            db.Ships.Add(Equipped("AGENT-6", "HAULER", ["MOUNT_SENSOR_ARRAY_I"], cargo: 80, fuel: 600));
+
+            // Bought since the last restart: cached with the shipyard's type, and no mounts until the next startup sync.
+            db.Ships.Add(Equipped("AGENT-7", "SHIP_SIPHON_DRONE", [], cargo: 15, fuel: 80));
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        ships.Select(s => (s.Ship, s.Capabilities)).Should().BeEquivalentTo(new[]
+        {
+            ("AGENT-1", "Survey, Mine, Siphon, Trade"),
+            ("AGENT-2", "none"),
+            ("AGENT-3", "Mine, Trade"),
+            ("AGENT-4", "Siphon, Trade"),
+            ("AGENT-5", "Survey"),
+            ("AGENT-6", "Trade"),
+            ("AGENT-7", "Siphon, Trade"),
+        });
+    }
+
+    /// <summary>
     /// The dashboard's settings table (slice 2.9): every setting the agent has, with its value and what it does. A value
     /// that may hold a secret is hidden, as in <c>SettingChanged</c>. A setting keeps the description it was seeded
     /// with, so the cluster's agent, registered before slice 6.3, still describes the probe plan of before; the table
@@ -389,6 +436,20 @@ public sealed class PrometheusMetricsServiceTests
 
     private static AgentSetting Setting(string agentId, string key, string value, string description)
         => new() { AgentId = agentId, Key = key, Value = value, Type = "string", Description = description };
+
+    /// <summary>A docked ship with its mounts, hold and tank, cached as startup sync and the ship repository store them.</summary>
+    private static CachedShip Equipped(string symbol, string shipType, string[] mounts, int cargo, int fuel) => new()
+    {
+        AgentId = AgentId,
+        Symbol = symbol,
+        ShipType = shipType,
+        Status = "DOCKED",
+        WaypointSymbol = "X1-AB-H51",
+        MountsJson = JsonSerializer.Serialize(mounts),
+        CargoCapacity = cargo,
+        FuelCurrent = fuel,
+        FuelCapacity = fuel,
+    };
 
     private static LedgerEntry Ledger(string ship, LedgerCategory category, long amount)
         => new() { AgentId = AgentId, ShipSymbol = ship, Category = category, Amount = amount, OccurredAt = TimeProvider.System.GetUtcNow() };
@@ -492,6 +553,8 @@ public sealed class PrometheusAutomationMetricsTests
         { "extractions", metrics => metrics.Extraction("AGENT-3", surveyed: true), "spacetraders_extractions_total{ship=\"AGENT-3\",surveyed=\"true\"} " },
         { "surveys taken", metrics => metrics.SurveyTaken("X1-AB-XB5C", "MODERATE"), "spacetraders_surveys_taken_total{waypoint=\"X1-AB-XB5C\",size=\"MODERATE\"} " },
         { "surveys ended", metrics => metrics.SurveyEnded("X1-AB-XB5C", "expired", used: false), "spacetraders_surveys_ended_total{waypoint=\"X1-AB-XB5C\",reason=\"expired\",used=\"false\"} " },
+        { "units sold", metrics => metrics.GoodsSold("X1-DC53-H51", "HYDROCARBON", 18), "spacetraders_goods_sold_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-H51\",good=\"HYDROCARBON\"} " },
+        { "units bought", metrics => metrics.GoodsBought("X1-DC53-K85", "PLASTICS", 20), "spacetraders_goods_bought_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-K85\",good=\"PLASTICS\"} " },
     };
 
     /// <summary>
@@ -593,6 +656,30 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Fleet([Drone("X1-AB-H51 (PLANET)", "delivering COPPER_ORE", [new("COPPER_ORE", 15)])], Start.AddMinutes(4));
 
         (await ExportAsync()).Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
+    }
+
+    /// <summary>
+    /// The fleet table shows what each ship can do next to what it does, one series per ship: a ship whose equipment
+    /// changes loses its old series, and a ship that is gone loses its own.
+    /// </summary>
+    [Fact]
+    public async Task WhatAShipCanDo_IsOneSeriesPerShip_ThatFollowsItsEquipment()
+    {
+        var probe = new ShipMetricsSample("AGENT-2", "SATELLITE", "DOCKED", "None", string.Empty) { Capabilities = "none" };
+        var drone = Drone("X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE", []) with { Capabilities = "Mine, Trade" };
+        _metrics.Fleet([probe, drone], Start);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-2\",can=\"none\"} 1\n");
+        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-3\",can=\"Mine, Trade\"} 1\n");
+
+        // A surveyor mount installed on the drone; the probe scrapped.
+        _metrics.Fleet([drone with { Capabilities = "Survey, Mine, Trade" }], Start.AddMinutes(1));
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-3\",can=\"Survey, Mine, Trade\"} 1\n");
+        text.Should().NotContain("can=\"Mine, Trade\"");
+        text.Should().NotContain("ship=\"AGENT-2\"");
     }
 
     /// <summary>The markets dashboard (slice 2.8): a market's goods with their prices, volume, supply and activity.</summary>

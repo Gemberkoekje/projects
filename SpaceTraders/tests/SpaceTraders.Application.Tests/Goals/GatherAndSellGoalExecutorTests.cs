@@ -183,7 +183,7 @@ public sealed class GatherAndSellGoalExecutorTests
         await _port.Received(1).SellCargoAsync("SHIP-1", "COPPER_ORE", 15, Arg.Any<CancellationToken>());
         await _port.Received(1).SellCargoAsync("SHIP-1", "COPPER_ORE", 5, Arg.Any<CancellationToken>());
         await _port.DidNotReceive().SellCargoAsync("SHIP-1", "QUARTZ_SAND", Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await _bus.Received(2).PublishAsync(Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-1"), Arg.Any<DeliveryOptions>());
+        await _bus.Received(2).PublishAsync(Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-1" && sold.WaypointSymbol == H51), Arg.Any<DeliveryOptions>());
         _log.Journal.Where(entry => entry.EventKind == "CargoSold").Should().HaveCount(2);
         await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, H51, "SHIP-1", Arg.Any<CancellationToken>());
 

@@ -43,14 +43,18 @@ public sealed record ShipCargoSoldEvent
 
     public required long NewAgentCredits { get; init; }
 
+    /// <summary>The market the cargo was sold to.</summary>
+    public required string WaypointSymbol { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ShipCargoSoldEvent(string ShipSymbol, TradeSymbol Good, int Units, long Revenue, long NewAgentCredits)
+    public ShipCargoSoldEvent(string ShipSymbol, TradeSymbol Good, int Units, long Revenue, long NewAgentCredits, string WaypointSymbol)
     {
         this.ShipSymbol = ShipSymbol;
         this.Good = Good;
         this.Units = Units;
         this.Revenue = Revenue;
         this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
     }
 }
 

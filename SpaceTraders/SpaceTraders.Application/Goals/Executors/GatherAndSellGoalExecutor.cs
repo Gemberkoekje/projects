@@ -150,13 +150,14 @@ public sealed class GatherAndSellGoalExecutor(
             await ships.UpdateCargoAsync(ship.Symbol, sold.Cargo, ct);
             await agents.SetCreditsAsync(bus, sold.AgentCredits, ct);
 
-            // The ledger and the credits-earned metric (B7).
+            // The ledger and the credits-earned metric (B7), and the units sold to this market.
             await bus.PublishAsync(new ShipCargoSoldEvent(
                 ship.Symbol,
                 new TradeSymbol(trip.SellTradeSymbol),
                 batch,
                 sold.Revenue,
-                sold.AgentCredits));
+                sold.AgentCredits,
+                trip.SellWaypointSymbol));
 
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",

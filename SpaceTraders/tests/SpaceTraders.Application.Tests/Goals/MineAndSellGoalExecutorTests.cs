@@ -116,7 +116,7 @@ public sealed class MineAndSellGoalExecutorTests
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-3" && sold.Units == 15 && sold.Revenue == 1_005),
+            Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-3" && sold.Units == 15 && sold.Revenue == 1_005 && sold.WaypointSymbol == H51),
             Arg.Any<DeliveryOptions>());
         _log.Journal.Should().ContainSingle(entry => entry.EventKind == "CargoSold");
         await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, H51, "SHIP-3", Arg.Any<CancellationToken>());

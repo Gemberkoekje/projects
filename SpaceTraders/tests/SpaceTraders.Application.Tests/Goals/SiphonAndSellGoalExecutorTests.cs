@@ -122,7 +122,7 @@ public sealed class SiphonAndSellGoalExecutorTests
         await _port.Received(1).SellCargoAsync("SHIP-5", "LIQUID_HYDROGEN", 6, Arg.Any<CancellationToken>());
         await _port.DidNotReceive().SellCargoAsync("SHIP-5", "HYDROCARBON", Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-5" && sold.Units == 6 && sold.Revenue == 330),
+            Arg.Is<ShipCargoSoldEvent>(sold => sold.ShipSymbol == "SHIP-5" && sold.Units == 6 && sold.Revenue == 330 && sold.WaypointSymbol == G50),
             Arg.Any<DeliveryOptions>());
         _log.Journal.Should().ContainSingle(entry => entry.EventKind == "CargoSold");
         await _refresher.Received(1).RefreshAfterTradeAsync(SystemSymbol, G50, "SHIP-5", Arg.Any<CancellationToken>());

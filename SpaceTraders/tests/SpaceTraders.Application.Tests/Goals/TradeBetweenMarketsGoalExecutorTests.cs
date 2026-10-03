@@ -313,7 +313,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         await StepAsync(Loaded(D41), Trip(bought: true));
 
         await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "SHIP-1" && e.Good.Value == "EQUIPMENT" && e.Units == 20 && e.Revenue == 69_740),
+            Arg.Is<ShipCargoSoldEvent>(e => e.ShipSymbol == "SHIP-1" && e.Good.Value == "EQUIPMENT" && e.Units == 20 && e.Revenue == 69_740 && e.WaypointSymbol == D41),
             Arg.Any<DeliveryOptions>());
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == Credits && e.NewCredits == Credits + 69_740),

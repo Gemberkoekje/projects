@@ -21,6 +21,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly ZeroFirstCounter _messagesHandled;
     private readonly ZeroFirstCounter _creditsEarned;
     private readonly ZeroFirstCounter _creditsSpent;
+    private readonly ZeroFirstCounter _goodsSold;
+    private readonly ZeroFirstCounter _goodsBought;
     private readonly Gauge _anomalyActive;
     private readonly Gauge _nextServerReset;
     private readonly Gauge _credits;
@@ -36,6 +38,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly ZeroFirstCounter _surveysEnded;
     private readonly Gauge _surveysActive;
     private readonly Gauge _shipInfo;
+    private readonly Gauge _shipCapabilities;
     private readonly Gauge _shipArrival;
     private readonly Gauge _shipCargoUnits;
     private readonly Gauge _shipCargoCapacity;
@@ -61,6 +64,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string Contract, string TradeSymbol)> _deliverables = [];
     private readonly HashSet<string> _contracts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Location, string Activity)> _shipInfoLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _shipCapabilityLabels = new(StringComparer.Ordinal);
     private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _shipGoods = new(StringComparer.Ordinal);
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _markets = [];
@@ -115,6 +119,18 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_credits_spent_total",
             "Credits spent, by ledger category.",
             "category");
+        _goodsSold = ZeroFirst(
+            "spacetraders_goods_sold_units_total",
+            "Units of a good our ships sold to a market, whoever sold them: traders, miners, siphoners and the command ship in its spare time.",
+            "system",
+            "waypoint",
+            "good");
+        _goodsBought = ZeroFirst(
+            "spacetraders_goods_bought_units_total",
+            "Units of a good our ships bought from a market.",
+            "system",
+            "waypoint",
+            "good");
         _anomalyActive = metrics.CreateGauge(
             "spacetraders_anomaly_active",
             "1 while an anomaly is active, 0 once it cleared.",
@@ -190,6 +206,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "ship",
             "location",
             "activity");
+        _shipCapabilities = metrics.CreateGauge(
+            "spacetraders_ship_capabilities_info",
+            "One series per ship, always 1: the roles its equipment allows, whichever plans are on (Survey, Mine, Siphon and Trade, in that order; none for a probe or a ship that can do none of them).",
+            "ship",
+            "can");
         _shipArrival = metrics.CreateGauge(
             "spacetraders_ship_arrival_timestamp_seconds",
             "When a ship in transit arrives (Unix time); no series while it isn't travelling.",
@@ -313,6 +334,14 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void CreditsSpent(string category, long amount) => _creditsSpent.Inc(amount, category);
+
+    /// <inheritdoc />
+    public void GoodsSold(string waypointSymbol, string tradeSymbol, int units)
+        => _goodsSold.Inc(units, SystemOf(waypointSymbol), waypointSymbol, tradeSymbol);
+
+    /// <inheritdoc />
+    public void GoodsBought(string waypointSymbol, string tradeSymbol, int units)
+        => _goodsBought.Inc(units, SystemOf(waypointSymbol), waypointSymbol, tradeSymbol);
 
     /// <inheritdoc />
     public void Extracted(string shipSymbol, string tradeSymbol, int units) => _extractedUnits.Inc(units, shipSymbol, tradeSymbol);
@@ -643,6 +672,13 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     /// <summary>A yes-or-no label: <c>true</c> or <c>false</c>.</summary>
     private static string Flag(bool value) => value ? "true" : "false";
 
+    /// <summary>The system a waypoint is in: its symbol up to the last dash, such as <c>X1-DC53</c> for <c>X1-DC53-H51</c>.</summary>
+    private static string SystemOf(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
+    }
+
     /// <summary>A supply level as a number, so a graph can show it: 1 SCARCE to 5 ABUNDANT; none when unknown.</summary>
     private static double? SupplyLevel(string supply) => supply.ToUpperInvariant() switch
     {
@@ -676,7 +712,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         }
     }
 
-    /// <summary>Where a ship is and what it does (one series), when it arrives, and its hold. Under the lock.</summary>
+    /// <summary>
+    /// Where a ship is and what it does (one series), what it can do (one series), when it arrives, and its hold. Under
+    /// the lock.
+    /// </summary>
     private void Details(ShipMetricsSample ship)
     {
         var info = (ship.Location, ship.Activity);
@@ -687,6 +726,14 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
         _shipInfo.WithLabels(ship.Ship, ship.Location, ship.Activity).Set(1);
         _shipInfoLabels[ship.Ship] = info;
+
+        if (_shipCapabilityLabels.TryGetValue(ship.Ship, out var could) && !string.Equals(could, ship.Capabilities, StringComparison.Ordinal))
+        {
+            _shipCapabilities.RemoveLabelled(ship.Ship, could);
+        }
+
+        _shipCapabilities.WithLabels(ship.Ship, ship.Capabilities).Set(1);
+        _shipCapabilityLabels[ship.Ship] = ship.Capabilities;
 
         if (ship.ArrivesAt != default)
         {
@@ -728,6 +775,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             _shipInfo.RemoveLabelled(ship, info.Location, info.Activity);
             _shipCargoCapacity.RemoveLabelled(ship);
             _shipValue.RemoveLabelled(ship);
+        }
+
+        if (_shipCapabilityLabels.Remove(ship, out var can))
+        {
+            _shipCapabilities.RemoveLabelled(ship, can);
         }
 
         if (_shipsInTransit.Remove(ship))

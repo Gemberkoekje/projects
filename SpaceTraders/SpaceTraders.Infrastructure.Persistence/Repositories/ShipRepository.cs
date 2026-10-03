@@ -173,8 +173,16 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static ShipModel MapToModel(CachedShip entity)
+    /// <summary>
+    /// The ship as the plans see it, from the cache: its nav, tank and hold, its type, and its mounts, modules, frame,
+    /// reactor and engine. Arrivals are not applied; <see cref="CachedShip.ApplyArrivalIfDue"/> does that.
+    /// </summary>
+    /// <param name="entity">The cached ship.</param>
+    /// <returns>The ship model.</returns>
+    public static ShipModel MapToModel(CachedShip entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         var mounts = DeserializeMounts(entity.MountsJson);
         var cargoInventory = DeserializeCargo(entity.CargoJson);
 

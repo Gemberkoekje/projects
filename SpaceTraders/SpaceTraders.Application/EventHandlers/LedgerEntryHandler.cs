@@ -7,7 +7,8 @@ namespace SpaceTraders.Application.EventHandlers;
 
 /// <summary>
 /// Records credit-affecting domain events into the ledger for financial analytics, counts them in
-/// the credits earned and spent metrics, and notifies dashboard clients via SignalR.
+/// the credits earned and spent metrics, and notifies dashboard clients via SignalR. A sale or a
+/// purchase of cargo also counts its units, by market and good, whichever ship made it.
 /// </summary>
 public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetrics metrics, IDashboardNotifier notifier)
 {
@@ -21,6 +22,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
             units: @event.Units,
             cancellationToken: cancellationToken);
         CountCredits(LedgerCategory.TradeSell, @event.Revenue);
+        metrics.GoodsSold(@event.WaypointSymbol, @event.Good.Value, @event.Units);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
@@ -36,6 +38,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
         CountCredits(LedgerCategory.TradeBuy, -@event.Cost);
+        metrics.GoodsBought(@event.WaypointSymbol, @event.Good.Value, @event.Units);
         notifier.Notify("ship", @event.ShipSymbol);
     }
 

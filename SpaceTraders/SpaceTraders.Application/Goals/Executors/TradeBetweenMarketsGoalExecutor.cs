@@ -112,7 +112,8 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
         await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
 
-        // The ledger and the credits-spent metric (B7). The port's "revenue" is the transaction's total.
+        // The ledger and the credits-spent metric (B7), and the units bought from this market. The port's "revenue" is
+        // the transaction's total.
         await bus.PublishAsync(new CargoPurchasedEvent(
             ship.Symbol,
             new TradeSymbol(trade.TradeSymbol),
@@ -195,13 +196,14 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
             await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
 
-            // The ledger and the credits-earned metric (B7).
+            // The ledger and the credits-earned metric (B7), and the units sold to this market.
             await bus.PublishAsync(new ShipCargoSoldEvent(
                 ship.Symbol,
                 new TradeSymbol(trade.TradeSymbol),
                 batch,
                 result.Revenue,
-                result.AgentCredits));
+                result.AgentCredits,
+                trade.SellWaypointSymbol));
 
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",

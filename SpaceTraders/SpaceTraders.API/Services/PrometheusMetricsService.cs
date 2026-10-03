@@ -15,7 +15,7 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
-/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, its hold, what it cost), the
+/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, what it can do, its hold, what it cost), the
 /// accepted contracts' deliverables and the usable surveys; and the bot's settings. What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
 /// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
@@ -172,19 +172,30 @@ public sealed class PrometheusMetricsService(
             ? ship.DestWaypointSymbol ?? ship.WaypointSymbol
             : ship.WaypointSymbol;
 
+        // The ship as the plans see it: its mounts, frame, hold and tank decide what it is and what it can do.
+        var model = ShipRepository.MapToModel(ship);
+
         return new ShipMetricsSample(ship.Symbol, ship.ShipType, State(ship, now), goalLabel, reason)
         {
             Location = Location(at, inTransit, waypointTypes),
-            Activity = Activity(goal, reason, assignment, at, inTransit, IsProbe(ship)),
+            Activity = Activity(goal, reason, assignment, at, inTransit, FleetRoles.IsProbe(model)),
+            Capabilities = Capabilities(model),
             ArrivesAt = inTransit ? ship.ArrivesAt.GetValueOrDefault() : default,
             CargoCapacity = ship.CargoCapacity,
             Cargo = Cargo(ship.CargoJson),
         };
     }
 
-    /// <summary>Whether the ship is a probe, as the probe plan counts one (<see cref="FleetRoles.IsProbe"/>).</summary>
-    private static bool IsProbe(CachedShip ship)
-        => FleetRoles.IsProbe(new ShipModel(ship.Symbol, ship.SystemSymbol, ship.WaypointSymbol, ship.Status, ship.FlightMode, ship.FuelCurrent, ship.FuelCapacity, ShipType: ship.ShipType, FrameJson: ship.FrameJson));
+    /// <summary>
+    /// What the ship's equipment lets it do, whichever plans are on: the roles it could take
+    /// (<see cref="FleetRoles.PotentialRoles"/>), in the order survey, mine, siphon, trade, such as <c>Siphon, Trade</c>;
+    /// <c>none</c> for a probe or a ship that can do none of them.
+    /// </summary>
+    private static string Capabilities(ShipModel ship)
+    {
+        var roles = FleetRoles.PotentialRoles(ship);
+        return roles.Count == 0 ? "none" : string.Join(", ", roles);
+    }
 
     /// <summary>The waypoint and its type, such as <c>X1-AB-A1 (ASTEROID)</c>; in transit, an arrow first.</summary>
     private static string Location(string? at, bool inTransit, Dictionary<string, string> waypointTypes)
