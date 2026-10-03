@@ -236,12 +236,24 @@ public sealed class PrometheusMetricsServiceTests
                 });
             }
 
-            // A mining drone and a siphon drone drifting to markets out of their CRUISE reach (slice 6.10c, D45): hours away.
+            // A mining drone and a siphon drone drifting to markets out of their CRUISE reach (slice 6.10c, D45), and the survey
+            // ship drifting to where most drones mine (D54): hours away.
             var mineFar = new MineAndSellGoal { TradeSymbol = "GOLD_ORE", SourceWaypointSymbol = "X1-AB-B14", SellWaypointSymbol = "X1-AB-B7", Drifting = true };
             var siphonFar = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-D90", SellWaypointSymbol = "X1-AB-F48", Drifting = true };
-            foreach (var (symbol, shipType, goal) in new (string, string, ShipGoal)[] { ("AGENT-11", "SHIP_MINING_DRONE", mineFar), ("AGENT-12", "SHIP_SIPHON_DRONE", siphonFar) })
+            var surveyorFar = new MoveToWaypointGoal { TargetWaypointSymbol = "X1-AB-B7", Drifting = true };
+            foreach (var (symbol, shipType, goal) in new (string, string, ShipGoal)[]
             {
-                var market = goal is MineAndSellGoal mine ? mine.SellWaypointSymbol : ((SiphonAndSellGoal)goal).SellWaypointSymbol;
+                ("AGENT-11", "SHIP_MINING_DRONE", mineFar),
+                ("AGENT-12", "SHIP_SIPHON_DRONE", siphonFar),
+                ("AGENT-13", "SHIP_SURVEYOR", surveyorFar),
+            })
+            {
+                var market = goal switch
+                {
+                    MineAndSellGoal mine => mine.SellWaypointSymbol,
+                    SiphonAndSellGoal siphoning => siphoning.SellWaypointSymbol,
+                    _ => ((MoveToWaypointGoal)goal).TargetWaypointSymbol,
+                };
                 db.Ships.Add(new CachedShip
                 {
                     AgentId = AgentId,
@@ -290,6 +302,7 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-10", "X1-AB-XB5C (ENGINEERED_ASTEROID)", "selling QUARTZ_SAND"),
             ("AGENT-11", "→ X1-AB-B7", "drifting to X1-AB-B7 to mine GOLD_ORE"),
             ("AGENT-12", "→ X1-AB-F48", "drifting to X1-AB-F48 to siphon for LIQUID_NITROGEN"),
+            ("AGENT-13", "→ X1-AB-B7", "drifting to X1-AB-B7"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);
@@ -490,7 +503,7 @@ public sealed class PrometheusMetricsServiceTests
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
-        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 5, "SHIP_PROBE", "X1-AB-A2", 77_117));
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 6, "SHIP_PROBE", "X1-AB-A2", 77_117));
     }
 
     /// <summary>
@@ -954,17 +967,17 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.PurchaseNeeds(
         [
             new PurchaseNeedMetricsSample("Survey", "Surveyor", 2, "SHIP_SURVEYOR", "X1-DC53-H52", 33_905),
-            new PurchaseNeedMetricsSample("Trading", "CargoShips", 4, "SHIP_LIGHT_SHUTTLE", "X1-DC53-A2", 114_225),
+            new PurchaseNeedMetricsSample("Trading", "CargoShips", 5, "SHIP_LIGHT_SHUTTLE", "X1-DC53-A2", 114_225),
         ]);
 
         var text = await ExportAsync();
         text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Survey\",tier=\"Surveyor\",position=\"2\",ship_type=\"SHIP_SURVEYOR\",shipyard=\"X1-DC53-H52\"} 33905\n");
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"4\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"5\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
 
-        _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 6, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
+        _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 7, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"6\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"7\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
         text.Should().NotContain("plan=\"Survey\"");
         text.Should().NotContain("SHIP_LIGHT_SHUTTLE");
     }

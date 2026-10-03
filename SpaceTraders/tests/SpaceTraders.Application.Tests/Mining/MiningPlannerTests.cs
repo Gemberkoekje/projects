@@ -409,6 +409,70 @@ public sealed class MiningPlannerTests
         MiningPlanner.CanReach(Map(), CommandShip(), B14).Should().BeTrue();
     }
 
+    [Fact]
+    public void ASurveyShip_MovesToTheAreaWhereMoreDronesMine()
+    {
+        // D54, asked on 2026-10-03: "Please add the option for the survey ship to get to the mining location without
+        // surveys", to work where most drones mine. Two drones work for B7, beyond an 80-unit tank's CRUISE reach, and one
+        // for H51: the survey ship drifts to B7, which sells fuel (D45).
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(), [B7, H51, B7], [], out var move).Should().BeTrue();
+
+        move.Should().Be(new SurveyorMove(B7, Drones: 2, OwnDrones: 1));
+    }
+
+    [Fact]
+    public void OnATie_TheSurveyShipStaysWhereItIs()
+    {
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(), [B7, H51], [], out _).Should().BeFalse();
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(waypoint: B7), [B7, H51], [], out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void WhereMostDronesMine_TheSurveyShipStays_AndFromThereItWouldMoveBackWhenThatChanges()
+    {
+        // At B7, its area is B7's. With more drones in the middle it goes back, to the market there where the most of them
+        // work: two for F49, one for H51.
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(waypoint: B7), [B7, B7, H51], [], out _).Should().BeFalse();
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(waypoint: B7), [B7, H51, F49, F49], [], out var move).Should().BeTrue();
+
+        move.Should().Be(new SurveyorMove(F49, Drones: 3, OwnDrones: 1));
+    }
+
+    [Fact]
+    public void AnAreaWithoutAMarketThatSellsFuel_IsNoPlaceToMoveTo()
+    {
+        // Drones between trips at B14 count where they are; the survey ship drifts only to a market that sells fuel (D45), and
+        // none of those waypoints is one.
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(), [B14, B14, H51], [], out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ASurveyShipThatSharesItsArea_DriftsToAnAreaWithDronesThatHasNone()
+    {
+        // D55, asked on 2026-10-03: "extra surveyor drones are bought to try and cover all areas with surveys". Two survey
+        // ships work in the middle, where three drones mine; B7's one drone has none: one of them goes there.
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(), [H51, F49, F49, B7], [XB5C], out var move).Should().BeTrue();
+
+        move.Should().Be(new SurveyorMove(B7, Drones: 1, OwnDrones: 3, Shared: true));
+    }
+
+    [Fact]
+    public void AnAreaAnotherSurveyShipWorksIn_IsNoPlaceToMoveTo()
+    {
+        // D55: each area with drones has a survey ship of its own. B7 has more drones, but a survey ship already, at B7 or
+        // on its way there.
+        MiningPlanner.TryFindBusierArea(Map(), SurveyShip(), [H51, B7, B7], [B7], out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheAreasWithDrones_AreCountedAsAShipFliesBetweenThem()
+    {
+        // D55: a survey ship's 80-unit tank keeps the middle and B7 apart; the command ship's 400 doesn't.
+        MiningPlanner.CountAreas(Map(), 80, [H51, F49, B7, B7]).Should().Be(2);
+        MiningPlanner.CountAreas(Map(), 400, [H51, F49, B7, B7]).Should().Be(1);
+        MiningPlanner.CountAreas(Map(), 80, []).Should().Be(0);
+    }
+
     /// <summary>A miner's trip on an ore for a market, by a ship with an 80-unit tank unless said otherwise.</summary>
     private static CoveringTrip Covering(string ore, string market, int tank = 80) => new(ore, market, tank);
 

@@ -266,7 +266,7 @@ it and the other ships can do and what each role would earn: see
 | Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral and area, the rest by an assignment (slice 6.9, D38–D42, D48, D53) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral and area must be worth their role |
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
 | ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
-| Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47) |
+| Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47); then one more for each further area with mining drones, after the drones per scarce mineral (D55) |
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
@@ -451,7 +451,7 @@ The goal is a probe at every market of the HQ system, where the market watch kee
 - **Buying** (D29): while the system has fewer probes than markets, it buys a `SHIP_PROBE` at the
   shipyard that sells it for the least, at most one a pass, through `ShipPurchaseService`: the
   purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30).
-  Probes in flight count (B15). The contract's drone, a surveyor, a drone per scarce mineral and area, and the
+  Probes in flight count (B15). The contract's drone, a surveyor, a drone per scarce mineral and area, a surveyor per area, and the
   cargo ships of `Trade.ShipPurchases` come first (D43): while one of them waits, the probe waits
   too (`Purchase` `WaitingForAnotherPurchase`), and the probes fly on.
 - **Flights** (`ProbePlanner`, no I/O):
@@ -498,6 +498,17 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   (slice 6.8). A ship that can only survey (`FleetRoles.CanOnlySurvey`: a bought `SHIP_SURVEYOR`) surveys on
   instead (D52): of the targets it reaches, the one with the fewest usable surveys, then the contract's, then
   the best paid.
+- **A ship that can only survey works where most drones mine** (D54, `MiningPlanner.TryFindBusierArea`):
+  before it gets a survey, the plan counts the mining drones by where they work (the market their trip sells
+  at, a drone still drifting there included; between trips, where they are). Its own area is what it reaches
+  in CRUISE; the drones beyond that group into areas as it would fly between them. When an area has more drones
+  than its own (a tie keeps it where it is), it gets a `MoveToWaypointGoal` with `Drifting` instead of a survey:
+  to the market of that area where the most drones work, among those that sell fuel, and logs "moves to …
+  (D54)". It drifts there (D45: 1 fuel, about 2.5 hours from the middle of X1-DC53 to B7), and surveys from
+  there. A survey lasts 10 to 55 minutes, so one survey ship serves one area at a time; the command ship, which
+  can do more, never moves for this. Each area with drones gets a survey ship of its own (D55): an area where
+  another ship that can only survey works, or is moving to, is taken; of two in one area, the one free first
+  moves to the busiest area with drones that has none, whatever its own area has.
 - **A spare-time trip that fills its hold** counts as free: a survey that needs taking takes the ship off it
   at once, with its hold aboard (D37), when that is safe (`SpareTimeInterruption`, see
   [Spare time](#spare-time-sparetimeplanservice-slice-68)), and logs `GatheringInterrupted` (`Reason`
@@ -509,7 +520,12 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   the system's shipyard that sells it for the least, second in the order ships are bought in (D43). The
   board gives it the survey role, as a ship that can only survey (D38), which frees the command ship for
   what pays it most. A bought surveyor counts by its type until startup sync records its mount. With the
-  board off the command ship surveys (D20) and no surveyor is bought.
+  board off the command ship surveys (D20) and no surveyor is bought. **One per area** (D55, asked on
+  2026-10-03: "extra surveyor drones are bought to try and cover all areas with surveys"): while a system has
+  fewer ships that can only survey than areas with mining drones (`MiningPlanner.CountAreas`, the drones
+  where they work, grouped as the survey ships fly), it buys one more, `SurveyorPerArea` in the order, after
+  the drones per scarce mineral and before the cargo ships. In X1-DC53 that is one for the middle and one for
+  B7; the new one, bought at H52, drifts to B7 when the first is in the middle.
 - **The state** (`plan_states`, `Survey`) lists the targets, best first, with how many usable surveys
   each has, whether it needs one, the surveyors on each, and the surveyors that can reach each in CRUISE
   (`CandidateShipSymbols`); it is written only when it changes. The `ShipLeftIdle` rule reads it: only
@@ -790,9 +806,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   2. `Surveyor`: a designated surveyor for each system with mining drones (D47);
   3. `Coverage`: a drone for each SCARCE or LIMITED mineral, ore or gas, until there is one drone per
      such mineral and area (D48, D53);
-  4. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
-  5. `Probes`: a probe for every market (D29);
-  6. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
+  4. `SurveyorPerArea`: one more surveyor for each area with mining drones that has none (D55: "The second
+     surveyor is lower priority than the first on the buy order");
+  5. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
+  6. `Probes`: a probe for every market (D29);
+  7. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
      in turn: the kind not bought last, so after the list's last cargo ship a drone, then a cargo ship, and
      so on (the ledger's `ShipPurchase` rows, which carry the type, and this process's purchases, which the
      ledger gets a moment later). Any drone counts, the contract's and a scarce mineral's too; a cargo ship is
@@ -937,6 +955,7 @@ step does the work.
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
 | `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
 | `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative: [API] buy and publish `CargoPurchasedEvent`, and record the purchase in the goal; otherwise clear the goal (`TradeDropped`), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
+| `MoveToWaypoint` | One flight to a waypoint (D54). At the target (its arrival docked it): clear the goal and complete. **Drifting**, for a move out of the ship's CRUISE reach: [cmd] navigate there in DRIFT and log `DriftStarted`. Otherwise: [cmd] navigate towards it in CRUISE (`GoalFlight`). The survey plan moves a ship that can only survey this way. |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `Idle` | Unreachable. |
 
@@ -1378,7 +1397,7 @@ The seven pages in `src/Future` are not routed.
   | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `contract`); `ContractId` for the contract |
   | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |
   | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`, `uncovered`) |
-  | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there |
+  | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45); the move executor, when a ship that can only survey sets off to where most drones mine (D54) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there; for a move, `Destination` |
   | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
   | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
@@ -1430,10 +1449,10 @@ The seven pages in `src/Future` are not routed.
   |---|---|---|---|
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
   | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry | Every 10 s |
-  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `CargoShips`, `Probes`, `Alternating`) and `position` the same as a number, 1 first. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
+  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `Probes`, `Alternating`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5, probes to 6, the turns to 7). A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
-  | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
+  | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c; `drifting to X1-AB-B7` for the survey ship's move, D54), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
   | `spacetraders_ship_arrival_timestamp_seconds` | `ship` | When a ship in transit arrives (Unix time); no series otherwise | Every 10 s |
   | `spacetraders_ship_cargo_units`, `spacetraders_ship_cargo_capacity_units` | `ship`, `good`; `ship` | A ship's hold per good aboard, and what it takes | Every 10 s |
   | `spacetraders_contract_units_required`, `_units_fulfilled` | `contract`, `trade_symbol` | The accepted contracts' deliverables | Every 10 s |

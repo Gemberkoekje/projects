@@ -56,10 +56,20 @@ public sealed record IdleGoal : ShipGoal
     public override ShipGoalKind Kind => ShipGoalKind.Idle;
 }
 
-/// <summary>The ship navigates to a target waypoint without any further objective.</summary>
+/// <summary>
+/// The ship navigates to a target waypoint without any further objective; the goal ends there. The survey plan moves a
+/// ship that can only survey to the area where most drones mine this way (D54), drifting when it is out of CRUISE reach
+/// (<see cref="Drifting"/>).
+/// </summary>
 public sealed record MoveToWaypointGoal : ShipGoal
 {
     public required string TargetWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True for a move to a market out of the ship's CRUISE reach (D45, D54): it drifts there, 1 fuel whatever the distance,
+    /// about ten times slower.
+    /// </summary>
+    public bool Drifting { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.MoveToWaypoint;

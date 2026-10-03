@@ -122,6 +122,22 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task ASecondSurveyor_ComesAfterTheDronesForScarceMinerals_AndBeforeTheCargoShips()
+    {
+        // D55, asked on 2026-10-03: "The second surveyor is lower priority than the first on the buy order": after the drones
+        // per scarce mineral and area, before the cargo ships.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Mining, Need(PurchaseTier.Coverage, "SHIP_MINING_DRONE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Survey, Need(PurchaseTier.SurveyorPerArea, "SHIP_SURVEYOR"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Mining, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Survey, Need(PurchaseTier.SurveyorPerArea, "SHIP_SURVEYOR"))).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task OnceEverythingElseIsBought_DronesAndCargoShipsTakeTurns_ADroneFirst()
     {
         // The list's last cargo ship was bought, then nothing: a drone's turn.

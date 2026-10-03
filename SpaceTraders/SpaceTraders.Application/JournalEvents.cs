@@ -94,8 +94,9 @@ public static class JournalEvents
     /// <summary>
     /// A mining or siphon trip set off in DRIFT to its market, out of the ship's CRUISE reach (slice 6.10c, D45:
     /// <c>ShipSymbol</c>, <c>WaypointSymbol</c> it leaves, <c>SellWaypoint</c> it drifts to, <c>TradeSymbol</c>,
-    /// <c>SourceWaypoint</c> it gathers at from there). The drift burns 1 fuel whatever the distance and takes about ten
-    /// times as long as in CRUISE; the trip's next flight, from that market, is in CRUISE.
+    /// <c>SourceWaypoint</c> it gathers at from there); or a ship that can only survey set off to the area where most drones
+    /// mine (D54: <c>ShipSymbol</c>, <c>WaypointSymbol</c> it leaves, <c>Destination</c>). The drift burns 1 fuel whatever
+    /// the distance and takes about ten times as long as in CRUISE; the ship's next flight, from that market, is in CRUISE.
     /// </summary>
     public const string DriftStarted = nameof(DriftStarted);
 

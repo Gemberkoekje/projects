@@ -413,7 +413,7 @@ internal sealed class FleetStatusQueryService(
         var (goalKind, description, sourceWaypoint, destinationWaypoint) = shipGoal switch
         {
             IdleGoal => (ShipGoalKind.Idle, "Idle", (string?)null, (string?)null),
-            MoveToWaypointGoal mv => (ShipGoalKind.MoveToWaypoint, $"Moving to {mv.TargetWaypointSymbol}", null, mv.TargetWaypointSymbol),
+            MoveToWaypointGoal mv => (ShipGoalKind.MoveToWaypoint, $"{(mv.Drifting ? "Drifting" : "Moving")} to {mv.TargetWaypointSymbol}", null, mv.TargetWaypointSymbol),
             MineResourceGoal mine => (ShipGoalKind.MineResource, $"Mining {mine.TradeSymbol} at {mine.SourceWaypointSymbol}", mine.SourceWaypointSymbol, (string?)null),
             MineAndSellGoal mineAndSell => (ShipGoalKind.MineResource, $"{(mineAndSell.Drifting ? $"Drifting to {mineAndSell.SellWaypointSymbol}, then mining" : "Mining")} {mineAndSell.TradeSymbol} at {mineAndSell.SourceWaypointSymbol} and selling at {mineAndSell.SellWaypointSymbol}", mineAndSell.SourceWaypointSymbol, mineAndSell.SellWaypointSymbol),
             SiphonResourceGoal siphon => (ShipGoalKind.SiphonResource, $"Siphoning {siphon.TradeSymbol} at {siphon.SourceWaypointSymbol}", siphon.SourceWaypointSymbol, (string?)null),

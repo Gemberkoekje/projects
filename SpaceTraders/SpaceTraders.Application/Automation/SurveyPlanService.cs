@@ -6,6 +6,7 @@ using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -42,6 +43,13 @@ public interface ISurveyPlanService
 /// With the role board on, it buys a designated surveyor (D47): a <c>SHIP_SURVEYOR</c> for each system with mining drones
 /// and no ship that can only survey, first in the order ships are bought in after the contract's drone (D43). The board
 /// gives it the survey role (D38), which frees the command ship for what pays it most.
+/// </para>
+/// <para>
+/// A ship that can only survey works where most mining drones work (D54, <see cref="MiningPlanner.TryFindBusierArea"/>):
+/// when an area out of its CRUISE reach has more drones than its own, it drifts there (<see cref="MoveToWaypointGoal"/>)
+/// before it surveys again; a tie keeps it where it is. Each area with drones gets a survey ship of its own (D55): an area
+/// another survey ship works in or moves to is taken, and of two in one area, the one free first moves to an area with
+/// drones that has none. The plan buys one more surveyor for each such area, after the drones per scarce mineral (D43).
 /// </para>
 /// </summary>
 public sealed class SurveyPlanService(
@@ -86,9 +94,19 @@ public sealed class SurveyPlanService(
         var surveying = new Dictionary<string, SurveyWaypointGoal>(StringComparer.OrdinalIgnoreCase);
         var free = new List<ShipModel>();
         var gathering = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Where each ship that can only survey works: where it is, or where it is moving to (D54, D55).
+        var surveyShipsAt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var ship in fleet.Where(board.IsSurveyor))
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            if (FleetRoles.CanOnlySurvey(ship))
+            {
+                surveyShipsAt[ship.Symbol] = goal is MoveToWaypointGoal moving && moving.Status is not GoalStatus.Blocked and not GoalStatus.Completed
+                    ? moving.TargetWaypointSymbol
+                    : MiningPlanner.Position(ship);
+            }
+
             if (goal is SurveyWaypointGoal survey && survey.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
             {
                 surveying[ship.Symbol] = survey;
@@ -108,6 +126,7 @@ public sealed class SurveyPlanService(
         var contract = await contractPlans.GetAsync(cancellationToken);
         var stock = await settings.ThresholdAsync(StockPerOreSetting, DefaultStockPerOre, cancellationToken);
         var targets = new List<SurveyPlanTarget>();
+        var drones = new Dictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)>(StringComparer.OrdinalIgnoreCase);
         foreach (var system in fleet
             .Where(ship => board.IsSurveyor(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
@@ -115,9 +134,33 @@ public sealed class SurveyPlanService(
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             var miners = await MinersAsync(fleet, board, system.Key, cancellationToken);
             var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);
+            var droneWaypoints = await DroneWaypointsAsync(fleet, system.Key, cancellationToken);
+            drones[system.Key] = (context.Map, droneWaypoints);
 
             foreach (var surveyor in free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)))
             {
+                // D54, D55: a ship that can only survey works where most drones mine, each area with drones with one of its own.
+                var others = system
+                    .Where(ship => !ship.Symbol.Equals(surveyor.Symbol, StringComparison.OrdinalIgnoreCase) && surveyShipsAt.ContainsKey(ship.Symbol))
+                    .Select(ship => surveyShipsAt[ship.Symbol])
+                    .ToList();
+                if (FleetRoles.CanOnlySurvey(surveyor) && MiningPlanner.TryFindBusierArea(context.Map, surveyor, droneWaypoints, others, out var move))
+                {
+                    await goals.SetActiveGoalAsync(
+                        surveyor.Symbol,
+                        new MoveToWaypointGoal { TargetWaypointSymbol = move.MarketSymbol, Drifting = true },
+                        cancellationToken);
+                    surveyShipsAt[surveyor.Symbol] = move.MarketSymbol;
+                    logger.LogInformation(
+                        "Survey plan: ship {ShipSymbol} moves to {WaypointSymbol}, where {Drones} mining drones work and no other survey ship, against {OwnDrones} in its own area{Shared} (D54, D55).",
+                        surveyor.Symbol,
+                        move.MarketSymbol,
+                        move.Drones,
+                        move.OwnDrones,
+                        move.Shared ? ", which another survey ship works in" : string.Empty);
+                    continue;
+                }
+
                 var reachable = systemTargets
                     .Where(target => target.NeedsSurvey && MiningPlanner.CanReach(context.Map, surveyor, target.AsteroidSymbol))
                     .ToList();
@@ -195,7 +238,7 @@ public sealed class SurveyPlanService(
             }));
         }
 
-        await BuySurveyorAsync(fleet, board, cancellationToken);
+        await BuySurveyorAsync(fleet, board, drones, cancellationToken);
         await SaveStateAsync(targets, now, cancellationToken);
     }
 
@@ -204,9 +247,13 @@ public sealed class SurveyPlanService(
     /// it (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. With the role board off the command ship surveys
     /// (D20), and no surveyor is bought.
     /// </summary>
-    private async Task BuySurveyorAsync(IReadOnlyList<ShipModel> fleet, FleetRoleBoard board, CancellationToken cancellationToken)
+    private async Task BuySurveyorAsync(
+        IReadOnlyList<ShipModel> fleet,
+        FleetRoleBoard board,
+        IReadOnlyDictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)> drones,
+        CancellationToken cancellationToken)
     {
-        var need = board.RolesOn ? await SurveyorNeedAsync(fleet, cancellationToken) : PurchaseNeed.None;
+        var need = board.RolesOn ? await SurveyorNeedAsync(fleet, drones, cancellationToken) : PurchaseNeed.None;
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Survey, need, cancellationToken))
         {
             return;
@@ -223,11 +270,16 @@ public sealed class SurveyPlanService(
     }
 
     /// <summary>
-    /// A designated surveyor (D47) for the first system, by symbol, with a mining drone (<see cref="FleetRoles.IsMiningDrone"/>)
-    /// and no ship that can only survey, at the system's shipyard that sells a <c>SHIP_SURVEYOR</c> for the least; none when
-    /// no shipyard there is known to sell one.
+    /// A surveyor for the first system, by symbol, with a mining drone (<see cref="FleetRoles.IsMiningDrone"/>) that needs one,
+    /// at the system's shipyard that sells a <c>SHIP_SURVEYOR</c> for the least; none when no shipyard there is known to sell
+    /// one. A system with no ship that can only survey needs its designated surveyor (D47,
+    /// <see cref="PurchaseTier.Surveyor"/>); one with fewer of them than areas with mining drones, as they fly between them,
+    /// needs one more (D55, <see cref="PurchaseTier.SurveyorPerArea"/>, after the drones per scarce mineral).
     /// </summary>
-    private async Task<PurchaseNeed> SurveyorNeedAsync(IReadOnlyList<ShipModel> fleet, CancellationToken cancellationToken)
+    private async Task<PurchaseNeed> SurveyorNeedAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyDictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)> drones,
+        CancellationToken cancellationToken)
     {
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
         foreach (var systemSymbol in fleet
@@ -238,10 +290,19 @@ public sealed class SurveyPlanService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.Ordinal))
         {
-            if (fleet.Any(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)
-                && FleetRoles.CanOnlySurvey(ship)))
+            var surveyShips = fleet
+                .Where(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase) && FleetRoles.CanOnlySurvey(ship))
+                .ToList();
+            var tier = PurchaseTier.Surveyor;
+            if (surveyShips.Count > 0)
             {
-                continue;
+                if (!drones.TryGetValue(systemSymbol, out var here)
+                    || surveyShips.Count >= MiningPlanner.CountAreas(here.Map, surveyShips.Min(ship => ship.FuelCapacity), here.Waypoints))
+                {
+                    continue;
+                }
+
+                tier = PurchaseTier.SurveyorPerArea;
             }
 
             var offer = shipyardList
@@ -258,7 +319,7 @@ public sealed class SurveyPlanService(
                 continue;
             }
 
-            return new PurchaseNeed(PurchaseTier.Surveyor, SurveyorShipType, offer[0].Shipyard, offer[0].Price);
+            return new PurchaseNeed(tier, SurveyorShipType, offer[0].Shipyard, offer[0].Price);
         }
 
         return PurchaseNeed.None;
@@ -286,6 +347,30 @@ public sealed class SurveyPlanService(
         }
 
         return miners;
+    }
+
+    /// <summary>
+    /// Where each mining drone in a system works (D54): the market its trip sells at, a drone still drifting there included;
+    /// between trips, where it is. A drone on other work doesn't count.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> DroneWaypointsAsync(IReadOnlyList<ShipModel> fleet, string systemSymbol, CancellationToken cancellationToken)
+    {
+        var waypoints = new List<string>();
+        foreach (var drone in fleet.Where(ship => FleetRoles.IsMiningDrone(ship)
+            && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
+        {
+            var goal = await goals.GetActiveGoalAsync(drone.Symbol, cancellationToken);
+            if (goal is MineAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                waypoints.Add(trip.SellWaypointSymbol);
+            }
+            else if (goal is null || goal.Status is GoalStatus.Blocked or GoalStatus.Completed)
+            {
+                waypoints.Add(MiningPlanner.Position(drone));
+            }
+        }
+
+        return waypoints;
     }
 
     /// <summary>The contract's ore, while the contract plan mines it in this system.</summary>

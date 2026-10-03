@@ -98,7 +98,10 @@
   is merged and deployed (projects#139, gembernodes#37, 12:13Z on 2026-10-03). Its first drift (SPECTER-4 to B7, 12:35Z)
   found B54 (projects#140, gembernodes#38), and the designated surveyor's first wait found B55 (projects#141, gembernodes#39)
   and your decision D52, a ship that can only survey surveys on (projects#142, gembernodes#40: the cluster runs `6c9f8cc`
-  since 14:00Z). Your decision D53, coverage per area, is built on branch `claude/spacetraders-coverage-per-area`.
+  since 14:00Z). Your decision D53, coverage per area, is merged and deployed (projects#143, gembernodes#41: the cluster runs
+  `489720e` since 14:40Z; its first coverage drone, SPECTER-11, mines the middle's silicon). Your decision D54, the survey
+  ship works where most drones mine, is projects#144 (branch `claude/spacetraders-surveyor-follows-drones`), and D55, a
+  survey ship per area with drones, is built on top of it on branch `claude/spacetraders-surveyor-per-area`.
 
 ## Known issues
 
@@ -226,6 +229,8 @@ get the next D-number.
 | D51 | Slice 6.10b (asked on 2026-10-03, in another session): "What if we made the amount of credits for trade wider based on the amount of cargo total in the fleet? Something like: 60.000 hard minimum, 1.000 per cargo hold. … This might ramp it up a bit too much. Which defaults would you recommend?" In 24 hours the command ship made 150 trade purchases, 51,610 credits on average (median 54,331, 27 units): an expensive good's trade volume (often 20 units) caps a load, so a trip's cost barely grows with the hold; the drones' few trades cost 45–67k. Counting every hold (11 drones and the command ship, 205 units) would ask 265,000, above the ~150,000 the credits peak at, and freeze every purchase. | **Grow the reserve with the trading holds:** the credits every ship purchase keeps are `FleetExpansion.MinCreditReserve` (the floor, seeded at 60,000) plus `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit of hold on the ships that trade: the cargo ships, the command ship (it trades whenever it isn't surveying, D34, D38) and any other ship the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo. The command ship alone keeps 100,000 (as today); with a light shuttle (40) 140,000, so the first light hauler needs 354,210 + 140,000; with one light hauler (80) 220,000, with two 300,000; a drone in the trade role adds 15,000 while it has it; no ship that trades, 60,000. The recommended defaults, yours unchanged. |
 | D52 | Slice 6.10c's first watch (2026-10-03): with every ore it reached at its stock of surveys (D27), the designated surveyor SPECTER-F (D47), which can do nothing else, waited at XB5C (and B55's false anomaly fired on it). | **Survey on:** "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is lowest." A ship that can only survey, once every ore it reaches has its stock, surveys the target it reaches with the fewest usable surveys, then the contract's, then the best paid. The command ship, which can do more, still waits, or trades and mines in its spare time (D27, D34). Amends D27 for ships that can only survey. ("Lowest" read as the fewest usable surveys, D27's own order.) |
 | D53 | Slice 6.10c's watch (2026-10-03): coverage (D48) counted a mineral for the whole system. With SPECTER-10 bound for B7's silicon, silicon counted as covered: the middle's SCARCE silicon (H53) had no drone, and by 14:01Z four of the five mining drones were drifting to B7 (SPECTER-4, -10, -A and -9), with SPECTER-3 alone in the middle. How does coverage treat far markets? | **Cover per area:** "A drone covers a mineral only for the markets it can reach in CRUISE from where it works (the middle, or B7). The middle's scarce silicon gets a drone of its own; the coverage tier may buy a drone per scarce mineral per area (more drones)." A trip covers its mineral at the markets its ship reaches in CRUISE, through refuelling stops, from the market it sells at; the coverage tier counts each SCARCE or LIMITED mineral once per area (the markets a drone flies between in CRUISE: in X1-DC53 the middle and B7); the role board keeps one drone per mineral and area. Amends D48. |
+| D54 | Slice 6.10c's watch (2026-10-03): from 15:02Z SPECTER-4 mined B14 for B7 without surveys (copper on about one extraction in six), with three more drones drifting there, while the survey ship SPECTER-F, whose 80-unit tank keeps it in the middle, surveyed XB5C for SPECTER-3 alone; the command ship doesn't survey while a ship that can only survey exists (D38). Asked: "Please add the option for the survey ship to get to the mining location without surveys." A drift between the middle and B7 takes about 2.5 hours and a survey lasts 10 to 55 minutes, so one survey ship serves one area at a time: where should it work? | **Where most drones mine:** a ship that can only survey works in the area where the most mining drones work (their trip's market, a drone drifting there included; between trips, where they are), and drifts once to the market of another area that has more drones than its own; a tie keeps it where it is. The command ship never moves for this. |
+| D55 | After D54 (2026-10-03): one survey ship serves one area at a time, so the area with fewer drones mines without surveys (at 15:45Z three drones in the middle, four for B7). Asked: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." Where in the order? | **A survey ship per area, after the coverage drones:** while a system has fewer ships that can only survey than areas with mining drones (as the survey ships fly between them), one more is bought, after the drones per scarce mineral and area (D48, D53) and before the cargo ships; the first stays second in the order (D47). Each area with drones gets a survey ship of its own: one already there or on its way takes it, and of two in one area, one drifts to an area with drones that has none. Amends D54. |
 
 ## Phases
 
@@ -2126,7 +2131,51 @@ How credits are split stays your call; Claude only fixes deviations from intende
         71, API 161 (and 4 skipped, as on main).
         On the old code the new tests of the plans and the board fail as the cluster did: the free drone drifts to B7's
         gold instead of mining the middle's copper, and the purchase comes as `Alternating`, not `Coverage`.
-  - **To understand this,** start with the decisions D43–D53, then this slice's notes; 6.10b and 6.10c each have their own
+      - Deployed by gembernodes#41 (merged before the CI run had pushed the images: the API, which is replaced rather than
+        rolled, was down 14:38:55–14:40:33Z). The coverage tier bought SPECTER-11 at 15:16:59Z, which the board kept for
+        coverage and which took the middle's silicon (XB5C for H53).
+    - **Follow-up, D54** (branch `claude/spacetraders-surveyor-follows-drones`): the survey ship works where most drones mine.
+      - **Where it works** (`MiningPlanner.TryFindBusierArea`, `SurveyorMove`): the survey plan counts the mining drones by
+        where they work, the market their trip sells at (a drone still drifting there included), else where they are;
+        its own area is what it reaches in CRUISE, and the drones beyond that group into areas as it would fly between
+        them (`Areas`' grouping). An area with more drones than its own gets it: the market there, among those that sell
+        fuel, where the most drones work. A tie keeps it where it is. Only a ship that can only survey moves.
+      - **The move** (`MoveToWaypointGoal.Drifting`, new `MoveToWaypointGoalExecutor`): the goal existed with no executor.
+        One flight, in DRIFT out of CRUISE reach (`DriftStarted`), else in CRUISE; at the target it ends, and the survey
+        plan gives the ship its surveys there (D27, D52). The fleet view says `drifting to X1-DC53-B7`; the plan logs
+        "moves to … (D54)" with both counts.
+      - **What to expect:** at 15:30Z B7 had four mining drones (SPECTER-4 mining, -10, -A and -9 drifting there) against
+        two in the middle (SPECTER-3, SPECTER-11), so SPECTER-F drifts to B7 at its first free tick after the deploy, about
+        2.5 hours, and surveys B14 from there. The middle's drones then mine
+        without surveys, by design; the command ship doesn't survey (D38).
+      - To understand it, start with `TryFindBusierArea` in `Mining/MiningPlanner.cs`, then the surveyor loop in
+        `Automation/SurveyPlanService.cs` and `Goals/Executors/MoveToWaypointGoalExecutor.cs`.
+      - Tests: App 842 (10 new: `MiningPlannerTests` 4, `SurveyPlanServiceTests` 2, `MoveToWaypointGoalExecutorTests` 4),
+        Domain 72 (1 new: `ShipGoalSerializationTests`), API 161 (and 4 skipped; `PrometheusMetricsTests` and
+        `FleetStatusQueryServiceTests` cover the drifting survey ship's words).
+    - **Follow-up, D55** (branch `claude/spacetraders-surveyor-per-area`, on top of D54's): a survey ship per area.
+      - **The order** (`PurchaseTier.SurveyorPerArea`, 4): one more surveyor, after the drones per scarce mineral and area
+        and before the cargo ships; the cargo ships, probes and turns moved one place down (5, 6, 7), as does `position` in
+        `spacetraders_purchase_need_credits`. The dashboard reads the labels as they come.
+      - **The need** (`SurveyorNeedAsync`, `MiningPlanner.CountAreas`): a system with no ship that can only survey needs
+        its first (`Surveyor`, D47); one with fewer of them than areas with mining drones (the drones where they work,
+        grouped with the survey ships' smallest tank) needs one more (`SurveyorPerArea`), at the same shipyard.
+      - **Where each works** (`TryFindBusierArea` with the other survey ships): the plan notes where each ship that can only
+        survey works, where it is or where it is moving to; an area with one of them is taken. A survey ship alone in its
+        area moves only to an area that isn't taken and has more drones than its own (D54); one that shares its area moves
+        to the busiest area with drones that isn't taken. The log says "moves to …, where N mining drones work and no
+        other survey ship, against M in its own area[, which another survey ship works in] (D54, D55)".
+      - **What to expect** after D54 and D55 are deployed, from 15:45Z: SPECTER-F drifts to B7 (four drones against three in
+        the middle), and the survey plan wants a second survey ship (33,905 at H52) for the middle, bought once the
+        coverage drones are (the third, for B7's aluminum, may still be wanted) and the credits allow; it surveys XB5C
+        where it is bought. If SPECTER-F is still in the middle when the second arrives, one of the two drifts to B7.
+      - To understand it, start with `TryFindBusierArea` and `CountAreas` in `Mining/MiningPlanner.cs`, then
+        `SurveyorNeedAsync` and the surveyor loop in `Automation/SurveyPlanService.cs`, then `PurchaseTier` in
+        `Services/PurchaseOrder.cs`.
+      - Tests: App 849 (7 new: `MiningPlannerTests` 3, `SurveyPlanServiceTests` 3, `PurchaseOrderTests` 1; D54's planner tests
+        pass no other survey ship), Domain 72, API 161 (and 4 skipped; the positions in `PrometheusMetricsTests` follow the
+        new order).
+  - **To understand this,** start with the decisions D43–D55, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes
