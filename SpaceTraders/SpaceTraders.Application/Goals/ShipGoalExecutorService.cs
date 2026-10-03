@@ -70,7 +70,8 @@ public sealed class ShipGoalExecutorService(
             and not SiphonAndSellGoal
             and not GatherAndSellGoal
             and not TradeBetweenMarketsGoal
-            and not SurveyWaypointGoal)
+            and not SurveyWaypointGoal
+            and not MoveToWaypointGoal)
         {
             return null;
         }

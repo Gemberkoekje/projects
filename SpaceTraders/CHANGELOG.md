@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B56)
+- The survey ship's move to where most drones mine (D54) runs: `ShipGoalExecutorService` stepped only the goal types it listed, and the move wasn't one of them, so SPECTER-F, sent to B7 at 15:55:03Z, stayed at XB5C with a goal that never ended. A move belongs to the survey plan's switch, as its other goals do. The plan's "moves to" log line no longer renders its empty phrase as `""`.
+
+### Docs – Changed (2026-10-03, B56)
+- `PLAN.md`: B56; D54 and D55 deployed. `docs/HOW_IT_WORKS.md`: the goal kinds that are created and stepped.
+
 ### Code – Added (2026-10-03, D55)
 - A survey ship per area with mining drones (D55), as asked on 2026-10-03: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." While a system has fewer ships that can only survey than areas with mining drones, the survey plan buys one more, in a new place in the order after the drones per scarce mineral and before the cargo ships (`SurveyorPerArea`; the cargo ships, probes and turns move one place down, and so does `position` in `spacetraders_purchase_need_credits`). Each area with drones gets a survey ship of its own: an area another one works in, or moves to, is taken, and of two in one area, one drifts to an area with drones that has none.
 
