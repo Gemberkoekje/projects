@@ -152,7 +152,7 @@ public sealed class SurveyPlanService(
                         cancellationToken);
                     surveyShipsAt[surveyor.Symbol] = move.MarketSymbol;
                     logger.LogInformation(
-                        "Survey plan: ship {ShipSymbol} moves to {WaypointSymbol}, where {Drones} mining drones work and no other survey ship, against {OwnDrones} in its own area{Shared} (D54, D55).",
+                        "Survey plan: ship {ShipSymbol} moves to {WaypointSymbol}, where {Drones} mining drones work and no other survey ship, against {OwnDrones} in its own area{Shared:l} (D54, D55).",
                         surveyor.Symbol,
                         move.MarketSymbol,
                         move.Drones,

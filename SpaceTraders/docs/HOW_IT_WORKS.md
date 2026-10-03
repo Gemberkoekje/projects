@@ -242,8 +242,9 @@ Scout and Contract are on by default; the survey plan (slice 6.4), the siphon pl
 spare-time plan (slice 6.8) and the role board (slice 6.9) are off too until switched on. A plan that is
 switched off:
 - isn't bootstrapped, so it doesn't buy anything;
-- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe, survey,
-  mine-and-sell, siphon-and-sell, trade, gather-and-sell). They resume when it is switched back on;
+- doesn't move its ships: `ShipGoalExecutorService` skips the goals it gives (scout, probe, survey and the
+  survey ship's move, D54, mine-and-sell, siphon-and-sell, trade, gather-and-sell). They resume when it is
+  switched back on;
 - for the contract plan: the tick's contract work (step 3) is skipped too;
 - for the role board, which gives no goals: the plans give work by the fixed rules below, whatever roles its
   state still holds.
@@ -877,14 +878,16 @@ scout and probe plans don't read the roles.
 
 - **Storage:** each ship has at most one active goal, stored in `cached_ships` (`GoalId`,
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
-- **Kinds:** 15 kinds are defined, but only seven are ever created: `ScoutWaypoint`,
-  `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `GatherAndSell`, `TradeBetweenMarkets` and
-  `SurveyWaypoint`. The older `SiphonResource`, like `MineResource`, is never created.
+- **Kinds:** 15 kinds are defined, but only eight are ever created: `ScoutWaypoint`,
+  `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `GatherAndSell`, `TradeBetweenMarkets`,
+  `SurveyWaypoint` and `MoveToWaypoint` (the survey ship's move, D54). The older `SiphonResource`, like
+  `MineResource`, is never created.
 - **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
   Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
   (`runaway`).
 - **Set by:**
-  - the scout, probe, survey, mining, siphon, trading and spare-time plans; the survey and trading plans
+  - the scout, probe, survey (a survey, or a move to where most drones mine, D54), mining, siphon, trading and
+    spare-time plans; the survey and trading plans
     also replace a spare-time trip that fills its hold (`SpareTimeInterruption`, slice 6.8);
   - `MineAndSellGoalExecutor` and `SiphonAndSellGoalExecutor`, which record that their trip's drift has
     ended (slice 6.10c) and that it turns to selling, `GatherAndSellGoalExecutor`, which records that its
@@ -896,7 +899,7 @@ scout and probe plans don't read the roles.
     sold or dropped, `MineAndSellGoalExecutor`, `SiphonAndSellGoalExecutor` and
     `GatherAndSellGoalExecutor` when the trip is sold or can't go on, and
     `SurveyWaypointGoalExecutor` after each survey (slice 6.4; B16's survey part, fixed: survey goals
-    were never cleared);
+    were never cleared), and `MoveToWaypointGoalExecutor` at the move's target (D54);
   - the scout plan, when its last stop is done.
 - **A trip books what it made** (D46, slice 6.10a): the four trip goals (`TradeBetweenMarkets`, `MineAndSell`,
   `SiphonAndSell`, `GatherAndSell`) derive from `TripGoal`, which keeps `Earned` (sales) and `Spent` (cargo bought)
@@ -914,8 +917,8 @@ scout and probe plans don't read the roles.
 
 - **Loads** the ship with `FindAsync`. That skips the arrival dead-reckoning that `GetAllAsync`
   applies (B17).
-- **Runs** one step of the executor for the active goal. Only the seven kinds above are
-  dispatched, so `IdleGoalExecutor` is unreachable.
+- **Runs** one step of the executor for the active goal. Only the eight kinds above are
+  dispatched (the move since B56), so `IdleGoalExecutor` is unreachable.
 - **Skips** every goal step while `Automation.Enabled` is off, whatever triggered it, and the
   goals of a plan that is switched off.
 - **One step at a time per ship** (B46): a step that finds another step of the same ship running is

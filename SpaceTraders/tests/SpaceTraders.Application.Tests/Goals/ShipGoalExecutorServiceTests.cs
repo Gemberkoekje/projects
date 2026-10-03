@@ -295,6 +295,7 @@ public sealed class ShipGoalExecutorServiceTests
     [InlineData("ProbeDeployment")]
     [InlineData("Mining")]
     [InlineData("Trading")]
+    [InlineData("Survey")]
     public async Task ExecuteAsync_WhenTheGoalsPlanIsSwitchedOff_DoesNotStep(string plan)
     {
         ShipGoal goal = plan switch
@@ -302,6 +303,7 @@ public sealed class ShipGoalExecutorServiceTests
             "Scout" => new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" },
             "ProbeDeployment" => new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-009" },
             "Mining" => new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-009" },
+            "Survey" => new MoveToWaypointGoal { TargetWaypointSymbol = "X1-AB-009", Drifting = true },
             _ => new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-001", SellWaypointSymbol = "X1-AB-009" },
         };
         _settings.GetAsync<bool>($"Automation.Plan.{plan}.Enabled", Arg.Any<CancellationToken>()).Returns(false);
@@ -344,6 +346,25 @@ public sealed class ShipGoalExecutorServiceTests
 
         await _goals.DidNotReceive().ClearActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _scoutPlanService.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenActiveGoalIsAMove_DispatchesToExecutor()
+    {
+        // B56, seen on the cluster on 2026-10-03: the survey plan gave SPECTER-F a move to B7 at 15:55:03Z (D54), and no step
+        // of it ever ran: this service steps only the goal types it lists, and the move wasn't one of them. SPECTER-F stayed
+        // at XB5C with a goal that never ended, so the survey plan gave it nothing else either.
+        var move = new MoveToWaypointGoal { TargetWaypointSymbol = "X1-AB-B7", Drifting = true };
+        var expected = GoalExecutionResult.WaitingForArrival("drifting");
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(move);
+        _executor.CanExecute(move).Returns(true);
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), move, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>()).Returns(expected);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().Be(expected);
+        await _executor.Received(1).ExecuteStepAsync(Arg.Any<ShipModel>(), move, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

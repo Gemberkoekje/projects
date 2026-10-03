@@ -42,6 +42,9 @@ public static class AutomationSwitches
         ScoutWaypointGoal => AutomationPlan.Scout,
         DeployProbeGoal => AutomationPlan.ProbeDeployment,
         SurveyWaypointGoal => AutomationPlan.Survey,
+
+        // Only the survey plan moves ships, to where most drones mine (D54, D55).
+        MoveToWaypointGoal => AutomationPlan.Survey,
         MineAndSellGoal => AutomationPlan.Mining,
         SiphonAndSellGoal => AutomationPlan.Siphon,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
