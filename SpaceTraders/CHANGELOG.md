@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-03, B52)
+- The credits, the database size and the next server reset no longer read 0 before the bot knows them. prometheus-net published every gauge without labels at 0 from the start, and Prometheus's first scrape of a new pod could come before the first sample: after a deploy the dashboard read 0 credits for a minute, which "Value gained per hour" showed as a loss of the whole fleet's value (−517,672 on 2026-10-03 at 07:28:30Z), and an hour later as the same gain. These gauges are listed from the start and have a series once they are set, so that minute is a gap now.
+
+### Docs – Changed (2026-10-03, B52)
+- `PLAN.md`: B52; `docs/HOW_IT_WORKS.md`: gauges without labels have no series until they are set.
+
 ### Code – Added (2026-10-02, slice 6.9: D38–D42)
 - The role board, as asked on 2026-10-02: "Each ship should have a set of potential roles. … A ship should occasionally consider whether it's role is still the best thing it can do. This is not only based on it's own potential roles but also of other ships." A new plan (`Automation.Plan.Roles.Enabled`, off by default, bootstrapped after the scout plan and before the others) gives every ship a role, survey, mine, siphon or trade, from what it carries and what the other ships can do, and the plans give work by those roles. Off, the fixed rules of D20 and D34 hold as before.
 - Surveys come first (D38): a ship that can only survey surveys, and where none can, the ship that can survey with the least to lose does, while another ship there can mine. While the contract wants ore, every other ship that can mine mines for it (D40, D23 kept). The rest share the work for the most credits per hour across the fleet (an assignment, the Hungarian method), no two on one trade route or mining or siphon opening; a ship's current role counts 20% more (`Roles.HeadStartPercent`, D41).

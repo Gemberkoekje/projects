@@ -445,6 +445,33 @@ public sealed class PrometheusAutomationMetricsTests
         }
     }
 
+    /// <summary>Every gauge without labels, each with a value it had on the cluster.</summary>
+    public static TheoryData<string, Action<IAutomationMetrics>, string> UnlabelledGauges => new()
+    {
+        { "spacetraders_agent_credits", metrics => metrics.Credits(145_028), "spacetraders_agent_credits 145028\n" },
+        { "spacetraders_db_size_bytes", metrics => metrics.DatabaseSize(15_742_655), "spacetraders_db_size_bytes 15742655\n" },
+        { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds 1791118800\n" },
+    };
+
+    /// <summary>
+    /// B52: a gauge without labels was published at 0 from the start, before the bot knew its value, and Prometheus's
+    /// first scrape of a new pod could come before the first sample. On 2026-10-03 at 07:28Z the dashboard read 0 credits
+    /// for a minute after a deploy: "Value gained per hour" fell from 56,896 to -517,672, to show the same amount as a
+    /// gain an hour later. Such a gauge is listed from the start, but has a series only once it has a value.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(UnlabelledGauges))]
+    public async Task AGaugeWithoutLabels_HasNoSeries_UntilItHasAValue(string name, Action<IAutomationMetrics> set, string series)
+    {
+        var text = await ExportAsync();
+        text.Should().Contain($"# TYPE {name} gauge\n");
+        text.Should().NotContain($"\n{name} ", "{0} has no value yet, and 0 isn't it", name);
+
+        set(_metrics);
+
+        (await ExportAsync()).Should().Contain(series);
+    }
+
     /// <summary>
     /// Every counter, each with what its first increment looked like on the cluster: the contract's
     /// deposit and the drone, booked before Prometheus first scraped the pod; a single 429; a single

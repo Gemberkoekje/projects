@@ -1267,6 +1267,13 @@ The seven pages in `src/Future` are not routed.
   until a scrape has exported that 0: up to two scrape intervals (2 minutes on the cluster). Locally,
   a new series shows its count from the second `curl` of `/metrics` after it appeared.
 
+  A gauge without labels (`spacetraders_agent_credits`, `spacetraders_db_size_bytes`,
+  `spacetraders_server_next_reset_timestamp_seconds`) is the opposite: its 0 would be read as a
+  value, so it has no series until the bot first sets it (B52); its `# TYPE` line is there from the
+  start. Prometheus's first scrape of a new pod can come before the first sample, and the dashboard
+  read 0 credits for a minute after a deploy, which "Value gained per hour" showed as a loss of the
+  whole fleet's value, and an hour later as the same gain. Now that minute is a gap.
+
   | Metric | Labels | What it counts or shows | Updated |
   |---|---|---|---|
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
