@@ -8,6 +8,7 @@ using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -30,6 +31,7 @@ public sealed class PrometheusMetricsService(
     IAutomationMetrics metrics,
     ShipStateJournal shipJournal,
     PurchaseNeeds purchaseNeeds,
+    FullHoldSavings fullHoldSavings,
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
@@ -104,7 +106,8 @@ public sealed class PrometheusMetricsService(
         var roleSamples = RoleSamples(roles);
         metrics.Roles(roleSamples);
 
-        // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits.
+        // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; and the dearest full
+        // hold a trader saves up for (D56).
         var roleOf = roleSamples.ToDictionary(
             sample => sample.Ship,
             sample => Enum.TryParse<FleetRole>(sample.Role, out var role) ? role : FleetRole.None,
@@ -113,7 +116,8 @@ public sealed class PrometheusMetricsService(
         metrics.ReservedCredits(CreditReserve.Of(
             long.TryParse(floor, NumberStyles.Integer, CultureInfo.InvariantCulture, out var floorCredits) ? floorCredits : 0,
             CreditReserve.PerTradingCargoUnit(settings.Find(setting => setting.Key == CreditReserve.PerTradingCargoUnitSetting)?.Value ?? string.Empty),
-            CreditReserve.TradingCargo(ships.Select(ShipRepository.MapToModel), ship => roleOf.GetValueOrDefault(ship.Symbol, FleetRole.None))));
+            CreditReserve.TradingCargo(ships.Select(ShipRepository.MapToModel), ship => roleOf.GetValueOrDefault(ship.Symbol, FleetRole.None)))
+            + fullHoldSavings.Largest());
 
         // Slice 6.10b (D43): what the credits are saved up for, and what waits behind it.
         metrics.PurchaseNeeds([.. purchaseNeeds.Open(now).Select(open => new PurchaseNeedMetricsSample(

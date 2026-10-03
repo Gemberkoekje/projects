@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-03, D56)
+- Trades are full holds, in one purchase and one sale (D56), as asked on 2026-10-03: "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits, the trip's fuel kept back, pay for all of it. Each trade moves the price (a whole trade volume bought raised it 9% on 2026-10-03), so smaller loads, such as the drones' SHIP_PARTS 6 or 7 at a time, no longer count. At the buy market a trip whose markets no longer trade the full hold at once is dropped (`TradeDropped`, `Reason` `not_full_hold`).
+
+### Code – Added (2026-10-03, D56)
+- Saving up for a full hold (D56): "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships are bought." A free trader whose best route, credits aside, is a hold the credits don't pay for yet logs "saves up for a full hold … (D56)" and takes the best hold it can pay for meanwhile, or none; the credit reserve every ship purchase keeps (`BudgetPolicy`, `spacetraders_credit_reserve`) grows by the dearest such hold until it is bought (`FullHoldSavings`, in memory).
+
+### Docs – Changed (2026-10-03, D56)
+- `PLAN.md`: D56 and its follow-up under 6.10c; B57 deployed. `docs/HOW_IT_WORKS.md`: a trip's units, saving up for a full hold, the credit reserve, `not_full_hold`, and the credit-reserve metric.
+
 ### Code – Fixed (2026-10-03, B57)
 - A sale's ledger row records the market it was sold to and its unit price, as a purchase's does. Every `TradeSell` row since the first, on 2026-10-02, had neither, though the sale event carried the market. The rows already written stay without them.
 

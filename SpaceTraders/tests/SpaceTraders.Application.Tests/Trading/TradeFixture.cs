@@ -7,7 +7,8 @@ namespace SpaceTraders.Application.Tests.Trading;
 
 /// <summary>
 /// A small system for the trading tests, with the positions and prices of three markets in X1-DC53 as
-/// the bot saw them on 2026-10-02:
+/// the bot saw them on 2026-10-02. EQUIPMENT and MEDICINE traded 20 at a time then; here 40, a command ship's
+/// hold, so its trips take a full hold in one go (D56). SHIP_PARTS keep D41's 15:
 /// <list type="bullet">
 ///   <item>K85 exports EQUIPMENT (3,254) and FOOD (2,360), and sells fuel at 93;</item>
 ///   <item>D41 imports EQUIPMENT (pays 3,487) and makes SHIP_PARTS (7,721) from it, exports MEDICINE
@@ -55,16 +56,16 @@ internal static class TradeFixture
 
     public static MarketSnapshot D41Market(int equipmentPrice = 3_487) => Market(
         D41,
-        Good("EQUIPMENT", "IMPORT", 7_032, equipmentPrice, 20),
+        Good("EQUIPMENT", "IMPORT", 7_032, equipmentPrice, 40),
         Good("SHIP_PARTS", "EXPORT", 7_721, 3_478, 15),
-        Good("MEDICINE", "EXPORT", 4_867, 2_227, 20),
+        Good("MEDICINE", "EXPORT", 4_867, 2_227, 40),
         Good("FUEL", "EXCHANGE", 76, 69, 180));
 
     public static MarketSnapshot A1Market(int medicinePrice = 5_253) => Market(
         A1,
-        Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 20),
+        Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 40),
         Good("FOOD", "IMPORT", 5_028, 2_492, 60),
-        Good("MEDICINE", "IMPORT", 10_604, medicinePrice, 20),
+        Good("MEDICINE", "IMPORT", 10_604, medicinePrice, 40),
         Good("FUEL", "EXCHANGE", 90, 76, 180));
 
     /// <summary>The far fuel stations, J57 and I56.</summary>
@@ -77,7 +78,7 @@ internal static class TradeFixture
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? [K85Market(), D41Market(), A1Market()] : markets, MadeFrom);
 
-    public static TradeContext Context(TradeMarketMap map, long credits = 129_451, int minProfitPerUnit = 200, long fuelReserve = 0)
+    public static TradeContext Context(TradeMarketMap map, long credits = 250_000, int minProfitPerUnit = 200, long fuelReserve = 0)
         => new(map, credits, minProfitPerUnit, fuelReserve);
 
     /// <summary>The command ship: a 40-unit hold and a 400-unit tank.</summary>

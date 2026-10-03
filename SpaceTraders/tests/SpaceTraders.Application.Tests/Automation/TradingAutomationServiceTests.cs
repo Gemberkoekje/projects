@@ -36,6 +36,7 @@ public sealed class TradingAutomationServiceTests
     private readonly IContractMineralPlanRepository _contractPlans = Substitute.For<IContractMineralPlanRepository>();
     private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly FullHoldSavings _savings = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -92,8 +93,8 @@ public sealed class TradingAutomationServiceTests
         trip.TradeSymbol.Should().Be("EQUIPMENT");
         trip.BuyWaypointSymbol.Should().Be(K85);
         trip.SellWaypointSymbol.Should().Be(D41);
-        trip.Units.Should().Be(20);
-        trip.ExpectedProfit.Should().Be((233 * 20) - (2 * 76));
+        trip.Units.Should().Be(40);
+        trip.ExpectedProfit.Should().Be((233 * 40) - (2 * 76));
         trip.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
         trip.CargoBought.Should().BeFalse();
 
@@ -141,8 +142,49 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task AFullHoldTheCreditsDontPayForYet_IsSavedUpFor_AndShipsAreBoughtAfterIt()
+    {
+        // D56, asked on 2026-10-03: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so
+        // any ship purchases wait for the full hold to be bought before new ships are bought." From K85 the command ship's
+        // best route is 40 EQUIPMENT for D41 (D15), 130,160 and 152 for fuel; it has 100,000 for cargo, and FOOD, which it could
+        // pay for, earns too little a unit: no trip, and the credit floor grows by the hold.
+        CreditsAre(100_000);
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
+        saving.Should().Be(new FullHoldSaving("SHIP-1", TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41), 130_312));
+        _savings.Largest().Should().Be(130_312);
+        _log.Kept.Should().ContainSingle(message => message.Contains("saves up for a full hold", StringComparison.Ordinal) && message.Contains("D56", StringComparison.Ordinal));
+
+        // Once the credits pay for it, the trader takes it; the saving lasts until the hold is bought.
+        CreditsAre(140_000);
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("EQUIPMENT");
+        _savings.Largest().Should().Be(130_312);
+    }
+
+    [Fact]
+    public async Task ATraderWhoseBestRouteItCanPayFor_SavesUpForNothing()
+    {
+        Fleet(CommandShip());
+        _savings.SaveFor("SHIP-1", TradeRoutePlanner.RouteKey("MEDICINE", D41, A1), 194_922);
+        _savings.SaveFor("SHIP-9", TradeRoutePlanner.RouteKey("MEDICINE", D41, A1), 194_922);
+
+        await RunAsync();
+
+        _savings.Largest().Should().Be(0, "SHIP-1 can pay for its best route, and SHIP-9 no longer trades");
+    }
+
+    [Fact]
     public async Task TwoTraders_NeverShareARoute()
     {
+        // Full holds of EQUIPMENT and MEDICINE (D56) cost 325,000.
+        CreditsAre(500_000);
         Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4"));
 
         await RunAsync();
@@ -406,10 +448,10 @@ public sealed class TradingAutomationServiceTests
     public async Task WithTheSpareTimePlanOn_TheOtherTradersChooseFirst()
     {
         // From K85 the command ship would earn most with EQUIPMENT for D41; the shuttle, a trader only, takes it, and
-        // the command ship takes MEDICINE, which is left.
+        // the command ship takes MEDICINE, which is left. Full holds of both (D56) cost 325,000.
         SurveyPlanOn();
         SpareTimePlanOn();
-        CreditsAre(300_000);
+        CreditsAre(500_000);
         Fleet(CommandShip(), Shuttle("SHIP-5"));
 
         await RunAsync();
@@ -435,8 +477,9 @@ public sealed class TradingAutomationServiceTests
     public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_AndThenOneMoreOfTheLastType_InTurnWithTheDrones()
     {
         // D21's list, then D43: "alternate drones and cargo ships", one more cargo ship of the list's last type at a time.
+        // A light hauler's 80-unit hold needs markets that trade 80 at once (D56): K85 and D41 do EQUIPMENT here.
         SurveyPlanOn();
-        CreditsAre(1_000_000);
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(MapWhereEquipmentFillsAHauler(), 1_000_000));
         var shuttle = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
         var hauler = Shuttle("SHIP-6") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
         Fleet(CommandShip(), shuttle, hauler);
@@ -556,6 +599,13 @@ public sealed class TradingAutomationServiceTests
     private void CreditsAre(long credits)
         => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(), credits));
 
+    /// <summary>The fixture, with K85 and D41 trading EQUIPMENT 80 at a time: a light hauler's hold (D56).</summary>
+    private static TradeMarketMap MapWhereEquipmentFillsAHauler()
+        => Map(
+            Market(K85, Good("EQUIPMENT", "EXPORT", 3_254, 1_456, 80), Good("FOOD", "EXPORT", 2_360, 1_069, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+            Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 80), Good("MEDICINE", "EXPORT", 4_867, 2_227, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+            A1Market());
+
     /// <summary>A cargo ship, as the trading plan buys them: a hold and a tank, nothing to mine or survey with.</summary>
     private static ShipModel Shuttle(string symbol)
         => new(symbol, SystemSymbol, A1, "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: ["MOUNT_TURRET_I"], CargoInventory: []);
@@ -574,6 +624,7 @@ public sealed class TradingAutomationServiceTests
                 _contractPlans,
                 _jettison,
                 _order,
+                _savings,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

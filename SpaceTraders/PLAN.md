@@ -102,8 +102,10 @@
   `489720e` since 14:40Z; its first coverage drone, SPECTER-11, mines the middle's silicon). Your decision D54, the survey
   ship works where most drones mine, and D55, a survey ship per area with drones, are merged and deployed (projects#144,
   gembernodes#42). Their first move found B56: the move never ran (projects#145, gembernodes#43: the cluster runs
-  `827785b` since 16:07Z). B57, sales booked without their market and unit price, is fixed on branch
-  `claude/spacetraders-b57`.
+  `827785b` since 16:07Z). B57, sales booked without their market and unit price, is merged and deployed (projects#146,
+  gembernodes#44: the cluster runs `2cfc071` since 17:53Z). Your decision D56, trade only full holds, in one purchase and
+  one sale, and keep ship purchases back while a trader saves up for one, is built on branch
+  `claude/spacetraders-full-holds`.
 
 ## Known issues
 
@@ -235,6 +237,7 @@ get the next D-number.
 | D53 | Slice 6.10c's watch (2026-10-03): coverage (D48) counted a mineral for the whole system. With SPECTER-10 bound for B7's silicon, silicon counted as covered: the middle's SCARCE silicon (H53) had no drone, and by 14:01Z four of the five mining drones were drifting to B7 (SPECTER-4, -10, -A and -9), with SPECTER-3 alone in the middle. How does coverage treat far markets? | **Cover per area:** "A drone covers a mineral only for the markets it can reach in CRUISE from where it works (the middle, or B7). The middle's scarce silicon gets a drone of its own; the coverage tier may buy a drone per scarce mineral per area (more drones)." A trip covers its mineral at the markets its ship reaches in CRUISE, through refuelling stops, from the market it sells at; the coverage tier counts each SCARCE or LIMITED mineral once per area (the markets a drone flies between in CRUISE: in X1-DC53 the middle and B7); the role board keeps one drone per mineral and area. Amends D48. |
 | D54 | Slice 6.10c's watch (2026-10-03): from 15:02Z SPECTER-4 mined B14 for B7 without surveys (copper on about one extraction in six), with three more drones drifting there, while the survey ship SPECTER-F, whose 80-unit tank keeps it in the middle, surveyed XB5C for SPECTER-3 alone; the command ship doesn't survey while a ship that can only survey exists (D38). Asked: "Please add the option for the survey ship to get to the mining location without surveys." A drift between the middle and B7 takes about 2.5 hours and a survey lasts 10 to 55 minutes, so one survey ship serves one area at a time: where should it work? | **Where most drones mine:** a ship that can only survey works in the area where the most mining drones work (their trip's market, a drone drifting there included; between trips, where they are), and drifts once to the market of another area that has more drones than its own; a tie keeps it where it is. The command ship never moves for this. |
 | D55 | After D54 (2026-10-03): one survey ship serves one area at a time, so the area with fewer drones mines without surveys (at 15:45Z three drones in the middle, four for B7). Asked: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." Where in the order? | **A survey ship per area, after the coverage drones:** while a system has fewer ships that can only survey than areas with mining drones (as the survey ships fly between them), one more is bought, after the drones per scarce mineral and area (D48, D53) and before the cargo ships; the first stays second in the order (D47). Each area with drones gets a survey ship of its own: one already there or on its way takes it, and of two in one area, one drifts to an area with drones that has none. Amends D54. |
+| D56 | Slice 6.10 (asked on 2026-10-03): "Can we add the rule that only full cargo holds can be traded? As the price changes after the buy, it's much more effective if 40 units are bought compared to 6 or 7." A market trades at most its trade volume at once, and each trade moves its price: on 2026-10-03 a purchase raised it 4% (under half the trade volume), 7% (half or more) or 9% (all of it), a sale lowered it 1 to 3%; a unit costs the price quoted for its purchase. The drones bought SHIP_PARTS 6 or 7 at a time at D41 (15 at once) and sold them at C39 and H52 (7 and 6 at once); a trip took as many units as the free hold, both trade volumes and the credits allowed, in one purchase. How should a trade fill a hold, and with what credits? | **Full hold or nothing, in one purchase and one sale:** "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits pay for all of it (the trip's fuel and `Trade.FuelReserveCredits` kept back, D24); otherwise the ship takes other work, and drones keep trading when a full hold is there (D37's spare time). The credits: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships are bought." While a trader's best route is a full hold the credits don't pay for yet, the credit reserve every ship purchase keeps (D51) grows by the dearest such hold, until it is bought. Amends D51; replaces "as many units as the credits allow". |
 
 ## Phases
 
@@ -2179,7 +2182,34 @@ How credits are split stays your call; Claude only fixes deviations from intende
       - Tests: App 849 (7 new: `MiningPlannerTests` 3, `SurveyPlanServiceTests` 3, `PurchaseOrderTests` 1; D54's planner tests
         pass no other survey ship), Domain 72, API 161 (and 4 skipped; the positions in `PrometheusMetricsTests` follow the
         new order).
-  - **To understand this,** start with the decisions D43–D55, then this slice's notes; 6.10b and 6.10c each have their own
+    - **Follow-up, D56** (branch `claude/spacetraders-full-holds`): full holds only, in one purchase and one sale.
+      - **A route** (`TradeRoutePlanner.TakesFullHold`, `TryEvaluateFrom`): its units are the ship's free hold; it counts only
+        when the buy market's and the sell market's trade volumes are both at least that, and the credits for cargo, the
+        trip's fuel kept back, pay for all of it. The held-cargo sale (D42) is unchanged: it sells what is aboard.
+      - **At the buy market** (`TradeBetweenMarketsGoalExecutor`): the trip is worked out again with the prices just
+        fetched; a market that no longer trades the full hold at once drops it (`TradeDropped`, `Reason` `not_full_hold`),
+        as do too few credits (`not_possible`). The purchase is the whole hold.
+      - **Saving up** (`FullHoldSavings`, `TradingAutomationService.NoteSaving`): a free trader whose best route, credits
+        aside, is a hold the credits don't pay for logs "saves up for a full hold of … (D56)" and takes the best hold it
+        can pay for meanwhile, or none. `BudgetPolicy` adds the dearest saving to the credit reserve, and so does
+        `spacetraders_credit_reserve`. The saving ends when that hold is bought, when the trader's best route is one it
+        can pay for, or when the ship no longer trades; a restart forgets it until the plan's next pass.
+      - **What to expect** after the deploy: at 18:25Z on 2026-10-03, 84 of the 124 goods the markets of X1-DC53 listed,
+        fuel aside, traded at least 40 at once, and 26 at least 80 (158 pairs of markets for a 40-unit hold, 18 for an
+        80-unit one). The command ship (40) trades only those routes; EQUIPMENT from K85 (43 at once) has no buyer that
+        takes 40 (20 each), and SHIP_PARTS (15 at D41, 6 to 13 where it is sold) fills no hold, not even a drone's 15. Its
+        purchases are all 40 units; with about 120,000 credits a 40-unit hold of a good dearer than about 3,000 a unit is
+        saved up for, and ship purchases wait meanwhile (the reserve shows it). At 18:25Z's prices the best 40-unit routes
+        were FABRICS from D43 (2,622 a unit, 104,880 the hold) to D41 and K85, 70 and 48 a unit more, then IRON from H51
+        (22) and PRECIOUS_STONES from J58 (18), against `Trade.MinProfitPerUnit` 5. Drones trade only 15-unit holds.
+      - To understand it, start with `TakesFullHold` and `TryEvaluateFrom` in `Trading/TradeRoutePlanner.cs`, then
+        `NoteSaving` in `Automation/TradingAutomationService.cs`, `Trading/FullHoldSavings.cs` and
+        `Orchestration/BudgetPolicy.cs`.
+      - Tests: App 857 (6 new, 3 rewritten: `TradeRoutePlannerTests`, `TradeBetweenMarketsGoalExecutorTests`,
+        `TradingAutomationServiceTests`, `BudgetPolicyTests`; the trading fixture's EQUIPMENT and MEDICINE trade 40 at once,
+        and its credits are 250,000), Domain 72, API 162 (and 4 skipped; the credit-reserve theory has a case with a
+        saving).
+  - **To understand this,** start with the decisions D43–D56, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes

@@ -9,7 +9,8 @@ namespace SpaceTraders.Application.Tests.Trading;
 /// <summary>
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
 /// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
-/// that feed a pricier good's production come first (D15); two traders never share a route.
+/// that feed a pricier good's production come first (D15); two traders never share a route. D56: a trip is a
+/// full hold, bought in one purchase and sold in one sale, or none.
 /// </summary>
 public sealed class TradeRoutePlannerTests
 {
@@ -19,13 +20,13 @@ public sealed class TradeRoutePlannerTests
     public void Profit_IsTheMarginTimesTheUnits_MinusTheFuelForBothLegs()
     {
         // From K85: 185 to D41 (2 FUEL at D41, 76 each), then 95 to A1 (1 FUEL at A1, 90).
-        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "MEDICINE", D41, A1, 129_451, out var route).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "MEDICINE", D41, A1, 250_000, out var route).Should().BeTrue();
 
-        route.Units.Should().Be(20, "both markets trade MEDICINE 20 at a time");
+        route.Units.Should().Be(40, "both markets trade MEDICINE 40 at a time: the command ship's full hold (D56)");
         route.BuyPrice.Should().Be(4_867);
         route.SellPrice.Should().Be(5_253);
         route.FuelCost.Should().Be((2 * 76) + 90);
-        route.Profit.Should().Be((386 * 20) - 242);
+        route.Profit.Should().Be((386 * 40) - 242);
         route.FeedsTradeSymbol.Should().BeEmpty("A1 makes nothing from MEDICINE");
     }
 
@@ -37,17 +38,17 @@ public sealed class TradeRoutePlannerTests
         var map = new TradeMarketMap(
             [Place("X1-AB-P", 0), Place("X1-AB-Q", 200), Place("X1-AB-R", 100)],
             [
-                Market("X1-AB-P", Good("GOOD", "EXPORT", 100, 50, 20), Good("FUEL", "EXCHANGE", 100, 90, 180)),
-                Market("X1-AB-Q", Good("GOOD", "EXPORT", 100, 50, 20), Good("FUEL", "EXCHANGE", 100, 90, 180)),
-                Market("X1-AB-R", Good("GOOD", "IMPORT", 800, 400, 20), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+                Market("X1-AB-P", Good("GOOD", "EXPORT", 100, 50, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+                Market("X1-AB-Q", Good("GOOD", "EXPORT", 100, 50, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+                Market("X1-AB-R", Good("GOOD", "IMPORT", 800, 400, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
             ],
             MadeFrom);
 
-        var routes = TradeRoutePlanner.Rank(map, CommandShip("X1-AB-P"), 129_451, 0, NoneHeld);
+        var routes = TradeRoutePlanner.Rank(map, CommandShip("X1-AB-P"), 250_000, 0, NoneHeld);
 
         routes.Select(route => route.BuyWaypointSymbol).Should().Equal("X1-AB-P", "X1-AB-Q");
-        routes[0].Profit.Should().Be((300 * 20) - 100);
-        routes[1].Profit.Should().Be((300 * 20) - 100 - 200, "the flight to Q is part of the trip");
+        routes[0].Profit.Should().Be((300 * 40) - 100);
+        routes[1].Profit.Should().Be((300 * 40) - 100 - 200, "the flight to Q is part of the trip");
 
         static WaypointCacheModel Place(string symbol, int x) => new(symbol, SystemSymbol, "PLANET", x, 0, true, false, DateTimeOffset.UnixEpoch);
     }
@@ -56,14 +57,14 @@ public sealed class TradeRoutePlannerTests
     public void Rank_PutsARouteThatFeedsAPricierGoodFirst_ThoughAnotherEarnsMore()
     {
         // D15: D41 makes SHIP_PARTS (7,721) from EQUIPMENT, so delivering it there grows that production.
-        var routes = TradeRoutePlanner.Rank(Map(), CommandShip(), 129_451, 200, NoneHeld);
+        var routes = TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => (route.TradeSymbol, route.BuyWaypointSymbol, route.SellWaypointSymbol)).Should().Equal(
             ("EQUIPMENT", K85, D41),
             ("MEDICINE", D41, A1),
             ("EQUIPMENT", K85, A1));
         routes[0].FeedsTradeSymbol.Should().Be("SHIP_PARTS");
-        routes[0].Profit.Should().Be((233 * 20) - (2 * 76));
+        routes[0].Profit.Should().Be((233 * 40) - (2 * 76));
         routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
     }
 
@@ -72,7 +73,7 @@ public sealed class TradeRoutePlannerTests
     {
         var map = new TradeMarketMap(Waypoints, [K85Market(), D41Market(), A1Market()], new Dictionary<string, IReadOnlyList<string>>());
 
-        var routes = TradeRoutePlanner.Rank(map, CommandShip(), 129_451, 200, NoneHeld);
+        var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => route.TradeSymbol + " " + route.SellWaypointSymbol).Should().Equal(
             "MEDICINE " + A1,
@@ -84,10 +85,10 @@ public sealed class TradeRoutePlannerTests
     public void Rank_LeavesOutRoutesBelowTheMinimumProfitPerUnit()
     {
         // D14: FOOD K85 to A1 earns 5,100 on 40 units, 127 a unit.
-        TradeRoutePlanner.Rank(Map(), CommandShip(), 129_451, 200, NoneHeld)
+        TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld)
             .Should().NotContain(route => route.TradeSymbol == "FOOD");
 
-        TradeRoutePlanner.Rank(Map(), CommandShip(), 129_451, 0, NoneHeld)
+        TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 0, NoneHeld)
             .Should().ContainSingle(route => route.TradeSymbol == "FOOD")
             .Which.Profit.Should().Be((132 * 40) - (2 * 90));
     }
@@ -97,7 +98,7 @@ public sealed class TradeRoutePlannerTests
     {
         var held = new HashSet<string> { TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41) };
 
-        TradeRoutePlanner.Rank(Map(), CommandShip(), 129_451, 200, held)
+        TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, held)
             .Should().NotContain(route => route.TradeSymbol == "EQUIPMENT" && route.SellWaypointSymbol == D41)
             .And.HaveCount(2);
     }
@@ -106,7 +107,7 @@ public sealed class TradeRoutePlannerTests
     public void Rank_LeavesOutALegLongerThanTheTankHolds()
     {
         // The drone's tank holds 80: every market is further than that from K85.
-        TradeRoutePlanner.Rank(Map(), Drone(), 129_451, 0, NoneHeld).Should().BeEmpty();
+        TradeRoutePlanner.Rank(Map(), Drone(), 250_000, 0, NoneHeld).Should().BeEmpty();
     }
 
     [Fact]
@@ -116,8 +117,8 @@ public sealed class TradeRoutePlannerTests
         // buy, and fills its tank before it leaves.
         var ship = CommandShip(status: "IN_ORBIT", fuel: 100);
 
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "MEDICINE", D41, A1, 129_451, out _).Should().BeFalse();
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 129_451, out _).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "MEDICINE", D41, A1, 250_000, out _).Should().BeFalse();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -128,13 +129,12 @@ public sealed class TradeRoutePlannerTests
         var map = Map([K85Market(), D41Market(), A1Market(), .. FarMarkets()]);
         var ship = CommandShip(J57, fuel: 252);
 
-        var routes = TradeRoutePlanner.Rank(map, ship, 129_451, 200, NoneHeld);
+        var routes = TradeRoutePlanner.Rank(map, ship, 250_000, 200, NoneHeld);
 
         // J57 to I56 (368: 4 FUEL at 86), I56 to D41 (312: 4 at 76), D41 to A1 (95: 1 at 90).
-        var best = routes.Should().NotBeEmpty().And.Subject.First();
-        best.TradeSymbol.Should().Be("MEDICINE");
-        best.FuelCost.Should().Be((4 * 86) + (4 * 76) + 90);
-        best.Profit.Should().Be((386 * 20) - 738);
+        var medicine = routes.Should().ContainSingle(route => route.TradeSymbol == "MEDICINE").Subject;
+        medicine.FuelCost.Should().Be((4 * 86) + (4 * 76) + 90);
+        medicine.Profit.Should().Be((386 * 40) - 738);
         TradeRoutePlanner.NextStop(map, ship, D41).Should().Be(I56);
     }
 
@@ -169,20 +169,43 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void Units_AreLimitedByTheCredits_WithTheFuelKeptBack()
+    public void WithoutTheCreditsForAFullHold_ThereIsNoRoute_TheFuelKeptBack()
     {
-        // D17: cargo may use the credit reserve, but not the trip's fuel.
-        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 50_000, out var route).Should().BeTrue();
-
-        route.Units.Should().Be((50_000 - 152) / 3_254);
+        // D56, "full hold or nothing"; D17: cargo may use the credit reserve, but not the trip's fuel. 40 EQUIPMENT at 3,254
+        // and 152 for fuel come to 130,312.
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_312, out var route).Should().BeTrue();
+        route.Units.Should().Be(40);
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_311, out _).Should().BeFalse();
     }
 
     [Fact]
-    public void Units_AreLimitedByTheFreeHold()
+    public void ARoute_IsOnlyOneWhereOnePurchaseAndOneSaleTakeTheFullHold()
+    {
+        // D56, asked on 2026-10-03: "The entire goal is to buy full holds in one go, because it makes no sense to buy more
+        // times than one", and to sell them in one sale too. D41 sells SHIP_PARTS 15 at a time: a drone's 15-unit hold, not
+        // the command ship's 40. A1 takes EQUIPMENT 20 at a time here: neither fills the command ship's hold.
+        var map = Map(
+            K85Market(),
+            D41Market(),
+            Market(
+                A1,
+                Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 20),
+                Good("SHIP_PARTS", "IMPORT", 16_000, 8_000, 40),
+                Good("FUEL", "EXCHANGE", 90, 76, 180)));
+
+        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "SHIP_PARTS", D41, A1, 1_000_000, out _).Should().BeFalse();
+        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "EQUIPMENT", K85, A1, 1_000_000, out _).Should().BeFalse();
+        TradeRoutePlanner.TryEvaluate(map, Drone(D41) with { FuelCapacity = 400, FuelCurrent = 400 }, "SHIP_PARTS", D41, A1, 1_000_000, out var drone)
+            .Should().BeTrue();
+        drone.Units.Should().Be(15);
+    }
+
+    [Fact]
+    public void Units_AreTheFreeHold()
     {
         var ship = CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 35)]);
 
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 129_451, out var route).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, out var route).Should().BeTrue();
 
         route.Units.Should().Be(5);
     }

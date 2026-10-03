@@ -20,13 +20,14 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// course in flight, so it reconsiders the trip where it lands, with the prices its arrival has just
 /// refreshed (and the newest prices known for the other market):
 /// <list type="bullet">
-///   <item>at the buy market, before buying: when the trip is no longer lucrative, it gives it up
-///   (<c>TradeDropped</c>) and the trading plan chooses again from there;</item>
+///   <item>at the buy market, before buying: when the trip is no longer lucrative, or the markets no longer trade its
+///   full hold in one go (D56), it gives it up (<c>TradeDropped</c>) and the trading plan chooses again from there;</item>
 ///   <item>at the sell market, before selling: when selling there is no longer lucrative and another
 ///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
 /// </list>
 /// The goal keeps what the cargo cost, and however the trip ends, sold or dropped, it is booked with what its
-/// sales brought in (<see cref="ITripBook"/>, D46). Its flights are in CRUISE, which the arithmetic assumes: a ship
+/// sales brought in (<see cref="ITripBook"/>, D46). A purchase of the full hold the credits were saved up for ends that
+/// saving (<see cref="FullHoldSavings"/>, D56). Its flights are in CRUISE, which the arithmetic assumes: a ship
 /// left in DRIFT is switched back before it flies (slice 6.10c).
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
@@ -39,10 +40,12 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     IDockSubCommand dock,
     IMessageBus bus,
     ITripBook trips,
+    FullHoldSavings savings,
     ILogger<TradeBetweenMarketsGoalExecutor> logger) : IShipGoalExecutor
 {
     private const string NotLucrative = "not_lucrative";
     private const string NotPossible = "not_possible";
+    private const string NotFullHold = "not_full_hold";
     private const string NotBoughtHere = "not_bought_here";
     private const string CruiseMode = "CRUISE";
 
@@ -91,7 +94,13 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 context.CreditsForCargo,
                 out var route))
         {
-            return await DropAsync(ship, trade, NotPossible, ct);
+            // D56: a full hold in one purchase and one sale, as the markets trade now, or no trip.
+            var reason = context.Map.TryGetGood(trade.BuyWaypointSymbol, trade.TradeSymbol, out _)
+                && context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out _)
+                && !TradeRoutePlanner.TakesFullHold(context.Map, ship, trade.TradeSymbol, trade.BuyWaypointSymbol, trade.SellWaypointSymbol)
+                    ? NotFullHold
+                    : NotPossible;
+            return await DropAsync(ship, trade, reason, ct);
         }
 
         if (!route.IsLucrative(context.MinProfitPerUnit))
@@ -135,6 +144,13 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             trade.TradeSymbol,
             trade.BuyWaypointSymbol,
             result.Revenue);
+
+        // D56: the full hold the credits were saved up for is bought; ships may be bought again.
+        if (savings.TryGet(ship.Symbol, out var saving)
+            && saving.RouteKey.Equals(TradeRoutePlanner.RouteKey(trade.TradeSymbol, trade.BuyWaypointSymbol, trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase))
+        {
+            savings.Clear(ship.Symbol);
+        }
 
         // The purchase moved the price: the market again, while the ship is still there (D25).
         await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.BuyWaypointSymbol, ship.Symbol, ct);

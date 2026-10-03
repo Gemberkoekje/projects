@@ -32,7 +32,7 @@ public sealed class RoleEstimatorTests
         // The command ship at K85, docked: EQUIPMENT to D41 is the best route there (6.5's dry run).
         var map = TradeFixture.Map();
         var ship = TradeFixture.CommandShip() with { EngineJson = """{"speed":36}""" };
-        var route = TradeRoutePlanner.Rank(map, ship, 129_451, 200, new HashSet<string>())
+        var route = TradeRoutePlanner.Rank(map, ship, 250_000, 200, new HashSet<string>())
             .Single(candidate => candidate.TradeSymbol == "EQUIPMENT" && candidate.SellWaypointSymbol == TradeFixture.D41);
 
         var option = RoleEstimator.Options(Context(map), ship, FleetRole.Trade, 20)
@@ -166,18 +166,18 @@ public sealed class RoleEstimatorTests
     [Fact]
     public void ATradeTrip_CountsTheChainAtMostItsMarginPerUnit()
     {
-        // D49. EQUIPMENT from K85 to D41 earns 233 a unit (3,487 against 3,254), 20 units a trip. D41, MODERATE in it, makes
+        // D49. EQUIPMENT from K85 to D41 earns 233 a unit (3,487 against 3,254), 40 units a trip (D56). D41, MODERATE in it, makes
         // SHIP_PARTS from it at 7,721 against 7,032: half of 689 at a share of 100%, 344.5 a unit; 172.25 at 50%.
         var map = TradeFixture.Map();
         var ship = TradeFixture.CommandShip() with { EngineJson = """{"speed":36}""" };
-        var route = TradeRoutePlanner.Rank(map, ship, 129_451, 200, new HashSet<string>())
+        var route = TradeRoutePlanner.Rank(map, ship, 250_000, 200, new HashSet<string>())
             .Single(candidate => candidate.TradeSymbol == "EQUIPMENT" && candidate.SellWaypointSymbol == TradeFixture.D41);
         RoleOption Option(double share)
             => RoleEstimator.Options(Context(map, share), ship, FleetRole.Trade, 20).Single(candidate => candidate.JobKey == "trade|" + route.Key);
 
-        route.Units.Should().Be(20);
-        Option(0.5).Credits.Should().Be(route.Profit + (long)Math.Round(20 * 172.25), "the chain is less than the margin, and counts in full");
-        Option(1).Credits.Should().Be(route.Profit + (20 * 233), "the chain counts no more than the margin");
+        route.Units.Should().Be(40);
+        Option(0.5).Credits.Should().Be(route.Profit + (long)Math.Round(40 * 172.25), "the chain is less than the margin, and counts in full");
+        Option(1).Credits.Should().Be(route.Profit + (40 * 233), "the chain counts no more than the margin");
     }
 
     [Fact]
@@ -242,5 +242,5 @@ public sealed class RoleEstimatorTests
         => RoleEstimator.Options(context, ship, role, 1).Single();
 
     private static RoleContext Context(TradeMarketMap map, double share = 0, GatheringRates? rates = null)
-        => new(new MiningContext(map, [], 129_451, MiningFixture.Now), 200, 0, new ChainValues(map, share), rates ?? new GatheringRates());
+        => new(new MiningContext(map, [], 250_000, MiningFixture.Now), 200, 0, new ChainValues(map, share), rates ?? new GatheringRates());
 }

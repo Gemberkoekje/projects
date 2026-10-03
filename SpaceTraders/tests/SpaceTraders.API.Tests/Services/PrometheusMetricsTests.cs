@@ -14,6 +14,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -94,6 +95,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -286,6 +288,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -342,6 +345,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -385,6 +389,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -429,6 +434,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -474,6 +480,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -500,6 +507,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             needs,
+            new FullHoldSavings(),
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -509,13 +517,20 @@ public sealed class PrometheusMetricsServiceTests
     /// <summary>
     /// D51: the dashboard shows the credit reserve next to the credits: the floor, and 1,000 a unit of what the ships that
     /// trade can carry. The command ship and a light shuttle carry 40 each; a mining drone counts only while the role board
-    /// has it trading.
+    /// has it trading. D56: and the dearest full hold a trader saves up for.
     /// </summary>
     [Theory]
-    [InlineData("false", 140_000)]
-    [InlineData("true", 155_000)]
-    public async Task SampleAsync_ExportsTheCreditReserve_ByWhatTheShipsThatTradeCanCarry(string boardSwitch, long reserve)
+    [InlineData("false", 0, 140_000)]
+    [InlineData("true", 0, 155_000)]
+    [InlineData("false", 130_312, 270_312)]
+    public async Task SampleAsync_ExportsTheCreditReserve_ByWhatTheShipsThatTradeCanCarry(string boardSwitch, long saving, long reserve)
     {
+        var savings = new FullHoldSavings();
+        if (saving > 0)
+        {
+            savings.SaveFor("AGENT-1", TradeRoutePlanner.RouteKey("EQUIPMENT", "X1-AB-K85", "X1-AB-D41"), saving);
+        }
+
         var state = new RolePlanState
         {
             EvaluatedAt = TimeProvider.System.GetUtcNow(),
@@ -541,6 +556,7 @@ public sealed class PrometheusMetricsServiceTests
             _metrics,
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
+            savings,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 

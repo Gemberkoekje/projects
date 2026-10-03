@@ -61,6 +61,7 @@ public sealed class TradingAutomationService(
     IContractMineralPlanRepository contractPlans,
     ICargoJettison cargoJettison,
     IPurchaseOrder purchaseOrder,
+    FullHoldSavings savings,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -129,6 +130,14 @@ public sealed class TradingAutomationService(
                 surveyorsWithCargo.Add(ship);
             }
         }
+
+        // D56: a saving is kept only for a ship that trades, on a trip or not.
+        savings.KeepOnly(fleet
+            .Where(ship => board.IsTrader(ship)
+                || (board.SpareTimeOn && board.GathersInSpareTime(ship) && ship.IsTradingCapable)
+                || held.Any(route => route.ShipSymbol.Equals(ship.Symbol, StringComparison.OrdinalIgnoreCase)))
+            .Select(ship => ship.Symbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase));
 
         var heldKeys = held.Select(route => route.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pending = new Dictionary<string, PendingRoute>(StringComparer.OrdinalIgnoreCase);
@@ -425,9 +434,10 @@ public sealed class TradingAutomationService(
         var credits = context.CreditsForCargo;
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
-        // counts as work waiting for it (D13).
+        // counts as work waiting for it (D13); and the full hold it saves up for, when it does (D56).
         foreach (var trader in traders)
         {
+            NoteSaving(context, trader, credits, heldKeys);
             foreach (var route in TradeRoutePlanner.Rank(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys))
             {
                 pending[route.Key] = pending.TryGetValue(route.Key, out var known)
@@ -475,6 +485,44 @@ public sealed class TradingAutomationService(
         }
 
         return credits;
+    }
+
+    /// <summary>
+    /// Notes what a free trader saves up for (D56): its best route, credits aside, when the credits for cargo don't pay for
+    /// that full hold and the trip's fuel; ships are bought after it (<see cref="FullHoldSavings"/>). Meanwhile it takes the
+    /// best full hold it can pay for, or none. A trader whose best route is one it can pay for saves up for nothing more,
+    /// unless that is the route it saved up for: then the saving lasts until the hold is bought.
+    /// </summary>
+    private void NoteSaving(TradeContext context, ShipModel trader, long credits, IReadOnlySet<string> heldKeys)
+    {
+        var routes = TradeRoutePlanner.Rank(context.Map, trader, AnyCredits, context.MinProfitPerUnit, heldKeys);
+        if (routes.Count == 0)
+        {
+            savings.Clear(trader.Symbol);
+            return;
+        }
+
+        var best = routes[0];
+        var cost = ((long)best.Units * best.BuyPrice) + best.FuelCost;
+        if (cost > credits)
+        {
+            if (savings.SaveFor(trader.Symbol, best.Key, cost))
+            {
+                logger.LogInformation(
+                    "Trading plan: ship {ShipSymbol} saves up for a full hold of {Units} {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}, {Cost} credits with its fuel, against {CreditsForCargo} for cargo now; ships are bought after it (D56).",
+                    trader.Symbol,
+                    best.Units,
+                    best.TradeSymbol,
+                    best.BuyWaypointSymbol,
+                    best.SellWaypointSymbol,
+                    cost,
+                    credits);
+            }
+        }
+        else if (savings.TryGet(trader.Symbol, out var saving) && !saving.RouteKey.Equals(best.Key, StringComparison.OrdinalIgnoreCase))
+        {
+            savings.Clear(trader.Symbol);
+        }
     }
 
     private async Task<TradeBetweenMarketsGoal> StartRouteAsync(ShipModel ship, TradeRoute route, CancellationToken cancellationToken)
