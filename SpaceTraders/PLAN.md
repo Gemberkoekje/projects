@@ -108,7 +108,9 @@
   gembernodes#45: the cluster runs `ef1cdb7` since 19:00Z), and so is B58, a survey ship flying to an asteroid it can't
   get away from (projects#148, gembernodes#46: the cluster runs `e17a765` since 19:03Z; SPECTER-F surveys B14 since
   19:17Z). B59, 429s from the API's rate limiter while the bot keeps to its budget: its first step, logging the
-  limiter's headers with each 429, is on branch `claude/spacetraders-b59-headers`.
+  limiter's headers with each 429, is merged and deployed (projects#149, gembernodes#47: the cluster runs `5ef42bd`
+  since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is built
+  on branch `claude/spacetraders-reserve-trip-credits`.
 
 ## Known issues
 
@@ -243,6 +245,7 @@ get the next D-number.
 | D54 | Slice 6.10c's watch (2026-10-03): from 15:02Z SPECTER-4 mined B14 for B7 without surveys (copper on about one extraction in six), with three more drones drifting there, while the survey ship SPECTER-F, whose 80-unit tank keeps it in the middle, surveyed XB5C for SPECTER-3 alone; the command ship doesn't survey while a ship that can only survey exists (D38). Asked: "Please add the option for the survey ship to get to the mining location without surveys." A drift between the middle and B7 takes about 2.5 hours and a survey lasts 10 to 55 minutes, so one survey ship serves one area at a time: where should it work? | **Where most drones mine:** a ship that can only survey works in the area where the most mining drones work (their trip's market, a drone drifting there included; between trips, where they are), and drifts once to the market of another area that has more drones than its own; a tie keeps it where it is. The command ship never moves for this. |
 | D55 | After D54 (2026-10-03): one survey ship serves one area at a time, so the area with fewer drones mines without surveys (at 15:45Z three drones in the middle, four for B7). Asked: "Can we add that extra surveyor drones are bought to try and cover all areas with surveys? The second surveyor is lower priority than the first on the buy order." Where in the order? | **A survey ship per area, after the coverage drones:** while a system has fewer ships that can only survey than areas with mining drones (as the survey ships fly between them), one more is bought, after the drones per scarce mineral and area (D48, D53) and before the cargo ships; the first stays second in the order (D47). Each area with drones gets a survey ship of its own: one already there or on its way takes it, and of two in one area, one drifts to an area with drones that has none. Amends D54. |
 | D56 | Slice 6.10 (asked on 2026-10-03): "Can we add the rule that only full cargo holds can be traded? As the price changes after the buy, it's much more effective if 40 units are bought compared to 6 or 7." A market trades at most its trade volume at once, and each trade moves its price: on 2026-10-03 a purchase raised it 4% (under half the trade volume), 7% (half or more) or 9% (all of it), a sale lowered it 1 to 3%; a unit costs the price quoted for its purchase. The drones bought SHIP_PARTS 6 or 7 at a time at D41 (15 at once) and sold them at C39 and H52 (7 and 6 at once); a trip took as many units as the free hold, both trade volumes and the credits allowed, in one purchase. How should a trade fill a hold, and with what credits? | **Full hold or nothing, in one purchase and one sale:** "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits pay for all of it (the trip's fuel and `Trade.FuelReserveCredits` kept back, D24); otherwise the ship takes other work, and drones keep trading when a full hold is there (D37's spare time). The credits: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships are bought." While a trader's best route is a full hold the credits don't pay for yet, the credit reserve every ship purchase keeps (D51) grows by the dearest such hold, until it is bought. Amends D51; replaces "as many units as the credits allow". |
+| D57 | After D56 (2026-10-03): traders share one pot of credits, and nothing held back the credits of a trip already on its way to buy. At 19:29Z SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85; by the time it got there another trader had spent about 121,000, leaving 54,596, too little once the fuel reserve was kept back, and it dropped the trip as `not_possible` with nothing bought (before D56 it would have bought what the credits paid for). | **Hold the credits back from the start:** "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at the price it was chosen with, from the moment it starts until the cargo is aboard: the other traders get only the credits no trip holds back, the trip at its buy market spends its own, and ship purchases leave them, as they leave a saving (D56); a trader that sets off for the hold it saved up for saves up no more, as the trip's hold takes its place. A price that rose meanwhile is paid from the credits no trip holds back. |
 
 ## Phases
 
@@ -2214,7 +2217,27 @@ How credits are split stays your call; Claude only fixes deviations from intende
         `TradingAutomationServiceTests`, `BudgetPolicyTests`; the trading fixture's EQUIPMENT and MEDICINE trade 40 at once,
         and its credits are 250,000), Domain 72, API 162 (and 4 skipped; the credit-reserve theory has a case with a
         saving).
-  - **To understand this,** start with the decisions D43–D56, then this slice's notes; 6.10b and 6.10c each have their own
+    - **Follow-up, D57** (branch `claude/spacetraders-reserve-trip-credits`): credits held back for a trip.
+      - **What a trip holds back** (`TradeBetweenMarketsGoal.ReservedCredits`, `Trading/TripReservations.cs`): its units at
+        the buy price it was chosen with, from the moment the trading plan starts it until its cargo is aboard; nothing
+        once bought, blocked or done. It is stored with the goal, so a restart keeps it, and a trip stored before D57
+        holds back nothing.
+      - **Who leaves it:** the trading plan gives free traders only the credits no trip on its way to buy holds back;
+        the trade executor at the buy market spends its own and those no other trip holds back (the goal store reads the
+        fleet's trips at once, `GetActiveTradeGoalsAsync`); `BudgetPolicy` adds the holds to the credits every ship
+        purchase must leave, and `spacetraders_credit_reserve` shows them. A trader that sets off for the hold it saved
+        up for (D56) saves up no more: the trip's hold takes its place.
+      - **What to expect:** no trade trip dropped `not_possible` at its buy market because another trader spent the
+        credits; while the command ship flies to buy a dear hold, the reserve shows it and ship purchases wait. A price
+        that rose since the trip was chosen (COPPER at H51: chosen at 270, bought at 286 on 2026-10-03) is paid from
+        the credits no trip holds back.
+      - To understand it, start with `Trading/TripReservations.cs`, then `AssignRoutesAsync` and `RouteGoal` in
+        `Automation/TradingAutomationService.cs`, the buy step of `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs` and
+        `Orchestration/BudgetPolicy.cs`.
+      - Tests: App 863 (4 new: `TradingAutomationServiceTests` 1, `TradeBetweenMarketsGoalExecutorTests` 2,
+        `BudgetPolicyTests` 1; D56's saving test now ends in the trip's hold), Domain 72, API 164 (and 4 skipped; two
+        credit-reserve cases with a trip's hold), and `ShipGoalRepositoryTests` 13 against Postgres (1 new).
+  - **To understand this,** start with the decisions D43–D57, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
 ## Changes in gembernodes

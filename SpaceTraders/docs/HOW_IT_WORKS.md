@@ -671,8 +671,9 @@ siphoned.
   - the units are the ship's whole free hold, in one purchase and one sale (D56, asked on 2026-10-03: "The
     entire goal is to buy full holds in one go, because it makes no sense to buy more times than one"): a
     route counts only when both markets' trade volumes, the most a single trade takes, are at least the free
-    hold, and the credits pay for all of it (cargo may use the credit reserve, D17; the trip's fuel and
-    `Trade.FuelReserveCredits`, 5,000, are kept back, D24: below them only fuel is bought). Each trade moves the
+    hold, and the credits no other trip holds back (D57) pay for all of it (cargo may use the credit reserve,
+    D17; the trip's fuel and `Trade.FuelReserveCredits`, 5,000, are kept back, D24: below them only fuel is
+    bought). Each trade moves the
     price (a whole trade volume bought raised it 9% on 2026-10-03, a smaller purchase 4 to 7%), so a hold
     bought in several purchases would cost more a unit than its first. Otherwise there is no trip, and the ship
     takes other work: a drone mines or siphons. In X1-DC53 on 2026-10-03 (18:25Z), 84 of the 124 goods the
@@ -692,9 +693,19 @@ siphoned.
   are bought." When a free trader's best route, credits aside, is a full hold the credits for cargo don't pay for
   (with the trip's fuel), the plan notes it ("saves up for a full hold … (D56)"), and the trader takes the best full
   hold it can pay for meanwhile, or none. The credit reserve every ship purchase keeps grows by the dearest such
-  hold (`BudgetPolicy`), so ships are bought after it. The saving ends when that hold is bought (the trade
-  executor), when the trader's best route is another it can pay for, or when the ship no longer trades. In
-  memory: a restart forgets it, and the plan notes it again at its first pass.
+  hold (`BudgetPolicy`), so ships are bought after it. The saving ends when the trader sets off for that hold (what
+  the trip holds back takes its place, D57, so ships still wait until it is bought), when the trader's best route is
+  another it can pay for, or when the ship no longer trades. In memory: a restart forgets it, and the plan notes it
+  again at its first pass.
+- **Credits held back for a trip** (D57, `TripReservations`): "Let's have these credits reserved as soon as a ship
+  starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at
+  the price it was chosen with (`TradeBetweenMarketsGoal.ReservedCredits`), from the moment it starts towards the buy
+  market until the cargo is aboard; a trip that is blocked or done holds back nothing. The plan gives the other
+  traders only the credits no trip holds back, a trip at its buy market spends its own and those no other trip holds
+  back, and every ship purchase leaves them (`BudgetPolicy`). Kept with the trip's goal, so a restart keeps it. A
+  price that rose since the trip was chosen is paid from the credits no trip holds back. Seen on 2026-10-03 at 19:29Z:
+  SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85, another trader spent about 121,000 before it got there, and
+  the trip was dropped with nothing bought.
 - **Each tick** every free trader gets a trip, from the cached prices:
   - one that holds cargo first sells it where it fetches the most after fuel, one good a trip, when that
     earns anything. Once no good aboard pays for its sale, the goods go overboard before the trader takes a
@@ -809,9 +820,9 @@ last, gives it something to do then; your decisions are D34–D37.
   hold counted, the 205 units of 2026-10-03 would have asked 265,000, above what the credits peaked at.
   With the command ship alone the reserve is 100,000; a light shuttle (40) makes it 140,000, a light hauler
   (80) 220,000, a second 300,000. While a trader saves up for a full hold the credits don't pay for yet
-  (D56, see [Trading](#trading-tradingautomationservice-slice-65)), the reserve grows by the dearest such hold. It
-  is judged from the cached fleet and the role board at every evaluation, and exported as
-  `spacetraders_credit_reserve`.
+  (D56, see [Trading](#trading-tradingautomationservice-slice-65)), the reserve grows by the dearest such hold, and
+  by what the trade trips on their way to buy hold back for their cargo (D57). It is judged from the cached fleet, the
+  role board and the trips' goals at every evaluation, and exported as `spacetraders_credit_reserve`.
 
 ### The order ships are bought in (`PurchaseOrder`, slice 6.10b)
 
@@ -977,7 +988,7 @@ step does the work.
 | `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
 | `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
-| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative, and still a full hold both markets trade at once and the credits pay for (D56): [API] buy and publish `CargoPurchasedEvent`, record the purchase in the goal, and end the saving for that hold, if any; otherwise clear the goal (`TradeDropped`, `not_full_hold` when a market no longer trades the full hold at once), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
+| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative, and still a full hold both markets trade at once and the credits pay for (D56), its own and those no other trip holds back (D57): [API] buy and publish `CargoPurchasedEvent`, record the purchase in the goal, and end the saving for that hold, if any; otherwise clear the goal (`TradeDropped`, `not_full_hold` when a market no longer trades the full hold at once), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
 | `MoveToWaypoint` | One flight to a waypoint (D54). At the target (its arrival docked it): clear the goal and complete. **Drifting**, for a move out of the ship's CRUISE reach: [cmd] navigate there in DRIFT and log `DriftStarted`. Otherwise: [cmd] navigate towards it in CRUISE (`GoalFlight`). The survey plan moves a ship that can only survey this way. |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `Idle` | Unreachable. |
@@ -1472,7 +1483,7 @@ The seven pages in `src/Future` are not routed.
   | Metric | Labels | What it counts or shows | Updated |
   |---|---|---|---|
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
-  | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry; and the dearest full hold a trader saves up for (D56) | Every 10 s |
+  | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry; the dearest full hold a trader saves up for (D56); and what the trade trips on their way to buy hold back (D57) | Every 10 s |
   | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `Probes`, `Alternating`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5, probes to 6, the turns to 7). A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |

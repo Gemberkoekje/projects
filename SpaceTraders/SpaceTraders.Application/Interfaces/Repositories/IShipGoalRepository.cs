@@ -37,4 +37,10 @@ public interface IShipGoalRepository
     /// across all ships.
     /// </summary>
     Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the active <see cref="TradeBetweenMarketsGoal"/> of every ship that has one, by ship symbol, with its
+    /// stored status: what the fleet's trade trips hold back for their cargo (D57).
+    /// </summary>
+    Task<IReadOnlyDictionary<string, TradeBetweenMarketsGoal>> GetActiveTradeGoalsAsync(CancellationToken cancellationToken = default);
 }

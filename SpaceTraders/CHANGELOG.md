@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-03, D57)
+- Credits held back for a trade trip (D57), as asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at the price it was chosen with (`TradeBetweenMarketsGoal.ReservedCredits`, `TripReservations`) from the moment it starts until its cargo is aboard. The trading plan gives other traders only the credits no trip holds back, the trip at its buy market spends its own and those no other trip holds back, and every ship purchase leaves them (`BudgetPolicy`, `spacetraders_credit_reserve`). A trader that sets off for the hold it saved up for (D56) saves up no more: the trip's hold takes its place. The goal store reads the fleet's trade trips at once (`GetActiveTradeGoalsAsync`). At 19:29Z SPECTER-8 had dropped its EQUIPMENT trip at K85 with nothing bought, because another trader spent the credits on the way.
+
+### Docs – Changed (2026-10-03, D57)
+- `PLAN.md`: D57 and its follow-up under 6.10c; B59's first step deployed. `docs/HOW_IT_WORKS.md`: credits held back for a trip, the saving that becomes the trip's hold, the credit reserve and its metric, the trade executor's buy step.
+
 ### Code – Changed (2026-10-03, B59)
 - Every 429 warning carries the rate limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them), so the request budget can be held against what the server counted. From 10:30Z on 2026-10-03 the limiter answered 429 about four times an hour, each time while the budget was in full use; which window it counted wasn't logged.
 

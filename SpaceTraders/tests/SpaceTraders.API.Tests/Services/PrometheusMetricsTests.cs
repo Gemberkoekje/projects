@@ -517,13 +517,16 @@ public sealed class PrometheusMetricsServiceTests
     /// <summary>
     /// D51: the dashboard shows the credit reserve next to the credits: the floor, and 1,000 a unit of what the ships that
     /// trade can carry. The command ship and a light shuttle carry 40 each; a mining drone counts only while the role board
-    /// has it trading. D56: and the dearest full hold a trader saves up for.
+    /// has it trading. D56: and the dearest full hold a trader saves up for. D57: and what the trade trips on their way to
+    /// buy hold back.
     /// </summary>
     [Theory]
-    [InlineData("false", 0, 140_000)]
-    [InlineData("true", 0, 155_000)]
-    [InlineData("false", 130_312, 270_312)]
-    public async Task SampleAsync_ExportsTheCreditReserve_ByWhatTheShipsThatTradeCanCarry(string boardSwitch, long saving, long reserve)
+    [InlineData("false", 0, 0, false, 140_000)]
+    [InlineData("true", 0, 0, false, 155_000)]
+    [InlineData("false", 130_312, 0, false, 270_312)]
+    [InlineData("false", 0, 130_160, false, 270_160)]
+    [InlineData("false", 0, 130_160, true, 140_000)]
+    public async Task SampleAsync_ExportsTheCreditReserve_ByWhatTheShipsThatTradeCanCarry(string boardSwitch, long saving, long hold, bool bought, long reserve)
     {
         var savings = new FullHoldSavings();
         if (saving > 0)
@@ -543,7 +546,17 @@ public sealed class PrometheusMetricsServiceTests
             db.Ships.Add(Equipped("AGENT-1", "COMMAND", ["MOUNT_SURVEYOR_II", "MOUNT_MINING_LASER_II"], 40, 400));
             db.Ships.Add(Equipped("AGENT-2", "SATELLITE", [], 0, 0));
             db.Ships.Add(Equipped("AGENT-3", "EXCAVATOR", ["MOUNT_MINING_LASER_I"], 15, 80));
-            db.Ships.Add(Equipped("AGENT-4", "SHIP_LIGHT_SHUTTLE", ["MOUNT_TURRET_I"], 40, 300));
+            var shuttle = Equipped("AGENT-4", "SHIP_LIGHT_SHUTTLE", ["MOUNT_TURRET_I"], 40, 300);
+            if (hold > 0)
+            {
+                ShipGoal trip = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-D41", Units = 40, ReservedCredits = hold, CargoBought = bought };
+                shuttle.GoalId = trip.GoalId;
+                shuttle.GoalKind = trip.Kind.ToString();
+                shuttle.GoalPayloadJson = JsonSerializer.Serialize(trip);
+                shuttle.GoalStatus = (int)trip.Status;
+            }
+
+            db.Ships.Add(shuttle);
             db.Settings.Add(Setting(AgentId, "FleetExpansion.MinCreditReserve", "60000", "The floor"));
             db.Settings.Add(Setting(AgentId, "FleetExpansion.ReservePerTradingCargoUnit", "1000", "A unit"));
             db.Settings.Add(Setting(AgentId, "Automation.Plan.Roles.Enabled", boardSwitch, "Run the role board"));

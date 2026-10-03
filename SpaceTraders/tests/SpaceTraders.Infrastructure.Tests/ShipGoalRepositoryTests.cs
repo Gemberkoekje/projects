@@ -196,6 +196,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
             Units = 20,
             ExpectedProfit = 4_508,
             FeedsTradeSymbol = "SHIP_PARTS",
+            ReservedCredits = 65_080,
             CargoBought = true,
             PricePaidPerUnit = 3_254,
             SellWaypointChanged = true,
@@ -206,6 +207,29 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await new ShipGoalRepository(fresh).GetActiveGoalAsync("SHIP-G9");
 
         result.Should().BeOfType<TradeBetweenMarketsGoal>().Which.Should().BeEquivalentTo(trip);
+    }
+
+    [SkippableFact]
+    public async Task TheFleetsTradeTrips_AreReadByShip_WithTheirStatus()
+    {
+        // D57: what the trade trips hold back is read for the whole fleet at once. A ship on other work has none.
+        await SeedShipAsync("SHIP-T1");
+        await SeedShipAsync("SHIP-T2");
+        await SeedShipAsync("SHIP-T3");
+        var flying = new TradeBetweenMarketsGoal { GoalId = Guid.NewGuid(), TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = "X1-TEST-K85", SellWaypointSymbol = "X1-TEST-D41", Units = 40, ReservedCredits = 130_160 };
+        var stuck = new TradeBetweenMarketsGoal { GoalId = Guid.NewGuid(), TradeSymbol = "MEDICINE", BuyWaypointSymbol = "X1-TEST-D41", SellWaypointSymbol = "X1-TEST-A1", Units = 40, ReservedCredits = 194_680 };
+        var repo = new ShipGoalRepository(Db);
+        await repo.SetActiveGoalAsync("SHIP-T1", flying);
+        await repo.SetActiveGoalAsync("SHIP-T2", stuck);
+        await repo.BlockGoalAsync("SHIP-T2", stuck.GoalId, "runaway");
+        await repo.SetActiveGoalAsync("SHIP-T3", new MineResourceGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-TEST-A1" });
+
+        await using var fresh = CreateFreshContext();
+        var trips = await new ShipGoalRepository(fresh).GetActiveTradeGoalsAsync();
+
+        trips.Keys.Should().BeEquivalentTo("SHIP-T1", "SHIP-T2");
+        trips["SHIP-T1"].ReservedCredits.Should().Be(130_160);
+        trips["SHIP-T2"].Status.Should().Be(GoalStatus.Blocked);
     }
 
     [SkippableFact]

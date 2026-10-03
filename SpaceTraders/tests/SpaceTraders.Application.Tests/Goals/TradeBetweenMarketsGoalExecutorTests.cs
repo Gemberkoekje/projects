@@ -162,6 +162,41 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task AtTheBuyMarket_TheCreditsOtherTripsHoldBack_AreNotSpent()
+    {
+        // D57, asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot
+        // happen (waste of time and fuel)." SHIP-4, on its way to buy MEDICINE at D41, holds back 60,000 of the 190,000 on
+        // hand: the 130,312 this trip needs, cargo and fuel, aren't there for it, and SHIP-4 still finds its own.
+        PricesAre(Map(), credits: 190_000);
+        TripsHoldBack(
+            ("SHIP-4", new TradeBetweenMarketsGoal { TradeSymbol = "MEDICINE", BuyWaypointSymbol = D41, SellWaypointSymbol = A1, Units = 40, ReservedCredits = 60_000 }),
+            ("SHIP-1", Trip() with { ReservedCredits = 130_160 }));
+
+        var result = await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ATripSpendsWhatItHeldBackItself()
+    {
+        // D57: of the 190,000, SHIP-4's trip holds back 50,000, which leaves 140,000; SHIP-1's own 130,160 is its to spend, and
+        // SHIP-5's trip, which has bought, holds back nothing.
+        PricesAre(Map(), credits: 190_000);
+        BuyReturns(units: 40, total: 130_160);
+        TripsHoldBack(
+            ("SHIP-4", new TradeBetweenMarketsGoal { TradeSymbol = "MEDICINE", BuyWaypointSymbol = D41, SellWaypointSymbol = A1, Units = 40, ReservedCredits = 50_000 }),
+            ("SHIP-1", Trip() with { ReservedCredits = 130_160 }),
+            ("SHIP-5", Trip(bought: true) with { ReservedCredits = 50_000 }));
+
+        await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 40, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheMarketsNoLongerTradeAFullHoldAtOnce()
     {
         // D56: K85 sells EQUIPMENT 30 at a time now, fewer than the hold: buying it would take two purchases.
@@ -412,6 +447,13 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             K85Market(),
             Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
             A1Market());
+
+    /// <summary>The trade trips of the fleet, by ship, as the goal store reads them (D57).</summary>
+    private void TripsHoldBack(params (string Ship, TradeBetweenMarketsGoal Trip)[] trips)
+    {
+        IReadOnlyDictionary<string, TradeBetweenMarketsGoal> byShip = trips.ToDictionary(trip => trip.Ship, trip => trip.Trip, StringComparer.OrdinalIgnoreCase);
+        _goals.GetActiveTradeGoalsAsync(Arg.Any<CancellationToken>()).Returns(byShip);
+    }
 
     private void PricesAre(TradeMarketMap map, long credits = Credits, long fuelReserve = 0)
         => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, credits, fuelReserve: fuelReserve));

@@ -303,6 +303,13 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
     public string FeedsTradeSymbol { get; init; } = string.Empty;
 
     /// <summary>
+    /// The credits the trip holds back for its cargo from the moment it starts towards the buy market until the cargo is
+    /// aboard (D57): its units at the buy price it was chosen with. Other trips and ship purchases leave them. 0 for cargo
+    /// the ship already held, and for a trip stored before D57.
+    /// </summary>
+    public long ReservedCredits { get; init; }
+
+    /// <summary>
     /// True once the cargo is aboard: after the purchase, or from the start for a trip that sells cargo
     /// the ship already held.
     /// </summary>

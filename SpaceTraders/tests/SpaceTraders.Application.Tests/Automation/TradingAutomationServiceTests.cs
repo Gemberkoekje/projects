@@ -159,13 +159,15 @@ public sealed class TradingAutomationServiceTests
         _savings.Largest().Should().Be(130_312);
         _log.Kept.Should().ContainSingle(message => message.Contains("saves up for a full hold", StringComparison.Ordinal) && message.Contains("D56", StringComparison.Ordinal));
 
-        // Once the credits pay for it, the trader takes it; the saving lasts until the hold is bought.
+        // Once the credits pay for it, the trader takes it, and the saving becomes what the trip holds back until it buys
+        // (D57): ships are still bought after the hold, and it isn't counted twice.
         CreditsAre(140_000);
 
         await RunAsync();
 
-        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.TradeSymbol.Should().Be("EQUIPMENT");
-        _savings.Largest().Should().Be(130_312);
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.ReservedCredits).Should().Be(("EQUIPMENT", 130_160L));
+        _savings.Largest().Should().Be(0);
     }
 
     [Fact]
@@ -206,6 +208,24 @@ public sealed class TradingAutomationServiceTests
 
         _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>()
             .Which.TradeSymbol.Should().Be("MEDICINE");
+    }
+
+    [Fact]
+    public async Task TheCreditsATripHoldsBackOnItsWayToBuy_AreNotGivenToAnotherTrader()
+    {
+        // D57, asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot
+        // happen (waste of time and fuel)." Seen at 19:29Z: SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85; another
+        // trader spent about 121,000 before it got there, leaving 54,596, and it dropped the trip with nothing bought. Here
+        // SHIP-4 flies to K85 for 40 EQUIPMENT and holds back 130,160 of the 250,000: MEDICINE, SHIP-1's best route left,
+        // costs 194,680 and 242 for fuel, so SHIP-1 saves up for it (D56) and takes nothing meanwhile.
+        _activeGoals["SHIP-4"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = K85, SellWaypointSymbol = D41, Units = 40, ReservedCredits = 130_160 };
+        Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-1");
+        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
+        saving.Should().Be(new FullHoldSaving("SHIP-1", TradeRoutePlanner.RouteKey("MEDICINE", D41, A1), 194_922));
     }
 
     [Fact]
