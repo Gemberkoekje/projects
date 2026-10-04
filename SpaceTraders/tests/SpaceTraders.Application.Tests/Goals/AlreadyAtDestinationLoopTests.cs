@@ -42,7 +42,7 @@ public sealed class AlreadyAtDestinationLoopTests
     [Fact]
     public async Task ScoutShipInOrbitAtTarget_TakesOneStep()
     {
-        var executor = new ScoutWaypointGoalExecutor(Substitute.For<IWaypointVisitService>(), _dock, _bus);
+        var executor = new ScoutWaypointGoalExecutor(Substitute.For<IWaypointVisitService>(), Substitute.For<ITradeContextReader>(), _dock, _bus);
 
         await RunOneStepAsync(
             executor,

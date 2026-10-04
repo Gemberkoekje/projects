@@ -5,6 +5,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using Wolverine;
 
@@ -41,8 +42,11 @@ public sealed class MineResourceVolumeHandler(
     IWaypointRepository waypoints,
     ISurveyRepository surveys,
     ISurveyKeeper surveyKeeper,
+    ITradeContextReader tradeContexts,
     IRefuelSubCommand refuel,
     IOrbitSubCommand orbit,
+    IDockSubCommand dock,
+    IFlightModeSubCommand flightMode,
     INavigateSubCommand navigate,
     IMessageBus bus,
     IAutomationMetrics metrics,
@@ -87,6 +91,14 @@ public sealed class MineResourceVolumeHandler(
 
         if (!atSource)
         {
+            // The contract's flight to the asteroid: in CRUISE, through refuelling stops (B47).
+            var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, cancellationToken)).Map;
+            if (CommandFlight.DocksToRefuel(map, ship, command.SourceWaypoint))
+            {
+                await dock.ExecuteAsync(ship.Symbol, cancellationToken);
+                ship = await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
+            }
+
             if (ship.LocalStatus == ShipLocalStatus.Docked)
             {
                 await TryRefuelBeforeUndockingAsync(ship, cancellationToken);
@@ -110,7 +122,7 @@ public sealed class MineResourceVolumeHandler(
                     ship.WaypointSymbol ?? string.Empty);
             }
 
-            await navigate.ExecuteAsync(ship.Symbol, command.SourceWaypoint, Guid.Empty, cancellationToken);
+            await CommandFlight.TowardsAsync(map, ship, command.SourceWaypoint, flightMode, navigate, cancellationToken);
 
             return new ShipCommandResult(
                 ship.Symbol,

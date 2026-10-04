@@ -495,10 +495,11 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   7. picks the nearest asteroid;
   8. saves an Active plan and a `Contract` assignment.
 - **The work itself is step 3 of the tick:**
-  - **Mining:** `MineResourceVolumeCommand` travels to the asteroid, extracts once per cooldown,
+  - **Mining:** `MineResourceVolumeCommand` travels to the asteroid in CRUISE, through refuelling
+    stops when it is beyond one tank (B47, under Commands below), extracts once per cooldown,
     with the best survey there for the contract's ore when there is one (slice 6.4), and
     jettisons other goods.
-  - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination, docks, delivers
+  - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination the same way, docks, delivers
     what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
     nothing is pending and the cached contract isn't fulfilled yet (another ship may have done it,
     D23), recording the payment in the cached credits and publishing `ContractFulfilledEvent` with
@@ -1146,7 +1147,7 @@ step does the work.
 
 | Executor | Behaviour |
 |---|---|
-| `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate. |
+| `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate towards it (`GoalFlight`: in CRUISE, through refuelling stops when it is beyond one tank, B47). |
 | `DeployProbe` | One flight of a probe (slice 6.3). At the target (the arrival fetched its market and shipyard, and docked): clear the goal and complete; the probe plan chooses again. Elsewhere: in DRIFT, [cmd] switch to CRUISE first (a probe has no tank, so no flight costs it fuel); then [cmd] navigate. |
 | `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
@@ -1168,12 +1169,15 @@ step does the work.
   - Docked: it refuels if the waypoint sells fuel, then orbits.
   - In orbit, it sets the flight mode the command asks for, if any (`FlightMode`, slice 6.10c;
     `FlightModeSubCommand`, which calls the API only when the ship's mode differs): DRIFT for a mining or
-    siphon trip's drift to a market out of CRUISE reach (D45), CRUISE for every flight of the mining,
-    siphon, survey, spare-time and trade executors. Scouting, probes and the contract's commands ask for
-    none.
+    siphon trip's drift to a market out of CRUISE reach (D45), CRUISE for every other flight a goal plans
+    (`GoalFlight`, the scout's included since B47, and the trade executor's). A probe asks for none: its
+    executor switches a probe in DRIFT to CRUISE itself. The contract's commands don't send this command;
+    they set CRUISE themselves (below).
   - Then it navigates. Navigate tries DRIFT mode and intermediate markets when fuel is short,
-    then schedules the arrival and publishes `ShipInTransitEvent`. That fallback leaves the ship in
-    DRIFT (B47); a goal flight that asks for CRUISE switches it back.
+    then schedules the arrival and publishes `ShipInTransitEvent`. Every CRUISE flight a goal or the
+    contract plans goes through refuelling stops when it is beyond one tank, so the fallback is left for
+    a flight that no chain of fuel markets the bot knows of reaches. It leaves the ship in DRIFT, and the
+    ship's next flight asks for CRUISE, which switches it back (B47).
 - **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market (publishing
   `MarketDataRefreshedEvent`) and the shipyard, docks, and publishes
   `ShipNavigationCompletedEvent`.
@@ -1208,7 +1212,10 @@ step does the work.
 - **`MineResourceVolumeCommand` and `FulfillContractDeliveryCommand`**, used by the tick's contract
   work, dead-reckon arrival themselves and navigate without a goal id (B17). The mining and survey
   goals navigate with `NavigateToWaypointCommand`, which carries the goal id, so their arrivals wake
-  them.
+  them. The contract's flights go in CRUISE (B47, `CommandFlight`): straight to the asteroid or the
+  delivery when the fuel aboard will do, otherwise to the first market on the way that sells fuel,
+  one leg a tick. A ship the next tick finds at such a stop is in orbit, so it docks and refuels before
+  it flies on; a docked ship fills its tank before it orbits.
 - **`PatchShipNavCommand`** changes the flight mode; the probe executor sends it (a navigation that asks
   for a mode sets it itself).
 - **Selling and buying** are direct API calls from the executors, which publish what they did.

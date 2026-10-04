@@ -9,6 +9,8 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Trading;
+using static SpaceTraders.Application.Tests.Commands.FuelStopFixture;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
@@ -19,6 +21,7 @@ public sealed class MineResourceVolumeHandlerTests
     private readonly IWaypointRepository _waypoints = Substitute.For<IWaypointRepository>();
     private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
     private readonly ISurveyKeeper _surveyKeeper = Substitute.For<ISurveyKeeper>();
+    private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly INavigateSubCommand _navigate = Substitute.For<INavigateSubCommand>();
     private readonly Wolverine.IMessageBus _bus = Substitute.For<Wolverine.IMessageBus>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
@@ -28,6 +31,11 @@ public sealed class MineResourceVolumeHandlerTests
     public MineResourceVolumeHandlerTests()
     {
         _surveys.GetActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<StoredSurvey>());
+        _tradeContexts.ReadAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns(new TradeContext(new TradeMarketMap([], [], new Dictionary<string, IReadOnlyList<string>>()), 0, 0));
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context());
+        _waypoints.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => Waypoints.FirstOrDefault(waypoint => waypoint.Symbol == call.Arg<string>()));
     }
 
     [Fact]
@@ -166,6 +174,40 @@ public sealed class MineResourceVolumeHandlerTests
             .Which.Message.Should().Contain("SIG-1").And.Contain("Invalid datetime");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_TheFlightToAnAsteroidBeyondOneTank_GoesInCruise_RefuellingOnTheWay()
+    {
+        // B47, on the cluster on 2026-10-04: the scout plan left SPECTER-1 at J67, 747 from the contract's asteroid. A
+        // 400-unit tank doesn't do that in CRUISE, so the navigation's fallback drifted it there: 87 minutes. The fuel
+        // stations J66 and I65 are on the way. Each tick flies a leg, and the next one dead-reckons its arrival.
+        var ship = new FlyingShip(CommandShip());
+        _port.ExtractResourcesAsync("SPECTER-1", Arg.Any<CancellationToken>()).Returns(Extraction("COPPER_ORE", 9));
+
+        for (var tick = 0; tick < 4; tick++)
+        {
+            await Handler(ship).ExecuteAsync(new MineResourceVolumeCommand("SPECTER-1", "COPPER_ORE", EF5D, 120), CancellationToken.None);
+        }
+
+        ship.Flights.Should().Equal(
+            new Flight(J66, "CRUISE", 400, 119),
+            new Flight(I65, "CRUISE", 400, 372),
+            new Flight(EF5D, "CRUISE", 400, 256));
+        await _port.Received(1).ExtractResourcesAsync("SPECTER-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AShipLeftInDrift_FliesToTheAsteroidInCruise()
+    {
+        // B47: the fallback leaves a ship in DRIFT, ten times slower, and nothing switched SPECTER-1 back for the contract:
+        // it delivered to H60 in DRIFT, and stayed in DRIFT until a survey trip asked for CRUISE. Docked at H60 after a
+        // delivery, its next trip to EF5D goes in CRUISE.
+        var ship = new FlyingShip(CommandShip(H60, flightMode: "DRIFT", fuel: 399));
+
+        await Handler(ship).ExecuteAsync(new MineResourceVolumeCommand("SPECTER-1", "COPPER_ORE", EF5D, 80), CancellationToken.None);
+
+        ship.Flights.Should().Equal(new Flight(EF5D, "CRUISE", 400, 19));
+    }
+
     private MineResourceVolumeHandler Handler()
         => new(
             _port,
@@ -173,9 +215,30 @@ public sealed class MineResourceVolumeHandlerTests
             _waypoints,
             _surveys,
             _surveyKeeper,
+            _tradeContexts,
             Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IDockSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             _navigate,
+            _bus,
+            _metrics,
+            _rates,
+            _log.For<MineResourceVolumeHandler>());
+
+    private MineResourceVolumeHandler Handler(FlyingShip ship)
+        => new(
+            _port,
+            ship.Ships,
+            _waypoints,
+            _surveys,
+            _surveyKeeper,
+            _tradeContexts,
+            ship.Refuel,
+            ship.Orbit,
+            ship.Dock,
+            ship.FlightMode,
+            ship.Navigate,
             _bus,
             _metrics,
             _rates,

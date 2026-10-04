@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B47)
+- The scout plan's flights and the contract's, to the asteroid and to the delivery, go in CRUISE, through refuelling stops when the fuel aboard won't reach, as the trips' flights do since slice 6.10c. They asked for no flight mode and flew straight to their target, so a flight beyond one tank was left to the navigation's fallback, which drifts, and a ship it left in DRIFT flew on in DRIFT. After the reset of 2026-10-04 the scout plan left SPECTER-1 at J67, 747 from the contract's asteroid, EF5D, with a 400-unit tank: it drifted there in 87 minutes, where CRUISE through J66 and I65 takes about ten, and took the copper the 19 to H60 in DRIFT too; the first flight that switched it back was a survey trip at 18:09Z. A contract command flies one leg a tick, and at a stop, where the next tick finds the ship in orbit, it docks and refuels first. The fallback still drifts where no chain of fuel markets reaches, and the ship's next flight asks for CRUISE again.
+
+### Docs – Changed (2026-10-04, B47)
+- `PLAN.md`: B47 fixed. `docs/HOW_IT_WORKS.md`: how the contract's and the scout plan's flights go, and what is left to the fallback.
+
 ### Code – Fixed (2026-10-04, B61)
 - When an arrival and the market watch store a market at the same moment, the later one updates the row the first one inserted: the market cache stores a row in one statement (`INSERT … ON CONFLICT … DO UPDATE`). Each looked for the row first, so for a market nobody had fetched before both inserted it, and the second insert failed on `PK_cached_markets` (23505): EF Core logged Errors, the watch a Warning, and the prices the watch fetched were lost. It happened twice on 2026-10-04, at X1-KR90-E18A at 12:46Z while exploring and at X1-FJ91-A2 at 13:07Z on the new agent's scout. The shipyard cache stores the same way now: two ships storing a shipyard never fetched at the same moment could collide there too.
 
