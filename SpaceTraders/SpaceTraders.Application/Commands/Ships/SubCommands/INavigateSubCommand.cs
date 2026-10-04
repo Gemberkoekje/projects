@@ -90,40 +90,64 @@ public sealed class NavigateSubCommand(
         ShipModel? ship,
         CancellationToken cancellationToken)
     {
-        try
+        // A flight the fuel aboard can't pay for isn't asked of the API, which would refuse it with a 400 (B62). Now that the
+        // flights plan their refuelling stops (B47), the fallback below is a last resort, so it warns.
+        var needed = await FuelNeededAsync(ship, destinationWaypoint, cancellationToken);
+        if (ship is not null && needed > ship.FuelCurrent)
         {
-            var direct = await port.NavigateShipAsync(shipSymbol, destinationWaypoint, cancellationToken);
-            return (direct, destinationWaypoint);
-        }
-        catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
-        {
-            logger.LogInformation(
-                ex,
-                "NavigateSubCommand: insufficient fuel for direct navigation of ship {ShipSymbol} to {Destination}; attempting fallback routing.",
+            logger.LogWarning(
+                "NavigateSubCommand: ship {ShipSymbol} has {Fuel} fuel, short of the {FuelNeeded} a flight to {Destination} in {FlightMode} takes; attempting fallback routing without asking the API.",
                 shipSymbol,
-                destinationWaypoint);
+                ship.FuelCurrent,
+                needed,
+                destinationWaypoint,
+                ship.FlightMode);
+        }
+        else
+        {
+            try
+            {
+                var direct = await port.NavigateShipAsync(shipSymbol, destinationWaypoint, cancellationToken);
+                return (direct, destinationWaypoint);
+            }
+            catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
+            {
+                logger.LogWarning(
+                    ex,
+                    "NavigateSubCommand: insufficient fuel for direct navigation of ship {ShipSymbol} to {Destination}; attempting fallback routing.",
+                    shipSymbol,
+                    destinationWaypoint);
+            }
         }
 
         ship = await TrySwitchToDriftForFuelEfficiencyAsync(shipSymbol, ship, cancellationToken);
 
-        try
+        if (ship is null || await FuelNeededAsync(ship, destinationWaypoint, cancellationToken) <= ship.FuelCurrent)
         {
-            var directAfterDrift = await port.NavigateShipAsync(shipSymbol, destinationWaypoint, cancellationToken);
-            return (directAfterDrift, destinationWaypoint);
-        }
-        catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
-        {
-            logger.LogInformation(
-                ex,
-                "NavigateSubCommand: ship {ShipSymbol} still lacks fuel for {Destination} after DRIFT fallback; trying intermediate markets.",
-                shipSymbol,
-                destinationWaypoint);
+            try
+            {
+                var directAfterDrift = await port.NavigateShipAsync(shipSymbol, destinationWaypoint, cancellationToken);
+                return (directAfterDrift, destinationWaypoint);
+            }
+            catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
+            {
+                logger.LogInformation(
+                    ex,
+                    "NavigateSubCommand: ship {ShipSymbol} still lacks fuel for {Destination} after DRIFT fallback; trying intermediate markets.",
+                    shipSymbol,
+                    destinationWaypoint);
+            }
         }
 
         var candidates = await GetIntermediateFuelMarketCandidatesAsync(ship, destinationWaypoint, cancellationToken);
 
         foreach (var market in candidates)
         {
+            if (ship is not null && await FuelNeededAsync(ship, market, cancellationToken) > ship.FuelCurrent)
+            {
+                continue;
+            }
+
             try
             {
                 var reroute = await port.NavigateShipAsync(shipSymbol, market, cancellationToken);
@@ -145,6 +169,22 @@ public sealed class NavigateSubCommand(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The fuel the ship's flight to <paramref name="destination"/> burns in its flight mode (<see cref="FlightFuel"/>), from
+    /// the cached positions: 0 when the ship has no tank (a probe) or a position isn't cached, so nothing holds it back.
+    /// </summary>
+    private async Task<int> FuelNeededAsync(ShipModel? ship, string destination, CancellationToken cancellationToken)
+    {
+        if (ship is null || ship.FuelCapacity == 0 || string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            return 0;
+        }
+
+        var from = await waypoints.FindAsync(ship.WaypointSymbol, cancellationToken);
+        var to = await waypoints.FindAsync(destination, cancellationToken);
+        return from is null || to is null ? 0 : FlightFuel.Needed(ship.FlightMode, (double)Distance(from, to));
     }
 
     private async Task<ShipModel?> TrySwitchToDriftForFuelEfficiencyAsync(

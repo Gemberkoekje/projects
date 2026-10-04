@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
@@ -158,7 +159,7 @@ public sealed class NavigateToWaypointHandler(
 public sealed class NavigateToWaypointArrivedHandler(
     IShipRepository ships,
     IWaypointRepository waypoints,
-    IMarketRepository markets,
+    IMarketRefresher marketRefresher,
     IShipyardRepository shipyards,
     IDockSubCommand dock,
     Ports.ISpaceTradersPort port,
@@ -182,14 +183,19 @@ public sealed class NavigateToWaypointArrivedHandler(
         {
             try
             {
-                var market = await port.GetMarketAsync(systemSymbol, command.DestinationWaypoint, cancellationToken);
-                await markets.UpsertAsync(market, cancellationToken);
-                await bus.PublishAsync(new MarketDataRefreshedEvent(
-                    new WaypointSymbol(command.DestinationWaypoint),
-                    market.TradeGoodsJson));
-                logger.LogDebug(
-                    "NavigateToWaypointArrivedHandler: market data updated for {WaypointSymbol}.",
-                    command.DestinationWaypoint);
+                // As the market watch does: an answer without prices isn't stored, or it would wipe the cached ones (B62).
+                if (await marketRefresher.RefreshAsync(systemSymbol, command.DestinationWaypoint, cancellationToken))
+                {
+                    logger.LogDebug(
+                        "NavigateToWaypointArrivedHandler: market data updated for {WaypointSymbol}.",
+                        command.DestinationWaypoint);
+                }
+                else
+                {
+                    logger.LogDebug(
+                        "NavigateToWaypointArrivedHandler: the market at {WaypointSymbol} came back without prices; kept the cached prices.",
+                        command.DestinationWaypoint);
+                }
             }
             catch (Exception ex)
             {

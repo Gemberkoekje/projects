@@ -96,7 +96,9 @@ public sealed class ProbeDeploymentPlanService(
         var now = TimeProvider.System.GetUtcNow();
         var minutes = await settings.GetAsync<int>(MarketWatchService.RefreshMinutesSetting, cancellationToken);
         var dueAfter = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultDueMinutes);
+        // A market without prices counts as never seen, so a probe goes there first (B62).
         var lastSeen = (await markets.GetAllFreshnessAsync(cancellationToken))
+            .Where(freshness => freshness.HasPrices)
             .GroupBy(freshness => freshness.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Max(freshness => freshness.LastObservedAt), StringComparer.OrdinalIgnoreCase);
         var probes = new List<ProbeShip>();

@@ -230,7 +230,10 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
   the most overdue (`MarketWatchAttempts`, in memory).
 - Each refresh stores the market and publishes `MarketDataRefreshedEvent`, as an arrival does, so the
   price history records it. An answer without prices (no ship there after all) is not stored: it
-  would wipe the cached prices.
+  would wipe the cached prices. The arrival and startup sync keep to that too (B62).
+- A market cached without prices counts as never seen (B62): `GetLastObservedAtAsync` answers none for
+  it, so the watch fetches it as soon as one of our ships is there, and the probe plan sends a probe
+  there first.
 - An arrival and the watch can fetch one market at the same moment: the watch counts a ship as there
   once its arrival time has passed, while the arrival may still be fetching, and a market never
   fetched is due at once. Both store their answer in the market's one row, and the later one wins
@@ -537,7 +540,8 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   2. every other free probe gets a market that is due, its prices older than `Market.RefreshMinutes`
      (5), with no probe at it or on its way. Each pair of free probe and due market is scored by the
      market's age minus twice the flight there in CRUISE (15 s plus the distance times 25 over the
-     engine's speed, 9 for a probe), and the best pair goes first. A market never seen is the oldest.
+     engine's speed, 9 for a probe), and the best pair goes first. A market never seen is the oldest,
+     and so is a market the cache holds without prices (B62).
   With a probe at every market, none is due without one, and the probes stay where they are.
 - **The flight** is a `DeployProbeGoal`: one per flight, ended at the arrival, which fetches the
   market and shipyard there. The plan then chooses again.
@@ -1174,13 +1178,17 @@ step does the work.
     (`GoalFlight`, the scout's included since B47, and the trade executor's). A probe asks for none: its
     executor switches a probe in DRIFT to CRUISE itself. The contract's commands don't send this command;
     they set CRUISE themselves (below).
-  - Then it navigates. Navigate tries DRIFT mode and intermediate markets when fuel is short,
-    then schedules the arrival and publishes `ShipInTransitEvent`. Every CRUISE flight a goal or the
+  - Then it navigates. A flight the fuel aboard can't pay for in the ship's flight mode (`FlightFuel`,
+    from the cached positions: the distance rounded, at least 1, in CRUISE; 1 in DRIFT) isn't asked of the
+    API, which would refuse it with a 400 (B62); it goes to the fallback at once, with a warning, as does a
+    flight the API refuses for its fuel. Navigate tries DRIFT mode and intermediate markets when fuel is
+    short, then schedules the arrival and publishes `ShipInTransitEvent`. Every CRUISE flight a goal or the
     contract plans goes through refuelling stops when it is beyond one tank, so the fallback is left for
     a flight that no chain of fuel markets the bot knows of reaches. It leaves the ship in DRIFT, and the
     ship's next flight asks for CRUISE, which switches it back (B47).
-- **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market (publishing
-  `MarketDataRefreshedEvent`) and the shipyard, docks, and publishes
+- **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market through `MarketRefresher`
+  (publishing `MarketDataRefreshedEvent`; an answer without prices isn't stored, B62) and the shipyard,
+  docks, and publishes
   `ShipNavigationCompletedEvent`.
 - **Orbit, Navigate, Dock, Refuel and FlightMode** are DI sub-commands, not bus messages. Refuel publishes
   `ShipRefueledEvent`.

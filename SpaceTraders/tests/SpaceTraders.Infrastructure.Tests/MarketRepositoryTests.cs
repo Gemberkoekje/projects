@@ -36,6 +36,25 @@ public sealed class MarketRepositoryTests : IntegrationTestBase
         market.TradeGoods.Should().ContainSingle().Which.PurchasePrice.Should().Be(71, "the watch's refresh went to the database last");
     }
 
+    /// <summary>
+    /// B62: a market cached without prices (a start's first fetch of a market, or one stored before B62) counts as never
+    /// seen, so the market watch fetches it as soon as one of our ships is there, and a probe goes there first.
+    /// </summary>
+    [SkippableFact]
+    public async Task AMarketCachedWithoutPrices_CountsAsNeverSeen_UntilItsPricesAreStored()
+    {
+        var markets = new MarketRepository(Db);
+        await markets.UpsertAsync(new MarketDataModel(Waypoint, SystemSymbol, null, Symbols("ICE_WATER"), Symbols("FABRICS"), Symbols("FUEL")));
+
+        (await markets.GetLastObservedAtAsync(Waypoint)).Should().BeNull();
+        (await markets.GetAllFreshnessAsync()).Should().ContainSingle().Which.HasPrices.Should().BeFalse();
+
+        await markets.UpsertAsync(new MarketDataModel(Waypoint, SystemSymbol, Goods(72), Symbols("ICE_WATER"), Symbols("FABRICS"), Symbols("FUEL")));
+
+        (await markets.GetLastObservedAtAsync(Waypoint)).Should().NotBeNull();
+        (await markets.GetAllFreshnessAsync()).Should().ContainSingle().Which.HasPrices.Should().BeTrue();
+    }
+
     [SkippableFact]
     public async Task UpsertAsync_StoresTheMarketAsFetched_AndTheNextRefreshReplacesIt()
     {

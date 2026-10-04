@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B62)
+- A market answered without prices no longer wipes the cached ones: the arrival stores a market through `MarketRefresher`, which leaves such an answer out, and startup sync keeps the cached prices. On 2026-10-04 an arrival fired at the pod's start stored X1-FJ91-C46 without prices; its fuel price gone, SPECTER-6 found no fuel stop it could reach and drifted 43 minutes after the API refused its flight with a 400.
+- A market the cache holds without prices counts as never seen: the market watch fetches it as soon as a ship is there, and the probe plan sends a probe there first (`MarketFreshnessRecord.HasPrices`).
+- A flight the fuel aboard can't pay for in the ship's flight mode isn't asked of the API (`FlightFuel`, from the cached positions); it goes straight to the fallback. The fallback logs a warning, for that and for the API's own refusal, so a run of them raises `RepeatingError`.
+
+### Docs – Changed (2026-10-04, B62)
+- `PLAN.md`: B62. `docs/HOW_IT_WORKS.md`: the arrival's market refresh, a market without prices, and the fuel check before a flight.
+
 ### Code – Added (2026-10-04, slice 2.13)
 - Every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04` (D70), as asked on 2026-10-04: "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" The bot registers the same symbol after every reset, so the reset date is what differs. `ResetDateLabel` reads it from the agent id; `PrometheusAutomationMetrics` defines every metric with the label and puts the value in front at every write (`RunGauge`, `ZeroFirstCounter`); `ResetDateEnricher` adds it to every log line once the agent is known. The next-reset gauge is set once the agent is known.
 

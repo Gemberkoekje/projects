@@ -341,8 +341,9 @@ public sealed class StartupSyncService(
                 {
                     dbContext.Markets.Add(marketValues);
                 }
-                else
+                else if (market.TradeGoods is not null)
                 {
+                    // An answer without prices would wipe the cached ones, so it is left out, as the market watch does (B62).
                     dbContext.Entry(cachedMarket).CurrentValues.SetValues(marketValues);
                 }
             }
