@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Configurations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
 using Testcontainers.PostgreSql;
@@ -65,21 +66,25 @@ public abstract class IntegrationTestBase : IAsyncLifetime, IAsyncDisposable
         _started = false;
     }
 
-    /// <summary>Creates a new <see cref="SpaceTradersDbContext"/> pointing at the same container.</summary>
-    protected SpaceTradersDbContext CreateFreshContext()
+    /// <summary>
+    /// Creates a new <see cref="SpaceTradersDbContext"/> pointing at the same container, with
+    /// <paramref name="interceptors"/> to step into its commands.
+    /// </summary>
+    protected SpaceTradersDbContext CreateFreshContext(params IInterceptor[] interceptors)
     {
         if (!_started)
         {
             throw new InvalidOperationException("The integration test database has not been started.");
         }
 
-        return BuildContext(_pg.GetConnectionString());
+        return BuildContext(_pg.GetConnectionString(), interceptors);
     }
 
-    private static SpaceTradersDbContext BuildContext(string connectionString)
+    private static SpaceTradersDbContext BuildContext(string connectionString, params IInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<SpaceTradersDbContext>()
             .UseNpgsql(connectionString)
+            .AddInterceptors(interceptors)
             .Options;
 
         var scope = new AgentDataScope();

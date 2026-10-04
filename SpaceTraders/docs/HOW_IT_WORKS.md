@@ -230,6 +230,10 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
 - Each refresh stores the market and publishes `MarketDataRefreshedEvent`, as an arrival does, so the
   price history records it. An answer without prices (no ship there after all) is not stored: it
   would wipe the cached prices.
+- An arrival and the watch can fetch one market at the same moment: the watch counts a ship as there
+  once its arrival time has passed, while the arrival may still be fetching, and a market never
+  fetched is due at once. Both store their answer in the market's one row, and the later one wins
+  (B61).
 - A market that fails is logged at Warning and tried again an interval later. Otherwise the watch
   logs at Debug.
 - A probe parked at a market keeps it current. The probe plan (slice 6.3) parks one at every market
@@ -1346,7 +1350,7 @@ other app (D8):
 | `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels, contract payments | bounded: one row |
 | `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship. Created with `fillfactor=50` and `autovacuum_vacuum_threshold=10`, so its frequent updates stay in place and VACUUM runs (B32) |
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
-| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
+| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals, the explore plan; markets also the market watch and the refresh after a trade (D25), shipyards also purchases | bounded: one row per market or shipyard. The repositories store a row in one statement (`INSERT … ON CONFLICT … DO UPDATE`), so two writers at once update one row (B61) |
 | `cached_waypoints`, `cached_systems` | Systems where ships are, with each waypoint's traits and modifiers (B34, fixed) | Sync (inserts, and fills in missing traits); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
 | `agent_settings` | Settings, each with whether it follows its default (`FollowsDefault`, D69) | Seed, `PUT /settings`, the control endpoints, the size guard, the reset monitor | bounded: one row per setting |
 | `next_run_settings` | The values chosen for the next runs; no agent (D69) | `PUT /settings`, `PUT` and `DELETE /settings/next-run/{key}`, the control endpoints; `POST /settings/reset` empties it | bounded: at most one row per seeded setting |

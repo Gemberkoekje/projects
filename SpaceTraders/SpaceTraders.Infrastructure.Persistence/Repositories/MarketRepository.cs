@@ -24,7 +24,6 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
 
     public async Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Markets.FindAsync([db.AgentId, market.WaypointSymbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedMarket
@@ -39,6 +38,28 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
             LastObservedAt = now
         };
 
+        if (db.Database.IsRelational())
+        {
+            // One statement (B61): an arrival and the market watch can store a market nobody fetched before at the
+            // same moment, each in its own scope. Each looked for the row first, found none and inserted it, and the
+            // second insert failed. Now the later one updates the row the first one inserted.
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO cached_markets ("AgentId", "WaypointSymbol", "SystemSymbol", "TradeGoodsJson", "ImportsJson", "ExportsJson", "ExchangeJson", "LastObservedAt")
+                VALUES ({values.AgentId}, {values.WaypointSymbol}, {values.SystemSymbol}, {values.TradeGoodsJson}, {values.ImportsJson}, {values.ExportsJson}, {values.ExchangeJson}, {values.LastObservedAt})
+                ON CONFLICT ("AgentId", "WaypointSymbol")
+                DO UPDATE
+                SET "SystemSymbol" = EXCLUDED."SystemSymbol",
+                    "TradeGoodsJson" = EXCLUDED."TradeGoodsJson",
+                    "ImportsJson" = EXCLUDED."ImportsJson",
+                    "ExportsJson" = EXCLUDED."ExportsJson",
+                    "ExchangeJson" = EXCLUDED."ExchangeJson",
+                    "LastObservedAt" = EXCLUDED."LastObservedAt";
+                """, cancellationToken);
+            return;
+        }
+
+        // The in-memory database of unit tests runs no SQL.
+        var existing = await db.Markets.FindAsync([db.AgentId, market.WaypointSymbol], cancellationToken);
         if (existing is null)
         {
             db.Markets.Add(values);

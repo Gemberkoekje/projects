@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
@@ -8,6 +9,9 @@ namespace SpaceTraders.Infrastructure.Tests;
 [Trait("Category", "Integration")]
 public sealed class ShipyardRepositoryTests : IntegrationTestBase
 {
+    private const string Yard = "X1-KR90-YARD";
+    private const string SystemSymbol = "X1-KR90";
+
     [SkippableFact]
     public async Task FindShipyardForTypeAsync_OnlyReturnsShipyardForCurrentAgent()
     {
@@ -50,5 +54,64 @@ public sealed class ShipyardRepositoryTests : IntegrationTestBase
         var waypoint = await new ShipyardRepository(fresh).FindShipyardForTypeAsync("SHIP_MINING_DRONE", ["X1-OWN"]);
 
         waypoint.Should().Be("X1-OWN-H53", "X1-KR90's was seen last, but isn't where our ships work");
+    }
+
+    /// <summary>
+    /// B61: a shipyard was stored as a market was, so two writers storing a shipyard nobody had fetched at the same moment
+    /// both inserted it, and the second failed on PK_cached_shipyards (23505). That takes two ships there at once: two
+    /// arrivals, or an arrival where the exploring command ship stores the shipyard. Here one arrival stores the shipyard
+    /// between the other's read and its write.
+    /// </summary>
+    [SkippableFact]
+    public async Task UpsertAsync_AShipyardAnotherArrivalStoredMeanwhile_IsUpdated()
+    {
+        await using var firstArrival = CreateFreshContext();
+        var firstArrivalStoresFirst = new BeforeInsertInterceptor(
+            "cached_shipyards",
+            async () => await new ShipyardRepository(firstArrival).UpsertAsync(Shipyard(dronePrice: 46_885)));
+        await using var secondArrival = CreateFreshContext(firstArrivalStoresFirst);
+
+        await new ShipyardRepository(secondArrival).UpsertAsync(Shipyard(dronePrice: 47_012));
+
+        firstArrivalStoresFirst.HasRun.Should().BeTrue("the first arrival stored the shipyard first");
+        await using var fresh = CreateFreshContext();
+        var shipyard = await new ShipyardRepository(fresh).FindByWaypointAsync(Yard);
+        shipyard.Should().NotBeNull();
+        shipyard.Ships.Should().ContainSingle().Which.PurchasePrice.Should().Be(47_012, "the second arrival's fetch went to the database last");
+    }
+
+    [SkippableFact]
+    public async Task UpsertAsync_StoresTheShipyardAsFetched_AndTheNextFetchReplacesIt()
+    {
+        var shipyards = new ShipyardRepository(Db);
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]""", Ships(46_885)));
+        var first = await StoredAsync();
+
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_PROBE"}]"""));
+        var second = await StoredAsync();
+
+        first.Should().BeEquivalentTo(new
+        {
+            SystemSymbol,
+            ShipTypesJson = """[{"type":"SHIP_MINING_DRONE"}]""",
+            ShipsDetailJson = Ships(46_885),
+        });
+        second.Should().BeEquivalentTo(new
+        {
+            SystemSymbol,
+            ShipTypesJson = """[{"type":"SHIP_PROBE"}]""",
+            ShipsDetailJson = (string?)null,
+        });
+        second.LastObservedAt.Should().BeAfter(first.LastObservedAt);
+    }
+
+    private static ShipyardDataModel Shipyard(long dronePrice) => new(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]""", Ships(dronePrice));
+
+    private static string Ships(long dronePrice) => $$"""[{"type":"SHIP_MINING_DRONE","purchasePrice":{{dronePrice}},"supply":"MODERATE"}]""";
+
+    private async Task<CachedShipyard> StoredAsync()
+    {
+        await using var fresh = CreateFreshContext();
+        return await fresh.Shipyards.AsNoTracking().SingleAsync(s => s.WaypointSymbol == Yard);
     }
 }

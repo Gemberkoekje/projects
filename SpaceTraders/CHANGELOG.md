@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B61)
+- When an arrival and the market watch store a market at the same moment, the later one updates the row the first one inserted: the market cache stores a row in one statement (`INSERT … ON CONFLICT … DO UPDATE`). Each looked for the row first, so for a market nobody had fetched before both inserted it, and the second insert failed on `PK_cached_markets` (23505): EF Core logged Errors, the watch a Warning, and the prices the watch fetched were lost. It happened twice on 2026-10-04, at X1-KR90-E18A at 12:46Z while exploring and at X1-FJ91-A2 at 13:07Z on the new agent's scout. The shipyard cache stores the same way now: two ships storing a shipyard never fetched at the same moment could collide there too.
+
+### Docs – Changed (2026-10-04, B61)
+- `PLAN.md`: B61. `docs/HOW_IT_WORKS.md`: an arrival and the market watch can fetch one market at the same moment; who writes the market and shipyard caches, and how.
+
 ### Code – Fixed (2026-10-04, B38)
 - Startup recovery treats only a ship marked in transit as one. Startup sync stores the last route's arrival on every ship, and recovery took any ship whose arrival time had passed for one that had just arrived: it published a `ShipInTransitEvent`, which writes an "in transit" activity row, and logged that the ship "arrived at" its waypoint. On 2026-10-04 that happened to the new agent's two ships at 13:06:52Z, seconds after the reset registered them, and to all three ships at the restart of 18:09:17Z, though SPECTER-1 had been docked at H60 since 16:12Z. A docked or orbiting ship now gets its goal step and no event, as one without an arrival time did. The rows already written are pruned after 30 days.
 
