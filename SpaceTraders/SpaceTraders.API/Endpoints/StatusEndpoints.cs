@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
 using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.Persistence.Entities;
 using Wolverine;
 
 namespace SpaceTraders.API.Endpoints;
@@ -123,6 +125,8 @@ public static class StatusEndpoints
                     s.Id,
                     s.CapturedAt,
                     s.IsInitialSnapshot,
+                    s.Reason,
+                    s.Discovered,
                 })
                 .ToListAsync(ct);
 
@@ -139,6 +143,7 @@ public static class StatusEndpoints
                     s.SnapshotJson,
                     s.CapturedAt,
                     s.IsInitialSnapshot,
+                    s.Reason,
                 })
                 .SingleOrDefaultAsync(ct);
 
@@ -147,9 +152,10 @@ public static class StatusEndpoints
                 return Results.NotFound();
             }
 
-            var capturedAt = snapshot.CapturedAt.UtcDateTime.ToString("yyyyMMdd-HHmmss");
+            var capturedAt = snapshot.CapturedAt.UtcDateTime.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
             var initialSuffix = snapshot.IsInitialSnapshot ? "-initial" : string.Empty;
-            var fileName = $"startup-snapshot-{id}-{capturedAt}{initialSuffix}.json";
+            var kind = snapshot.Reason == StartupSnapshot.DiscoveryReason ? "discovery" : "startup";
+            var fileName = $"{kind}-snapshot-{id}-{capturedAt}{initialSuffix}.json";
 
             return Results.File(Encoding.UTF8.GetBytes(snapshot.SnapshotJson), "application/json", fileName);
         });

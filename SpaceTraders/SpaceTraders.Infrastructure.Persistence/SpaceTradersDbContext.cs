@@ -298,6 +298,7 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.Id).UseIdentityColumn();
             entity.Property(x => x.AgentId).HasMaxLength(AgentIdentity.MaxLength).IsRequired();
             entity.Property(x => x.SnapshotJson).IsRequired();
+            entity.Property(x => x.Reason).HasMaxLength(20).IsRequired();
             entity.HasIndex(x => new { x.AgentId, x.CapturedAt });
         });
 

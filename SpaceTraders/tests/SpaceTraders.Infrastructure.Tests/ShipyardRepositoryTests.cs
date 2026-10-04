@@ -87,7 +87,7 @@ public sealed class ShipyardRepositoryTests : IntegrationTestBase
         await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]""", Ships(46_885)));
         var first = await StoredAsync();
 
-        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_PROBE"}]"""));
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_PROBE"}]""", Ships(47_012)));
         var second = await StoredAsync();
 
         first.Should().BeEquivalentTo(new
@@ -100,9 +100,44 @@ public sealed class ShipyardRepositoryTests : IntegrationTestBase
         {
             SystemSymbol,
             ShipTypesJson = """[{"type":"SHIP_PROBE"}]""",
-            ShipsDetailJson = (string?)null,
+            ShipsDetailJson = Ships(47_012),
         });
         second.LastObservedAt.Should().BeAfter(first.LastObservedAt);
+    }
+
+    /// <summary>
+    /// B64: the API lists a shipyard's ships, with their prices, only while one of our ships is there; another answer has
+    /// only the ship types. The shipyard was stored as it came, so such an answer wiped the listings the cache had, and with
+    /// them the prices a purchase reads (B28), as an answer without prices did to a market's (B62).
+    /// </summary>
+    [SkippableFact]
+    public async Task UpsertAsync_AnAnswerWithoutListings_KeepsTheCachedOnes()
+    {
+        var shipyards = new ShipyardRepository(Db);
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]""", Ships(46_885)));
+        var listed = await StoredAsync();
+
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]"""));
+
+        var stored = await StoredAsync();
+        stored.ShipsDetailJson.Should().Be(Ships(46_885), "an answer without listings says nothing about them");
+        stored.LastObservedAt.Should().Be(listed.LastObservedAt, "the listings weren't seen again");
+    }
+
+    [SkippableFact]
+    public async Task UpsertAsync_AnAnswerWithoutListings_IsStoredWhenTheCacheHasNone()
+    {
+        // A shipyard no ship of ours has been at: its ship types are all there is to keep, and the time they were seen.
+        var shipyards = new ShipyardRepository(Db);
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]"""));
+        var first = await StoredAsync();
+
+        await shipyards.UpsertAsync(new ShipyardDataModel(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"},{"type":"SHIP_PROBE"}]"""));
+
+        var stored = await StoredAsync();
+        stored.ShipTypesJson.Should().Be("""[{"type":"SHIP_MINING_DRONE"},{"type":"SHIP_PROBE"}]""");
+        stored.ShipsDetailJson.Should().BeNull();
+        stored.LastObservedAt.Should().BeAfter(first.LastObservedAt);
     }
 
     private static ShipyardDataModel Shipyard(long dronePrice) => new(Yard, SystemSymbol, """[{"type":"SHIP_MINING_DRONE"}]""", Ships(dronePrice));

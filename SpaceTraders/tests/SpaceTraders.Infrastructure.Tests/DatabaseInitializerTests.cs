@@ -139,6 +139,32 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task InitializeAsync_AddsWhySnapshotsWereTaken_ToATableFromBeforeIt_AsTheModelWouldCreateIt()
+    {
+        // Slice 2.15: the cluster's startup_snapshots was created without "Reason" and "Discovered", and a table that exists
+        // is never created again. Every snapshot it holds was a startup's.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        var asTheModelCreatesThem = await ColumnsAsync("startup_snapshots");
+        await ExecuteAsync("""ALTER TABLE startup_snapshots DROP COLUMN "Reason", DROP COLUMN "Discovered";""");
+        await ExecuteAsync("""
+            INSERT INTO startup_snapshots ("AgentId", "SnapshotJson", "CapturedAt", "IsInitialSnapshot")
+            VALUES ('INITIALIZER-TEST@2026-09-27', '{}', now(), true);
+            """);
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        (await ColumnsAsync("startup_snapshots")).Should().Equal(asTheModelCreatesThem);
+        var before = await db.StartupSnapshots.AsNoTracking().SingleAsync();
+        before.Reason.Should().Be(StartupSnapshot.StartupReason);
+        before.Discovered.Should().BeNull();
+    }
+
+    [SkippableFact]
     public async Task InitializeAsync_D69_KeepsWhatWasSetBeforeIt_AndSwitchesOnThePlansThatWereOff()
     {
         // The agent the reset of 2026-10-04 13:00Z registered has most plans off (D9's defaults). Before the deploy you

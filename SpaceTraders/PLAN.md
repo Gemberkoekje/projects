@@ -139,6 +139,9 @@
 - Slices 6.12 (mining drones keep the ores they can sell within one tank, D71) and 2.14 (the bot's own ship names beside
   the game's symbols, D72), both asked on 2026-10-04, are built on branch `claude/dreamy-albattani-zo7njw` in projects and
   gembernodes.
+- Slice 2.15 (snapshots of every cached shipyard and market, taken at every discovery too, and in Grafana, asked on
+  2026-10-04, with your decision D73) is built on branch `ccr-a2ff9235-gidedj` in projects and gembernodes. It found and
+  fixed B64.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -217,6 +220,7 @@ the misbehaviour.
 | B61 | **A market seen for the first time can be stored twice at once** (found on 2026-10-04, on the cluster). An arrival at a market fetches it and stores it, and so does the market watch, each in a scope of its own. The watch counts a ship as there as soon as its arrival time has passed, while the arrival is still fetching, and a market never fetched is due at once. Each looked for the market's row first: for a market the bot had never fetched, both found none and both inserted one, and the second insert failed on `PK_cached_markets` (23505). That logged EF Core's Errors, which Grafana's error-log alert counts, and the watch's Warning; the watch's call was wasted and its prices dropped. It happened twice to SPECTER-1: at 12:46:05Z at X1-KR90-E18A, the last market of the system it had just jumped into (6.11), and at 13:07:23Z at X1-FJ91-A2, one of the first markets of the new agent's scout plan after the server reset. The first agent's scout ran before the market watch existed (6.5). Shipyards were stored the same way; two ships storing a shipyard never fetched at the same moment would have collided too. | `MarketRepository.cs`, `ShipyardRepository.cs` (`UpsertAsync`); `MarketWatchService.cs`, `NavigateToWaypointCommand.cs` (the arrival); Loki, the lines naming `PK_cached_markets` or `PK_cached_shipyards` over 30 days: 12:46:05Z and 13:07:23Z only | 6.11 follow-up (fixed: the market and shipyard caches store a row in one statement, `INSERT … ON CONFLICT … DO UPDATE`, so the later of two writers updates the row the first one inserted) |
 | B62 | **A market answered without prices loses the prices the cache has** (found on 2026-10-04, on the cluster, the first minutes after the deploy of `150700a`). When the pod started at 19:28Z, the scheduler fired SPECTER-5's arrival at X1-FJ91-C46, due since 19:27:37Z, while no pod ran. The market came back without prices, and the arrival stored it as it came: C46, the station at the gas giant C45, lost its fuel price (the dashboard showed 28 markets, 27 with prices). At 19:29:59Z SPECTER-6, at C45 with 37 of 80 fuel, found no fuel stop it could reach (C47 is 43 away; its siphon trips refuelled at C46 first), flew straight at G59, 93 away, and the API refused the flight with a 400, which the fallback took for its cue: a 43-minute drift. The 400 showed only as a status, as the fallback logged it at Information. `MarketRefresher` already said why not to store such an answer: "it would wipe the prices the cache has"; the arrival and startup sync stored it anyway. And a market without prices looked fresh to the probes and the watch, its last fetch being recent. | `NavigateToWaypointCommand.cs` (`NavigateToWaypointArrivedHandler`), `StartupSyncService.cs`, `MarketRepository.cs`, `INavigateSubCommand.cs`; `ProbeDeploymentPlanService.cs` | 6.5 follow-up (fixed: the arrival stores a market through `MarketRefresher` and startup sync keeps the cached prices, so an answer without prices never wipes them; a market without prices counts as never seen, for the watch and the probes; a flight the fuel aboard can't pay for isn't asked of the API, and the fallback warns) |
 | B63 | **A drone whose trip ends mid-tick trades instead of gathering** (found on 2026-10-04, on the cluster, asked about SPECTER-3). SPECTER-3, a mining drone with the mining role (`coverage`), sold its ore at H60 at 19:50:06.749Z in its arrival's goal step, which runs outside the tick, and tick 202's trading plan gave it a POLYNUCLEOTIDES route 0.3 s later; the same at 19:10:41Z (tick 576), 2 of its last 8 trip ends. The trading plan takes a ship with the mining, siphon or construction role that is free when it runs as one its own plan, earlier in the tick, had no work for; but that plan had run while the trip was still on, and at the next tick it would have given a trip, as it did after the drone's other trips (D58: drones gather first). | `TradingAutomationService.cs` (its free traders), `FleetRoleBoard.IsTrader`; `MiningAutomationService.cs`, `SiphonAutomationService.cs`, `ConstructionPlanService.cs` | 6.9 follow-up (fixed: the mining, siphon and construction plans record the free ships they had no work for at each pass, `PassedOverShips`, and the trading plan gives a ship of theirs a route only when its plan, switched on, passed it over) |
+| B64 | **A shipyard answered without its ships for sale loses the listings the cache has** (found on 2026-10-04 by reading the code, asked whether a snapshot holds a shipyard where no ship is). The API lists a shipyard's ships for sale, with their price, frame, modules and mounts, only while one of our ships is there; another answer has only the ship types. Startup sync, an arrival and the exploring command ship stored a shipyard as it came, so such an answer wiped the cached listings, and with them the price a purchase reads (B28: "every purchase at that shipyard failed until a ship arrived there again"), as an answer without prices did to a market's (B62). A purchase already left such an answer out (`ShipPurchaseService.QuoteAsync`), and `ShipyardRepositoryTests` asserted the wipe as part of B61's "the next fetch replaces it". Whether it happened on the cluster is not known: the cache keeps no history. | `ShipyardRepository.cs` (`UpsertAsync`), `StartupSyncService.cs` | 2.15 (fixed: an answer without the ships for sale leaves a row that has them as it is, in the repository's one statement and in startup sync; B61's test now replaces listings with listings) |
 
 ### Decisions (2026-10-01)
 
@@ -297,6 +301,7 @@ get the next D-number.
 | D70 | Slice 2.13 (asked on 2026-10-04, after the server reset): "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" To the reset date, which I proposed because the bot registers the same symbol after every reset: "reset date is a fine key", and "The grafana key per reset should be added for all 3 grafana dashboards." | **Grafana data per server reset:** every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04`. The SpaceTraders, markets and systems dashboards each have a "Reset" picker, the newest reset first, several to compare runs; every query filters on it. The alert rules stay as they are. |
 | D71 | Slice 6.12 (asked on 2026-10-04): "I'd like to have the configuration for mining drones only to throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically mining for. They still should use the survey with the highest chance of getting the minerals they want, just added with some extra trips to sell other ores as well." A mining trip jettisoned every ore but its own (6.4); a siphon trip keeps every gas a market it can carry it to buys, refuelling stops included (D33). Asked how to measure a tank, and whether the contract's miners keep other ores too. | **Keep what sells within one tank, on the mining plan's trips:** "Full tank, no refuel stop": a mining trip keeps every other ore a market buys within one full tank's CRUISE flight of the asteroid, without a refuelling stop (for a drone's 80-unit tank, the markets within about 80), and jettisons the rest. It still extracts with the survey best for its own ore and sells its own ore at its market; the mining plan sells the others after it, one good a trip, where each fetches most after fuel, and a full hold sells even where that doesn't pay for the fuel. "Mining plan only": the contract's round trips keep only the contract's ore. |
 | D72 | Slice 2.14 (asked on 2026-10-04): "SHIPS are now named by the game in ascending order. Can we make custom names within the API which should be type-number, so COMMAND-1, SATTELITE-1, EXCAVATOR-1. Bonus points if there's a list of relevant names for each of the types, one of which is picked per reset to call that type, e.g. all sattelites being called SPUTNIK-1, SPUTNIK-2 etc. There should be a list of potential names for each ShipType SHIPYARD enum value. This does mean that while SIPHON DRONE and MINING DRONE are both EXCAVATORs, they should get different names." The API can't rename a ship. Asked where the name should show. | **Beside the symbol:** "Grafana's Fleet and Roles tables and the WebUI fleet page get a Name column; every journal line about a ship carries its name as an extra field. SPECTER-n stays as the key everywhere." Each type a shipyard sells has a list of names; each reset picks one per type, by its reset date, and the type's ships are numbered after it in the order they joined the fleet (MARINER-1, MARINER-2); a mining drone and a siphon drone are told apart by their mounts; a type with no list is named after its registration role (PATROL-1). |
+| D73 | Slice 2.15 (asked on 2026-10-04): "Can you expand the JSON export to include shipyard information, and can you make these jsons available through Grafana? If we do that, is everything from the webUI covered in Grafana?", then "I'd like the snapshots to be made whenever a new discovery is made. So a shipyard with a new ship type or a market with a new good type, in addition to the times they are currently made." The JSON export is the startup snapshot, which held a shipyard only where a ship stood. Asked how Grafana should get the snapshots (it reads only Prometheus and Loki, which can't hold a JSON document), what counts as a discovery, and which snapshots to keep, you chose the Infinity data source reading the bot's internal API with its API key, a ship type or good new to the run, and retention as it is. | **Snapshots of everything cached, at every discovery, in Grafana:** a snapshot holds every market and shipyard the bot has cached, as last seen, also where no ship is. Besides the one at every start, one is taken whenever the cached shipyards or markets list a ship type or good no snapshot of the run held yet (new to the run, not to a place), and says what was new and where. The agent's first snapshot and the 10 newest are kept, whatever the reason. Grafana's Infinity data source reads the bot's internal API with its key, copied from 1Password into the monitoring namespace, for a snapshots dashboard: the list, a download of each as JSON, and what the picked one holds. The key also lets Grafana's users call the API's write endpoints, as it lets anyone who opens the bot's own dashboard (B22). |
 
 ## Phases
 
@@ -1162,6 +1167,90 @@ day, D72)
 - To understand this, start with `SpaceTraders.Application/Naming/ShipNames.cs`, then `ShipNameBook.cs` and
   `SpaceTraders.API/Services/ShipNameEnricher.cs`; in gembernodes, the Fleet table's query H in
   `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
+
+**2.15 Snapshots of every shipyard and market, at every discovery, and in Grafana** (built 2026-10-04 on branch
+`ccr-a2ff9235-gidedj`, in projects and gembernodes; asked that day, D73)
+- Asked: "Can you expand the JSON export to include shipyard information, and can you make these jsons available through
+  Grafana? If we do that, is everything from the webUI covered in Grafana?" Then: "I'd like the snapshots to be made
+  whenever a new discovery is made. So a shipyard with a new ship type or a market with a new good type, in addition to
+  the times they are currently made." And: "If the snapshot is taken and data is in memory but there's no ship at the
+  shipyard right now, will the data from memory be in the snapshot or none at all?" None at all: the snapshot held the
+  market and shipyard only where a ship stood, though the cache had the others.
+- Done:
+  - **Every market and shipyard the cache holds** is in the snapshot now, as last seen, each with when
+    (`LastObservedAt`): the systems the ships are in first, then every other system the cache holds a market or
+    shipyard in, each with its cached waypoints. A shipyard lists its ship types, and the ships for sale (price,
+    supply, frame, reactor, engine, modules, mounts, crew) once one of our ships has been there; a market its imports,
+    exports and exchange, and its prices once a ship has been there. The snapshot is built by `GameStateSnapshots`, moved
+    out of `StartupSnapshotService`; it still calls no API (B35).
+  - **A snapshot at every discovery** (`DiscoverySnapshotService`, every minute, started right after the startup
+    snapshot): when the cached shipyards list a ship type, or the cached markets a good (imports, exports, exchange or
+    prices), that no snapshot of the run held yet, it takes one. New to the run, not to a place (D73): a second shipyard
+    selling a known type discovers nothing. It reads the cache rather than following its writers (arrivals, the market
+    watch, the exploring command ship, startup sync, purchases), so every writer counts, and what was stored within the
+    same minute shares one snapshot. One process serves one agent, so what the snapshots held is kept in memory, from the
+    startup snapshot on; when that failed, from what the cache lists at the first look, which takes no snapshot.
+  - **Why a snapshot was taken:** `Reason` (`Startup` or `Discovery`) at the top of its JSON and in a new column, and for
+    a discovery `Discoveries` (each ship type and good with the shipyards or markets that list it) and a `Discovered`
+    column with the same in a line: `Ship types: SHIP_LIGHT_HAULER (X1-FJ91-A2). Goods: FAB_MATS (X1-FJ91-H59).` The
+    cluster's table gets the columns at the first start (`AddedSchema`); its rows were all startups'. A discovery is a
+    `Discovered` journal line too, with the snapshot's id, so Loki keeps them after the snapshots are pruned.
+  - **Retention as it is** (D73): the agent's first snapshot and the 10 newest, whatever the reason, pruned at every
+    start and daily. With new types bounded (about 20 ship types and 150 goods), so are a run's discovery snapshots; most
+    come in its first hours.
+  - **The internal API:** `/status/startup-snapshots` lists `reason` and `discovered` with each snapshot; the download is
+    named `startup-snapshot-…` or `discovery-snapshot-…`. The WebUI's Snapshots page shows why each was taken and what a
+    discovery found, and names its downloads the same way.
+  - **B64** (found answering the question above): a shipyard answered without its ships for sale no longer wipes the
+    cached listings.
+  - **Grafana** (gembernodes, same branch): the Infinity data source (3.11.1, pinned: 4.x needs Grafana 11.6.11, the
+    cluster runs 11.6.1), installed by Grafana's own background preinstall, reads the internal API with the API key
+    (the 1Password item `spacetraders-secrets`, copied into the monitoring namespace). A **SpaceTraders snapshots**
+    dashboard (uid `spacetraders-snapshots`) lists the run's snapshots (captured, why, what a discovery found), downloads
+    each as the JSON file the bot saved, through Grafana's data source proxy, so the browser needs no key, and shows the
+    picked one: its summary, what it found, its ships, its shipyards (one row per ship type: price, supply, activity,
+    tank, hold, mounts, modules, when seen) and its markets (one row per good). A Discoveries panel shows the journal's
+    `Discovered` lines. The three other SpaceTraders dashboards link to it.
+- **Is everything from the WebUI covered in Grafana?** No (from reading the code and the dashboards; no live comparison).
+  Grafana covers the live state, mostly with more detail, history and alerts: credits, each ship's state, location,
+  arrival, activity and hold, contracts, market and shipyard prices and their age, settings, the API's request rates and
+  429s; with this slice the snapshots too. Not in Grafana:
+  - per ship: fuel, flight mode, cooldown, mounts, and its assignment's contract, source and destination;
+  - per waypoint: coordinates, its market, shipyard and construction flags, and extractable resources;
+  - the rate limiter's state (remaining, limit, reset, type, the bot's burst budget), whether the pod holds the leader
+    lease, and per-endpoint call counts over the agent's life with when each was last called;
+  - the mining plan's queue of openings;
+  - a ship for sale's name, description and activity; per-good prices in systems the command ship has only explored
+    (left out of Prometheus on purpose, slice 6.11);
+  - the settings' types and the `Runtime.*` flags (the metric has the flags; the Settings table filters them out);
+  - the WebUI's search, filters and per-ship page.
+
+  Most of these could be metrics (a series per ship, endpoint or setting) or a Loki panel (trip history, from
+  `TripEnded`); descriptions and the explored systems' prices could come through the Infinity data source, as the
+  snapshots do. Whether to retire the WebUI is still D5.
+- Noticed (not changed):
+  - The Infinity data source has the API's full key, so a Grafana user can also switch automation off or change a
+    setting, through the data source proxy (which forwards POST, PUT and DELETE) or an Infinity query (which allows POST).
+    Anyone who opens the bot's dashboard can already (B22), and Grafana needs a login; a key that only reads, for Grafana,
+    would close it.
+  - The WebUI shows several things nothing feeds: the Overview's API, Cache and Contract deadline badges and the server
+    reset pill read settings nothing writes; Plans' "Recent goals" reads `ship_goal_history`, which nothing writes;
+    a surveying ship and a probe on a deploy trip show as Idle there (`FleetStatusQueryService` has no case for their
+    goals); the ship page's "Last synced" is the time of the request; the Current Status badges compare against
+    `IN_TRANSIT` and `DOCKED` while the API sends `InTransit` and `Docked`.
+- Tests: `DiscoverySnapshotServiceTests` (a new ship type and a new good each take a snapshot that says what and where,
+  with the journal line; a new place with known types takes none; one snapshot per discovery; discoveries between two
+  looks share one; without a startup snapshot, the first look counts what the cache lists as known; a list that doesn't
+  parse discovers nothing), `StartupSnapshotServiceTests` (a shipyard and a market where no ship is, in another system
+  too, with their listings and when they were seen), `ShipyardRepositoryTests` and `StartupSyncServiceTests` (B64),
+  `DatabaseInitializerTests` (a table from before gets the columns as the model creates them, its rows a startup's) and
+  `SnapshotEndpointsIntegrationTests` (the list's reason and discovered, newest first; the download's name), against
+  PostgreSQL 16; the Snapshots page (WebUI, 113). App 1059, Domain 72, API 209 (and 4 skipped), Infrastructure 87,
+  Integration 1. In gembernodes, `scripts/validate.py`, and the dashboard in Grafana 11.6.1 with Infinity 3.11.1 against
+  a stand-in for the bot's API serving snapshots the bot's code wrote (NOTES.md).
+- To understand this, start with `SpaceTraders.API/Services/GameStateSnapshots.cs`, then `KnownTypes.cs` and
+  `DiscoverySnapshotService.cs`; in gembernodes, `infrastructure/monitoring/dashboards/spacetraders-snapshots-dashboard.json`
+  and the SpaceTraders API data source in `infrastructure/monitoring/grafana-release.yaml`.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2824,4 +2913,5 @@ your PC, 1Password or kubectl:
 | 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (merged: PR #55, which deployed the build) |
 | 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (branch `claude/spacetraders-run-label`, PR #56, not merged). It shows data once the bot runs a build with slice 2.13: deploy that build with it |
 | 2.14 | A "name" column in the SpaceTraders dashboard's Fleet and Roles tables, and the ship's name in brackets in front of a journal line about it, in the journal, the survey journal and the exploring journal (branch `claude/dreamy-albattani-zo7njw`, not merged). It shows data once the bot runs a build with slice 2.14: deploy that build with it |
+| 2.15 | The Infinity data source (Grafana's background preinstall, pinned to 3.11.1), the SpaceTraders API data source with the bot's API key (`spacetraders-secrets.yaml`, the 1Password item copied into the monitoring namespace), a snapshots dashboard, uid `spacetraders-snapshots`, and links to it from the three other SpaceTraders dashboards (branch `ccr-a2ff9235-gidedj`, not merged). The download and the tables need a build with slice 2.15; the list works with any |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |

@@ -49,8 +49,9 @@ export default function SnapshotsPage() {
       const capturedAt = new Date(snapshot.capturedAt)
       const ts = `${capturedAt.getUTCFullYear()}${String(capturedAt.getUTCMonth() + 1).padStart(2, '0')}${String(capturedAt.getUTCDate()).padStart(2, '0')}-${String(capturedAt.getUTCHours()).padStart(2, '0')}${String(capturedAt.getUTCMinutes()).padStart(2, '0')}${String(capturedAt.getUTCSeconds()).padStart(2, '0')}`
       const initialSuffix = snapshot.isInitialSnapshot ? '-initial' : ''
+      const kind = snapshot.reason === 'Discovery' ? 'discovery' : 'startup'
       a.href = url
-      a.download = `startup-snapshot-${snapshot.id}-${ts}${initialSuffix}.json`
+      a.download = `${kind}-snapshot-${snapshot.id}-${ts}${initialSuffix}.json`
       document.body.append(a)
       a.click()
       a.remove()
@@ -65,11 +66,11 @@ export default function SnapshotsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Snapshots</h1>
         <span className="rounded-full bg-muted text-muted-foreground px-3 py-1 text-xs font-medium">
-          Read-only exports from database snapshots
+          Taken at every start, and whenever a new ship type or good is found
         </span>
       </div>
 
-      <section aria-label="Startup snapshots">
+      <section aria-label="Snapshots">
         {snapshotsQ.isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
 
         {snapshots.length === 0 && !snapshotsQ.isLoading && (
@@ -82,7 +83,8 @@ export default function SnapshotsPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-2">Captured</th>
-                  <th className="px-4 py-2">Type</th>
+                  <th className="px-4 py-2">Why</th>
+                  <th className="px-4 py-2">Discovered</th>
                   <th className="px-4 py-2">Download</th>
                 </tr>
               </thead>
@@ -96,8 +98,10 @@ export default function SnapshotsPage() {
                       {formatTs(snapshot.capturedAt)}
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                      {snapshot.isInitialSnapshot ? 'Initial' : 'Regular'}
+                      {snapshot.reason === 'Discovery' ? 'Discovery' : 'Startup'}
+                      {snapshot.isInitialSnapshot ? ' (first)' : ''}
                     </td>
+                    <td className="px-4 py-2 text-xs">{snapshot.discovered ?? '—'}</td>
                     <td className="px-4 py-2">
                       <button
                         type="button"
