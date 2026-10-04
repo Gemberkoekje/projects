@@ -62,7 +62,8 @@ public sealed class DiValidationTests : IClassFixture<DiValidationFactory>
             .And.NotContain(typeof(MiningAutomationService))
             .And.NotContain(typeof(SiphonAutomationService))
             .And.NotContain(typeof(TradingAutomationService))
-            .And.NotContain(typeof(SpareTimePlanService));
+            .And.NotContain(typeof(SpareTimePlanService))
+            .And.NotContain(typeof(ConstructionPlanService));
     }
 
     [Fact]

@@ -6,7 +6,8 @@ namespace SpaceTraders.Application.Automation;
 /// <summary>
 /// The plans the tick runs, in this order. Each has its own on/off setting. The role board (slice 6.9) runs before
 /// the plans whose ships it gives roles; the explore plan (asked on 2026-10-04) before them all but the scout plan, so the
-/// command ship it is waiting for goes exploring as soon as its trip ends.
+/// command ship it is waiting for goes exploring as soon as its trip ends; the construction plan (slice 6.6) before
+/// trading, which takes its ship when it has nothing it may buy.
 /// </summary>
 /// <remarks>Only the names are stored (settings, journal lines, metric labels), so a plan can go anywhere in the order.</remarks>
 public enum AutomationPlan
@@ -19,6 +20,7 @@ public enum AutomationPlan
     Survey,
     Mining,
     Siphon,
+    Construction,
     Trading,
     SpareTime,
 }
@@ -53,6 +55,7 @@ public static class AutomationSwitches
         SiphonAndSellGoal => AutomationPlan.Siphon,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
         GatherAndSellGoal => AutomationPlan.SpareTime,
+        SupplyConstructionGoal => AutomationPlan.Construction,
         _ => null,
     };
 }

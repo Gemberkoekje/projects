@@ -393,14 +393,15 @@ public sealed class PrometheusMetricsServiceTests
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
+        // Slice 6.6 (D65): a ship with a hold and a tank can build the jump gate, unless it is a drone.
         ships.Select(s => (s.Ship, s.Capabilities)).Should().BeEquivalentTo(new[]
         {
-            ("AGENT-1", "Survey, Mine, Siphon, Trade"),
+            ("AGENT-1", "Survey, Mine, Siphon, Trade, Construct"),
             ("AGENT-2", "none"),
             ("AGENT-3", "Mine, Trade"),
             ("AGENT-4", "Siphon, Trade"),
             ("AGENT-5", "Survey"),
-            ("AGENT-6", "Trade"),
+            ("AGENT-6", "Trade, Construct"),
             ("AGENT-7", "Siphon, Trade"),
         });
     }
@@ -511,7 +512,8 @@ public sealed class PrometheusMetricsServiceTests
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
-        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 6, "SHIP_PROBE", "X1-AB-A2", 77_117));
+        // Slice 6.6 (D64) put the jump gate's materials at 6, after the cargo ships: the probes moved to 7.
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 7, "SHIP_PROBE", "X1-AB-A2", 77_117));
     }
 
     /// <summary>
@@ -609,6 +611,75 @@ public sealed class PrometheusMetricsServiceTests
         CargoSymbol = "COPPER_ORE",
         ContractId = "C-1",
     };
+
+    /// <summary>
+    /// Slice 6.6: the fleet view says what a builder does, the jump gate's materials feed the dashboard's progress, and what a
+    /// construction trip on its way to buy holds back is in the credit reserve (D64).
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_SaysWhatABuilderDoes_AndExportsTheJumpGatesProgress()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            var buying = new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = "X1-AB-F49", Units = 80, ReservedCredits = 168_000 };
+            var supplying = new SupplyConstructionGoal { TradeSymbol = "ADVANCED_CIRCUITRY", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = "X1-AB-D42", Units = 40, CargoBought = true };
+            foreach (var (symbol, goal) in new[] { ("AGENT-6", buying), ("AGENT-7", supplying) })
+            {
+                db.Ships.Add(new CachedShip
+                {
+                    AgentId = AgentId,
+                    Symbol = symbol,
+                    ShipType = "SHIP_LIGHT_HAULER",
+                    Status = "DOCKED",
+                    WaypointSymbol = "X1-AB-H51",
+                    GoalId = goal.GoalId,
+                    GoalKind = goal.Kind.ToString(),
+                    GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(goal),
+                    GoalStatus = (int)goal.Status,
+                });
+            }
+
+            db.ConstructionSites.Add(new CachedConstruction
+            {
+                AgentId = AgentId,
+                WaypointSymbol = "X1-AB-I55",
+                SystemSymbol = "X1-AB",
+                MaterialsJson = JsonSerializer.Serialize(new List<ConstructionMaterialModel> { new("FAB_MATS", 1_600, 400), new("ADVANCED_CIRCUITRY", 400, 0) }),
+                LastObservedAt = TimeProvider.System.GetUtcNow(),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        IReadOnlyCollection<ConstructionMetricsSample> materials = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+        _metrics.When(m => m.Construction(Arg.Any<IReadOnlyCollection<ConstructionMetricsSample>>()))
+            .Do(call => materials = call.Arg<IReadOnlyCollection<ConstructionMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
+            new FullHoldSavings(),
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        ships.Select(s => (s.Ship, s.Activity)).Should().BeEquivalentTo(new[]
+        {
+            ("AGENT-6", "buying FAB_MATS at X1-AB-F49 for X1-AB-I55"),
+            ("AGENT-7", "supplying ADVANCED_CIRCUITRY to X1-AB-I55"),
+        });
+        materials.Should().BeEquivalentTo(new[]
+        {
+            new ConstructionMetricsSample("X1-AB-I55", "FAB_MATS", 1_600, 400),
+            new ConstructionMetricsSample("X1-AB-I55", "ADVANCED_CIRCUITRY", 400, 0),
+        });
+        _metrics.Received(1).ReservedCredits(168_000);
+    }
 
     private static ServiceProvider BuildProvider()
     {
@@ -1076,6 +1147,31 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().NotContain("role=\"Survey\"");
         text.Should().NotContain("ship=\"AGENT-3\"");
         text.Should().NotContain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Mine\"}");
+    }
+
+    /// <summary>
+    /// Slice 6.6: what the jump gate requires and what it has, per material, for the dashboard's jump gate progress; a
+    /// material that is gone loses its series.
+    /// </summary>
+    [Fact]
+    public async Task TheJumpGatesMaterials_AreOneSeriesEach_UntilTheyAreGone()
+    {
+        _metrics.Construction(
+        [
+            new ConstructionMetricsSample("X1-DC53-I55", "FAB_MATS", 1_600, 400),
+            new ConstructionMetricsSample("X1-DC53-I55", "ADVANCED_CIRCUITRY", 400, 0),
+        ]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_construction_units_required{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
+        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 400\n");
+        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"ADVANCED_CIRCUITRY\"} 0\n");
+
+        _metrics.Construction([new ConstructionMetricsSample("X1-DC53-I55", "FAB_MATS", 1_600, 1_600)]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
+        text.Should().NotContain("trade_symbol=\"ADVANCED_CIRCUITRY\"");
     }
 
     /// <summary>

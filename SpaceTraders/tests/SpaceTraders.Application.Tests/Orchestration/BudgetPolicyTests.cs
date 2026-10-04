@@ -161,6 +161,24 @@ public sealed class BudgetPolicyTests
     }
 
     [Fact]
+    public async Task WhileAConstructionTripIsOnItsWayToBuy_TheReserveGrowsByWhatItHoldsBack()
+    {
+        // Slice 6.6 (D64): the jump gate's load holds back its cargo from the start, as a trade trip does (D57); once bought,
+        // nothing.
+        Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
+        IReadOnlyDictionary<string, SupplyConstructionGoal> trips = new Dictionary<string, SupplyConstructionGoal>
+        {
+            ["SHIP-6"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-DC53-I55", BuyWaypointSymbol = F49, Units = 80, ReservedCredits = 168_000 },
+            ["SHIP-7"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-DC53-I55", BuyWaypointSymbol = F49, Units = 40, ReservedCredits = 84_000, CargoBought = true },
+        };
+        _goals.GetActiveConstructionGoalsAsync(Arg.Any<CancellationToken>()).Returns(trips);
+
+        var decision = await Policy(MakeAgent(1_000_000), _settings).EvaluateAsync(50_000, CancellationToken.None);
+
+        decision.ReservedCredits.Should().Be(60_000 + 168_000);
+    }
+
+    [Fact]
     public async Task WithoutAShipThatTrades_TheReserveIsTheFloor()
     {
         Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));

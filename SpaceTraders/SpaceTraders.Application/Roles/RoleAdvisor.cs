@@ -45,7 +45,7 @@ public sealed class RoleAdvisor(
             return false;
         }
 
-        var others = roles.Where(other => other != role && other != FleetRole.Survey).ToList();
+        var others = roles.Where(other => other != role && other is not FleetRole.Survey and not FleetRole.Construct).ToList();
         if (others.Count == 0)
         {
             return true;

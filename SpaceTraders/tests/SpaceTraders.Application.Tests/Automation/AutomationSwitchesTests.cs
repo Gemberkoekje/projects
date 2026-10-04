@@ -30,6 +30,7 @@ public sealed class AutomationSwitchesTests
             ["Automation.Plan.Survey.Enabled"] = "false",
             ["Automation.Plan.Mining.Enabled"] = "false",
             ["Automation.Plan.Siphon.Enabled"] = "false",
+            ["Automation.Plan.Construction.Enabled"] = "false",
             ["Automation.Plan.Trading.Enabled"] = "false",
             ["Automation.Plan.SpareTime.Enabled"] = "false",
         });
@@ -49,6 +50,7 @@ public sealed class AutomationSwitchesTests
                 "Automation.Plan.Survey.Enabled",
                 "Automation.Plan.Mining.Enabled",
                 "Automation.Plan.Siphon.Enabled",
+                "Automation.Plan.Construction.Enabled",
                 "Automation.Plan.Trading.Enabled",
                 "Automation.Plan.SpareTime.Enabled");
     }
@@ -65,6 +67,7 @@ public sealed class AutomationSwitchesTests
         AutomationSwitches.PlanFor(new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-1" }).Should().Be(AutomationPlan.SpareTime);
         AutomationSwitches.PlanFor(new JumpGoal { GateWaypointSymbol = "X1-AB-I1", DestinationGateWaypointSymbol = "X1-CD-I2" }).Should().Be(AutomationPlan.Explore);
         AutomationSwitches.PlanFor(new ExploreSystemGoal { SystemSymbol = "X1-CD", Stops = ["X1-CD-I2"] }).Should().Be(AutomationPlan.Explore);
+        AutomationSwitches.PlanFor(new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55" }).Should().Be(AutomationPlan.Construction);
         AutomationSwitches.PlanFor(new IdleGoal()).Should().BeNull();
     }
 }

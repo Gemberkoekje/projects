@@ -13,6 +13,8 @@ namespace SpaceTraders.Application.Roles;
 ///   <item>a ship with the mining role mines, and one with the siphon role siphons; each trades when its own plan has
 ///   no trip for it, as before;</item>
 ///   <item>a ship with the trade role trades;</item>
+///   <item>a ship with the construction role builds the jump gate (slice 6.6), and trades when the construction plan has
+///   nothing it may buy;</item>
 ///   <item>the contract takes every ship that can mine but the one that surveys (D40), whatever its role, so the
 ///   contract never waits for the next evaluation;</item>
 ///   <item>a ship the board hasn't seen yet, bought this tick, waits for its role: one tick.</item>
@@ -131,8 +133,17 @@ public sealed class FleetRoleBoard
             : FleetRoles.IsSiphoner(ship);
 
     /// <summary>
-    /// Whether the trading plan may give the ship a route: a hold and a tank, and the trade role, or the mining or
-    /// siphon role when that plan had no trip for it (the board); with the board off, any such ship that doesn't
+    /// Whether the ship builds the jump gate for the construction plan (slice 6.6, D65): the construction role (the board).
+    /// With the board off the construction plan picks its builders by the same rule, the largest holds.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship the construction plan gives trips, with the board on.</returns>
+    public bool IsBuilder(ShipModel ship)
+        => RolesOn && RoleOf(ship) == FleetRole.Construct && FleetRoles.CanConstruct(ship);
+
+    /// <summary>
+    /// Whether the trading plan may give the ship a route: a hold and a tank, and the trade role, or the mining, siphon or
+    /// construction role when that plan had no trip for it (the board); with the board off, any such ship that doesn't
     /// survey (D20). A ship that gathers in its spare time trades by its own rule (D34).
     /// </summary>
     /// <param name="ship">The ship.</param>
@@ -140,7 +151,7 @@ public sealed class FleetRoleBoard
     public bool IsTrader(ShipModel ship)
         => ship.IsTradingCapable
             && (RolesOn
-                ? RoleOf(ship) is FleetRole.Trade or FleetRole.Mine or FleetRole.Siphon
+                ? RoleOf(ship) is FleetRole.Trade or FleetRole.Mine or FleetRole.Siphon or FleetRole.Construct
                 : !FleetRoles.IsSurveyor(ship, SurveyOn));
 
     /// <summary>

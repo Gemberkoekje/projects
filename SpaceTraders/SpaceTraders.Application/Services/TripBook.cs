@@ -8,7 +8,7 @@ namespace SpaceTraders.Application.Services;
 
 /// <summary>
 /// Books what each trip made after fuel when it ends (D46), so what trading, mining, siphoning, spare time and contracts
-/// earn shows without comparing the credits before and after.
+/// earn, and what the jump gate costs (slice 6.6), shows without comparing the credits before and after.
 /// </summary>
 public interface ITripBook
 {
@@ -22,7 +22,9 @@ public interface ITripBook
     /// <param name="reason">
     /// Why it ended: <see cref="TripBook.Sold"/>, <see cref="TripBook.Interrupted"/>, <see cref="TripBook.Runaway"/>,
     /// <see cref="TripBook.Rejected"/>, <see cref="TripBook.NothingAboard"/>, <see cref="TripBook.NoBuyer"/>, or why a trade
-    /// was dropped (<c>not_bought_here</c>, <c>not_lucrative</c>, <c>not_possible</c>).
+    /// was dropped (<c>not_bought_here</c>, <c>not_lucrative</c>, <c>not_possible</c>); for a construction trip
+    /// <see cref="TripBook.Supplied"/>, or why it was dropped (<see cref="TripBook.NotNeeded"/>, <c>low_supply</c>,
+    /// <c>not_full_hold</c>, <c>over_budget</c>, <c>not_sold_here</c>, <c>wrong_location</c>).
     /// </param>
     /// <param name="cancellationToken">Stops the work.</param>
     /// <returns>A task that completes once the trip is booked.</returns>
@@ -62,6 +64,9 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
     /// <summary>Contract work: a round trip, and the contract's deposit and payout.</summary>
     public const string Contract = "contract";
 
+    /// <summary>A construction trip (<see cref="SupplyConstructionGoal"/>, slice 6.6): supplying pays nothing, so it books a loss.</summary>
+    public const string Construction = "construction";
+
     /// <summary>The trip sold its cargo, or what of it pays for its fuel.</summary>
     public const string Sold = "sold";
 
@@ -86,6 +91,12 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
     /// <summary>The trip's sell market doesn't buy its cargo any more.</summary>
     public const string NotBoughtHere = "not_bought_here";
 
+    /// <summary>A construction trip supplied its site (slice 6.6).</summary>
+    public const string Supplied = "supplied";
+
+    /// <summary>The construction site no longer needs what the trip carries or goes to buy (slice 6.6).</summary>
+    public const string NotNeeded = "not_needed";
+
     /// <inheritdoc />
     public Task BookAsync(string shipSymbol, TripGoal trip, string reason, CancellationToken cancellationToken)
     {
@@ -103,6 +114,7 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
         MineAndSellGoal => Mining,
         SiphonAndSellGoal => Siphoning,
         GatherAndSellGoal => SpareTime,
+        SupplyConstructionGoal => Construction,
         _ => throw new ArgumentOutOfRangeException(nameof(trip), trip.Kind, "A trip the book has no activity for."),
     };
 

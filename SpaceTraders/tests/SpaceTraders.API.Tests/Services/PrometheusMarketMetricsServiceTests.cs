@@ -142,15 +142,16 @@ public sealed class PrometheusMarketMetricsServiceTests
 
         await Service(provider).SampleAsync(Start, CancellationToken.None);
 
+        // Slice 6.6: a ship with a hold and a tank that isn't a drone can build the jump gate (Construct), as in the fleet table.
         shipyards.Should().ContainSingle().Which.Ships
             .Select(ship => (ship.Type, ship.FuelCapacity, ship.CargoCapacity, ship.Can, ship.Equipment))
             .Should().Equal(
                 ("SHIP_MINING_DRONE", 80, 15, "Mine, Trade", "MINING_LASER_I, MINERAL_PROCESSOR_I"),
                 ("SHIP_SIPHON_DRONE", 80, 15, "Siphon, Trade", "GAS_SIPHON_I"),
                 ("SHIP_SURVEYOR", 80, 0, "Survey", "SURVEYOR_I"),
-                ("SHIP_LIGHT_HAULER", 600, 80, "Trade", "SENSOR_ARRAY_I"),
+                ("SHIP_LIGHT_HAULER", 600, 80, "Trade, Construct", "SENSOR_ARRAY_I"),
                 ("SHIP_PROBE", 0, 0, "Probe", "none"),
-                ("SHIP_COMMAND_FRIGATE", 400, 40, "Survey, Mine, Siphon, Trade", "GAS_SIPHON_II, MINING_LASER_II, SENSOR_ARRAY_II, SURVEYOR_II, GAS_PROCESSOR_I, MINERAL_PROCESSOR_I"));
+                ("SHIP_COMMAND_FRIGATE", 400, 40, "Survey, Mine, Siphon, Trade, Construct", "GAS_SIPHON_II, MINING_LASER_II, SENSOR_ARRAY_II, SURVEYOR_II, GAS_PROCESSOR_I, MINERAL_PROCESSOR_I"));
     }
 
     [Fact]

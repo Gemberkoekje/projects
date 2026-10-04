@@ -97,6 +97,17 @@ public sealed class LedgerEntryHandlerTests
     }
 
     [Fact]
+    public async Task MaterialsForTheJumpGate_AreBookedApartFromTrading()
+    {
+        // Slice 6.6: supplying pays nothing back, so the dashboard's spending shows the gate as a category of its own.
+        await _handler.Handle(new CargoPurchasedEvent("AGENT-6", new TradeSymbol("FAB_MATS"), 80, 168_000, 132_000, "X1-DC53-F49") { ForConstruction = true }, CancellationToken.None);
+
+        await _ledger.Received(1).AppendAsync("AGENT-6", LedgerCategory.ConstructionBuy, -168_000, goodSymbol: "FAB_MATS", unitPrice: 2_100, units: 80, waypointSymbol: "X1-DC53-F49", cancellationToken: Arg.Any<CancellationToken>());
+        _metrics.Received(1).CreditsSpent("ConstructionBuy", 168_000);
+        _metrics.Received(1).GoodsBought("X1-DC53-F49", "FAB_MATS", 80);
+    }
+
+    [Fact]
     public async Task ACargoPurchase_CountsItsUnits_ByMarketAndGood()
     {
         await _handler.Handle(new CargoPurchasedEvent("AGENT-6", new TradeSymbol("PLASTICS"), 20, 3_400, 173_310, "X1-DC53-K85"), CancellationToken.None);

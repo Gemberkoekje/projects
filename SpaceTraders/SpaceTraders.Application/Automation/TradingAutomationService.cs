@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
@@ -63,6 +64,7 @@ public sealed class TradingAutomationService(
     ICargoJettison cargoJettison,
     IPurchaseOrder purchaseOrder,
     FullHoldSavings savings,
+    IConstructionSites constructionSites,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -84,6 +86,7 @@ public sealed class TradingAutomationService(
     {
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var earmarked = await ContractOreAsync(cancellationToken);
+        var materials = await ConstructionMaterialsAsync(cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
         var active = await assignments.GetAllActiveAsync(cancellationToken);
         var withAssignment = active
@@ -144,6 +147,9 @@ public sealed class TradingAutomationService(
         var heldKeys = held.Select(route => route.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pending = new Dictionary<string, PendingRoute>(StringComparer.OrdinalIgnoreCase);
         var idle = 0;
+
+        // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64).
+        var constructionHolds = TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(cancellationToken));
         foreach (var system in free.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
             var context = await tradeContexts.ReadAsync(system.Key, cancellationToken);
@@ -159,11 +165,11 @@ public sealed class TradingAutomationService(
                 else
                 {
                     // Cargo that doesn't pay for its sale would only take room from the route (D42).
-                    traders.Add(await JettisonDeadCargoAsync(context.Map, ship, board, earmarked, cancellationToken));
+                    traders.Add(await JettisonDeadCargoAsync(context.Map, ship, board, earmarked, materials, cancellationToken));
                 }
             }
 
-            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, cancellationToken);
+            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, constructionHolds, cancellationToken);
             idle += traders.Count;
 
             // After the other traders: a ship that gathers in its spare time takes a route that is left for it.
@@ -187,7 +193,7 @@ public sealed class TradingAutomationService(
                 }
                 else
                 {
-                    await JettisonDeadCargoAsync(map, ship, board, earmarked, cancellationToken);
+                    await JettisonDeadCargoAsync(map, ship, board, earmarked, materials, cancellationToken);
                 }
             }
         }
@@ -210,8 +216,21 @@ public sealed class TradingAutomationService(
                 : string.Empty;
 
     /// <summary>
+    /// The materials the home system's jump gate still needs while the construction plan is on (slice 6.6, D68): a ship that
+    /// holds them keeps them, and the construction plan, which comes first, has it supply them. Empty with the plan off.
+    /// </summary>
+    private async Task<IReadOnlySet<string>> ConstructionMaterialsAsync(CancellationToken cancellationToken)
+        => await settings.IsPlanEnabledAsync(AutomationPlan.Construction, cancellationToken)
+            ? (await constructionSites.CachedNeedingMaterialsAsync(cancellationToken))
+                .SelectMany(site => site.Materials.Where(material => material.Fulfilled < material.Required))
+                .Select(material => material.TradeSymbol)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Jettisons what a free ship holds that nothing will sell or use (D42), when no good aboard pays for its sale:
-    /// everything but the contract's ore on a ship that mines for the contract.
+    /// everything but the contract's ore on a ship that mines for the contract, and the materials a jump gate still needs
+    /// (slice 6.6).
     /// </summary>
     /// <returns>The ship with the hold it has left.</returns>
     private async Task<ShipModel> JettisonDeadCargoAsync(
@@ -219,13 +238,15 @@ public sealed class TradingAutomationService(
         ShipModel ship,
         FleetRoleBoard board,
         string contractOre,
+        IReadOnlySet<string> constructionMaterials,
         CancellationToken cancellationToken)
     {
         var current = ship;
         foreach (var (cargo, reason) in HeldCargo.ToJettison(
             map,
             ship,
-            good => contractOre.Length > 0 && good.Equals(contractOre, StringComparison.OrdinalIgnoreCase) && board.MinesForContract(ship)))
+            good => (contractOre.Length > 0 && good.Equals(contractOre, StringComparison.OrdinalIgnoreCase) && board.MinesForContract(ship))
+                || constructionMaterials.Contains(good)))
         {
             if (await cargoJettison.JettisonAsync(current, cargo, reason, cancellationToken) is { } left)
             {
@@ -433,10 +454,12 @@ public sealed class TradingAutomationService(
         List<HeldRoute> held,
         HashSet<string> heldKeys,
         Dictionary<string, PendingRoute> pending,
+        long constructionHolds,
         CancellationToken cancellationToken)
     {
-        // Cargo leaves Trade.FuelReserveCredits for fuel (D24), and what the trips on their way to buy hold back (D57).
-        var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)));
+        // Cargo leaves Trade.FuelReserveCredits for fuel (D24), and what the trade and construction trips on their way to buy
+        // hold back (D57, D64).
+        var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds);
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
         // counts as work waiting for it (D13); and the full hold it saves up for, when it does (D56).

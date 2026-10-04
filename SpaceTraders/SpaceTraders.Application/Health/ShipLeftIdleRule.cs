@@ -30,7 +30,9 @@ namespace SpaceTraders.Application.Health;
 ///   <item>trading: a lucrative route without a trader (Pending), for a ship the plan lists as able to
 ///   take it (slice 6.5);</item>
 ///   <item>spare time: a place to mine or siphon, for a ship the plan lists with one (slice 6.8): the command ship
-///   with nothing to survey or trade.</item>
+///   with nothing to survey or trade;</item>
+///   <item>construction: a load of the home system's jump gate's materials, for a builder the plan lists as one a load waits
+///   for (slice 6.6). The plan gives a free one its load at once, so only a plan that has stopped leaves it idle.</item>
 /// </list>
 /// <para>
 /// Without such work an idle ship is idle by design: in the first run (D9, D1) the starting probe, the
@@ -220,6 +222,18 @@ public sealed class ShipLeftIdleRule(
                     "a place to mine or siphon in its spare time",
                     ship => withSource.Contains(ship.Symbol)));
             }
+        }
+
+        // The plan gives a free builder a load waits for at once (slice 6.6), so one can only be left idle while the plan has
+        // stopped.
+        if (context.IsOn(AutomationPlan.Construction)
+            && await plans.GetAsync<ConstructionPlanState>(PlanTypes.Construction, cancellationToken) is { ReadyShipSymbols.Count: > 0 } construction)
+        {
+            var ready = construction.ReadyShipSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            waiting.Add(new WaitingWork(
+                AutomationPlan.Construction,
+                "a load of materials for the jump gate",
+                ship => ready.Contains(ship.Symbol)));
         }
 
         return waiting;

@@ -28,6 +28,12 @@ public sealed record RoleSettings
     /// <summary>The production chains' share when the setting gives none: 50% (D39).</summary>
     internal const int DefaultChainValueSharePercent = 50;
 
+    /// <summary>The setting that holds how many ships get the construction role while the jump gate needs materials (D65).</summary>
+    public const string ConstructionShipsSetting = "Construction.Ships";
+
+    /// <summary>The ships with the construction role when the setting gives none: one (D65).</summary>
+    internal const int DefaultConstructionShips = 1;
+
     /// <summary>The plans whose ships the board gives roles, and the contract plan.</summary>
     private static readonly AutomationPlan[] Weighed =
     [
@@ -35,6 +41,7 @@ public sealed record RoleSettings
         AutomationPlan.Survey,
         AutomationPlan.Mining,
         AutomationPlan.Siphon,
+        AutomationPlan.Construction,
         AutomationPlan.Trading,
         AutomationPlan.SpareTime,
     ];
@@ -81,6 +88,15 @@ public sealed record RoleSettings
     /// <summary>The credits cargo must leave for fuel (D24).</summary>
     public required long FuelReserveCredits { get; init; }
 
+    /// <summary>How many ships per system get the construction role while its jump gate needs materials (D65).</summary>
+    public int ConstructionShips { get; init; } = DefaultConstructionShips;
+
+    /// <summary>
+    /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): only there may a ship
+    /// take the construction role. Empty until the role board reads the sites.
+    /// </summary>
+    public IReadOnlySet<string> ConstructionSystems { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Reads the settings.</summary>
     /// <param name="settings">The settings.</param>
     /// <param name="cancellationToken">Stops the reads.</param>
@@ -108,16 +124,20 @@ public sealed record RoleSettings
             await PercentAsync(settings, HeadStartPercentSetting, DefaultHeadStartPercent, cancellationToken) / 100.0,
             Math.Min(100, await PercentAsync(settings, ChainValueSharePercentSetting, DefaultChainValueSharePercent, cancellationToken)) / 100.0,
             Math.Max(0, await settings.GetAsync<int>(TradeContextReader.MinProfitPerUnitSetting, cancellationToken)),
-            Math.Max(0, await settings.GetAsync<long>(TradeContextReader.FuelReserveCreditsSetting, cancellationToken)));
+            Math.Max(0, await settings.GetAsync<long>(TradeContextReader.FuelReserveCreditsSetting, cancellationToken)))
+        {
+            ConstructionShips = await settings.ThresholdAsync(ConstructionShipsSetting, DefaultConstructionShips, cancellationToken),
+        };
     }
 
     /// <summary>
     /// The roles a ship could take whose plan is on (D38): surveying with the survey plan; mining with the mining plan,
-    /// or while the contract wants ore (D40); siphoning with the siphon plan; trading with the trading plan.
+    /// or while the contract wants ore (D40); siphoning with the siphon plan; trading with the trading plan; constructing
+    /// with the construction plan, while the jump gate of the ship's system needs materials (slice 6.6).
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="contractWantsOre">Whether the contract plan's contract still wants ore.</param>
-    /// <returns>Its roles, in the order survey, mine, siphon, trade.</returns>
+    /// <returns>Its roles, in the order survey, mine, siphon, trade, construct.</returns>
     public IReadOnlyList<FleetRole> Available(ShipModel ship, bool contractWantsOre)
         => [.. FleetRoles.PotentialRoles(ship).Where(role => role switch
         {
@@ -125,6 +145,7 @@ public sealed record RoleSettings
             FleetRole.Mine => Switches.Contains(AutomationPlan.Mining) || contractWantsOre,
             FleetRole.Siphon => Switches.Contains(AutomationPlan.Siphon),
             FleetRole.Trade => Switches.Contains(AutomationPlan.Trading),
+            FleetRole.Construct => Switches.Contains(AutomationPlan.Construction) && ConstructionSystems.Contains(ship.SystemSymbol ?? string.Empty),
             _ => false,
         })];
 

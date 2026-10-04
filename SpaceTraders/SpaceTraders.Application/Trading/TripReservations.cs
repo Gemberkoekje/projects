@@ -11,7 +11,8 @@ namespace SpaceTraders.Application.Trading;
 /// these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)".
 /// </summary>
 /// <remarks>
-/// Kept with the trip's goal, so a restart keeps it. A trip that has bought, or is blocked or done, holds back nothing.
+/// Kept with the trip's goal, so a restart keeps it. A trip that has bought, or is blocked or done, holds back nothing. A
+/// construction trip holds back its cargo the same way (slice 6.6, D64): traders, other trips and ship purchases leave it.
 /// </remarks>
 public static class TripReservations
 {
@@ -31,6 +32,29 @@ public static class TripReservations
     /// <param name="exceptShipSymbol">The ship whose trip doesn't count: the credits it holds back are its own to spend.</param>
     /// <returns>The credits held back.</returns>
     public static long HeldBack(IEnumerable<KeyValuePair<string, TradeBetweenMarketsGoal>> trips, string exceptShipSymbol = "")
+    {
+        ArgumentNullException.ThrowIfNull(trips);
+        return trips
+            .Where(trip => !trip.Key.Equals(exceptShipSymbol, StringComparison.OrdinalIgnoreCase))
+            .Sum(trip => HeldBack(trip.Value));
+    }
+
+    /// <summary>What one construction trip holds back now (slice 6.6, D64): what its cargo costs, until it is aboard.</summary>
+    /// <param name="trip">The trip.</param>
+    /// <returns>Its reserved credits until its cargo is aboard, else 0.</returns>
+    public static long HeldBack(SupplyConstructionGoal trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return !trip.CargoBought && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed
+            ? Math.Max(0, trip.ReservedCredits)
+            : 0;
+    }
+
+    /// <summary>What the fleet's construction trips hold back now, but one ship's.</summary>
+    /// <param name="trips">The trips, by ship symbol.</param>
+    /// <param name="exceptShipSymbol">The ship whose trip doesn't count: the credits it holds back are its own to spend.</param>
+    /// <returns>The credits held back.</returns>
+    public static long HeldBack(IEnumerable<KeyValuePair<string, SupplyConstructionGoal>> trips, string exceptShipSymbol = "")
     {
         ArgumentNullException.ThrowIfNull(trips);
         return trips

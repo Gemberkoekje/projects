@@ -102,7 +102,8 @@ public sealed record RoleOption
 /// (15 seconds plus the distance times 25 over the engine's speed), <see cref="StopSeconds"/> at each landing, and for
 /// mining and siphoning the cooldowns to fill the hold, half a tick after each. A mining or siphon trip to a market out
 /// of the ship's CRUISE reach drifts there first (slice 6.10c, D45): ten times as long as in CRUISE, and the 1 fuel it
-/// burns is bought back there. Surveying has no estimate: it comes first (D38).
+/// burns is bought back there. Surveying has no estimate: it comes first (D38). Nor has building the jump gate, which
+/// pays nothing and comes before the trips by profit (slice 6.6, D65).
 /// </summary>
 public static class RoleEstimator
 {
@@ -122,7 +123,7 @@ public static class RoleEstimator
     /// <param name="ship">The ship.</param>
     /// <param name="role">The role.</param>
     /// <param name="limit">The most trips to return.</param>
-    /// <returns>The trips; none for a role the ship can't take, and for surveying.</returns>
+    /// <returns>The trips; none for a role the ship can't take, for surveying and for building.</returns>
     public static IReadOnlyList<RoleOption> Options(RoleContext context, ShipModel ship, FleetRole role, int limit)
     {
         ArgumentNullException.ThrowIfNull(context);

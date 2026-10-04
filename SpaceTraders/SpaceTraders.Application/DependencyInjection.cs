@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Exploring;
@@ -92,6 +93,13 @@ public static class DependencyInjection
         services.AddScoped<TripBook>();
         services.AddScoped<ITripBook>(sp => sp.GetRequiredService<TripBook>());
 
+        // Construction (slice 6.6): the ship with the construction role buys the jump gate's materials and supplies it; the
+        // sites as cached, fetched when due; and the supplies a site refused lately.
+        services.AddScoped<IConstructionPlanService, ConstructionPlanService>();
+        services.AddScoped<IConstructionSites, ConstructionSites>();
+        services.AddSingleton<ConstructionSiteWatch>();
+        services.AddSingleton<ConstructionRetries>();
+
         // Spare time (slice 6.8): the command ship mines or siphons when it has nothing to survey or trade.
         services.AddScoped<ISpareTimePlanService, SpareTimePlanService>();
         services.AddScoped<SpareTimeInterruption>();
@@ -124,6 +132,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, JumpGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, ExploreSystemGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SupplyConstructionGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
         services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
         services.AddSingleton<IShipGoalStepGuard, ShipGoalStepGuard>();

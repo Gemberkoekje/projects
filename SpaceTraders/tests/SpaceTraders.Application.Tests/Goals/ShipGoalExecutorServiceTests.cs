@@ -297,12 +297,14 @@ public sealed class ShipGoalExecutorServiceTests
     [InlineData("Trading")]
     [InlineData("Survey")]
     [InlineData("Explore")]
+    [InlineData("Construction")]
     public async Task ExecuteAsync_WhenTheGoalsPlanIsSwitchedOff_DoesNotStep(string plan)
     {
         ShipGoal goal = plan switch
         {
             "Scout" => new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" },
             "Explore" => new JumpGoal { GateWaypointSymbol = "X1-AB-I55", DestinationGateWaypointSymbol = "X1-CD-AF5F" },
+            "Construction" => new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = "X1-AB-009", Units = 40 },
             "ProbeDeployment" => new DeployProbeGoal { TargetWaypointSymbol = "X1-AB-009" },
             "Mining" => new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-009" },
             "Survey" => new MoveToWaypointGoal { TargetWaypointSymbol = "X1-AB-009", Drifting = true },
@@ -389,6 +391,22 @@ public sealed class ShipGoalExecutorServiceTests
 
         result.Should().Be(expected);
         await _executor.Received(1).ExecuteStepAsync(Arg.Any<ShipModel>(), goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenActiveGoalIsAConstructionTrip_DispatchesToExecutor()
+    {
+        // Slice 6.6: the construction plan's trips are stepped like the other plans' goals.
+        var trip = new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = "X1-AB-F49", Units = 40 };
+        var expected = GoalExecutionResult.WaitingForArrival("to the market");
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip with { CargoCapacity = 40, ShipType = "SHIP_LIGHT_SHUTTLE" });
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(trip);
+        _executor.CanExecute(trip).Returns(true);
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), trip, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>()).Returns(expected);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().Be(expected);
     }
 
     [Fact]

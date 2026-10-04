@@ -218,20 +218,25 @@ public sealed class ShipGoalSerializationTests
     [Fact]
     public void SupplyConstructionGoal_RoundTrip_PreservesAllFields()
     {
+        // Slice 6.6: a construction trip keeps its load, what it holds back until it buys (D64), and what it spent (D46).
         var goal = new SupplyConstructionGoal
         {
             GoalId = Guid.NewGuid(),
-            TradeSymbol = "ALUMINUM",
+            TradeSymbol = "FAB_MATS",
             ConstructionSiteWaypointSymbol = "X1-AB-JG",
+            BuyWaypointSymbol = "X1-AB-F49",
+            Units = 80,
+            ReservedCredits = 168_000,
+            CargoBought = true,
+            PricePaidPerUnit = 2_100,
+            Spent = 168_000,
         };
 
         var json = JsonSerializer.Serialize<ShipGoal>(goal);
         var result = JsonSerializer.Deserialize<ShipGoal>(json);
 
-        result.Should().BeOfType<SupplyConstructionGoal>();
-        var supplyGoal = (SupplyConstructionGoal)result;
-        supplyGoal.TradeSymbol.Should().Be("ALUMINUM");
-        supplyGoal.ConstructionSiteWaypointSymbol.Should().Be("X1-AB-JG");
+        result.Should().BeOfType<SupplyConstructionGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Should().BeAssignableTo<TripGoal>();
     }
 
     [Fact]

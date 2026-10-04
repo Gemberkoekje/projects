@@ -180,6 +180,23 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task AtTheBuyMarket_TheCreditsAConstructionTripHoldsBack_AreNotSpent()
+    {
+        // Slice 6.6 (D64): the jump gate's load on its way to buy holds back 60,000 of the 190,000, as a trade trip would.
+        PricesAre(Map(), credits: 190_000);
+        IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
+        {
+            ["SHIP-6"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = K85, Units = 40, ReservedCredits = 60_000 },
+        };
+        _goals.GetActiveConstructionGoalsAsync(Arg.Any<CancellationToken>()).Returns(construction);
+
+        var result = await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
     public async Task AtTheBuyMarket_ATripSpendsWhatItHeldBackItself()
     {
         // D57: of the 190,000, SHIP-4's trip holds back 50,000, which leaves 140,000; SHIP-1's own 130,160 is its to spend, and

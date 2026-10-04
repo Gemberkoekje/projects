@@ -120,6 +120,10 @@
   the seeded settings, so switch it on after that.
 - Slice 2.11 (each ship for sale's tank, hold, what it could do in the fleet and its equipment, on the markets dashboard's
   shipyards table, asked on 2026-10-04) is built on branch `ccr-1e461fef-n6hydk` in projects and gembernodes.
+- Slice 6.6 (the jump gate, asked on 2026-10-04, with your decisions D64–D68) is built on branch `ccr-914173a3-6coo89` in
+  projects and gembernodes. Supplying a construction site pays nothing. X1-DC53's own gate was complete before our ships
+  came, so the plan has nothing to build until the server reset (2026-10-04 13:00Z) gives a new home system; it is off
+  until you switch it on, and a new agent's settings start at their defaults.
 
 ## Known issues
 
@@ -262,6 +266,11 @@ get the next D-number.
 | D61 | Slice 6.11: when does exploring take the command ship from its work (surveying, trading, spare time)? | **When its current trip ends** (the recommended option): the plan takes it once it is free (no goal, no assignment, not in transit), before the role board and every plan after it. |
 | D62 | Slice 6.11: an uncharted waypoint keeps its traits hidden (an asteroid's deposits among them), and the command ship could chart the waypoints it visits (`POST my/ships/{ship}/chart`). Chart them? | **Not for now:** "Skip them for now, charting might be interesting later but simple first, expansion later." |
 | D63 | Slice 6.11: each jump buys one ANTIMATTER at the gate's market. What credits may a jump spend? | **Keep the 60,000 credit floor** (the recommended option): a jump goes only while the credits after it stay at or above `FleetExpansion.MinCreditReserve` (seeded at 60,000), the floor every ship purchase keeps (D51); until then the plan holds the jump. |
+| D64 | Slice 6.6 (asked on 2026-10-04): "Also please check whether the construction command gives any money, if so the new role can be set up like a trader, if not it probably needs a different money cap." It gives none: the API's supply call answers with the construction site and the ship's cargo, without credits. Where does a load of materials stand against the other purchases? | **Judged like a ship purchase, after the cargo ships:** a load keeps the credit reserve (D51, with the saving of D56) and what the trips on their way to buy hold back (D57), and comes after the cargo ships in the order ships are bought in (D43): the contract's drone, the surveyors, a drone per scarce mineral and area, and the cargo ships of `Trade.ShipPurchases` go first; the probes and the further drones and cargo ships wait while the gate has a load to buy. A construction trip holds back its cargo from the moment it starts until it buys, as a trade trip does (D57). |
+| D65 | Slice 6.6: "Can you implement a special role that works on this jump gate?" Which ships take the role, and what do they do when there is nothing to buy? | **One: the largest hold:** the ship with the largest hold that isn't a drone or the surveyor builds (`Construction.Ships`, 1, for more); of equal holds the one that builds now, then the one that can do least else. It trades while construction has nothing it may buy. Supplying pays nothing, so no estimate chooses it: it goes first to the largest hold, as surveys go first (D38). |
+| D66 | Slice 6.6: each purchase raises a market's price, and a market short of a material asks more for it. Buy at any supply? | **Not at low supply:** no purchase where the material's supply is SCARCE or LIMITED; the builder waits (and trades) until a market is back at MODERATE or better. |
+| D67 | Slice 6.6: one purchase per trip, or several? Then asked: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade volume is a haulers hold." | **A full hold in one purchase:** a load is the builder's free hold, or what the gate still needs when that is less, bought at once, and only where the market's trade volume takes all of it; otherwise the builder waits (and trades), while the purchases after construction in the order keep waiting for it. |
+| D68 | Slice 6.6 (asked on 2026-10-04): "Only the home base jump gate construction should be high priority, any other jump gate construction should be low priority or maybe not even considered at all." | **Only the home gate:** the plan builds only the jump gate of the headquarters' system; a gate elsewhere is never fetched, built or given a role. |
 
 ## Phases
 
@@ -1689,7 +1698,118 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `TradeBetweenMarketsGoalExecutorTests`, `MarketWatchServiceTests`, `SupplyChainCacheTests`, B46 in
       `ShipGoalExecutorServiceTests`, the trip's round trip in `ShipGoalRepositoryTests`, D19 in
       `RateLimitHandlerTests`.
-- **6.6 Jump gate construction.**
+- **6.6 Jump gate construction** (built 2026-10-04 on branch `ccr-914173a3-6coo89`, in projects and gembernodes, with your
+  decisions D64–D68). Asked that day: "Spacetraders has unfinished buildings at waypoints, specifically an unbuilt jump
+  node. Finishing this jump node should be top priority, as it opens up the rest of the game. Can you implement a special
+  role that works on this jump gate? Also please check whether the construction command gives any money, if so the new
+  role can be set up like a trader, if not it probably needs a different money cap."
+  - **Supplying pays nothing:** the API's supply call (`POST systems/{system}/waypoints/{waypoint}/construction/supply`,
+    OpenAPI spec v2.3.0) answers with the construction site and the ship's cargo only, without credits or the agent. So
+    the role isn't set up like a trader: a load is judged like a ship purchase (D64). A refused supply answers 4800 (the
+    site doesn't need the material), 4801 (it has all of it) or 4802 (the ship isn't at the site).
+  - **X1-DC53** (public API, 2026-10-04): its jump gate, X1-DC53-I55, was complete before our ships came (FAB_MATS
+    1600/1600, ADVANCED_CIRCUITRY 400/400, QUANTUM_STABILIZERS 1/1). Its neighbours X1-HZ59-I59 and X1-BG54-I54 were
+    under construction, needing the same, but D68 leaves them out. F49 exports FAB_MATS and D42 ADVANCED_CIRCUITRY. So
+    the plan finds nothing to build until the server reset (2026-10-04 13:00Z) gives a new home system.
+  - Done:
+    - **The role** (`FleetRole.Construct`, `FleetRoles.CanConstruct`): a hold and a tank, and no drone or probe. While the
+      home gate needs materials, the role board gives it (reason `construction`) to the `Construction.Ships` (new, 1)
+      largest holds that are left once the drones and the surveyor are decided, before the trips by profit (D65); of
+      equal holds the one that builds now, then the one that can do least else. The gate starting or stopping to need
+      materials weighs the roles at once. A builder trades when the construction plan has nothing it may buy. With the
+      board off, the plan picks its builders by the same rule.
+    - **The site** (`Construction/ConstructionSites.cs`): only the home system's jump gate (D68), fetched when the
+      waypoint cache lists it under construction and it isn't cached, then every 10 minutes while it needs materials
+      (other agents supply it too), and stored from every supply's answer: `cached_construction_sites`, which nothing
+      wrote before. Journal: `PlanStarted` with its materials, `PlanCompleted`.
+    - **The plan** (`Automation/ConstructionPlanService.cs`, new switch `Automation.Plan.Construction.Enabled`, off;
+      bootstrapped after siphon and before trading): a free ship that holds what the gate needs supplies it first,
+      whatever its role (`held_cargo`); then it tells the order ships are bought in what it would buy next, and when
+      that lets it, each free builder with an empty hold takes the first load the credits pay for above the credit
+      reserve (`purchase`). The state (`plan_states`, `Construction`): each material with what is on its way, the
+      builders, those a load waits for, and why none was bought (`purchase_order`, `waiting_for_credits`, `low_supply`,
+      `trade_volume`, `no_market`).
+    - **A load** (`Construction/ConstructionPlanner.cs`, no I/O): one material in one purchase, a full hold or what the
+      gate still needs, at a market whose trade volume takes it at once (D67) and whose supply isn't SCARCE or LIMITED
+      (D66); the material with the smallest share supplied or on its way first; the market where the load costs least
+      with its fuel, there and on to the gate, in CRUISE through refuelling stops.
+    - **The trip** (`SupplyConstructionGoal`, now a `TripGoal` with the load, what it holds back and what it paid;
+      `Goals/Executors/SupplyConstructionGoalExecutor.cs`): to the market, where it checks the load again with the
+      prices its arrival fetched (dropped as `not_needed`, `not_sold_here`, `low_supply`, `not_full_hold` or
+      `over_budget`), buys it in one purchase, flies to the gate and supplies it. A supply the API refuses
+      (`ConstructionRefusedException`, from the port adapter) ends the trip at Warning with the cargo aboard, fetches
+      the site again, and the ship isn't offered the material again for 10 minutes (`ConstructionRetries`). Each trip
+      books its loss (`TripEnded`, activity `construction`, D46).
+    - **Money** (D64): a load leaves the credit reserve and waits for tiers 1 to 5 of the order ships are bought in
+      (`PurchaseTier.Construction`, 6); the probes (now 7) and the turns of drones and cargo ships (now 8) wait while
+      the gate has a load to buy. A trip holds back its cargo from start to purchase (`ReservedCredits`, as D57): the
+      trading plan, the trade executor and `BudgetPolicy` (so `spacetraders_credit_reserve`) leave it. The purchases
+      have a ledger category of their own, `ConstructionBuy` (`CargoPurchasedEvent.ForConstruction`).
+    - **Cargo the gate needs** isn't jettisoned by the trading plan while the construction plan is on.
+    - **Visibility:** the journal kinds `ConstructionStarted`, `ConstructionSupplied` and `ConstructionDropped`; the
+      metrics `spacetraders_construction_units_required` and `_fulfilled` (`site`, `trade_symbol`); the fleet view's
+      "buying … at … for …" and "supplying … to …"; `ShipLeftIdle` counts a load as work for the builders a load waits
+      for; `ConstructionSuppliedEvent` is published (an `activity_logs` row).
+    - **The dashboard** (gembernodes, same branch): "Jump gate progress" (percent), "Jump gate: materials still needed"
+      (a table of what is left, supplied and required per material) and "Jump gate materials" (each material's share),
+      under Contracts; the Roles, Purchase order, Spent per hour and Profit per hour descriptions name the new reason,
+      tier, ledger category and activity.
+  - Noticed (not changed):
+    - **The scale:** X1-DC53's neighbours needed 1,600 FAB_MATS and 400 ADVANCED_CIRCUITRY each. If the next home gate is
+      like them, an 80-unit hold takes 25 loads, each waiting for a market at MODERATE or better whose trade volume
+      takes the hold (D66, D67), and probes and further ships wait meanwhile (D64). The state's `Waiting` and the
+      dashboard's Purchase order table show what holds it up.
+    - **A trade volume under the hold** holds that material up for as long as it lasts (D67): if no market trades a
+      whole hold of it at once (say 40 at a time for an 80-unit hauler), the builder never buys it, the state says
+      `trade_volume`, and the probes and further ships keep waiting behind the load (D64). Whether to change that is
+      your call; nothing here does.
+    - **A gate others finish:** the plan sees it at the next fetch, within 10 minutes. A trip on its way to buy is then
+      dropped `not_needed` at its market; one that has bought is refused at the gate (`not_needed`) and keeps its cargo,
+      which the trading plan sells where it fetches most, likely below what it cost.
+    - **Settings after a reset:** a new agent's settings start at their defaults, so the plan (and the role board) must
+      be switched on again for the new home gate.
+    - **And exploring** (slice 6.11, merged meanwhile): a jump needs both gates built, so the explore plan can't take
+      the command ship while the home gate needs materials; they take turns. The explore plan looks at a gate under
+      construction again hourly, so it may set off up to an hour after this plan has seen the gate complete; it could
+      read the construction cache instead, which is your call.
+    - **The shipyards table** (slice 2.11) judges what a ship for sale could do as the fleet table does, so a cargo ship
+      now reads `Trade, Construct` there too; its gembernodes description (on its own branch) doesn't name `Construct`.
+    - The dashboard's Purchase order description had no SurveyorPerArea (D55) and the Roles description no
+      `gathers_first` (D58); both are fixed with this slice. HOW_IT_WORKS said "8 of the 13 goal kinds" never run; with
+      `SupplyConstruction` running it is 6 of 15.
+    - Left as they were: the Qowaiv warnings (QW0028, QW0029) in `ShipGoal.cs` and `DomainEvents.cs`, which ask for
+      strongly typed identifiers across the domain. The five S8969 warnings in `ShipGoalRepositoryTests.cs` are fixed.
+  - To switch it on: `PUT /settings/Automation.Plan.Construction.Enabled` with `{"value": "true"}`, with the role board on
+    (`Automation.Plan.Roles.Enabled`) so the role shows on the dashboard; after the reset, on the new agent.
+  - Done when: the home gate is complete with the plan on, and no open anomaly for it.
+  - **To understand this,** start with D64–D68, then `Construction/ConstructionPlanner.cs` and `ConstructionSites.cs`,
+    `Automation/ConstructionPlanService.cs` and `Goals/Executors/SupplyConstructionGoalExecutor.cs`;
+    `tests/SpaceTraders.Application.Tests/Construction/ConstructionFixture.cs` holds X1-DC53's gate side (positions from
+    the API, prices made up).
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Construction/ConstructionPlanner.cs`, `Construction/ConstructionSites.cs` (with `ConstructionSiteWatch`),
+      `Construction/ConstructionRetries.cs`, `Automation/ConstructionPlanService.cs`, `Automation/ConstructionPlanState.cs`,
+      `Goals/Executors/SupplyConstructionGoalExecutor.cs`, `Ports/ConstructionRefusedException.cs`;
+    - changed: `Automation/FleetRoles.cs`, `AutomationSwitches.cs`, `GameLoopService.cs`, `RolePlanService.cs`,
+      `TradingAutomationService.cs`; `Roles/FleetRole.cs`, `FleetRoleBoard.cs`, `RolePlanner.cs`, `RoleSettings.cs`,
+      `RoleAdvisor.cs`, `RoleEstimator.cs`; `Services/PurchaseOrder.cs`, `TripBook.cs`; `Trading/TripReservations.cs`;
+      `Orchestration/BudgetPolicy.cs`; `Goals/ShipGoalExecutorService.cs`,
+      `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`; `EventHandlers/LedgerEntryHandler.cs`;
+      `Health/ShipLeftIdleRule.cs`; `Interfaces/IAutomationMetrics.cs`, `Interfaces/Repositories/IShipGoalRepository.cs`;
+      `JournalEvents.cs`; `DependencyInjection.cs`; `SupplyConstructionGoal`, `LedgerCategory` and
+      `CargoPurchasedEvent` (Domain); `ShipGoalRepository` and `DefaultSettingsSeed` (Persistence);
+      `SpaceTradersPortAdapter` (Infrastructure.SpaceTradersAPI); `PrometheusMetricsService` and
+      `PrometheusAutomationMetrics` (API);
+    - tests: new `Construction/ConstructionPlannerTests`, `ConstructionSitesTests`, `Roles/RolePlannerConstructionTests`,
+      `Roles/ConstructionRoleTests`, `Automation/ConstructionPlanServiceTests`, `Goals/SupplyConstructionGoalExecutorTests`;
+      more in `RolePlanServiceTests`, `TradingAutomationServiceTests`, `TradeBetweenMarketsGoalExecutorTests`,
+      `BudgetPolicyTests`, `LedgerEntryHandlerTests`, `PurchaseOrderTests`, `ShipGoalExecutorServiceTests`,
+      `ShipRuleTests`, `DefaultSettingsSeedTests`, `AutomationSwitchesTests`, `ShipGoalSerializationTests` (Domain),
+      `PrometheusMetricsTests` and `DiValidationTests` (API), and `ShipGoalRepositoryTests` (Postgres).
+  - Tests: App 940 (76 new), Domain 72, API 167 (2 new, and 4 skipped); against Postgres, Infrastructure 75 (1 new, in
+    `ShipGoalRepositoryTests`) and API 2. Merged with slices 6.11 and 2.11 (whose decisions took D59–D63, so this
+    slice's are D64–D68): App 981, Domain 72, API 171 (and 4 skipped), Infrastructure 76 and API 2 against Postgres;
+    2.11's shipyards test now expects `Construct` in what a cargo ship for sale can do.
 - **6.7 Siphoning** (merged 2026-10-02 as projects#130, deployed by gembernodes#29; built on branch `ccr-0969c532-x5ricm`, with your decisions D31–D33).
   Asked that day: "Can you work on implementing syphons. Functions practically the same as minors,
   including surveys, but for gassy materials."
@@ -2468,3 +2588,4 @@ your PC, 1Password or kubectl:
 | 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50) |
 | 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (branch `ccr-c7061120-est7c1`, not merged). It shows data once the bot runs a build with slice 6.11, and the systems beyond home once the explore plan is on |
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (branch `ccr-1e461fef-n6hydk`, not merged). The new columns show data once the bot runs a build with slice 2.11: deploy that build with it |
+| 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (branch `ccr-914173a3-6coo89`, not merged). They show data once the bot runs a build with slice 6.6, with the construction plan on and the home gate under construction; the build's deploy is a further image bump there |

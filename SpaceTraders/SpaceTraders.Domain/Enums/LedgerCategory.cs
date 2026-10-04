@@ -14,4 +14,5 @@ public enum LedgerCategory
     Repair,
     Other,
     AntimatterPurchase,
+    ConstructionBuy,
 }

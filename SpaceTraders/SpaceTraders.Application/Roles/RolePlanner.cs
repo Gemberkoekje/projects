@@ -120,6 +120,10 @@ public sealed record MineralCoverage
 ///   <item>every other drone gathers too (<see cref="GathersFirst"/>, D58): a drone, which can mine or siphon and trade and
 ///   nothing else, takes its gathering role whatever trading would pay, and trades only when its plan has no trip for it.
 ///   Moved to trading for profit, drones left the minerals they had mined short, and the plans bought drones for them;</item>
+///   <item>while a system's jump gate needs materials, the ships with the largest holds there, as many as
+///   <c>Construction.Ships</c> (one), build it (<see cref="Construction"/>, slice 6.6, D65): supplying pays nothing, so no
+///   estimate could choose it, and finishing the gate comes first. Drones and the ship that surveys are decided by then.
+///   Of two equal holds, the one that builds now keeps it, else the one that can do least else;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
 ///   takes one trip, and no two the same trade route (D18) or the same mining or siphon opening. A ship's current role
 ///   counts the head start more (D41), so a close call doesn't flip back and forth. A ship left without a trip keeps
@@ -146,6 +150,9 @@ public static class RolePlanner
     /// </summary>
     public const string GathersFirst = "gathers_first";
 
+    /// <summary>The ship builds the jump gate: of those that can, it has the largest hold (slice 6.6, D65).</summary>
+    public const string Construction = "construction";
+
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
     public const string MostProfitable = "most_profitable";
 
@@ -171,19 +178,26 @@ public static class RolePlanner
     /// <param name="contractWantsOre">Whether the contract plan is on and its contract still wants ore (D40).</param>
     /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
     /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
+    /// <param name="builders">
+    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
+    /// role available: only where the gate needs materials.
+    /// </param>
     /// <returns>A decision per ship, by symbol.</returns>
     public static IReadOnlyList<RoleDecision> Decide(
         IReadOnlyList<RoleCandidate> ships,
         bool contractWantsOre,
         double headStart,
-        IReadOnlyList<MineralCoverage> coverage)
+        IReadOnlyList<MineralCoverage> coverage,
+        int builders = 1)
     {
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(coverage);
 
         var bonus = 1 + Math.Max(0, headStart);
         var decisions = new Dictionary<string, RoleDecision>(StringComparer.OrdinalIgnoreCase);
-        foreach (var ship in ships.Where(ship => ship.Roles.Count <= 1))
+
+        // The construction role goes only to the ships with the largest holds (D65), even where it is a ship's one role.
+        foreach (var ship in ships.Where(ship => ship.Roles.Count <= 1 && !ship.Roles.Contains(FleetRole.Construct)))
         {
             decisions[ship.Ship.Symbol] = ship.Roles.Count == 0
                 ? new RoleDecision(ship.Ship.Symbol, FleetRole.None, NoRole, null)
@@ -211,6 +225,11 @@ public static class RolePlanner
         foreach (var drone in ships.Where(ship => !decisions.ContainsKey(ship.Ship.Symbol) && IsDrone(ship)))
         {
             decisions[drone.Ship.Symbol] = new RoleDecision(drone.Ship.Symbol, GatheringRole(drone), GathersFirst, null);
+        }
+
+        foreach (var builder in Builders(ships, decisions, builders))
+        {
+            decisions[builder.Ship.Symbol] = new RoleDecision(builder.Ship.Symbol, FleetRole.Construct, Construction, null);
         }
 
         foreach (var decision in ShareTheWork([.. ships.Where(ship => !decisions.ContainsKey(ship.Ship.Symbol))], bonus))
@@ -253,6 +272,27 @@ public static class RolePlanner
             yield return current is not null && current.BestPerHour <= cheapest.BestPerHour * bonus ? current : cheapest;
         }
     }
+
+    /// <summary>
+    /// The ships that build each system's jump gate (slice 6.6, D65): of those not yet decided that have the construction
+    /// role available (only where the gate needs materials), the largest holds, as many as <paramref name="count"/>; of two
+    /// equal holds, the one that builds now, then the one that can do least else (a cargo ship before the command ship), then
+    /// by symbol.
+    /// </summary>
+    private static IEnumerable<RoleCandidate> Builders(
+        IReadOnlyList<RoleCandidate> ships,
+        IReadOnlyDictionary<string, RoleDecision> decided,
+        int count)
+        => ships
+            .Where(ship => !decided.ContainsKey(ship.Ship.Symbol) && ship.Roles.Contains(FleetRole.Construct))
+            .GroupBy(ship => ship.Ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(system => system
+                .OrderByDescending(ship => ship.Ship.CargoCapacity)
+                .ThenByDescending(ship => ship.Current == FleetRole.Construct)
+                .ThenBy(ship => ship.Roles.Count)
+                .ThenBy(ship => ship.Ship.Symbol, StringComparer.Ordinal)
+                .Take(Math.Max(0, count)))
+            .ToList();
 
     /// <summary>
     /// Whether the ship is a drone (D58): it can mine or siphon, whichever plan of those is on, and can't survey, so not the
@@ -348,9 +388,12 @@ public static class RolePlanner
         }
     }
 
-    /// <summary>The role a ship without a trip keeps: its own, when it still has it and it isn't surveying; else its first role but surveying.</summary>
+    /// <summary>
+    /// The role a ship without a trip keeps: its own, when it still has it and it isn't surveying or building; else its first
+    /// role but those. Surveying and building go only to the ships chosen for them.
+    /// </summary>
     private static FleetRole Keep(RoleCandidate ship)
-        => ship.Current != FleetRole.Survey && ship.Roles.Contains(ship.Current)
+        => ship.Current is not FleetRole.Survey and not FleetRole.Construct && ship.Roles.Contains(ship.Current)
             ? ship.Current
-            : ship.Roles.FirstOrDefault(role => role != FleetRole.Survey);
+            : ship.Roles.FirstOrDefault(role => role is not FleetRole.Survey and not FleetRole.Construct);
 }
