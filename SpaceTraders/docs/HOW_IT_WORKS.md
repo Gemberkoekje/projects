@@ -502,7 +502,8 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   - **Mining:** `MineResourceVolumeCommand` travels to the asteroid in CRUISE, through refuelling
     stops when it is beyond one tank (B47, under Commands below), extracts once per cooldown,
     with the best survey there for the contract's ore when there is one (slice 6.4), and
-    jettisons other goods.
+    jettisons other goods: unlike a mining plan's trip (D71), it keeps none, so its hold fills with
+    the contract's ore only.
   - **Delivery:** `FulfillContractDeliveryCommand` travels to the destination the same way, docks, delivers
     what it holds but at most what the contract still needs (B30, fixed), and calls fulfil once
     nothing is pending and the cached contract isn't fulfilled yet (another ship may have done it,
@@ -631,8 +632,11 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   free miners it wants (D23).
 - **Each tick** every free miner gets one trip (`MineAndSellGoal`); the trip ends when it is sold,
   and the plan chooses the next one:
-  1. a miner that holds ore a market buys sells it first, where it fetches most after fuel (reason
-     `held_cargo`): ore left over from the contract, for one;
+  1. a miner that holds ore a market buys sells it first, one good a trip, where each fetches most after fuel
+     (reason `held_cargo`, `TradeRoutePlanner.TryFindBestCargoSale`): ore left over from the contract, and the other
+     ores a trip keeps (D71, below). A full hold only sells, even where the sale doesn't pay for its fuel: a mining trip
+     would turn to selling at once and end without its ore aboard, on every tick. A full hold no market it can reach
+     buys gets no trip, so the trading plan jettisons it (D42);
   2. otherwise the best of `MiningPlanner.MiningTargets`: every market that buys an ore (imported or
      exchanged), mined at an asteroid with a usable survey holding the ore, or else at the asteroid
      nearest the market whose traits yield it, and sold there; only trips the miner can make in CRUISE,
@@ -655,6 +659,14 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      its supply level, and among D48's uncovered ores after those in reach. In X1-DC53 on 2026-10-03 that was
      B7, SCARCE or LIMITED in five ores that B14, 25 from it, yields; from the middle a drone drifts there in
      about 2.5 hours. Once it is there, B7's ores are in reach, and the middle is the drift away.
+- **What a trip keeps** (D71, asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank
+  of fuel, instead of everything they're not specifically mining for"): each extraction keeps the trip's ore, and every
+  other ore a market buys within one tank of the asteroid: a full tank's CRUISE flight there without a refuelling stop
+  (`MiningPlanner.IsSellableWithinOneTank`; for a drone's 80-unit tank, the markets within about 80). The rest goes
+  overboard. The trip still extracts with the survey best for its own ore, and turns to selling when the hold is full,
+  of whatever ores; it sells its own ore at its market, and the plan sells the others on the trips after it (step 1
+  above). The contract's round trips keep only the contract's ore, so their holds fill with it alone. Siphon
+  trips keep more: every gas a market they can carry it to buys, refuelling stops included (D33).
 - **Drones,** one a tick, so the next tick counts the new drone; up to `Mining.MaxDrones` (default 20),
   within the credit reserve and when the order ships are bought in lets it (D43). Not while the
   contract plan mines: the contract would take the drone, and the contract plan buys at most one
@@ -1159,7 +1171,7 @@ step does the work.
 |---|---|
 | `ScoutWaypoint` | Docked at the target: mark it visited and complete. In orbit at the target: dock. Elsewhere: [cmd] navigate towards it (`GoalFlight`: in CRUISE, through refuelling stops when it is beyond one tank, B47). |
 | `DeployProbe` | One flight of a probe (slice 6.3). At the target (the arrival fetched its market and shipyard, and docked): clear the goal and complete; the probe plan chooses again. Elsewhere: in DRIFT, [cmd] switch to CRUISE first (a probe has no tank, so no flight costs it fuel); then [cmd] navigate. |
-| `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore. A full hold turns the trip to selling. **Selling:** navigate towards the sell market, dock, [API] sell in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
+| `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore and keeps the other ores a market buys within one tank (`KeepOtherOres`, D71). A full hold, of any ores, turns the trip to selling. **Selling:** with none of the trip's ore aboard, clear the goal and complete (the plan sells the other ores); else navigate towards the sell market, dock, [API] sell the trip's ore in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
 | `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
 | `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative, and still a full hold both markets trade at once and the credits pay for (D56), its own and those no other trip holds back (D57): [API] buy and publish `CargoPurchasedEvent`, record the purchase in the goal, and end the saving for that hold, if any; otherwise clear the goal (`TradeDropped`, `not_full_hold` when a market no longer trades the full hold at once), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
@@ -1208,7 +1220,9 @@ step does the work.
   dropped and journaled as `SurveyEnded`, and nothing is extracted that step (B49, fixed: the survey
   would have been tried again on every step). A rejected survey is also logged as a warning with the
   API's response body. The survey goes back to the API as it was given out, its expiry in the API's
-  own form (`…51.937Z`, B51). Other goods are jettisoned.
+  own form (`…51.937Z`, B51). Other goods are jettisoned, but for a mining trip's (`KeepOtherOres`, D71): it keeps
+  every other ore a market buys within one tank of the asteroid, a full tank's CRUISE flight without a refuelling stop.
+  The contract's round trips keep only the contract's ore.
 - **`SiphonResourcesCommand`** (slice 6.7) siphons once per call at the GAS_GIANT waypoint the ship is
   at, in orbit (a docked ship orbits first; the arrival docks it), off cooldown and with room in the
   hold, without a survey: the API's siphon call takes none. It stores the cargo and the cooldown,

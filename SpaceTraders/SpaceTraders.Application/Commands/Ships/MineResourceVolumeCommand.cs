@@ -14,7 +14,8 @@ namespace SpaceTraders.Application.Commands.Ships;
 /// <summary>
 /// Mines <see cref="TradeSymbol"/> at <see cref="SourceWaypoint"/> until the trip holds
 /// <see cref="RequiredUnitsTotal"/> of it (at most a full hold): one extraction per call, with the best
-/// survey of the waypoint for the good when there is one (slice 6.4), and other goods jettisoned.
+/// survey of the waypoint for the good when there is one (slice 6.4), and other goods jettisoned, but for the
+/// ores a mining trip keeps (<see cref="KeepOtherOres"/>, D71).
 /// </summary>
 public sealed record MineResourceVolumeCommand
 {
@@ -25,6 +26,12 @@ public sealed record MineResourceVolumeCommand
     public required string SourceWaypoint { get; init; }
 
     public required int RequiredUnitsTotal { get; init; }
+
+    /// <summary>
+    /// Whether the other ores a market buys within one tank of the asteroid stay aboard (D71): the mining plan's trips,
+    /// whose plan sells them on the trips after. Otherwise every other good is jettisoned: the contract's round trips.
+    /// </summary>
+    public bool KeepOtherOres { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal)
@@ -179,7 +186,7 @@ public sealed class MineResourceVolumeHandler(
 
         if (targetUnitsInCargo >= maxTargetForTrip || ship.CargoCurrent >= ship.CargoCapacity)
         {
-            await JettisonNonTargetCargoAsync(ship.Symbol, cargoInventory, command.TradeSymbol, cancellationToken);
+            await JettisonWhatTheTripDoesNotKeepAsync(ship, cargoInventory, command, cancellationToken);
 
             return new ShipCommandResult(
                 ship.Symbol,
@@ -262,7 +269,7 @@ public sealed class MineResourceVolumeHandler(
         await ships.UpdateCooldownAsync(ship.Symbol, cooldownAt, cancellationToken);
 
         var updatedShip = await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
-        await JettisonNonTargetCargoAsync(ship.Symbol, updatedShip.CargoInventory ?? [], command.TradeSymbol, cancellationToken);
+        await JettisonWhatTheTripDoesNotKeepAsync(ship, updatedShip.CargoInventory ?? [], command, cancellationToken);
 
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} extracted {Units} {TradeSymbol} at {WaypointSymbol}, mining for {Target}, with survey {Signature}.",
@@ -326,17 +333,31 @@ public sealed class MineResourceVolumeHandler(
         return await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
     }
 
-    private async Task JettisonNonTargetCargoAsync(
-        string shipSymbol,
+    /// <summary>
+    /// Jettisons every good but the one mined for, unless the trip keeps it: a mining trip keeps the other ores a market buys
+    /// within one tank of the asteroid (D71, <see cref="MiningPlanner.IsSellableWithinOneTank"/>), which the mining plan sells
+    /// on the trips after. A contract round trip keeps only the contract's ore.
+    /// </summary>
+    private async Task JettisonWhatTheTripDoesNotKeepAsync(
+        ShipModel ship,
         IReadOnlyList<CargoItemModel> cargo,
-        string targetTradeSymbol,
+        MineResourceVolumeCommand command,
         CancellationToken cancellationToken)
     {
-        foreach (var item in cargo.Where(i => i.Units > 0 && !i.Symbol.Equals(targetTradeSymbol, StringComparison.OrdinalIgnoreCase)))
+        var others = cargo.Where(i => i.Units > 0 && !i.Symbol.Equals(command.TradeSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (others.Count == 0)
         {
-            var result = await port.JettisonCargoAsync(shipSymbol, item.Symbol, item.Units, cancellationToken);
-            await ships.UpdateCargoAsync(shipSymbol, result.Cargo, cancellationToken);
-            metrics.Jettisoned(shipSymbol, item.Symbol, item.Units);
+            return;
+        }
+
+        var map = command.KeepOtherOres
+            ? (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, cancellationToken)).Map
+            : null;
+        foreach (var item in others.Where(item => map is null || !MiningPlanner.IsSellableWithinOneTank(map, ship, command.SourceWaypoint, item.Symbol)))
+        {
+            var result = await port.JettisonCargoAsync(ship.Symbol, item.Symbol, item.Units, cancellationToken);
+            await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, cancellationToken);
+            metrics.Jettisoned(ship.Symbol, item.Symbol, item.Units);
         }
     }
 }

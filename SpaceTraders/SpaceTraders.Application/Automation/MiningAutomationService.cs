@@ -26,8 +26,9 @@ public interface IMiningAutomationService
 /// <list type="bullet">
 ///   <item>a miner is a ship with a mining laser, a hold and a tank that doesn't survey (D20,
 ///   <see cref="FleetRoles"/>);</item>
-///   <item>a miner that holds ore a market buys sells it first, where it fetches most after fuel: the ore
-///   left over from a contract, for one;</item>
+///   <item>a miner that holds ore a market buys sells it first, one good a trip, where it fetches most after fuel: the
+///   ore left over from a contract, and the other ores a trip keeps (D71); a full hold sells even where that doesn't pay
+///   for the fuel;</item>
 ///   <item>otherwise it takes the best of its mining targets (<see cref="MiningPlanner"/>): a SCARCE or LIMITED ore no
 ///   miner works on first, the nearest asteroid first (D48), where a trip covers its ore only at the markets its ship
 ///   reaches in CRUISE from where it sells (D53); then the market shortest of an ore (D28), SCARCE, then LIMITED, and
@@ -157,7 +158,10 @@ public sealed class MiningAutomationService(
 
     /// <summary>
     /// Gives a free miner its next trip: selling ore it holds, else the best mining target, a scarce ore no miner works on
-    /// near its market first (D48, D53). The reason says <c>uncovered</c> when that came before D28's choice.
+    /// near its market first (D48, D53). The reason says <c>uncovered</c> when that came before D28's choice. A full hold
+    /// only sells, even where the sale doesn't pay for its fuel: a trip keeps the other ores a market buys within one tank
+    /// (D71), so its hold can fill with them, and a mining trip would turn to selling at once and end without its ore
+    /// aboard, on every tick.
     /// </summary>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -168,7 +172,8 @@ public sealed class MiningAutomationService(
         List<CoveringTrip> covered,
         CancellationToken cancellationToken)
     {
-        if (TryFindHeldOreSale(context.Map, miner, out var ore, out var sale))
+        var holdIsFull = miner.CargoCapacity > 0 && miner.CargoCurrent >= miner.CargoCapacity;
+        if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, miner, holdIsFull, out var ore, out var sale))
         {
             covered.Add(new CoveringTrip(ore.Symbol, sale.WaypointSymbol, miner.FuelCapacity));
             await StartAsync(miner, new MineAndSellGoal
@@ -179,6 +184,12 @@ public sealed class MiningAutomationService(
                 Selling = true,
             }, "held_cargo", cancellationToken);
             return true;
+        }
+
+        if (holdIsFull)
+        {
+            logger.LogDebug("Mining plan: ship {ShipSymbol} has a full hold that no market it can reach buys.", miner.Symbol);
+            return false;
         }
 
         var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
@@ -214,30 +225,6 @@ public sealed class MiningAutomationService(
             trip.SourceWaypointSymbol,
             trip.SellWaypointSymbol,
             reason);
-    }
-
-    /// <summary>
-    /// For a miner that holds ore: the ore that fetches most where it sells best, after the fuel to get
-    /// there, when that is anything at all. Other cargo is jettisoned on the next extraction.
-    /// </summary>
-    private static bool TryFindHeldOreSale(TradeMarketMap map, ShipModel miner, out CargoItemModel ore, out TradeSale sale)
-    {
-        ore = new CargoItemModel(string.Empty, 0);
-        sale = new TradeSale(string.Empty, 0, 0, 0);
-        var found = false;
-        foreach (var item in (miner.CargoInventory ?? []).Where(item => item.Units > 0))
-        {
-            if (TradeRoutePlanner.TryFindBestSale(map, miner, item.Symbol, item.Units, out var candidate)
-                && candidate.NetRevenue > 0
-                && (!found || candidate.NetRevenue > sale.NetRevenue))
-            {
-                ore = item;
-                sale = candidate;
-                found = true;
-            }
-        }
-
-        return found;
     }
 
     /// <summary>Whether the contract plan mines now: it takes every free miner (D23), a bought drone included.</summary>

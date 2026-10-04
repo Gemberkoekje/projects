@@ -188,6 +188,40 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task AMinerWithAFullHold_SellsWhatItHolds_EvenWhenTheSaleDoesntPayForItsFuel()
+    {
+        // D71: a trip keeps the other ores a market buys within one tank, so its hold can fill with them. Only F49 buys this
+        // quartz, for 1 a unit: 15 credits against 82 for the fuel there. A mining trip would turn to selling at once and end
+        // without its ore aboard, on every tick.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(
+            Map(
+                Market(XB5C, Good("FUEL", "EXCHANGE", 97, 82, 180, "MODERATE")),
+                Market(H51, Good("COPPER_ORE", "IMPORT", 138, 67, 123, "LIMITED"), Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE")),
+                Market(F49, Good("QUARTZ_SAND", "IMPORT", 2, 1, 60, "ABUNDANT"), Good("FUEL", "EXCHANGE", 82, 72, 180, "MODERATE"))),
+            [],
+            129_357,
+            Now));
+        Fleet(Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("QUARTZ_SAND", 15)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol, trip.Selling).Should().Be(("QUARTZ_SAND", F49, true));
+    }
+
+    [Fact]
+    public async Task AMinerWithAFullHold_ThatNoMarketBuys_GetsNoTrip()
+    {
+        Fleet(Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("ICE_WATER", 15)]));
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _log.Journal.Should().BeEmpty();
+        _passedOver.MayTrade("SHIP-3", [AutomationPlan.Mining]).Should().BeTrue("the pass had nothing for it, so the trading plan may sell or jettison its hold (B63)");
+    }
+
+    [Fact]
     public async Task AShipThatCanSurvey_DoesNotMine_WhileTheSurveyPlanIsOn()
     {
         Fleet(CommandShip());

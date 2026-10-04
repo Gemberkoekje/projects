@@ -671,6 +671,28 @@ public static class MiningPlanner
             && CanSellFrom(map, ship, from, market));
     }
 
+    /// <summary>
+    /// Whether a market within one tank of a waypoint buys a good, at any price: a full tank flies there in CRUISE without a
+    /// refuelling stop. What a mining trip keeps of the other ores it gets (D71, asked on 2026-10-04: "only throw out
+    /// minerals that they cannot sell within a single tank of fuel"); <see cref="IsSellableFrom"/>, D33's rule, also counts
+    /// markets a refuelling stop away.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="ship">The miner.</param>
+    /// <param name="from">Where it mines.</param>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when a market within one tank buys it.</returns>
+    public static bool IsSellableWithinOneTank(TradeMarketMap map, ShipModel ship, string from, string tradeSymbol)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+        return map.MarketWaypoints.Any(market =>
+            map.TryGetGood(market, tradeSymbol, out var good)
+            && good.SellPrice > 0
+            && TradeRoutePlanner.TryPlanFlight(map, from, market, ship.FuelCapacity, ship.FuelCapacity, out var flight)
+            && flight.Stops.Count <= 1);
+    }
+
     /// <summary>Whether a market takes a good: it imports or exchanges it, at a price. Gases too (slice 6.7).</summary>
     /// <param name="good">The good as last seen at the market.</param>
     /// <returns>True when the market buys the good.</returns>

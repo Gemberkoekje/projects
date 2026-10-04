@@ -292,6 +292,7 @@ get the next D-number.
 | D68 | Slice 6.6 (asked on 2026-10-04): "Only the home base jump gate construction should be high priority, any other jump gate construction should be low priority or maybe not even considered at all." | **Only the home gate:** the plan builds only the jump gate of the headquarters' system; a gate elsewhere is never fetched, built or given a role. |
 | D69 | Slice 2.12 (asked on 2026-10-04, after the server reset of 13:00Z left the new agent with only the scout and contract plans on): "After the restart most config items were turned off. Can you ensure everything is on by default? And changes in config changes those defaults?" Asked what the second part should do, you chose to have your changes remembered apart from the agent, the bot's own switch-offs left out, and a setting nobody changed follow the default. Then: "In addition, id like to have a separate set of endpoints to only affect future runs. So I can have a setting for this run (e.g. 50% split between miners and traders) and change those settings for the next run to see if it gives an improvement." | **Every plan on by default, and settings for the next runs:** every plan switch defaults to on, which replaces D9. The next run is the agent the next server reset registers; it starts with the value chosen for each setting, else the default. `PUT /settings/{key}` and the kill switch set a setting now and for the next runs; `PUT /settings/next-run/{key}` only for the next runs, `DELETE` gives them the default back and `GET /settings/next-run` lists them. When the bot switches automation off itself (the size guard, the reset monitor), the next runs keep their value. A setting nobody has set follows its default, also on the agent that runs. `POST /settings/reset` forgets the values chosen for the next runs. |
 | D70 | Slice 2.13 (asked on 2026-10-04, after the server reset): "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" To the reset date, which I proposed because the bot registers the same symbol after every reset: "reset date is a fine key", and "The grafana key per reset should be added for all 3 grafana dashboards." | **Grafana data per server reset:** every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04`. The SpaceTraders, markets and systems dashboards each have a "Reset" picker, the newest reset first, several to compare runs; every query filters on it. The alert rules stay as they are. |
+| D71 | Slice 6.12 (asked on 2026-10-04): "I'd like to have the configuration for mining drones only to throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically mining for. They still should use the survey with the highest chance of getting the minerals they want, just added with some extra trips to sell other ores as well." A mining trip jettisoned every ore but its own (6.4); a siphon trip keeps every gas a market it can carry it to buys, refuelling stops included (D33). Asked how to measure a tank, and whether the contract's miners keep other ores too. | **Keep what sells within one tank, on the mining plan's trips:** "Full tank, no refuel stop": a mining trip keeps every other ore a market buys within one full tank's CRUISE flight of the asteroid, without a refuelling stop (for a drone's 80-unit tank, the markets within about 80), and jettisons the rest. It still extracts with the survey best for its own ore and sells its own ore at its market; the mining plan sells the others after it, one good a trip, where each fetches most after fuel, and a full hold sells even where that doesn't pay for the fuel. "Mining plan only": the contract's round trips keep only the contract's ore. |
 
 ## Phases
 
@@ -2703,6 +2704,42 @@ when it is seen for the first time.
     trading and contract plans, which failed before the change; the antimatter's ledger row; the two new goals in
     `ShipGoalExecutorServiceTests`), Domain 72, API 167 (and 6 skipped: the sandbox, and Postgres without Docker),
     Integration 1. `ShipyardRepositoryTests` (Infrastructure) need Docker and didn't run here.
+
+- **6.12 Mining drones keep what they can sell within one tank** (built 2026-10-04 on branch
+  `claude/dreamy-albattani-zo7njw`; asked that day, D71). Asked: "I'd like to have the configuration for mining drones only
+  to throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically
+  mining for. They still should use the survey with the highest chance of getting the minerals they want, just added with
+  some extra trips to sell other ores as well."
+  - Done:
+    - **What a trip keeps** (`MineResourceVolumeCommand.KeepOtherOres`, set only by the mining plan's trips): after each
+      extraction, the trip's own ore, and every other ore a market buys within one tank of the asteroid
+      (`MiningPlanner.IsSellableWithinOneTank`: a full tank's CRUISE flight there without a refuelling stop). The rest is
+      jettisoned, as before. The survey it extracts with is still the best for its own ore (`SurveySelection`). This holds
+      for whichever ship has the trip: a drone, or the command ship with the mining role, whose 400-unit tank keeps nearly
+      every ore a market buys.
+    - **Selling them:** the trip turns to selling when the hold is full, of whatever ores, and sells its own ore at its
+      market. The mining plan then sells the others, one good a trip, where each fetches most after fuel (`held_cargo`),
+      by the rule traders and siphoners sell held cargo by (`TradeRoutePlanner.TryFindBestCargoSale`), which replaces the
+      plan's own copy of it. As in the siphon plan, a full hold sells even where the sale doesn't pay for its fuel, and a
+      full hold no market it can reach buys gets no trip, so the trading plan jettisons it (D42): a mining trip would
+      otherwise turn to selling at once and end without its ore aboard, on every tick.
+    - **The contract's round trips** keep only the contract's ore (D71): the tick's contract work sends the command
+      without the flag.
+  - Noticed (not changed):
+    - The role board values a mining trip by a full hold of its own ore (`RoleEstimator`), so the ores it keeps beside it
+      count for nothing there: mining earns a little more than the board says. Since D58 a drone gathers whatever the
+      estimate, so it weighs only where the command ship's roles are compared.
+    - An ore kept whose sale doesn't pay for the fuel to its market stays aboard until it pays, or until a full hold sells
+      it at a loss, as a siphon's gas does. A drone's flight within one tank costs at most one unit of FUEL at the market
+      (72 to 97 credits in X1-DC53's markets on 2026-10-02), less than a few units of almost any ore.
+  - Tests: `MineResourceVolumeHandlerTests` (a mining trip keeps the ore a market buys within one tank, and jettisons the
+    one only a refuelling stop away and the one nobody buys; the contract's keeps neither; a full hold keeps what it keeps),
+    `MineAndSellGoalExecutorTests` (the trip asks to keep other ores; a full hold of mixed ores turns it to selling),
+    `MiningAutomationServiceTests` (a full hold sells at a loss; a full hold nobody buys gets no trip). Each failed before
+    the change, but the contract's, which shows it unchanged. App 1027, Domain 72, API 189 (and 4 skipped), Integration 1.
+  - To understand this, start with `JettisonWhatTheTripDoesNotKeepAsync` in
+    `SpaceTraders.Application/Commands/Ships/MineResourceVolumeCommand.cs`, then `MiningPlanner.IsSellableWithinOneTank`
+    and `GiveTripAsync` in `Automation/MiningAutomationService.cs`.
 
 ## Changes in gembernodes
 
