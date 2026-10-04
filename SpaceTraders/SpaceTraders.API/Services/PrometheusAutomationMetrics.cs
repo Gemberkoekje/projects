@@ -53,6 +53,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _shipCargoUnits;
     private readonly RunGauge _shipCargoCapacity;
     private readonly RunGauge _shipValue;
+    private readonly RunGauge _shipLedger;
     private readonly RunGauge _marketObserved;
     private readonly RunGauge _marketPurchasePrice;
     private readonly RunGauge _marketSellPrice;
@@ -95,6 +96,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Dictionary<string, string> _shipCapabilityLabels = new(StringComparer.Ordinal);
     private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _shipGoods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> _shipLedgerCategories = new(StringComparer.Ordinal);
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _markets = [];
     private readonly HashSet<(string System, string Waypoint, string Good, string Kind)> _marketGoods = [];
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _shipyards = [];
@@ -294,6 +296,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_ship_value_credits",
             "What was paid for a ship and for the mounts and modules installed on it; 0 for a starting ship.",
             "ship");
+        _shipLedger = Labelled(
+            "spacetraders_ship_ledger_credits",
+            "A ship's ledger since it joined the fleet, by ledger category: the credits it earned (positive) and spent (negative), such as its purchase, the cargo it bought and sold, and its fuel. Summed over the categories, what the ship has made. The contract's payments are the agent's, not a ship's.",
+            "ship",
+            "category");
         _systemInfo = new SampledGauge(Labelled(
             "spacetraders_system_info",
             "One series per system the bot knows, always 1: what the explore plan knows of it (home, explored, to_explore, gate_under_construction, jump_refused, no_gate, gate_unknown, cached) and its jump gate.",
@@ -1110,6 +1117,22 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _shipGoods[ship.Ship] = new HashSet<string>(goods.Keys, StringComparer.Ordinal);
         _shipCargoCapacity.WithLabels(ship.Ship).Set(ship.CargoCapacity);
         _shipValue.WithLabels(ship.Ship).Set(ship.Value);
+
+        // Slice 2.16: a series per category the ship's ledger has rows in; one whose rows aged out of the ledger goes.
+        if (_shipLedgerCategories.TryGetValue(ship.Ship, out var booked))
+        {
+            foreach (var gone in booked.Where(category => !ship.Ledger.ContainsKey(category)))
+            {
+                _shipLedger.RemoveLabelled(ship.Ship, gone);
+            }
+        }
+
+        foreach (var (category, credits) in ship.Ledger)
+        {
+            _shipLedger.WithLabels(ship.Ship, category).Set(credits);
+        }
+
+        _shipLedgerCategories[ship.Ship] = new HashSet<string>(ship.Ledger.Keys, StringComparer.Ordinal);
     }
 
     /// <summary>Removes a ship's details once it is gone. Under the lock.</summary>
@@ -1142,6 +1165,14 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             foreach (var good in goods)
             {
                 _shipCargoUnits.RemoveLabelled(ship, good);
+            }
+        }
+
+        if (_shipLedgerCategories.Remove(ship, out var booked))
+        {
+            foreach (var category in booked)
+            {
+                _shipLedger.RemoveLabelled(ship, category);
             }
         }
     }
