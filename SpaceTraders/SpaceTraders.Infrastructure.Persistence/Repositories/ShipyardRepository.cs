@@ -32,7 +32,6 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
 
     public async Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Shipyards.FindAsync([db.AgentId, shipyard.WaypointSymbol], cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
 
         var values = new CachedShipyard
@@ -45,6 +44,26 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
             LastObservedAt = now
         };
 
+        if (db.Database.IsRelational())
+        {
+            // One statement, as for markets (B61): two ships' arrivals, or an arrival and the exploring command ship,
+            // can store a shipyard nobody fetched before at the same moment. The later one updates the row the first
+            // one inserted.
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO cached_shipyards ("AgentId", "WaypointSymbol", "SystemSymbol", "ShipTypesJson", "ShipsDetailJson", "LastObservedAt")
+                VALUES ({values.AgentId}, {values.WaypointSymbol}, {values.SystemSymbol}, {values.ShipTypesJson}, {values.ShipsDetailJson}, {values.LastObservedAt})
+                ON CONFLICT ("AgentId", "WaypointSymbol")
+                DO UPDATE
+                SET "SystemSymbol" = EXCLUDED."SystemSymbol",
+                    "ShipTypesJson" = EXCLUDED."ShipTypesJson",
+                    "ShipsDetailJson" = EXCLUDED."ShipsDetailJson",
+                    "LastObservedAt" = EXCLUDED."LastObservedAt";
+                """, cancellationToken);
+            return;
+        }
+
+        // The in-memory database of unit tests runs no SQL.
+        var existing = await db.Shipyards.FindAsync([db.AgentId, shipyard.WaypointSymbol], cancellationToken);
         if (existing is null)
         {
             db.Shipyards.Add(values);
