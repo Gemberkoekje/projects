@@ -33,8 +33,22 @@ public sealed class ShipyardRepositoryTests : IntegrationTestBase
         await using var fresh = CreateFreshContext();
         var freshRepo = new ShipyardRepository(fresh);
 
-        var waypoint = await freshRepo.FindShipyardForTypeAsync("SHIP_MINING_DRONE");
+        var waypoint = await freshRepo.FindShipyardForTypeAsync("SHIP_MINING_DRONE", ["X1-OWN", "X1-OTHER"]);
 
         waypoint.Should().Be("X1-OWN-H53");
+    }
+
+    [SkippableFact]
+    public async Task FindShipyardForTypeAsync_OnlyLooksInTheSystemsItIsGiven()
+    {
+        // Asked on 2026-10-04: the shipyard seen last can be one the command ship explored; business stays where our ships work.
+        var repo = new ShipyardRepository(Db);
+        await repo.UpsertAsync(new ShipyardDataModel("X1-OWN-H53", "X1-OWN", "[\"SHIP_MINING_DRONE\"]"));
+        await repo.UpsertAsync(new ShipyardDataModel("X1-KR90-YARD", "X1-KR90", "[\"SHIP_MINING_DRONE\"]"));
+
+        await using var fresh = CreateFreshContext();
+        var waypoint = await new ShipyardRepository(fresh).FindShipyardForTypeAsync("SHIP_MINING_DRONE", ["X1-OWN"]);
+
+        waypoint.Should().Be("X1-OWN-H53", "X1-KR90's was seen last, but isn't where our ships work");
     }
 }

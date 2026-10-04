@@ -80,7 +80,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             StartingFaction: snapshot.Agent.StartingFaction,
             ShipCount: snapshot.Agent.ShipCount));
 
-        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>())
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
             .Returns("X1-PT96-H53");
 
         var miningDrone = snapshot.Systems

@@ -879,6 +879,58 @@ public sealed class PrometheusAutomationMetricsTests
         (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H51\"");
     }
 
+    /// <summary>The systems dashboard (asked on 2026-10-04): what each known system offers, and its gate.</summary>
+    [Fact]
+    public async Task ASystem_ShowsItsStateGateJumpsSitesRawGoodsAndTrades()
+    {
+        var explored = new SpaceTraders.Application.Exploring.SystemSample
+        {
+            System = "X1-KR90",
+            State = "explored",
+            Gate = "X1-KR90-AF5F",
+            GateState = "active",
+            Jumps = 1,
+            ExploredAt = Start,
+            Connections = ["X1-DC53", "X1-VR15"],
+            Markets = 7,
+            Shipyards = 1,
+            Uncharted = 0,
+            WaypointTypes = new Dictionary<string, int> { ["ASTEROID"] = 11, ["JUMP_GATE"] = 1 },
+            GatheringSites = new Dictionary<string, int> { ["IRON_ORE"] = 4 },
+            RawGoods = [new SpaceTraders.Application.Exploring.RawGoodSample { Good = "IRON_ORE", Price = 61, Market = "X1-KR90-A1", Supply = "SCARCE" }],
+            Trades = [new SpaceTraders.Application.Exploring.TradeSample { Good = "FOOD", BuyAt = "X1-KR90-B2", SellAt = "X1-KR90-A1", Margin = 420, Volume = 20 }],
+        };
+        var beyond = new SpaceTraders.Application.Exploring.SystemSample { System = "X1-HZ59", State = "gate_under_construction", Gate = "X1-HZ59-I59", GateState = "under_construction", Jumps = 1 };
+
+        _metrics.Systems([explored, beyond]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_system_info{system=\"X1-KR90\",state=\"explored\",gate=\"X1-KR90-AF5F\",gate_state=\"active\"} 1\n");
+        text.Should().Contain("spacetraders_system_info{system=\"X1-HZ59\",state=\"gate_under_construction\",gate=\"X1-HZ59-I59\",gate_state=\"under_construction\"} 1\n");
+        text.Should().Contain("spacetraders_system_jumps_from_home{system=\"X1-KR90\"} 1\n");
+        text.Should().Contain($"spacetraders_system_explored_timestamp_seconds{{system=\"X1-KR90\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().NotContain("spacetraders_system_explored_timestamp_seconds{system=\"X1-HZ59\"}");
+        text.Should().Contain("spacetraders_system_connection_info{system=\"X1-KR90\",to=\"X1-VR15\"} 1\n");
+        text.Should().Contain("spacetraders_system_facilities{system=\"X1-KR90\",kind=\"market\"} 7\n");
+        text.Should().Contain("spacetraders_system_facilities{system=\"X1-KR90\",kind=\"shipyard\"} 1\n");
+        text.Should().Contain("spacetraders_system_waypoints{system=\"X1-KR90\",type=\"ASTEROID\"} 11\n");
+        text.Should().Contain("spacetraders_system_gathering_sites{system=\"X1-KR90\",good=\"IRON_ORE\"} 4\n");
+        text.Should().Contain("spacetraders_system_raw_good_price{system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-A1\"} 61\n");
+        text.Should().Contain("spacetraders_system_raw_good_supply{system=\"X1-KR90\",good=\"IRON_ORE\"} 1\n");
+        text.Should().Contain("spacetraders_system_trade_margin{system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 420\n");
+        text.Should().Contain("spacetraders_system_trade_volume{system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 20\n");
+
+        // Iron is no longer bought best at A1, and FOOD no longer pays; after a reset the new agent knows no systems yet.
+        _metrics.Systems([explored with { RawGoods = [new SpaceTraders.Application.Exploring.RawGoodSample { Good = "IRON_ORE", Price = 58, Market = "X1-KR90-C3", Supply = "LIMITED" }], Trades = [] }, beyond]);
+        text = await ExportAsync();
+        text.Should().NotContain("market=\"X1-KR90-A1\"");
+        text.Should().Contain("spacetraders_system_raw_good_price{system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-C3\"} 58\n");
+        text.Should().NotContain("spacetraders_system_trade_margin{system=\"X1-KR90\"");
+
+        _metrics.Systems([]);
+        (await ExportAsync()).Should().NotContain("system=\"X1-KR90\"");
+    }
+
     [Fact]
     public async Task AShipyard_ShowsItsShipTypesAndThePricesItKnows()
     {

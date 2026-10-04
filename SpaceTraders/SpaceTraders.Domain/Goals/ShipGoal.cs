@@ -27,6 +27,8 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(GatherAndSellGoal), "GatherAndSell")]
 [JsonDerivedType(typeof(TradeBetweenMarketsGoal), "TradeBetweenMarkets")]
 [JsonDerivedType(typeof(SurveyWaypointGoal), "SurveyWaypoint")]
+[JsonDerivedType(typeof(JumpGoal), "Jump")]
+[JsonDerivedType(typeof(ExploreSystemGoal), "ExploreSystem")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -337,4 +339,43 @@ public sealed record SurveyWaypointGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.SurveyWaypoint;
+}
+
+/// <summary>
+/// One jump of the command ship's exploring (asked on 2026-10-04): it flies to <see cref="GateWaypointSymbol"/>, the jump
+/// gate of the system it is in, and jumps to <see cref="DestinationGateWaypointSymbol"/>, a gate that gate connects to,
+/// which buys one ANTIMATTER at the gate's market. The explore plan gives it only while the jump leaves the credit floor every
+/// ship purchase keeps. The goal ends in the destination's system; the explore plan chooses the next step.
+/// </summary>
+public sealed record JumpGoal : ShipGoal
+{
+    /// <summary>The gate the ship jumps from, in the system it is in.</summary>
+    public required string GateWaypointSymbol { get; init; }
+
+    /// <summary>The gate it jumps to, in another system.</summary>
+    public required string DestinationGateWaypointSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.Jump;
+}
+
+/// <summary>
+/// The command ship scouts a system it explores (asked on 2026-10-04): it visits each of <see cref="Stops"/>, the system's
+/// markets and shipyards, once, as the scout plan does at home, and the visit stores what the market and the shipyard
+/// there sell. The goal keeps its own progress (<see cref="Visited"/>), so the tick and an arrival that step it one after
+/// the other can't skip a stop (B45). It ends after the last stop; the explore plan then counts the system as explored.
+/// </summary>
+public sealed record ExploreSystemGoal : ShipGoal
+{
+    /// <summary>The system it scouts.</summary>
+    public required string SystemSymbol { get; init; }
+
+    /// <summary>The markets and shipyards to visit, in the order the ship flies to them.</summary>
+    public required IReadOnlyList<string> Stops { get; init; }
+
+    /// <summary>How many of <see cref="Stops"/> it has visited: the next stop is <c>Stops[Visited]</c>.</summary>
+    public int Visited { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.ExploreSystem;
 }

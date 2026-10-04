@@ -85,7 +85,8 @@ public sealed class TradingAutomationService(
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var earmarked = await ContractOreAsync(cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
-        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+        var active = await assignments.GetAllActiveAsync(cancellationToken);
+        var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -191,7 +192,8 @@ public sealed class TradingAutomationService(
             }
         }
 
-        await BuyCargoShipAsync(fleet, heldKeys, idle, cancellationToken);
+        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
+        await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, idle, cancellationToken);
 
         await SaveStateAsync(held, pending, cancellationToken);
     }
@@ -243,7 +245,12 @@ public sealed class TradingAutomationService(
     /// contract's drone, a surveyor and a drone for each scarce mineral; a ship beyond the list takes turns with the drones,
     /// and needs nothing while a trader has no trip or no new ship would have a route.
     /// </summary>
-    private async Task BuyCargoShipAsync(IReadOnlyList<ShipModel> fleet, IReadOnlySet<string> heldKeys, int idle, CancellationToken cancellationToken)
+    private async Task BuyCargoShipAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> businessSystems,
+        IReadOnlySet<string> heldKeys,
+        int idle,
+        CancellationToken cancellationToken)
     {
         var purchases = (await settings.GetAsync<string>(ShipPurchasesSetting, cancellationToken) ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -256,11 +263,7 @@ public sealed class TradingAutomationService(
         var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
         var inList = cargoShips < purchases.Length;
         var shipType = inList ? purchases[cargoShips] : purchases[^1];
-        var systems = fleet
-            .Select(ship => ship.SystemSymbol)
-            .OfType<string>()
-            .Where(system => system.Length > 0)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var systems = businessSystems.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var offer = (await shipyards.GetAllAsync(cancellationToken))
             .Where(shipyard => systems.Contains(shipyard.SystemSymbol))
             .SelectMany(shipyard => shipyard.Ships

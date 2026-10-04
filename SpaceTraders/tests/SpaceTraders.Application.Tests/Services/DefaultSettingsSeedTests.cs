@@ -15,6 +15,7 @@ public sealed class DefaultSettingsSeedTests
         // The kill switch and the plan switches: the tick, goal steps, startup recovery.
         "Automation.Enabled",
         "Automation.Plan.Scout.Enabled",
+        "Automation.Plan.Explore.Enabled",
         "Automation.Plan.Roles.Enabled",
         "Automation.Plan.Contract.Enabled",
         "Automation.Plan.ProbeDeployment.Enabled",

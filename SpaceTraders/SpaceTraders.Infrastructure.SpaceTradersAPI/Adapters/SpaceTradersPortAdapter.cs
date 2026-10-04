@@ -65,6 +65,9 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             response.Meta.Limit);
     }
 
+    public async Task<WaypointDataModel> GetWaypointAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+        => MapWaypoint(await client.GetWaypointAsync(systemSymbol, waypointSymbol, cancellationToken));
+
     public async Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
         var result = await client.NavigateShipAsync(shipSymbol, waypointSymbol, cancellationToken);
@@ -334,10 +337,25 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return new WarpActionResult(MapNav(result.Nav), MapFuel(result.Fuel));
     }
 
-    public async Task<JumpActionResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default)
+    public async Task<JumpActionResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
-        var result = await client.JumpShipAsync(shipSymbol, systemSymbol, cancellationToken);
-        return new JumpActionResult(MapNav(result.Nav), result.Cooldown.TotalSeconds);
+        JumpResult result;
+        try
+        {
+            result = await client.JumpShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        }
+        catch (SpaceTradersApiException exception) when (IsRefusal(exception))
+        {
+            // A client error is the game's answer to this jump, and would be the same on every step.
+            throw new JumpRefusedException(waypointSymbol, exception.ErrorCode ?? 0, exception.Message, exception);
+        }
+
+        return new JumpActionResult(
+            MapNav(result.Nav),
+            result.Cooldown.TotalSeconds,
+            result.Cooldown.Expiration,
+            result.Transaction?.TotalPrice ?? 0,
+            result.Agent?.Credits);
     }
 
     public async Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default)
@@ -351,7 +369,7 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         var jumpGate = await client.GetJumpGateAsync(systemSymbol, waypointSymbol, cancellationToken);
         return new JumpGateConnectionModel(
             jumpGate.Symbol,
-            jumpGate.Connections?.Select(ExtractSystemSymbol).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? []);
+            jumpGate.Connections?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? []);
     }
 
     public async Task<ShipRepairQuoteModel> GetRepairQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default)
@@ -427,11 +445,13 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             result.Transaction.TotalPrice);
     }
 
-    private static string ExtractSystemSymbol(string waypointSymbol)
-    {
-        var lastDash = waypointSymbol.LastIndexOf('-');
-        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
-    }
+    /// <summary>
+    /// Whether an API error is the game refusing what was asked: a client error, but not the rate limiter's 429 nor the
+    /// 401 of a server reset, which the client handles.
+    /// </summary>
+    private static bool IsRefusal(SpaceTradersApiException exception)
+        => (int)exception.StatusCode is >= 400 and < 500
+            && exception.StatusCode is not HttpStatusCode.TooManyRequests and not HttpStatusCode.Unauthorized;
 
     private static DateTimeOffset? TryParseDate(string? raw)
         => DateTimeOffset.TryParse(raw, out var parsed) ? parsed : null;
@@ -540,8 +560,10 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             waypoint.Y,
             HasMarket: waypoint.Traits?.Any(t => t.Symbol.Equals("MARKETPLACE", StringComparison.OrdinalIgnoreCase)) ?? false,
             HasShipyard: waypoint.Traits?.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)) ?? false,
-            TraitsJson: waypoint.Traits is not null ? System.Text.Json.JsonSerializer.Serialize(waypoint.Traits) : null,
-            OrbitalsJson: waypoint.Orbitals is not null ? System.Text.Json.JsonSerializer.Serialize(waypoint.Orbitals) : null,
+            TraitsJson: JsonSerializer.Serialize(waypoint.Traits ?? []),
+            ModifiersJson: JsonSerializer.Serialize(waypoint.Modifiers ?? []),
+            OrbitalsJson: waypoint.Orbitals is not null ? JsonSerializer.Serialize(waypoint.Orbitals) : null,
             ParentSymbol: waypoint.Orbits,
-            IsUnderConstruction: waypoint.IsUnderConstruction);
+            IsUnderConstruction: waypoint.IsUnderConstruction,
+            ChartJson: waypoint.Chart is not null ? JsonSerializer.Serialize(waypoint.Chart) : null);
 }

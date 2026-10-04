@@ -120,6 +120,9 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 # The journal: a timeline of the run
 {namespace="spacetraders"} | json | EventKind != ""
 
+# Exploring (slice 6.11): jumps, systems explored, the explore plan's start, waits and end, refused jumps
+{namespace="spacetraders"} | json | EventKind=~"Jumped|SystemExplored" or Plan="Explore" or Reason="jump_refused"
+
 # Log volume per hour (a loop shows up here)
 sum(count_over_time({namespace="spacetraders"}[1h]))                               (with --step 1h)
 ```
@@ -137,6 +140,10 @@ time() - spacetraders_ship_status_since_timestamp_seconds
 
 # Every setting as it is now, the Runtime.* flags included (a secret shows "(hidden)")
 spacetraders_setting_info
+
+# What the explore plan knows of each system (slice 6.11): state, gate, jumps from home
+spacetraders_system_info
+spacetraders_system_jumps_from_home
 
 # API calls that failed, and real 429s
 sum by (endpoint, status) (increase(spacetraders_api_requests_total{status!~"2.."}[1h]))

@@ -146,6 +146,19 @@ public static class JournalEvents
     /// </summary>
     public const string ProbeCalled = nameof(ProbeCalled);
 
+    /// <summary>
+    /// A ship jumped through a jump gate (exploring, asked on 2026-10-04: <c>ShipSymbol</c>, <c>WaypointSymbol</c> the gate
+    /// it left, <c>Destination</c> the gate it is at now, <c>SystemSymbol</c> it is in now, <c>Cost</c> of the one ANTIMATTER
+    /// the jump bought).
+    /// </summary>
+    public const string Jumped = nameof(Jumped);
+
+    /// <summary>
+    /// The command ship explored a system (asked on 2026-10-04: <c>ShipSymbol</c>, <c>SystemSymbol</c>, <c>Markets</c> and
+    /// <c>Shipyards</c> it visited there, each once, as the scout plan does at home).
+    /// </summary>
+    public const string SystemExplored = nameof(SystemExplored);
+
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);
 

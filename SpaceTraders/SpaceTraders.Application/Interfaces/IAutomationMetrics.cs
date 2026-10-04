@@ -183,6 +183,21 @@ public interface IAutomationMetrics
     void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom);
 
     /// <summary>
+    /// Records what each known system offers, for the systems dashboard (asked on 2026-10-04): its state and gate
+    /// (<c>spacetraders_system_info{system,state,gate,gate_state}</c>, always 1), its jumps from home
+    /// (<c>spacetraders_system_jumps_from_home</c>), when it was explored (<c>spacetraders_system_explored_timestamp_seconds</c>),
+    /// the systems its gate connects to (<c>spacetraders_system_connection_info{system,to}</c>), its markets, shipyards and
+    /// uncharted waypoints (<c>spacetraders_system_facilities{system,kind}</c>), its waypoints by type
+    /// (<c>spacetraders_system_waypoints{system,type}</c>), where each good can be mined or siphoned
+    /// (<c>spacetraders_system_gathering_sites{system,good}</c>), the raw goods its markets buy
+    /// (<c>spacetraders_system_raw_good_price{system,good,market}</c> and <c>_raw_good_supply{system,good}</c>), and its best
+    /// trades (<c>spacetraders_system_trade_margin</c> and <c>_trade_volume</c>, each <c>{system,good,buy_at,sell_at}</c>).
+    /// A series that is no longer in <paramref name="systems"/> is removed.
+    /// </summary>
+    /// <param name="systems">Every system the bot knows.</param>
+    void Systems(IReadOnlyCollection<SpaceTraders.Application.Exploring.SystemSample> systems);
+
+    /// <summary>
     /// Records the agent's settings, one series per setting, always 1
     /// (<c>spacetraders_setting_info{setting,current,description}</c>): its value now and what it does, for the
     /// dashboard's settings table (slice 2.9). A setting whose value or description changed loses its old series, and a

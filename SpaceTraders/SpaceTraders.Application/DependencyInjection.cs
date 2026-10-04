@@ -5,6 +5,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
@@ -66,6 +67,9 @@ public static class DependencyInjection
         services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();
         services.AddScoped<IBudgetPolicy, BudgetPolicy>();
         services.AddScoped<IScoutAllMarketplacesPlanService, ScoutAllMarketplacesPlanService>();
+
+        // Exploring (asked on 2026-10-04): the command ship jumps through active gates to every system not explored yet.
+        services.AddScoped<IExplorePlanService, ExplorePlanService>();
         services.AddScoped<IContractPlanService, ContractPlanService>();
         services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();
@@ -118,6 +122,8 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, JumpGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, ExploreSystemGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
         services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
         services.AddSingleton<IShipGoalStepGuard, ShipGoalStepGuard>();

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Contracts;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -159,6 +160,7 @@ public sealed class GameLoopService(
     private static Task BootstrapAsync(AutomationPlan plan, IServiceProvider services, CancellationToken cancellationToken) => plan switch
     {
         AutomationPlan.Scout => services.GetRequiredService<IScoutAllMarketplacesPlanService>().EnsureBootstrappedAsync(cancellationToken),
+        AutomationPlan.Explore => services.GetRequiredService<IExplorePlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.Roles => services.GetRequiredService<IRolePlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.Contract => services.GetRequiredService<IContractPlanService>().EnsureBootstrappedAsync(cancellationToken),
         AutomationPlan.ProbeDeployment => services.GetRequiredService<IProbeDeploymentPlanService>().EnsureBootstrappedAsync(cancellationToken),

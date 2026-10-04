@@ -110,10 +110,14 @@
   19:17Z). B59, 429s from the API's rate limiter while the bot keeps to its budget: its first step, logging the
   limiter's headers with each 429, is merged and deployed (projects#149, gembernodes#47: the cluster runs `5ef42bd`
   since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is merged
-  (projects#150); its deploy is gembernodes#48. Your decision D58, drones gather first, was merged as projects#151;
-  gembernodes#49 deploys it (`3ffb1a2`).
-- Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) was
-  merged as projects#152; gembernodes#50 deploys it (`df677b9`) with the graph.
+  and deployed (projects#150, gembernodes#48), and so is your decision D58, drones gather first (projects#151,
+  gembernodes#49).
+- Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) is merged
+  and deployed (projects#152, gembernodes#50: the cluster runs `df677b9`).
+- Slice 6.11 (exploring through the jump gates, and a systems dashboard, asked on 2026-10-04, with your decisions
+  D59–D63) is built on branch `ccr-c7061120-est7c1` in projects and gembernodes. It found and fixes B60. The explore
+  plan stays off until you switch it on (D9); the server's weekly reset (2026-10-04 13:00Z) registers a new agent with
+  the seeded settings, so switch it on after that.
 - Slice 2.11 (each ship for sale's tank, hold, what it could do in the fleet and its equipment, on the markets dashboard's
   shipyards table, asked on 2026-10-04) is built on branch `ccr-1e461fef-n6hydk` in projects and gembernodes.
 
@@ -186,6 +190,7 @@ the misbehaviour.
 | B57 | **Sales are booked without their market and unit price** (found on 2026-10-03, while measuring how our trades move prices). All 1,336 `TradeSell` rows of the ledger, from the first on 2026-10-02 at 13:20Z, have no `WaypointSymbol` and no `UnitPrice`, while all 281 `TradeBuy` rows have both. `ShipCargoSoldEvent` carries the market (slice 6.10a, D50), and `LedgerEntryHandler` passed it to `spacetraders_goods_sold_units_total` but not to the row; its test asserted the row without them. | `LedgerEntryHandler.cs`; `ledger_entries` grouped by category and empty columns, 2026-10-03 17:33Z | 6.10c follow-up (fixed: a sale is booked with its market and unit price, as a purchase is; the rows already written stay without them) |
 | B58 | **A survey ship flies to an asteroid it can't get away from, and back** (found on 2026-10-03, watching D54 on the cluster). A surveyor took any target it could reach one way (`MiningPlanner.CanReach`). The command ship's 400-unit tank makes B37's gold, platinum and silver targets for B7 (68 away; no drone's 80-unit tank gets there and back). SPECTER-F reached B7 at 18:40:10Z after its drift from the middle (D54), refuelled, and at once flew to B37 for gold, the best paid ore without a survey (as all were): it got there at 18:43:38Z with 12 of 80 fuel, and the nearest market that sells fuel is B7, 68 away. Its survey (no gold in it) done, the area rule found no drones within its CRUISE reach and drifted it back to B7 (18:43:49Z, arriving 19:15:33Z), where gold at B37 would again be the best paid ore without a survey: a loop of about 36 minutes, 32 of them drifting, while B14, where the drones mine for B7, gets no survey. D54 has the survey ship drift once, and survey from where the drones are. | `SurveyPlanService.cs`, `MiningPlanner.cs` (`CanReach`); Loki, `ShipSymbol="SPECTER-F"` from 18:40Z; the survey plan's state at 18:43:56Z (every target at B37 and B14 with 0 usable surveys, SPECTER-F the one candidate) | 6.10c follow-up (fixed: a surveyor takes a target only where it can get on, with the fuel left, to a market that sells fuel, `MiningPlanner.CanSurveyAt`; the state lists only those surveyors) |
 | B59 | **The API's rate limiter answers 429 while the bot keeps to its budget** (found on 2026-10-03, on the cluster). `ApiThrottled` expects none (slice 1.10), and B13 left its reading of the guide's burst (30 more requests per 60 seconds on top of 2 a second) for the 429 counter to confirm. From about 10:30Z on 2026-10-03, as the fleet grew to 21 ships and its requests to about 0.6 a second, the limiter answered 429 7 to 13 times every three hours (about 1 in 500 requests), in bursts: four in 4 seconds at 19:07Z, six in 16 seconds at 19:14Z. Each came while the bot's own budget was in full use (writes waited 3.1 and 9.1 seconds in the two minutes around them), and each went through on its first retry, most after about 35 ms. `RepeatingError` was raised at 19:15Z, `ApiThrottled` at 19:27Z (11 in an hour). What the server counted isn't known: the warning gave the endpoint and the wait, not the limiter's headers. | `RateLimitResponseHandler.cs`, `RequestBudget.cs`; Loki, `|= "429 from"` from 18:55Z; `spacetraders_api_throttled_total`, `spacetraders_api_rate_limit_wait_seconds_total`, `spacetraders_api_requests_total` | 6.10c follow-up (step 1, asked on 2026-10-03, "log headers first": each 429's warning carries the limiter's headers; the budget is fixed once they show what the server counts) |
+| B60 | **The jump call sends the destination's system, not its gate** (found on 2026-10-04, building slice 6.11, from the API's spec). `POST my/ships/{ship}/jump` takes the jump gate to jump to, `{"waypointSymbol": …}` (API v2.3.0), and buys one ANTIMATTER at the gate's market; `SpaceTradersApiClient.JumpShipAsync` sent `{"systemSymbol": …}`. The port's jump-gate read turned each connection into its system, so nothing could have named the gate either. No plan jumped before 6.11, so neither ever ran. | `SpaceTradersApiClient.cs`, `SpaceTradersPortAdapter.cs` (`JumpShipAsync`, `GetJumpGateConnectionsAsync`); the API's spec, `jump-ship` and `get-jump-gate` | 6.11 (fixed: the jump sends the gate's `waypointSymbol`, which `JumpRequestTests` checks in the request's body; the connections stay gates; the result carries the antimatter's price and the credits after it, and a refused jump is a `JumpRefusedException`) |
 
 ### Decisions (2026-10-01)
 
@@ -252,6 +257,11 @@ get the next D-number.
 | D56 | Slice 6.10 (asked on 2026-10-03): "Can we add the rule that only full cargo holds can be traded? As the price changes after the buy, it's much more effective if 40 units are bought compared to 6 or 7." A market trades at most its trade volume at once, and each trade moves its price: on 2026-10-03 a purchase raised it 4% (under half the trade volume), 7% (half or more) or 9% (all of it), a sale lowered it 1 to 3%; a unit costs the price quoted for its purchase. The drones bought SHIP_PARTS 6 or 7 at a time at D41 (15 at once) and sold them at C39 and H52 (7 and 6 at once); a trip took as many units as the free hold, both trade volumes and the credits allowed, in one purchase. How should a trade fill a hold, and with what credits? | **Full hold or nothing, in one purchase and one sale:** "So I'd suggest waiting for the market trade volume to be at max cargo capacity, and only then buy all of it at once. And especially mining drones can mine while this is not the case. The entire goal is to buy full holds in one go, because it makes no sense to buy more times than one." A route counts only when both markets' trade volumes are at least the ship's free hold and the credits pay for all of it (the trip's fuel and `Trade.FuelReserveCredits` kept back, D24); otherwise the ship takes other work, and drones keep trading when a full hold is there (D37's spare time). The credits: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships are bought." While a trader's best route is a full hold the credits don't pay for yet, the credit reserve every ship purchase keeps (D51) grows by the dearest such hold, until it is bought. Amends D51; replaces "as many units as the credits allow". |
 | D57 | After D56 (2026-10-03): traders share one pot of credits, and nothing held back the credits of a trip already on its way to buy. At 19:29Z SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85; by the time it got there another trader had spent about 121,000, leaving 54,596, too little once the fuel reserve was kept back, and it dropped the trip as `not_possible` with nothing bought (before D56 it would have bought what the credits paid for). | **Hold the credits back from the start:** "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at the price it was chosen with, from the moment it starts until the cargo is aboard: the other traders get only the credits no trip holds back, the trip at its buy market spends its own, and ship purchases leave them, as they leave a saving (D56); a trader that sets off for the hold it saved up for saves up no more, as the trip's hold takes its place. A price that rose meanwhile is paid from the credits no trip holds back. |
 | D58 | After D57 (2026-10-03): asked why a drone (SPECTER-15, 18:52Z) was bought while the light shuttle waited, we found the role board moving drones between gathering and trading every 10 minutes for profit (SPECTER-3: Mine to Trade at 19:33Z, back at 19:51Z, to Trade at 20:01Z; siphon drones the same). The ores and gases they no longer gathered went short, and the coverage tier (D48, D53) bought drones for them: SPECTER-15's first trip was the middle's copper, "uncovered". Asked: "I feel it's wrong if the drone buying system feels like there are not enough mining drones, but the mining drones themselves are trading. Mining drones should be mining drones first, and traders second, and they should not leave gaps when trading in a way that results in endless drones being bought." | **Drones gather first, mining and siphon drones alike:** the role board gives every drone (it can mine or siphon, and trade, and nothing else) its gathering role, whatever trading would pay; a drone trades only when its plan has no trip for it, as it already could, so its trading leaves no mineral without a drone. The command ship, which can survey, still takes what pays it most (D38). Amends D38's "most profitable" for drones. |
+| D59 | Slice 6.11 (asked on 2026-10-04): "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the home system, recursively." How far does it go? X1-DC53's gate connects to four systems that day: X1-KR90 and X1-MT49, built, and X1-HZ59 and X1-BG54, still under construction; a walk through the gates' connections passed 60 systems within 7 jumps. | **No limit:** "No limit. Most likely a shipyard will be found with dedicated explorer type ships that can take over from the command ship eventually." The command ship explores every system the built gates reach, the nearest by jumps first. |
+| D60 | Slice 6.11: what does the command ship do once nothing is left to explore, and do the other plans work in the systems it finds? | **Come home, for now:** "For now: come home. Long term: plans should just work across systems, keeping in mind antimatter fuel costs etc. But let's start simple and expand once we understand what's out there a bit better." It jumps home, where the other plans give it work again. Meanwhile they do business only in the systems where a ship that doesn't explore is (home); what the command ship finds elsewhere is for the systems dashboard. |
+| D61 | Slice 6.11: when does exploring take the command ship from its work (surveying, trading, spare time)? | **When its current trip ends** (the recommended option): the plan takes it once it is free (no goal, no assignment, not in transit), before the role board and every plan after it. |
+| D62 | Slice 6.11: an uncharted waypoint keeps its traits hidden (an asteroid's deposits among them), and the command ship could chart the waypoints it visits (`POST my/ships/{ship}/chart`). Chart them? | **Not for now:** "Skip them for now, charting might be interesting later but simple first, expansion later." |
+| D63 | Slice 6.11: each jump buys one ANTIMATTER at the gate's market. What credits may a jump spend? | **Keep the 60,000 credit floor** (the recommended option): a jump goes only while the credits after it stay at or above `FleetExpansion.MinCreditReserve` (seeded at 60,000), the floor every ship purchase keeps (D51); until then the plan holds the jump. |
 
 ## Phases
 
@@ -2335,6 +2345,108 @@ How credits are split stays your call; Claude only fixes deviations from intende
   - **To understand this,** start with the decisions D43–D58, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
+- **6.11 Exploring through the jump gates, and a systems dashboard** (asked 2026-10-04, with your decisions D59–D63; built
+  on branch `ccr-c7061120-est7c1` in projects and gembernodes; fixes B60). Asked: "if an active jump gate goes to a system
+  that isn't explored yet, the COMMAND ship should go through that jump gate. If there are markets or shipyard there, the
+  COMMAND ship should scout them, as it initially does for the home system, recursively." And during the work: "I'd
+  probably want a systems grafana dashboard with a more wide view of which systems have been explored and what kind of
+  mining, trading and shipyard opportunities it gives."
+  - **What the API said** (2026-10-04, public endpoints and the spec, v2.3.0):
+    - X1-DC53's gate, I55, is built; its market exchanges ANTIMATTER and FUEL. It connects to X1-KR90 (18 waypoints, 7
+      markets, no shipyard) and X1-MT49 (31 waypoints, 11 markets, two gas giants, no shipyard), both built, and to X1-HZ59
+      and X1-BG54 (each about 90 waypoints, 26 to 28 markets and 3 shipyards), whose gates are under construction. A walk
+      through the connections passed 60 systems within 7 jumps; farther out, systems such as X1-VR15 and X1-CV66 have a
+      shipyard each.
+    - A jump (`POST my/ships/{ship}/jump`) takes the destination gate's `waypointSymbol`, needs the ship in orbit at a gate
+      and both gates built, buys one ANTIMATTER at the gate's market, and starts a cooldown (B60: the bot's call sent the
+      destination's system).
+    - An uncharted waypoint shows the trait `UNCHARTED` instead of its own. X1-DC53 and its four neighbours have none;
+      some systems farther out do (X1-UF58: 13 of 34).
+    - The server resets weekly; the next is on 2026-10-04 at 13:00Z, so this runs under a new agent, maybe in another
+      system: nothing in it is tied to X1-DC53.
+  - Done:
+    - **The explore plan** (`Exploring/ExplorePlanService.cs`, switch `Automation.Plan.Explore.Enabled`, off by
+      default): bootstrapped after the scout plan and before the role board. It knows every system it has seen
+      (`ExplorePlanState`, `plan_states` row `Explore`): the gate, whether it is built, the gates it connects to, when a
+      jump there was refused and when it was explored. Home counts as explored (the scout plan's). It learns one thing
+      from the API a pass (D19): home's gate, then each explored system's connections, then each connected gate; a gate
+      under construction, or one a jump was refused at, is looked at again hourly. A system the ship has just jumped into
+      has its system and waypoints fetched and cached at once, as startup sync does.
+    - **The command ship** is taken when its trip ends (D61): free, with a system left to explore; an `Explore`
+      assignment keeps the other plans off it. It goes to the nearest system not explored yet by jumps through built
+      gates, no limit (D59, `ExploreAtlas`), jumps home when none is left (D60) and is released there.
+    - **A jump** (`JumpGoal`, `JumpGoalExecutor`): fly to the gate, fill the tank when docked at a gate that sells fuel,
+      orbit, wait out the cooldown, jump. Only while the credits after the antimatter stay at or above
+      `FleetExpansion.MinCreditReserve` (D63); until then the plan holds it (`PlanBlocked`, `waiting_for_credits`, once),
+      and a free command ship keeps its other work. The antimatter is booked (`AntimatterPurchase`). A jump the API
+      refuses blocks the goal (`jump_refused`); the plan leaves that gate an hour and chooses again.
+    - **Scouting a system** (`ExploreSystemGoal`, `ExploreSystemGoalExecutor`): each market and shipyard not cached yet,
+      nearest first from the gate, once; the arrival stores them, and the gate it jumped to is fetched there. Nothing is
+      charted (D62). Journal `SystemExplored` when it is done; a system without either is explored at once.
+    - **Business stays home** (D60, `Automation/BusinessSystems.cs`): the mining, siphon and trading plans buy ships, and
+      the contract plan looks for its drone's shipyard, only in systems where a ship that doesn't explore is
+      (`IShipyardRepository.FindShipyardForTypeAsync` takes those systems); the mining, siphon and survey plans plan no
+      work for the system the explorer is in.
+    - **Visibility:** journal kinds `Jumped` and `SystemExplored`, and the plan's `PlanStarted`, `PlanCompleted` and
+      `PlanBlocked`; the ship's activity reads "jumping to …" or "exploring …". Eleven `spacetraders_system_*` gauges
+      (`SystemOpportunities`, every minute): each known system's state, jumps from home, when it was explored, its
+      connections, markets, shipyards and uncharted waypoints, waypoints by type, gathering sites per good (asteroids by
+      their deposits, gas giants), the best price its markets pay for each ore and gas with the lowest supply, and its
+      five best trades with their volume. A system only explored keeps its markets' refresh times but not each good's
+      price series, so Prometheus doesn't grow with every system explored.
+    - **The systems dashboard** (gembernodes, uid `spacetraders-systems`): counts of systems known, explored, to explore
+      and behind gates under construction, and the antimatter bought; the command ship; a table per system; mining and
+      siphoning; trades; shipyards; gates; systems over time; the exploring journal. The two other SpaceTraders
+      dashboards link to it.
+  - **What to expect** once switched on: within a minute (one call a 5-second pass) the plan has looked at home's gate,
+    what it connects to and each gate there; at the end of the command ship's trip, `PlanStarted` ("explores X1-…, 1 jumps
+    away"), the flight to the gate, `Jumped`, then the new system's markets and shipyards one by one, `SystemExplored`,
+    the next jump. Each jump costs one ANTIMATTER at the gate's price; while the credits after it would be under the
+    floor, `PlanBlocked` says so once and the ship keeps working. With nothing left it jumps home, `PlanCompleted`, and
+    the other plans give it work again. The systems dashboard fills as it goes. While it is away it neither surveys nor
+    trades at home: a ship that can only survey (D47) surveys on, and without one the drones mine without surveys.
+  - Noticed (not changed):
+    - **A gate the API won't describe:** the connections of a gate that is uncharted may be refused, or come back
+      empty; the plan treats either as no connections and asks again hourly. Charting it (D62) would settle that.
+    - **The role board still evaluates the command ship while it explores,** in the system it is in; the plans give it
+      no work there (it is assigned), so only the board's state and `RoleChanged` lines show it.
+    - **The credit reserve still counts the command ship's 40-unit hold** while it explores (D51), 40,000 credits that
+      no trade of it will spend meanwhile. Yours to call.
+    - **`JumpGateCacheService`** is registered but nothing calls it (it was already unused); the explore plan keeps the
+      gates in its own state.
+    - The explore plan is off by default, as every new plan (D9), and the reset of 13:00Z registers a new agent with the
+      seeded settings: switch it on after the reset.
+  - To switch it on: `PUT /settings/Automation.Plan.Explore.Enabled` with `{"value": "true"}`.
+  - Done when: the command ship has explored every system the built gates reach and is back home, with no open anomaly.
+  - **To understand this,** start with `SpaceTraders.Application/Exploring/ExplorePlanService.cs` and `ExploreAtlas.cs`,
+    then the two executors (`Goals/Executors/JumpGoalExecutor.cs`, `ExploreSystemGoalExecutor.cs`) and
+    `Automation/BusinessSystems.cs`; for the dashboard, `Exploring/SystemOpportunities.cs`.
+  - Files, in `SpaceTraders.Application` unless named:
+    - new: `Exploring/ExplorePlanService.cs`, `ExplorePlanState.cs`, `ExploreAtlas.cs`, `SystemOpportunities.cs`;
+      `Goals/Executors/JumpGoalExecutor.cs`, `ExploreSystemGoalExecutor.cs`; `Automation/BusinessSystems.cs`;
+      `Ports/WaypointSymbols.cs`, `JumpRefusedException.cs`;
+    - changed: `Ports/ISpaceTradersPort.cs` (`GetWaypointAsync`, the jump's gate), `ApiPortModels.cs`;
+      `Automation/AutomationSwitches.cs`, `GameLoopService.cs`, `ScoutAllMarketplacesPlanState.cs` (`PlanTypes.Explore`),
+      `MiningAutomationService.cs`, `SiphonAutomationService.cs`, `TradingAutomationService.cs`, `SurveyPlanService.cs`,
+      `ContractPlanService.cs`; `Goals/ShipGoalExecutorService.cs`; `EventHandlers/LedgerEntryHandler.cs`;
+      `JournalEvents.cs`; `Services/FleetStatusQueryService.cs`; `Interfaces/IAutomationMetrics.cs`,
+      `Repositories/IShipyardRepository.cs`; `DependencyInjection.cs`; `ShipGoal.cs`, `ShipGoalKind.cs`,
+      `LedgerCategory.cs`, `DomainEvents.cs` (Domain); `SpaceTradersApiClient.cs`, `ISpaceTradersApiClient.cs`,
+      `Phase1ActionModels.cs`, `SpaceTradersPortAdapter.cs` (SpaceTradersAPI); `ShipyardRepository.cs`,
+      `DefaultSettingsSeed.cs` (Persistence); `PrometheusAutomationMetrics.cs`, `PrometheusMarketMetricsService.cs`,
+      `PrometheusMetricsService.cs` (API);
+    - tests: `Exploring/ExplorePlanServiceTests`, `ExploreAtlasTests`, `JumpGoalExecutorTests`,
+      `ExploreSystemGoalExecutorTests`, `SystemOpportunitiesTests`, `Ports/JumpRequestTests` (new); additions to
+      `MiningAutomationServiceTests`, `SiphonAutomationServiceTests`, `SurveyPlanServiceTests`,
+      `TradingAutomationServiceTests`, `ContractPlanServiceTests`, `AutomationSwitchesTests`,
+      `ShipGoalExecutorServiceTests`, `LedgerEntryHandlerTests`, `DefaultSettingsSeedTests`; `ShipyardRepositoryTests`
+      (Infrastructure); `PrometheusMetricsTests`, `PrometheusMarketMetricsServiceTests`, `MetricsEndpointTests` (API).
+  - Tests: App 907 (new: `ExplorePlanServiceTests` 8, `JumpGoalExecutorTests` 6, `ExploreSystemGoalExecutorTests` 6,
+    `ExploreAtlasTests` 4, `SystemOpportunitiesTests` 4, `JumpRequestTests` 3; one each for the mining, siphon, survey,
+    trading and contract plans, which failed before the change; the antimatter's ledger row; the two new goals in
+    `ShipGoalExecutorServiceTests`), Domain 72, API 167 (and 6 skipped: the sandbox, and Postgres without Docker),
+    Integration 1. `ShipyardRepositoryTests` (Infrastructure) need Docker and didn't run here.
+
 ## Changes in gembernodes
 
 Changes to files are made on a branch there, and Flux deploys them once merged. The rest needs
@@ -2353,5 +2465,6 @@ your PC, 1Password or kubectl:
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
 | 2.9 | The settings table on the SpaceTraders dashboard (merged: PR #31) |
 | 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (merged: PR #32). It shows data while the role board is switched on |
-| 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50, with the deploy of slice 2.10) |
+| 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50) |
+| 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (branch `ccr-c7061120-est7c1`, not merged). It shows data once the bot runs a build with slice 6.11, and the systems beyond home once the explore plan is on |
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (branch `ccr-1e461fef-n6hydk`, not merged). The new columns show data once the bot runs a build with slice 2.11: deploy that build with it |

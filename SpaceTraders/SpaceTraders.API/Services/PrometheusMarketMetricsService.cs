@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
@@ -18,6 +19,12 @@ namespace SpaceTraders.API.Services;
 /// good is made from.
 /// They come from <see cref="ISupplyChainCache"/>, which the trading plan shares: one API call per
 /// start between them, and after a failure one an hour.
+/// <para>
+/// It also exports what each known system offers, for the systems dashboard (asked on 2026-10-04,
+/// <see cref="SystemOpportunities"/>). A system the command ship has only explored, away from where our ships work, keeps
+/// its markets' refresh times and its summary, but not each good's series: exploring has no limit, and at about a
+/// thousand series a system they would grow Prometheus without end.
+/// </para>
 /// </summary>
 public sealed class PrometheusMarketMetricsService(
     IServiceScopeFactory serviceScopeFactory,
@@ -46,10 +53,28 @@ public sealed class PrometheusMarketMetricsService(
         var shipyardsObservedAt = (await shipyards.GetAllFreshnessAsync(cancellationToken))
             .ToDictionary(shipyard => shipyard.WaypointSymbol, shipyard => shipyard.LastObservedAt, StringComparer.Ordinal);
 
-        List<string> places = [.. knownMarkets.Select(m => m.WaypointSymbol).Concat(knownShipyards.Select(s => s.WaypointSymbol)).Distinct(StringComparer.Ordinal)];
-        var waypointTypes = await db.Waypoints.AsNoTracking()
-            .Where(w => places.Contains(w.Symbol))
-            .ToDictionaryAsync(w => w.Symbol, w => w.Type, StringComparer.Ordinal, cancellationToken);
+        var waypoints = (await db.Waypoints.AsNoTracking()
+                .Select(w => new { w.Symbol, w.SystemSymbol, w.Type, w.HasMarket, w.HasShipyard, w.TraitsJson })
+                .ToListAsync(cancellationToken))
+            .Select(w => new WaypointCacheModel(w.Symbol, w.SystemSymbol, w.Type, 0, 0, w.HasMarket, w.HasShipyard, default, w.TraitsJson))
+            .ToList();
+        var waypointTypes = waypoints
+            .GroupBy(w => w.Symbol, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Type, StringComparer.Ordinal);
+
+        var explore = await scope.ServiceProvider.GetRequiredService<IPlanRepository>().GetAsync<ExplorePlanState>(PlanTypes.Explore, cancellationToken);
+        var headquarters = (await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetAsync(cancellationToken))?.HeadquartersSymbol;
+        var home = explore?.HomeSystemSymbol ?? (headquarters is { Length: > 0 } ? WaypointSymbols.SystemOf(headquarters) : string.Empty);
+        var business = BusinessSystems.Of(
+                await scope.ServiceProvider.GetRequiredService<IShipRepository>().GetAllAsync(cancellationToken),
+                BusinessSystems.Explorers(await scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>().GetAllActiveAsync(cancellationToken)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var summaryOnly = (explore?.Systems ?? [])
+            .Where(system => system.ExploredAt is not null
+                && !system.SystemSymbol.Equals(home, StringComparison.OrdinalIgnoreCase)
+                && !business.Contains(system.SystemSymbol))
+            .Select(system => system.SystemSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         metrics.Markets(
         [
@@ -58,7 +83,7 @@ public sealed class PrometheusMarketMetricsService(
                 market.WaypointSymbol,
                 waypointTypes.GetValueOrDefault(market.WaypointSymbol, string.Empty),
                 market.LastObservedAt,
-                priced.TryGetValue(market.WaypointSymbol, out var snapshot) ? snapshot.TradeGoods : [])),
+                !summaryOnly.Contains(market.SystemSymbol) && priced.TryGetValue(market.WaypointSymbol, out var snapshot) ? snapshot.TradeGoods : [])),
         ]);
         metrics.Shipyards(
         [
@@ -70,6 +95,8 @@ public sealed class PrometheusMarketMetricsService(
                 shipyard.ShipTypes,
                 [.. shipyard.Ships.Select(ForSale)])),
         ]);
+
+        metrics.Systems(SystemOpportunities.Summarise(explore, home, waypoints, [.. priced.Values], now));
 
         if (!_hasSupplyChain)
         {

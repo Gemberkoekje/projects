@@ -14,7 +14,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ShipyardShipDto` lists a ship for sale's mounts and modules; `ShipyardWaypointDto` lists its ship types and ships as read-only lists (two QW0012 warnings fewer).
 
 ### Docs – Changed (2026-10-04, slice 2.11)
-- `PLAN.md`: slice 2.11; D58 and slice 2.10 merged; the gembernodes table's merged rows. `docs/HOW_IT_WORKS.md`: the new metrics.
+- `PLAN.md`: slice 2.11; the gembernodes table's merged rows. `docs/HOW_IT_WORKS.md`: the new metrics.
+
+### Code – Added (2026-10-04, slice 6.11)
+- The explore plan (`ExplorePlanService`, off by default: `Automation.Plan.Explore.Enabled`), as asked on 2026-10-04: "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the home system, recursively." Once its trip ends (D61), the command ship jumps through built gates to the nearest system not explored yet, with no limit (D59), visits each market and shipyard there once (`ExploreSystemGoal`), and goes on; with nothing left it comes home, where the other plans give it work again (D60). A jump buys one ANTIMATTER at the gate's market (`JumpGoal`, booked as `AntimatterPurchase`) and goes only while the credits after it stay at or above `FleetExpansion.MinCreditReserve` (D63). Nothing is charted (D62). The plan learns the gates from the API one call a pass, and caches each new system's waypoints when the ship gets there. Journal kinds `Jumped` and `SystemExplored`.
+- Eleven `spacetraders_system_*` gauges for a systems dashboard (gembernodes), asked the same day: "a systems grafana dashboard with a more wide view of which systems have been explored and what kind of mining, trading and shipyard opportunities it gives": each known system's state, jumps from home, connections, markets, shipyards, waypoints, what can be mined or siphoned there, the best price its markets pay for each ore and gas, and its best trades (`SystemOpportunities`).
+
+### Code – Changed (2026-10-04, slice 6.11)
+- Business stays home while the command ship explores (D60, `BusinessSystems`): the mining, siphon and trading plans buy ships, and the contract plan looks for its drone's shipyard, only in systems where a ship that doesn't explore is; the mining, siphon and survey plans plan no work in a system because the explorer is in it.
+- A system the command ship has only explored keeps its markets' refresh times and its summary in the metrics, but not each good's price series, so Prometheus doesn't grow with every system explored.
+
+### Code – Fixed (2026-10-04, B60)
+- The jump call sends the destination gate's `waypointSymbol`, as API v2.3.0 asks; it sent the destination's `systemSymbol`. The port's jump-gate read keeps the connections as gates, so a jump can name one, and a jump the API refuses comes back as `JumpRefusedException`. Nothing jumped before slice 6.11.
+
+### Docs – Changed (2026-10-04, slice 6.11)
+- `PLAN.md`: slice 6.11, decisions D59–D63, B60; D57, D58 and slice 2.10 merged and deployed. `docs/HOW_IT_WORKS.md`: the explore plan, the jump and explore-system goals, business staying home, the journal kinds, the system metrics, the jump call. `docs/GLOSSARY.md`: jump gate, antimatter, explored system, business systems. The `st-investigate` skill: queries for exploring.
 
 ### Code – Added (2026-10-03, slice 2.10)
 - The bot counts every request it initiates to the game API, once, as it starts: before the pause after a 502 and the local budget, and without the retries of a 429 (`spacetraders_api_requests_initiated_total{method,endpoint}`, from a new outermost handler, `ApiRequestInitiatedHandler`). It feeds the dashboard's new "API request rates" graph, asked on 2026-10-03: "For spacetraders, can we add a graph similar to this?" Next to the requests that went out, it shows requests waiting for the budget, and retries.
