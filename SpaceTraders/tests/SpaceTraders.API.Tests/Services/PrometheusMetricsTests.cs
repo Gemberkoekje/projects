@@ -405,6 +405,71 @@ public sealed class PrometheusMetricsServiceTests
     }
 
     /// <summary>
+    /// Slice 2.16: the dashboard's profit by ship reads each ship's ledger, summed by category: its purchase, the cargo it
+    /// bought and sold, its fuel, and the rest, such as a jump's antimatter or the jump gate's materials. Summed together,
+    /// what the ship has made. A starting ship has no purchase, a ship without rows no ledger, and the contract's payments
+    /// are the agent's: no ship's.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_SumsEachShipsLedger_ByCategory()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-1", ShipType = "COMMAND", Status = "DOCKED" });
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-2", ShipType = "SATELLITE", Status = "DOCKED" });
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-3", ShipType = "SHIP_LIGHT_HAULER", Status = "DOCKED" });
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.TradeBuy, -9_000));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.TradeSell, 7_000));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.TradeSell, 6_500));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.FuelPurchase, -120));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.FuelPurchase, -80));
+            db.LedgerEntries.Add(Ledger("AGENT-1", LedgerCategory.AntimatterPurchase, -2_000));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.ShipPurchase, -70_000));
+            db.LedgerEntries.Add(Ledger("AGENT-3", LedgerCategory.ConstructionBuy, -160_000));
+            db.LedgerEntries.Add(Ledger("AGENT", LedgerCategory.ContractDeposit, 4_000));
+            db.LedgerEntries.Add(Ledger("AGENT", LedgerCategory.ContractPayout, 23_000));
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
+            new FullHoldSavings(),
+            _names,
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        ships.Select(s => s.Ship).Should().BeEquivalentTo("AGENT-1", "AGENT-2", "AGENT-3");
+        ships.Single(s => s.Ship == "AGENT-1").Ledger.Should().BeEquivalentTo(new Dictionary<string, long>
+        {
+            ["TradeBuy"] = -9_000,
+            ["TradeSell"] = 13_500,
+            ["FuelPurchase"] = -200,
+            ["AntimatterPurchase"] = -2_000,
+        });
+        ships.Single(s => s.Ship == "AGENT-2").Ledger.Should().BeEmpty();
+        ships.Single(s => s.Ship == "AGENT-3").Ledger.Should().BeEquivalentTo(new Dictionary<string, long>
+        {
+            ["ShipPurchase"] = -70_000,
+            ["ConstructionBuy"] = -160_000,
+        });
+        ships.Select(s => (s.Ship, s.Value)).Should().BeEquivalentTo(new[]
+        {
+            ("AGENT-1", 0L),
+            ("AGENT-2", 0L),
+            ("AGENT-3", 70_000L),
+        });
+    }
+
+    /// <summary>
     /// The fleet table shows what each ship can do next to what it does. Its cached type is the registration role after
     /// startup sync, EXCAVATOR for a mining drone and a siphon drone alike, though a siphon drone can't mine: what a ship
     /// can do is what its mounts, hold and tank allow, whichever plans are on.
@@ -1009,6 +1074,60 @@ public sealed class PrometheusAutomationMetricsTests
         text = await ExportAsync();
         text.Should().Contain("ship=\"AGENT-3\",name=\"PICKAXE-1\"");
         text.Should().NotContain("SPUTNIK-1");
+    }
+
+    /// <summary>
+    /// Slice 2.16: the dashboard's profit by ship reads each ship's ledger, one series per category it has rows in; a ship
+    /// without rows has none. A category it no longer has (the ledger keeps 30 days) loses its series, and so does a ship
+    /// that is gone.
+    /// </summary>
+    [Fact]
+    public async Task AShipsLedger_IsOneSeriesPerCategory_UntilTheShipIsGone()
+    {
+        var hauler = new ShipMetricsSample("AGENT-3", "SHIP_LIGHT_HAULER", "DOCKED", "None", string.Empty)
+        {
+            Ledger = new Dictionary<string, long>(StringComparer.Ordinal)
+            {
+                ["ShipPurchase"] = -70_000,
+                ["TradeBuy"] = -9_000,
+                ["TradeSell"] = 13_500,
+                ["FuelPurchase"] = -200,
+            },
+        };
+        var probe = new ShipMetricsSample("AGENT-2", "SATELLITE", "DOCKED", "None", string.Empty);
+        _metrics.Fleet([hauler, probe], Start);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\",category=\"ShipPurchase\"} -70000\n");
+        text.Should().Contain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\",category=\"TradeBuy\"} -9000\n");
+        text.Should().Contain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\",category=\"TradeSell\"} 13500\n");
+        text.Should().Contain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\",category=\"FuelPurchase\"} -200\n");
+        text.Should().NotContain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-2\"");
+
+        // It sold another load, and its fuel aged out of the ledger.
+        _metrics.Fleet(
+            [
+                hauler with
+                {
+                    Ledger = new Dictionary<string, long>(StringComparer.Ordinal)
+                    {
+                        ["ShipPurchase"] = -70_000,
+                        ["TradeBuy"] = -9_000,
+                        ["TradeSell"] = 20_000,
+                    },
+                },
+                probe,
+            ],
+            Start.AddMinutes(1));
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\",category=\"TradeSell\"} 20000\n");
+        text.Should().NotContain("category=\"FuelPurchase\"");
+
+        // The hauler gone.
+        _metrics.Fleet([probe], Start.AddMinutes(2));
+
+        (await ExportAsync()).Should().NotContain("spacetraders_ship_ledger_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\"");
     }
 
     /// <summary>The markets dashboard (slice 2.8): a market's goods with their prices, volume, supply and activity.</summary>

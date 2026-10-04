@@ -491,7 +491,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     [Fact]
     public async Task TradingRoutes_ListTheHeldRoutes_ThenTheWaitingOnes_NumberedInTheTradingPlansOrder()
     {
-        // Slice 2.16 (D75): the order the trading plan gives routes out in, as it stored it at its last pass: a route that
+        // Slice 2.17 (D75): the order the trading plan gives routes out in, as it stored it at its last pass: a route that
         // feeds a pricier good first (D15), so FABRICS, which feeds CLOTHING, comes before SHIP_PARTS, which earns more.
         var updatedAt = new DateTimeOffset(2026, 10, 04, 23, 30, 00, TimeSpan.Zero);
         _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())

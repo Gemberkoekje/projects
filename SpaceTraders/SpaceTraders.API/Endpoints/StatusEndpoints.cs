@@ -114,7 +114,7 @@ public static class StatusEndpoints
             });
         });
 
-        // Slice 2.16 (D75): the trading plan's routes as it stored them at its last pass. The routes traders hold come first;
+        // Slice 2.17 (D75): the trading plan's routes as it stored them at its last pass. The routes traders hold come first;
         // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: one that
         // feeds a pricier good first, D15, then the most profit after fuel), numbered from 1. Only a pass with a free trader
         // lists any, and at most 20 (TradingAutomationService.MaxPendingRoutes).
@@ -357,7 +357,7 @@ public static class StatusEndpoints
     }
 
     /// <summary>
-    /// One route of the trading plan's view (slice 2.16): its place in the order the plan gives routes out (none for a held
+    /// One route of the trading plan's view (slice 2.17): its place in the order the plan gives routes out (none for a held
     /// one), the trip as estimated (units, profit after fuel and per unit) and why it ranks where it does (what it feeds, D15).
     /// </summary>
     private static object TradingRoute(TradingAutomationOpportunityState route, int? position) => new

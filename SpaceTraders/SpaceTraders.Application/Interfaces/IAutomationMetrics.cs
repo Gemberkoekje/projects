@@ -137,11 +137,13 @@ public interface IAutomationMetrics
     /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), what it can do
     /// (<c>spacetraders_ship_capabilities_info{ship,can}</c>), what the bot calls it
     /// (<c>spacetraders_ship_name_info{ship,name,type}</c>, slice 2.14), when it arrives
-    /// (<c>spacetraders_ship_arrival_timestamp_seconds{ship}</c>, while in transit) and its hold
-    /// (<c>spacetraders_ship_cargo_units{ship,good}</c>, <c>spacetraders_ship_cargo_capacity_units{ship}</c>).
+    /// (<c>spacetraders_ship_arrival_timestamp_seconds{ship}</c>, while in transit), its hold
+    /// (<c>spacetraders_ship_cargo_units{ship,good}</c>, <c>spacetraders_ship_cargo_capacity_units{ship}</c>),
+    /// what it cost (<c>spacetraders_ship_value_credits{ship}</c>) and its ledger by category
+    /// (<c>spacetraders_ship_ledger_credits{ship,category}</c>, slice 2.16).
     /// A ship whose labels changed since the last call entered its state at <paramref name="now"/>;
     /// a ship that is no longer in <paramref name="ships"/> loses its series, and so does a good that
-    /// is no longer aboard.
+    /// is no longer aboard and a ledger category it no longer has.
     /// </summary>
     void Fleet(IReadOnlyCollection<ShipMetricsSample> ships, DateTimeOffset now);
 
@@ -496,6 +498,13 @@ public sealed record ShipMetricsSample
 
     /// <summary>What was paid for it and for the mounts and modules installed on it, as the ledger has it; 0 for a starting ship.</summary>
     public long Value { get; init; }
+
+    /// <summary>
+    /// Its ledger since it joined the fleet, the credits of each category summed (slice 2.16): what it earned positive, what it
+    /// spent negative, such as <c>TradeSell</c> 13,500 and <c>FuelPurchase</c> -200. Summed together, what the ship has made.
+    /// Empty for a ship the ledger has no rows of.
+    /// </summary>
+    public IReadOnlyDictionary<string, long> Ledger { get; init; } = new Dictionary<string, long>(StringComparer.Ordinal);
 
     /// <summary>The name the bot gives it beside its symbol (slice 2.14, D72), such as <c>SPUTNIK-2</c>; empty before the agent is known.</summary>
     public string Name { get; init; } = string.Empty;
