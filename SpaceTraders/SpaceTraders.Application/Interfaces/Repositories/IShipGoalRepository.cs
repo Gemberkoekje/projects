@@ -46,7 +46,7 @@ public interface IShipGoalRepository
 
     /// <summary>
     /// Returns the active <see cref="SupplyConstructionGoal"/> of every ship that has one, by ship symbol, with its stored
-    /// status: what the fleet's construction trips carry or go to buy, and hold back for their cargo (slice 6.6, D59).
+    /// status: what the fleet's construction trips carry or go to buy, and hold back for their cargo (slice 6.6, D64).
     /// </summary>
     Task<IReadOnlyDictionary<string, SupplyConstructionGoal>> GetActiveConstructionGoalsAsync(CancellationToken cancellationToken = default);
 }

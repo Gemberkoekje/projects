@@ -10,7 +10,7 @@ using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 namespace SpaceTraders.Application.Tests.Construction;
 
 /// <summary>
-/// Slice 6.6: the construction sites as the plan knows them. Only the home system's jump gate counts (D63); it is fetched when
+/// Slice 6.6: the construction sites as the plan knows them. Only the home system's jump gate counts (D68); it is fetched when
 /// first seen under construction and again every 10 minutes while it needs materials, stored from every supply's answer, and
 /// a site that starts or stops needing materials is journaled.
 /// </summary>
@@ -104,7 +104,7 @@ public sealed class ConstructionSitesTests : IDisposable
     [Fact]
     public async Task OnlyTheHomeSystemsGates_AreLookedAt()
     {
-        // D63: a gate under construction elsewhere isn't considered.
+        // D68: a gate under construction elsewhere isn't considered.
         await Sites().NeedingMaterialsAsync(CancellationToken.None);
 
         await _waypoints.Received(1).GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>());

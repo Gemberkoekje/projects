@@ -1,4 +1,3 @@
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Interfaces;
@@ -174,7 +173,11 @@ public interface IAutomationMetrics
     /// (<c>spacetraders_shipyard_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>), the ship
     /// types it sells (<c>spacetraders_shipyard_ship_type{system,waypoint,ship_type}</c>) and, once a ship
     /// has been there, their prices and supply (<c>spacetraders_shipyard_ship_price</c>,
-    /// <c>_ship_supply</c>). A shipyard or a ship type that is no longer listed loses its series.
+    /// <c>_ship_supply</c>), their tank and hold (<c>_ship_fuel_capacity_units</c>,
+    /// <c>_ship_cargo_capacity_units</c>), and what each could do in the fleet and carries, one series per
+    /// ship type (<c>spacetraders_shipyard_ship_info{system,waypoint,ship_type,can,equipment}</c>, slice
+    /// 2.11). A shipyard or a ship type that is no longer listed loses its series, and a ship type listed
+    /// without details keeps only its type.
     /// </summary>
     void Shipyards(IReadOnlyCollection<ShipyardMetricsSample> shipyards);
 
@@ -185,6 +188,21 @@ public interface IAutomationMetrics
     /// </summary>
     /// <param name="madeFrom">Each exported good, with the goods it is made from.</param>
     void SupplyChain(IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom);
+
+    /// <summary>
+    /// Records what each known system offers, for the systems dashboard (asked on 2026-10-04): its state and gate
+    /// (<c>spacetraders_system_info{system,state,gate,gate_state}</c>, always 1), its jumps from home
+    /// (<c>spacetraders_system_jumps_from_home</c>), when it was explored (<c>spacetraders_system_explored_timestamp_seconds</c>),
+    /// the systems its gate connects to (<c>spacetraders_system_connection_info{system,to}</c>), its markets, shipyards and
+    /// uncharted waypoints (<c>spacetraders_system_facilities{system,kind}</c>), its waypoints by type
+    /// (<c>spacetraders_system_waypoints{system,type}</c>), where each good can be mined or siphoned
+    /// (<c>spacetraders_system_gathering_sites{system,good}</c>), the raw goods its markets buy
+    /// (<c>spacetraders_system_raw_good_price{system,good,market}</c> and <c>_raw_good_supply{system,good}</c>), and its best
+    /// trades (<c>spacetraders_system_trade_margin</c> and <c>_trade_volume</c>, each <c>{system,good,buy_at,sell_at}</c>).
+    /// A series that is no longer in <paramref name="systems"/> is removed.
+    /// </summary>
+    /// <param name="systems">Every system the bot knows.</param>
+    void Systems(IReadOnlyCollection<SpaceTraders.Application.Exploring.SystemSample> systems);
 
     /// <summary>
     /// Records the agent's settings, one series per setting, always 1
@@ -345,7 +363,7 @@ public sealed record MarketMetricsSample
 public sealed record ShipyardMetricsSample
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ShipyardMetricsSample(string System, string Waypoint, string WaypointType, DateTimeOffset ObservedAt, IReadOnlyList<string> ShipTypes, IReadOnlyList<ShipyardShipDto> Ships)
+    public ShipyardMetricsSample(string System, string Waypoint, string WaypointType, DateTimeOffset ObservedAt, IReadOnlyList<string> ShipTypes, IReadOnlyList<ShipyardShipMetricsSample> Ships)
     {
         this.System = System;
         this.Waypoint = Waypoint;
@@ -371,7 +389,47 @@ public sealed record ShipyardMetricsSample
     public required IReadOnlyList<string> ShipTypes { get; init; }
 
     /// <summary>The ships with their prices; empty until a ship has been there.</summary>
-    public required IReadOnlyList<ShipyardShipDto> Ships { get; init; }
+    public required IReadOnlyList<ShipyardShipMetricsSample> Ships { get; init; }
+}
+
+/// <summary>One ship type a shipyard lists in full, as the shipyards table shows it (slice 2.11).</summary>
+public sealed record ShipyardShipMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipyardShipMetricsSample(string Type, long PurchasePrice, string Supply)
+    {
+        this.Type = Type;
+        this.PurchasePrice = PurchasePrice;
+        this.Supply = Supply;
+    }
+
+    /// <summary>The ship type, such as <c>SHIP_MINING_DRONE</c>.</summary>
+    public required string Type { get; init; }
+
+    /// <summary>What the shipyard charges for it.</summary>
+    public required long PurchasePrice { get; init; }
+
+    /// <summary>Its supply at the shipyard, <c>SCARCE</c> to <c>ABUNDANT</c>; empty when the shipyard gave none.</summary>
+    public required string Supply { get; init; }
+
+    /// <summary>What its tank holds, from its frame; 0 for a probe.</summary>
+    public int FuelCapacity { get; init; }
+
+    /// <summary>What its cargo holds take together; 0 for a ship without a hold.</summary>
+    public int CargoCapacity { get; init; }
+
+    /// <summary>
+    /// What it could do in the fleet, judged as the fleet table's "can do" judges a ship: <c>Survey</c>, <c>Mine</c>,
+    /// <c>Siphon</c> and <c>Trade</c>, in that order, such as <c>Mine, Trade</c>; <c>none</c> for a ship that can do
+    /// none of them; but <c>Probe</c> for a probe.
+    /// </summary>
+    public string Can { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Its mounts, then its modules, without their <c>MOUNT_</c> and <c>MODULE_</c> prefixes and without the cargo
+    /// holds and crew quarters, such as <c>MINING_LASER_I, MINERAL_PROCESSOR_I</c>; <c>none</c> without any.
+    /// </summary>
+    public string Equipment { get; init; } = string.Empty;
 }
 
 /// <summary>One ship as the metrics show it.</summary>

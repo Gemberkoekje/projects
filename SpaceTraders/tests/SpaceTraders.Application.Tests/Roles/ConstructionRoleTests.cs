@@ -7,7 +7,7 @@ namespace SpaceTraders.Application.Tests.Roles;
 
 /// <summary>
 /// Slice 6.6: the construction role counts while the construction plan is on and the jump gate of the ship's system needs
-/// materials (D63: the home system's only); a builder trades when the construction plan has nothing it may buy (D60).
+/// materials (D68: the home system's only); a builder trades when the construction plan has nothing it may buy (D65).
 /// </summary>
 public sealed class ConstructionRoleTests
 {

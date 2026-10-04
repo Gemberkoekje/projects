@@ -10,7 +10,7 @@ namespace SpaceTraders.Application.Tests.Construction;
 /// <summary>
 /// Slice 6.6, asked on 2026-10-04: "Finishing this jump node should be top priority, as it opens up the rest of the game."
 /// What the jump gate still needs, and which load a builder takes: a full hold, or what the gate still needs, in one
-/// purchase (D62), where the supply isn't SCARCE or LIMITED (D61), at the market where it costs least with its fuel.
+/// purchase (D67), where the supply isn't SCARCE or LIMITED (D66), at the market where it costs least with its fuel.
 /// </summary>
 public sealed class ConstructionPlannerTests
 {
@@ -34,8 +34,8 @@ public sealed class ConstructionPlannerTests
     [Fact]
     public void AHaulerWithAnEmptyHold_BuysAFullHoldOfFabMats_WhereItCostsLeast()
     {
-        // ADVANCED_CIRCUITRY comes first by name at an equal share, but D42 trades 40 at a time, under the hauler's 80 (D62);
-        // A1's FAB_MATS are LIMITED (D61), and dearer anyway.
+        // ADVANCED_CIRCUITRY comes first by name at an equal share, but D42 trades 40 at a time, under the hauler's 80 (D67);
+        // A1's FAB_MATS are LIMITED (D66), and dearer anyway.
         var loads = ConstructionPlanner.Loads(Map(), Hauler(), Gate, ConstructionPlanner.Needs(Site(), []));
 
         var load = loads.Should().ContainSingle().Subject;
@@ -72,7 +72,7 @@ public sealed class ConstructionPlannerTests
     [InlineData("HIGH", true)]
     public void AMarketShortOfTheMaterial_SellsNoLoad(string supply, bool bought)
     {
-        // D61: "Don't buy where the material is SCARCE or LIMITED; wait until the market recovers to MODERATE."
+        // D66: "Don't buy where the material is SCARCE or LIMITED; wait until the market recovers to MODERATE."
         var map = Map(GateMarket(), F49Market(supply: supply), D42Market(), H51Market(), I56Market());
 
         var loads = ConstructionPlanner.Loads(map, Hauler(), Gate, ConstructionPlanner.Needs(Site(), []));
@@ -83,7 +83,7 @@ public sealed class ConstructionPlannerTests
     [Fact]
     public void AMarketWhoseTradeVolumeIsUnderAHold_SellsNoLoad_ButTheCreditsAreSavedUpForIt()
     {
-        // D62, asked on 2026-10-04: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade
+        // D67, asked on 2026-10-04: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade
         // volume is a haulers hold." Not strict, it is what the plan waits for.
         var map = Map(GateMarket(), F49Market(tradeVolume: 60), D42Market(), H51Market(), I56Market());
         var needs = ConstructionPlanner.Needs(Site(), []);

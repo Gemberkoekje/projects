@@ -133,7 +133,7 @@ public sealed class FleetRoleBoard
             : FleetRoles.IsSiphoner(ship);
 
     /// <summary>
-    /// Whether the ship builds the jump gate for the construction plan (slice 6.6, D60): the construction role (the board).
+    /// Whether the ship builds the jump gate for the construction plan (slice 6.6, D65): the construction role (the board).
     /// With the board off the construction plan picks its builders by the same rule, the largest holds.
     /// </summary>
     /// <param name="ship">The ship.</param>

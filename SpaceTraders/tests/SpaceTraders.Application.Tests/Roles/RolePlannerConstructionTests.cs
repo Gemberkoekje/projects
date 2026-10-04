@@ -7,7 +7,7 @@ using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 namespace SpaceTraders.Application.Tests.Roles;
 
 /// <summary>
-/// Slice 6.6 (D60): while the home system's jump gate needs materials, the ship with the largest hold that isn't a drone or
+/// Slice 6.6 (D65): while the home system's jump gate needs materials, the ship with the largest hold that isn't a drone or
 /// the surveyor builds it. Asked on 2026-10-04: "Can you implement a special role that works on this jump gate?" Supplying
 /// pays nothing, so no estimate chooses the role: it goes first to the largest hold, as surveys go first (D38).
 /// </summary>
@@ -109,7 +109,7 @@ public sealed class RolePlannerConstructionTests
     [Fact]
     public void AShipWhoseOneRoleIsBuilding_ButIsntChosen_HasNone()
     {
-        // With the trading plan off, both shuttles could only build; one builds (D60), the other has no role.
+        // With the trading plan off, both shuttles could only build; one builds (D65), the other has no role.
         var decisions = RolePlanner.Decide(
             [Candidate(Shuttle(), [FleetRole.Construct]), Candidate(Shuttle("SHIP-9"), [FleetRole.Construct])],
             contractWantsOre: false,

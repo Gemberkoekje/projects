@@ -15,7 +15,7 @@ public sealed record ConstructionPlanState
     /// <summary>The construction sites that need materials, in the systems where our ships are.</summary>
     public required IReadOnlyList<ConstructionSiteState> Sites { get; init; }
 
-    /// <summary>The ships that build: with the role board on, those with the construction role (D60).</summary>
+    /// <summary>The ships that build: with the role board on, those with the construction role (D65).</summary>
     public IReadOnlyList<string> BuilderShipSymbols { get; init; } = [];
 
     /// <summary>
@@ -27,8 +27,8 @@ public sealed record ConstructionPlanState
 
     /// <summary>
     /// Why a free builder bought no load, when one didn't: <c>purchase_order</c> (a purchase before it in the order ships are
-    /// bought in, D59), <c>waiting_for_credits</c> (the load would dip into the credit reserve), <c>low_supply</c> (D61),
-    /// <c>trade_volume</c> (D62), <c>no_market</c>; empty otherwise. Meanwhile the builder trades.
+    /// bought in, D64), <c>waiting_for_credits</c> (the load would dip into the credit reserve), <c>low_supply</c> (D66),
+    /// <c>trade_volume</c> (D67), <c>no_market</c>; empty otherwise. Meanwhile the builder trades.
     /// </summary>
     public string Waiting { get; init; } = string.Empty;
 

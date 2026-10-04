@@ -121,7 +121,7 @@ public sealed record MineralCoverage
 ///   nothing else, takes its gathering role whatever trading would pay, and trades only when its plan has no trip for it.
 ///   Moved to trading for profit, drones left the minerals they had mined short, and the plans bought drones for them;</item>
 ///   <item>while a system's jump gate needs materials, the ships with the largest holds there, as many as
-///   <c>Construction.Ships</c> (one), build it (<see cref="Construction"/>, slice 6.6, D60): supplying pays nothing, so no
+///   <c>Construction.Ships</c> (one), build it (<see cref="Construction"/>, slice 6.6, D65): supplying pays nothing, so no
 ///   estimate could choose it, and finishing the gate comes first. Drones and the ship that surveys are decided by then.
 ///   Of two equal holds, the one that builds now keeps it, else the one that can do least else;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
@@ -150,7 +150,7 @@ public static class RolePlanner
     /// </summary>
     public const string GathersFirst = "gathers_first";
 
-    /// <summary>The ship builds the jump gate: of those that can, it has the largest hold (slice 6.6, D60).</summary>
+    /// <summary>The ship builds the jump gate: of those that can, it has the largest hold (slice 6.6, D65).</summary>
     public const string Construction = "construction";
 
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
@@ -179,7 +179,7 @@ public static class RolePlanner
     /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
     /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
     /// <param name="builders">
-    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D60), of those that have the construction
+    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
     /// role available: only where the gate needs materials.
     /// </param>
     /// <returns>A decision per ship, by symbol.</returns>
@@ -196,7 +196,7 @@ public static class RolePlanner
         var bonus = 1 + Math.Max(0, headStart);
         var decisions = new Dictionary<string, RoleDecision>(StringComparer.OrdinalIgnoreCase);
 
-        // The construction role goes only to the ships with the largest holds (D60), even where it is a ship's one role.
+        // The construction role goes only to the ships with the largest holds (D65), even where it is a ship's one role.
         foreach (var ship in ships.Where(ship => ship.Roles.Count <= 1 && !ship.Roles.Contains(FleetRole.Construct)))
         {
             decisions[ship.Ship.Symbol] = ship.Roles.Count == 0
@@ -274,7 +274,7 @@ public static class RolePlanner
     }
 
     /// <summary>
-    /// The ships that build each system's jump gate (slice 6.6, D60): of those not yet decided that have the construction
+    /// The ships that build each system's jump gate (slice 6.6, D65): of those not yet decided that have the construction
     /// role available (only where the gate needs materials), the largest holds, as many as <paramref name="count"/>; of two
     /// equal holds, the one that builds now, then the one that can do least else (a cargo ship before the command ship), then
     /// by symbol.

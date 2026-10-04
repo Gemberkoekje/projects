@@ -88,7 +88,8 @@ public sealed class TradingAutomationService(
         var earmarked = await ContractOreAsync(cancellationToken);
         var materials = await ConstructionMaterialsAsync(cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
-        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+        var active = await assignments.GetAllActiveAsync(cancellationToken);
+        var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -147,7 +148,7 @@ public sealed class TradingAutomationService(
         var pending = new Dictionary<string, PendingRoute>(StringComparer.OrdinalIgnoreCase);
         var idle = 0;
 
-        // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D59).
+        // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64).
         var constructionHolds = TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(cancellationToken));
         foreach (var system in free.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
@@ -197,7 +198,8 @@ public sealed class TradingAutomationService(
             }
         }
 
-        await BuyCargoShipAsync(fleet, heldKeys, idle, cancellationToken);
+        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
+        await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, idle, cancellationToken);
 
         await SaveStateAsync(held, pending, cancellationToken);
     }
@@ -214,7 +216,7 @@ public sealed class TradingAutomationService(
                 : string.Empty;
 
     /// <summary>
-    /// The materials the home system's jump gate still needs while the construction plan is on (slice 6.6, D63): a ship that
+    /// The materials the home system's jump gate still needs while the construction plan is on (slice 6.6, D68): a ship that
     /// holds them keeps them, and the construction plan, which comes first, has it supply them. Empty with the plan off.
     /// </summary>
     private async Task<IReadOnlySet<string>> ConstructionMaterialsAsync(CancellationToken cancellationToken)
@@ -264,7 +266,12 @@ public sealed class TradingAutomationService(
     /// contract's drone, a surveyor and a drone for each scarce mineral; a ship beyond the list takes turns with the drones,
     /// and needs nothing while a trader has no trip or no new ship would have a route.
     /// </summary>
-    private async Task BuyCargoShipAsync(IReadOnlyList<ShipModel> fleet, IReadOnlySet<string> heldKeys, int idle, CancellationToken cancellationToken)
+    private async Task BuyCargoShipAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> businessSystems,
+        IReadOnlySet<string> heldKeys,
+        int idle,
+        CancellationToken cancellationToken)
     {
         var purchases = (await settings.GetAsync<string>(ShipPurchasesSetting, cancellationToken) ?? string.Empty)
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -277,11 +284,7 @@ public sealed class TradingAutomationService(
         var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
         var inList = cargoShips < purchases.Length;
         var shipType = inList ? purchases[cargoShips] : purchases[^1];
-        var systems = fleet
-            .Select(ship => ship.SystemSymbol)
-            .OfType<string>()
-            .Where(system => system.Length > 0)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var systems = businessSystems.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var offer = (await shipyards.GetAllAsync(cancellationToken))
             .Where(shipyard => systems.Contains(shipyard.SystemSymbol))
             .SelectMany(shipyard => shipyard.Ships
@@ -455,7 +458,7 @@ public sealed class TradingAutomationService(
         CancellationToken cancellationToken)
     {
         // Cargo leaves Trade.FuelReserveCredits for fuel (D24), and what the trade and construction trips on their way to buy
-        // hold back (D57, D59).
+        // hold back (D57, D64).
         var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds);
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule

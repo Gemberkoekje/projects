@@ -59,6 +59,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipyardShipType;
     private readonly Gauge _shipyardShipPrice;
     private readonly Gauge _shipyardShipSupply;
+    private readonly Gauge _shipyardShipFuelCapacity;
+    private readonly Gauge _shipyardShipCargoCapacity;
+    private readonly Gauge _shipyardShipInfo;
     private readonly Gauge _supplyChain;
     private readonly Gauge _settingInfo;
     private readonly Gauge _roleInfo;
@@ -67,6 +70,17 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _creditReserve;
 
     private readonly Lock _lock = new();
+    private readonly SampledGauge _systemInfo;
+    private readonly SampledGauge _systemJumps;
+    private readonly SampledGauge _systemExplored;
+    private readonly SampledGauge _systemConnection;
+    private readonly SampledGauge _systemFacilities;
+    private readonly SampledGauge _systemWaypoints;
+    private readonly SampledGauge _systemGatheringSites;
+    private readonly SampledGauge _systemRawGoodPrice;
+    private readonly SampledGauge _systemRawGoodSupply;
+    private readonly SampledGauge _systemTradeMargin;
+    private readonly SampledGauge _systemTradeVolume;
     private readonly Dictionary<string, string[]> _shipLabels = new(StringComparer.Ordinal);
     private readonly HashSet<(string Role, string State)> _shipCountLabels = [];
     private readonly HashSet<(string Contract, string TradeSymbol)> _deliverables = [];
@@ -80,6 +94,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string System, string Waypoint, string Good, string Kind)> _marketGoods = [];
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _shipyards = [];
     private readonly HashSet<(string System, string Waypoint, string ShipType)> _shipyardShips = [];
+    private readonly Dictionary<(string System, string Waypoint, string ShipType), (string Can, string Equipment)> _shipyardShipInfoLabels = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
     private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
@@ -265,6 +280,61 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_ship_value_credits",
             "What was paid for a ship and for the mounts and modules installed on it; 0 for a starting ship.",
             "ship");
+        _systemInfo = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_info",
+            "One series per system the bot knows, always 1: what the explore plan knows of it (home, explored, to_explore, gate_under_construction, jump_refused, no_gate, gate_unknown, cached) and its jump gate.",
+            "system",
+            "state",
+            "gate",
+            "gate_state"));
+        _systemJumps = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_jumps_from_home",
+            "How many jumps a system is from home through built gates (one more to a gate still under construction).",
+            "system"));
+        _systemExplored = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_explored_timestamp_seconds",
+            "When the command ship explored a system (Unix time): it visited each market and shipyard there once.",
+            "system"));
+        _systemConnection = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_connection_info",
+            "One series per jump gate connection the bot asked for, always 1.",
+            "system",
+            "to"));
+        _systemFacilities = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_facilities",
+            "A system's cached waypoints with a market, a shipyard, or still uncharted.",
+            "system",
+            "kind"));
+        _systemWaypoints = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_waypoints",
+            "A system's cached waypoints, by type.",
+            "system",
+            "type"));
+        _systemGatheringSites = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_gathering_sites",
+            "In how many waypoints of a system a good can be mined (by the asteroids' deposits) or siphoned (gas giants).",
+            "system",
+            "good"));
+        _systemRawGoodPrice = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_raw_good_price",
+            "The best price a market in a system pays for an ore or a gas it imports or exchanges, as last seen, and where.",
+            "system",
+            "good",
+            "market"));
+        _systemRawGoodSupply = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_raw_good_supply",
+            "The lowest supply of an ore or a gas among the markets in a system that buy it: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
+            "system",
+            "good"));
+        string[] tradeLabels = ["system", "good", "buy_at", "sell_at"];
+        _systemTradeMargin = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_trade_margin",
+            "The best trades within a system, one per good, the five best: what a unit earns before fuel, buying where it is cheapest and selling where it pays most.",
+            tradeLabels));
+        _systemTradeVolume = new SampledGauge(metrics.CreateGauge(
+            "spacetraders_system_trade_volume",
+            "The units one trade of a system's best trades moves at once: the smaller of the two markets' trade volumes.",
+            tradeLabels));
         _marketObserved = metrics.CreateGauge(
             "spacetraders_market_observed_timestamp_seconds",
             "When the bot last refreshed a cached market (Unix time).",
@@ -311,6 +381,22 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_shipyard_ship_supply",
             "A ship type's supply at a shipyard, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
             shipyardShipLabels);
+        _shipyardShipFuelCapacity = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_fuel_capacity_units",
+            "What a ship type's tank holds (its frame's), as a shipyard last listed it; 0 for a probe.",
+            shipyardShipLabels);
+        _shipyardShipCargoCapacity = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_cargo_capacity_units",
+            "Units a ship type's cargo holds take together, as a shipyard last listed it.",
+            shipyardShipLabels);
+        _shipyardShipInfo = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_info",
+            "One series per ship type a shipyard listed in full, always 1: what it could do in the fleet, judged as spacetraders_ship_capabilities_info judges a ship (Survey, Mine, Siphon and Trade, in that order; none for a ship that can do none of them), but Probe for a probe; and its mounts and modules, without the cargo holds and crew quarters (none without any).",
+            "system",
+            "waypoint",
+            "ship_type",
+            "can",
+            "equipment");
         _supplyChain = metrics.CreateGauge(
             "spacetraders_good_supply_chain",
             "One series per good, always 1: the goods it is made from and the goods made from it (the game's production chains).",
@@ -632,20 +718,23 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
                     .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
                 foreach (var shipType in shipyard.ShipTypes.Concat(priced.Keys).Distinct(StringComparer.Ordinal))
                 {
+                    var shipKey = (shipyard.System, shipyard.Waypoint, shipType);
                     string[] labels = [shipyard.System, shipyard.Waypoint, shipType];
                     _shipyardShipType.WithLabels(labels).Set(1);
                     if (priced.TryGetValue(shipType, out var ship))
                     {
                         _shipyardShipPrice.WithLabels(labels).Set(ship.PurchasePrice);
-                        SetOrRemove(_shipyardShipSupply, labels, SupplyLevel(ship.Supply ?? string.Empty));
+                        SetOrRemove(_shipyardShipSupply, labels, SupplyLevel(ship.Supply));
+                        _shipyardShipFuelCapacity.WithLabels(labels).Set(ship.FuelCapacity);
+                        _shipyardShipCargoCapacity.WithLabels(labels).Set(ship.CargoCapacity);
+                        ShipyardShipInfo(shipKey, (ship.Can, ship.Equipment));
                     }
                     else
                     {
-                        _shipyardShipPrice.RemoveLabelled(labels);
-                        _shipyardShipSupply.RemoveLabelled(labels);
+                        ForgetShipyardShipDetails(shipKey);
                     }
 
-                    currentShips.Add((shipyard.System, shipyard.Waypoint, shipType));
+                    currentShips.Add(shipKey);
                 }
             }
 
@@ -657,15 +746,114 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
             foreach (var gone in _shipyardShips.Where(ship => !currentShips.Contains(ship)).ToList())
             {
-                string[] labels = [gone.System, gone.Waypoint, gone.ShipType];
-                _shipyardShipType.RemoveLabelled(labels);
-                _shipyardShipPrice.RemoveLabelled(labels);
-                _shipyardShipSupply.RemoveLabelled(labels);
+                _shipyardShipType.RemoveLabelled(gone.System, gone.Waypoint, gone.ShipType);
+                ForgetShipyardShipDetails(gone);
                 _shipyardShips.Remove(gone);
             }
 
             _shipyards.UnionWith(currentShipyards);
             _shipyardShips.UnionWith(currentShips);
+        }
+    }
+
+    /// <summary>
+    /// A ship type's one info series at a shipyard (what it could do, its equipment), which replaces the one it had.
+    /// Under the lock.
+    /// </summary>
+    private void ShipyardShipInfo((string System, string Waypoint, string ShipType) ship, (string Can, string Equipment) info)
+    {
+        if (_shipyardShipInfoLabels.TryGetValue(ship, out var previous) && previous != info)
+        {
+            _shipyardShipInfo.RemoveLabelled(ship.System, ship.Waypoint, ship.ShipType, previous.Can, previous.Equipment);
+        }
+
+        _shipyardShipInfo.WithLabels(ship.System, ship.Waypoint, ship.ShipType, info.Can, info.Equipment).Set(1);
+        _shipyardShipInfoLabels[ship] = info;
+    }
+
+    /// <summary>
+    /// Removes what a shipyard listed of a ship type beyond the type: its price, supply, tank, hold and info. Under the
+    /// lock.
+    /// </summary>
+    private void ForgetShipyardShipDetails((string System, string Waypoint, string ShipType) ship)
+    {
+        string[] labels = [ship.System, ship.Waypoint, ship.ShipType];
+        _shipyardShipPrice.RemoveLabelled(labels);
+        _shipyardShipSupply.RemoveLabelled(labels);
+        _shipyardShipFuelCapacity.RemoveLabelled(labels);
+        _shipyardShipCargoCapacity.RemoveLabelled(labels);
+        if (_shipyardShipInfoLabels.Remove(ship, out var info))
+        {
+            _shipyardShipInfo.RemoveLabelled(ship.System, ship.Waypoint, ship.ShipType, info.Can, info.Equipment);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Systems(IReadOnlyCollection<SpaceTraders.Application.Exploring.SystemSample> systems)
+    {
+        lock (_lock)
+        {
+            SampledGauge[] all =
+            [
+                _systemInfo, _systemJumps, _systemExplored, _systemConnection, _systemFacilities, _systemWaypoints,
+                _systemGatheringSites, _systemRawGoodPrice, _systemRawGoodSupply, _systemTradeMargin, _systemTradeVolume,
+            ];
+            foreach (var gauge in all)
+            {
+                gauge.Begin();
+            }
+
+            foreach (var system in systems)
+            {
+                _systemInfo.Set(1, system.System, system.State, system.Gate, system.GateState);
+                if (system.Jumps is { } jumps)
+                {
+                    _systemJumps.Set(jumps, system.System);
+                }
+
+                if (system.ExploredAt is { } explored)
+                {
+                    _systemExplored.Set(explored.ToUnixTimeSeconds(), system.System);
+                }
+
+                foreach (var to in system.Connections)
+                {
+                    _systemConnection.Set(1, system.System, to);
+                }
+
+                _systemFacilities.Set(system.Markets, system.System, "market");
+                _systemFacilities.Set(system.Shipyards, system.System, "shipyard");
+                _systemFacilities.Set(system.Uncharted, system.System, "uncharted");
+                foreach (var (type, count) in system.WaypointTypes)
+                {
+                    _systemWaypoints.Set(count, system.System, type);
+                }
+
+                foreach (var (good, sites) in system.GatheringSites)
+                {
+                    _systemGatheringSites.Set(sites, system.System, good);
+                }
+
+                foreach (var raw in system.RawGoods)
+                {
+                    _systemRawGoodPrice.Set(raw.Price, system.System, raw.Good, raw.Market);
+                    if (SupplyLevel(raw.Supply) is { } supply)
+                    {
+                        _systemRawGoodSupply.Set(supply, system.System, raw.Good);
+                    }
+                }
+
+                foreach (var trade in system.Trades)
+                {
+                    _systemTradeMargin.Set(trade.Margin, system.System, trade.Good, trade.BuyAt, trade.SellAt);
+                    _systemTradeVolume.Set(trade.Volume, system.System, trade.Good, trade.BuyAt, trade.SellAt);
+                }
+            }
+
+            foreach (var gauge in all)
+            {
+                gauge.End();
+            }
         }
     }
 
@@ -915,6 +1103,35 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             foreach (var good in goods)
             {
                 _shipCargoUnits.RemoveLabelled(ship, good);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A gauge whose series are all set in one sample: <see cref="Begin"/>, then <see cref="Set"/> each, then <see cref="End"/>
+    /// removes the series the sample didn't set. Under the lock.
+    /// </summary>
+    private sealed class SampledGauge(Gauge gauge)
+    {
+        private readonly Dictionary<string, string[]> _series = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _set = new(StringComparer.Ordinal);
+
+        public void Begin() => _set.Clear();
+
+        public void Set(double value, params string[] labels)
+        {
+            var key = string.Join('\u001f', labels);
+            gauge.WithLabels(labels).Set(value);
+            _series[key] = labels;
+            _set.Add(key);
+        }
+
+        public void End()
+        {
+            foreach (var (key, labels) in _series.Where(series => !_set.Contains(series.Key)).ToList())
+            {
+                gauge.RemoveLabelled(labels);
+                _series.Remove(key);
             }
         }
     }

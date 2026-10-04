@@ -88,7 +88,7 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
   2.5 from the middle of X1-DC53 to B7), and `drifting to … to mine …` in `spacetraders_ship_info`. A ship
   in transit is never `ShipStuck`. Its next flight logs `FlightModeSubCommand: … switches from DRIFT to
   CRUISE`; a drone that keeps flying in DRIFT after its drift is a bug.
-- **Construction loses money by design** (slice 6.6, D59–D63): supplying the home jump gate pays nothing, so every
+- **Construction loses money by design** (slice 6.6, D64–D68): supplying the home jump gate pays nothing, so every
   `TripEnded` with `Activity` `construction` is a loss and its purchases are `ConstructionBuy` ledger rows. A builder
   that trades while the construction plan's state (`plan_states`, `Construction`) says `Waiting` (`purchase_order`,
   `waiting_for_credits`, `low_supply`, `trade_volume`, `no_market`) is waiting by design, and so are the probes and
@@ -125,6 +125,9 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 # The journal: a timeline of the run
 {namespace="spacetraders"} | json | EventKind != ""
 
+# Exploring (slice 6.11): jumps, systems explored, the explore plan's start, waits and end, refused jumps
+{namespace="spacetraders"} | json | EventKind=~"Jumped|SystemExplored" or Plan="Explore" or Reason="jump_refused"
+
 # Log volume per hour (a loop shows up here)
 sum(count_over_time({namespace="spacetraders"}[1h]))                               (with --step 1h)
 ```
@@ -142,6 +145,10 @@ time() - spacetraders_ship_status_since_timestamp_seconds
 
 # Every setting as it is now, the Runtime.* flags included (a secret shows "(hidden)")
 spacetraders_setting_info
+
+# What the explore plan knows of each system (slice 6.11): state, gate, jumps from home
+spacetraders_system_info
+spacetraders_system_jumps_from_home
 
 # API calls that failed, and real 429s
 sum by (endpoint, status) (increase(spacetraders_api_requests_total{status!~"2.."}[1h]))

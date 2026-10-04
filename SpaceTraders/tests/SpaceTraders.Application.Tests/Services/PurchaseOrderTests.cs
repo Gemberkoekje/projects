@@ -124,7 +124,7 @@ public sealed class PurchaseOrderTests
     [Fact]
     public async Task TheJumpGatesMaterials_ComeAfterTheCargoShips_AndTheProbesWaitForThem()
     {
-        // Slice 6.6 (D59): supplying pays nothing back, so a load is judged as a purchase, after the cargo ships of the list;
+        // Slice 6.6 (D64): supplying pays nothing back, so a load is judged as a purchase, after the cargo ships of the list;
         // while the gate needs materials the probes and further ships wait.
         EveryoneSays(PurchaseNeed.None);
         _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);

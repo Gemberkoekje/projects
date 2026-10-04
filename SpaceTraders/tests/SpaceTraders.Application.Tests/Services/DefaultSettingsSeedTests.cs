@@ -15,6 +15,7 @@ public sealed class DefaultSettingsSeedTests
         // The kill switch and the plan switches: the tick, goal steps, startup recovery.
         "Automation.Enabled",
         "Automation.Plan.Scout.Enabled",
+        "Automation.Plan.Explore.Enabled",
         "Automation.Plan.Roles.Enabled",
         "Automation.Plan.Contract.Enabled",
         "Automation.Plan.ProbeDeployment.Enabled",
@@ -63,7 +64,7 @@ public sealed class DefaultSettingsSeedTests
         "Siphon.MaxDrones",
 
         // The role board (slice 6.9): RoleSettings, read by RolePlanService and RoleAdvisor (D39, D41); how many ships build
-        // the jump gate, read by RolePlanService and ConstructionPlanService (slice 6.6, D60).
+        // the jump gate, read by RolePlanService and ConstructionPlanService (slice 6.6, D65).
         "Roles.ReconsiderMinutes",
         "Roles.HeadStartPercent",
         "Roles.ChainValueSharePercent",

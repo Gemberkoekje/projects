@@ -111,7 +111,7 @@ public sealed class PrometheusMetricsService(
         metrics.Roles(roleSamples);
 
         // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; the dearest full
-        // hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D59).
+        // hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D64).
         var roleOf = roleSamples.ToDictionary(
             sample => sample.Ship,
             sample => Enum.TryParse<FleetRole>(sample.Role, out var role) ? role : FleetRole.None,
@@ -190,7 +190,7 @@ public sealed class PrometheusMetricsService(
     }
 
     /// <summary>
-    /// What the trade and construction trips on their way to buy hold back for their cargo (D57, D59), from the goals cached
+    /// What the trade and construction trips on their way to buy hold back for their cargo (D57, D64), from the goals cached
     /// with the ships, with the stored status as the goal store reads it.
     /// </summary>
     private static long TripHolds(IEnumerable<CachedShip> ships)
@@ -312,6 +312,8 @@ public sealed class PrometheusMetricsService(
                 PatrolMarketGoal => "watching its market",
                 MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",
                 MoveToWaypointGoal => "moving",
+                JumpGoal jump => $"jumping to {WaypointSymbols.SystemOf(jump.DestinationGateWaypointSymbol)}",
+                ExploreSystemGoal explore => $"exploring {explore.SystemSymbol}",
                 IdleGoal => "idle",
                 _ => goal.Kind.ToString(),
             };

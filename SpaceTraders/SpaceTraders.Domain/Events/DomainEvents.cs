@@ -397,6 +397,34 @@ public sealed record ShipRefueledEvent
     }
 }
 
+/// <summary>
+/// A ship jumped through a jump gate (exploring, asked on 2026-10-04): the jump bought one ANTIMATTER at the market of the
+/// gate it left, for <see cref="Cost"/>.
+/// </summary>
+public sealed record ShipJumpedEvent
+{
+    /// <summary>The ship.</summary>
+    public required string ShipSymbol { get; init; }
+
+    /// <summary>The gate it jumped from, where the antimatter was bought.</summary>
+    public required string FromWaypointSymbol { get; init; }
+
+    /// <summary>The gate it jumped to.</summary>
+    public required string ToWaypointSymbol { get; init; }
+
+    /// <summary>What the antimatter cost.</summary>
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipJumpedEvent(string ShipSymbol, string FromWaypointSymbol, string ToWaypointSymbol, long Cost)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.FromWaypointSymbol = FromWaypointSymbol;
+        this.ToWaypointSymbol = ToWaypointSymbol;
+        this.Cost = Cost;
+    }
+}
+
 public sealed record ShipRepairedEvent
 {
     public required string ShipSymbol { get; init; }

@@ -14,13 +14,13 @@ namespace SpaceTraders.Application.Construction;
 /// credits), so every load is spent for good:
 /// <list type="bullet">
 ///   <item>a load is one purchase of one material: a full hold, or what the site still needs when that is less, at a
-///   market whose trade volume takes it in one go (D62: "If the markets trade volume is smaller than a haulers hold, it
-///   should wait until the trade volume is a haulers hold"), and whose supply of it isn't SCARCE or LIMITED (D61); then
+///   market whose trade volume takes it in one go (D67: "If the markets trade volume is smaller than a haulers hold, it
+///   should wait until the trade volume is a haulers hold"), and whose supply of it isn't SCARCE or LIMITED (D66); then
 ///   carried to the site through refuelling stops, in CRUISE;</item>
 ///   <item>of the materials the site still needs, the one it has the smallest share of comes first, so the markets that
 ///   sell them get to recover in turn; of the markets, the one where the load costs least with its fuel;</item>
 ///   <item>whether the money allows it is the plan's to judge: a load keeps the credit reserve, as a ship purchase does,
-///   and comes after the cargo ships in the order ships are bought in (D59).</item>
+///   and comes after the cargo ships in the order ships are bought in (D64).</item>
 /// </list>
 /// </summary>
 public static class ConstructionPlanner
@@ -31,10 +31,10 @@ public static class ConstructionPlanner
     /// <summary>No market the ship can reach sells a material the site needs.</summary>
     public const string NoMarket = "no_market";
 
-    /// <summary>Every market that sells a material the site needs has it SCARCE or LIMITED (D61).</summary>
+    /// <summary>Every market that sells a material the site needs has it SCARCE or LIMITED (D66).</summary>
     public const string LowSupply = "low_supply";
 
-    /// <summary>No market that sells a material the site needs trades the whole load at once (D62).</summary>
+    /// <summary>No market that sells a material the site needs trades the whole load at once (D67).</summary>
     public const string TradeVolume = "trade_volume";
 
     /// <summary>The system of a waypoint: its symbol up to the last dash.</summary>
@@ -114,8 +114,8 @@ public static class ConstructionPlanner
     /// <param name="siteWaypointSymbol">The construction site.</param>
     /// <param name="needs">What the site still needs (<see cref="Needs"/>).</param>
     /// <param name="strict">
-    /// True for the loads the ship may buy now: the market's supply isn't SCARCE or LIMITED (D61), and its trade volume takes
-    /// the whole load at once (D62). False for what it would buy once they are: what the credits are saved up for.
+    /// True for the loads the ship may buy now: the market's supply isn't SCARCE or LIMITED (D66), and its trade volume takes
+    /// the whole load at once (D67). False for what it would buy once they are: what the credits are saved up for.
     /// </param>
     /// <returns>At most one load per material; none when the ship has no free hold.</returns>
     public static IReadOnlyList<ConstructionLoad> Loads(
@@ -160,8 +160,8 @@ public static class ConstructionPlanner
 
     /// <summary>
     /// Why a ship has no load it may buy now, though it has room: no market it can reach sells what the site needs
-    /// (<see cref="NoMarket"/>), every one has it SCARCE or LIMITED (<see cref="LowSupply"/>, D61), or none trades the whole
-    /// load at once (<see cref="TradeVolume"/>, D62). Empty when it has a load.
+    /// (<see cref="NoMarket"/>), every one has it SCARCE or LIMITED (<see cref="LowSupply"/>, D66), or none trades the whole
+    /// load at once (<see cref="TradeVolume"/>, D67). Empty when it has a load.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now, with its hold.</param>
@@ -194,7 +194,7 @@ public static class ConstructionPlanner
     }
 
     /// <summary>
-    /// The ships that build when the role board is off (D60's rule): of the ships that can (<see cref="FleetRoles.CanConstruct"/>),
+    /// The ships that build when the role board is off (D65's rule): of the ships that can (<see cref="FleetRoles.CanConstruct"/>),
     /// the largest holds, then the one that can do least else, then by symbol.
     /// </summary>
     /// <param name="candidates">The ships that may build: the caller leaves out those that survey.</param>
@@ -318,7 +318,7 @@ public sealed record ConstructionLoad
     /// <summary>The fuel to the market and on to the site.</summary>
     public required long FuelCost { get; init; }
 
-    /// <summary>What the cargo costs: the credits the trip holds back until it buys (D57, D59).</summary>
+    /// <summary>What the cargo costs: the credits the trip holds back until it buys (D57, D64).</summary>
     public long CargoCost => Units * UnitPrice;
 
     /// <summary>What the load costs with its fuel.</summary>

@@ -163,7 +163,7 @@ public sealed class BudgetPolicyTests
     [Fact]
     public async Task WhileAConstructionTripIsOnItsWayToBuy_TheReserveGrowsByWhatItHoldsBack()
     {
-        // Slice 6.6 (D59): the jump gate's load holds back its cargo from the start, as a trade trip does (D57); once bought,
+        // Slice 6.6 (D64): the jump gate's load holds back its cargo from the start, as a trade trip does (D57); once bought,
         // nothing.
         Fleet(StartingProbe(), Drone("SHIP-3"), Drone("SHIP-4"));
         IReadOnlyDictionary<string, SupplyConstructionGoal> trips = new Dictionary<string, SupplyConstructionGoal>

@@ -235,7 +235,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
     [SkippableFact]
     public async Task TheFleetsConstructionTrips_AreReadByShip_WithTheirStatus()
     {
-        // Slice 6.6 (D59): what the construction trips carry or go to buy, and hold back, is read for the whole fleet at once.
+        // Slice 6.6 (D64): what the construction trips carry or go to buy, and hold back, is read for the whole fleet at once.
         await SeedShipAsync("SHIP-C1");
         await SeedShipAsync("SHIP-C2");
         await SeedShipAsync("SHIP-C3");

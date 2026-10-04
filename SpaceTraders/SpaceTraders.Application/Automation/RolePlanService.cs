@@ -36,7 +36,7 @@ public interface IRolePlanService
 /// journaled (<c>RoleChanged</c>); the state lists every ship's role, why, and what each role would earn it. One drone
 /// per SCARCE or LIMITED mineral and area keeps gathering it (slice 6.10b, D48, D53), as the mining and siphon plans buy
 /// one per such mineral and area. While a system's jump gate needs materials and the construction plan is on, the ship
-/// with the largest hold builds it (slice 6.6, D60); the gate's completion weighs the roles again at once.
+/// with the largest hold builds it (slice 6.6, D65); the gate's completion weighs the roles again at once.
 /// </summary>
 public sealed class RolePlanService(
     IShipRepository ships,
@@ -130,7 +130,7 @@ public sealed class RolePlanService(
 
     /// <summary>
     /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): the home system, or
-    /// none (D63).
+    /// none (D68).
     /// </summary>
     private async Task<IReadOnlySet<string>> ConstructionSystemsAsync(CancellationToken cancellationToken)
         => (await constructionSites.CachedNeedingMaterialsAsync(cancellationToken))

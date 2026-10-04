@@ -21,8 +21,8 @@ using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 namespace SpaceTraders.Application.Tests.Goals;
 
 /// <summary>
-/// Slice 6.6: one construction trip. The builder buys its load in one purchase (D62), checked again with the prices its
-/// arrival fetched (D61, D62) and against the credit reserve (D59), flies it to the jump gate and supplies it. Supplying pays
+/// Slice 6.6: one construction trip. The builder buys its load in one purchase (D67), checked again with the prices its
+/// arrival fetched (D66, D67) and against the credit reserve (D64), flies it to the jump gate and supplies it. Supplying pays
 /// nothing: the trip books what it cost.
 /// </summary>
 public sealed class SupplyConstructionGoalExecutorTests
@@ -106,7 +106,7 @@ public sealed class SupplyConstructionGoalExecutorTests
     [InlineData("MODERATE", 60, "not_full_hold")]
     public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheMarketNoLongerSellsTheLoadAsItMay(string supply, int tradeVolume, string reason)
     {
-        // D61 and D62, with the prices its arrival fetched.
+        // D66 and D67, with the prices its arrival fetched.
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
             .Returns(new TradeContext(Map(GateMarket(), F49Market(supply: supply, tradeVolume: tradeVolume), D42Market(), H51Market(), I56Market()), 1_000_000, 200, 5_000));
 
@@ -122,7 +122,7 @@ public sealed class SupplyConstructionGoalExecutorTests
     [Fact]
     public async Task AtTheBuyMarket_ALoadThatWouldDipIntoTheCreditReserve_IsNotBought()
     {
-        // D59: 220,000 on hand, the reserve 100,000 besides this trip's own: 120,000, under the 168,000 the load costs.
+        // D64: 220,000 on hand, the reserve 100,000 besides this trip's own: 120,000, under the 168,000 the load costs.
         Budget(available: 220_000, reserved: 268_000);
 
         var result = await StepAsync(Hauler(waypoint: F49), Trip());

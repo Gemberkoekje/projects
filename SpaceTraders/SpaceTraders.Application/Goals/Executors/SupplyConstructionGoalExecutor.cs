@@ -21,8 +21,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// market (<see cref="GoalFlight"/>: in CRUISE, through refuelling stops), buys its load in one purchase, flies to the
 /// construction site and supplies it there. A ship can't change course in flight, so it checks the load again at the
 /// market, with the prices its arrival has just fetched: when the site no longer needs it, the market's supply has dropped
-/// to SCARCE or LIMITED (D61), its trade volume no longer takes the load at once (D62), or the load would dip into the
-/// credit reserve (D59), it drops the trip (<c>ConstructionDropped</c>) and the construction plan chooses again. Supplying
+/// to SCARCE or LIMITED (D66), its trade volume no longer takes the load at once (D67), or the load would dip into the
+/// credit reserve (D64), it drops the trip (<c>ConstructionDropped</c>) and the construction plan chooses again. Supplying
 /// pays nothing: the trip books what its cargo and fuel cost as a loss (D46).
 /// </summary>
 public sealed class SupplyConstructionGoalExecutor(
@@ -105,7 +105,7 @@ public sealed class SupplyConstructionGoalExecutor(
             return await DropAsync(ship, trip, NotFullHold, ct);
         }
 
-        // D59: a load keeps the credit reserve, as a ship purchase does; what this trip holds back is its own to spend.
+        // D64: a load keeps the credit reserve, as a ship purchase does; what this trip holds back is its own to spend.
         var decision = await budget.EvaluateAsync(0, ct);
         var spendable = Math.Max(0, decision.AvailableCredits - Math.Max(0, decision.ReservedCredits - TripReservations.HeldBack(trip)));
         if ((long)units * good.PurchasePrice > spendable)

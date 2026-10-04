@@ -182,7 +182,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     [Fact]
     public async Task AtTheBuyMarket_TheCreditsAConstructionTripHoldsBack_AreNotSpent()
     {
-        // Slice 6.6 (D59): the jump gate's load on its way to buy holds back 60,000 of the 190,000, as a trade trip would.
+        // Slice 6.6 (D64): the jump gate's load on its way to buy holds back 60,000 of the 190,000, as a trade trip would.
         PricesAre(Map(), credits: 190_000);
         IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
         {

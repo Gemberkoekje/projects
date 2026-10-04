@@ -87,7 +87,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
         var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
 
-        // D57: what the other trips hold back on their way to buy is theirs, construction trips' too (D59); what this one holds
+        // D57: what the other trips hold back on their way to buy is theirs, construction trips' too (D64); what this one holds
         // back is its own to spend.
         var heldByOthers = TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(ct), ship.Symbol)
             + TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(ct));

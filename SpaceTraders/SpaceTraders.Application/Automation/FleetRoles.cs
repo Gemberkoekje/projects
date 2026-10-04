@@ -143,7 +143,7 @@ public static class FleetRoles
     /// <summary>
     /// The roles a ship could take, by what it carries (slice 6.9, D38), whichever plans are on: survey with a
     /// surveyor; mine with a mining laser, a hold and a tank; siphon with a gas siphon, a hold and a tank; trade with
-    /// a hold and a tank; construct with a hold and a tank, unless it is a drone (slice 6.6, D60). A probe has none: the
+    /// a hold and a tank; construct with a hold and a tank, unless it is a drone (slice 6.6, D65). A probe has none: the
     /// probe plan flies it.
     /// </summary>
     /// <param name="ship">The ship.</param>
@@ -187,7 +187,7 @@ public static class FleetRoles
     }
 
     /// <summary>
-    /// Whether the ship can build the jump gate (slice 6.6, D60): a hold and a tank, to buy the materials and carry them
+    /// Whether the ship can build the jump gate (slice 6.6, D65): a hold and a tank, to buy the materials and carry them
     /// there, and no drone, which gathers first (D58). The command ship and the cargo ships can; probes, drones and survey
     /// ships can't.
     /// </summary>

@@ -12,7 +12,7 @@ namespace SpaceTraders.Application.Trading;
 /// </summary>
 /// <remarks>
 /// Kept with the trip's goal, so a restart keeps it. A trip that has bought, or is blocked or done, holds back nothing. A
-/// construction trip holds back its cargo the same way (slice 6.6, D59): traders, other trips and ship purchases leave it.
+/// construction trip holds back its cargo the same way (slice 6.6, D64): traders, other trips and ship purchases leave it.
 /// </remarks>
 public static class TripReservations
 {
@@ -39,7 +39,7 @@ public static class TripReservations
             .Sum(trip => HeldBack(trip.Value));
     }
 
-    /// <summary>What one construction trip holds back now (slice 6.6, D59): what its cargo costs, until it is aboard.</summary>
+    /// <summary>What one construction trip holds back now (slice 6.6, D64): what its cargo costs, until it is aboard.</summary>
     /// <param name="trip">The trip.</param>
     /// <returns>Its reserved credits until its cargo is aboard, else 0.</returns>
     public static long HeldBack(SupplyConstructionGoal trip)

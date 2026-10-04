@@ -203,6 +203,34 @@ public sealed class SiphonAutomationServiceTests
         _activeGoals.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task WhereOnlyTheExploringCommandShipIs_NoDroneIsBought()
+    {
+        // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells siphon drones, and its
+        // gases are short; the command ship, exploring, is docked at its shipyard.
+        const string Kr90 = "X1-KR90";
+        Fleet(CommandShip(waypoint: C39) with { SystemSymbol = Kr90, Status = "DOCKED" });
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Explore", C39, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
+        _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = C39,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_SIPHON_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_SIPHON_DRONE", PurchasePrice = 42_000, FuelCapacity = 80, CargoCapacity = 15 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _state?.Opportunities.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData(true, 1)]
     [InlineData(false, 0)]

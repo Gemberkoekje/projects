@@ -236,7 +236,7 @@ public sealed class RolePlanServiceTests
     [Fact]
     public async Task WhileTheHomeGateNeedsMaterials_TheLargestHoldBuildsIt_AndItsCompletionFreesItAtOnce()
     {
-        // Slice 6.6 (D60, D63): a light hauler, the only cargo ship, builds the home system's jump gate; the command ship surveys.
+        // Slice 6.6 (D65, D68): a light hauler, the only cargo ship, builds the home system's jump gate; the command ship surveys.
         On(AutomationPlan.Survey, AutomationPlan.Mining, AutomationPlan.Trading, AutomationPlan.Construction);
         _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Construction.ConstructionFixture.Site()]);
         var hauler = new ShipModel("SHIP-6", SystemSymbol, H51, "DOCKED", "CRUISE", 600, 600, CargoCapacity: 80, ShipType: "SHIP_LIGHT_HAULER", MountSymbols: ["MOUNT_TURRET_I"], CargoInventory: []);

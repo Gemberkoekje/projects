@@ -9,7 +9,7 @@ namespace SpaceTraders.Application.Construction;
 /// What the construction plan and its trips know of the construction sites (PLAN.md slice 6.6): the cache
 /// (<c>cached_construction_sites</c>), fetched from the API when a jump gate is first seen under construction and every
 /// <see cref="ConstructionSiteWatch.Interval"/> while it needs materials (other agents in the system may supply it too), and
-/// stored from every supply's answer. Only the jump gate of the home system, where the headquarters are, counts (D63:
+/// stored from every supply's answer. Only the jump gate of the home system, where the headquarters are, counts (D68:
 /// "Only the home base jump gate construction should be high priority, any other jump gate construction should be low
 /// priority or maybe not even considered at all"): a gate elsewhere is never fetched, built or given a role.
 /// </summary>

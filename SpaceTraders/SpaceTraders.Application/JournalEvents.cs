@@ -155,8 +155,8 @@ public static class JournalEvents
 
     /// <summary>
     /// A construction trip was given up (slice 6.6: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c>,
-    /// <c>Reason</c>: at the market <c>not_needed</c>, <c>not_sold_here</c>, <c>low_supply</c> (D61), <c>not_full_hold</c>
-    /// (D62) or <c>over_budget</c> (D59); at the site <c>not_needed</c>; at Warning when the API refused the supply,
+    /// <c>Reason</c>: at the market <c>not_needed</c>, <c>not_sold_here</c>, <c>low_supply</c> (D66), <c>not_full_hold</c>
+    /// (D67) or <c>over_budget</c> (D64); at the site <c>not_needed</c>; at Warning when the API refused the supply,
     /// <c>not_needed</c> or <c>wrong_location</c>, with the <c>Units</c> kept aboard). The construction plan chooses again.
     /// </summary>
     public const string ConstructionDropped = nameof(ConstructionDropped);
@@ -166,6 +166,19 @@ public static class JournalEvents
     /// (slice 6.3, D30: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>ShipType</c> the purchase is for).
     /// </summary>
     public const string ProbeCalled = nameof(ProbeCalled);
+
+    /// <summary>
+    /// A ship jumped through a jump gate (exploring, asked on 2026-10-04: <c>ShipSymbol</c>, <c>WaypointSymbol</c> the gate
+    /// it left, <c>Destination</c> the gate it is at now, <c>SystemSymbol</c> it is in now, <c>Cost</c> of the one ANTIMATTER
+    /// the jump bought).
+    /// </summary>
+    public const string Jumped = nameof(Jumped);
+
+    /// <summary>
+    /// The command ship explored a system (asked on 2026-10-04: <c>ShipSymbol</c>, <c>SystemSymbol</c>, <c>Markets</c> and
+    /// <c>Shipyards</c> it visited there, each once, as the scout plan does at home).
+    /// </summary>
+    public const string SystemExplored = nameof(SystemExplored);
 
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);

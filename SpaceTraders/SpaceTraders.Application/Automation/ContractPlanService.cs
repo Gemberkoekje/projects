@@ -597,11 +597,15 @@ public sealed class ContractPlanService(
 
     /// <summary>
     /// Buys the contract's drone when no miner is free for it (D23): first in the order ships are bought in (D43), so the
-    /// plans after it save up for it, at a shipyard whose price for it is known; without a price nothing could buy it.
+    /// plans after it save up for it, at a shipyard whose price for it is known; without a price nothing could buy it. Only
+    /// a shipyard where our ships work counts, not one the command ship has just explored (asked on 2026-10-04).
     /// </summary>
     private async Task<ShipModel?> TryPurchaseMinerDroneAsync(CancellationToken cancellationToken)
     {
-        var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(MinerShipType, cancellationToken);
+        var systems = BusinessSystems.Of(
+            await ships.GetAllAsync(cancellationToken),
+            BusinessSystems.Explorers(await assignments.GetAllActiveAsync(cancellationToken)));
+        var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(MinerShipType, systems, cancellationToken);
         if (string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
             logger.LogDebug(

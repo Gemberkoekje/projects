@@ -28,10 +28,10 @@ public sealed record RoleSettings
     /// <summary>The production chains' share when the setting gives none: 50% (D39).</summary>
     internal const int DefaultChainValueSharePercent = 50;
 
-    /// <summary>The setting that holds how many ships get the construction role while the jump gate needs materials (D60).</summary>
+    /// <summary>The setting that holds how many ships get the construction role while the jump gate needs materials (D65).</summary>
     public const string ConstructionShipsSetting = "Construction.Ships";
 
-    /// <summary>The ships with the construction role when the setting gives none: one (D60).</summary>
+    /// <summary>The ships with the construction role when the setting gives none: one (D65).</summary>
     internal const int DefaultConstructionShips = 1;
 
     /// <summary>The plans whose ships the board gives roles, and the contract plan.</summary>
@@ -88,7 +88,7 @@ public sealed record RoleSettings
     /// <summary>The credits cargo must leave for fuel (D24).</summary>
     public required long FuelReserveCredits { get; init; }
 
-    /// <summary>How many ships per system get the construction role while its jump gate needs materials (D60).</summary>
+    /// <summary>How many ships per system get the construction role while its jump gate needs materials (D65).</summary>
     public int ConstructionShips { get; init; } = DefaultConstructionShips;
 
     /// <summary>

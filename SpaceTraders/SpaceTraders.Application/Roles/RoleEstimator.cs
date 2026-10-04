@@ -103,7 +103,7 @@ public sealed record RoleOption
 /// mining and siphoning the cooldowns to fill the hold, half a tick after each. A mining or siphon trip to a market out
 /// of the ship's CRUISE reach drifts there first (slice 6.10c, D45): ten times as long as in CRUISE, and the 1 fuel it
 /// burns is bought back there. Surveying has no estimate: it comes first (D38). Nor has building the jump gate, which
-/// pays nothing and comes before the trips by profit (slice 6.6, D60).
+/// pays nothing and comes before the trips by profit (slice 6.6, D65).
 /// </summary>
 public static class RoleEstimator
 {

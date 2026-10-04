@@ -14,6 +14,9 @@ public interface ISpaceTradersPort
 
     Task<PagedResult<WaypointDataModel>> GetWaypointsAsync(string systemSymbol, int page = 1, int limit = 20, CancellationToken cancellationToken = default);
 
+    /// <summary>One waypoint, as anyone can see it: its traits (once charted), and whether it is still under construction.</summary>
+    Task<WaypointDataModel> GetWaypointAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
     Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<NavModel> DockShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
@@ -62,10 +65,15 @@ public interface ISpaceTradersPort
 
     Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
-    Task<JumpActionResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Jumps a ship in orbit at a jump gate to <paramref name="waypointSymbol"/>, a gate the first connects to; the jump buys
+    /// one ANTIMATTER at the gate's market.
+    /// </summary>
+    Task<JumpActionResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>The gates a jump gate connects to, by their waypoints.</summary>
     Task<JumpGateConnectionModel> GetJumpGateConnectionsAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     // Phase 7 additions

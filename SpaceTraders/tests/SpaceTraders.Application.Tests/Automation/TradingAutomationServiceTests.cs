@@ -234,7 +234,7 @@ public sealed class TradingAutomationServiceTests
     [Fact]
     public async Task TheCreditsAConstructionTripHoldsBack_AreNotGivenToATrader()
     {
-        // Slice 6.6 (D59): the jump gate's load holds back its cargo from the start, as a trade trip does (D57). Of the 250,000,
+        // Slice 6.6 (D64): the jump gate's load holds back its cargo from the start, as a trade trip does (D57). Of the 250,000,
         // SHIP-6's 130,160 leave too little for a full hold of EQUIPMENT: SHIP-1 saves up for it and takes nothing meanwhile.
         IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
         {
@@ -526,6 +526,34 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WhereOnlyTheExploringCommandShipIs_NoCargoShipIsBought()
+    {
+        // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells shuttles, and a shuttle
+        // there would have a lucrative route; the command ship, exploring, is docked at its shipyard.
+        const string Kr90 = "X1-KR90";
+        SurveyPlanOn();
+        Fleet(CommandShip(waypoint: A1) with { SystemSymbol = Kr90, Status = "DOCKED" });
+        CreditsAre(300_000);
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Explore", A1, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
+        _tradeContexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = A1,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_LIGHT_SHUTTLE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 117_273, FuelCapacity = 300, CargoCapacity = 40 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]

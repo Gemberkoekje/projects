@@ -218,7 +218,7 @@ public sealed class ShipGoalSerializationTests
     [Fact]
     public void SupplyConstructionGoal_RoundTrip_PreservesAllFields()
     {
-        // Slice 6.6: a construction trip keeps its load, what it holds back until it buys (D59), and what it spent (D46).
+        // Slice 6.6: a construction trip keeps its load, what it holds back until it buys (D64), and what it spent (D46).
         var goal = new SupplyConstructionGoal
         {
             GoalId = Guid.NewGuid(),

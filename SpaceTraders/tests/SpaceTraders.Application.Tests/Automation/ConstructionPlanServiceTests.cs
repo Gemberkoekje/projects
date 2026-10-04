@@ -19,7 +19,7 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// <summary>
 /// Slice 6.6, asked on 2026-10-04: "Finishing this jump node should be top priority, as it opens up the rest of the game."
 /// The ship with the construction role buys the home gate's materials and supplies them; supplying pays nothing, so a load
-/// keeps the credit reserve and comes after the cargo ships in the order ships are bought in (D59). A ship that holds what
+/// keeps the credit reserve and comes after the cargo ships in the order ships are bought in (D64). A ship that holds what
 /// the gate needs takes it there first.
 /// </summary>
 public sealed class ConstructionPlanServiceTests
@@ -71,14 +71,14 @@ public sealed class ConstructionPlanServiceTests
         started.EventKind.Should().Be("ConstructionStarted");
         started.Properties["Reason"].Should().Be("purchase");
 
-        // D59: its place in the order ships are bought in, after the cargo ships.
+        // D64: its place in the order ships are bought in, after the cargo ships.
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "FAB_MATS" && need.ShipyardWaypointSymbol == F49);
     }
 
     [Fact]
     public async Task APurchaseBeforeItInTheOrder_HoldsTheLoadBack()
     {
-        // D59: the contract's drone, the surveyors, the drones per scarce mineral and the cargo ships come first.
+        // D64: the contract's drone, the surveyors, the drones per scarce mineral and the cargo ships come first.
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         Fleet(Hauler());
         _order.Allows = false;
@@ -94,7 +94,7 @@ public sealed class ConstructionPlanServiceTests
     public async Task ALoadThatWouldDipIntoTheCreditReserve_Waits_AndTheProbesWaitBehindIt()
     {
         // 168,000 for the cargo and 532 for fuel; 150,000 above the reserve. The builder trades meanwhile: the trading plan
-        // comes next. The need stays at its place in the order, so the probes and further ships wait (D59).
+        // comes next. The need stays at its place in the order, so the probes and further ships wait (D64).
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         Fleet(Hauler());
         Spendable(150_000);
@@ -110,7 +110,7 @@ public sealed class ConstructionPlanServiceTests
     [Fact]
     public async Task WhereEveryMarketIsShort_TheBuilderWaitsForTheSupply()
     {
-        // D61: no purchase at SCARCE or LIMITED; what it waits for is still its place in the order.
+        // D66: no purchase at SCARCE or LIMITED; what it waits for is still its place in the order.
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         Fleet(Hauler());
         PricesAre(Map(GateMarket(), F49Market(supply: "LIMITED"), D42Market(supply: "SCARCE"), H51Market(), I56Market()));
@@ -151,7 +151,7 @@ public sealed class ConstructionPlanServiceTests
     [Fact]
     public async Task WhatOtherTripsCarry_IsNotBoughtAgain()
     {
-        // 1,500 FAB_MATS are in and SHIP-7 carries 80: 20 are left, which the hauler takes in one purchase (D62).
+        // 1,500 FAB_MATS are in and SHIP-7 carries 80: 20 are left, which the hauler takes in one purchase (D67).
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct), ("SHIP-7", FleetRole.Construct));
         _sites.NeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Site(fabMats: 1_500, circuitry: 400)]);
         _activeGoals["SHIP-7"] = new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = Gate, BuyWaypointSymbol = F49, Units = 80, CargoBought = true };
@@ -218,7 +218,7 @@ public sealed class ConstructionPlanServiceTests
     [Fact]
     public async Task OnlyTheHomeSystemsGate_IsBuilt()
     {
-        // D63: "Only the home base jump gate construction should be high priority, any other jump gate construction should be
+        // D68: "Only the home base jump gate construction should be high priority, any other jump gate construction should be
         // low priority or maybe not even considered at all." With none of our ships at home, no gate is even looked at.
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         _sites.HomeSystemAsync(Arg.Any<CancellationToken>()).Returns("X1-HZ59");

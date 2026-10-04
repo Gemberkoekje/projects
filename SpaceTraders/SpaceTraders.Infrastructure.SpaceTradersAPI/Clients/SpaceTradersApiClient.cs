@@ -236,10 +236,10 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
-    public Task<JumpResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default)
+    public Task<JumpResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
         => PostWrappedAsync<object, JumpResult>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/jump",
-            new { systemSymbol },
+            new { waypointSymbol },
             AuthMode.AgentToken,
             cancellationToken);
 

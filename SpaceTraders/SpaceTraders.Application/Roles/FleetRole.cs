@@ -25,7 +25,7 @@ public enum FleetRole
     Trade = 4,
 
     /// <summary>
-    /// Builds the jump gate (a hold and a tank, and no drone): the construction plan's trips (slice 6.6, D60). It trades
+    /// Builds the jump gate (a hold and a tank, and no drone): the construction plan's trips (slice 6.6, D65). It trades
     /// when the construction plan has nothing it may buy.
     /// </summary>
     Construct = 5,

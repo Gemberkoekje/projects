@@ -965,17 +965,35 @@ public sealed record WarpActionResult
     }
 }
 
+/// <summary>
+/// A jump through a jump gate: the ship is in orbit at the gate it jumped to, in that gate's system, with a cooldown; the
+/// jump bought one unit of ANTIMATTER at the gate's market it left from.
+/// </summary>
 public sealed record JumpActionResult
 {
+    /// <summary>Where the ship is now: in orbit at the destination gate.</summary>
     public required NavModel Nav { get; init; }
 
+    /// <summary>The cooldown the jump started, in seconds.</summary>
     public required int CooldownSeconds { get; init; }
 
+    /// <summary>When the cooldown ends, as the API gave it.</summary>
+    public DateTimeOffset? CooldownExpiresAt { get; init; }
+
+    /// <summary>What the antimatter cost, in credits.</summary>
+    public long Cost { get; init; }
+
+    /// <summary>The agent's credits after the jump; null when the answer had no agent.</summary>
+    public long? AgentCredits { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public JumpActionResult(NavModel Nav, int CooldownSeconds)
+    public JumpActionResult(NavModel Nav, int CooldownSeconds, DateTimeOffset? CooldownExpiresAt = null, long Cost = 0, long? AgentCredits = null)
     {
         this.Nav = Nav;
         this.CooldownSeconds = CooldownSeconds;
+        this.CooldownExpiresAt = CooldownExpiresAt;
+        this.Cost = Cost;
+        this.AgentCredits = AgentCredits;
     }
 }
 
@@ -993,17 +1011,24 @@ public sealed record ChartActionResult
     }
 }
 
+/// <summary>A jump gate and the gates it connects to: a jump names the gate it goes to.</summary>
 public sealed record JumpGateConnectionModel
 {
+    /// <summary>The gate.</summary>
     public required string WaypointSymbol { get; init; }
 
-    public required IReadOnlyList<string> ConnectedSystems { get; init; }
+    /// <summary>The waypoints of the gates it connects to, one in each connected system.</summary>
+    public required IReadOnlyList<string> Connections { get; init; }
+
+    /// <summary>The systems it connects to.</summary>
+    public IReadOnlyList<string> ConnectedSystems
+        => [.. Connections.Select(WaypointSymbols.SystemOf).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public JumpGateConnectionModel(string WaypointSymbol, IReadOnlyList<string> ConnectedSystems)
+    public JumpGateConnectionModel(string WaypointSymbol, IReadOnlyList<string> Connections)
     {
         this.WaypointSymbol = WaypointSymbol;
-        this.ConnectedSystems = ConnectedSystems;
+        this.Connections = Connections;
     }
 }
 

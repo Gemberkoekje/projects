@@ -29,15 +29,15 @@ public interface IConstructionPlanService
 /// The construction plan (PLAN.md slice 6.6), asked for on 2026-10-04: "Finishing this jump node should be top priority,
 /// as it opens up the rest of the game. Can you implement a special role that works on this jump gate?" Bootstrapped after
 /// the mining and siphon plans and before trading, it builds the jump gate of the home system, where the headquarters are,
-/// while the gate needs materials (<see cref="IConstructionSites"/>); a gate elsewhere isn't considered (D63):
+/// while the gate needs materials (<see cref="IConstructionSites"/>); a gate elsewhere isn't considered (D68):
 /// <list type="bullet">
 ///   <item>a free ship that holds a material the gate still needs takes it there first, whatever its role: it would
 ///   otherwise be sold, or jettisoned where no market buys it;</item>
 ///   <item>a free builder with an empty hold takes a load (<see cref="ConstructionPlanner"/>): the ship with the
-///   construction role, the largest hold that isn't a drone or the surveyor (D60); with the role board off, the plan picks
+///   construction role, the largest hold that isn't a drone or the surveyor (D65); with the role board off, the plan picks
 ///   it by the same rule. A load is a full hold, or what the gate still needs, in one purchase, at a market whose trade
-///   volume takes it at once (D62) and whose supply isn't SCARCE or LIMITED (D61);</item>
-///   <item>supplying pays nothing, so a load is judged as a ship purchase (D59): it keeps the credit reserve
+///   volume takes it at once (D67) and whose supply isn't SCARCE or LIMITED (D66);</item>
+///   <item>supplying pays nothing, so a load is judged as a ship purchase (D64): it keeps the credit reserve
 ///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships in the order ships are bought in
 ///   (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so probes and further ships wait until the
 ///   gate is done. A trip holds back what its cargo costs from the moment it starts until it buys, as a trade trip does
@@ -58,10 +58,10 @@ public sealed class ConstructionPlanService(
     ConstructionRetries retries,
     ILogger<ConstructionPlanService> logger) : IConstructionPlanService
 {
-    /// <summary>A free builder bought no load: a purchase before it in the order ships are bought in (D59).</summary>
+    /// <summary>A free builder bought no load: a purchase before it in the order ships are bought in (D64).</summary>
     internal const string WaitingForPurchaseOrder = "purchase_order";
 
-    /// <summary>A free builder bought no load: it would dip into the credit reserve (D59).</summary>
+    /// <summary>A free builder bought no load: it would dip into the credit reserve (D64).</summary>
     internal const string WaitingForCredits = "waiting_for_credits";
 
     private const string HeldCargo = "held_cargo";
@@ -99,7 +99,7 @@ public sealed class ConstructionPlanService(
         var builders = await BuildersAsync(board, fleet, cancellationToken);
         var pass = new Pass(free, trips, builders);
 
-        // D63: only the home system's jump gate, and only while one of our ships is there to build it.
+        // D68: only the home system's jump gate, and only while one of our ships is there to build it.
         var home = await sites.HomeSystemAsync(cancellationToken);
         if (home.Length > 0 && fleet.Any(ship => !FleetRoles.IsProbe(ship) && string.Equals(ship.SystemSymbol, home, StringComparison.OrdinalIgnoreCase)))
         {
@@ -120,7 +120,7 @@ public sealed class ConstructionPlanService(
     }
 
     /// <summary>
-    /// The ships that build (D60): with the role board on, those with the construction role; with it off, the largest holds
+    /// The ships that build (D65): with the role board on, those with the construction role; with it off, the largest holds
     /// of each system that don't survey (D20), as many as <c>Construction.Ships</c>.
     /// </summary>
     private async Task<IReadOnlyList<ShipModel>> BuildersAsync(FleetRoleBoard board, IReadOnlyList<ShipModel> fleet, CancellationToken cancellationToken)
@@ -178,7 +178,7 @@ public sealed class ConstructionPlanService(
     }
 
     /// <summary>
-    /// Tells the order ships are bought in what construction would buy next (D59), and gives each free builder with an empty
+    /// Tells the order ships are bought in what construction would buy next (D64), and gives each free builder with an empty
     /// hold the first load its credits pay for, while nothing comes before it in the order.
     /// </summary>
     private async Task BuyLoadsAsync(Pass pass, CancellationToken cancellationToken)
