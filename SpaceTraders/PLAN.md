@@ -19,7 +19,7 @@
 - **Claude: mechanic.** Fixes things that don't work the way they are intended to, and nothing
   else. See "Claude's role" in `CLAUDE.md`.
 
-## Where things stand (2026-10-02)
+## Where things stand (2026-10-04)
 
 - The bot was taken off the cluster on 2026-05-26 (gembernodes `906fd99`), and its manifests were
   removed on 2026-09-26 (`3f9f785`). The 1Password item `spacetraders-secrets` still exists.
@@ -115,20 +115,28 @@
 - Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) is merged
   and deployed (projects#152, gembernodes#50: the cluster runs `df677b9`).
 - Slice 6.11 (exploring through the jump gates, and a systems dashboard, asked on 2026-10-04, with your decisions
-  D59–D63) is built on branch `ccr-c7061120-est7c1` in projects and gembernodes. It found and fixes B60. The explore
-  plan stays off until you switch it on (D9); the server's weekly reset (2026-10-04 13:00Z) registers a new agent with
-  the seeded settings, so switch it on after that.
+  D59–D63) is merged and deployed (projects#153, its dashboard gembernodes#51, deployed by gembernodes#52). It found and
+  fixed B60. You switched the explore plan on at 11:54Z: the command ship explored X1-KR90 and had jumped on to X1-CV66
+  when the reset ended the run.
 - Slice 2.11 (each ship for sale's tank, hold, what it could do in the fleet and its equipment, on the markets dashboard's
-  shipyards table, asked on 2026-10-04) is built on branch `ccr-1e461fef-n6hydk` in projects and gembernodes.
-- Slice 6.6 (the jump gate, asked on 2026-10-04, with your decisions D64–D68) is built on branch `ccr-914173a3-6coo89` in
-  projects and gembernodes. Supplying a construction site pays nothing. X1-DC53's own gate was complete before our ships
-  came, so the plan has nothing to build until the server reset (2026-10-04 13:00Z) gives a new home system; it is off
-  until you switch it on, and a new agent's settings start at their defaults.
+  shipyards table, asked on 2026-10-04) is merged and deployed (projects#154, gembernodes#52).
+- Slice 6.6 (the jump gate, asked on 2026-10-04, with your decisions D64–D68) is merged and deployed (projects#155, its
+  dashboard gembernodes#53, deployed by gembernodes#52). Supplying a construction site pays nothing. X1-DC53's own gate was
+  complete before our ships came; the new home system's gate is not (below).
+- The server reset on 2026-10-04 at 13:00Z. The bot found it at 13:00:33Z, restarted until the API was back (it answered
+  503, "The universe is being reset", for about six minutes), and registered a new agent at 13:06Z, SPECTER again, in
+  X1-FJ91. The scout plan visited all 28 of its markets (so B45 is fixed), and the contract was fulfilled at 16:12Z. Its
+  jump gate, X1-FJ91-I64, needs 1,600 FAB_MATS and 400 ADVANCED_CIRCUITRY, which the construction plan (6.6) now works on;
+  until it is built the explore plan has no gate to jump through.
 - Slice 2.12 (asked on 2026-10-04, after that reset left the new agent with only the scout and contract plans on, with your
-  decision D69) is built on branch `ccr-856636cc-qj1te0` in projects and gembernodes: every plan is on by default, the
-  settings you set carry over to the next run (the agent the next reset registers), and `/settings/next-run` sets the next
-  run alone. Its first start switches on the plans the agent of 13:00Z has had off since. With it, "stays off until you
-  switch it on (D9)" in the bullets above no longer holds.
+  decision D69) is merged and deployed (projects#156, gembernodes#55: the cluster runs `52a73fd` since 18:09Z): every plan
+  is on by default, the settings you set carry over to the next run (the agent the next reset registers), and
+  `/settings/next-run` sets the next run alone. Its first start switched on, at 18:09Z, the plans the agent of 13:00Z had
+  had off. With it, "stays off until you switch it on (D9)" in the bullets above no longer holds.
+- Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
+  its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
+  period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
+  were B59's 429s.
 
 ## Known issues
 
@@ -959,8 +967,8 @@ and gembernodes; asked that day)
     between the deploy at 16:07Z and the 429s at 19:07Z. The new graph joins gaps of up to 10 minutes only (a restart),
     and reads 0 for rate limited while the bot runs without a 429 series.
 
-**2.11 What each ship for sale holds, could do and carries** (built 2026-10-04 on branch `ccr-1e461fef-n6hydk`, in
-projects and gembernodes; asked that day)
+**2.11 What each ship for sale holds, could do and carries** (done: merged 2026-10-04 as projects#154 and gembernodes#52,
+which deployed it; built on branch `ccr-1e461fef-n6hydk`; asked that day)
 - Asked: "For spacetraders, can we add some more information to the shipyard ships? I'd like to know fuel tank size,
   cargo size, and which special bits they have (e.g. mining laser)", in Grafana, then "Also which role they can fulfill
   within my fleet".
@@ -996,8 +1004,8 @@ projects and gembernodes; asked that day)
     quarters, on 2026-10-02), so the shipyards table's equipment column answers it whenever the cache holds C39's
     listing in full.
 
-**2.12 The next run's settings, and every plan on by default** (built 2026-10-04 on branch `ccr-856636cc-qj1te0`, in
-projects and gembernodes; asked that day, D69)
+**2.12 The next run's settings, and every plan on by default** (done: merged 2026-10-04 as projects#156 and gembernodes#55,
+which deployed it at 18:09Z; built on branch `ccr-856636cc-qj1te0`; asked that day, D69)
 - Asked, after the server reset of 2026-10-04 13:00Z registered a new agent with the seeded settings (only the scout and
   contract plans on, D9): "After the restart most config items were turned off. Can you ensure everything is on by
   default? And changes in config changes those defaults?" Then: "In addition, id like to have a separate set of endpoints
@@ -1371,7 +1379,7 @@ projects and gembernodes; asked that day, D69)
 - Checked against the first run: the procedure explained B42's anomaly and reproduced it with its
   test, and found B45, the scout plan skipping a stop when a tick and an arrival race.
 - Traps it took: this PC has no psql, jq or logcli; Grafana's API needs a login; plain `kubectl get`
-  reads Secrets; the read-only login can still read the agent token until 4.1's revoke; Wolverine's
+  reads Secrets; the read-only login could read the agent token until 4.1's revoke (done the same day); Wolverine's
   warnings run to dozens of lines; and `sed -i` in Git Bash turns CRLF files into LF.
 - To understand this phase, start with `.claude/skills/st-investigate/SKILL.md`, then
   `tools/investigate/README.md` and `st.py`'s `check`; for an example of the procedure, B45 in the
@@ -1381,6 +1389,15 @@ projects and gembernodes; asked that day, D69)
 
 A loop counts as done after a full reset period with no open anomalies for it on the dashboard.
 How credits are split stays your call; Claude only fixes deviations from intended behaviour.
+
+Checked after the reset of 2026-10-04 13:00Z, on the run that ended then (on the cluster since 2026-10-02 08:50Z, the last
+2.2 days of its period): 6.10b's and 6.10c's checks are met, and 6.11's plan explored a system. The contract ran end to end
+twice, the second time under the new agent (accepted at 13:06Z, fulfilled at 16:12Z), and the command ship went straight on
+from scouting to the contract (6.2). No loop has had its full period yet; the first began at 13:00Z, with every plan on
+since 18:09Z. The run's anomalies came from bugs since fixed (B42, B51, B55), a short outage of the shared Postgres, and
+B59's 429s. The checks found three
+more bugs: B38 is still open, B47's DRIFT fallback still flew the contract's trip, and a new one, B61, stores a market twice
+when it is seen for the first time.
 
 - **6.1 The first contract, end to end:** B8 and B9 (both fixed in 1.14; what's left is a clean
   reset period). Per D1 and D2 the bot takes one mineral contract per reset; taking the next
@@ -1751,8 +1768,8 @@ How credits are split stays your call; Claude only fixes deviations from intende
       `TradeBetweenMarketsGoalExecutorTests`, `MarketWatchServiceTests`, `SupplyChainCacheTests`, B46 in
       `ShipGoalExecutorServiceTests`, the trip's round trip in `ShipGoalRepositoryTests`, D19 in
       `RateLimitHandlerTests`.
-- **6.6 Jump gate construction** (built 2026-10-04 on branch `ccr-914173a3-6coo89`, in projects and gembernodes, with your
-  decisions D64–D68). Asked that day: "Spacetraders has unfinished buildings at waypoints, specifically an unbuilt jump
+- **6.6 Jump gate construction** (merged 2026-10-04 as projects#155, its dashboard as gembernodes#53, deployed by
+  gembernodes#52; built on branch `ccr-914173a3-6coo89`, with your decisions D64–D68). Asked that day: "Spacetraders has unfinished buildings at waypoints, specifically an unbuilt jump
   node. Finishing this jump node should be top priority, as it opens up the rest of the game. Can you implement a special
   role that works on this jump gate? Also please check whether the construction command gives any money, if so the new
   role can be set up like a trader, if not it probably needs a different money cap."
@@ -1764,6 +1781,9 @@ How credits are split stays your call; Claude only fixes deviations from intende
     1600/1600, ADVANCED_CIRCUITRY 400/400, QUANTUM_STABILIZERS 1/1). Its neighbours X1-HZ59-I59 and X1-BG54-I54 were
     under construction, needing the same, but D68 leaves them out. F49 exports FAB_MATS and D42 ADVANCED_CIRCUITRY. So
     the plan finds nothing to build until the server reset (2026-10-04 13:00Z) gives a new home system.
+  - **X1-FJ91**, the home system after that reset: its gate, X1-FJ91-I64, needs 1,600 FAB_MATS and 400 ADVANCED_CIRCUITRY
+    (QUANTUM_STABILIZERS 1/1). The plan started at 18:09Z, when slice 2.12 switched it on, with SPECTER-1 as its builder;
+    the builder trades while the ships ahead of the gate's loads in the purchase order are bought (D64).
   - Done:
     - **The role** (`FleetRole.Construct`, `FleetRoles.CanConstruct`): a hold and a tank, and no drone or probe. While the
       home gate needs materials, the role board gives it (reason `construction`) to the `Construction.Ships` (new, 1)
@@ -2258,6 +2278,10 @@ How credits are split stays your call; Claude only fixes deviations from intende
       - `ContractPlanService` holds a `LegacyContractShipPurchaseService` that nothing constructs (dead code).
     - Done when: the surveyor and the shuttle are bought in that order, the probes after the list, and no drone beyond one
       per scarce mineral before the probes; `spacetraders_purchase_need_credits` shows what waits.
+    - **Met** (checked on 2026-10-04): after the deploy (11:37Z on 2026-10-03) the purchases were the surveyor SPECTER-F
+      (12:50Z), five drones the role board kept for `coverage` (SPECTER-10, -11, -12, -14, -15), the second survey ship
+      SPECTER-13 (16:32Z, D55), the shuttle SPECTER-16 (20:33Z) and the hauler SPECTER-17 (04:51Z on 2026-10-04); no probe and
+      no further drone, and none at all after D58 (20:26Z), as the order says.
     - **To understand this,** start with `SpaceTraders.Application/Services/PurchaseOrder.cs`, then each plan's need:
       `DroneNeedAsync` in `Automation/MiningAutomationService.cs` and `SiphonAutomationService.cs`, `BuyCargoShipAsync` in
       `TradingAutomationService.cs`, `SurveyorNeedAsync` in `SurveyPlanService.cs`; for coverage, `UncoveredFirst` in
@@ -2346,6 +2370,9 @@ How credits are split stays your call; Claude only fixes deviations from intende
       - The analyzers ask for strongly typed ids on `ShipGoal.GoalId`, `DeliverCargoGoal.ContractId` and
         `NavigateToWaypointArrivedCommand.GoalId` (QW0028, QW0029): a change across the goal model, left.
     - Done when: a drone drifts to B7, mines there and sells there in CRUISE, and its later trips leave B7 in CRUISE.
+    - **Met** (checked on 2026-10-04): SPECTER-4 drifted from H53 at 12:35Z on 2026-10-03, reached B7 at 15:00:45Z and
+      switched to CRUISE at 15:00:52Z; from then on it mined at B14 and sold at B7, about 90 fuel a round trip, as did
+      SPECTER-10 and SPECTER-A.
     - Tests: App 817, Domain 71, API 163.
     - **To understand this,** start with `MiningTargets` in `Mining/MiningPlanner.cs` (the far targets, `CanDriftTo` and
       `IsWithinRoundTrip`), then `DriftStepAsync` in `Goals/Executors/MineAndSellGoalExecutor.cs` with `GoalFlight.cs`,
@@ -2518,8 +2545,9 @@ How credits are split stays your call; Claude only fixes deviations from intende
   - **To understand this,** start with the decisions D43–D58, then this slice's notes; 6.10b and 6.10c each have their own
     entry.
 
-- **6.11 Exploring through the jump gates, and a systems dashboard** (asked 2026-10-04, with your decisions D59–D63; built
-  on branch `ccr-c7061120-est7c1` in projects and gembernodes; fixes B60). Asked: "if an active jump gate goes to a system
+- **6.11 Exploring through the jump gates, and a systems dashboard** (asked 2026-10-04, with your decisions D59–D63; merged
+  as projects#153, its dashboard as gembernodes#51, deployed by gembernodes#52; built on branch `ccr-c7061120-est7c1`; fixes
+  B60). Asked: "if an active jump gate goes to a system
   that isn't explored yet, the COMMAND ship should go through that jump gate. If there are markets or shipyard there, the
   COMMAND ship should scout them, as it initially does for the home system, recursively." And during the work: "I'd
   probably want a systems grafana dashboard with a more wide view of which systems have been explored and what kind of
@@ -2591,6 +2619,10 @@ How credits are split stays your call; Claude only fixes deviations from intende
       seeded settings: switch it on after the reset.
   - To switch it on: `PUT /settings/Automation.Plan.Explore.Enabled` with `{"value": "true"}`.
   - Done when: the command ship has explored every system the built gates reach and is back home, with no open anomaly.
+  - **The first run** (switched on at 11:54Z on 2026-10-04): the plan started at 12:24Z, SPECTER-1 jumped to X1-KR90 at
+    12:31Z (antimatter 7,723), explored its 7 markets by 12:46Z and jumped on to X1-CV66 at 12:57Z (4,862), when the reset
+    ended the run. In X1-FJ91 the home gate is still to be built (6.6), so the plan has nothing to jump through until then;
+    its state says done, and it looks at the gate again every hour.
   - **To understand this,** start with `SpaceTraders.Application/Exploring/ExplorePlanService.cs` and `ExploreAtlas.cs`,
     then the two executors (`Goals/Executors/JumpGoalExecutor.cs`, `ExploreSystemGoalExecutor.cs`) and
     `Automation/BusinessSystems.cs`; for the dashboard, `Exploring/SystemOpportunities.cs`.
@@ -2632,14 +2664,14 @@ your PC, 1Password or kubectl:
 | 2.7 | The fleet table's new columns, and panels for the holds and for what was mined (merged: PR #15) |
 | 2.8 | A markets dashboard per system, uid `spacetraders-markets` (merged: PR #17) |
 | 6.4 | A survey section on the SpaceTraders dashboard: surveys taken, the share that ended unused, the share of extractions with a survey, usable surveys per asteroid, and the survey journal (merged: PR #21) |
-| 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` (done; the revoke on `stored_credentials`, step 3, is still to do) |
+| 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` (done; the revoke on `stored_credentials`, step 3, done on 2026-10-02) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
 | 2.9 | The settings table on the SpaceTraders dashboard (merged: PR #31) |
 | 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (merged: PR #32). It shows data while the role board is switched on |
 | 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50) |
-| 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (branch `ccr-c7061120-est7c1`, not merged). It shows data once the bot runs a build with slice 6.11, and the systems beyond home once the explore plan is on |
-| 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (branch `ccr-1e461fef-n6hydk`, not merged). The new columns show data once the bot runs a build with slice 2.11: deploy that build with it |
-| 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (branch `ccr-856636cc-qj1te0`, not merged). The column shows data once the bot runs a build with slice 2.12: deploy that build with it |
-| 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (branch `ccr-914173a3-6coo89`, not merged). They show data once the bot runs a build with slice 6.6, with the construction plan on and the home gate under construction; the build's deploy is a further image bump there |
+| 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (merged: PR #51). It shows the systems beyond home once the explore plan has jumped |
+| 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (merged: PR #52, which deployed the build) |
+| 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (merged: PR #55, which deployed the build) |
+| 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |
