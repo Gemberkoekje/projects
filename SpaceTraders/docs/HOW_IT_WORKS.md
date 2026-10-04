@@ -124,15 +124,20 @@ before any of those, so a pod that keeps failing during startup still prunes at 
 - On success it:
   - sets the agent data scope to the agent's id, which every later database query filters on
     (see [Agent scoping](#agent-scoping));
-  - seeds any missing settings;
+  - seeds the settings (D69): a setting the agent doesn't have yet starts with the value chosen for
+    the next runs, else with its default; a setting that still follows its default gets the default
+    as the running version has it (a `SettingChanged` journal line each); see
+    [How settings work](#how-settings-work);
   - records the active token.
 - Then it deletes the rows of every other agent, table by table, except their `runs`. A table
   that fails is logged and left for the next start.
 - This only happens at startup. A reset during a run is noticed by the API client (see
   [Outbound API client](#8-outbound-api-client-spacetradersinfrastructurespacetradersapi)): the
   host stops, and after the restart this registers the new agent and deletes the old one's rows.
-  The new agent's settings start from the defaults, because settings are stored per agent; the
-  old values survive only in the settings snapshot of the old agent's runs.
+  Settings are stored per agent, so the new agent's settings are seeded afresh: with the values
+  chosen for the next runs (`next_run_settings`, which belongs to no agent and outlives the old
+  one), else with the defaults (D69). The old values also survive in the settings snapshot of the
+  old agent's runs.
 
 **Run lifecycle** (`RunLifecycleService`):
 - Opens a run, or resumes the open one, with a name, a strategy label, a settings snapshot and
@@ -1284,19 +1289,25 @@ happens instead (B7, fixed).
   database don't stop it (B21). It doesn't upgrade an existing schema: a database from before
   slice 1.4 has to be dropped.
 - Agent bootstrap seeds the settings of the agent it picks.
+- A column or table added after the cluster's tables exist is added at every start by a statement
+  that is safe to repeat (`AddedSchema`): `cached_surveys."Extractions"` (slice 6.4),
+  `agent_settings."FollowsDefault"` and `next_run_settings` (D69), in one transaction with the
+  one-off judging of the settings stored before D69 (see
+  [How settings work](#how-settings-work)). `DatabaseInitializerTests` checks each against what the
+  model creates.
 - Wolverine stores nothing in the database.
 
 ### Agent scoping
 
-- Every table but `scheduled_ship_events` has an `AgentId` column: the agent's symbol and the
+- Every table but `scheduled_ship_events` and `next_run_settings` has an `AgentId` column: the agent's symbol and the
   server's reset date, such as `GEMBER@2026-09-27` (`AgentIdentity`). A token keeps the id it
   was first stored under. Where a table has a natural key, the id is part of it.
-- EF filters every query on the active agent's id. `startup_snapshots`, `agent_credits_samples`
-  and `scheduled_ship_events` have no filter.
+- EF filters every query on the active agent's id. `startup_snapshots`, `agent_credits_samples`,
+  `scheduled_ship_events` and `next_run_settings` have no filter.
 - The token itself is stored only in `stored_credentials`.
 - The database keeps one agent: at startup, agent bootstrap deletes every other agent's rows,
   except their `runs` (`AgentDataCleanup`). Pruning then only has the active agent's rows to deal
-  with.
+  with. `next_run_settings` has no agent, so the cleanup leaves it (D69).
 
 ### Retention
 
@@ -1337,7 +1348,8 @@ other app (D8):
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
 | `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals | bounded: one row per market or shipyard |
 | `cached_waypoints`, `cached_systems` | Systems where ships are, with each waypoint's traits and modifiers (B34, fixed) | Sync (inserts, and fills in missing traits); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
-| `agent_settings` | Settings | Seed, `PUT /settings` | bounded: one row per setting |
+| `agent_settings` | Settings, each with whether it follows its default (`FollowsDefault`, D69) | Seed, `PUT /settings`, the control endpoints, the size guard, the reset monitor | bounded: one row per setting |
+| `next_run_settings` | The values chosen for the next runs; no agent (D69) | `PUT /settings`, `PUT` and `DELETE /settings/next-run/{key}`, the control endpoints; `POST /settings/reset` empties it | bounded: at most one row per seeded setting |
 | `ship_assignment_records` | Scout and contract assignment per ship | Scout and contract plans | bounded: one row per ship |
 | `plan_states` | Plan JSON per plan type | All eleven plans, the role board included | bounded: one row per plan |
 | `scheduled_ship_events` | Arrival timers | Navigate | bounded: deleted when fired |
@@ -1366,15 +1378,45 @@ other app (D8):
 
 - Settings live in `agent_settings` and are read from the database on every use (no cache), so a
   change applies on the next read.
-- `PUT /settings/{key}` with `{"value": "…"}` writes any key, even an unknown one.
-- `POST /settings/reset` restores the defaults.
+- **Defaults:** `DefaultSettingsSeed` holds every setting's default. Every plan is on by default
+  (D69, asked on 2026-10-04; until then only the scout and contract plans were, D9).
+- **A setting follows its default** while nobody has set it: seeded from its default, it gets the
+  default as the running version has it at every start, so a default that changes reaches the agent
+  that runs (`FollowsDefault`). Set through `SettingsRepository`, by these endpoints, the control
+  endpoints, the size guard or the reset monitor, it keeps its value until it is set again. Of the
+  settings stored before D69, the start that adds the column takes one whose value isn't its default
+  as set, and lets the rest follow, with the plan switches that are off: D69 switched their defaults
+  on. So that start switches on the plans the reset of 2026-10-04 13:00Z left off, and keeps what was
+  changed before it. The `Runtime.*` status flags never follow.
+- **The next run** is the agent the next server reset registers. It starts with the value chosen for
+  it for each setting, else with the default (D69). A chosen value lasts until it is changed, for
+  every run after; it belongs to no agent (`next_run_settings`). Only settings the seed holds can be
+  chosen, and no status flag.
+- `PUT /settings/{key}` with `{"value": "…"}` writes any key, even an unknown one, and for a setting
+  the seed holds also chooses that value for the next runs (D69). The kill switch
+  (`POST /control/automation/enable`, `/disable`) does the same for `Automation.Enabled`. When the
+  bot sets a setting itself (the size guard and the reset monitor switch automation off), the next
+  runs keep their value.
+- `GET /settings/next-run` lists every setting a run starts with, the value the next run starts
+  with and whether that is the default (`isDefault`). `PUT /settings/next-run/{key}` with
+  `{"value": "…"}` chooses a value for the next runs only, and leaves the run that runs now alone;
+  `DELETE /settings/next-run/{key}` gives the next runs the default again. Both answer 404 for a key
+  the seed doesn't hold and for a status flag. For example, to run with half the mining-capable
+  ships mining now and try 60% next time, `PUT /settings/Automation.MiningShipPercentage` with
+  `0.5`, then `PUT /settings/next-run/Automation.MiningShipPercentage` with `0.6`; in that order,
+  since the first also sets the next runs.
+- `POST /settings/reset` gives every setting its default back, to follow it from then on, and
+  forgets the values chosen for the next runs.
 - Every change, whoever makes it (these endpoints, the control endpoints, the size guard, the
-  reset monitor), is a `SettingChanged` journal line with `Setting`, `OldValue` and `NewValue`
-  (`SettingsRepository`). A key that may hold a secret (ending in `Url`, or naming a secret,
-  password or API key) shows `(hidden)` instead of its value.
-- The SpaceTraders dashboard's **Settings** table shows every setting with its value now and what
-  it does (`spacetraders_setting_info`, section 11): the switches first, on or off, then the rest by
-  name; the `Runtime.*` status flags are left out. A value that may hold a secret is hidden there too.
+  reset monitor, a start that gives a setting its new default), is a `SettingChanged` journal line
+  with `Setting`, `OldValue` and `NewValue` (`SettingsRepository`), and every change of a value
+  chosen for the next runs a `NextRunSettingChanged` line, `(default)` where none is chosen. A key
+  that may hold a secret (ending in `Url`, or naming a secret, password or API key) shows `(hidden)`
+  instead of its value.
+- The SpaceTraders dashboard's **Settings** table shows every setting with its value now, the value
+  the next run starts with (D69) and what it does (`spacetraders_setting_info`, section 11): the
+  switches first, on or off, then the rest by name; the `Runtime.*` status flags are left out. A
+  value that may hold a secret is hidden there too.
   What a setting does comes from the running version's seed: a stored description is the one the
   setting was seeded with, which an older version may have written (slice 2.9).
 
@@ -1387,7 +1429,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | Setting (default) | Effect |
 |---|---|
 | `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
-| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled` (true); `.Explore.Enabled`, `.Roles.Enabled`, `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Construction.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (false) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37). With the role board on, every ship works for the plan of the role the board gives it instead (D38–D41). With the construction plan on, the largest hold builds the home system's jump gate while it needs materials (slice 6.6, D64–D68) |
+| `Automation.Plan.Scout.Enabled`, `.Contract.Enabled`, `.Explore.Enabled`, `.Roles.Enabled`, `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Construction.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (true, D69) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37). With the role board on, every ship works for the plan of the role the board gives it instead (D38–D41). With the construction plan on, the largest hold builds the home system's jump gate while it needs materials (slice 6.6, D64–D68) |
 | `Construction.Ships` (1) | Ships that build the home system's jump gate while it needs materials: the largest holds that aren't drones, probes or the surveyor. The role board gives them the construction role; with the board off, the construction plan picks them (D65) |
 | `Roles.ReconsiderMinutes` (10) | Minutes between the role board's evaluations of the whole fleet; a new ship, a plan switched, the contract starting or stopping to want ore, the home gate starting or stopping to need materials, or a ship left without work weighs the roles at once (D41) |
 | `Roles.HeadStartPercent` (20) | Percent more a ship's current role counts on the role board, so close calls don't flip back and forth (D41); 0 means none |
@@ -1525,8 +1567,8 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Fleet | `GET /fleet/assignments`, `/activity`, `/activity/{ship}`, `/activity/{ship}/history`, `/goal-chains` | 5 s cache. History is always `[]` |
 | Markets | `GET /markets/waypoints`, `/waypoints/{s}`, `/freshness`, `/goods/{s}/prices`, `/waypoints/{s}/prices`, `/best-routes` | Best routes always 204 |
 | Shipyards | `GET /shipyards/waypoints`, `/waypoints/{s}`, `/freshness` | |
-| Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset` | |
-| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled` |
+| Settings | `GET /settings`, `PUT /settings/{key}`, `POST /settings/reset`; `GET /settings/next-run`, `PUT /settings/next-run/{key}`, `DELETE /settings/next-run/{key}` | `PUT /settings/{key}` also sets the next runs; the `next-run` endpoints only the next runs, and answer 404 for a key a run doesn't start with (D69) |
+| Control | `POST /control/automation/enable`, `/disable` | Sets `Automation.Enabled`, now and for the next runs (D69) |
 
 **SignalR** (`/hubs/dashboard`): the server broadcasts `ReceiveInvalidation({Kind, Id, OccurredAt})`
 for ships, activity, assignments, goal chains, contracts and markets. Clients can't call
@@ -1618,7 +1660,8 @@ The seven pages in `src/Future` are not routed.
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`), explore plan (`waiting_for_credits`, with the jump's `WaypointSymbol`, `Destination`, `SystemSymbol`, `Price`, `Floor` and `Credits`; `no_way_home` at Warning) | `Plan`, `Reason` |
   | `ShipIdle` | `ShipStateJournal`, from the 10 s sample: `idle_at_start`, `new_ship`, `goal_ended` (with `PreviousGoal`) | `ShipSymbol`, `Reason` |
   | `ShipBlocked` | The circuit breaker (Warning); `JumpGoalExecutor`, for a jump the API refused (`jump_refused`, Warning, slice 6.11) | `ShipSymbol`, `GoalKind`, `Reason`; a refused jump has `WaypointSymbol` and `Destination` instead of `GoalKind` |
-  | `SettingChanged` | `SettingsRepository` | `Setting`, `OldValue`, `NewValue` |
+  | `SettingChanged` | `SettingsRepository`; agent bootstrap, for a setting it gives its new default (D69) | `Setting`, `OldValue`, `NewValue` |
+  | `NextRunSettingChanged` | `SettingsRepository`, for a value chosen for the next runs (D69) | `Setting`, `OldValue`, `NewValue`; `(default)` where none is chosen |
   | `ResetDetected` | `ServerResetMonitor` (Critical) | `Detail` |
   | `ApiUnavailable`, `ApiAvailable` | The tick | `PausedUntil` |
   | `AnomalyRaised` | The health monitor (Warning) and the size guard | `Rule`, `Subject`; the monitor's also `Details` |
@@ -1710,7 +1753,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_good_supply_chain` | `good`, `made_from`, `used_for` | One series per good, always 1: the goods it is made from and the goods made from it, comma-separated (`GET market/supply-chain`) | Once per start |
   | `spacetraders_ship_role_info` | `ship`, `role`, `reason` | One series per ship on the role board (slice 6.9), always 1: its role (`Survey`, `Mine`, `Siphon`, `Trade`, `Construct`, `None`) and why (`survey_first`, `coverage`, `gathers_first`, `construction`, `most_profitable`, ...). Only while the board is on: switched off, the plans don't read its roles. The dashboard's roles table | Every 10 s, from the board's state |
   | `spacetraders_ship_role_credits_per_hour` | `ship`, `role` | What each role a ship could take but surveying and constructing would earn it per hour, by the board's estimate of its best trip; 0 for a role without a trip. Only while the board is on | Every 10 s |
-  | `spacetraders_setting_info` | `setting`, `current`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`) and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
+  | `spacetraders_setting_info` | `setting`, `current`, `next_run`, `description` | One series per setting the agent has, always 1: its value now (`true` or `false` for a switch; `(hidden)` for a key that may hold a secret, as in `SettingChanged`), the value the next run starts with, hidden alike (D69; empty for a status flag or a key the seed doesn't hold), and what it does, from the running version's seed, else as stored. The dashboard's settings table (slice 2.9) | Every 10 s |
   | `spacetraders_ship_capabilities_info` | `ship`, `can` | One series per ship, always 1: the roles its equipment allows whichever plans are on (`FleetRoles.PotentialRoles`), in the order `Survey` (a surveyor mount, or a bought SHIP_SURVEYOR), `Mine` (a mining laser, or a bought mining drone or ore hound, with a hold and a tank), `Siphon` (a gas siphon, or a bought siphon drone, with a hold and a tank), `Trade` (a hold and a tank), `Construct` (a hold and a tank, and no drone, slice 6.6); `none` for a probe or a ship with none. Mining and siphon drones are both cached as EXCAVATOR, the game's registration role, which the `role` label of `spacetraders_ships` shows; this tells them apart (slice 6.10a). The fleet and roles tables' "can do" column | Every 10 s |
   | `spacetraders_goods_sold_units_total`, `spacetraders_goods_bought_units_total` | `system`, `waypoint`, `good` | Units our ships sold to, or bought from, a market, whoever traded them (trade, mining, siphon and spare-time trips; only traders buy). The same labels as the market gauges without `kind`, so what we sell into a market can be set against the supply, trade volume and price of what it makes (D50) | Per sale or purchase (`LedgerEntryHandler`) |
   | `spacetraders_trips_total`, `spacetraders_trip_profit_credits_total`, `spacetraders_trip_loss_credits_total` | `activity` | Trips that ended, and what they made or lost after fuel, by `trade`, `mining`, `siphoning`, `spare_time`, `contract` or `construction` (D46; construction only ever loses, slice 6.6): a trip adds its profit to one counter and 0 to the other, so both series exist and profit − loss is what the activity made. A contract's deposit and payout count as its profit; each delivery's round trip, its fuel as a loss | Per trip end (`TripBook`); contract payments in `LedgerEntryHandler` |

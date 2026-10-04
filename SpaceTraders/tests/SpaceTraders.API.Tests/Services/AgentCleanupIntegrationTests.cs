@@ -3,6 +3,7 @@ using DotNet.Testcontainers.Configurations;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using NSubstitute;
@@ -85,6 +86,38 @@ public sealed class AgentCleanupIntegrationTests : IAsyncLifetime
         await using var db = CreateContext(NewAgent);
         (await db.Agents.SingleAsync()).Symbol.Should().Be("AGENT");
         (await db.Ships.SingleAsync()).Symbol.Should().Be("AGENT-1");
+    }
+
+    [SkippableFact]
+    public async Task StartAsync_AfterAReset_TheNewAgentStartsWithTheValuesChosenForTheNextRuns_WhichOutliveTheOldAgent()
+    {
+        // D69: the old agent ran with a quarter of its ships mining, and the next run was set to try 60%.
+        await SeedOldAgentAsync();
+        await using (var old = CreateContext(OldAgent))
+        {
+            (await new SettingsRepository(old, NullLogger<SettingsRepository>.Instance)
+                .SetNextRunSettingAsync("Automation.MiningShipPercentage", "0.6")).Should().BeTrue();
+        }
+
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<Agent>>(_ => throw new SpaceTradersApiException(
+                "Token reset_date does not match the server",
+                HttpStatusCode.Unauthorized,
+                "my/agent",
+                null));
+        apiClient.RegisterAsync(Arg.Any<RegisterRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateRegistration()));
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ServerStatus { Status = "online", Version = "v2.3.0", ResetDate = "2026-09-27", Description = "SpaceTraders" }));
+        await using var provider = BuildProvider(apiClient);
+
+        await provider.GetRequiredService<AgentBootstrapService>().StartAsync(CancellationToken.None);
+
+        await using var db = CreateContext(NewAgent);
+        (await db.Settings.SingleAsync(s => s.Key == "Automation.MiningShipPercentage")).Value.Should().Be("0.6");
+        (await db.Settings.SingleAsync(s => s.Key == "Automation.Plan.Trading.Enabled")).Value.Should().Be("true");
+        (await db.NextRunSettings.SingleAsync()).Should().Match<NextRunSetting>(s => s.Key == "Automation.MiningShipPercentage" && s.Value == "0.6");
     }
 
     private async Task SeedOldAgentAsync()

@@ -16,6 +16,9 @@ public static class ControlEndpoints
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
             var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.SetAsync("Automation.Enabled", "true", ct);
+
+            // D69: the kill switch holds for the next runs too.
+            await settings.SetNextRunSettingAsync("Automation.Enabled", "true", ct);
             await settings.SetAsync("Runtime.AutomationPausedByReset", "false", ct);
             await settings.SetAsync("Runtime.Alert.AutomationDisabled", "false", ct);
             await snapshotLogger.LogAsync("control automation enabled", ct);
@@ -27,13 +30,12 @@ public static class ControlEndpoints
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
             var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.SetAsync("Automation.Enabled", "false", ct);
+            await settings.SetNextRunSettingAsync("Automation.Enabled", "false", ct);
             await settings.SetAsync("Runtime.AutomationPausedByReset", "false", ct);
             await settings.SetAsync("Runtime.Alert.AutomationDisabled", "true", ct);
             await snapshotLogger.LogAsync("control automation disabled", ct);
             return Results.Ok(new { enabled = false });
         });
-
-
 
         return app;
     }

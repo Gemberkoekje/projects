@@ -27,6 +27,9 @@ public static class SettingsEndpoints
             var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             var runLifecycle = sp.GetRequiredService<IRunLifecycleManager>();
             await settings.SetAsync(key, body.Value, ct);
+
+            // D69: what you set is also what the next runs start with.
+            await settings.SetNextRunSettingAsync(key, body.Value, ct);
             await snapshotLogger.LogAsync($"settings updated: {key}", ct);
             await runLifecycle.RotateForSettingsChangeAsync(key, ct);
             return Results.Ok();
@@ -39,6 +42,32 @@ public static class SettingsEndpoints
             await settings.ResetToDefaultsAsync(ct);
             await snapshotLogger.LogAsync("settings reset", ct);
             return Results.Ok();
+        });
+
+        // D69: the values the next runs start with, without changing the run that runs now. A key the seed doesn't
+        // hold, or a Runtime.* status flag, is not found.
+        var nextRun = group.MapGroup("/next-run");
+
+        nextRun.MapGet("/", async (IMessageBus bus, CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<IReadOnlyList<Application.DTOs.NextRunSettingDto>>(new GetNextRunSettingsQuery(), ct);
+            return Results.Ok(result);
+        });
+
+        nextRun.MapPut("/{key}", async (
+            string key,
+            UpdateSettingRequest body,
+            IServiceProvider sp,
+            CancellationToken ct) =>
+        {
+            var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            return await settings.SetNextRunSettingAsync(key, body.Value, ct) ? Results.Ok() : Results.NotFound();
+        });
+
+        nextRun.MapDelete("/{key}", async (string key, IServiceProvider sp, CancellationToken ct) =>
+        {
+            var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            return await settings.RemoveNextRunSettingAsync(key, ct) ? Results.Ok() : Results.NotFound();
         });
 
         return app;

@@ -48,6 +48,7 @@ public sealed class DataRetention(SpaceTradersDbContext db) : IDataRetention
         Bounded("cached_construction_sites", "one row per construction site"),
         Bounded("cached_surveys", "expired surveys are deleted whenever new ones are saved"),
         Bounded("agent_settings", "one row per setting"),
+        Bounded("next_run_settings", "at most one row per seeded setting, whatever the agent"),
         Bounded("ship_assignment_records", "one row per ship"),
         Bounded("plan_states", "one row per plan"),
         Bounded("leader_leases", "one row per lease"),

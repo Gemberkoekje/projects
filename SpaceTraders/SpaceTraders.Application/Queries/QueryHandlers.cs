@@ -75,6 +75,18 @@ public sealed class GetSettingsQueryHandler(ISettingsRepository settings)
     }
 }
 
+/// <summary>The settings the next run starts with (D69).</summary>
+public sealed record GetNextRunSettingsQuery;
+
+public sealed class GetNextRunSettingsQueryHandler(ISettingsRepository settings)
+{
+    public async Task<IReadOnlyList<NextRunSettingDto>> Handle(GetNextRunSettingsQuery query, CancellationToken cancellationToken)
+    {
+        var all = await settings.GetNextRunSettingsAsync(cancellationToken);
+        return all.Select(s => new NextRunSettingDto(s.Key, s.Value, s.Type, s.Description, s.IsDefault)).ToList();
+    }
+}
+
 public sealed record GetActivityLogQuery
 {
     public int Page { get; init; } = 1;

@@ -206,9 +206,10 @@ public interface IAutomationMetrics
 
     /// <summary>
     /// Records the agent's settings, one series per setting, always 1
-    /// (<c>spacetraders_setting_info{setting,current,description}</c>): its value now and what it does, for the
-    /// dashboard's settings table (slice 2.9). A setting whose value or description changed loses its old series, and a
-    /// setting that is no longer in <paramref name="settings"/> loses its own.
+    /// (<c>spacetraders_setting_info{setting,current,next_run,description}</c>): its value now, the value the next run
+    /// starts with (D69) and what it does, for the dashboard's settings table (slice 2.9). A setting whose values or
+    /// description changed loses its old series, and a setting that is no longer in <paramref name="settings"/> loses its
+    /// own.
     /// </summary>
     void Settings(IReadOnlyCollection<SettingMetricsSample> settings);
 
@@ -292,10 +293,11 @@ public sealed record RoleMetricsSample
 public sealed record SettingMetricsSample
 {
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public SettingMetricsSample(string Setting, string Value, string Description)
+    public SettingMetricsSample(string Setting, string Value, string NextRun, string Description)
     {
         this.Setting = Setting;
         this.Value = Value;
+        this.NextRun = NextRun;
         this.Description = Description;
     }
 
@@ -304,6 +306,12 @@ public sealed record SettingMetricsSample
 
     /// <summary>Its value now, as it may be shown: <c>(hidden)</c> for one that may hold a secret.</summary>
     public required string Value { get; init; }
+
+    /// <summary>
+    /// The value the next run starts with, as it may be shown (D69): the one chosen for it, else the default; empty for a
+    /// key a run doesn't start with (a <c>Runtime.*</c> status flag, or one the seed doesn't hold).
+    /// </summary>
+    public required string NextRun { get; init; }
 
     /// <summary>What it does; empty for a key nothing describes (one only <c>PUT /settings/{key}</c> wrote).</summary>
     public required string Description { get; init; }

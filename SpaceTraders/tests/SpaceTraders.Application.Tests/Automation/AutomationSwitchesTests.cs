@@ -9,9 +9,10 @@ namespace SpaceTraders.Application.Tests.Automation;
 public sealed class AutomationSwitchesTests
 {
     [Fact]
-    public async Task Seed_SwitchesOnAutomation_ButOnlyTheScoutAndContractPlans()
+    public async Task Seed_SwitchesOnAutomation_AndEveryPlan()
     {
-        // D9: the first run after the redeploy runs only the scout and contract plans.
+        // D69 (asked on 2026-10-04, when the server reset left a new agent with most plans off): every plan is on by
+        // default. D9 had only the scout and contract plans on for the first run after the redeploy.
         await using var db = TestDbContextFactory.Create();
         await DefaultSettingsSeed.SeedAsync(db);
 
@@ -23,16 +24,16 @@ public sealed class AutomationSwitchesTests
         {
             ["Automation.Enabled"] = "true",
             ["Automation.Plan.Scout.Enabled"] = "true",
-            ["Automation.Plan.Explore.Enabled"] = "false",
-            ["Automation.Plan.Roles.Enabled"] = "false",
+            ["Automation.Plan.Explore.Enabled"] = "true",
+            ["Automation.Plan.Roles.Enabled"] = "true",
             ["Automation.Plan.Contract.Enabled"] = "true",
-            ["Automation.Plan.ProbeDeployment.Enabled"] = "false",
-            ["Automation.Plan.Survey.Enabled"] = "false",
-            ["Automation.Plan.Mining.Enabled"] = "false",
-            ["Automation.Plan.Siphon.Enabled"] = "false",
-            ["Automation.Plan.Construction.Enabled"] = "false",
-            ["Automation.Plan.Trading.Enabled"] = "false",
-            ["Automation.Plan.SpareTime.Enabled"] = "false",
+            ["Automation.Plan.ProbeDeployment.Enabled"] = "true",
+            ["Automation.Plan.Survey.Enabled"] = "true",
+            ["Automation.Plan.Mining.Enabled"] = "true",
+            ["Automation.Plan.Siphon.Enabled"] = "true",
+            ["Automation.Plan.Construction.Enabled"] = "true",
+            ["Automation.Plan.Trading.Enabled"] = "true",
+            ["Automation.Plan.SpareTime.Enabled"] = "true",
         });
     }
 

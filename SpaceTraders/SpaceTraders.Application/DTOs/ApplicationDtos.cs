@@ -283,6 +283,31 @@ public sealed record SettingDto
     }
 }
 
+/// <summary>A setting a run starts with, and the value the next run starts with (D69).</summary>
+public sealed record NextRunSettingDto
+{
+    public required string Key { get; init; }
+
+    public required string Value { get; init; }
+
+    public required string Type { get; init; }
+
+    public required string Description { get; init; }
+
+    /// <summary>True when no value is chosen for the next runs: they start with the default.</summary>
+    public required bool IsDefault { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public NextRunSettingDto(string Key, string Value, string Type, string Description, bool IsDefault)
+    {
+        this.Key = Key;
+        this.Value = Value;
+        this.Type = Type;
+        this.Description = Description;
+        this.IsDefault = IsDefault;
+    }
+}
+
 public sealed record ActivityLogDto
 {
     public required long Id { get; init; }
