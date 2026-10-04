@@ -110,10 +110,12 @@
   19:17Z). B59, 429s from the API's rate limiter while the bot keeps to its budget: its first step, logging the
   limiter's headers with each 429, is merged and deployed (projects#149, gembernodes#47: the cluster runs `5ef42bd`
   since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is merged
-  (projects#150); its deploy is gembernodes#48. Your decision D58, drones gather first, is built on branch
-  `claude/spacetraders-drones-gather-first`.
-- Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) is built
-  on branch `ccr-ff72b415-uqqj4q` in projects and gembernodes.
+  (projects#150); its deploy is gembernodes#48. Your decision D58, drones gather first, was merged as projects#151;
+  gembernodes#49 deploys it (`3ffb1a2`).
+- Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) was
+  merged as projects#152; gembernodes#50 deploys it (`df677b9`) with the graph.
+- Slice 2.11 (each ship for sale's tank, hold, what it could do in the fleet and its equipment, on the markets dashboard's
+  shipyards table, asked on 2026-10-04) is built on branch `ccr-1e461fef-n6hydk` in projects and gembernodes.
 
 ## Known issues
 
@@ -931,6 +933,43 @@ and gembernodes; asked that day)
     2026-10-03 23:11 (local time) it climbs from 0 to about 4 between about 18:10 and 21:20 local time, the hours
     between the deploy at 16:07Z and the 429s at 19:07Z. The new graph joins gaps of up to 10 minutes only (a restart),
     and reads 0 for rate limited while the bot runs without a 429 series.
+
+**2.11 What each ship for sale holds, could do and carries** (built 2026-10-04 on branch `ccr-1e461fef-n6hydk`, in
+projects and gembernodes; asked that day)
+- Asked: "For spacetraders, can we add some more information to the shipyard ships? I'd like to know fuel tank size,
+  cargo size, and which special bits they have (e.g. mining laser)", in Grafana, then "Also which role they can fulfill
+  within my fleet".
+- Done:
+  - With the markets and shipyards, every minute (`PrometheusMarketMetricsService`), the bot exports for each ship type
+    a shipyard lists in full, once a ship has been there: its tank, the frame's `fuelCapacity`
+    (`spacetraders_shipyard_ship_fuel_capacity_units`); its hold, what its cargo holds take together
+    (`spacetraders_shipyard_ship_cargo_capacity_units`); and one series with what it could do in the fleet and its
+    equipment (`spacetraders_shipyard_ship_info{system,waypoint,ship_type,can,equipment}`). The cached listings hold the
+    frame, modules and mounts; slice 6.4 read the tank and hold from them for purchases, and the mounts and modules are
+    read now too (`ShipyardShipDto.Mounts`, `.Modules`).
+  - `can` is judged as the fleet table's "can do" judges a ship (`FleetRoles.PotentialRoles`), on the ship as the
+    plans see one they would buy: by its type, mounts, hold and tank, whichever plans are on. `Survey`, `Mine`, `Siphon`
+    and `Trade` in that order, such as `Mine, Trade` for a mining drone; `none` for a ship that can do none of them. A
+    probe says `Probe`, where the fleet table says `none`: the probe plan buys and flies it.
+  - `equipment` is its mounts, then its modules, each in symbol order and without its `MOUNT_` or `MODULE_` prefix,
+    such as `MINING_LASER_I, MINERAL_PROCESSOR_I`. The cargo holds are left out, as the cargo column has them, and so
+    are the crew quarters, which house the crew (the command frigate has two); `none` without any.
+  - The dashboard's side is gembernodes (same branch): the markets dashboard's **Shipyards** table gets the columns
+    "can do", "fuel", "cargo" and "equipment", and is full width under "Places", which is too; the panels below moved
+    down.
+  - `ShipyardWaypointDto` lists its ship types and ships as read-only lists, which removes the two QW0012 warnings in
+    `ApplicationDtos.cs`. The file's QW0028 and QW0029 warnings (strongly typed identifiers) stay, as across the code.
+  - Tests: `ShipyardShipCapacityTests` (a listing's mounts and modules), `PrometheusMarketMetricsServiceTests` (tank,
+    hold, can do and equipment of a mining drone, siphon drone, surveyor, light hauler, probe and command frigate as
+    listed), `PrometheusAutomationMetricsTests` (the series; one info series per ship type that follows the listing,
+    gone with the details or the type) and `MetricsEndpointTests` (the scrape lists them). The panel's queries with
+    `promtool test rules` against synthetic series in two systems, and the dashboard in Grafana 11.6.1 against a local
+    Prometheus scraping the series as the bot writes them, at desktop and phone width.
+- Noticed (not changed):
+  - Slice 6.7 noted that whether a siphon drone has a gas processor "isn't known here (the shipyard listing the bot
+    caches has no modules)". The cached listings do hold the modules (A2's light hauler, with its two holds and crew
+    quarters, on 2026-10-02), so the shipyards table's equipment column answers it whenever the cache holds C39's
+    listing in full.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2307,11 +2346,12 @@ your PC, 1Password or kubectl:
 | 2.5 | Rules in `infrastructure/monitoring/grafana-alerting-provisioning.yaml`, then a Grafana rollout restart (merged: PR #10; Grafana restarted 2026-10-02) |
 | 2.7 | The fleet table's new columns, and panels for the holds and for what was mined (merged: PR #15) |
 | 2.8 | A markets dashboard per system, uid `spacetraders-markets` (merged: PR #17) |
-| 6.4 | A survey section on the SpaceTraders dashboard: surveys taken, the share that ended unused, the share of extractions with a survey, usable surveys per asteroid, and the survey journal (branch `claude/spacetraders-survey-dashboard`, not committed; ships with 6.4's deploy) |
+| 6.4 | A survey section on the SpaceTraders dashboard: surveys taken, the share that ended unused, the share of extractions with a survey, usable surveys per asteroid, and the survey journal (merged: PR #21) |
 | 4.1 | Database login and read-only login (Postgres and 1Password): by hand, with the steps in `apps/spacetraders/README.md` (done; the revoke on `stored_credentials`, step 3, is still to do) |
 | 4.2 | `apps/spacetraders/`, `namespaces/spacetraders-namespace.yaml`, `ingress/spacetraders-ingress.yaml`, plus the kustomization entries (merged: PR #11) |
 | 4.3 | "SpaceTraders bot is down" unpaused (merged: PR #11), then the Grafana rollout restart (done 2026-10-02 09:09Z) |
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
-| 2.9 | The settings table on the SpaceTraders dashboard (branch `ccr-212dac2b-p2ent0`, not merged). It shows data once the bot runs a build with `spacetraders_setting_info`: deploy that build with it |
-| 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (branch `claude/ship-role-profitability-ghjzlb`, not merged). It shows data once the bot runs a build with the role board switched on |
-| 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (branch `ccr-ff72b415-uqqj4q`, not merged). "Initiated" shows data once the bot runs a build with slice 2.10; the rest works without it |
+| 2.9 | The settings table on the SpaceTraders dashboard (merged: PR #31) |
+| 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (merged: PR #32). It shows data while the role board is switched on |
+| 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50, with the deploy of slice 2.10) |
+| 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (branch `ccr-1e461fef-n6hydk`, not merged). The new columns show data once the bot runs a build with slice 2.11: deploy that build with it |

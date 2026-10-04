@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.11)
+- The markets dashboard's shipyards table shows, for each ship for sale, its tank, its hold, what it could do in the fleet and its equipment, as asked on 2026-10-04: "For spacetraders, can we add some more information to the shipyard ships? I'd like to know fuel tank size, cargo size, and which special bits they have (e.g. mining laser)", then "Also which role they can fulfill within my fleet". From the shipyard listings it caches, the bot exports `spacetraders_shipyard_ship_fuel_capacity_units`, `spacetraders_shipyard_ship_cargo_capacity_units` and one series per ship type, `spacetraders_shipyard_ship_info{can,equipment}`: what it could do, judged as the fleet table's "can do" (`FleetRoles.PotentialRoles`; `Probe` for a probe), and its mounts and modules without the cargo holds and crew quarters. The table's new columns are in gembernodes, on the same branch.
+
+### Code – Changed (2026-10-04, slice 2.11)
+- `ShipyardShipDto` lists a ship for sale's mounts and modules; `ShipyardWaypointDto` lists its ship types and ships as read-only lists (two QW0012 warnings fewer).
+
+### Docs – Changed (2026-10-04, slice 2.11)
+- `PLAN.md`: slice 2.11; D58 and slice 2.10 merged; the gembernodes table's merged rows. `docs/HOW_IT_WORKS.md`: the new metrics.
+
 ### Code – Added (2026-10-03, slice 2.10)
 - The bot counts every request it initiates to the game API, once, as it starts: before the pause after a 502 and the local budget, and without the retries of a 429 (`spacetraders_api_requests_initiated_total{method,endpoint}`, from a new outermost handler, `ApiRequestInitiatedHandler`). It feeds the dashboard's new "API request rates" graph, asked on 2026-10-03: "For spacetraders, can we add a graph similar to this?" Next to the requests that went out, it shows requests waiting for the budget, and retries.
 

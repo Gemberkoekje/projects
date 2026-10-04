@@ -84,7 +84,72 @@ public sealed class PrometheusMarketMetricsServiceTests
         shipyard.WaypointType.Should().Be("MOON");
         shipyard.ObservedAt.Should().Be(Start);
         shipyard.ShipTypes.Should().Equal("SHIP_MINING_DRONE", "SHIP_PROBE");
-        shipyard.Ships.Should().ContainSingle().Which.PurchasePrice.Should().Be(46_885);
+        var drone = shipyard.Ships.Should().ContainSingle().Subject;
+        drone.PurchasePrice.Should().Be(46_885);
+        drone.Supply.Should().Be("MODERATE");
+    }
+
+    /// <summary>
+    /// Slice 2.11, asked on 2026-10-04: "For spacetraders, can we add some more information to the shipyard ships? I'd
+    /// like to know fuel tank size, cargo size, and which special bits they have (e.g. mining laser)", then "Also which
+    /// role they can fulfill within my fleet". A ship for sale is judged as the fleet table judges a ship
+    /// (<c>FleetRoles.PotentialRoles</c>), by its mounts, hold and tank; a probe is the probe plan's. Its equipment is
+    /// its mounts and modules, without the cargo holds (its hold shows them) and the crew quarters.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_SaysWhatEachShipForSaleHolds_CanDo_AndCarries()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+
+            // The mining drone and the surveyor as the game listed them in May 2026 (the startup snapshots), the hauler's
+            // holds as A2 listed them on 2026-10-02, and the probe and the frigate as the starting ships came: the
+            // frigate with a hold, two crew quarters, two processors and four mounts.
+            db.Shipyards.Add(new CachedShipyard
+            {
+                AgentId = AgentId,
+                WaypointSymbol = "X1-AB-H52",
+                SystemSymbol = "X1-AB",
+                LastObservedAt = Start,
+                ShipTypesJson = """[{"type":"SHIP_MINING_DRONE"},{"type":"SHIP_SIPHON_DRONE"},{"type":"SHIP_SURVEYOR"},{"type":"SHIP_LIGHT_HAULER"},{"type":"SHIP_PROBE"},{"type":"SHIP_COMMAND_FRIGATE"}]""",
+                ShipsDetailJson = """
+                    [{"type":"SHIP_MINING_DRONE","purchasePrice":39716,"frame":{"symbol":"FRAME_DRONE","fuelCapacity":80},
+                      "modules":[{"symbol":"MODULE_CARGO_HOLD_I","capacity":15},{"symbol":"MODULE_MINERAL_PROCESSOR_I"}],
+                      "mounts":[{"symbol":"MOUNT_MINING_LASER_I"}]},
+                     {"type":"SHIP_SIPHON_DRONE","purchasePrice":42000,"frame":{"symbol":"FRAME_DRONE","fuelCapacity":80},
+                      "modules":[{"symbol":"MODULE_CARGO_HOLD_I","capacity":15}],
+                      "mounts":[{"symbol":"MOUNT_GAS_SIPHON_I"}]},
+                     {"type":"SHIP_SURVEYOR","purchasePrice":26025,"frame":{"symbol":"FRAME_DRONE","fuelCapacity":80},
+                      "modules":[],"mounts":[{"symbol":"MOUNT_SURVEYOR_I"}]},
+                     {"type":"SHIP_LIGHT_HAULER","purchasePrice":354210,"frame":{"symbol":"FRAME_LIGHT_FREIGHTER","fuelCapacity":600},
+                      "modules":[{"symbol":"MODULE_CARGO_HOLD_II","capacity":40},{"symbol":"MODULE_CARGO_HOLD_II","capacity":40},{"symbol":"MODULE_CREW_QUARTERS_I","capacity":40}],
+                      "mounts":[{"symbol":"MOUNT_SENSOR_ARRAY_I"}]},
+                     {"type":"SHIP_PROBE","purchasePrice":81645,"frame":{"symbol":"FRAME_PROBE","fuelCapacity":0},"modules":[],"mounts":[]},
+                     {"type":"SHIP_COMMAND_FRIGATE","purchasePrice":1000000,"frame":{"symbol":"FRAME_FRIGATE","fuelCapacity":400},
+                      "modules":[{"symbol":"MODULE_CARGO_HOLD_II","capacity":40},{"symbol":"MODULE_CREW_QUARTERS_I","capacity":40},{"symbol":"MODULE_CREW_QUARTERS_I","capacity":40},{"symbol":"MODULE_MINERAL_PROCESSOR_I"},{"symbol":"MODULE_GAS_PROCESSOR_I"}],
+                      "mounts":[{"symbol":"MOUNT_SENSOR_ARRAY_II"},{"symbol":"MOUNT_GAS_SIPHON_II"},{"symbol":"MOUNT_MINING_LASER_II"},{"symbol":"MOUNT_SURVEYOR_II"}]}]
+                    """,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipyardMetricsSample> shipyards = [];
+        _metrics.When(m => m.Shipyards(Arg.Any<IReadOnlyCollection<ShipyardMetricsSample>>()))
+            .Do(call => shipyards = call.Arg<IReadOnlyCollection<ShipyardMetricsSample>>());
+
+        await Service(provider).SampleAsync(Start, CancellationToken.None);
+
+        shipyards.Should().ContainSingle().Which.Ships
+            .Select(ship => (ship.Type, ship.FuelCapacity, ship.CargoCapacity, ship.Can, ship.Equipment))
+            .Should().Equal(
+                ("SHIP_MINING_DRONE", 80, 15, "Mine, Trade", "MINING_LASER_I, MINERAL_PROCESSOR_I"),
+                ("SHIP_SIPHON_DRONE", 80, 15, "Siphon, Trade", "GAS_SIPHON_I"),
+                ("SHIP_SURVEYOR", 80, 0, "Survey", "SURVEYOR_I"),
+                ("SHIP_LIGHT_HAULER", 600, 80, "Trade", "SENSOR_ARRAY_I"),
+                ("SHIP_PROBE", 0, 0, "Probe", "none"),
+                ("SHIP_COMMAND_FRIGATE", 400, 40, "Survey, Mine, Siphon, Trade", "GAS_SIPHON_II, MINING_LASER_II, SENSOR_ARRAY_II, SURVEYOR_II, GAS_PROCESSOR_I, MINERAL_PROCESSOR_I"));
     }
 
     [Fact]

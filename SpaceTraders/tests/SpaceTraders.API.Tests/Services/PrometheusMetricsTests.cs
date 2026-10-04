@@ -882,13 +882,7 @@ public sealed class PrometheusAutomationMetricsTests
     [Fact]
     public async Task AShipyard_ShowsItsShipTypesAndThePricesItKnows()
     {
-        _metrics.Shipyards([new ShipyardMetricsSample(
-            "X1-AB",
-            "X1-AB-H52",
-            "MOON",
-            Start,
-            ["SHIP_MINING_DRONE", "SHIP_PROBE"],
-            [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 46_885, Supply = "MODERATE" }])]);
+        _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE", "SHIP_PROBE"], new ShipyardShipMetricsSample("SHIP_MINING_DRONE", 46_885, "MODERATE"))]);
 
         var text = await ExportAsync();
         text.Should().Contain($"spacetraders_shipyard_observed_timestamp_seconds{{system=\"X1-AB\",waypoint=\"X1-AB-H52\",waypoint_type=\"MOON\"}} {Start.ToUnixTimeSeconds()}\n");
@@ -899,6 +893,51 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().NotContain("spacetraders_shipyard_ship_price{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"}");
 
         _metrics.Shipyards([]);
+        (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H52\"");
+    }
+
+    /// <summary>
+    /// Slice 2.11: the shipyards table shows each ship for sale's tank and hold, what it could do in the fleet, and its
+    /// equipment, in one info series per ship type that follows the listing. A ship type listed again without details
+    /// (no ship of ours there) keeps only its type; one that is no longer listed loses its series.
+    /// </summary>
+    [Fact]
+    public async Task AShipForSale_ShowsItsTankHoldRolesAndEquipment_WhileTheShipyardListsThem()
+    {
+        var drone = new ShipyardShipMetricsSample("SHIP_MINING_DRONE", 46_885, "MODERATE")
+        {
+            FuelCapacity = 80,
+            CargoCapacity = 15,
+            Can = "Mine, Trade",
+            Equipment = "MINING_LASER_I, MINERAL_PROCESSOR_I",
+        };
+        _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"], drone)]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_shipyard_ship_fuel_capacity_units{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 80\n");
+        text.Should().Contain("spacetraders_shipyard_ship_cargo_capacity_units{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 15\n");
+        text.Should().Contain("spacetraders_shipyard_ship_info{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Mine, Trade\",equipment=\"MINING_LASER_I, MINERAL_PROCESSOR_I\"} 1\n");
+
+        // A listing that changes keeps one series.
+        _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"], drone with { Can = "Survey, Mine, Trade", Equipment = "MINING_LASER_I, SURVEYOR_I, MINERAL_PROCESSOR_I" })]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_shipyard_ship_info{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Survey, Mine, Trade\",equipment=\"MINING_LASER_I, SURVEYOR_I, MINERAL_PROCESSOR_I\"} 1\n");
+        text.Should().NotContain("can=\"Mine, Trade\"");
+
+        // Listed again without details: only its type is left.
+        _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"])]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
+        text.Should().NotContain("spacetraders_shipyard_ship_fuel_capacity_units{");
+        text.Should().NotContain("spacetraders_shipyard_ship_cargo_capacity_units{");
+        text.Should().NotContain("spacetraders_shipyard_ship_info{");
+
+        // Listed in full again, then no longer listed.
+        _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"], drone)]);
+        _metrics.Shipyards([]);
+
         (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H52\"");
     }
 
@@ -1054,6 +1093,9 @@ public sealed class PrometheusAutomationMetricsTests
 
     private static MarketMetricsSample Market(params TradeGoodSnapshot[] goods)
         => new("X1-AB", "X1-AB-H51", "PLANET", Start, goods);
+
+    private static ShipyardMetricsSample Shipyard(string[] shipTypes, params ShipyardShipMetricsSample[] ships)
+        => new("X1-AB", "X1-AB-H52", "MOON", Start, shipTypes, ships);
 
     private static ShipMetricsSample Drone(string location, string activity, CargoItemModel[] cargo, DateTimeOffset arrivesAt = default)
         => new("AGENT-3", "SHIP_MINING_DRONE", arrivesAt == default ? "IN_ORBIT" : "IN_TRANSIT", "Contract", string.Empty)
