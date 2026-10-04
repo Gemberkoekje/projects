@@ -7,14 +7,17 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// </summary>
 /// <remarks>
 /// Both windows slide, so the client never sends more than any fixed window the server counts in
-/// allows. Registered as a singleton: the HttpClient factory recreates its handlers every few
-/// minutes, and the budget has to outlive them. It also counts the writes waiting for it, which reads
-/// give way to (D19, <see cref="RateLimitingHandler"/>).
+/// allows. Three things keep the server's count and this one together (B59): each window is longer by
+/// <see cref="JourneyMargin"/>, for a request's journey to the server; a 429 from the rate limiter holds
+/// every request back until the reset it names (<see cref="PauseUntil"/>); and a new process starts with
+/// its burst spent (<see cref="ForANewProcess"/>), as the server still counts what the process before it
+/// sent. Registered as a singleton: the HttpClient factory recreates its handlers every few minutes,
+/// and the budget has to outlive them. It also counts the writes waiting for it, which reads give way
+/// to (D19, <see cref="RateLimitingHandler"/>).
 /// </remarks>
 public sealed class RequestBudget
 {
     public const int PerSecond = 2;
-
     public const int Burst = 30;
 
     /// <summary>
@@ -23,22 +26,68 @@ public sealed class RequestBudget
     /// </summary>
     public const int WriteReserve = 10;
 
-    private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan BurstDuration = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// Added to each window for a request's journey to the server (B59). A request that leaves a second
+    /// after the one two before it reaches the server less than a second after it when that one took
+    /// longer on its way, and the server counts three in its second. Half the 429s of 2026-10-03 and
+    /// 2026-10-04 came that way, a few to some tens of milliseconds early.
+    /// </summary>
+    public static readonly TimeSpan JourneyMargin = TimeSpan.FromMilliseconds(100);
+
+    private static readonly TimeSpan SecondWindow = TimeSpan.FromSeconds(1) + JourneyMargin;
+    private static readonly TimeSpan BurstWindow = TimeSpan.FromSeconds(60) + JourneyMargin;
 
     private readonly Queue<DateTimeOffset> _perSecond = new();
     private readonly Queue<DateTimeOffset> _burst = new();
     private readonly Lock _lock = new();
+    private DateTimeOffset _pausedUntil = DateTimeOffset.MinValue;
     private int _writesWaiting;
 
     /// <summary>The writes waiting for the budget now; reads give way to them (D19).</summary>
     public int WritesWaiting => Volatile.Read(ref _writesWaiting);
+
+    /// <summary>
+    /// A budget for a process that has just started, with its burst spent at <paramref name="now"/>: the
+    /// server counts the requests of the last minute whichever process sent them, and a process that
+    /// stopped a moment ago may have used the burst (B59: the 429s at 10:07:50Z on 2026-10-04 came
+    /// during a start). It goes at 2 a second until the burst comes back, a minute later.
+    /// </summary>
+    /// <param name="now">The time the process starts.</param>
+    /// <returns>The budget.</returns>
+    public static RequestBudget ForANewProcess(DateTimeOffset now)
+    {
+        var budget = new RequestBudget();
+        for (var request = 0; request < Burst; request++)
+        {
+            budget._burst.Enqueue(now);
+        }
+
+        return budget;
+    }
 
     /// <summary>Counts a write as waiting for the budget, until <see cref="WriteServed"/>.</summary>
     public void WriteWaiting() => Interlocked.Increment(ref _writesWaiting);
 
     /// <summary>A write that was waiting has taken its request from the budget, or given up.</summary>
     public void WriteServed() => Interlocked.Decrement(ref _writesWaiting);
+
+    /// <summary>
+    /// Holds every request back until <paramref name="until"/> (B59): the rate limiter answered 429 and
+    /// named when it lets the next request through. Until then the server's budget is empty for every
+    /// request, not only the one it refused. A later pause than the one held replaces it; an earlier one
+    /// changes nothing.
+    /// </summary>
+    /// <param name="until">When requests may go again.</param>
+    public void PauseUntil(DateTimeOffset until)
+    {
+        lock (_lock)
+        {
+            if (until > _pausedUntil)
+            {
+                _pausedUntil = until;
+            }
+        }
+    }
 
     /// <summary>
     /// Takes one request from the budget at <paramref name="now"/>. Returns <see cref="TimeSpan.Zero"/>
@@ -54,8 +103,13 @@ public sealed class RequestBudget
     {
         lock (_lock)
         {
-            Forget(_perSecond, now - OneSecond);
-            Forget(_burst, now - BurstDuration);
+            if (now < _pausedUntil)
+            {
+                return _pausedUntil - now;
+            }
+
+            Forget(_perSecond, now - SecondWindow);
+            Forget(_burst, now - BurstWindow);
 
             if (_perSecond.Count < PerSecond)
             {
@@ -71,9 +125,9 @@ public sealed class RequestBudget
             }
 
             // The burst opens for this request once enough of its oldest requests have left the window.
-            var untilPerSecond = _perSecond.Peek() + OneSecond - now;
+            var untilPerSecond = _perSecond.Peek() + SecondWindow - now;
             var untilBurst = burstOpen > 0
-                ? _burst.ElementAt(_burst.Count - burstOpen) + BurstDuration - now
+                ? _burst.ElementAt(_burst.Count - burstOpen) + BurstWindow - now
                 : TimeSpan.MaxValue;
             return untilPerSecond < untilBurst ? untilPerSecond : untilBurst;
         }
@@ -84,7 +138,7 @@ public sealed class RequestBudget
     {
         lock (_lock)
         {
-            Forget(_burst, now - BurstDuration);
+            Forget(_burst, now - BurstWindow);
             return Burst - _burst.Count;
         }
     }

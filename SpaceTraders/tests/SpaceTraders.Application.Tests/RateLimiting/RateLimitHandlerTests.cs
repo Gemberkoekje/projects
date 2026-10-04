@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using FluentAssertions;
@@ -26,7 +27,7 @@ public sealed class RequestBudgetTests
             budget.TryTake(Start).Should().Be(TimeSpan.Zero, $"request {request + 1} fits in 2 per second plus a burst of 30");
         }
 
-        budget.TryTake(Start).Should().Be(TimeSpan.FromSeconds(1));
+        budget.TryTake(Start).Should().Be(TimeSpan.FromSeconds(1) + RequestBudget.JourneyMargin);
     }
 
     [Fact]
@@ -40,7 +41,7 @@ public sealed class RequestBudgetTests
 
         for (var second = 1; second <= 10; second++)
         {
-            var now = Start.AddSeconds(second);
+            var now = Start + ((TimeSpan.FromSeconds(1) + RequestBudget.JourneyMargin) * second);
             budget.TryTake(now).Should().Be(TimeSpan.Zero);
             budget.TryTake(now).Should().Be(TimeSpan.Zero);
             budget.TryTake(now).Should().BeGreaterThan(TimeSpan.Zero);
@@ -56,7 +57,24 @@ public sealed class RequestBudgetTests
             budget.TryTake(Start);
         }
 
-        budget.TryTake(Start.AddMilliseconds(250)).Should().Be(TimeSpan.FromMilliseconds(750));
+        budget.TryTake(Start.AddMilliseconds(250)).Should().Be(TimeSpan.FromMilliseconds(750) + RequestBudget.JourneyMargin);
+    }
+
+    [Fact]
+    public void TryTake_AddsTheRequestsJourneyToEachWindow()
+    {
+        // B59: half the 429s seen on 2026-10-03 and 2026-10-04 named a reset a few milliseconds away, and their retry after 35 to
+        // 80 ms went through. A request that leaves a second after the one two before it can still reach the server less than a
+        // second after it, when that one took longer on its way.
+        var budget = new RequestBudget();
+        for (var request = 0; request < 32; request++)
+        {
+            budget.TryTake(Start);
+        }
+
+        RequestBudget.JourneyMargin.Should().Be(TimeSpan.FromMilliseconds(100));
+        budget.TryTake(Start.AddSeconds(1)).Should().Be(RequestBudget.JourneyMargin);
+        budget.TryTake(Start.AddSeconds(1) + RequestBudget.JourneyMargin).Should().Be(TimeSpan.Zero);
     }
 
     [Fact]
@@ -69,7 +87,7 @@ public sealed class RequestBudgetTests
             budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.Zero, $"read {request + 1} leaves the reserve alone");
         }
 
-        budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.FromSeconds(1), "the next read waits for the next second");
+        budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.FromSeconds(1) + RequestBudget.JourneyMargin, "the next read waits for the next second");
         budget.TryTake(Start).Should().Be(TimeSpan.Zero, "a write takes from the reserve");
         budget.BurstRemaining(Start).Should().Be(RequestBudget.WriteReserve - 1);
     }
@@ -83,8 +101,32 @@ public sealed class RequestBudgetTests
             budget.TryTake(Start);
         }
 
-        budget.BurstRemaining(Start.AddSeconds(59)).Should().Be(0);
-        budget.BurstRemaining(Start.AddSeconds(60)).Should().Be(30);
+        budget.BurstRemaining(Start.AddSeconds(60)).Should().Be(0, "the window is longer by the request's journey");
+        budget.BurstRemaining(Start.AddSeconds(60) + RequestBudget.JourneyMargin).Should().Be(30);
+    }
+
+    [Fact]
+    public void TryTake_WaitsWhilePaused_ForTheLatestPause()
+    {
+        var budget = new RequestBudget();
+        budget.PauseUntil(Start.AddMilliseconds(500));
+        budget.PauseUntil(Start.AddMilliseconds(200));
+
+        budget.TryTake(Start.AddMilliseconds(100)).Should().Be(TimeSpan.FromMilliseconds(400), "an earlier pause changes nothing");
+        budget.TryTake(Start.AddMilliseconds(500)).Should().Be(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public void ForANewProcess_GoesAt2PerSecond_UntilTheBurstComesBack()
+    {
+        // B59: the 429s at 10:07:50Z on 2026-10-04 came during a start. The server counts the requests of the last minute
+        // whichever process sent them; a new process can't know what the one before it used.
+        var budget = RequestBudget.ForANewProcess(Start);
+
+        budget.TryTake(Start).Should().Be(TimeSpan.Zero);
+        budget.TryTake(Start).Should().Be(TimeSpan.Zero);
+        budget.TryTake(Start).Should().Be(TimeSpan.FromSeconds(1) + RequestBudget.JourneyMargin, "the process before may have used the burst");
+        budget.BurstRemaining(Start.AddSeconds(60) + RequestBudget.JourneyMargin).Should().Be(RequestBudget.Burst);
     }
 }
 
@@ -298,7 +340,7 @@ public sealed class RateLimitResponseHandlerTests
     private async Task<(HttpResponseMessage Response, int Calls)> SendAsync(Func<int, HttpResponseMessage> respond)
     {
         var calls = 0;
-        using var handler = new RateLimitResponseHandler(_status, _log.For<RateLimitResponseHandler>(), ShortBackoff)
+        using var handler = new RateLimitResponseHandler(_status, new RequestBudget(), _log.For<RateLimitResponseHandler>(), ShortBackoff)
         {
             InnerHandler = new CallbackMessageHandler(_ => respond(++calls)),
         };
@@ -306,6 +348,66 @@ public sealed class RateLimitResponseHandlerTests
         using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
         var response = await invoker.SendAsync(request, CancellationToken.None);
         return (response, calls);
+    }
+}
+
+/// <summary>The two handlers as the API client chains them: the 429 handler outside, the budget inside (B59).</summary>
+public sealed class RateLimitPipelineTests
+{
+    [Fact]
+    public async Task A429FromTheRateLimiter_HoldsBackTheRequestsAfterIt_UntilItsReset()
+    {
+        // B59, seen on the cluster on 2026-10-03 and 2026-10-04: 68 of 118 429s came within 20 seconds of the one before. A 429
+        // made only its own request wait for the limiter's reset; the requests after it went out at once, while the server's
+        // budget was still empty, and drew 429s of their own.
+        var budget = new RequestBudget();
+        var reset = TimeProvider.System.GetUtcNow().AddMilliseconds(400);
+        var arrivals = new ConcurrentQueue<(string Path, DateTimeOffset At)>();
+        var calls = 0;
+        using var handler = new RateLimitResponseHandler(new RateLimitStatus(), budget, NullLogger<RateLimitResponseHandler>.Instance)
+        {
+            InnerHandler = new RateLimitingHandler(budget, new RateLimitStatus(), Substitute.For<IAutomationMetrics>())
+            {
+                InnerHandler = new CallbackMessageHandler(request =>
+                {
+                    arrivals.Enqueue((request.RequestUri!.AbsolutePath, TimeProvider.System.GetUtcNow()));
+                    return Interlocked.Increment(ref calls) == 1 ? RateLimiter429(reset) : new HttpResponseMessage(HttpStatusCode.OK);
+                }),
+            },
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var throttled = SendAsync(invoker, "/my/ships/SHIP-1/navigate");
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        using (var next = await SendAsync(invoker, "/my/ships/SHIP-2/orbit"))
+        {
+            next.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        using (var retried = await throttled)
+        {
+            retried.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        arrivals.Single(arrival => arrival.Path.EndsWith("/orbit", StringComparison.Ordinal)).At
+            .Should().BeOnOrAfter(reset, "the server's budget is empty until the reset the 429 named");
+    }
+
+    private static HttpResponseMessage RateLimiter429(DateTimeOffset reset)
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        response.Headers.Add("x-ratelimit-type", "IP Address");
+        response.Headers.Add("x-ratelimit-limit-burst", "30");
+        response.Headers.Add("x-ratelimit-limit-per-second", "2");
+        response.Headers.Add("x-ratelimit-remaining", "0");
+        response.Headers.Add("x-ratelimit-reset", reset.ToString("O"));
+        return response;
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpMessageInvoker invoker, string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://test" + path);
+        return await invoker.SendAsync(request, CancellationToken.None);
     }
 }
 
