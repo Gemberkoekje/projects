@@ -57,6 +57,9 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _shipyardShipType;
     private readonly Gauge _shipyardShipPrice;
     private readonly Gauge _shipyardShipSupply;
+    private readonly Gauge _shipyardShipFuelCapacity;
+    private readonly Gauge _shipyardShipCargoCapacity;
+    private readonly Gauge _shipyardShipInfo;
     private readonly Gauge _supplyChain;
     private readonly Gauge _settingInfo;
     private readonly Gauge _roleInfo;
@@ -88,6 +91,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string System, string Waypoint, string Good, string Kind)> _marketGoods = [];
     private readonly HashSet<(string System, string Waypoint, string WaypointType)> _shipyards = [];
     private readonly HashSet<(string System, string Waypoint, string ShipType)> _shipyardShips = [];
+    private readonly Dictionary<(string System, string Waypoint, string ShipType), (string Can, string Equipment)> _shipyardShipInfoLabels = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
     private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
@@ -364,6 +368,22 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_shipyard_ship_supply",
             "A ship type's supply at a shipyard, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
             shipyardShipLabels);
+        _shipyardShipFuelCapacity = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_fuel_capacity_units",
+            "What a ship type's tank holds (its frame's), as a shipyard last listed it; 0 for a probe.",
+            shipyardShipLabels);
+        _shipyardShipCargoCapacity = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_cargo_capacity_units",
+            "Units a ship type's cargo holds take together, as a shipyard last listed it.",
+            shipyardShipLabels);
+        _shipyardShipInfo = metrics.CreateGauge(
+            "spacetraders_shipyard_ship_info",
+            "One series per ship type a shipyard listed in full, always 1: what it could do in the fleet, judged as spacetraders_ship_capabilities_info judges a ship (Survey, Mine, Siphon and Trade, in that order; none for a ship that can do none of them), but Probe for a probe; and its mounts and modules, without the cargo holds and crew quarters (none without any).",
+            "system",
+            "waypoint",
+            "ship_type",
+            "can",
+            "equipment");
         _supplyChain = metrics.CreateGauge(
             "spacetraders_good_supply_chain",
             "One series per good, always 1: the goods it is made from and the goods made from it (the game's production chains).",
@@ -662,20 +682,23 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
                     .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
                 foreach (var shipType in shipyard.ShipTypes.Concat(priced.Keys).Distinct(StringComparer.Ordinal))
                 {
+                    var shipKey = (shipyard.System, shipyard.Waypoint, shipType);
                     string[] labels = [shipyard.System, shipyard.Waypoint, shipType];
                     _shipyardShipType.WithLabels(labels).Set(1);
                     if (priced.TryGetValue(shipType, out var ship))
                     {
                         _shipyardShipPrice.WithLabels(labels).Set(ship.PurchasePrice);
-                        SetOrRemove(_shipyardShipSupply, labels, SupplyLevel(ship.Supply ?? string.Empty));
+                        SetOrRemove(_shipyardShipSupply, labels, SupplyLevel(ship.Supply));
+                        _shipyardShipFuelCapacity.WithLabels(labels).Set(ship.FuelCapacity);
+                        _shipyardShipCargoCapacity.WithLabels(labels).Set(ship.CargoCapacity);
+                        ShipyardShipInfo(shipKey, (ship.Can, ship.Equipment));
                     }
                     else
                     {
-                        _shipyardShipPrice.RemoveLabelled(labels);
-                        _shipyardShipSupply.RemoveLabelled(labels);
+                        ForgetShipyardShipDetails(shipKey);
                     }
 
-                    currentShips.Add((shipyard.System, shipyard.Waypoint, shipType));
+                    currentShips.Add(shipKey);
                 }
             }
 
@@ -687,15 +710,45 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
             foreach (var gone in _shipyardShips.Where(ship => !currentShips.Contains(ship)).ToList())
             {
-                string[] labels = [gone.System, gone.Waypoint, gone.ShipType];
-                _shipyardShipType.RemoveLabelled(labels);
-                _shipyardShipPrice.RemoveLabelled(labels);
-                _shipyardShipSupply.RemoveLabelled(labels);
+                _shipyardShipType.RemoveLabelled(gone.System, gone.Waypoint, gone.ShipType);
+                ForgetShipyardShipDetails(gone);
                 _shipyardShips.Remove(gone);
             }
 
             _shipyards.UnionWith(currentShipyards);
             _shipyardShips.UnionWith(currentShips);
+        }
+    }
+
+    /// <summary>
+    /// A ship type's one info series at a shipyard (what it could do, its equipment), which replaces the one it had.
+    /// Under the lock.
+    /// </summary>
+    private void ShipyardShipInfo((string System, string Waypoint, string ShipType) ship, (string Can, string Equipment) info)
+    {
+        if (_shipyardShipInfoLabels.TryGetValue(ship, out var previous) && previous != info)
+        {
+            _shipyardShipInfo.RemoveLabelled(ship.System, ship.Waypoint, ship.ShipType, previous.Can, previous.Equipment);
+        }
+
+        _shipyardShipInfo.WithLabels(ship.System, ship.Waypoint, ship.ShipType, info.Can, info.Equipment).Set(1);
+        _shipyardShipInfoLabels[ship] = info;
+    }
+
+    /// <summary>
+    /// Removes what a shipyard listed of a ship type beyond the type: its price, supply, tank, hold and info. Under the
+    /// lock.
+    /// </summary>
+    private void ForgetShipyardShipDetails((string System, string Waypoint, string ShipType) ship)
+    {
+        string[] labels = [ship.System, ship.Waypoint, ship.ShipType];
+        _shipyardShipPrice.RemoveLabelled(labels);
+        _shipyardShipSupply.RemoveLabelled(labels);
+        _shipyardShipFuelCapacity.RemoveLabelled(labels);
+        _shipyardShipCargoCapacity.RemoveLabelled(labels);
+        if (_shipyardShipInfoLabels.Remove(ship, out var info))
+        {
+            _shipyardShipInfo.RemoveLabelled(ship.System, ship.Waypoint, ship.ShipType, info.Can, info.Equipment);
         }
     }
 

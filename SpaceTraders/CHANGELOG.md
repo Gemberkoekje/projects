@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.11)
+- The markets dashboard's shipyards table shows, for each ship for sale, its tank, its hold, what it could do in the fleet and its equipment, as asked on 2026-10-04: "For spacetraders, can we add some more information to the shipyard ships? I'd like to know fuel tank size, cargo size, and which special bits they have (e.g. mining laser)", then "Also which role they can fulfill within my fleet". From the shipyard listings it caches, the bot exports `spacetraders_shipyard_ship_fuel_capacity_units`, `spacetraders_shipyard_ship_cargo_capacity_units` and one series per ship type, `spacetraders_shipyard_ship_info{can,equipment}`: what it could do, judged as the fleet table's "can do" (`FleetRoles.PotentialRoles`; `Probe` for a probe), and its mounts and modules without the cargo holds and crew quarters. The table's new columns are in gembernodes, on the same branch.
+
+### Code – Changed (2026-10-04, slice 2.11)
+- `ShipyardShipDto` lists a ship for sale's mounts and modules; `ShipyardWaypointDto` lists its ship types and ships as read-only lists (two QW0012 warnings fewer).
+
+### Docs – Changed (2026-10-04, slice 2.11)
+- `PLAN.md`: slice 2.11; the gembernodes table's merged rows. `docs/HOW_IT_WORKS.md`: the new metrics.
+
 ### Code – Added (2026-10-04, slice 6.11)
 - The explore plan (`ExplorePlanService`, off by default: `Automation.Plan.Explore.Enabled`), as asked on 2026-10-04: "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the home system, recursively." Once its trip ends (D61), the command ship jumps through built gates to the nearest system not explored yet, with no limit (D59), visits each market and shipyard there once (`ExploreSystemGoal`), and goes on; with nothing left it comes home, where the other plans give it work again (D60). A jump buys one ANTIMATTER at the gate's market (`JumpGoal`, booked as `AntimatterPurchase`) and goes only while the credits after it stay at or above `FleetExpansion.MinCreditReserve` (D63). Nothing is charted (D62). The plan learns the gates from the API one call a pass, and caches each new system's waypoints when the ship gets there. Journal kinds `Jumped` and `SystemExplored`.
 - Eleven `spacetraders_system_*` gauges for a systems dashboard (gembernodes), asked the same day: "a systems grafana dashboard with a more wide view of which systems have been explored and what kind of mining, trading and shipyard opportunities it gives": each known system's state, jumps from home, connections, markets, shipyards, waypoints, what can be mined or siphoned there, the best price its markets pay for each ore and gas, and its best trades (`SystemOpportunities`).

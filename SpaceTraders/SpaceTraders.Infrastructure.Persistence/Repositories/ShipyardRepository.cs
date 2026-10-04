@@ -187,10 +187,36 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
                 PurchasePrice = element.TryGetProperty("purchasePrice", out var price) ? price.GetInt64() : 0,
                 FuelCapacity = ReadFuelCapacity(element),
                 CargoCapacity = ReadCargoCapacity(element),
+                Mounts = ReadSymbols(element, "mounts"),
+                Modules = ReadSymbols(element, "modules"),
             });
         }
 
         return ships.ToArray();
+    }
+
+    /// <summary>The symbols of a ship for sale's mounts or modules (<paramref name="property"/>), as the shipyard lists them.</summary>
+    private static string[] ReadSymbols(JsonElement ship, string property)
+    {
+        if (!ship.TryGetProperty(property, out var parts) || parts.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var symbols = new List<string>();
+        for (var index = 0; index < parts.GetArrayLength(); index++)
+        {
+            var part = parts[index];
+            if (part.ValueKind == JsonValueKind.Object
+                && part.TryGetProperty("symbol", out var symbol)
+                && symbol.ValueKind == JsonValueKind.String
+                && symbol.GetString() is { Length: > 0 } text)
+            {
+                symbols.Add(text);
+            }
+        }
+
+        return [.. symbols];
     }
 
     /// <summary>The tank of a ship for sale: its frame's <c>fuelCapacity</c>.</summary>

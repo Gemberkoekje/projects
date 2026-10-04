@@ -524,6 +524,12 @@ public sealed record ShipyardShipDto
 
     /// <summary>What the ship's cargo holds take together; 0 when the shipyard listed no details.</summary>
     public int CargoCapacity { get; init; }
+
+    /// <summary>The symbols of the ship's mounts, such as <c>MOUNT_MINING_LASER_I</c>; empty when the shipyard listed no details.</summary>
+    public IReadOnlyList<string> Mounts { get; init; } = [];
+
+    /// <summary>The symbols of the ship's modules, cargo holds included; empty when the shipyard listed no details.</summary>
+    public IReadOnlyList<string> Modules { get; init; } = [];
 }
 
 public sealed record ShipyardWaypointDto
@@ -532,9 +538,9 @@ public sealed record ShipyardWaypointDto
 
     public required string SystemSymbol { get; init; }
 
-    public required string[] ShipTypes { get; init; }
+    public required IReadOnlyList<string> ShipTypes { get; init; }
 
-    public required ShipyardShipDto[] Ships { get; init; }
+    public required IReadOnlyList<ShipyardShipDto> Ships { get; init; }
 }
 
 public sealed record ShipyardFreshnessDto
