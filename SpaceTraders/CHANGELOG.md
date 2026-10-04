@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B38)
+- Startup recovery treats only a ship marked in transit as one. Startup sync stores the last route's arrival on every ship, and recovery took any ship whose arrival time had passed for one that had just arrived: it published a `ShipInTransitEvent`, which writes an "in transit" activity row, and logged that the ship "arrived at" its waypoint. On 2026-10-04 that happened to the new agent's two ships at 13:06:52Z, seconds after the reset registered them, and to all three ships at the restart of 18:09:17Z, though SPECTER-1 had been docked at H60 since 16:12Z. A docked or orbiting ship now gets its goal step and no event, as one without an arrival time did. The rows already written are pruned after 30 days.
+
+### Docs – Changed (2026-10-04, B38)
+- `PLAN.md`: B38 fixed. `docs/HOW_IT_WORKS.md`: what startup recovery does with a docked or orbiting ship.
+
 ### Docs – Changed (2026-10-04, phase 6 check)
 - `PLAN.md`: where things stand after the server reset of 2026-10-04 (the new agent in X1-FJ91, its contract, its gate); slices 2.11, 2.12, 6.6 and 6.11 merged and deployed instead of "built on branch"; phase 6's checks on the run that ended (6.10b's and 6.10c's met, 6.11's first run); the gembernodes table's merged rows; 4.1's revoke done.
 

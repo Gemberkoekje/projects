@@ -176,9 +176,9 @@ first tick reconsiders it (D26, see
 
 | Ship state | Recovery action |
 |---|---|
-| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step. The code doesn't check "still in transit", and a docked ship keeps its last arrival time, so every docked ship that ever travelled lands here (B38) |
+| Arrival time passed, still marked in transit | Publish `ShipInTransitEvent`, then run one goal step. The arrival dead-reckoning that `GetAllAsync` applies puts such a ship in orbit at its destination, so in practice it takes the last row |
 | Still in transit | Publish `ShipInTransitEvent` only |
-| Docked or in orbit | Run one goal step |
+| Docked or in orbit | Run one goal step. The ship keeps the arrival time of its last route, which startup sync stores, but it isn't in transit, so it gets no `ShipInTransitEvent` (B38, fixed: until then every ship that had ever flown, and a new agent's ships, got one on every start, which wrote an "in transit" activity row) |
 
 It doesn't reschedule arrivals. Pending arrivals survive a restart only through
 `scheduled_ship_events`.
