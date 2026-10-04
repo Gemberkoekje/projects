@@ -709,7 +709,7 @@ public sealed class PrometheusAutomationMetricsTests
 
     public PrometheusAutomationMetricsTests()
     {
-        _metrics = new PrometheusAutomationMetrics(_registry);
+        _metrics = new PrometheusAutomationMetrics(_registry, Agent("AGENT@2026-09-27"));
     }
 
     [Fact]
@@ -726,10 +726,10 @@ public sealed class PrometheusAutomationMetricsTests
     /// <summary>Every gauge without labels, each with a value it had on the cluster.</summary>
     public static TheoryData<string, Action<IAutomationMetrics>, string> UnlabelledGauges => new()
     {
-        { "spacetraders_agent_credits", metrics => metrics.Credits(145_028), "spacetraders_agent_credits 145028\n" },
-        { "spacetraders_credit_reserve", metrics => metrics.ReservedCredits(100_000), "spacetraders_credit_reserve 100000\n" },
-        { "spacetraders_db_size_bytes", metrics => metrics.DatabaseSize(15_742_655), "spacetraders_db_size_bytes 15742655\n" },
-        { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds 1791118800\n" },
+        { "spacetraders_agent_credits", metrics => metrics.Credits(145_028), "spacetraders_agent_credits{reset_date=\"2026-09-27\"} 145028\n" },
+        { "spacetraders_credit_reserve", metrics => metrics.ReservedCredits(100_000), "spacetraders_credit_reserve{reset_date=\"2026-09-27\"} 100000\n" },
+        { "spacetraders_db_size_bytes", metrics => metrics.DatabaseSize(15_742_655), "spacetraders_db_size_bytes{reset_date=\"2026-09-27\"} 15742655\n" },
+        { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds{reset_date=\"2026-09-27\"} 1791118800\n" },
     };
 
     /// <summary>
@@ -744,7 +744,7 @@ public sealed class PrometheusAutomationMetricsTests
     {
         var text = await ExportAsync();
         text.Should().Contain($"# TYPE {name} gauge\n");
-        text.Should().NotContain($"\n{name} ", "{0} has no value yet, and 0 isn't it", name);
+        text.Should().NotContain($"\n{name}{{", "{0} has no value yet, and 0 isn't it", name);
 
         set(_metrics);
 
@@ -758,25 +758,25 @@ public sealed class PrometheusAutomationMetricsTests
     /// </summary>
     public static TheoryData<string, Action<IAutomationMetrics>, string> FirstIncrements => new()
     {
-        { "credits earned", metrics => metrics.CreditsEarned("ContractDeposit", 4_267), "spacetraders_credits_earned_total{source=\"ContractDeposit\"} " },
-        { "credits spent", metrics => metrics.CreditsSpent("ShipPurchase", 46_885), "spacetraders_credits_spent_total{category=\"ShipPurchase\"} " },
-        { "429s", metrics => metrics.ApiThrottled("rate_limiter"), "spacetraders_api_throttled_total{source=\"rate_limiter\"} " },
-        { "API requests initiated", metrics => metrics.ApiRequestInitiated("POST", "my/ships/{shipSymbol}/extract"), "spacetraders_api_requests_initiated_total{method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\"} " },
-        { "API responses", metrics => metrics.ApiRequest("POST", "my/ships/{shipSymbol}/extract", "429"), "spacetraders_api_requests_total{method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\",status=\"429\"} " },
-        { "breaker trips", metrics => metrics.GoalBreakerTripped("AGENT-3"), "spacetraders_goal_breaker_trips_total{ship=\"AGENT-3\"} " },
-        { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{kind=\"ScoutWaypoint\"} " },
-        { "messages", metrics => metrics.MessageHandled("ContractAcceptedEvent"), "spacetraders_messages_handled_total{type=\"ContractAcceptedEvent\"} " },
-        { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3), "read"), "spacetraders_api_rate_limit_wait_seconds_total{kind=\"read\"} " },
-        { "units extracted", metrics => metrics.Extracted("AGENT-3", "COPPER_ORE", 2), "spacetraders_extracted_units_total{ship=\"AGENT-3\",good=\"COPPER_ORE\"} " },
-        { "units jettisoned", metrics => metrics.Jettisoned("AGENT-3", "SILICON_CRYSTALS", 2), "spacetraders_jettisoned_units_total{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} " },
-        { "extractions", metrics => metrics.Extraction("AGENT-3", surveyed: true), "spacetraders_extractions_total{ship=\"AGENT-3\",surveyed=\"true\"} " },
-        { "surveys taken", metrics => metrics.SurveyTaken("X1-AB-XB5C", "MODERATE"), "spacetraders_surveys_taken_total{waypoint=\"X1-AB-XB5C\",size=\"MODERATE\"} " },
-        { "surveys ended", metrics => metrics.SurveyEnded("X1-AB-XB5C", "expired", used: false), "spacetraders_surveys_ended_total{waypoint=\"X1-AB-XB5C\",reason=\"expired\",used=\"false\"} " },
-        { "units sold", metrics => metrics.GoodsSold("X1-DC53-H51", "HYDROCARBON", 18), "spacetraders_goods_sold_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-H51\",good=\"HYDROCARBON\"} " },
-        { "units bought", metrics => metrics.GoodsBought("X1-DC53-K85", "PLASTICS", 20), "spacetraders_goods_bought_units_total{system=\"X1-DC53\",waypoint=\"X1-DC53-K85\",good=\"PLASTICS\"} " },
-        { "trips", metrics => metrics.TripEnded("trade"), "spacetraders_trips_total{activity=\"trade\"} " },
-        { "trip profit", metrics => metrics.TripProfit("contract", 4_267), "spacetraders_trip_profit_credits_total{activity=\"contract\"} " },
-        { "trip loss", metrics => metrics.TripProfit("trade", -65_232), "spacetraders_trip_loss_credits_total{activity=\"trade\"} " },
+        { "credits earned", metrics => metrics.CreditsEarned("ContractDeposit", 4_267), "spacetraders_credits_earned_total{reset_date=\"2026-09-27\",source=\"ContractDeposit\"} " },
+        { "credits spent", metrics => metrics.CreditsSpent("ShipPurchase", 46_885), "spacetraders_credits_spent_total{reset_date=\"2026-09-27\",category=\"ShipPurchase\"} " },
+        { "429s", metrics => metrics.ApiThrottled("rate_limiter"), "spacetraders_api_throttled_total{reset_date=\"2026-09-27\",source=\"rate_limiter\"} " },
+        { "API requests initiated", metrics => metrics.ApiRequestInitiated("POST", "my/ships/{shipSymbol}/extract"), "spacetraders_api_requests_initiated_total{reset_date=\"2026-09-27\",method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\"} " },
+        { "API responses", metrics => metrics.ApiRequest("POST", "my/ships/{shipSymbol}/extract", "429"), "spacetraders_api_requests_total{reset_date=\"2026-09-27\",method=\"POST\",endpoint=\"my/ships/{shipSymbol}/extract\",status=\"429\"} " },
+        { "breaker trips", metrics => metrics.GoalBreakerTripped("AGENT-3"), "spacetraders_goal_breaker_trips_total{reset_date=\"2026-09-27\",ship=\"AGENT-3\"} " },
+        { "goal steps", metrics => metrics.GoalStep("ScoutWaypoint"), "spacetraders_goal_steps_total{reset_date=\"2026-09-27\",kind=\"ScoutWaypoint\"} " },
+        { "messages", metrics => metrics.MessageHandled("ContractAcceptedEvent"), "spacetraders_messages_handled_total{reset_date=\"2026-09-27\",type=\"ContractAcceptedEvent\"} " },
+        { "rate-limit waits", metrics => metrics.RateLimitWait(TimeSpan.FromSeconds(3), "read"), "spacetraders_api_rate_limit_wait_seconds_total{reset_date=\"2026-09-27\",kind=\"read\"} " },
+        { "units extracted", metrics => metrics.Extracted("AGENT-3", "COPPER_ORE", 2), "spacetraders_extracted_units_total{reset_date=\"2026-09-27\",ship=\"AGENT-3\",good=\"COPPER_ORE\"} " },
+        { "units jettisoned", metrics => metrics.Jettisoned("AGENT-3", "SILICON_CRYSTALS", 2), "spacetraders_jettisoned_units_total{reset_date=\"2026-09-27\",ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} " },
+        { "extractions", metrics => metrics.Extraction("AGENT-3", surveyed: true), "spacetraders_extractions_total{reset_date=\"2026-09-27\",ship=\"AGENT-3\",surveyed=\"true\"} " },
+        { "surveys taken", metrics => metrics.SurveyTaken("X1-AB-XB5C", "MODERATE"), "spacetraders_surveys_taken_total{reset_date=\"2026-09-27\",waypoint=\"X1-AB-XB5C\",size=\"MODERATE\"} " },
+        { "surveys ended", metrics => metrics.SurveyEnded("X1-AB-XB5C", "expired", used: false), "spacetraders_surveys_ended_total{reset_date=\"2026-09-27\",waypoint=\"X1-AB-XB5C\",reason=\"expired\",used=\"false\"} " },
+        { "units sold", metrics => metrics.GoodsSold("X1-DC53-H51", "HYDROCARBON", 18), "spacetraders_goods_sold_units_total{reset_date=\"2026-09-27\",system=\"X1-DC53\",waypoint=\"X1-DC53-H51\",good=\"HYDROCARBON\"} " },
+        { "units bought", metrics => metrics.GoodsBought("X1-DC53-K85", "PLASTICS", 20), "spacetraders_goods_bought_units_total{reset_date=\"2026-09-27\",system=\"X1-DC53\",waypoint=\"X1-DC53-K85\",good=\"PLASTICS\"} " },
+        { "trips", metrics => metrics.TripEnded("trade"), "spacetraders_trips_total{reset_date=\"2026-09-27\",activity=\"trade\"} " },
+        { "trip profit", metrics => metrics.TripProfit("contract", 4_267), "spacetraders_trip_profit_credits_total{reset_date=\"2026-09-27\",activity=\"contract\"} " },
+        { "trip loss", metrics => metrics.TripProfit("trade", -65_232), "spacetraders_trip_loss_credits_total{reset_date=\"2026-09-27\",activity=\"trade\"} " },
     };
 
     /// <summary>
@@ -794,10 +794,10 @@ public sealed class PrometheusAutomationMetricsTests
 
         var text = await ExportAsync();
 
-        text.Should().Contain("spacetraders_trip_profit_credits_total{activity=\"trade\"} 4320\n");
-        text.Should().Contain("spacetraders_trip_loss_credits_total{activity=\"trade\"} 2152\n");
-        text.Should().Contain("spacetraders_trip_profit_credits_total{activity=\"mining\"} 1005\n");
-        text.Should().Contain("spacetraders_trip_loss_credits_total{activity=\"mining\"} 0\n");
+        text.Should().Contain("spacetraders_trip_profit_credits_total{reset_date=\"2026-09-27\",activity=\"trade\"} 4320\n");
+        text.Should().Contain("spacetraders_trip_loss_credits_total{reset_date=\"2026-09-27\",activity=\"trade\"} 2152\n");
+        text.Should().Contain("spacetraders_trip_profit_credits_total{reset_date=\"2026-09-27\",activity=\"mining\"} 1005\n");
+        text.Should().Contain("spacetraders_trip_loss_credits_total{reset_date=\"2026-09-27\",activity=\"mining\"} 0\n");
     }
 
     /// <summary>
@@ -825,8 +825,8 @@ public sealed class PrometheusAutomationMetricsTests
 
         _metrics.CreditsSpent("ShipPurchase", 46_885);
 
-        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{category=\"ShipPurchase\"} 0\n");
-        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{category=\"ShipPurchase\"} 46885\n");
+        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{reset_date=\"2026-09-27\",category=\"ShipPurchase\"} 0\n");
+        (await ExportAsync()).Should().Contain("spacetraders_credits_spent_total{reset_date=\"2026-09-27\",category=\"ShipPurchase\"} 46885\n");
     }
 
     [Fact]
@@ -834,11 +834,11 @@ public sealed class PrometheusAutomationMetricsTests
     {
         _metrics.CreditsEarned("TradeSell", 450);
         await ExportAsync();
-        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{source=\"TradeSell\"} 450\n");
+        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{reset_date=\"2026-09-27\",source=\"TradeSell\"} 450\n");
 
         _metrics.CreditsEarned("TradeSell", 50);
 
-        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{source=\"TradeSell\"} 500\n");
+        (await ExportAsync()).Should().Contain("spacetraders_credits_earned_total{reset_date=\"2026-09-27\",source=\"TradeSell\"} 500\n");
     }
 
     [Fact]
@@ -854,8 +854,8 @@ public sealed class PrometheusAutomationMetricsTests
         var text = await ExportAsync();
         text.Should().Contain(StatusLine("AGENT-1", "COMMAND", "IN_TRANSIT", "None", string.Empty, Start.AddMinutes(2)));
         text.Should().NotContain("state=\"DOCKED\",goal");
-        text.Should().Contain("spacetraders_ships{role=\"COMMAND\",state=\"DOCKED\"} 0");
-        text.Should().Contain("spacetraders_ships{role=\"COMMAND\",state=\"IN_TRANSIT\"} 1");
+        text.Should().Contain("spacetraders_ships{reset_date=\"2026-09-27\",role=\"COMMAND\",state=\"DOCKED\"} 0");
+        text.Should().Contain("spacetraders_ships{reset_date=\"2026-09-27\",role=\"COMMAND\",state=\"IN_TRANSIT\"} 1");
     }
 
     [Fact]
@@ -878,22 +878,22 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Fleet([Drone("X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE", [new("COPPER_ORE", 9), new("SILICON_CRYSTALS", 2)])], Start);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_info{ship=\"AGENT-3\",location=\"X1-AB-XB5C (ENGINEERED_ASTEROID)\",activity=\"mining COPPER_ORE\"} 1\n");
-        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"COPPER_ORE\"} 9\n");
-        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} 2\n");
-        text.Should().Contain("spacetraders_ship_cargo_capacity_units{ship=\"AGENT-3\"} 15\n");
-        text.Should().Contain("spacetraders_ship_value_credits{ship=\"AGENT-3\"} 50000\n");
+        text.Should().Contain("spacetraders_ship_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",location=\"X1-AB-XB5C (ENGINEERED_ASTEROID)\",activity=\"mining COPPER_ORE\"} 1\n");
+        text.Should().Contain("spacetraders_ship_cargo_units{reset_date=\"2026-09-27\",ship=\"AGENT-3\",good=\"COPPER_ORE\"} 9\n");
+        text.Should().Contain("spacetraders_ship_cargo_units{reset_date=\"2026-09-27\",ship=\"AGENT-3\",good=\"SILICON_CRYSTALS\"} 2\n");
+        text.Should().Contain("spacetraders_ship_cargo_capacity_units{reset_date=\"2026-09-27\",ship=\"AGENT-3\"} 15\n");
+        text.Should().Contain("spacetraders_ship_value_credits{reset_date=\"2026-09-27\",ship=\"AGENT-3\"} 50000\n");
         text.Should().NotContain("spacetraders_ship_arrival_timestamp_seconds{");
 
         // It jettisoned the crystals, filled up, and is on its way to deliver.
         _metrics.Fleet([Drone("→ X1-AB-H51 (PLANET)", "on the way to deliver COPPER_ORE", [new("COPPER_ORE", 15)], Start.AddMinutes(4))], Start.AddMinutes(1));
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_info{ship=\"AGENT-3\",location=\"→ X1-AB-H51 (PLANET)\",activity=\"on the way to deliver COPPER_ORE\"} 1\n");
+        text.Should().Contain("spacetraders_ship_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",location=\"→ X1-AB-H51 (PLANET)\",activity=\"on the way to deliver COPPER_ORE\"} 1\n");
         text.Should().NotContain("activity=\"mining COPPER_ORE\"");
-        text.Should().Contain("spacetraders_ship_cargo_units{ship=\"AGENT-3\",good=\"COPPER_ORE\"} 15\n");
+        text.Should().Contain("spacetraders_ship_cargo_units{reset_date=\"2026-09-27\",ship=\"AGENT-3\",good=\"COPPER_ORE\"} 15\n");
         text.Should().NotContain("good=\"SILICON_CRYSTALS\"");
-        text.Should().Contain($"spacetraders_ship_arrival_timestamp_seconds{{ship=\"AGENT-3\"}} {Start.AddMinutes(4).ToUnixTimeSeconds()}\n");
+        text.Should().Contain($"spacetraders_ship_arrival_timestamp_seconds{{reset_date=\"2026-09-27\",ship=\"AGENT-3\"}} {Start.AddMinutes(4).ToUnixTimeSeconds()}\n");
 
         // Arrived: no arrival time any more.
         _metrics.Fleet([Drone("X1-AB-H51 (PLANET)", "delivering COPPER_ORE", [new("COPPER_ORE", 15)])], Start.AddMinutes(4));
@@ -913,14 +913,14 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Fleet([probe, drone], Start);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-2\",can=\"none\"} 1\n");
-        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-3\",can=\"Mine, Trade\"} 1\n");
+        text.Should().Contain("spacetraders_ship_capabilities_info{reset_date=\"2026-09-27\",ship=\"AGENT-2\",can=\"none\"} 1\n");
+        text.Should().Contain("spacetraders_ship_capabilities_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",can=\"Mine, Trade\"} 1\n");
 
         // A surveyor mount installed on the drone; the probe scrapped.
         _metrics.Fleet([drone with { Capabilities = "Survey, Mine, Trade" }], Start.AddMinutes(1));
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_capabilities_info{ship=\"AGENT-3\",can=\"Survey, Mine, Trade\"} 1\n");
+        text.Should().Contain("spacetraders_ship_capabilities_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",can=\"Survey, Mine, Trade\"} 1\n");
         text.Should().NotContain("can=\"Mine, Trade\"");
         text.Should().NotContain("ship=\"AGENT-2\"");
     }
@@ -934,21 +934,21 @@ public sealed class PrometheusAutomationMetricsTests
             new TradeGoodSnapshot("FUEL", "EXCHANGE", 72, 68, 180, "MODERATE", string.Empty))]);
 
         var text = await ExportAsync();
-        text.Should().Contain($"spacetraders_market_observed_timestamp_seconds{{system=\"X1-AB\",waypoint=\"X1-AB-H51\",waypoint_type=\"PLANET\"}} {Start.ToUnixTimeSeconds()}\n");
-        text.Should().Contain("spacetraders_market_purchase_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
-        text.Should().Contain("spacetraders_market_sell_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 55\n");
-        text.Should().Contain("spacetraders_market_trade_volume{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
-        text.Should().Contain("spacetraders_market_supply{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
-        text.Should().Contain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
-        text.Should().Contain("spacetraders_market_supply{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 3\n");
-        text.Should().NotContain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\"");
+        text.Should().Contain($"spacetraders_market_observed_timestamp_seconds{{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",waypoint_type=\"PLANET\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().Contain("spacetraders_market_purchase_price{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
+        text.Should().Contain("spacetraders_market_sell_price{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 55\n");
+        text.Should().Contain("spacetraders_market_trade_volume{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 60\n");
+        text.Should().Contain("spacetraders_market_supply{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
+        text.Should().Contain("spacetraders_market_activity{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"COPPER_ORE\",kind=\"IMPORT\"} 1\n");
+        text.Should().Contain("spacetraders_market_supply{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 3\n");
+        text.Should().NotContain("spacetraders_market_activity{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\"");
 
         // The next visit no longer lists copper; after a reset the new agent knows no markets yet.
         _metrics.Markets([Market(new TradeGoodSnapshot("FUEL", "EXCHANGE", 74, 70, 180, "LIMITED", "GROWING"))]);
         text = await ExportAsync();
         text.Should().NotContain("good=\"COPPER_ORE\"");
-        text.Should().Contain("spacetraders_market_purchase_price{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 74\n");
-        text.Should().Contain("spacetraders_market_activity{system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 2\n");
+        text.Should().Contain("spacetraders_market_purchase_price{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 74\n");
+        text.Should().Contain("spacetraders_market_activity{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H51\",good=\"FUEL\",kind=\"EXCHANGE\"} 2\n");
 
         _metrics.Markets([]);
         (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H51\"");
@@ -980,27 +980,27 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Systems([explored, beyond]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_system_info{system=\"X1-KR90\",state=\"explored\",gate=\"X1-KR90-AF5F\",gate_state=\"active\"} 1\n");
-        text.Should().Contain("spacetraders_system_info{system=\"X1-HZ59\",state=\"gate_under_construction\",gate=\"X1-HZ59-I59\",gate_state=\"under_construction\"} 1\n");
-        text.Should().Contain("spacetraders_system_jumps_from_home{system=\"X1-KR90\"} 1\n");
-        text.Should().Contain($"spacetraders_system_explored_timestamp_seconds{{system=\"X1-KR90\"}} {Start.ToUnixTimeSeconds()}\n");
-        text.Should().NotContain("spacetraders_system_explored_timestamp_seconds{system=\"X1-HZ59\"}");
-        text.Should().Contain("spacetraders_system_connection_info{system=\"X1-KR90\",to=\"X1-VR15\"} 1\n");
-        text.Should().Contain("spacetraders_system_facilities{system=\"X1-KR90\",kind=\"market\"} 7\n");
-        text.Should().Contain("spacetraders_system_facilities{system=\"X1-KR90\",kind=\"shipyard\"} 1\n");
-        text.Should().Contain("spacetraders_system_waypoints{system=\"X1-KR90\",type=\"ASTEROID\"} 11\n");
-        text.Should().Contain("spacetraders_system_gathering_sites{system=\"X1-KR90\",good=\"IRON_ORE\"} 4\n");
-        text.Should().Contain("spacetraders_system_raw_good_price{system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-A1\"} 61\n");
-        text.Should().Contain("spacetraders_system_raw_good_supply{system=\"X1-KR90\",good=\"IRON_ORE\"} 1\n");
-        text.Should().Contain("spacetraders_system_trade_margin{system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 420\n");
-        text.Should().Contain("spacetraders_system_trade_volume{system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 20\n");
+        text.Should().Contain("spacetraders_system_info{reset_date=\"2026-09-27\",system=\"X1-KR90\",state=\"explored\",gate=\"X1-KR90-AF5F\",gate_state=\"active\"} 1\n");
+        text.Should().Contain("spacetraders_system_info{reset_date=\"2026-09-27\",system=\"X1-HZ59\",state=\"gate_under_construction\",gate=\"X1-HZ59-I59\",gate_state=\"under_construction\"} 1\n");
+        text.Should().Contain("spacetraders_system_jumps_from_home{reset_date=\"2026-09-27\",system=\"X1-KR90\"} 1\n");
+        text.Should().Contain($"spacetraders_system_explored_timestamp_seconds{{reset_date=\"2026-09-27\",system=\"X1-KR90\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().NotContain("spacetraders_system_explored_timestamp_seconds{reset_date=\"2026-09-27\",system=\"X1-HZ59\"}");
+        text.Should().Contain("spacetraders_system_connection_info{reset_date=\"2026-09-27\",system=\"X1-KR90\",to=\"X1-VR15\"} 1\n");
+        text.Should().Contain("spacetraders_system_facilities{reset_date=\"2026-09-27\",system=\"X1-KR90\",kind=\"market\"} 7\n");
+        text.Should().Contain("spacetraders_system_facilities{reset_date=\"2026-09-27\",system=\"X1-KR90\",kind=\"shipyard\"} 1\n");
+        text.Should().Contain("spacetraders_system_waypoints{reset_date=\"2026-09-27\",system=\"X1-KR90\",type=\"ASTEROID\"} 11\n");
+        text.Should().Contain("spacetraders_system_gathering_sites{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\"} 4\n");
+        text.Should().Contain("spacetraders_system_raw_good_price{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-A1\"} 61\n");
+        text.Should().Contain("spacetraders_system_raw_good_supply{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\"} 1\n");
+        text.Should().Contain("spacetraders_system_trade_margin{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 420\n");
+        text.Should().Contain("spacetraders_system_trade_volume{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"FOOD\",buy_at=\"X1-KR90-B2\",sell_at=\"X1-KR90-A1\"} 20\n");
 
         // Iron is no longer bought best at A1, and FOOD no longer pays; after a reset the new agent knows no systems yet.
         _metrics.Systems([explored with { RawGoods = [new SpaceTraders.Application.Exploring.RawGoodSample { Good = "IRON_ORE", Price = 58, Market = "X1-KR90-C3", Supply = "LIMITED" }], Trades = [] }, beyond]);
         text = await ExportAsync();
         text.Should().NotContain("market=\"X1-KR90-A1\"");
-        text.Should().Contain("spacetraders_system_raw_good_price{system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-C3\"} 58\n");
-        text.Should().NotContain("spacetraders_system_trade_margin{system=\"X1-KR90\"");
+        text.Should().Contain("spacetraders_system_raw_good_price{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-C3\"} 58\n");
+        text.Should().NotContain("spacetraders_system_trade_margin{reset_date=\"2026-09-27\",system=\"X1-KR90\"");
 
         _metrics.Systems([]);
         (await ExportAsync()).Should().NotContain("system=\"X1-KR90\"");
@@ -1012,12 +1012,12 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE", "SHIP_PROBE"], new ShipyardShipMetricsSample("SHIP_MINING_DRONE", 46_885, "MODERATE"))]);
 
         var text = await ExportAsync();
-        text.Should().Contain($"spacetraders_shipyard_observed_timestamp_seconds{{system=\"X1-AB\",waypoint=\"X1-AB-H52\",waypoint_type=\"MOON\"}} {Start.ToUnixTimeSeconds()}\n");
-        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
-        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"} 1\n");
-        text.Should().Contain("spacetraders_shipyard_ship_price{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 46885\n");
-        text.Should().Contain("spacetraders_shipyard_ship_supply{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 3\n");
-        text.Should().NotContain("spacetraders_shipyard_ship_price{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"}");
+        text.Should().Contain($"spacetraders_shipyard_observed_timestamp_seconds{{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",waypoint_type=\"MOON\"}} {Start.ToUnixTimeSeconds()}\n");
+        text.Should().Contain("spacetraders_shipyard_ship_type{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_type{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_price{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 46885\n");
+        text.Should().Contain("spacetraders_shipyard_ship_supply{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 3\n");
+        text.Should().NotContain("spacetraders_shipyard_ship_price{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_PROBE\"}");
 
         _metrics.Shipyards([]);
         (await ExportAsync()).Should().NotContain("waypoint=\"X1-AB-H52\"");
@@ -1041,22 +1041,22 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"], drone)]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_shipyard_ship_fuel_capacity_units{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 80\n");
-        text.Should().Contain("spacetraders_shipyard_ship_cargo_capacity_units{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 15\n");
-        text.Should().Contain("spacetraders_shipyard_ship_info{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Mine, Trade\",equipment=\"MINING_LASER_I, MINERAL_PROCESSOR_I\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_fuel_capacity_units{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 80\n");
+        text.Should().Contain("spacetraders_shipyard_ship_cargo_capacity_units{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 15\n");
+        text.Should().Contain("spacetraders_shipyard_ship_info{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Mine, Trade\",equipment=\"MINING_LASER_I, MINERAL_PROCESSOR_I\"} 1\n");
 
         // A listing that changes keeps one series.
         _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"], drone with { Can = "Survey, Mine, Trade", Equipment = "MINING_LASER_I, SURVEYOR_I, MINERAL_PROCESSOR_I" })]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_shipyard_ship_info{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Survey, Mine, Trade\",equipment=\"MINING_LASER_I, SURVEYOR_I, MINERAL_PROCESSOR_I\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_info{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\",can=\"Survey, Mine, Trade\",equipment=\"MINING_LASER_I, SURVEYOR_I, MINERAL_PROCESSOR_I\"} 1\n");
         text.Should().NotContain("can=\"Mine, Trade\"");
 
         // Listed again without details: only its type is left.
         _metrics.Shipyards([Shipyard(["SHIP_MINING_DRONE"])]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_shipyard_ship_type{system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
+        text.Should().Contain("spacetraders_shipyard_ship_type{reset_date=\"2026-09-27\",system=\"X1-AB\",waypoint=\"X1-AB-H52\",ship_type=\"SHIP_MINING_DRONE\"} 1\n");
         text.Should().NotContain("spacetraders_shipyard_ship_fuel_capacity_units{");
         text.Should().NotContain("spacetraders_shipyard_ship_cargo_capacity_units{");
         text.Should().NotContain("spacetraders_shipyard_ship_info{");
@@ -1079,10 +1079,10 @@ public sealed class PrometheusAutomationMetricsTests
         });
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_good_supply_chain{good=\"IRON\",made_from=\"IRON_ORE\",used_for=\"FAB_MATS, MACHINERY\"} 1\n");
-        text.Should().Contain("spacetraders_good_supply_chain{good=\"FAB_MATS\",made_from=\"IRON, QUARTZ_SAND\",used_for=\"\"} 1\n");
-        text.Should().Contain("spacetraders_good_supply_chain{good=\"IRON_ORE\",made_from=\"\",used_for=\"IRON\"} 1\n");
-        text.Should().Contain("spacetraders_good_supply_chain{good=\"QUARTZ_SAND\",made_from=\"\",used_for=\"FAB_MATS\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{reset_date=\"2026-09-27\",good=\"IRON\",made_from=\"IRON_ORE\",used_for=\"FAB_MATS, MACHINERY\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{reset_date=\"2026-09-27\",good=\"FAB_MATS\",made_from=\"IRON, QUARTZ_SAND\",used_for=\"\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{reset_date=\"2026-09-27\",good=\"IRON_ORE\",made_from=\"\",used_for=\"IRON\"} 1\n");
+        text.Should().Contain("spacetraders_good_supply_chain{reset_date=\"2026-09-27\",good=\"QUARTZ_SAND\",made_from=\"\",used_for=\"FAB_MATS\"} 1\n");
     }
 
     [Fact]
@@ -1092,8 +1092,8 @@ public sealed class PrometheusAutomationMetricsTests
         _metrics.Surveys([new SurveyMetricsSample("X1-AB-XB5C", false, 2), new SurveyMetricsSample("X1-AB-XB5C", true, 1)]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_surveys_active{waypoint=\"X1-AB-XB5C\",used=\"false\"} 2\n");
-        text.Should().Contain("spacetraders_surveys_active{waypoint=\"X1-AB-XB5C\",used=\"true\"} 1\n");
+        text.Should().Contain("spacetraders_surveys_active{reset_date=\"2026-09-27\",waypoint=\"X1-AB-XB5C\",used=\"false\"} 2\n");
+        text.Should().Contain("spacetraders_surveys_active{reset_date=\"2026-09-27\",waypoint=\"X1-AB-XB5C\",used=\"true\"} 1\n");
 
         _metrics.Surveys([]);
 
@@ -1114,14 +1114,14 @@ public sealed class PrometheusAutomationMetricsTests
         ]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"true\",description=\"Run the mining plan\"} 1\n");
-        text.Should().Contain("spacetraders_setting_info{setting=\"Trade.MinProfitPerUnit\",current=\"200\",next_run=\"200\",description=\"Credits per unit, after fuel, a trade trip must earn\"} 1\n");
+        text.Should().Contain("spacetraders_setting_info{reset_date=\"2026-09-27\",setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"true\",description=\"Run the mining plan\"} 1\n");
+        text.Should().Contain("spacetraders_setting_info{reset_date=\"2026-09-27\",setting=\"Trade.MinProfitPerUnit\",current=\"200\",next_run=\"200\",description=\"Credits per unit, after fuel, a trade trip must earn\"} 1\n");
 
         // D69: a value chosen for the next run alone changes the row too.
         _metrics.Settings([new SettingMetricsSample("Automation.Plan.Mining.Enabled", "false", "false", "Run the mining plan")]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"false\",description=\"Run the mining plan\"} 1\n");
+        text.Should().Contain("spacetraders_setting_info{reset_date=\"2026-09-27\",setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"false\",description=\"Run the mining plan\"} 1\n");
         text.Should().NotContain("next_run=\"true\"");
         text.Should().NotContain("setting=\"Trade.MinProfitPerUnit\"");
     }
@@ -1140,18 +1140,18 @@ public sealed class PrometheusAutomationMetricsTests
         ]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-1\",role=\"Survey\",reason=\"survey_first\"} 1\n");
-        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-3\",role=\"Mine\",reason=\"most_profitable\"} 1\n");
-        text.Should().Contain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Trade\"} 21000\n");
-        text.Should().Contain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-3\",role=\"Mine\"} 2500\n");
+        text.Should().Contain("spacetraders_ship_role_info{reset_date=\"2026-09-27\",ship=\"AGENT-1\",role=\"Survey\",reason=\"survey_first\"} 1\n");
+        text.Should().Contain("spacetraders_ship_role_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",role=\"Mine\",reason=\"most_profitable\"} 1\n");
+        text.Should().Contain("spacetraders_ship_role_credits_per_hour{reset_date=\"2026-09-27\",ship=\"AGENT-1\",role=\"Trade\"} 21000\n");
+        text.Should().Contain("spacetraders_ship_role_credits_per_hour{reset_date=\"2026-09-27\",ship=\"AGENT-3\",role=\"Mine\"} 2500\n");
 
         _metrics.Roles([new RoleMetricsSample("AGENT-1", "Trade", "most_profitable", new Dictionary<string, long> { ["Trade"] = 21_000 })]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_ship_role_info{ship=\"AGENT-1\",role=\"Trade\",reason=\"most_profitable\"} 1\n");
+        text.Should().Contain("spacetraders_ship_role_info{reset_date=\"2026-09-27\",ship=\"AGENT-1\",role=\"Trade\",reason=\"most_profitable\"} 1\n");
         text.Should().NotContain("role=\"Survey\"");
         text.Should().NotContain("ship=\"AGENT-3\"");
-        text.Should().NotContain("spacetraders_ship_role_credits_per_hour{ship=\"AGENT-1\",role=\"Mine\"}");
+        text.Should().NotContain("spacetraders_ship_role_credits_per_hour{reset_date=\"2026-09-27\",ship=\"AGENT-1\",role=\"Mine\"}");
     }
 
     /// <summary>
@@ -1168,14 +1168,14 @@ public sealed class PrometheusAutomationMetricsTests
         ]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_construction_units_required{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
-        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 400\n");
-        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"ADVANCED_CIRCUITRY\"} 0\n");
+        text.Should().Contain("spacetraders_construction_units_required{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
+        text.Should().Contain("spacetraders_construction_units_fulfilled{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 400\n");
+        text.Should().Contain("spacetraders_construction_units_fulfilled{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",trade_symbol=\"ADVANCED_CIRCUITRY\"} 0\n");
 
         _metrics.Construction([new ConstructionMetricsSample("X1-DC53-I55", "FAB_MATS", 1_600, 1_600)]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_construction_units_fulfilled{site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
+        text.Should().Contain("spacetraders_construction_units_fulfilled{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
         text.Should().NotContain("trade_symbol=\"ADVANCED_CIRCUITRY\"");
     }
 
@@ -1193,13 +1193,13 @@ public sealed class PrometheusAutomationMetricsTests
         ]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Survey\",tier=\"Surveyor\",position=\"2\",ship_type=\"SHIP_SURVEYOR\",shipyard=\"X1-DC53-H52\"} 33905\n");
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"CargoShips\",position=\"5\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{reset_date=\"2026-09-27\",plan=\"Survey\",tier=\"Surveyor\",position=\"2\",ship_type=\"SHIP_SURVEYOR\",shipyard=\"X1-DC53-H52\"} 33905\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{reset_date=\"2026-09-27\",plan=\"Trading\",tier=\"CargoShips\",position=\"5\",ship_type=\"SHIP_LIGHT_SHUTTLE\",shipyard=\"X1-DC53-A2\"} 114225\n");
 
         _metrics.PurchaseNeeds([new PurchaseNeedMetricsSample("Trading", "Alternating", 7, "SHIP_LIGHT_HAULER", "X1-DC53-A2", 354_210)]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_purchase_need_credits{plan=\"Trading\",tier=\"Alternating\",position=\"7\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
+        text.Should().Contain("spacetraders_purchase_need_credits{reset_date=\"2026-09-27\",plan=\"Trading\",tier=\"Alternating\",position=\"7\",ship_type=\"SHIP_LIGHT_HAULER\",shipyard=\"X1-DC53-A2\"} 354210\n");
         text.Should().NotContain("plan=\"Survey\"");
         text.Should().NotContain("SHIP_LIGHT_SHUTTLE");
     }
@@ -1235,9 +1235,9 @@ public sealed class PrometheusAutomationMetricsTests
     {
         _metrics.Contracts([new ContractMetricsSample("C-1", "IRON_ORE", 42, 7, Start.AddDays(7))]);
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_contract_units_required{contract=\"C-1\",trade_symbol=\"IRON_ORE\"} 42");
-        text.Should().Contain("spacetraders_contract_units_fulfilled{contract=\"C-1\",trade_symbol=\"IRON_ORE\"} 7");
-        text.Should().Contain($"spacetraders_contract_deadline_timestamp_seconds{{contract=\"C-1\"}} {Start.AddDays(7).ToUnixTimeSeconds()}");
+        text.Should().Contain("spacetraders_contract_units_required{reset_date=\"2026-09-27\",contract=\"C-1\",trade_symbol=\"IRON_ORE\"} 42");
+        text.Should().Contain("spacetraders_contract_units_fulfilled{reset_date=\"2026-09-27\",contract=\"C-1\",trade_symbol=\"IRON_ORE\"} 7");
+        text.Should().Contain($"spacetraders_contract_deadline_timestamp_seconds{{reset_date=\"2026-09-27\",contract=\"C-1\"}} {Start.AddDays(7).ToUnixTimeSeconds()}");
 
         _metrics.Contracts([]);
 
@@ -1261,13 +1261,53 @@ public sealed class PrometheusAutomationMetricsTests
             Value = 50_000,
         };
 
-    private static string StatusLine(string ship, string role, string state, string goal, string reason, DateTimeOffset since)
-        => $"spacetraders_ship_status_since_timestamp_seconds{{ship=\"{ship}\",role=\"{role}\",state=\"{state}\",goal=\"{goal}\",reason=\"{reason}\"}} {since.ToUnixTimeSeconds()}";
+    [Fact]
+    public async Task EverySeries_CarriesTheAgentsResetDate()
+    {
+        // Slice 2.13 (D70): the bot registers the same symbol after every reset, so AGENT-3 is a ship of every run. The reset
+        // date keeps one run's series apart from the next on the dashboards.
+        _metrics.Credits(145_028);
+        _metrics.ReservedCredits(100_000);
+        _metrics.ApiRequest("GET", "my/agent", "200");
+        _metrics.Anomaly("ShipStuck", "AGENT-3", active: true);
+        _metrics.GoodsSold("X1-AB-H51", "COPPER_ORE", 15);
+        _metrics.TripProfit("mining", 340);
+        _metrics.Fleet([Drone("X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE", [new CargoItemModel("COPPER_ORE", 9)])], Start);
 
-    private async Task<string> ExportAsync()
+        var samples = (await ExportAsync()).Split('\n').Where(line => line.StartsWith("spacetraders_", StringComparison.Ordinal)).ToList();
+
+        samples.Should().HaveCountGreaterThan(10)
+            .And.OnlyContain(line => line.Contains("{reset_date=\"2026-09-27\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task BeforeTheAgentIsKnown_ASeriesHasAnEmptyResetDate()
+    {
+        // Bootstrap's own API calls come before it has picked the agent. Prometheus stores an empty value as no label.
+        var registry = Metrics.NewCustomRegistry();
+        var metrics = new PrometheusAutomationMetrics(registry, new AgentDataScope());
+
+        metrics.Credits(1);
+
+        (await ExportAsync(registry)).Should().Contain("spacetraders_agent_credits{reset_date=\"\"} 1\n");
+    }
+
+    private static AgentDataScope Agent(string agentId)
+    {
+        var agent = new AgentDataScope();
+        agent.Set(agentId);
+        return agent;
+    }
+
+    private static string StatusLine(string ship, string role, string state, string goal, string reason, DateTimeOffset since)
+        => $"spacetraders_ship_status_since_timestamp_seconds{{reset_date=\"2026-09-27\",ship=\"{ship}\",role=\"{role}\",state=\"{state}\",goal=\"{goal}\",reason=\"{reason}\"}} {since.ToUnixTimeSeconds()}";
+
+    private Task<string> ExportAsync() => ExportAsync(_registry);
+
+    private static async Task<string> ExportAsync(CollectorRegistry registry)
     {
         using var stream = new MemoryStream();
-        await _registry.CollectAndExportAsTextAsync(stream);
+        await registry.CollectAndExportAsTextAsync(stream);
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 }

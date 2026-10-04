@@ -42,11 +42,17 @@ public sealed class AgentBootstrapService(
     {
         // Read before any token is tried: a token that the server accepts after this was
         // registered in this reset.
-        var resetDate = await GetServerResetDateAsync(cancellationToken);
+        var (resetDate, nextReset) = await GetServerResetDateAsync(cancellationToken);
 
         if (!await TryBootstrapWithKnownTokenAsync(resetDate, cancellationToken))
         {
             await RegisterNewAgentAsync(resetDate, cancellationToken);
+        }
+
+        // Once the agent is known, so the gauge carries its reset date as every metric does (slice 2.13).
+        if (nextReset is { } next)
+        {
+            metrics.NextServerReset(next);
         }
 
         await DeleteOtherAgentsAsync(cancellationToken);
@@ -175,19 +181,18 @@ public sealed class AgentBootstrapService(
         _agentTokenProvider.Set(token);
     }
 
-    private async Task<string> GetServerResetDateAsync(CancellationToken cancellationToken)
+    private async Task<(string ResetDate, DateTimeOffset? NextReset)> GetServerResetDateAsync(CancellationToken cancellationToken)
     {
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         var status = await scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().GetStatusAsync(cancellationToken);
 
-        if (DateTimeOffset.TryParse(status.ServerResets?.Next, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var nextReset))
-        {
-            metrics.NextServerReset(nextReset);
-        }
+        DateTimeOffset? nextReset = DateTimeOffset.TryParse(status.ServerResets?.Next, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var next)
+            ? next
+            : null;
 
         return string.IsNullOrWhiteSpace(status.ResetDate)
             ? throw new InvalidOperationException("The SpaceTraders server status has no reset date.")
-            : status.ResetDate;
+            : (status.ResetDate, nextReset);
     }
 
     private async Task<string?> FindAgentIdAsync(string token, CancellationToken cancellationToken)
