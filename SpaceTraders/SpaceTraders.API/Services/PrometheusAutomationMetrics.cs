@@ -1,19 +1,22 @@
 using Prometheus;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Infrastructure.Persistence.Scoping;
 
 namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Exports <see cref="IAutomationMetrics"/> to Prometheus. It defines every <c>spacetraders_*</c>
 /// metric when it is created, so a scrape lists them all, also before they have a value. Every
-/// counter series reaches Prometheus at 0 before it counts (<see cref="ZeroFirstCounter"/>, B43); a
-/// gauge without labels has no series until it has a value (B52), as 0 would be read as one.
+/// series carries the run's reset date first, as <c>reset_date</c> (<see cref="ResetDateLabel"/>,
+/// slice 2.13), so one run's data never mixes with the next on the dashboards. Every counter series
+/// reaches Prometheus at 0 before it counts (<see cref="ZeroFirstCounter"/>, B43); a gauge with no
+/// other label has no series until it has a value (B52), as 0 would be read as one.
 /// </summary>
 /// <remarks>Thread-safe: the per-ship and per-contract series it tracks are guarded by a lock.</remarks>
 public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 {
     private readonly ZeroFirstCounter _goalBreakerTrips;
-    private readonly Gauge _databaseSizeBytes;
+    private readonly RunGauge _databaseSizeBytes;
     private readonly ZeroFirstCounter _goalSteps;
     private readonly ZeroFirstCounter _apiRequestsInitiated;
     private readonly ZeroFirstCounter _apiRequests;
@@ -27,47 +30,47 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly ZeroFirstCounter _trips;
     private readonly ZeroFirstCounter _tripProfit;
     private readonly ZeroFirstCounter _tripLoss;
-    private readonly Gauge _anomalyActive;
-    private readonly Gauge _nextServerReset;
-    private readonly Gauge _credits;
-    private readonly Gauge _ships;
-    private readonly Gauge _shipStatusSince;
-    private readonly Gauge _contractUnitsRequired;
-    private readonly Gauge _contractUnitsFulfilled;
-    private readonly Gauge _contractDeadline;
-    private readonly Gauge _constructionUnitsRequired;
-    private readonly Gauge _constructionUnitsFulfilled;
+    private readonly RunGauge _anomalyActive;
+    private readonly RunGauge _nextServerReset;
+    private readonly RunGauge _credits;
+    private readonly RunGauge _ships;
+    private readonly RunGauge _shipStatusSince;
+    private readonly RunGauge _contractUnitsRequired;
+    private readonly RunGauge _contractUnitsFulfilled;
+    private readonly RunGauge _contractDeadline;
+    private readonly RunGauge _constructionUnitsRequired;
+    private readonly RunGauge _constructionUnitsFulfilled;
     private readonly ZeroFirstCounter _extractedUnits;
     private readonly ZeroFirstCounter _jettisonedUnits;
     private readonly ZeroFirstCounter _extractions;
     private readonly ZeroFirstCounter _surveysTaken;
     private readonly ZeroFirstCounter _surveysEnded;
-    private readonly Gauge _surveysActive;
-    private readonly Gauge _shipInfo;
-    private readonly Gauge _shipCapabilities;
-    private readonly Gauge _shipArrival;
-    private readonly Gauge _shipCargoUnits;
-    private readonly Gauge _shipCargoCapacity;
-    private readonly Gauge _shipValue;
-    private readonly Gauge _marketObserved;
-    private readonly Gauge _marketPurchasePrice;
-    private readonly Gauge _marketSellPrice;
-    private readonly Gauge _marketTradeVolume;
-    private readonly Gauge _marketSupply;
-    private readonly Gauge _marketActivity;
-    private readonly Gauge _shipyardObserved;
-    private readonly Gauge _shipyardShipType;
-    private readonly Gauge _shipyardShipPrice;
-    private readonly Gauge _shipyardShipSupply;
-    private readonly Gauge _shipyardShipFuelCapacity;
-    private readonly Gauge _shipyardShipCargoCapacity;
-    private readonly Gauge _shipyardShipInfo;
-    private readonly Gauge _supplyChain;
-    private readonly Gauge _settingInfo;
-    private readonly Gauge _roleInfo;
-    private readonly Gauge _roleCreditsPerHour;
-    private readonly Gauge _purchaseNeed;
-    private readonly Gauge _creditReserve;
+    private readonly RunGauge _surveysActive;
+    private readonly RunGauge _shipInfo;
+    private readonly RunGauge _shipCapabilities;
+    private readonly RunGauge _shipArrival;
+    private readonly RunGauge _shipCargoUnits;
+    private readonly RunGauge _shipCargoCapacity;
+    private readonly RunGauge _shipValue;
+    private readonly RunGauge _marketObserved;
+    private readonly RunGauge _marketPurchasePrice;
+    private readonly RunGauge _marketSellPrice;
+    private readonly RunGauge _marketTradeVolume;
+    private readonly RunGauge _marketSupply;
+    private readonly RunGauge _marketActivity;
+    private readonly RunGauge _shipyardObserved;
+    private readonly RunGauge _shipyardShipType;
+    private readonly RunGauge _shipyardShipPrice;
+    private readonly RunGauge _shipyardShipSupply;
+    private readonly RunGauge _shipyardShipFuelCapacity;
+    private readonly RunGauge _shipyardShipCargoCapacity;
+    private readonly RunGauge _shipyardShipInfo;
+    private readonly RunGauge _supplyChain;
+    private readonly RunGauge _settingInfo;
+    private readonly RunGauge _roleInfo;
+    private readonly RunGauge _roleCreditsPerHour;
+    private readonly RunGauge _purchaseNeed;
+    private readonly RunGauge _creditReserve;
 
     private readonly Lock _lock = new();
     private readonly SampledGauge _systemInfo;
@@ -103,9 +106,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string Ship, string Role)> _roleEstimates = [];
 
     /// <summary>Defines the metrics in <paramref name="registry"/> (the default registry in the host).</summary>
-    public PrometheusAutomationMetrics(CollectorRegistry registry)
+    /// <param name="registry">The registry that exports them.</param>
+    /// <param name="agent">The active agent, whose reset date every series carries (slice 2.13).</param>
+    public PrometheusAutomationMetrics(CollectorRegistry registry, IAgentDataScope agent)
     {
         var metrics = Metrics.WithCustomRegistry(registry);
+        string ResetDate() => ResetDateLabel.Of(agent.AgentId);
 
         _goalBreakerTrips = ZeroFirst(
             "spacetraders_goal_breaker_trips_total",
@@ -173,7 +179,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_trip_loss_credits_total",
             "What trips lost after fuel, by activity: each trip's cargo and fuel less its sales, when that is more; a contract round trip's fuel.",
             "activity");
-        _anomalyActive = metrics.CreateGauge(
+        _anomalyActive = Labelled(
             "spacetraders_anomaly_active",
             "1 while an anomaly is active, 0 once it cleared.",
             "rule",
@@ -184,12 +190,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _credits = UntilSet(
             "spacetraders_agent_credits",
             "The agent's credits, as cached.");
-        _ships = metrics.CreateGauge(
+        _ships = Labelled(
             "spacetraders_ships",
             "Ships by role (their type as cached) and state (DOCKED, IN_ORBIT or IN_TRANSIT).",
             "role",
             "state");
-        _shipStatusSince = metrics.CreateGauge(
+        _shipStatusSince = Labelled(
             "spacetraders_ship_status_since_timestamp_seconds",
             "One series per ship: its role, state, goal and blocked reason as labels, and as value when it entered that combination (Unix time; since the start at the latest).",
             "ship",
@@ -197,26 +203,26 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "state",
             "goal",
             "reason");
-        _contractUnitsRequired = metrics.CreateGauge(
+        _contractUnitsRequired = Labelled(
             "spacetraders_contract_units_required",
             "Units an accepted contract requires, per good.",
             "contract",
             "trade_symbol");
-        _contractUnitsFulfilled = metrics.CreateGauge(
+        _contractUnitsFulfilled = Labelled(
             "spacetraders_contract_units_fulfilled",
             "Units delivered to an accepted contract, per good.",
             "contract",
             "trade_symbol");
-        _contractDeadline = metrics.CreateGauge(
+        _contractDeadline = Labelled(
             "spacetraders_contract_deadline_timestamp_seconds",
             "Deadline of an accepted contract (Unix time).",
             "contract");
-        _constructionUnitsRequired = metrics.CreateGauge(
+        _constructionUnitsRequired = Labelled(
             "spacetraders_construction_units_required",
             "Units a construction site (the home system's jump gate) requires, per material.",
             "site",
             "trade_symbol");
-        _constructionUnitsFulfilled = metrics.CreateGauge(
+        _constructionUnitsFulfilled = Labelled(
             "spacetraders_construction_units_fulfilled",
             "Units supplied to a construction site (the home system's jump gate), per material, by anyone.",
             "site",
@@ -247,149 +253,149 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "waypoint",
             "reason",
             "used");
-        _surveysActive = metrics.CreateGauge(
+        _surveysActive = Labelled(
             "spacetraders_surveys_active",
             "Usable surveys in the cache, by waypoint and whether any extraction used them yet (used: true or false).",
             "waypoint",
             "used");
-        _shipInfo = metrics.CreateGauge(
+        _shipInfo = Labelled(
             "spacetraders_ship_info",
             "One series per ship, always 1: where it is (its waypoint and the waypoint's type; in transit, an arrow and where it goes) and what the bot has it do.",
             "ship",
             "location",
             "activity");
-        _shipCapabilities = metrics.CreateGauge(
+        _shipCapabilities = Labelled(
             "spacetraders_ship_capabilities_info",
             "One series per ship, always 1: the roles its equipment allows, whichever plans are on (Survey, Mine, Siphon and Trade, in that order; none for a probe or a ship that can do none of them).",
             "ship",
             "can");
-        _shipArrival = metrics.CreateGauge(
+        _shipArrival = Labelled(
             "spacetraders_ship_arrival_timestamp_seconds",
             "When a ship in transit arrives (Unix time); no series while it isn't travelling.",
             "ship");
-        _shipCargoUnits = metrics.CreateGauge(
+        _shipCargoUnits = Labelled(
             "spacetraders_ship_cargo_units",
             "Units in a ship's hold, per good aboard.",
             "ship",
             "good");
-        _shipCargoCapacity = metrics.CreateGauge(
+        _shipCargoCapacity = Labelled(
             "spacetraders_ship_cargo_capacity_units",
             "Units a ship's hold takes.",
             "ship");
-        _shipValue = metrics.CreateGauge(
+        _shipValue = Labelled(
             "spacetraders_ship_value_credits",
             "What was paid for a ship and for the mounts and modules installed on it; 0 for a starting ship.",
             "ship");
-        _systemInfo = new SampledGauge(metrics.CreateGauge(
+        _systemInfo = new SampledGauge(Labelled(
             "spacetraders_system_info",
             "One series per system the bot knows, always 1: what the explore plan knows of it (home, explored, to_explore, gate_under_construction, jump_refused, no_gate, gate_unknown, cached) and its jump gate.",
             "system",
             "state",
             "gate",
             "gate_state"));
-        _systemJumps = new SampledGauge(metrics.CreateGauge(
+        _systemJumps = new SampledGauge(Labelled(
             "spacetraders_system_jumps_from_home",
             "How many jumps a system is from home through built gates (one more to a gate still under construction).",
             "system"));
-        _systemExplored = new SampledGauge(metrics.CreateGauge(
+        _systemExplored = new SampledGauge(Labelled(
             "spacetraders_system_explored_timestamp_seconds",
             "When the command ship explored a system (Unix time): it visited each market and shipyard there once.",
             "system"));
-        _systemConnection = new SampledGauge(metrics.CreateGauge(
+        _systemConnection = new SampledGauge(Labelled(
             "spacetraders_system_connection_info",
             "One series per jump gate connection the bot asked for, always 1.",
             "system",
             "to"));
-        _systemFacilities = new SampledGauge(metrics.CreateGauge(
+        _systemFacilities = new SampledGauge(Labelled(
             "spacetraders_system_facilities",
             "A system's cached waypoints with a market, a shipyard, or still uncharted.",
             "system",
             "kind"));
-        _systemWaypoints = new SampledGauge(metrics.CreateGauge(
+        _systemWaypoints = new SampledGauge(Labelled(
             "spacetraders_system_waypoints",
             "A system's cached waypoints, by type.",
             "system",
             "type"));
-        _systemGatheringSites = new SampledGauge(metrics.CreateGauge(
+        _systemGatheringSites = new SampledGauge(Labelled(
             "spacetraders_system_gathering_sites",
             "In how many waypoints of a system a good can be mined (by the asteroids' deposits) or siphoned (gas giants).",
             "system",
             "good"));
-        _systemRawGoodPrice = new SampledGauge(metrics.CreateGauge(
+        _systemRawGoodPrice = new SampledGauge(Labelled(
             "spacetraders_system_raw_good_price",
             "The best price a market in a system pays for an ore or a gas it imports or exchanges, as last seen, and where.",
             "system",
             "good",
             "market"));
-        _systemRawGoodSupply = new SampledGauge(metrics.CreateGauge(
+        _systemRawGoodSupply = new SampledGauge(Labelled(
             "spacetraders_system_raw_good_supply",
             "The lowest supply of an ore or a gas among the markets in a system that buy it: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
             "system",
             "good"));
         string[] tradeLabels = ["system", "good", "buy_at", "sell_at"];
-        _systemTradeMargin = new SampledGauge(metrics.CreateGauge(
+        _systemTradeMargin = new SampledGauge(Labelled(
             "spacetraders_system_trade_margin",
             "The best trades within a system, one per good, the five best: what a unit earns before fuel, buying where it is cheapest and selling where it pays most.",
             tradeLabels));
-        _systemTradeVolume = new SampledGauge(metrics.CreateGauge(
+        _systemTradeVolume = new SampledGauge(Labelled(
             "spacetraders_system_trade_volume",
             "The units one trade of a system's best trades moves at once: the smaller of the two markets' trade volumes.",
             tradeLabels));
-        _marketObserved = metrics.CreateGauge(
+        _marketObserved = Labelled(
             "spacetraders_market_observed_timestamp_seconds",
             "When the bot last refreshed a cached market (Unix time).",
             "system",
             "waypoint",
             "waypoint_type");
         string[] marketGoodLabels = ["system", "waypoint", "good", "kind"];
-        _marketPurchasePrice = metrics.CreateGauge(
+        _marketPurchasePrice = Labelled(
             "spacetraders_market_purchase_price",
             "What a market charges a ship per unit of a good, as last seen. kind is EXPORT, IMPORT or EXCHANGE.",
             marketGoodLabels);
-        _marketSellPrice = metrics.CreateGauge(
+        _marketSellPrice = Labelled(
             "spacetraders_market_sell_price",
             "What a market pays a ship per unit of a good, as last seen.",
             marketGoodLabels);
-        _marketTradeVolume = metrics.CreateGauge(
+        _marketTradeVolume = Labelled(
             "spacetraders_market_trade_volume",
             "Units of a good a market trades per transaction before its price moves, as last seen.",
             marketGoodLabels);
-        _marketSupply = metrics.CreateGauge(
+        _marketSupply = Labelled(
             "spacetraders_market_supply",
             "A good's supply at a market, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
             marketGoodLabels);
-        _marketActivity = metrics.CreateGauge(
+        _marketActivity = Labelled(
             "spacetraders_market_activity",
             "A good's activity at a market, as last seen: 0 RESTRICTED, 1 WEAK, 2 GROWING, 3 STRONG.",
             marketGoodLabels);
-        _shipyardObserved = metrics.CreateGauge(
+        _shipyardObserved = Labelled(
             "spacetraders_shipyard_observed_timestamp_seconds",
             "When the bot last refreshed a cached shipyard (Unix time).",
             "system",
             "waypoint",
             "waypoint_type");
         string[] shipyardShipLabels = ["system", "waypoint", "ship_type"];
-        _shipyardShipType = metrics.CreateGauge(
+        _shipyardShipType = Labelled(
             "spacetraders_shipyard_ship_type",
             "1 for each ship type a shipyard sells.",
             shipyardShipLabels);
-        _shipyardShipPrice = metrics.CreateGauge(
+        _shipyardShipPrice = Labelled(
             "spacetraders_shipyard_ship_price",
             "What a shipyard charges for a ship type, as last seen.",
             shipyardShipLabels);
-        _shipyardShipSupply = metrics.CreateGauge(
+        _shipyardShipSupply = Labelled(
             "spacetraders_shipyard_ship_supply",
             "A ship type's supply at a shipyard, as last seen: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.",
             shipyardShipLabels);
-        _shipyardShipFuelCapacity = metrics.CreateGauge(
+        _shipyardShipFuelCapacity = Labelled(
             "spacetraders_shipyard_ship_fuel_capacity_units",
             "What a ship type's tank holds (its frame's), as a shipyard last listed it; 0 for a probe.",
             shipyardShipLabels);
-        _shipyardShipCargoCapacity = metrics.CreateGauge(
+        _shipyardShipCargoCapacity = Labelled(
             "spacetraders_shipyard_ship_cargo_capacity_units",
             "Units a ship type's cargo holds take together, as a shipyard last listed it.",
             shipyardShipLabels);
-        _shipyardShipInfo = metrics.CreateGauge(
+        _shipyardShipInfo = Labelled(
             "spacetraders_shipyard_ship_info",
             "One series per ship type a shipyard listed in full, always 1: what it could do in the fleet, judged as spacetraders_ship_capabilities_info judges a ship (Survey, Mine, Siphon and Trade, in that order; none for a ship that can do none of them), but Probe for a probe; and its mounts and modules, without the cargo holds and crew quarters (none without any).",
             "system",
@@ -397,26 +403,26 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "ship_type",
             "can",
             "equipment");
-        _supplyChain = metrics.CreateGauge(
+        _supplyChain = Labelled(
             "spacetraders_good_supply_chain",
             "One series per good, always 1: the goods it is made from and the goods made from it (the game's production chains).",
             "good",
             "made_from",
             "used_for");
-        _settingInfo = metrics.CreateGauge(
+        _settingInfo = Labelled(
             "spacetraders_setting_info",
             "One series per setting the agent has, always 1: its value now, the value the next run starts with (one that may hold a secret shows (hidden)) and what it does.",
             "setting",
             "current",
             "next_run",
             "description");
-        _roleInfo = metrics.CreateGauge(
+        _roleInfo = Labelled(
             "spacetraders_ship_role_info",
             "One series per ship on the role board, always 1: its role (Survey, Mine, Siphon, Trade or None) and why it has it.",
             "ship",
             "role",
             "reason");
-        _roleCreditsPerHour = metrics.CreateGauge(
+        _roleCreditsPerHour = Labelled(
             "spacetraders_ship_role_credits_per_hour",
             "What each role a ship could take would earn it per hour, by the role board's estimate: its best trip, after fuel, with the production chains' share.",
             "ship",
@@ -424,7 +430,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _creditReserve = UntilSet(
             "spacetraders_credit_reserve",
             "The credits a ship purchase must leave (D51): FleetExpansion.MinCreditReserve, and FleetExpansion.ReservePerTradingCargoUnit for every unit the ships that trade can carry.");
-        _purchaseNeed = metrics.CreateGauge(
+        _purchaseNeed = Labelled(
             "spacetraders_purchase_need_credits",
             "What each plan that buys ships would buy now, by its place in the order ships are bought in (position 1 first): what the ship costs, as cached.",
             "plan",
@@ -435,12 +441,18 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
-            => new(metrics.CreateCounter(name, help, labelNames), registry);
+            => new(metrics.CreateCounter(name, help, [ResetDateLabel.Name, .. labelNames]), registry, ResetDate);
 
-        // A gauge without labels would be published at 0 at once, and the first scrape of a new pod could read the
-        // credits as 0 before the first sample (B52). It is listed from the start, with a series once it is set.
-        Gauge UntilSet(string name, string help)
-            => metrics.CreateGauge(name, help, new GaugeConfiguration { SuppressInitialValue = true });
+        RunGauge Labelled(string name, string help, params string[] labelNames)
+            => new(metrics.CreateGauge(name, help, [ResetDateLabel.Name, .. labelNames]), ResetDate);
+
+        // A gauge with no label but the reset date would be published at 0 as soon as it is first asked for, and the
+        // first scrape of a new pod could read the credits as 0 before the first sample (B52). It is listed from the
+        // start, with a series once it is set.
+        RunGauge UntilSet(string name, string help)
+            => new(
+                metrics.CreateGauge(name, help, new GaugeConfiguration { LabelNames = [ResetDateLabel.Name], SuppressInitialValue = true }),
+                ResetDate);
     }
 
     /// <inheritdoc />
@@ -1012,7 +1024,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _ => null,
     };
 
-    private static void SetOrRemove(Gauge gauge, string[] labels, double? value)
+    private static void SetOrRemove(RunGauge gauge, string[] labels, double? value)
     {
         if (value is { } known)
         {
@@ -1112,7 +1124,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     /// A gauge whose series are all set in one sample: <see cref="Begin"/>, then <see cref="Set"/> each, then <see cref="End"/>
     /// removes the series the sample didn't set. Under the lock.
     /// </summary>
-    private sealed class SampledGauge(Gauge gauge)
+    private sealed class SampledGauge(RunGauge gauge)
     {
         private readonly Dictionary<string, string[]> _series = new(StringComparer.Ordinal);
         private readonly HashSet<string> _set = new(StringComparer.Ordinal);
@@ -1135,5 +1147,19 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
                 _series.Remove(key);
             }
         }
+    }
+
+    /// <summary>
+    /// A gauge whose every series carries the run's reset date as its first label (slice 2.13): its callers give the other
+    /// label values, and it puts the reset date in front. The reset date doesn't change once agent bootstrap has set it
+    /// (a reset ends the process), and the samplers that set and remove series start after bootstrap.
+    /// </summary>
+    private sealed class RunGauge(Gauge gauge, Func<string> resetDate)
+    {
+        public Gauge.Child WithLabels(params string[] labels) => gauge.WithLabels([resetDate(), .. labels]);
+
+        public void RemoveLabelled(params string[] labels) => gauge.RemoveLabelled([resetDate(), .. labels]);
+
+        public void Set(double value) => gauge.WithLabels(resetDate()).Set(value);
     }
 }

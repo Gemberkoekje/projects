@@ -133,6 +133,9 @@
   is on by default, the settings you set carry over to the next run (the agent the next reset registers), and
   `/settings/next-run` sets the next run alone. Its first start switched on, at 18:09Z, the plans the agent of 13:00Z had
   had off. With it, "stays off until you switch it on (D9)" in the bullets above no longer holds.
+- Slice 2.13 (Grafana data per server reset, asked on 2026-10-04, with your decision D70) is built on branch
+  `claude/spacetraders-run-label` in projects and gembernodes: every metric and log line carries the reset date, and the
+  three SpaceTraders dashboards show one reset's run at a time.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -286,6 +289,7 @@ get the next D-number.
 | D67 | Slice 6.6: one purchase per trip, or several? Then asked: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade volume is a haulers hold." | **A full hold in one purchase:** a load is the builder's free hold, or what the gate still needs when that is less, bought at once, and only where the market's trade volume takes all of it; otherwise the builder waits (and trades), while the purchases after construction in the order keep waiting for it. |
 | D68 | Slice 6.6 (asked on 2026-10-04): "Only the home base jump gate construction should be high priority, any other jump gate construction should be low priority or maybe not even considered at all." | **Only the home gate:** the plan builds only the jump gate of the headquarters' system; a gate elsewhere is never fetched, built or given a role. |
 | D69 | Slice 2.12 (asked on 2026-10-04, after the server reset of 13:00Z left the new agent with only the scout and contract plans on): "After the restart most config items were turned off. Can you ensure everything is on by default? And changes in config changes those defaults?" Asked what the second part should do, you chose to have your changes remembered apart from the agent, the bot's own switch-offs left out, and a setting nobody changed follow the default. Then: "In addition, id like to have a separate set of endpoints to only affect future runs. So I can have a setting for this run (e.g. 50% split between miners and traders) and change those settings for the next run to see if it gives an improvement." | **Every plan on by default, and settings for the next runs:** every plan switch defaults to on, which replaces D9. The next run is the agent the next server reset registers; it starts with the value chosen for each setting, else the default. `PUT /settings/{key}` and the kill switch set a setting now and for the next runs; `PUT /settings/next-run/{key}` only for the next runs, `DELETE` gives them the default back and `GET /settings/next-run` lists them. When the bot switches automation off itself (the size guard, the reset monitor), the next runs keep their value. A setting nobody has set follows its default, also on the agent that runs. `POST /settings/reset` forgets the values chosen for the next runs. |
+| D70 | Slice 2.13 (asked on 2026-10-04, after the server reset): "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" To the reset date, which I proposed because the bot registers the same symbol after every reset: "reset date is a fine key", and "The grafana key per reset should be added for all 3 grafana dashboards." | **Grafana data per server reset:** every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04`. The SpaceTraders, markets and systems dashboards each have a "Reset" picker, the newest reset first, several to compare runs; every query filters on it. The alert rules stay as they are. |
 
 ## Phases
 
@@ -1051,6 +1055,51 @@ which deployed it at 18:09Z; built on branch `ccr-856636cc-qj1te0`; asked that d
 - Noticed (not changed):
   - `SettingsRepository.SetAsync` stores the type of what it was given, so `PUT /settings/{key}` turns a `bool` setting's
     type into `string`. Only the bot's own Settings page and the settings snapshot log show it; nothing acts on it.
+
+**2.13 Grafana data per server reset** (built 2026-10-04 on branch `claude/spacetraders-run-label`, in projects and
+gembernodes; asked that day, D70)
+- Asked, after the server reset of 2026-10-04: "Can we key all the Grafana data off the agent ID (or something else that's
+  different between resets) so data does not mix between different agents/different resets?"
+- The bot registers the same symbol after every reset (SPECTER), so the agent's and its ships' symbols repeat: a counter of
+  the new run looked like the old one restarted, a graph ran on from one agent to the next, and an `increase()`, an `offset
+  1h` or a table over the dashboard's range added both runs up (the fleet's "mined in range", "Value gained in the last
+  hour" for an hour after the reset, the 24-hour survey stats). What differs is the server's reset date, the part of the
+  agent id after `@` (`SPECTER@2026-10-04`, B4).
+- Done:
+  - **Every metric** (`spacetraders_*`) carries `reset_date` as its first label. `PrometheusAutomationMetrics` defines every
+    metric with it, and a wrapper (`RunGauge`, and `ZeroFirstCounter`) puts the value in front of the others at every
+    write, so the hundred places that write a metric stay as they were. The value comes from the agent id at every write
+    (`ResetDateLabel`); a reset ends the process, so one process has one value once bootstrap has picked the agent. What is
+    written before that (bootstrap's own API calls) carries an empty value, which Prometheus stores as no label.
+    `spacetraders_server_next_reset_timestamp_seconds` is set once the agent is known, so it carries it too. A counter of
+    a new run starts at 0 as a series of its own (B43's zero first still holds), and an unlabelled gauge of before (the
+    credits, the reserve, the database size, the next reset) has no series until it is set (B52 still holds).
+  - **Every log line** carries `ResetDate`, the same value, once bootstrap has picked the agent (`ResetDateEnricher`, in
+    `Program.cs`'s Serilog setup).
+  - **The dashboards** (gembernodes, same branch): the SpaceTraders, markets and systems dashboards each get a "Reset"
+    picker, the dashboard's first variable: the reset dates of `spacetraders_agent_credits` in the time range, newest first,
+    so a dashboard opens on the run that runs now; tick several to compare runs. Every Prometheus query filters on
+    `reset_date`, the markets and systems pickers too, so their lists hold only that run's systems, markets and goods.
+    The journal panels (the journal, the survey journal, the exploring journal) and the setting-change markers keep the
+    chosen run's lines. "Errors" keeps them and the lines that carry no run (not the bot's JSON, or logged before the
+    agent was known), and "Log lines per hour" counts those too, as the log-volume alert does. The links between the
+    three dashboards pass the picker on. Left unfiltered: the "Bot" stat (`up`, which is Prometheus's, not the bot's), and
+    the "Server resets" markers, the line between two runs.
+  - Checked against the cluster's Prometheus and Loki before the deploy: with the picker matching anything, every changed
+    query answers what it answered before (119 identical; the rest differ only by the seconds between the two queries).
+  - The alert rules stay as they are: they look at what the bot reports now, and add over the label.
+- Noticed (not changed):
+  - Data from before the deploy has no reset date, so the picker can't show it: the run of 2026-10-04 shows from the
+    deploy on, and the run before it not at all. Prometheus keeps 15 days and Loki 31, so it ages out.
+  - `RunLifecycleService` has runs of its own, which also start when a strategy setting changes (see 2.12); the label is
+    the reset date, not that run.
+- Tests: `PrometheusMetricsTests` (every expected series carries `reset_date="2026-09-27"`; every series of a scrape carries
+  the agent's reset date; before the agent is known a series has an empty one), `ResetDateLabelTests` (the reset date of an
+  agent id; a log line carries it once the agent is known), `AgentBootstrapServiceTests` (the next-reset gauge is set once
+  the agent is known). App 1005, Domain 72, API 188 (and 4 skipped), Integration 1.
+- To understand this, start with `SpaceTraders.API/Services/ResetDateLabel.cs`, then `RunGauge` at the end of
+  `PrometheusAutomationMetrics.cs` and `ZeroFirstCounter.cs`; in gembernodes, the `reset_date` variable of
+  `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2675,4 +2724,5 @@ your PC, 1Password or kubectl:
 | 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (merged: PR #51). It shows the systems beyond home once the explore plan has jumped |
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (merged: PR #52, which deployed the build) |
 | 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (merged: PR #55, which deployed the build) |
+| 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (branch `claude/spacetraders-run-label`, PR #56, not merged). It shows data once the bot runs a build with slice 2.13: deploy that build with it |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |

@@ -40,7 +40,8 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
   (CLEF: `@t`, `@m`, `@i`, and `@l` for levels above Information); other environments use plain
   text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
   Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
-  `Application=SpaceTraders.API`. The host logs through its own logger and leaves Serilog's static
+  `Application=SpaceTraders.API`, and, once agent bootstrap has picked the agent, `ResetDate` (slice
+  2.13, see [Logging and metrics](#11-logging-and-metrics)). The host logs through its own logger and leaves Serilog's static
   `Log.Logger` alone, so test hosts running side by side don't share one (B41).
 - **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
   nothing goes to Postgres. It compiles a handler's code at runtime (`WolverineFx.RuntimeCompilation`)
@@ -1642,6 +1643,11 @@ The seven pages in `src/Future` are not routed.
   - Every line logged during a tick carries `Tick`; a step's lines also carry its `Plan`, or its
     `ShipSymbol` (and `ContractId`). The game loop sets these with `ILogger.BeginScope`, which
     Serilog turns into properties.
+  - Every line carries `ResetDate` (slice 2.13, D70): the server reset the agent was registered
+    under, such as `2026-10-04`, read from the agent id (`SPECTER@2026-10-04`) by `ResetDateEnricher`.
+    The bot registers the same symbol after every reset, so the agent's and its ships' symbols repeat
+    from run to run; the reset date doesn't, and the dashboards' Loki queries filter on it. Lines
+    logged before agent bootstrap has picked the agent (the start's first lines) have none.
 - **The journal:** one line per meaningful thing, with an `EventKind` property and a message that
   starts with it (`CargoSold: ship …`), so `{namespace="spacetraders"} | json | EventKind != ""`
   in Loki reads as a timeline of the run. `JournalEvents` names every kind:
@@ -1702,6 +1708,15 @@ The seven pages in `src/Future` are not routed.
   before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the
   .NET meters, Wolverine's among them). Labels stay low-cardinality: a few per ship or contract
   at most.
+
+  Every `spacetraders_*` series carries `reset_date` as its first label (slice 2.13, D70): the server
+  reset the agent was registered under, such as `2026-10-04`, the same value as the log lines'
+  `ResetDate`. The agent's symbol and its ships' symbols are the same in every run, so without it a
+  counter of the new run looked like the old one reset, and a graph or an `increase()` across the
+  reset mixed both runs. `ResetDateLabel` reads it from the agent id at every write; a reset ends the
+  process, so a process has one value once agent bootstrap has set it. What is written before that
+  (bootstrap's own API calls) carries an empty value, which Prometheus stores as no label. The three
+  SpaceTraders dashboards filter every query on it with a "Reset" picker, the newest run first.
 
   Every `spacetraders_*` counter series reaches Prometheus at 0 before it counts anything
   (`ZeroFirstCounter`, B43). Prometheus's `increase()` and `rate()` never count the value a series

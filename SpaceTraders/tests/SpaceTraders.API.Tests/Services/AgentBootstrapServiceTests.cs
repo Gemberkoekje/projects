@@ -174,9 +174,14 @@ public sealed class AgentBootstrapServiceTests
                     Options.Create(new SpaceTradersBootstrapOptions { AgentName = "MATCHING-AGENT", AgentFaction = "COSMIC" }));
             });
 
+        var agentAtThatMoment = string.Empty;
+        metrics.When(m => m.NextServerReset(Arg.Any<DateTimeOffset>()))
+            .Do(_ => agentAtThatMoment = provider.GetRequiredService<IAgentDataScope>().AgentId);
+
         await provider.GetRequiredService<AgentBootstrapService>().StartAsync(CancellationToken.None);
 
         metrics.Received(1).NextServerReset(new DateTimeOffset(2026, 10, 04, 16, 00, 00, TimeSpan.Zero));
+        agentAtThatMoment.Should().Be("MATCHING-AGENT@2026-09-27", "the gauge carries the agent's reset date, as every metric does (slice 2.13)");
     }
 
     [Fact]

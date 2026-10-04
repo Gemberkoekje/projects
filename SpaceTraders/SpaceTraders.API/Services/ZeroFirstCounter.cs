@@ -18,6 +18,10 @@ namespace SpaceTraders.API.Services;
 /// it is added just before the scrape after that, at most two scrape intervals late. From then on the
 /// series counts at once. Without a scrape (no metrics server) nothing is added, and nothing reads it.
 /// </para>
+/// <para>
+/// Every series carries the run's reset date as its first label (slice 2.13): callers give the other label values, and
+/// the counter puts the reset date in front, so the next run's series start at 0 of their own.
+/// </para>
 /// <para>Thread-safe: increments and scrapes may come from any thread.</para>
 /// </remarks>
 internal sealed class ZeroFirstCounter
@@ -25,31 +29,28 @@ internal sealed class ZeroFirstCounter
     private const char LabelSeparator = '\u001F';
 
     private readonly Counter _counter;
+    private readonly Func<string> _resetDate;
     private readonly Dictionary<string, Series> _series = new(StringComparer.Ordinal);
     private readonly Lock _lock = new();
     private long _scrapes;
 
     /// <summary>Wraps <paramref name="counter"/>, which <paramref name="registry"/> exports.</summary>
-    /// <param name="counter">The counter, without any series of its own yet.</param>
+    /// <param name="counter">The counter, without any series of its own yet; its first label is the reset date.</param>
     /// <param name="registry">The registry that exports it: its collections are the scrapes.</param>
-    public ZeroFirstCounter(Counter counter, CollectorRegistry registry)
+    /// <param name="resetDate">The run's reset date, the first label value of every series.</param>
+    public ZeroFirstCounter(Counter counter, CollectorRegistry registry, Func<string> resetDate)
     {
         _counter = counter;
-
-        // A counter without labels is its own series, published at 0 from the start.
-        if (counter.LabelNames.Length == 0)
-        {
-            _series[string.Empty] = new Series([], publishedAt: 0);
-        }
-
+        _resetDate = resetDate;
         registry.AddBeforeCollectCallback(BeforeScrape);
     }
 
-    /// <summary>Adds <paramref name="amount"/> to the series with <paramref name="labels"/>.</summary>
+    /// <summary>Adds <paramref name="amount"/> to the series with <paramref name="values"/>.</summary>
     /// <param name="amount">What to add; not negative.</param>
-    /// <param name="labels">The series' label values, in the counter's label order.</param>
-    public void Inc(double amount, params string[] labels)
+    /// <param name="values">The series' label values after the reset date, in the counter's label order.</param>
+    public void Inc(double amount, params string[] values)
     {
+        string[] labels = [_resetDate(), .. values];
         var key = string.Join(LabelSeparator, labels);
         lock (_lock)
         {
@@ -89,7 +90,7 @@ internal sealed class ZeroFirstCounter
         }
     }
 
-    private ICounter Child(string[] labels) => labels.Length == 0 ? _counter : _counter.WithLabels(labels);
+    private Counter.Child Child(string[] labels) => _counter.WithLabels(labels);
 
     /// <summary>One series: when it was published at 0 (in scrapes seen), and what it waits to add.</summary>
     [Mutable]

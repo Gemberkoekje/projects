@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.13)
+- Every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04` (D70), as asked on 2026-10-04: "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" The bot registers the same symbol after every reset, so the reset date is what differs. `ResetDateLabel` reads it from the agent id; `PrometheusAutomationMetrics` defines every metric with the label and puts the value in front at every write (`RunGauge`, `ZeroFirstCounter`); `ResetDateEnricher` adds it to every log line once the agent is known. The next-reset gauge is set once the agent is known.
+
+### Docs – Changed (2026-10-04, slice 2.13)
+- `PLAN.md`: slice 2.13 and decision D70. `docs/HOW_IT_WORKS.md`: the label on every metric and the property on every log line.
+
 ### Code – Fixed (2026-10-04, B47)
 - The scout plan's flights and the contract's, to the asteroid and to the delivery, go in CRUISE, through refuelling stops when the fuel aboard won't reach, as the trips' flights do since slice 6.10c. They asked for no flight mode and flew straight to their target, so a flight beyond one tank was left to the navigation's fallback, which drifts, and a ship it left in DRIFT flew on in DRIFT. After the reset of 2026-10-04 the scout plan left SPECTER-1 at J67, 747 from the contract's asteroid, EF5D, with a 400-unit tank: it drifted there in 87 minutes, where CRUISE through J66 and I65 takes about ten, and took the copper the 19 to H60 in DRIFT too; the first flight that switched it back was a survey trip at 18:09Z. A contract command flies one leg a tick, and at a stop, where the next tick finds the ship in orbit, it docks and refuels first. The fallback still drifts where no chain of fuel markets reaches, and the ship's next flight asks for CRUISE again.
 

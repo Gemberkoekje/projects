@@ -16,6 +16,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.Persistence.Scoping;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
@@ -75,6 +76,9 @@ builder.Host.UseSerilog(
         cfg.ReadFrom.Configuration(ctx.Configuration);
         cfg.Enrich.FromLogContext();
         cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
+
+        // Every line carries the run's reset date once the agent is known, as every metric does (slice 2.13).
+        cfg.Enrich.With(new ResetDateEnricher(services.GetRequiredService<IAgentDataScope>()));
     },
     preserveStaticLogger: true);
 
