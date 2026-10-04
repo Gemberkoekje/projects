@@ -19,7 +19,9 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
     {
         var entity = await db.Markets.AsNoTracking()
             .FirstOrDefaultAsync(m => m.WaypointSymbol == waypointSymbol, cancellationToken);
-        return entity?.LastObservedAt;
+
+        // A market cached without prices counts as never seen (B62).
+        return entity?.TradeGoodsJson is null ? null : entity.LastObservedAt;
     }
 
     public async Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
@@ -105,7 +107,7 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
             .ToListAsync(cancellationToken);
 
         return markets
-            .Select(m => new MarketFreshnessRecord(m.WaypointSymbol, m.SystemSymbol, m.LastObservedAt))
+            .Select(m => new MarketFreshnessRecord(m.WaypointSymbol, m.SystemSymbol, m.LastObservedAt, m.TradeGoodsJson is not null))
             .ToList();
     }
 

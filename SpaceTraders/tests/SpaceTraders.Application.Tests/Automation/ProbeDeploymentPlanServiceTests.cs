@@ -89,6 +89,26 @@ public sealed class ProbeDeploymentPlanServiceTests
     }
 
     [Fact]
+    public async Task AMarketWithoutPrices_CountsAsNeverSeen_SoAProbeGoesThereFirst()
+    {
+        // B62, seen on the cluster on 2026-10-04: X1-FJ91-C46 lost its prices at 19:28:27Z, and from then on its last fetch
+        // made it look a minute old, so no probe would go there for them. A market without prices counts as never seen.
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketFreshnessRecord(A1, SystemSymbol, _now.AddMinutes(-60)),
+            new MarketFreshnessRecord(A2, SystemSymbol, _now.AddMinutes(-2)),
+            new MarketFreshnessRecord(H51, SystemSymbol, _now.AddMinutes(-1), HasPrices: false),
+            new MarketFreshnessRecord(H52, SystemSymbol, _now.AddMinutes(-1)),
+            new MarketFreshnessRecord(XB5C, SystemSymbol, _now.AddMinutes(-1)),
+            new MarketFreshnessRecord(J58, SystemSymbol, _now.AddMinutes(-90)),
+        ]);
+
+        await RunAsync();
+
+        _activeGoals["SPECTER-2"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(H51);
+    }
+
+    [Fact]
     public async Task WithFewerProbesThanMarkets_ItBuysAProbe_WhereProbesCostLeast()
     {
         // D29: SHIP_PROBE, while the credits stay at the reserve, which the purchase checks.
