@@ -48,7 +48,8 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
         {
             // One statement, as for markets (B61): two ships' arrivals, or an arrival and the exploring command ship,
             // can store a shipyard nobody fetched before at the same moment. The later one updates the row the first
-            // one inserted.
+            // one inserted. The API lists the ships for sale only while one of ours is there: an answer without them
+            // leaves a row that has them as it is, or it would wipe the prices a purchase reads (B64, as B62 for markets).
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO cached_shipyards ("AgentId", "WaypointSymbol", "SystemSymbol", "ShipTypesJson", "ShipsDetailJson", "LastObservedAt")
                 VALUES ({values.AgentId}, {values.WaypointSymbol}, {values.SystemSymbol}, {values.ShipTypesJson}, {values.ShipsDetailJson}, {values.LastObservedAt})
@@ -57,7 +58,8 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
                 SET "SystemSymbol" = EXCLUDED."SystemSymbol",
                     "ShipTypesJson" = EXCLUDED."ShipTypesJson",
                     "ShipsDetailJson" = EXCLUDED."ShipsDetailJson",
-                    "LastObservedAt" = EXCLUDED."LastObservedAt";
+                    "LastObservedAt" = EXCLUDED."LastObservedAt"
+                WHERE EXCLUDED."ShipsDetailJson" IS NOT NULL OR cached_shipyards."ShipsDetailJson" IS NULL;
                 """, cancellationToken);
             return;
         }
@@ -68,7 +70,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
         {
             db.Shipyards.Add(values);
         }
-        else
+        else if (!ListingsWouldBeLost(existing.ShipsDetailJson, values.ShipsDetailJson))
         {
             db.Entry(existing).CurrentValues.SetValues(values);
         }
@@ -111,6 +113,9 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
 
         return shipyards;
     }
+
+    /// <summary>Whether storing an answer without listings would replace the listings the cache has (B64).</summary>
+    private static bool ListingsWouldBeLost(string? cached, string? fetched) => fetched is null && cached is not null;
 
     private static ShipyardWaypointDto MapToDto(CachedShipyard entity)
     {

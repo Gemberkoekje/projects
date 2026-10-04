@@ -272,6 +272,10 @@ export interface StartupSnapshotListItemDto {
   id: number
   capturedAt: string
   isInitialSnapshot: boolean
+  /** Why it was taken: at a start, or because the cache lists a ship type or good no snapshot of the run held. */
+  reason: 'Startup' | 'Discovery'
+  /** For a discovery, what was new and where, such as "Goods: FAB_MATS (X1-FJ91-H59)."; else null. */
+  discovered: string | null
 }
 
 export interface ContractRoiDto {

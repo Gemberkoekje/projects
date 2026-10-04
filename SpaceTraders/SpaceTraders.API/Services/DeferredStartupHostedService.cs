@@ -75,6 +75,9 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<LeaderElectionService>(cancellationToken);
             await StartServiceAsync<StartupSyncService>(cancellationToken);
             await StartServiceAsync<StartupSnapshotService>(cancellationToken);
+
+            // From what the startup snapshot held: a snapshot whenever the cache lists a new ship type or good.
+            await StartServiceAsync<DiscoverySnapshotService>(cancellationToken);
             await StartServiceAsync<StartupRecoveryService>(cancellationToken);
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);

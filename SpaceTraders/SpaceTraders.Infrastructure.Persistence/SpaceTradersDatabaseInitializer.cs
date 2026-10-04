@@ -29,6 +29,10 @@ public static class SpaceTradersDatabaseInitializer
 
         // D69: the values chosen for the next runs.
         """CREATE TABLE IF NOT EXISTS next_run_settings ("Key" character varying(200) NOT NULL, "Value" text NOT NULL, CONSTRAINT "PK_next_run_settings" PRIMARY KEY ("Key"))""",
+
+        // Slice 2.15: why a snapshot was taken, and for a discovery what was new. Every snapshot before was a startup's.
+        """ALTER TABLE startup_snapshots ADD COLUMN IF NOT EXISTS "Reason" character varying(20) NOT NULL DEFAULT 'Startup'""",
+        """ALTER TABLE startup_snapshots ADD COLUMN IF NOT EXISTS "Discovered" text""",
     ];
 
     public static Task InitializeAsync(

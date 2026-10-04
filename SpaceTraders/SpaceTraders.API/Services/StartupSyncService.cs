@@ -368,8 +368,10 @@ public sealed class StartupSyncService(
                 {
                     dbContext.Shipyards.Add(shipyardValues);
                 }
-                else
+                else if (shipyard.Ships is not null || cachedShipyard.ShipsDetailJson is null)
                 {
+                    // An answer without the ships for sale would wipe the cached ones, and the prices a purchase reads, so
+                    // it is left out, as the repository does (B64).
                     dbContext.Entry(cachedShipyard).CurrentValues.SetValues(shipyardValues);
                 }
             }

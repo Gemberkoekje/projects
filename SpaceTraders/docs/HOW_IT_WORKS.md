@@ -94,15 +94,16 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
 | 8 | `StartupSyncService` | once | Agent, ships, systems, markets, contracts |
 | 9 | `StartupSnapshotService` | once | One JSON snapshot row, from the cache |
-| 10 | `StartupRecoveryService` | once | Resumes ships; releases the contract's ships (D26) |
-| 11 | `SettingsStartupLoggingService` | once | Logs every setting |
-| 12 | `GameLoopService` | every 5 s | The tick |
-| 13 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
-| 14 | `PrometheusMarketMetricsService` | every minute | Exports the cached markets and shipyards, and once the game's production chains (`GET market/supply-chain`, through `SupplyChainCache`, which the trading plan shares: one call per start, retried hourly after a failure) |
-| 15 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
+| 10 | `DiscoverySnapshotService` | every minute | Another snapshot when the cache lists a ship type or good no snapshot of the run held (slice 2.15) |
+| 11 | `StartupRecoveryService` | once | Resumes ships; releases the contract's ships (D26) |
+| 12 | `SettingsStartupLoggingService` | once | Logs every setting |
+| 13 | `GameLoopService` | every 5 s | The tick |
+| 14 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
+| 15 | `PrometheusMarketMetricsService` | every minute | Exports the cached markets and shipyards, and once the game's production chains (`GET market/supply-chain`, through `SupplyChainCache`, which the trading plan shares: one call per start, retried hourly after a failure) |
+| 16 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
 
-One try/catch wraps the chain. Steps 5, 9, 11 and 15 catch their own errors. A throw in steps 1, 4, 6,
-8 or 10 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
+One try/catch wraps the chain. Steps 5, 9, 10, 12 and 16 catch their own errors. A throw in steps 1, 4, 6,
+8 or 11 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
 stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
 before any of those, so a pod that keeps failing during startup still prunes at every start.
 
@@ -157,18 +158,36 @@ checks it. The lease is not released on shutdown.
   traits (B34, fixed: until then no trait was ever stored, so nothing knew what an asteroid yields).
   Waypoints cached already keep when they were last observed, which scouting reads. It also fetches market and shipyard data at waypoints where
   a ship is not in transit, and the first page of contracts (20). It stores them the way the
-  other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and
+  other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and an
+  answer without the ships for sale leaves the cached ones (B64, fixed), and
   contracts with their terms, so a restart doesn't blank the deliverables the contract plan works
   from (B31, fixed).
 - **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It
   leaves their goal columns alone, so ships keep their goals across a restart.
 - It has no error handling.
 
-**Startup snapshot** (`StartupSnapshotService`): writes one `startup_snapshots` row from what
-startup sync has just cached: the agent, the ships with their goals, the contracts, every waypoint
-in the ships' systems, and the market and shipyard where each ship is (not in transit). It calls no
-API (B35, fixed); before, it fetched all of that again, about 11 calls on every start. The cache
-holds less than the API returns: no crew or mount details.
+**Snapshots** (`GameStateSnapshots`, slice 2.15): a `startup_snapshots` row holds the game state as
+the bot has cached it, as one JSON document: why it was taken (`Reason`), for a discovery what was new
+and where (`Discoveries`), the agent, the ships with their goals, the contracts, and every system the
+bot has a ship, market or shipyard in (the ships' systems first), with the system's cached waypoints
+and every market and shipyard cached there, as last seen, each with when (`LastObservedAt`). A
+shipyard lists its ship types, and the ships for sale (price, supply, frame, reactor, engine, modules,
+mounts, crew) once one of our ships has been there; a market its imports, exports and exchange, and
+its prices once a ship has been there. Until slice 2.15 a snapshot held only the market and shipyard
+where a ship was, so the others were missing even though the cache had them. It calls no API (B35,
+fixed). The cache holds less than the API returns for our own ships: no crew or mount details.
+- **At startup** (`StartupSnapshotService`): one, `Reason` `Startup`, right after startup sync.
+- **On a discovery** (`DiscoverySnapshotService`, every minute; asked on 2026-10-04, D73): when the
+  cached shipyards list a ship type, or the cached markets a good (in their imports, exports, exchange
+  or prices), that no snapshot of the run held yet, it takes one, `Reason` `Discovery`, which lists each
+  new ship type and good with the shipyards or markets that list it, also in the row's `Discovered`
+  column (`Ship types: SHIP_LIGHT_HAULER (X1-FJ91-A2). Goods: FAB_MATS (X1-FJ91-H59).`) and in a
+  `Discovered` journal line. A type is new to the run, not to a place: a second shipyard selling a known
+  type discovers nothing. It reads the cache rather than following its writers, so whatever stores a
+  shipyard or market counts, and what was stored within the same minute shares one snapshot. One
+  process serves one agent, so what the snapshots held is kept in memory, from the startup snapshot on;
+  when that failed, from what the cache lists at the first look.
+- Retention is unchanged: the agent's first snapshot and the 10 newest, whatever the reason (D73).
 
 **Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false. With
 the contract plan on, it first releases every ship on the contract that isn't in flight, so the
@@ -1207,8 +1226,8 @@ step does the work.
     a flight that no chain of fuel markets the bot knows of reaches. It leaves the ship in DRIFT, and the
     ship's next flight asks for CRUISE, which switches it back (B47).
 - **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market through `MarketRefresher`
-  (publishing `MarketDataRefreshedEvent`; an answer without prices isn't stored, B62) and the shipyard,
-  docks, and publishes
+  (publishing `MarketDataRefreshedEvent`; an answer without prices isn't stored, B62) and the shipyard
+  (an answer without the ships for sale leaves the cached ones, B64), docks, and publishes
   `ShipNavigationCompletedEvent`.
 - **Orbit, Navigate, Dock, Refuel and FlightMode** are DI sub-commands, not bus messages. Refuel publishes
   `ShipRefueledEvent`.
@@ -1420,7 +1439,7 @@ other app (D8):
 | `cached_agents` | Agent (credits, HQ) | Sync, bootstrap, purchases, sales, refuels, contract payments | bounded: one row |
 | `cached_ships` | Ship state and the active goal | Sync (game state only), ship commands, goal repository | bounded: one row per ship. Created with `fillfactor=50` and `autovacuum_vacuum_threshold=10`, so its frequent updates stay in place and VACUUM runs (B32) |
 | `cached_contracts` | Contracts | Sync, bootstrap, contract plan, delivery | bounded: the agent's contracts |
-| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals, the explore plan; markets also the market watch and the refresh after a trade (D25), shipyards also purchases | bounded: one row per market or shipyard. The repositories store a row in one statement (`INSERT … ON CONFLICT … DO UPDATE`), so two writers at once update one row (B61) |
+| `cached_markets`, `cached_shipyards` | Market and shipyard JSON | Sync, arrivals, the explore plan; markets also the market watch and the refresh after a trade (D25), shipyards also purchases | bounded: one row per market or shipyard. The repositories store a row in one statement (`INSERT … ON CONFLICT … DO UPDATE`), so two writers at once update one row (B61). The API lists a shipyard's ships for sale only while one of our ships is there; an answer without them leaves a row that has them as it is (B64), as an answer without prices does a market's (B62) |
 | `cached_waypoints`, `cached_systems` | Systems where ships are, with each waypoint's traits and modifiers (B34, fixed) | Sync (inserts, and fills in missing traits); scouting sets `LastObservedAt` | bounded: the systems the fleet has been in |
 | `agent_settings` | Settings, each with whether it follows its default (`FollowsDefault`, D69) | Seed, `PUT /settings`, the control endpoints, the size guard, the reset monitor | bounded: one row per setting |
 | `next_run_settings` | The values chosen for the next runs; no agent (D69) | `PUT /settings`, `PUT` and `DELETE /settings/next-run/{key}`, the control endpoints; `POST /settings/reset` empties it | bounded: at most one row per seeded setting |
@@ -1434,7 +1453,7 @@ other app (D8):
 | `api_endpoint_usages` | Call count per endpoint string | Every outbound call once the agent is known | bounded: one counter per endpoint |
 | `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
 | `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
-| `startup_snapshots` | One full JSON snapshot per start | Startup snapshot | the agent's first and the last 10 |
+| `startup_snapshots` | One full JSON snapshot per start and per discovery, with why (`Reason`) and what was new (`Discovered`) | Startup snapshot, discovery snapshots (slice 2.15) | the agent's first and the last 10 |
 | `market_price_samples` | Price history | `MarketPriceSampleHandler`, one row per good on every market refresh | 7 days raw, first per hour to 90 days |
 | `agent_credits_samples` | Credits over time | `AgentCreditsSampleHandler`, on every credit change | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
@@ -1639,7 +1658,7 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14) |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14); `/startup-snapshots` with each snapshot's `reason` and `discovered`, and the download named `startup-snapshot-…` or `discovery-snapshot-…` (slice 2.15) |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes` | Read tables that are never written; always 204, `[]` or zeros |
 | Status (credit growth) | `GET /status/anomalies` | A heuristic over the credit samples: credits per hour over the last 24 hours against the last hour. Not the health rules' anomalies (section 12) |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
@@ -1675,7 +1694,7 @@ anything.
 | `/plans` | `/fleet/goal-chains`, `/fleet/assignments`, `/fleet/activity`, `/status/mining-opportunities` |
 | `/fleet`, `/fleet/:symbol` | `/status/ships`, diagnostics, waypoints; each ship's name beside its symbol, which the search finds too (slice 2.14) |
 | `/markets` | Market and shipyard waypoints and freshness |
-| `/snapshots` | Startup snapshots |
+| `/snapshots` | Snapshots: when, why, what a discovery found, and a download of each |
 | `/health` | `/status/rate-limit`, `/health/automation`, `/health/rate-limit/history` |
 | `/settings` | `/settings` (read-only page) |
 
@@ -1744,6 +1763,7 @@ The seven pages in `src/Future` are not routed.
   | `ProbeCalled` | Probe plan, when it sends a probe to a shipyard where a purchase waits for one of our ships (D30) | `ShipSymbol`, `WaypointSymbol`, `ShipType` the purchase is for |
   | `Jumped` | `JumpGoalExecutor`, per jump (slice 6.11) | `ShipSymbol`, `WaypointSymbol`: the gate it left, `Destination`: the gate it jumped to, `SystemSymbol` it is in now, `Cost` of the antimatter |
   | `SystemExplored` | Explore plan, when the command ship has scouted a system, or is in one with no market or shipyard (slice 6.11) | `ShipSymbol`, `SystemSymbol`, `Markets`, `Shipyards` |
+  | `Discovered` | `GameStateSnapshots`, when the cache lists a ship type or good no snapshot of the run held, and a snapshot was saved (slice 2.15) | `Discovered`: each new ship type and good with where it is listed; `SnapshotId` |
   | `PlanStarted`, `PlanCompleted` | Scout, contract, probe and explore plans; the construction plan when it first sees the home gate need materials, and when it is complete (slice 6.6) | `Plan`, and the plan's ship, contract or system; the explore plan's start also `Purpose` (`explores`, `flies home to`), the `SystemSymbol` it goes to and its `Jumps`, its completion the systems `Explored`; for construction the site (`WaypointSymbol`) and, at the start, its `Materials` |
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`), explore plan (`waiting_for_credits`, with the jump's `WaypointSymbol`, `Destination`, `SystemSymbol`, `Price`, `Floor` and `Credits`; `no_way_home` at Warning) | `Plan`, `Reason` |
   | `ShipIdle` | `ShipStateJournal`, from the 10 s sample: `idle_at_start`, `new_ship`, `goal_ended` (with `PreviousGoal`) | `ShipSymbol`, `Reason` |
@@ -1767,7 +1787,8 @@ The seven pages in `src/Future` are not routed.
   (slice 6.6). The role board journals each role that changes
   (`RoleChanged`), and cargo that goes overboard because nothing will sell or use it is a
   `CargoJettisoned` line (D42). Exploring journals each jump (`Jumped`) and each system scouted
-  (`SystemExplored`), between the explore plan's `PlanStarted` and `PlanCompleted`.
+  (`SystemExplored`), between the explore plan's `PlanStarted` and `PlanCompleted`. A ship type or good
+  new to the run is a `Discovered` line, with the snapshot taken for it (slice 2.15).
 - **Metrics** on the metrics port (`Metrics:Port`, 9090), without the API key.
   `PrometheusAutomationMetrics` defines them all at startup, so a scrape lists every one, also
   before it has a value; prometheus-net adds its defaults (process, .NET and HTTP metrics, and the

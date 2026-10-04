@@ -180,6 +180,12 @@ public static class JournalEvents
     /// </summary>
     public const string SystemExplored = nameof(SystemExplored);
 
+    /// <summary>
+    /// The cached shipyards or markets list a ship type or good no snapshot of the run held yet, and a snapshot was saved
+    /// (slice 2.15: <c>Discovered</c>, the types and goods with where they are listed, and <c>SnapshotId</c>).
+    /// </summary>
+    public const string Discovered = nameof(Discovered);
+
     /// <summary>A plan started (<c>Plan</c>).</summary>
     public const string PlanStarted = nameof(PlanStarted);
 

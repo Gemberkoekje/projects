@@ -489,6 +489,46 @@ describe('SettingsPage', () => {
   })
 })
 
+// ─── SnapshotsPage ────────────────────────────────────────────────────────────
+
+import SnapshotsPage from '../pages/SnapshotsPage'
+
+describe('SnapshotsPage', () => {
+  it('shows why each snapshot was taken, and what a discovery found', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/startup-snapshots')
+        return Promise.resolve([
+          {
+            id: 2,
+            capturedAt: '2026-10-04T14:02:11Z',
+            isInitialSnapshot: false,
+            reason: 'Discovery',
+            discovered: 'Goods: FAB_MATS (X1-FJ91-H59).',
+          },
+          {
+            id: 1,
+            capturedAt: '2026-10-04T13:06:41Z',
+            isInitialSnapshot: true,
+            reason: 'Startup',
+            discovered: null,
+          },
+        ])
+      return Promise.resolve([])
+    })
+
+    render(
+      <Wrapper>
+        <SnapshotsPage />
+      </Wrapper>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Goods: FAB_MATS (X1-FJ91-H59).')).toBeInTheDocument())
+    expect(screen.getByText('Discovery')).toBeInTheDocument()
+    expect(screen.getByText('Startup (first)')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Download JSON' })).toHaveLength(2)
+  })
+})
+
 import GoalChainPanel from '../Future/components/GoalChainPanel'
 
 describe('GoalChainPanel', () => {
