@@ -10,7 +10,8 @@ namespace SpaceTraders.Application.Tests.Trading;
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
 /// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
 /// that feed a pricier good's production come first (D15); two traders never share a route. D56: a trip is a
-/// full hold, bought in one purchase and sold in one sale, or none.
+/// full hold, bought in one purchase and sold in one sale, or none; D74: at a seller whose supply is ABUNDANT, what both
+/// markets trade at once, in one purchase and one sale, when that fills less.
 /// </summary>
 public sealed class TradeRoutePlannerTests
 {
@@ -198,6 +199,74 @@ public sealed class TradeRoutePlannerTests
         TradeRoutePlanner.TryEvaluate(map, Drone(D41) with { FuelCapacity = 400, FuelCurrent = 400 }, "SHIP_PARTS", D41, A1, 1_000_000, out var drone)
             .Should().BeTrue();
         drone.Units.Should().Be(15);
+    }
+
+    [Fact]
+    public void AtAnAbundantSeller_ARouteTakesWhatBothMarketsTradeAtOnce_ThoughThatFillsNoHold()
+    {
+        // D74, asked on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT,
+        // in which case a full hold is not necessary", still in one purchase and one sale. D41 sells SHIP_PARTS 15 at a time;
+        // the flight to A1 burns 95, one FUEL at A1's 90.
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, out var route).Should().BeTrue();
+
+        route.Units.Should().Be(15, "one purchase at D41 takes 15, and A1 takes them in one sale");
+        route.FuelCost.Should().Be(90);
+        route.Profit.Should().Be(((8_000 - 7_721) * 15) - 90);
+    }
+
+    [Theory]
+    [InlineData(15, 40, 0, 15)]
+    [InlineData(15, 6, 0, 6)]
+    [InlineData(15, 40, 36, 4)]
+    [InlineData(60, 60, 0, 40)]
+    public void AtAnAbundantSeller_TheUnitsAreTheSmallestOfTheFreeHoldAndBothTradeVolumes(int atD41, int atA1, int aboard, int units)
+    {
+        // One purchase and one sale (D74): what A1 takes at once limits the trip as much as what D41 sells at once, and a hold
+        // both trade at once is still filled.
+        var ship = CommandShip(D41, cargo: aboard == 0 ? null : [new CargoItemModel("COPPER_ORE", aboard)]);
+
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(atD41: atD41, atA1: atA1), ship, "SHIP_PARTS", D41, A1, 1_000_000, out var route)
+            .Should().BeTrue();
+
+        route.Units.Should().Be(units);
+    }
+
+    [Theory]
+    [InlineData("SCARCE")]
+    [InlineData("LIMITED")]
+    [InlineData("MODERATE")]
+    [InlineData("HIGH")]
+    public void AtASellerThatIsntAbundant_ThereIsNoRouteWithoutAFullHold(string supply)
+        => TradeRoutePlanner.TryEvaluate(ShipPartsMap(supplyAtD41: supply), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, out _)
+            .Should().BeFalse("D56 holds: 15 at a time fills no 40-unit hold");
+
+    [Fact]
+    public void TheBuyersSupply_OpensNoException()
+        => TradeRoutePlanner.TryEvaluate(
+                ShipPartsMap(supplyAtD41: "MODERATE", supplyAtA1: "ABUNDANT"),
+                CommandShip(D41),
+                "SHIP_PARTS",
+                D41,
+                A1,
+                1_000_000,
+                out _)
+            .Should().BeFalse("D74 names the seller's supply, not the buyer's");
+
+    [Fact]
+    public void AtAnAbundantSeller_TheCreditsStillPayForAllTheUnits()
+    {
+        // D56's credits stand: 15 SHIP_PARTS at 7,721 and 90 for fuel come to 115,905.
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 115_905, out _).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 115_904, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AtAnAbundantSeller_TheMinimumProfitPerUnitStillHolds()
+    {
+        // D14: 4,095 after fuel over 15 units is 273 a unit.
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 273, NoneHeld)
+            .Should().ContainSingle(route => route.TradeSymbol == "SHIP_PARTS" && route.Units == 15);
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 274, NoneHeld).Should().BeEmpty();
     }
 
     [Fact]

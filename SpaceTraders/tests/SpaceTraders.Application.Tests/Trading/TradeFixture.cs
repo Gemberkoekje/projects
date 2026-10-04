@@ -75,6 +75,16 @@ internal static class TradeFixture
         Market(I56, Good("FUEL", "EXCHANGE", 86, 74, 180)),
     ];
 
+    /// <summary>
+    /// For D74: D41 makes SHIP_PARTS and sells them <paramref name="atD41"/> at a time at 7,721, with its supply as given; A1
+    /// pays 8,000 for them, <paramref name="atA1"/> at a time. Nothing else trades at a profit.
+    /// </summary>
+    public static TradeMarketMap ShipPartsMap(string supplyAtD41 = "ABUNDANT", int atD41 = 15, int atA1 = 40, string supplyAtA1 = "MODERATE")
+        => Map(
+            K85Market(),
+            Market(D41, Good("SHIP_PARTS", "EXPORT", 7_721, 3_478, atD41, supplyAtD41), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+            Market(A1, Good("SHIP_PARTS", "IMPORT", 16_000, 8_000, atA1, supplyAtA1), Good("FUEL", "EXCHANGE", 90, 76, 180)));
+
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? [K85Market(), D41Market(), A1Market()] : markets, MadeFrom);
 
@@ -115,8 +125,8 @@ internal static class TradeFixture
             [.. goods.Where(good => good.Type == "EXPORT").Select(good => good.Symbol)],
             [.. goods.Where(good => good.Type == "EXCHANGE").Select(good => good.Symbol)]);
 
-    public static TradeGoodSnapshot Good(string symbol, string type, int purchasePrice, int sellPrice, int tradeVolume)
-        => new(symbol, type, purchasePrice, sellPrice, tradeVolume, "MODERATE");
+    public static TradeGoodSnapshot Good(string symbol, string type, int purchasePrice, int sellPrice, int tradeVolume, string supply = "MODERATE")
+        => new(symbol, type, purchasePrice, sellPrice, tradeVolume, supply);
 
     private static WaypointCacheModel Waypoint(string symbol, int x, int y, bool hasMarket = true)
         => new(symbol, SystemSymbol, "PLANET", x, y, hasMarket, false, DateTimeOffset.UnixEpoch);
