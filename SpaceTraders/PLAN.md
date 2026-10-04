@@ -136,6 +136,9 @@
 - Slice 2.13 (Grafana data per server reset, asked on 2026-10-04, with your decision D70) is built on branch
   `claude/spacetraders-run-label` in projects and gembernodes: every metric and log line carries the reset date, and the
   three SpaceTraders dashboards show one reset's run at a time.
+- Slices 6.12 (mining drones keep the ores they can sell within one tank, D71) and 2.14 (the bot's own ship names beside
+  the game's symbols, D72), both asked on 2026-10-04, are built on branch `claude/dreamy-albattani-zo7njw` in projects and
+  gembernodes.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -293,6 +296,7 @@ get the next D-number.
 | D69 | Slice 2.12 (asked on 2026-10-04, after the server reset of 13:00Z left the new agent with only the scout and contract plans on): "After the restart most config items were turned off. Can you ensure everything is on by default? And changes in config changes those defaults?" Asked what the second part should do, you chose to have your changes remembered apart from the agent, the bot's own switch-offs left out, and a setting nobody changed follow the default. Then: "In addition, id like to have a separate set of endpoints to only affect future runs. So I can have a setting for this run (e.g. 50% split between miners and traders) and change those settings for the next run to see if it gives an improvement." | **Every plan on by default, and settings for the next runs:** every plan switch defaults to on, which replaces D9. The next run is the agent the next server reset registers; it starts with the value chosen for each setting, else the default. `PUT /settings/{key}` and the kill switch set a setting now and for the next runs; `PUT /settings/next-run/{key}` only for the next runs, `DELETE` gives them the default back and `GET /settings/next-run` lists them. When the bot switches automation off itself (the size guard, the reset monitor), the next runs keep their value. A setting nobody has set follows its default, also on the agent that runs. `POST /settings/reset` forgets the values chosen for the next runs. |
 | D70 | Slice 2.13 (asked on 2026-10-04, after the server reset): "Can we key all the Grafana data off the agent ID (or something else that's different between resets) so data does not mix between different agents/different resets?" To the reset date, which I proposed because the bot registers the same symbol after every reset: "reset date is a fine key", and "The grafana key per reset should be added for all 3 grafana dashboards." | **Grafana data per server reset:** every `spacetraders_*` series carries `reset_date` and every log line `ResetDate`: the server reset the agent was registered under, such as `2026-10-04`. The SpaceTraders, markets and systems dashboards each have a "Reset" picker, the newest reset first, several to compare runs; every query filters on it. The alert rules stay as they are. |
 | D71 | Slice 6.12 (asked on 2026-10-04): "I'd like to have the configuration for mining drones only to throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically mining for. They still should use the survey with the highest chance of getting the minerals they want, just added with some extra trips to sell other ores as well." A mining trip jettisoned every ore but its own (6.4); a siphon trip keeps every gas a market it can carry it to buys, refuelling stops included (D33). Asked how to measure a tank, and whether the contract's miners keep other ores too. | **Keep what sells within one tank, on the mining plan's trips:** "Full tank, no refuel stop": a mining trip keeps every other ore a market buys within one full tank's CRUISE flight of the asteroid, without a refuelling stop (for a drone's 80-unit tank, the markets within about 80), and jettisons the rest. It still extracts with the survey best for its own ore and sells its own ore at its market; the mining plan sells the others after it, one good a trip, where each fetches most after fuel, and a full hold sells even where that doesn't pay for the fuel. "Mining plan only": the contract's round trips keep only the contract's ore. |
+| D72 | Slice 2.14 (asked on 2026-10-04): "SHIPS are now named by the game in ascending order. Can we make custom names within the API which should be type-number, so COMMAND-1, SATTELITE-1, EXCAVATOR-1. Bonus points if there's a list of relevant names for each of the types, one of which is picked per reset to call that type, e.g. all sattelites being called SPUTNIK-1, SPUTNIK-2 etc. There should be a list of potential names for each ShipType SHIPYARD enum value. This does mean that while SIPHON DRONE and MINING DRONE are both EXCAVATORs, they should get different names." The API can't rename a ship. Asked where the name should show. | **Beside the symbol:** "Grafana's Fleet and Roles tables and the WebUI fleet page get a Name column; every journal line about a ship carries its name as an extra field. SPECTER-n stays as the key everywhere." Each type a shipyard sells has a list of names; each reset picks one per type, by its reset date, and the type's ships are numbered after it in the order they joined the fleet (MARINER-1, MARINER-2); a mining drone and a siphon drone are told apart by their mounts; a type with no list is named after its registration role (PATROL-1). |
 
 ## Phases
 
@@ -1102,6 +1106,61 @@ gembernodes; asked that day, D70)
   the agent is known). App 1005, Domain 72, API 188 (and 4 skipped), Integration 1.
 - To understand this, start with `SpaceTraders.API/Services/ResetDateLabel.cs`, then `RunGauge` at the end of
   `PrometheusAutomationMetrics.cs` and `ZeroFirstCounter.cs`; in gembernodes, the `reset_date` variable of
+  `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
+
+**2.14 Ship names** (built 2026-10-04 on branch `claude/dreamy-albattani-zo7njw`, in projects and gembernodes; asked that
+day, D72)
+- Asked: "SHIPS are now named by the game in ascending order. Can we make custom names within the API which should be
+  type-number, so COMMAND-1, SATTELITE-1, EXCAVATOR-1. Bonus points if there's a list of relevant names for each of the
+  types, one of which is picked per reset to call that type, e.g. all sattelites being called SPUTNIK-1, SPUTNIK-2 etc.
+  There should be a list of potential names for each ShipType SHIPYARD enum value. This does mean that while SIPHON DRONE
+  and MINING DRONE are both EXCAVATORs, they should get different names."
+- The game names an agent's ships after it, in the order they join the fleet, in hexadecimal (SPECTER-1 … SPECTER-F,
+  SPECTER-10), and the API can't rename a ship. So the name is the bot's own, beside the game's symbol (D72), which stays
+  what every API call, table, metric label and log line keys a ship by.
+- Done:
+  - **The names** (`Naming/ShipNames.cs`, no I/O): each type a shipyard sells has a list of names (13 lists, one for each
+    of the API's ship types, 8 to 10 names each, no name in two lists): probes after probes and telescopes, mining drones
+    after what digs, siphon drones after what sips, surveyors after their instruments, the command frigate after
+    flagships, shuttles after small birds, haulers after pack animals, and so on. Each server reset picks one name of each
+    list, by its reset date (FNV-1a, the same on every start of the reset), and the type's ships are numbered after it in
+    the order they joined the fleet, the game's own numbers read as hexadecimal. A type with no list is named after its
+    registration role: the plain version asked for. In the run of 2026-10-04 the command frigate is INTREPID-1, the
+    starting probe MARINER-1, the mining drones PICKAXE, the siphon drones HUMMINGBIRD, the survey ships ASTROLABE, the light
+    shuttle ROBIN and the light haulers PONY.
+  - **A ship's type** (`ShipNames.TypeOf`): the one it was bought as, while the cache has it (until the next start's sync
+    caches its registration role, B25); then what its frame makes it, a drone by its mount (a laser, a gas siphon or a
+    surveyor) and a heavy freighter by a refinery. A test checks for every type that both give the same.
+  - **Not stored:** a name follows from the fleet and the reset date alone, and ships only join the fleet, so a name never
+    changes during a reset and a restart gives every ship the name it had. A test pins the run of 2026-10-04's names:
+    reordering a list, or changing the pick, would rename the fleet of the run under way at the next deploy.
+  - **The name book** (`Naming/ShipNameBook.cs`, in memory) keeps them for the log lines, which can't read the fleet:
+    startup recovery, a purchase, the internal API's ship list and the metrics every 10 seconds tell it the fleet. It
+    needs the reset date, which the Application layer reads through `IActiveReset` (Persistence's `ActiveReset`, from the
+    agent id, as slice 2.13's label does).
+  - **Where they show** (D72): `ShipName` on every log line about a ship, one with a `ShipSymbol` from its message or from
+    the tick's scope (`ShipNameEnricher`, as slice 2.13's `ResetDateEnricher`), and the `ShipPurchased` line says the new
+    ship's name ("the bot calls it PICKAXE-3"); `spacetraders_ship_name_info{ship,name,type}`, one series per ship; `name`
+    on the internal API's `/status/ships`, which the WebUI's fleet page shows in a column and searches, and the ship's
+    page shows beside its symbol. In gembernodes (same branch): a "name" column in the dashboard's Fleet and Roles tables,
+    and the name in brackets in front of a journal line about a ship, in the journal, the survey journal and the exploring
+    journal. The `st-investigate` skill takes a ship's name too.
+- Noticed (not changed):
+  - The Fleet table's "type" column still shows the type as cached: the registration role after a start's sync, EXCAVATOR
+    for both kinds of drone. The new series' `type` label has the shipyard type, if you'd rather show that.
+  - A type the game adds later, with a frame no type has yet, is named after the type it was bought as until the next
+    start, and after its registration role from then on.
+- Tests: `ShipNamesTests` (numbered by type in the order the ships joined, hexadecimal; a mining and a siphon drone told
+  apart; one name per reset, kept for it; every bought type keeps its name through a start's sync; a type with no list
+  named after its role; a list for every shipyard type, no name in two; the run of 2026-10-04's names),
+  `ShipNameBookTests`, `ShipListNamesTests`, and additions to `ShipPurchaseServiceTests` (Application);
+  `ShipNameEnricherTests` (a line naming a ship, a line in a ship's goal step through Microsoft's logging, a line about
+  no ship), `StartupRecoveryServiceTests`, `PrometheusMetricsServiceTests` and `PrometheusAutomationMetricsTests` (API);
+  the fleet page's name column and search, and the ship's page (WebUI, 112). App 1059, Domain 72, API 195 (and 4
+  skipped), Integration 1. In gembernodes, `scripts/validate.py`, the PromQL queries with `promtool test rules` and the
+  LogQL queries with `logcli --stdin` (NOTES.md).
+- To understand this, start with `SpaceTraders.Application/Naming/ShipNames.cs`, then `ShipNameBook.cs` and
+  `SpaceTraders.API/Services/ShipNameEnricher.cs`; in gembernodes, the Fleet table's query H in
   `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
@@ -2764,4 +2823,5 @@ your PC, 1Password or kubectl:
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (merged: PR #52, which deployed the build) |
 | 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (merged: PR #55, which deployed the build) |
 | 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (branch `claude/spacetraders-run-label`, PR #56, not merged). It shows data once the bot runs a build with slice 2.13: deploy that build with it |
+| 2.14 | A "name" column in the SpaceTraders dashboard's Fleet and Roles tables, and the ship's name in brackets in front of a journal line about it, in the journal, the survey journal and the exploring journal (branch `claude/dreamy-albattani-zo7njw`, not merged). It shows data once the bot runs a build with slice 2.14: deploy that build with it |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |

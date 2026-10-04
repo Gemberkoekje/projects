@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -14,6 +15,7 @@ namespace SpaceTraders.API.Services;
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
+    IShipNameBook names,
     ILogger<StartupRecoveryService> logger) : IHostedService
 {
     /// <inheritdoc />
@@ -43,6 +45,9 @@ public sealed class StartupRecoveryService(
 
         var fleet = await ships.GetAllAsync(cancellationToken);
         logger.LogInformation("StartupRecovery: recovering {Count} ship(s).", fleet.Count);
+
+        // The ships' names (slice 2.14, D72), so the lines of their first steps carry them.
+        names.Know(fleet);
 
         foreach (var ship in fleet)
         {

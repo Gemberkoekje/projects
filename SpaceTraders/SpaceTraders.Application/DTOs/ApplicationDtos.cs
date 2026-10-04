@@ -63,6 +63,9 @@ public sealed record ShipDto
 
     public required bool HasMineralProcessor { get; init; }
 
+    /// <summary>The name the bot gives the ship, such as <c>SPUTNIK-2</c> (slice 2.14, D72); empty before it is known.</summary>
+    public string Name { get; init; } = string.Empty;
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ShipDto(
         string Symbol,

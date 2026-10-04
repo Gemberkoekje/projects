@@ -96,7 +96,8 @@ export default function FleetPage() {
   const systems = [...new Set(ships.map(s => s.systemSymbol).filter(Boolean))] as string[]
 
   const filtered = ships.filter(s => {
-    if (search && !s.symbol.toLowerCase().includes(search.toLowerCase())) return false
+    const query = search.toLowerCase()
+    if (query && !s.symbol.toLowerCase().includes(query) && !(s.name ?? '').toLowerCase().includes(query)) return false
     if (statusFilter === 'transit' && !s.isInTransit) return false
     if (statusFilter === 'docked' && (s.isInTransit || s.status !== 'DOCKED')) return false
     if (statusFilter === 'orbit' && (s.isInTransit || s.status !== 'IN_ORBIT')) return false
@@ -155,6 +156,7 @@ export default function FleetPage() {
           <thead>
             <tr className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2">Symbol</th>
+              <th className="px-4 py-2">Name</th>
               <th className="px-4 py-2">Location</th>
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Fuel</th>
@@ -165,7 +167,7 @@ export default function FleetPage() {
           <tbody>
             {filtered.length === 0 && !isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   No ships match the current filters.
                 </td>
               </tr>
@@ -180,6 +182,7 @@ export default function FleetPage() {
                     {ship.symbol}
                   </Link>
                 </td>
+                <td className="px-4 py-3 font-mono">{ship.name || '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">
                   <div>{ship.systemSymbol ?? '—'}</div>
                   {ship.waypointSymbol && (

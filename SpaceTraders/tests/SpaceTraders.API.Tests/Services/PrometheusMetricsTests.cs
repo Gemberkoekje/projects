@@ -11,6 +11,7 @@ using SpaceTraders.API.Services;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
@@ -30,6 +31,7 @@ public sealed class PrometheusMetricsServiceTests
     private const string AgentId = "AGENT@2026-09-27";
 
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
+    private readonly ShipNameBook _names = new(new ActiveReset(Agent()));
 
     [Fact]
     public async Task SampleAsync_ExportsCreditsShipsAndContracts_FromTheCache()
@@ -96,6 +98,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -108,6 +111,49 @@ public sealed class PrometheusMetricsServiceTests
             new ShipMetricsSample("AGENT-4", "COMMAND", "IN_ORBIT", "ScoutWaypoint", "runaway"),
         });
         contracts.Should().Equal(new ContractMetricsSample("C-1", "IRON_ORE", 42, 7, new DateTimeOffset(2026, 10, 08, 07, 09, 22, TimeSpan.Zero)));
+    }
+
+    /// <summary>
+    /// Slice 2.14 (D72): beside its symbol, each ship's name, which the log lines read from the name book. The two probes are
+    /// one type, the starting one as startup sync stores it and the bought one as the purchase does.
+    /// </summary>
+    [Fact]
+    public async Task SampleAsync_NamesEachShip_AndTellsTheNameBook()
+    {
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-1", ShipType = "COMMAND", Status = "DOCKED", FrameJson = """{"symbol":"FRAME_FRIGATE"}""" });
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-2", ShipType = "SATELLITE", Status = "DOCKED", FrameJson = """{"symbol":"FRAME_PROBE"}""" });
+            db.Ships.Add(new CachedShip { AgentId = AgentId, Symbol = "AGENT-3", ShipType = "SHIP_PROBE", Status = "DOCKED" });
+            await db.SaveChangesAsync();
+        }
+
+        IReadOnlyCollection<ShipMetricsSample> ships = [];
+        _metrics.When(m => m.Fleet(Arg.Any<IReadOnlyCollection<ShipMetricsSample>>(), Arg.Any<DateTimeOffset>()))
+            .Do(call => ships = call.Arg<IReadOnlyCollection<ShipMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
+            new FullHoldSavings(),
+            _names,
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        var commandShip = ShipNames.Lists["SHIP_COMMAND_FRIGATE"];
+        var probe = ShipNames.Lists["SHIP_PROBE"];
+        ships.Select(ship => (ship.Ship, ship.NamedType)).Should().BeEquivalentTo(
+            [("AGENT-1", "SHIP_COMMAND_FRIGATE"), ("AGENT-2", "SHIP_PROBE"), ("AGENT-3", "SHIP_PROBE")]);
+        var names = ships.ToDictionary(ship => ship.Ship, ship => ship.Name);
+        commandShip.Should().Contain(names["AGENT-1"][..^2]);
+        probe.Should().Contain(names["AGENT-2"][..^2]);
+        names["AGENT-2"].Should().EndWith("-1");
+        names["AGENT-3"].Should().Be($"{names["AGENT-2"][..^2]}-2");
+        _names.NameOf("AGENT-3").Should().Be(names["AGENT-3"]);
     }
 
     /// <summary>
@@ -289,6 +335,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -346,6 +393,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -390,6 +438,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -439,6 +488,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -486,6 +536,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -513,6 +564,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             needs,
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -576,6 +628,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             savings,
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -669,6 +722,7 @@ public sealed class PrometheusMetricsServiceTests
             new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
             new PurchaseNeeds(),
             new FullHoldSavings(),
+            _names,
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
@@ -683,6 +737,13 @@ public sealed class PrometheusMetricsServiceTests
             new ConstructionMetricsSample("X1-AB-I55", "ADVANCED_CIRCUITRY", 400, 0),
         });
         _metrics.Received(1).ReservedCredits(168_000);
+    }
+
+    private static AgentDataScope Agent()
+    {
+        var agent = new AgentDataScope();
+        agent.Set(AgentId);
+        return agent;
     }
 
     private static ServiceProvider BuildProvider()
@@ -923,6 +984,31 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().Contain("spacetraders_ship_capabilities_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",can=\"Survey, Mine, Trade\"} 1\n");
         text.Should().NotContain("can=\"Mine, Trade\"");
         text.Should().NotContain("ship=\"AGENT-2\"");
+    }
+
+    /// <summary>
+    /// Slice 2.14 (D72): the Fleet and Roles tables show each ship's name beside its symbol, one series per ship; a ship whose
+    /// name isn't known yet has none, and a ship that is gone loses its own.
+    /// </summary>
+    [Fact]
+    public async Task AShipsName_IsOneSeriesPerShip_BesideItsSymbol()
+    {
+        var probe = new ShipMetricsSample("AGENT-2", "SATELLITE", "DOCKED", "None", string.Empty) { Name = "SPUTNIK-1", NamedType = "SHIP_PROBE" };
+        var drone = Drone("X1-AB-XB5C (ENGINEERED_ASTEROID)", "mining COPPER_ORE", []) with { Name = "PICKAXE-1", NamedType = "SHIP_MINING_DRONE" };
+        var unnamed = new ShipMetricsSample("AGENT-4", "COMMAND", "DOCKED", "None", string.Empty);
+        _metrics.Fleet([probe, drone, unnamed], Start);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_ship_name_info{reset_date=\"2026-09-27\",ship=\"AGENT-2\",name=\"SPUTNIK-1\",type=\"SHIP_PROBE\"} 1\n");
+        text.Should().Contain("spacetraders_ship_name_info{reset_date=\"2026-09-27\",ship=\"AGENT-3\",name=\"PICKAXE-1\",type=\"SHIP_MINING_DRONE\"} 1\n");
+        text.Should().NotContain("spacetraders_ship_name_info{reset_date=\"2026-09-27\",ship=\"AGENT-4\"");
+
+        // The probe gone; the drone's name the same.
+        _metrics.Fleet([drone, unnamed], Start.AddMinutes(1));
+
+        text = await ExportAsync();
+        text.Should().Contain("ship=\"AGENT-3\",name=\"PICKAXE-1\"");
+        text.Should().NotContain("SPUTNIK-1");
     }
 
     /// <summary>The markets dashboard (slice 2.8): a market's goods with their prices, volume, supply and activity.</summary>

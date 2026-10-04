@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -37,9 +38,10 @@ public sealed class PurchaseShipHandler(
         IBudgetPolicy budget,
         ShipyardCalls calls,
         PurchaseNeeds purchases,
+        IShipNameBook names,
         IMessageBus bus,
         ILogger<PurchaseShipHandler> logger)
-        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, calls, purchases, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
+        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, calls, purchases, names, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
     {
     }
 

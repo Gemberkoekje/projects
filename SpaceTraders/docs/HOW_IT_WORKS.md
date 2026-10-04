@@ -41,7 +41,7 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
   text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
   Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
   `Application=SpaceTraders.API`, and, once agent bootstrap has picked the agent, `ResetDate` (slice
-  2.13, see [Logging and metrics](#11-logging-and-metrics)). The host logs through its own logger and leaves Serilog's static
+  2.13, see [Logging and metrics](#11-logging-and-metrics)); a line about a ship also carries its `ShipName` (slice 2.14). The host logs through its own logger and leaves Serilog's static
   `Log.Logger` alone, so test hosts running side by side don't share one (B41).
 - **Wolverine** (6.x) discovers handlers in the Application assembly and keeps messages in memory:
   nothing goes to Postgres. It compiles a handler's code at runtime (`WolverineFx.RuntimeCompilation`)
@@ -182,7 +182,8 @@ first tick reconsiders it (D26, see
 | Docked or in orbit | Run one goal step. The ship keeps the arrival time of its last route, which startup sync stores, but it isn't in transit, so it gets no `ShipInTransitEvent` (B38, fixed: until then every ship that had ever flown, and a new agent's ships, got one on every start, which wrote an "in transit" activity row) |
 
 It doesn't reschedule arrivals. Pending arrivals survive a restart only through
-`scheduled_ship_events`.
+`scheduled_ship_events`. Before the ships' steps it tells the name book the fleet (slice 2.14), so their
+lines carry the ships' names from the start.
 
 ---
 
@@ -982,6 +983,8 @@ last, gives it something to do then; your decisions are D34–D37.
   6. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`, and records the
      purchase for the order ships are bought in at once (`PurchaseNeeds.Bought`): the ledger's row comes a
      moment later.
+  7. It tells the name book the fleet, the new ship in it, and its `ShipPurchased` line says the name the
+     bot gives the ship: "the bot calls it PICKAXE-3" (slice 2.14, see [Names](#names-shipnames-slice-214)).
   - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`
     or `NoShipAtShipyard`.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus the credit reserve (slice 6.10b,
@@ -1264,6 +1267,38 @@ step does the work.
 
 Cooldown timers are never scheduled, and `ShipCooldownExpiredEvent` has no handler. Goals that
 wait for a cooldown simply run again on a later tick.
+
+### Names (`ShipNames`, slice 2.14)
+
+Asked on 2026-10-04: "SHIPS are now named by the game in ascending order. Can we make custom names within the API which
+should be type-number … Bonus points if there's a list of relevant names for each of the types, one of which is picked
+per reset to call that type, e.g. all sattelites being called SPUTNIK-1, SPUTNIK-2 etc. … while SIPHON DRONE and MINING
+DRONE are both EXCAVATORs, they should get different names." Your decision is D72: the name shows beside the symbol.
+
+- **The game's symbol stays** what every API call, table, metric label (`ship`) and journal line keys a ship by
+  (`SPECTER-4`): the API can't rename a ship. The name is the bot's own, worked out from the fleet, never stored.
+- **A ship's type** (`ShipNames.TypeOf`) is the one it was bought as, while it is cached by that; after the next start's
+  sync, which caches its registration role instead (B25), what its frame makes it: `FRAME_PROBE` a probe,
+  `FRAME_FRIGATE` the command frigate, `FRAME_SHUTTLE` a light shuttle, `FRAME_LIGHT_FREIGHTER` a light hauler, a
+  `FRAME_DRONE` a mining drone, a siphon drone or a surveyor by its mount, and so on. Both give a bought ship the same
+  type, so it keeps its name across the restart.
+- **Each type has a list of names** (`ShipNames.Lists`, one for every type a shipyard sells): probes after probes and
+  telescopes (SPUTNIK, VOYAGER, …), mining drones after what digs (PICKAXE, MOLE, …), siphon drones after what sips
+  (MOSQUITO, HUMMINGBIRD, …), surveyors after their instruments, the command frigate after flagships, shuttles after small
+  birds, haulers after pack animals, and so on. No name is in two lists. Each server reset picks one name of each list,
+  by its reset date (FNV-1a, so every start of the reset picks the same); on 2026-10-04 the command frigate is INTREPID,
+  the probes MARINER, the mining drones PICKAXE and the siphon drones HUMMINGBIRD.
+- **The number** counts the ships of the type in the order they joined the fleet, which is the order of the game's own
+  numbers, in hexadecimal (SPECTER-F before SPECTER-10): MARINER-1 is the starting probe, MARINER-2 the next bought.
+  Ships only join the fleet, so a name never changes during a reset.
+- **A type with no list** (a frame no shipyard type has yet) is named after its registration role: `PATROL-1`.
+- **Where it shows** (D72: beside the symbol): `ShipName` on every log line about a ship (`ShipNameEnricher`), and the
+  `ShipPurchased` line says it; `spacetraders_ship_name_info{ship,name,type}`, which the SpaceTraders dashboard's Fleet and
+  Roles tables show in a "name" column, and its journals in front of a line (gembernodes); the ship list of the internal
+  API (`/status/ships`, `name`), which the WebUI's fleet page shows, and searches, and the ship's page.
+- **The name book** (`IShipNameBook`, in memory) keeps the names for the log lines, which can't read the fleet: startup
+  recovery, a purchase, the ship list and the metrics every 10 seconds tell it the fleet. A ship it hasn't been told of
+  yet has no `ShipName`; before agent bootstrap has picked the agent, nothing has one.
 
 ---
 
@@ -1604,7 +1639,7 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14) |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes` | Read tables that are never written; always 204, `[]` or zeros |
 | Status (credit growth) | `GET /status/anomalies` | A heuristic over the credit samples: credits per hour over the last 24 hours against the last hour. Not the health rules' anomalies (section 12) |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |
@@ -1638,7 +1673,7 @@ anything.
 |---|---|
 | `/` Overview | `/status/agent`, `/status/ships`, `/status/rate-limit`, `/status/system-alerts` |
 | `/plans` | `/fleet/goal-chains`, `/fleet/assignments`, `/fleet/activity`, `/status/mining-opportunities` |
-| `/fleet`, `/fleet/:symbol` | `/status/ships`, diagnostics, waypoints |
+| `/fleet`, `/fleet/:symbol` | `/status/ships`, diagnostics, waypoints; each ship's name beside its symbol, which the search finds too (slice 2.14) |
 | `/markets` | Market and shipyard waypoints and freshness |
 | `/snapshots` | Startup snapshots |
 | `/health` | `/status/rate-limit`, `/health/automation`, `/health/rate-limit/history` |
@@ -1675,6 +1710,9 @@ The seven pages in `src/Future` are not routed.
     The bot registers the same symbol after every reset, so the agent's and its ships' symbols repeat
     from run to run; the reset date doesn't, and the dashboards' Loki queries filter on it. Lines
     logged before agent bootstrap has picked the agent (the start's first lines) have none.
+  - A line about a ship, one with a `ShipSymbol` from its message or from the tick's scope, carries `ShipName`
+    beside it (slice 2.14, D72): the name the bot gives the ship, such as `PICKAXE-2`, from the name book
+    (`ShipNameEnricher`; see [Names](#names-shipnames-slice-214)). A ship the book hasn't been told of has none.
 - **The journal:** one line per meaningful thing, with an `EventKind` property and a message that
   starts with it (`CargoSold: ship …`), so `{namespace="spacetraders"} | json | EventKind != ""`
   in Loki reads as a timeline of the run. `JournalEvents` names every kind:
@@ -1683,7 +1721,7 @@ The seven pages in `src/Future` are not routed.
   |---|---|---|
   | `ContractAccepted` | Contract plan | `ContractId`, `TradeSymbol`, `WaypointSymbol`, `Payment` |
   | `ContractDelivered`, `ContractFulfilled` | `FulfillContractDeliveryCommand` | `ContractId`, `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`; `Payment` |
-  | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost` |
+  | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost`, `ShipName` (slice 2.14) |
   | `CargoBought`, `CargoSold` | Trade, mining, siphon and spare-time executors; `CargoBought` also the construction executor (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
   | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it |
   | `TradeRerouted` | Trade executor, at the sell market | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellPrice`, `SellWaypoint`, `NewSellPrice`, `FuelCost`, `Reason` |
@@ -1768,6 +1806,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
   | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c; `drifting to X1-AB-B7` for the survey ship's move, D54; `buying FAB_MATS at X1-AB-F49 for X1-AB-I55` and `supplying FAB_MATS to X1-AB-I55` for a construction trip, slice 6.6), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
+  | `spacetraders_ship_name_info` | `ship`, `name`, `type` | One series per ship, always 1 (slice 2.14, D72): the name the bot gives it beside the game's symbol, such as `MARINER-2`, and the type that name is for: the shipyard type (`SHIP_PROBE`), else its registration role. No series before the agent is known. The Fleet and Roles tables' "name" column | Every 10 s |
   | `spacetraders_ship_arrival_timestamp_seconds` | `ship` | When a ship in transit arrives (Unix time); no series otherwise | Every 10 s |
   | `spacetraders_ship_cargo_units`, `spacetraders_ship_cargo_capacity_units` | `ship`, `good`; `ship` | A ship's hold per good aboard, and what it takes | Every 10 s |
   | `spacetraders_contract_units_required`, `_units_fulfilled` | `contract`, `trade_symbol` | The accepted contracts' deliverables | Every 10 s |

@@ -28,6 +28,7 @@ public sealed class MetricsEndpointTests
         "spacetraders_ship_status_since_timestamp_seconds",
         "spacetraders_ship_info",
         "spacetraders_ship_capabilities_info",
+        "spacetraders_ship_name_info",
         "spacetraders_ship_arrival_timestamp_seconds",
         "spacetraders_ship_cargo_units",
         "spacetraders_ship_cargo_capacity_units",

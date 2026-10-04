@@ -14,6 +14,8 @@ export interface AgentDto {
 
 export interface ShipDto {
   symbol: string
+  /** The name the bot gives the ship beside the game's symbol, such as SPUTNIK-2 (slice 2.14); empty before it is known. */
+  name: string
   systemSymbol: string | null
   waypointSymbol: string | null
   status: string | null

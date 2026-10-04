@@ -1,7 +1,9 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -23,10 +25,14 @@ public sealed class ShipPurchaseServiceTests
     private readonly ShipyardCalls _calls = new();
     private readonly PurchaseNeeds _purchases = new();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IActiveReset _reset = Substitute.For<IActiveReset>();
     private readonly LogRecorder _log = new();
+    private readonly ShipNameBook _names;
 
     public ShipPurchaseServiceTests()
     {
+        _reset.ResetDate.Returns("2026-10-04");
+        _names = new ShipNameBook(_reset);
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, "X1-AB-HQ", 100_000, "COSMIC", 1));
         _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(ShipyardSelling(12_000));
         _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(new BudgetDecision(true, 100_000, 20_000, 80_000));
@@ -55,7 +61,23 @@ public sealed class ShipPurchaseServiceTests
         await _bus.Received(1).PublishAsync(
             Arg.Is<AgentCreditsChangedEvent>(e => e.OldCredits == 100_000 && e.NewCredits == 88_000),
             Arg.Any<DeliveryOptions>());
-        _log.Journal.Should().ContainSingle().Which.Message.Should().Be("ShipPurchased: ship AGENT-2 (SHIP_MINING_DRONE) bought at X1-AB-SY1 for 12000 credits.");
+        _log.Journal.Should().ContainSingle().Which.Message.Should().StartWith("ShipPurchased: ship AGENT-2 (SHIP_MINING_DRONE) bought at X1-AB-SY1 for 12000 credits;");
+    }
+
+    [Fact]
+    public async Task TryPurchaseAsync_NamesTheNewShip_InTheJournalAndTheNameBook()
+    {
+        // Slice 2.14 (D72): the bought ship takes the next number of its type, and its first lines carry its name.
+        ShipModel probe = new("PROBE-1", "X1-AB", Shipyard, "DOCKED", "CRUISE", 0, 0, ShipType: "SATELLITE");
+        ShipModel bought = new("AGENT-2", "X1-AB", Shipyard, "DOCKED", "CRUISE", 80, 80, ShipType: "SHIP_MINING_DRONE");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([probe], [probe, bought]);
+        var name = ShipNames.For([probe, bought], "2026-10-04")["AGENT-2"];
+
+        await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        name.Should().EndWith("-1");
+        _names.NameOf("AGENT-2").Should().Be(name);
+        _log.Journal.Should().ContainSingle().Which.Message.Should().EndWith($"; the bot calls it {name}.");
     }
 
     [Fact]
@@ -179,6 +201,7 @@ public sealed class ShipPurchaseServiceTests
         _budget,
         _calls,
         _purchases,
+        _names,
         _bus,
         _log.For<ShipPurchaseService>());
 }
