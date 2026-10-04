@@ -810,6 +810,11 @@ buy.
   plan is on (below); a miner trades only when neither the contract nor the mining plan has work for
   it, and a siphoner only when the siphon plan has none. With the role board on (slice 6.9), a trader is a
   ship with the trade role, or with the mining or siphon role when that plan had no trip for it.
+  "Had no trip for it" is what that plan recorded at its pass in the same tick (`PassedOverShips`, B63): the
+  mining, siphon and construction plans each note the ships they work with and the free ones they gave no
+  work. An arrival's goal step runs outside the tick, so a trip can end after its plan's pass and before
+  the trading plan's; that ship wasn't passed over and waits for its own plan's next pass, a tick later,
+  instead of trading. A plan that is switched off has no say.
 - **A ship that gathers in its spare time** (the command ship, with the survey and spare-time plans on,
   slice 6.8) trades when it has nothing to survey (D34), but only for a route that waits for it once
   its hold is sold, and after the other traders have chosen. The route is judged from where selling its

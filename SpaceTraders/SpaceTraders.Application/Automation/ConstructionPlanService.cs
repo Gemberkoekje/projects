@@ -56,6 +56,7 @@ public sealed class ConstructionPlanService(
     IBudgetPolicy budget,
     IPurchaseOrder purchaseOrder,
     ConstructionRetries retries,
+    PassedOverShips passedOver,
     ILogger<ConstructionPlanService> logger) : IConstructionPlanService
 {
     /// <summary>A free builder bought no load: a purchase before it in the order ships are bought in (D64).</summary>
@@ -116,6 +117,13 @@ public sealed class ConstructionPlanService(
         }
 
         await BuyLoadsAsync(pass, cancellationToken);
+
+        // B63: the trading plan, later in the tick, gives a route only to a builder this pass had no load for.
+        passedOver.Record(
+            AutomationPlan.Construction,
+            builders.Select(ship => ship.Symbol),
+            pass.FreeBuilders().Select(ship => ship.Symbol));
+
         await SaveStateAsync(pass, now, cancellationToken);
     }
 

@@ -65,10 +65,14 @@ public sealed class TradingAutomationService(
     IPurchaseOrder purchaseOrder,
     FullHoldSavings savings,
     IConstructionSites constructionSites,
+    PassedOverShips passedOver,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
     internal const int MaxPendingRoutes = 20;
+
+    /// <summary>The plans whose ships trade only when their own plan passed them over (B63, D58).</summary>
+    private static readonly AutomationPlan[] GatheringPlans = [AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Construction];
 
     /// <summary>
     /// The setting that lists the cargo ships the plan buys, in order (D21): the Nth is bought while the
@@ -97,6 +101,17 @@ public sealed class TradingAutomationService(
         var held = new List<HeldRoute>();
         var free = new List<ShipModel>();
 
+        // B63: a ship a gathering plan works with trades only when that plan passed it over at its pass in this tick. An
+        // arrival's goal step, outside the tick, can free it after that pass; it then waits for its own plan's next one.
+        var gatheringPlansOn = new List<AutomationPlan>();
+        foreach (var plan in GatheringPlans)
+        {
+            if (await settings.IsPlanEnabledAsync(plan, cancellationToken))
+            {
+                gatheringPlansOn.Add(plan);
+            }
+        }
+
         // Ships that gather in their spare time (slice 6.8), free or on a spare-time trip that fills its hold, while
         // the spare-time plan is on: the survey plan, which goes first, had nothing for them, and they trade only for
         // a route that waits for them (D34). Any other surveyor surveys, and only that (D20), but for selling or
@@ -113,7 +128,7 @@ public sealed class TradingAutomationService(
             {
                 held.Add(new HeldRoute(ship.Symbol, trade));
             }
-            else if ((gathers ? ship.IsTradingCapable : board.IsTrader(ship))
+            else if ((gathers ? ship.IsTradingCapable : board.IsTrader(ship) && passedOver.MayTrade(ship.Symbol, gatheringPlansOn))
                 && FleetRoles.IsFree(ship, goal, hasAssignment))
             {
                 free.Add(ship);

@@ -36,6 +36,7 @@ public sealed class SiphonAutomationServiceTests
     private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly LogRecorder _log = new();
+    private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private MiningAutomationPlanState? _state;
 
@@ -77,6 +78,7 @@ public sealed class SiphonAutomationServiceTests
         var started = _log.Journal.Should().ContainSingle().Subject;
         started.EventKind.Should().Be("SiphonStarted");
         started.Properties["Reason"].Should().Be("low_supply");
+        _passedOver.MayTrade("SHIP-5", [AutomationPlan.Siphon]).Should().BeFalse("this pass gave it a trip (B63)");
     }
 
     [Fact]
@@ -164,6 +166,7 @@ public sealed class SiphonAutomationServiceTests
 
         _activeGoals.Should().BeEmpty();
         _log.Journal.Should().BeEmpty();
+        _passedOver.MayTrade("SHIP-5", [AutomationPlan.Siphon]).Should().BeTrue("the pass had nothing for it, so the trading plan may sell or jettison its hold (B63)");
     }
 
     [Fact]
@@ -429,6 +432,7 @@ public sealed class SiphonAutomationServiceTests
                 _purchases,
                 _roleAdvisor,
                 _order,
+                _passedOver,
                 _log.For<SiphonAutomationService>())
             .EnsureBootstrappedAsync();
 }

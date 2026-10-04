@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B63)
+- A drone whose trip ends between its plan's pass and the trading plan's, in a tick, no longer trades: the mining, siphon and construction plans record the free ships they had no work for (`PassedOverShips`), and the trading plan gives a ship of theirs a route only when its own plan, switched on, passed it over. On 2026-10-04 SPECTER-3's arrival sold its ore 0.3 s before tick 202's trading plan, which gave it a route although the mining plan would have given it a trip a tick later (D58).
+
+### Docs – Changed (2026-10-04, B63)
+- `PLAN.md`: B63. `docs/HOW_IT_WORKS.md`: what "had no trip for it" means for the trading plan.
+
 ### Code – Fixed (2026-10-04, B62)
 - A market answered without prices no longer wipes the cached ones: the arrival stores a market through `MarketRefresher`, which leaves such an answer out, and startup sync keeps the cached prices. On 2026-10-04 an arrival fired at the pod's start stored X1-FJ91-C46 without prices; its fuel price gone, SPECTER-6 found no fuel stop it could reach and drifted 43 minutes after the API refused its flight with a 400.
 - A market the cache holds without prices counts as never seen: the market watch fetches it as soon as a ship is there, and the probe plan sends a probe there first (`MarketFreshnessRecord.HasPrices`).

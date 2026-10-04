@@ -56,6 +56,7 @@ public sealed class MiningAutomationService(
     IShipPurchaseService shipPurchases,
     IRoleAdvisor roles,
     IPurchaseOrder purchaseOrder,
+    PassedOverShips passedOver,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
@@ -102,6 +103,7 @@ public sealed class MiningAutomationService(
         }
 
         var freeAtStart = free.Count > 0;
+        var gaveTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var opportunities = new List<MiningAutomationOpportunityState>();
         foreach (var system in fleet
             .Where(ship => board.IsMiner(ship) && !explorers.Contains(ship.Symbol) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
@@ -115,6 +117,7 @@ public sealed class MiningAutomationService(
                 if (await GiveTripAsync(context, miner, heldKeys, heldBy, covered, cancellationToken))
                 {
                     withTrip.Add(miner.Symbol);
+                    gaveTrip.Add(miner.Symbol);
                 }
             }
 
@@ -141,6 +144,12 @@ public sealed class MiningAutomationService(
                 });
             }
         }
+
+        // B63: the trading plan, later in the tick, gives a route only to a miner this pass had no trip for.
+        passedOver.Record(
+            AutomationPlan.Mining,
+            fleet.Where(board.IsMiner).Select(ship => ship.Symbol),
+            free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
         await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
         await SaveStateAsync(opportunities, cancellationToken);

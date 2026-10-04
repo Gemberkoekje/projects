@@ -38,6 +38,7 @@ public sealed class MiningAutomationServiceTests
     private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly LogRecorder _log = new();
+    private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private MiningAutomationPlanState? _state;
 
@@ -84,6 +85,7 @@ public sealed class MiningAutomationServiceTests
         var started = _log.Journal.Should().ContainSingle().Subject;
         started.EventKind.Should().Be("MiningStarted");
         started.Properties["Reason"].Should().Be("low_supply");
+        _passedOver.MayTrade("SHIP-3", [AutomationPlan.Mining]).Should().BeFalse("this pass gave it a trip (B63)");
     }
 
     [Fact]
@@ -576,6 +578,7 @@ public sealed class MiningAutomationServiceTests
                 _purchases,
                 _roleAdvisor,
                 _order,
+                _passedOver,
                 _log.For<MiningAutomationService>())
             .EnsureBootstrappedAsync();
 }
