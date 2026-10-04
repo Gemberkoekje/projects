@@ -21,7 +21,8 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Every 10 seconds, exports the state of the game as the bot has cached it: the agent's credits,
-/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, what it can do, its hold, what it cost), the
+/// every ship (role, state, goal, why its goal is blocked, where it is, what it does, what it can do, its hold, what it cost, its
+/// ledger by category: what it has made, slice 2.16), the
 /// accepted contracts' deliverables and the usable surveys; the bot's settings; and what each plan would buy, in the order ships
 /// are bought in (slice 6.10b, from <see cref="PurchaseNeeds"/>). What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
@@ -64,21 +65,32 @@ public sealed class PrometheusMetricsService(
         var waypointTypes = await db.Waypoints.AsNoTracking()
             .Where(w => places.Contains(w.Symbol))
             .ToDictionaryAsync(w => w.Symbol, w => w.Type, StringComparer.Ordinal, cancellationToken);
-        // What was paid for each ship and its equipment. The ledger keeps 30 days, longer than a reset lasts.
-        LedgerCategory[] equipment = [LedgerCategory.ShipPurchase, LedgerCategory.MountPurchase, LedgerCategory.ModulePurchase];
-        var paid = await db.LedgerEntries.AsNoTracking()
-            .Where(e => equipment.Contains(e.Category))
-            .GroupBy(e => e.ShipSymbol)
-            .Select(g => new { Ship = g.Key, Paid = -g.Sum(e => e.Amount) })
-            .ToDictionaryAsync(p => p.Ship, p => p.Paid, StringComparer.Ordinal, cancellationToken);
+        // Each ship's ledger by category (slice 2.16), and from it what was paid for the ship and its equipment. The ledger keeps
+        // 30 days, longer than a reset lasts. The contract's payments are booked to the agent, which is no ship.
+        var books = await db.LedgerEntries.AsNoTracking()
+            .GroupBy(e => new { e.ShipSymbol, e.Category })
+            .Select(g => new { Ship = g.Key.ShipSymbol, g.Key.Category, Amount = g.Sum(e => e.Amount) })
+            .ToListAsync(cancellationToken);
+        var ledgers = books
+            .GroupBy(book => book.Ship, StringComparer.Ordinal)
+            .ToDictionary(
+                ship => ship.Key,
+                ship => ship.ToDictionary(book => book.Category.ToString(), book => book.Amount, StringComparer.Ordinal),
+                StringComparer.Ordinal);
+        string[] equipment = [nameof(LedgerCategory.ShipPurchase), nameof(LedgerCategory.MountPurchase), nameof(LedgerCategory.ModulePurchase)];
         // Slice 2.14 (D72): the names the bot gives the ships, which the log lines read from the book.
         var named = names.Know([.. ships.Select(ShipRepository.MapToModel)]);
         ShipMetricsSample[] fleet =
         [
-            .. ships.Select(ship => ToSample(ship, assignmentByShip, waypointTypes, now) with
+            .. ships.Select(ship =>
             {
-                Value = paid.GetValueOrDefault(ship.Symbol),
-                Name = named.GetValueOrDefault(ship.Symbol, string.Empty),
+                var ledger = ledgers.GetValueOrDefault(ship.Symbol) ?? new Dictionary<string, long>(StringComparer.Ordinal);
+                return ToSample(ship, assignmentByShip, waypointTypes, now) with
+                {
+                    Value = -equipment.Sum(category => ledger.GetValueOrDefault(category)),
+                    Ledger = ledger,
+                    Name = named.GetValueOrDefault(ship.Symbol, string.Empty),
+                };
             }),
         ];
         metrics.Fleet(fleet, now);

@@ -145,6 +145,8 @@
 - Slice 6.13 (a trade trip may carry less than a full hold where the seller's supply is ABUNDANT, asked on 2026-10-04,
   with your decision D74) is built on branch `ccr-f3fba810-ie3vm6` in projects and gembernodes. The market tree's trade
   volumes, asked just before it, are merged (gembernodes#61); the gembernodes branch adds D74 to the panel's description.
+- Slice 2.16 (each ship's profit, asked on 2026-10-04) is built on branch `ccr-fea929ec-ptl3vh` in projects and
+  gembernodes: each ship's ledger by category as a metric, and a "Profit by ship" table on the SpaceTraders dashboard.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -1255,6 +1257,43 @@ day, D72)
 - To understand this, start with `SpaceTraders.API/Services/GameStateSnapshots.cs`, then `KnownTypes.cs` and
   `DiscoverySnapshotService.cs`; in gembernodes, `infrastructure/monitoring/dashboards/spacetraders-snapshots-dashboard.json`
   and the SpaceTraders API data source in `infrastructure/monitoring/grafana-release.yaml`.
+
+**2.16 Each ship's profit** (built 2026-10-04 on branch `ccr-fea929ec-ptl3vh`, in projects and gembernodes; asked that day)
+- Asked: "For spacetraders, I'd like to see each ships total profit. So -purchase price-market buys+market sales-fuel (plus
+  or minus any other relevant ship-specific credit changes)"
+- The ledger already books every credit change to the ship it is about (`LedgerEntryHandler`): its purchase, each cargo
+  purchase and sale, each refuel, each jump's antimatter, the jump gate's materials. Only the contract's deposit and payout
+  go to `AGENT`. The metrics read the ledger only for what each ship cost (`spacetraders_ship_value_credits`, the "Total
+  value" graph), and "Profit per hour by activity" adds trips up by activity, not by ship.
+- Done:
+  - **The metric:** `spacetraders_ship_ledger_credits{ship,category}`, each ship's ledger summed by category since it joined
+    the fleet: earnings positive, costs negative, one series per category the ship has rows of; summed by ship, what it has
+    made. `PrometheusMetricsService` reads it every 10 seconds in one query that groups the ledger by ship and category; it
+    replaces the query for what each ship cost, which now comes from the same sums. A category whose rows age out of the
+    ledger (30 days, longer than a reset lasts) loses its series, and a ship that is gone loses them all.
+  - **Grafana** (gembernodes, same branch): a "Profit by ship" table under Roles, most profitable first: ship, name, profit,
+    then what it is made of: purchase (the ship and its mounts and modules), market buys, market sales, fuel, and other
+    (antimatter for jumps, the jump gate's materials, repairs). Costs are negative, a ship with nothing in a column shows 0,
+    profit is green or red, and the bottom row sums the fleet. Ship, name and profit fit a phone's width.
+- Noticed (not changed):
+  - The contract's payments are the agent's (`AGENT`), so a ship that mines and delivers for the contract shows only its
+    fuel, and a contract's deposit and payout count for no ship. Splitting them over the ships that delivered would need
+    each delivery booked with its ship and units, and a rule for the deposit; asked whether you want that.
+  - Profit counts credits as they move: a trader between its purchase and its sale shows the purchase until it sells, and
+    cargo aboard counts for nothing (the "Total value" graph values it).
+  - The builder's profit is mostly the jump gate's materials, which supplying never pays back (slice 6.6).
+  - `MetricsEndpointTests.ExpectedMetrics`, the metrics the dashboard and the alerts read, missed
+    `spacetraders_ship_value_credits` and the two construction gauges; they are listed now.
+- Tests: `PrometheusMetricsServiceTests` (each ship's ledger summed by category; a ship without rows has an empty ledger;
+  the agent's contract payments are no ship's; the value is still the ship and its equipment), `PrometheusAutomationMetricsTests`
+  (one series per category; a category that ages out and a ship that is gone lose theirs), `PrometheusMetricsIntegrationTests`
+  (the grouping against PostgreSQL 16; the agent of the reset before, with the same ship symbols, counts for none) and
+  `MetricsEndpointTests` (the metric is listed). App 1074, Domain 72, API 206 (and 4 skipped), Integration 1; the API's
+  integration tests 6. In gembernodes, the panel's seven queries with `promtool test rules`, the table in Grafana 11.6.1
+  against a local Prometheus at 1600 and 390 pixels wide, and `scripts/validate.py` (NOTES.md).
+- To understand this, start with the ledger query in `SpaceTraders.API/Services/PrometheusMetricsService.cs`, then the end of
+  `Details` in `PrometheusAutomationMetrics.cs`; in gembernodes, the "Profit by ship" panel of
+  `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2951,3 +2990,4 @@ your PC, 1Password or kubectl:
 | 2.15 | The Infinity data source (Grafana's background preinstall, pinned to 3.11.1), the SpaceTraders API data source with the bot's API key (`spacetraders-secrets.yaml`, the 1Password item copied into the monitoring namespace), a snapshots dashboard, uid `spacetraders-snapshots`, and links to it from the three other SpaceTraders dashboards (branch `ccr-a2ff9235-gidedj`, not merged). The download and the tables need a build with slice 2.15; the list works with any |
 | 6.13 | The markets dashboard's market tree: the trade volume where each good is cheapest and where it sells best ("buy volume", "sell volume"), and a description that says when such a pair is traded (merged: PR #61); D74 in that description (branch `ccr-f3fba810-ie3vm6`, not merged). Its D74 part describes the bot once it runs a build with slice 6.13: deploy that build with it |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |
+| 2.16 | A "Profit by ship" table under the SpaceTraders dashboard's Roles table: each ship's profit, its purchase, market buys, market sales, fuel and other, and the fleet's totals; the panels below moved down by its height (branch `ccr-fea929ec-ptl3vh`, not merged). Its numbers show once the bot runs a build with slice 2.16: deploy that build with it |

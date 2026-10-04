@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.16)
+- Each ship's profit, as asked on 2026-10-04: "I'd like to see each ships total profit. So -purchase price-market buys+market sales-fuel (plus or minus any other relevant ship-specific credit changes)". `spacetraders_ship_ledger_credits{ship,category}` is each ship's ledger since it joined the fleet, summed by category: earnings positive, costs negative (its purchase, mounts and modules, cargo bought, fuel, a jump's antimatter, the jump gate's materials); summed by ship, what it has made. `PrometheusMetricsService` reads it every 10 seconds in one query grouping the ledger by ship and category, which also gives what each ship cost. The contract's payments are booked to the agent, no ship.
+- In Grafana (gembernodes, same branch): a "Profit by ship" table under Roles, most profitable first, with what each profit is made of and the fleet's totals.
+
+### Docs – Changed (2026-10-04, slice 2.16)
+- `PLAN.md`: slice 2.16. `docs/HOW_IT_WORKS.md`: `spacetraders_ship_ledger_credits` and `spacetraders_ship_value_credits` in the metrics table, and who reads the ledger.
+
 ### Code – Changed (2026-10-04, slice 6.13)
 - A trade trip may carry less than a full hold where the buy market's supply of the good is ABUNDANT (D74), as asked on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT, in which case a full hold is not necessary. All other rules for profitability etc. Still stand." It carries what both markets trade at once, the smallest of the free hold and the two trade volumes, still in one purchase and one sale and paid for in full (`TradeRoutePlanner.UnitsAtOnce`, which replaces `TakesFullHold`). Anywhere else a trip is a full hold, as D56 has it. At the buy market the trip is worked out again with the supply its arrival fetched: it buys what the markets trade at once then, and a seller no longer ABUNDANT whose volume fills no hold drops it (`not_full_hold`). The minimum profit per unit (D14), the order of routes (D15) and the credits held back (D17, D24, D57) are unchanged.
 
