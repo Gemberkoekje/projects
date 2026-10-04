@@ -143,8 +143,8 @@
   2026-10-04, with your decision D73) is built on branch `ccr-a2ff9235-gidedj` in projects and gembernodes. It found and
   fixed B64.
 - Slice 6.13 (a trade trip may carry less than a full hold where the seller's supply is ABUNDANT, asked on 2026-10-04,
-  with your decision D74) is built on branch `ccr-f3fba810-ie3vm6` in projects. The market tree's trade volumes, asked
-  just before it, are gembernodes#61 on the branch of the same name.
+  with your decision D74) is built on branch `ccr-f3fba810-ie3vm6` in projects and gembernodes. The market tree's trade
+  volumes, asked just before it, are merged (gembernodes#61); the gembernodes branch adds D74 to the panel's description.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -2949,5 +2949,5 @@ your PC, 1Password or kubectl:
 | 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (branch `claude/spacetraders-run-label`, PR #56, not merged). It shows data once the bot runs a build with slice 2.13: deploy that build with it |
 | 2.14 | A "name" column in the SpaceTraders dashboard's Fleet and Roles tables, and the ship's name in brackets in front of a journal line about it, in the journal, the survey journal and the exploring journal (branch `claude/dreamy-albattani-zo7njw`, not merged). It shows data once the bot runs a build with slice 2.14: deploy that build with it |
 | 2.15 | The Infinity data source (Grafana's background preinstall, pinned to 3.11.1), the SpaceTraders API data source with the bot's API key (`spacetraders-secrets.yaml`, the 1Password item copied into the monitoring namespace), a snapshots dashboard, uid `spacetraders-snapshots`, and links to it from the three other SpaceTraders dashboards (branch `ccr-a2ff9235-gidedj`, not merged). The download and the tables need a build with slice 2.15; the list works with any |
-| 6.13 | The markets dashboard's market tree: the trade volume where each good is cheapest and where it sells best ("buy volume", "sell volume"), and a description that says when such a pair is traded (D56, D74) (branch `ccr-f3fba810-ie3vm6`, PR #61, not merged) |
+| 6.13 | The markets dashboard's market tree: the trade volume where each good is cheapest and where it sells best ("buy volume", "sell volume"), and a description that says when such a pair is traded (merged: PR #61); D74 in that description (branch `ccr-f3fba810-ie3vm6`, not merged). Its D74 part describes the bot once it runs a build with slice 6.13: deploy that build with it |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |
