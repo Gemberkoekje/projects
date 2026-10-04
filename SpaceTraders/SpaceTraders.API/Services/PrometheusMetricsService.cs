@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
@@ -24,7 +25,8 @@ namespace SpaceTraders.API.Services;
 /// accepted contracts' deliverables and the usable surveys; the bot's settings; and what each plan would buy, in the order ships
 /// are bought in (slice 6.10b, from <see cref="PurchaseNeeds"/>). What happens (API calls, goal steps, credits earned and spent) is counted where
 /// it happens, through <see cref="IAutomationMetrics"/>. The ship states also feed the journal's
-/// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>).
+/// <c>ShipIdle</c> lines (<see cref="ShipStateJournal"/>), and the ships' names (slice 2.14) the name book the log lines read
+/// (<see cref="IShipNameBook"/>).
 /// </summary>
 public sealed class PrometheusMetricsService(
     IServiceScopeFactory serviceScopeFactory,
@@ -32,6 +34,7 @@ public sealed class PrometheusMetricsService(
     ShipStateJournal shipJournal,
     PurchaseNeeds purchaseNeeds,
     FullHoldSavings fullHoldSavings,
+    IShipNameBook names,
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(10);
@@ -68,7 +71,16 @@ public sealed class PrometheusMetricsService(
             .GroupBy(e => e.ShipSymbol)
             .Select(g => new { Ship = g.Key, Paid = -g.Sum(e => e.Amount) })
             .ToDictionaryAsync(p => p.Ship, p => p.Paid, StringComparer.Ordinal, cancellationToken);
-        ShipMetricsSample[] fleet = [.. ships.Select(ship => ToSample(ship, assignmentByShip, waypointTypes, now) with { Value = paid.GetValueOrDefault(ship.Symbol) })];
+        // Slice 2.14 (D72): the names the bot gives the ships, which the log lines read from the book.
+        var named = names.Know([.. ships.Select(ShipRepository.MapToModel)]);
+        ShipMetricsSample[] fleet =
+        [
+            .. ships.Select(ship => ToSample(ship, assignmentByShip, waypointTypes, now) with
+            {
+                Value = paid.GetValueOrDefault(ship.Symbol),
+                Name = named.GetValueOrDefault(ship.Symbol, string.Empty),
+            }),
+        ];
         metrics.Fleet(fleet, now);
         shipJournal.Observe(fleet);
 
@@ -255,6 +267,7 @@ public sealed class PrometheusMetricsService(
 
         return new ShipMetricsSample(ship.Symbol, ship.ShipType, State(ship, now), goalLabel, reason)
         {
+            NamedType = ShipNames.KindOf(model),
             Location = Location(at, inTransit, waypointTypes),
             Activity = Activity(goal, reason, assignment, at, inTransit, FleetRoles.IsProbe(model)),
             Capabilities = Capabilities(model),

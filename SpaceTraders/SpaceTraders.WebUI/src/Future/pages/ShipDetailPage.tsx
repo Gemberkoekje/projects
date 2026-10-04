@@ -78,6 +78,7 @@ export default function ShipDetailPage() {
 
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold font-mono">{symbol}</h1>
+        {ship?.name && <span className="text-lg font-mono text-muted-foreground">{ship.name}</span>}
         {ship?.isInTransit ? (
           <span className="rounded-full bg-status-yellow/15 text-status-yellow px-2 py-0.5 text-xs font-medium">
             In transit ({formatCountdown(ship.arrivesAt)})

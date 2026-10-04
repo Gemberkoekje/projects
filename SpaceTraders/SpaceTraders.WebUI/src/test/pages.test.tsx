@@ -233,6 +233,41 @@ describe('FleetPage', () => {
       expect(screen.getByText('No ships match the current filters.')).toBeInTheDocument(),
     )
   })
+
+  it("shows each ship's name beside its symbol, and finds a ship by its name", async () => {
+    // Slice 2.14 (D72): the bot's own names, as the game numbers its ships SPECTER-1, SPECTER-2, …
+    const ship = (symbol: string, name: string) => ({
+      symbol,
+      name,
+      systemSymbol: 'X1-FJ91',
+      waypointSymbol: 'X1-FJ91-A1',
+      status: 'DOCKED',
+      flightMode: 'CRUISE',
+      fuelCurrent: 0,
+      fuelCapacity: 0,
+      cargoCurrent: 0,
+      cargoCapacity: 0,
+      arrivesAt: null,
+      isInTransit: false,
+      lastSyncedAt: new Date().toISOString(),
+    })
+    mockApiFetch.mockResolvedValue([ship('SPECTER-2', 'SPUTNIK-1'), ship('SPECTER-3', 'PICKAXE-1')])
+    render(
+      <Wrapper>
+        <FleetPage />
+      </Wrapper>,
+    )
+
+    await waitFor(() => expect(screen.getByText('SPUTNIK-1')).toBeInTheDocument())
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
+    expect(screen.getByText('PICKAXE-1')).toBeInTheDocument()
+
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search ships' }), { target: { value: 'pickaxe' } })
+
+    await waitFor(() => expect(screen.queryByText('SPECTER-2')).not.toBeInTheDocument())
+    expect(screen.getByText('SPECTER-3')).toBeInTheDocument()
+  })
 })
 
 // ─── ActivityPage ────────────────────────────────────────────────────────────
@@ -646,6 +681,7 @@ describe('ShipDetailPage', () => {
         return Promise.resolve([
           {
             symbol: 'SHIP-1',
+            name: 'PICKAXE-2',
             systemSymbol: 'X1-AB',
             waypointSymbol: 'X1-AB-01',
             status: 'DOCKED',
@@ -723,6 +759,9 @@ describe('ShipDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'SHIP-1' })).toBeInTheDocument(),
     )
     expect(screen.getByRole('link', { name: 'Back to Fleet' })).toBeInTheDocument()
+
+    // Slice 2.14 (D72): the name the bot gives it, beside its symbol.
+    await waitFor(() => expect(screen.getByText('PICKAXE-2')).toBeInTheDocument())
   })
 
   it('shows not-found message for unknown ship', async () => {

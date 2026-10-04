@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.14)
+- Ships have names of the bot's own beside the game's symbols (D72), as asked on 2026-10-04: "Can we make custom names within the API which should be type-number … Bonus points if there's a list of relevant names for each of the types, one of which is picked per reset to call that type". Each type a shipyard sells has a list of names (`ShipNames.Lists`); each server reset picks one per type by its reset date, and the type's ships are numbered after it in the order they joined the fleet: in the run of 2026-10-04 the probes are MARINER-1, MARINER-2, …, the mining drones PICKAXE and the siphon drones HUMMINGBIRD, told apart by their mounts though the game calls both EXCAVATOR. A type with no list is named after its registration role (PATROL-1). The names aren't stored: they follow from the fleet and the reset date, so a restart keeps them.
+- Where they show: `ShipName` on every log line about a ship (`ShipNameEnricher`), and the `ShipPurchased` line says the new ship's name; `spacetraders_ship_name_info{ship,name,type}`; `name` in the internal API's `/status/ships`, which the WebUI's fleet page shows in a column and searches, and the ship's page beside its symbol. The game's symbol stays what everything keys a ship by.
+
+### Docs – Changed (2026-10-04, slice 2.14)
+- `PLAN.md`: slice 2.14 and decision D72. `docs/HOW_IT_WORKS.md`: how ships are named and where the names show. `docs/GLOSSARY.md`: Ship Name. The `st-investigate` skill: a ship's name as its argument, and where to look it up.
+
+### Code – Changed (2026-10-04, slice 6.12)
+- A mining plan's trip keeps every other ore a market buys within one tank of the asteroid, and jettisons only the rest (D71), as asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically mining for". One tank is a full tank's CRUISE flight there without a refuelling stop (`MiningPlanner.IsSellableWithinOneTank`). The trip still extracts with the survey best for its own ore and sells that ore at its market; the mining plan sells the others after it, one good a trip, where each fetches most after fuel. As in the siphon plan, a full hold sells even where the sale doesn't pay for its fuel, and a full hold no market the miner can reach buys gets no trip. The contract's round trips keep only the contract's ore.
+
+### Docs – Changed (2026-10-04, slice 6.12)
+- `PLAN.md`: slice 6.12 and decision D71. `docs/HOW_IT_WORKS.md`: what a mining trip keeps, how the mining plan sells it, and that the contract's trips keep none.
+
 ### Code – Fixed (2026-10-04, B63)
 - A drone whose trip ends between its plan's pass and the trading plan's, in a tick, no longer trades: the mining, siphon and construction plans record the free ships they had no work for (`PassedOverShips`), and the trading plan gives a ship of theirs a route only when its own plan, switched on, passed it over. On 2026-10-04 SPECTER-3's arrival sold its ore 0.3 s before tick 202's trading plan, which gave it a route although the mining plan would have given it a trip a tick later (D58).
 

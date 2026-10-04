@@ -48,6 +48,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _surveysActive;
     private readonly RunGauge _shipInfo;
     private readonly RunGauge _shipCapabilities;
+    private readonly RunGauge _shipName;
     private readonly RunGauge _shipArrival;
     private readonly RunGauge _shipCargoUnits;
     private readonly RunGauge _shipCargoCapacity;
@@ -90,6 +91,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<string> _contracts = new(StringComparer.Ordinal);
     private readonly HashSet<(string Site, string TradeSymbol)> _constructionMaterials = [];
     private readonly Dictionary<string, (string Location, string Activity)> _shipInfoLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Name, string Type)> _shipNameLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _shipCapabilityLabels = new(StringComparer.Ordinal);
     private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _shipGoods = new(StringComparer.Ordinal);
@@ -269,6 +271,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "One series per ship, always 1: the roles its equipment allows, whichever plans are on (Survey, Mine, Siphon and Trade, in that order; none for a probe or a ship that can do none of them).",
             "ship",
             "can");
+        _shipName = Labelled(
+            "spacetraders_ship_name_info",
+            "One series per ship, always 1: the name the bot gives it beside the game's symbol (slice 2.14), such as SPUTNIK-2, and the type that name is for (the shipyard type, such as SHIP_PROBE, else its registration role).",
+            "ship",
+            "name",
+            "type");
         _shipArrival = Labelled(
             "spacetraders_ship_arrival_timestamp_seconds",
             "When a ship in transit arrives (Unix time); no series while it isn't travelling.",
@@ -1059,6 +1067,19 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _shipCapabilities.WithLabels(ship.Ship, ship.Capabilities).Set(1);
         _shipCapabilityLabels[ship.Ship] = ship.Capabilities;
 
+        var named = (ship.Name, ship.NamedType);
+        if (_shipNameLabels.TryGetValue(ship.Ship, out var called) && called != named)
+        {
+            _shipName.RemoveLabelled(ship.Ship, called.Name, called.Type);
+            _shipNameLabels.Remove(ship.Ship);
+        }
+
+        if (ship.Name.Length > 0)
+        {
+            _shipName.WithLabels(ship.Ship, ship.Name, ship.NamedType).Set(1);
+            _shipNameLabels[ship.Ship] = named;
+        }
+
         if (ship.ArrivesAt != default)
         {
             _shipArrival.WithLabels(ship.Ship).Set(ship.ArrivesAt.ToUnixTimeSeconds());
@@ -1104,6 +1125,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         if (_shipCapabilityLabels.Remove(ship, out var can))
         {
             _shipCapabilities.RemoveLabelled(ship, can);
+        }
+
+        if (_shipNameLabels.Remove(ship, out var called))
+        {
+            _shipName.RemoveLabelled(ship, called.Name, called.Type);
         }
 
         if (_shipsInTransit.Remove(ship))

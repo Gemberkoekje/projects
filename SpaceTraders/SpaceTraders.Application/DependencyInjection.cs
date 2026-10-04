@@ -11,6 +11,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Mining;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
@@ -85,6 +86,9 @@ public static class DependencyInjection
         services.AddScoped<IRoleAdvisor, RoleAdvisor>();
         services.AddSingleton<IGatheringRates, GatheringRates>();
         services.AddSingleton<RoleBoardMemory>();
+
+        // The names the bot gives its ships, beside the game's symbols (slice 2.14, D72), kept for the log lines.
+        services.AddSingleton<IShipNameBook, ShipNameBook>();
 
         // Cargo nothing will sell or use is sold where that pays, else jettisoned (D42).
         services.AddScoped<ICargoJettison, CargoJettison>();

@@ -87,6 +87,80 @@ public sealed class MineResourceVolumeHandlerTests
     }
 
     [Fact]
+    public async Task ForAMiningTrip_TheOresAMarketBuysWithinOneTank_StayAboard_AndTheRestGoOverboard()
+    {
+        // D71, asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank of fuel, instead of
+        // everything they're not specifically mining for". NEAR buys quartz 60 from the asteroid, within the drone's
+        // 80-unit tank. FAR buys aluminum 140 away: a refuelling stop at FUEL gets it there, but not one tank. Nobody buys
+        // ice water.
+        _tradeContexts.ReadAsync(OneTank.SystemSymbol, Arg.Any<CancellationToken>()).Returns(OneTank.Context());
+        var drone = OneTank.Drone();
+        var mined = new CargoModel(
+            14,
+            15,
+            [
+                new CargoItemModel("IRON_ORE", 3),
+                new CargoItemModel("QUARTZ_SAND", 4),
+                new CargoItemModel("ALUMINUM_ORE", 5),
+                new CargoItemModel("ICE_WATER", 2),
+            ]);
+        _ships.FindAsync(drone.Symbol, Arg.Any<CancellationToken>()).Returns(drone, drone with { CargoCurrent = 14, CargoInventory = mined.Inventory });
+        _port.ExtractResourcesAsync(drone.Symbol, Arg.Any<CancellationToken>())
+            .Returns(new ExtractionActionResult("QUARTZ_SAND", 4, mined, CooldownSeconds: 70));
+        _port.JettisonCargoAsync(drone.Symbol, Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new JettisonActionResult(new CargoModel(7, 15, [new CargoItemModel("IRON_ORE", 3), new CargoItemModel("QUARTZ_SAND", 4)])));
+
+        var result = await Handler().ExecuteAsync(
+            new MineResourceVolumeCommand(drone.Symbol, "IRON_ORE", OneTank.Asteroid, 15) { KeepOtherOres = true },
+            CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await _port.Received(1).JettisonCargoAsync(drone.Symbol, "ALUMINUM_ORE", 5, Arg.Any<CancellationToken>());
+        await _port.Received(1).JettisonCargoAsync(drone.Symbol, "ICE_WATER", 2, Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().JettisonCargoAsync(drone.Symbol, "QUARTZ_SAND", Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().JettisonCargoAsync(drone.Symbol, "IRON_ORE", Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ForTheContract_EveryOtherGoodGoesOverboard_ThoughAMarketWithinOneTankBuysIt()
+    {
+        // D71 is the mining plan's: a contract round trip keeps its hold for the contract's ore.
+        _tradeContexts.ReadAsync(OneTank.SystemSymbol, Arg.Any<CancellationToken>()).Returns(OneTank.Context());
+        var drone = OneTank.Drone();
+        var mined = new CargoModel(7, 15, [new CargoItemModel("IRON_ORE", 3), new CargoItemModel("QUARTZ_SAND", 4)]);
+        _ships.FindAsync(drone.Symbol, Arg.Any<CancellationToken>()).Returns(drone, drone with { CargoCurrent = 7, CargoInventory = mined.Inventory });
+        _port.ExtractResourcesAsync(drone.Symbol, Arg.Any<CancellationToken>())
+            .Returns(new ExtractionActionResult("QUARTZ_SAND", 4, mined, CooldownSeconds: 70));
+        _port.JettisonCargoAsync(drone.Symbol, "QUARTZ_SAND", 4, Arg.Any<CancellationToken>())
+            .Returns(new JettisonActionResult(new CargoModel(3, 15, [new CargoItemModel("IRON_ORE", 3)])));
+
+        await Handler().ExecuteAsync(new MineResourceVolumeCommand(drone.Symbol, "IRON_ORE", OneTank.Asteroid, 40), CancellationToken.None);
+
+        await _port.Received(1).JettisonCargoAsync(drone.Symbol, "QUARTZ_SAND", 4, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ForAMiningTrip_AFullHold_KeepsTheOresAMarketBuysWithinOneTank()
+    {
+        // A full hold mines no more; what the trip keeps stays aboard for the mining plan to sell (D71).
+        _tradeContexts.ReadAsync(OneTank.SystemSymbol, Arg.Any<CancellationToken>()).Returns(OneTank.Context());
+        var full = OneTank.Drone() with
+        {
+            CargoCurrent = 15,
+            CargoInventory = [new CargoItemModel("IRON_ORE", 5), new CargoItemModel("QUARTZ_SAND", 10)],
+        };
+        _ships.FindAsync(full.Symbol, Arg.Any<CancellationToken>()).Returns(full);
+
+        var result = await Handler().ExecuteAsync(
+            new MineResourceVolumeCommand(full.Symbol, "IRON_ORE", OneTank.Asteroid, 15) { KeepOtherOres = true },
+            CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await _port.DidNotReceiveWithAnyArgs().ExtractResourcesAsync(default!, default);
+        await _port.DidNotReceiveWithAnyArgs().JettisonCargoAsync(default!, default!, default, default);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_NavigatesToSource_WhenNotAtSource()
     {
         var ship = AtAsteroid("SHIP-2") with { WaypointSymbol = "X1-AB-MKT" };
@@ -262,4 +336,56 @@ public sealed class MineResourceVolumeHandlerTests
 
     private static SurveyModel Survey(string signature, params string[] deposits)
         => new(signature, "X1-AB-AST", [.. deposits.Select(deposit => new SurveyDepositModel(deposit))], DateTimeOffset.UtcNow.AddMinutes(20), "MODERATE");
+
+    /// <summary>
+    /// A drone's one tank (D71): the asteroid AST, NEAR 60 from it, which buys quartz, and FAR 140 from it, which buys
+    /// aluminum. FUEL, 70 from both, sells fuel: a drone's 80-unit tank gets to FAR by way of it, not in one go.
+    /// </summary>
+    private static class OneTank
+    {
+        public const string SystemSymbol = "X1-OT";
+        public const string Asteroid = "X1-OT-AST";
+        private const string Near = "X1-OT-NEAR";
+        private const string Fuel = "X1-OT-FUEL";
+        private const string Far = "X1-OT-FAR";
+
+        public static TradeContext Context()
+            => new(
+                new TradeMarketMap(
+                    [
+                        Waypoint(Asteroid, "ASTEROID", 0, 0, hasMarket: false),
+                        Waypoint(Near, "PLANET", 0, 60),
+                        Waypoint(Fuel, "FUEL_STATION", 70, 0),
+                        Waypoint(Far, "PLANET", 140, 0),
+                    ],
+                    [
+                        Market(Near, new TradeGoodSnapshot("QUARTZ_SAND", "IMPORT", 52, 26, 60, "SCARCE")),
+                        Market(Fuel, new TradeGoodSnapshot("FUEL", "EXCHANGE", 72, 68, 180, "MODERATE")),
+                        Market(Far, new TradeGoodSnapshot("ALUMINUM_ORE", "IMPORT", 130, 63, 60, "LIMITED")),
+                    ],
+                    new Dictionary<string, IReadOnlyList<string>>()),
+                150_000,
+                200);
+
+        /// <summary>A mining drone in orbit at the asteroid: a 15-unit hold and an 80-unit tank.</summary>
+        public static ShipModel Drone()
+            => new(
+                "SHIP-4",
+                SystemSymbol,
+                Asteroid,
+                "IN_ORBIT",
+                "CRUISE",
+                80,
+                80,
+                CargoCapacity: 15,
+                ShipType: "EXCAVATOR",
+                MountSymbols: ["MOUNT_MINING_LASER_I"],
+                CargoInventory: []);
+
+        private static MarketSnapshot Market(string waypoint, TradeGoodSnapshot good)
+            => new(waypoint, SystemSymbol, [good], good.Type == "IMPORT" ? [good.Symbol] : [], [], good.Type == "EXCHANGE" ? [good.Symbol] : []);
+
+        private static WaypointCacheModel Waypoint(string symbol, string type, int x, int y, bool hasMarket = true)
+            => new(symbol, SystemSymbol, type, x, y, hasMarket, false, DateTimeOffset.UnixEpoch);
+    }
 }

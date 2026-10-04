@@ -16,11 +16,12 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Executor for <see cref="MineAndSellGoal"/>: one mining trip (PLAN.md slice 6.4). The ship flies to the
 /// asteroid, through refuelling stops when it must, and extracts once per cooldown, with the best survey
-/// there for its ore when there is one (<see cref="MineResourceVolumeCommand"/>), until its hold is full.
-/// Then it flies to the sell market, docks and sells, in batches of the market's trade volume, and the
-/// goal ends: the mining plan chooses the next trip. However the trip ends, it is booked with what its sale
-/// brought in (<see cref="ITripBook"/>, D46). A trip to a market out of the ship's CRUISE reach drifts to
-/// that market first, and mines from there in CRUISE (slice 6.10c, D45).
+/// there for its ore when there is one (<see cref="MineResourceVolumeCommand"/>), keeping the other ores a
+/// market buys within one tank (D71), until its hold is full. Then it flies to the sell market, docks and
+/// sells the trip's ore, in batches of the market's trade volume, and the goal ends: the mining plan sells
+/// the other ores and chooses the next trip. However the trip ends, it is booked with what its sale brought
+/// in (<see cref="ITripBook"/>, D46). A trip to a market out of the ship's CRUISE reach drifts to that market
+/// first, and mines from there in CRUISE (slice 6.10c, D45).
 /// </summary>
 public sealed class MineAndSellGoalExecutor(
     IShipRepository ships,
@@ -59,7 +60,7 @@ public sealed class MineAndSellGoalExecutor(
         if (!trip.Selling && ship.CargoCapacity > 0 && ship.CargoCurrent >= ship.CargoCapacity)
         {
             await goals.SetActiveGoalAsync(ship.Symbol, trip with { Selling = true }, ct);
-            return GoalExecutionResult.Progressing($"Hold full of {trip.TradeSymbol}; next, selling at {trip.SellWaypointSymbol}.");
+            return GoalExecutionResult.Progressing($"Hold full; next, selling {trip.TradeSymbol} at {trip.SellWaypointSymbol}.");
         }
 
         return trip.Selling
@@ -104,9 +105,10 @@ public sealed class MineAndSellGoalExecutor(
             return GoalExecutionResult.WaitingForCooldown("Waiting for extraction cooldown.", ship.CooldownExpiresAt);
         }
 
-        // One extraction, with the best survey for the ore when there is one; a docked ship orbits first.
+        // One extraction, with the best survey for the ore when there is one; a docked ship orbits first. The other ores a
+        // market buys within one tank stay aboard, for the mining plan to sell after this trip (D71).
         var mined = await bus.InvokeAsync<ShipCommandResult>(
-            new MineResourceVolumeCommand(ship.Symbol, trip.TradeSymbol, trip.SourceWaypointSymbol, Math.Max(1, ship.CargoCapacity)),
+            new MineResourceVolumeCommand(ship.Symbol, trip.TradeSymbol, trip.SourceWaypointSymbol, Math.Max(1, ship.CargoCapacity)) { KeepOtherOres = true },
             ct);
         if (mined is null || !mined.Accepted)
         {
@@ -131,6 +133,7 @@ public sealed class MineAndSellGoalExecutor(
             .Sum(item => item.Units);
         if (units <= 0)
         {
+            // A hold of other ores (D71): the mining plan sells them where each fetches most.
             await EndTripAsync(ship.Symbol, trip, TripBook.NothingAboard, ct);
             return GoalExecutionResult.Completed($"No {trip.TradeSymbol} aboard; the trip is done.");
         }

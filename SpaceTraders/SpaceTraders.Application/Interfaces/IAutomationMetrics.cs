@@ -135,7 +135,8 @@ public interface IAutomationMetrics
     /// Records every ship's state (<c>spacetraders_ships{role,state}</c> and
     /// <c>spacetraders_ship_status_since_timestamp_seconds{ship,role,state,goal,reason}</c>), where it
     /// is and what it does (<c>spacetraders_ship_info{ship,location,activity}</c>), what it can do
-    /// (<c>spacetraders_ship_capabilities_info{ship,can}</c>), when it arrives
+    /// (<c>spacetraders_ship_capabilities_info{ship,can}</c>), what the bot calls it
+    /// (<c>spacetraders_ship_name_info{ship,name,type}</c>, slice 2.14), when it arrives
     /// (<c>spacetraders_ship_arrival_timestamp_seconds{ship}</c>, while in transit) and its hold
     /// (<c>spacetraders_ship_cargo_units{ship,good}</c>, <c>spacetraders_ship_cargo_capacity_units{ship}</c>).
     /// A ship whose labels changed since the last call entered its state at <paramref name="now"/>;
@@ -495,6 +496,12 @@ public sealed record ShipMetricsSample
 
     /// <summary>What was paid for it and for the mounts and modules installed on it, as the ledger has it; 0 for a starting ship.</summary>
     public long Value { get; init; }
+
+    /// <summary>The name the bot gives it beside its symbol (slice 2.14, D72), such as <c>SPUTNIK-2</c>; empty before the agent is known.</summary>
+    public string Name { get; init; } = string.Empty;
+
+    /// <summary>The type its name is for: the shipyard type, such as <c>SHIP_PROBE</c>, else its registration role.</summary>
+    public string NamedType { get; init; } = string.Empty;
 }
 
 /// <summary>One material of a construction site (slice 6.6).</summary>

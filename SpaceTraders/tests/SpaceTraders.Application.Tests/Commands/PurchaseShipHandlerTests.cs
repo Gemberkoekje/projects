@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -62,6 +64,7 @@ public sealed class PurchaseShipHandlerTests
             budget,
             new ShipyardCalls(),
             new PurchaseNeeds(),
+            new ShipNameBook(Substitute.For<IActiveReset>()),
             bus,
             NullLogger<PurchaseShipHandler>.Instance);
 

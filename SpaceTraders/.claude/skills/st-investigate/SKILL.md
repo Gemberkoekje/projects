@@ -11,7 +11,9 @@ description: Investigate SpaceTraders bot misbehaviour on the home cluster and f
 Arguments: `$ARGUMENTS` is one of:
 - an anomaly (`<rule> <subject>`, for example `ContractStalled cmup71is3f88dt06vr7h29pbw` or
   `ShipStuck SPECTER-3`);
-- a ship symbol or contract id;
+- a ship symbol or contract id; or a ship's name, such as `PICKAXE-2` (slice 2.14): the name the bot gives it
+  beside the game's symbol, which `spacetraders_ship_name_info` maps back to the symbol, and every log line
+  about the ship carries as `ShipName`;
 - a short description of the symptom;
 - `week`, for a review of the last 7 days.
 
@@ -116,8 +118,9 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 # Every occurrence of one statement
 {namespace="spacetraders"} |= "\"@i\":\"bd1538c5\""
 
-# Everything about one ship (always ShipSymbol since slice 1.9)
+# Everything about one ship (always ShipSymbol since slice 1.9; ShipName beside it since slice 2.14)
 {namespace="spacetraders"} | json | ShipSymbol="SPECTER-1"
+{namespace="spacetraders"} | json | ShipName="PICKAXE-2"
 
 # Anomalies raised and cleared, with what was wrong (Details)
 {namespace="spacetraders"} | json | EventKind=~"Anomaly.*"                          (with --props)
@@ -142,6 +145,9 @@ sum by (type) (rate(spacetraders_messages_handled_total[5m]))
 # Each ship: where it is and what the bot has it do; how long it has been in its state
 spacetraders_ship_info
 time() - spacetraders_ship_status_since_timestamp_seconds
+
+# Each ship's name beside its symbol (slice 2.14), and the type the name is for
+spacetraders_ship_name_info
 
 # Every setting as it is now, the Runtime.* flags included (a secret shows "(hidden)")
 spacetraders_setting_info

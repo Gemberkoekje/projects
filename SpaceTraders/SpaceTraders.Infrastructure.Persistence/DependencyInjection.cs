@@ -23,6 +23,7 @@ public static class DependencyInjection
 
         // Empty until agent bootstrap has picked the agent (AgentBootstrapService).
         services.AddSingleton<IAgentDataScope, AgentDataScope>();
+        services.AddSingleton<IActiveReset, ActiveReset>();
 
         // Singleton: tracks current active run ID in memory so LedgerRepository can tag entries.
         services.AddSingleton<ActiveRunIdProvider>();

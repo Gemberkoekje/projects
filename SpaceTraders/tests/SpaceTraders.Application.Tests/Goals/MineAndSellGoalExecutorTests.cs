@@ -123,6 +123,30 @@ public sealed class MineAndSellGoalExecutorTests
     }
 
     [Fact]
+    public async Task AtTheAsteroid_ItKeepsTheOtherOresAMarketBuysWithinOneTank()
+    {
+        // D71: the trip keeps them, and the mining plan sells them on the trips after it.
+        await StepAsync(Drone(waypoint: XB5C, status: "IN_ORBIT"), Trip);
+
+        await _bus.Received(1).InvokeAsync<ShipCommandResult>(
+            Arg.Is<MineResourceVolumeCommand>(command => command.KeepOtherOres),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<TimeSpan?>());
+    }
+
+    [Fact]
+    public async Task WithAFullHoldOfOtherOres_TheTripTurnsToSelling_AndSaysSo()
+    {
+        // D71: the hold fills with the ores kept as well as the trip's own.
+        var full = Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("COPPER_ORE", 6), new CargoItemModel("QUARTZ_SAND", 9)]);
+
+        var result = await StepAsync(full, Trip);
+
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-3", Arg.Is<MineAndSellGoal>(goal => goal.Selling), Arg.Any<CancellationToken>());
+        result.Reason.Should().Be($"Hold full; next, selling COPPER_ORE at {H51}.");
+    }
+
+    [Fact]
     public async Task OnCooldown_ItWaits()
     {
         var result = await StepAsync(Drone(waypoint: XB5C, status: "IN_ORBIT") with { CooldownExpiresAt = DateTimeOffset.UtcNow.AddSeconds(40) }, Trip);

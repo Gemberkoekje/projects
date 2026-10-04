@@ -16,4 +16,15 @@ public static class AgentIdentity
         ArgumentException.ThrowIfNullOrWhiteSpace(resetDate);
         return $"{agentSymbol.ToUpperInvariant()}@{resetDate}";
     }
+
+    /// <summary>The reset date in an agent id: <c>2026-10-04</c> in <c>SPECTER@2026-10-04</c>; empty without one.</summary>
+    /// <param name="agentId">The agent id, or empty before agent bootstrap.</param>
+    /// <returns>The reset date, or empty.</returns>
+    public static string ResetDateOf(string agentId)
+    {
+        ArgumentNullException.ThrowIfNull(agentId);
+
+        var at = agentId.LastIndexOf('@');
+        return at < 0 ? string.Empty : agentId[(at + 1)..];
+    }
 }

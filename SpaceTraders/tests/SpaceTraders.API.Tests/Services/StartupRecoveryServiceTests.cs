@@ -1,10 +1,13 @@
+using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Goals;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -22,10 +25,25 @@ public sealed class StartupRecoveryServiceTests
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IActiveReset _reset = Substitute.For<IActiveReset>();
+    private readonly ShipNameBook _names;
 
     public StartupRecoveryServiceTests()
     {
         _settings.GetAsync<bool>(AutomationSwitches.EnabledSetting, Arg.Any<CancellationToken>()).Returns(true);
+        _reset.ResetDate.Returns("2026-10-04");
+        _names = new ShipNameBook(_reset);
+    }
+
+    [Fact]
+    public async Task StartAsync_TellsTheNameBookTheFleet_SoTheFirstStepsLinesCarryTheNames()
+    {
+        // Slice 2.14 (D72): until the metrics' first sample, 10 seconds on, the log lines would go without them.
+        Fleet(Ship("DOCKED", DateTimeOffset.UtcNow.AddMinutes(-5)));
+
+        await StartAsync();
+
+        _names.NameOf("SPECTER-1").Should().Be(ShipNames.For([Ship("DOCKED", DateTimeOffset.UtcNow)], "2026-10-04")["SPECTER-1"]);
     }
 
     [Fact]
@@ -130,7 +148,7 @@ public sealed class StartupRecoveryServiceTests
         services.AddSingleton(_bus);
         await using var provider = services.BuildServiceProvider();
 
-        await new StartupRecoveryService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupRecoveryService>.Instance)
+        await new StartupRecoveryService(provider.GetRequiredService<IServiceScopeFactory>(), _names, NullLogger<StartupRecoveryService>.Instance)
             .StartAsync(CancellationToken.None);
     }
 }

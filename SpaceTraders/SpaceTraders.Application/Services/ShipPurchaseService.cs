@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -30,6 +31,7 @@ public sealed class ShipPurchaseService(
     IBudgetPolicy budget,
     ShipyardCalls calls,
     PurchaseNeeds purchases,
+    IShipNameBook names,
     IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
@@ -104,16 +106,20 @@ public sealed class ShipPurchaseService(
 
         await ships.UpsertAsync(newShip, cancellationToken);
 
+        // The name the bot gives it (slice 2.14, D72): the next number of its type. Told now, so its first lines carry it.
+        var name = names.Know(await ships.GetAllAsync(cancellationToken)).GetValueOrDefault(result.ShipSymbol, string.Empty);
+
         // The ledger and the credits-spent metric (B7).
         await bus.PublishAsync(new NewShipPurchasedEvent(result.ShipSymbol, ToShipType(shipType), result.Cost));
 
         logger.LogInformation(
-            "{EventKind:l}: ship {ShipSymbol} ({ShipType}) bought at {WaypointSymbol} for {Cost} credits.",
+            "{EventKind:l}: ship {ShipSymbol} ({ShipType}) bought at {WaypointSymbol} for {Cost} credits; the bot calls it {ShipName}.",
             JournalEvents.ShipPurchased,
             result.ShipSymbol,
             shipType,
             shipyardWaypoint,
-            result.Cost);
+            result.Cost,
+            name);
 
         return new ShipPurchaseResult
         {

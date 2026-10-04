@@ -1,6 +1,7 @@
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Naming;
 
 namespace SpaceTraders.Application.Queries;
 
@@ -17,11 +18,13 @@ public sealed class GetAgentQueryHandler(IAgentRepository agents)
 
 public sealed record GetAllShipsQuery;
 
-public sealed class GetAllShipsQueryHandler(IShipRepository ships)
+/// <summary>Every ship, with the name the bot gives it beside its symbol (slice 2.14, D72), which it tells the name book too.</summary>
+public sealed class GetAllShipsQueryHandler(IShipRepository ships, IShipNameBook names)
 {
     public async Task<IReadOnlyList<ShipDto>> Handle(GetAllShipsQuery query, CancellationToken cancellationToken)
     {
         var all = await ships.GetAllAsync(cancellationToken);
+        var named = names.Know(all);
         var now = TimeProvider.System.GetUtcNow();
         return all.Select(s => new ShipDto(
             s.Symbol,
@@ -42,7 +45,10 @@ public sealed class GetAllShipsQueryHandler(IShipRepository ships)
             s.HasSurveyEquipment,
             s.HasGasSiphonEquipment,
             s.HasGasProcessor,
-            s.HasMineralProcessor)).ToList();
+            s.HasMineralProcessor)
+        {
+            Name = named.GetValueOrDefault(s.Symbol, string.Empty),
+        }).ToList();
     }
 }
 

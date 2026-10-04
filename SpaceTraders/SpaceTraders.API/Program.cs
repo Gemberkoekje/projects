@@ -15,6 +15,7 @@ using SpaceTraders.Application;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Naming;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
 using SpaceTraders.Infrastructure.Persistence.Seed;
@@ -79,6 +80,9 @@ builder.Host.UseSerilog(
 
         // Every line carries the run's reset date once the agent is known, as every metric does (slice 2.13).
         cfg.Enrich.With(new ResetDateEnricher(services.GetRequiredService<IAgentDataScope>()));
+
+        // A line about a ship carries the name the bot gives it, beside its symbol (slice 2.14).
+        cfg.Enrich.With(new ShipNameEnricher(services.GetRequiredService<IShipNameBook>()));
     },
     preserveStaticLogger: true);
 
