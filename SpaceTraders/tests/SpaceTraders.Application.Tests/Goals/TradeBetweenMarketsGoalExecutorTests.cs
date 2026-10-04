@@ -55,6 +55,17 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         SellWaypointChanged = moved,
     };
 
+    /// <summary>A trip of 15 SHIP_PARTS from D41 to A1, chosen at an ABUNDANT seller (D74, <see cref="ShipPartsMap"/>).</summary>
+    private static TradeBetweenMarketsGoal ShipPartsTrip() => new()
+    {
+        TradeSymbol = "SHIP_PARTS",
+        BuyWaypointSymbol = D41,
+        SellWaypointSymbol = A1,
+        Units = 15,
+        ExpectedProfit = 4_095,
+        ReservedCredits = 115_815,
+    };
+
     private static ShipModel Loaded(string waypoint, int units = 40, string status = "DOCKED")
         => CommandShip(waypoint, status, cargo: [new CargoItemModel("EQUIPMENT", units)]);
 
@@ -223,6 +234,39 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             A1Market()));
 
         var result = await StepAsync(CommandShip(K85), Trip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_full_hold"));
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Any<TradeBetweenMarketsGoal>(), "not_full_hold", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtAnAbundantSeller_ItBuysWhatBothMarketsTradeAtOnce_InOnePurchase()
+    {
+        // D74: D41 sells SHIP_PARTS 15 at a time, its supply ABUNDANT, and A1 takes 40 at once: the trip buys 15, though the
+        // hold takes 40.
+        PricesAre(ShipPartsMap());
+        _port.BuyCargoAsync("SHIP-1", "SHIP_PARTS", 15, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult("AGENT", Credits - 115_815, new CargoModel(15, 40, [new CargoItemModel("SHIP_PARTS", 15)]), 115_815));
+
+        var result = await StepAsync(CommandShip(D41), ShipPartsTrip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "SHIP_PARTS", 15, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 15 && g.PricePaidPerUnit == 7_721),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheSellerIsNoLongerAbundant_AndNoFullHoldTradesAtOnce()
+    {
+        // D74: D41's supply fell to HIGH since the trip was chosen, and 15 at a time fills no 40-unit hold (D56).
+        PricesAre(ShipPartsMap(supplyAtD41: "HIGH"));
+
+        var result = await StepAsync(CommandShip(D41), ShipPartsTrip());
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);

@@ -404,6 +404,22 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task AtAnAbundantSeller_ATraderTakesWhatBothMarketsTradeAtOnce_ThoughThatFillsNoHold()
+    {
+        // D74: D41 sells SHIP_PARTS 15 at a time, its supply ABUNDANT; the command ship's trip carries 15 in its 40-unit hold,
+        // and holds back what those 15 cost (D57).
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(ShipPartsMap()));
+        Fleet(CommandShip(D41));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        trip.TradeSymbol.Should().Be("SHIP_PARTS");
+        trip.Units.Should().Be(15);
+        trip.ReservedCredits.Should().Be(15 * 7_721);
+    }
+
+    [Fact]
     public async Task WithoutALucrativeRoute_TheTraderWaits()
     {
         Fleet(Drone());

@@ -20,7 +20,9 @@ namespace SpaceTraders.Application.Trading;
 /// A trip is a full hold, bought in one purchase and sold in one sale (D56): a route counts only when both
 /// markets' trade volumes, the most a single trade takes, are at least the ship's free hold, and the credits
 /// pay for all of it. Each trade moves the price, so a hold bought in several purchases costs more per unit
-/// than the first one. Cargo may use the credit reserve (D17); the trip's fuel is kept back.
+/// than the first one. Where the buy market's supply of the good is ABUNDANT, a trip may fill less: what both
+/// markets trade at once, still in one purchase and one sale (D74). Cargo may use the credit reserve (D17); the
+/// trip's fuel is kept back.
 /// </para>
 /// <para>
 /// Ships fly CRUISE, which burns one unit of fuel per unit of distance (at least 1). A ship docked at
@@ -34,6 +36,9 @@ namespace SpaceTraders.Application.Trading;
 public static class TradeRoutePlanner
 {
     private const int FuelPerMarketUnit = 100;
+
+    /// <summary>The supply at which a seller's trade volume may fill less than the hold (D74).</summary>
+    private const string AbundantSupply = "ABUNDANT";
 
     /// <summary>The key that identifies a route: good, buy market and sell market.</summary>
     /// <param name="tradeSymbol">The good.</param>
@@ -138,8 +143,8 @@ public static class TradeRoutePlanner
     /// <param name="route">The route's figures.</param>
     /// <returns>
     /// False when the ship can't fly it (a market, a price or a position unknown, no way to get there
-    /// within its tank) or can't trade a full hold in one go (D56: no free hold, a trade volume below it,
-    /// too few credits for it).
+    /// within its tank) or can't trade its units in one go (<see cref="UnitsAtOnce"/>: no free hold, a trade volume
+    /// below it at a seller whose supply isn't ABUNDANT, too few credits for them).
     /// </returns>
     public static bool TryEvaluate(
         TradeMarketMap map,
@@ -163,27 +168,37 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Whether both markets trade the ship's whole free hold of a good at once, as last seen (D56): the buy market sells
-    /// it in one purchase and the sell market takes it in one sale. Asked on 2026-10-03: "The entire goal is to buy full
-    /// holds in one go, because it makes no sense to buy more times than one."
+    /// The units a trip of a good carries, as the markets were last seen, bought in one purchase and sold in one sale:
+    /// <list type="bullet">
+    ///   <item>the ship's whole free hold, when both markets' trade volumes take it at once (D56). Asked on 2026-10-03: "The
+    ///   entire goal is to buy full holds in one go, because it makes no sense to buy more times than one.";</item>
+    ///   <item>otherwise, where the buy market's supply of the good is ABUNDANT, what both markets trade at once (D74). Asked
+    ///   on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT, in which
+    ///   case a full hold is not necessary";</item>
+    ///   <item>otherwise none.</item>
+    /// </list>
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship.</param>
     /// <param name="tradeSymbol">The good.</param>
     /// <param name="buyWaypointSymbol">The buy market.</param>
     /// <param name="sellWaypointSymbol">The sell market.</param>
-    /// <returns>True when the ship has a free hold and both trade volumes are at least that.</returns>
-    public static bool TakesFullHold(TradeMarketMap map, ShipModel ship, string tradeSymbol, string buyWaypointSymbol, string sellWaypointSymbol)
+    /// <returns>The units; 0 when the trip takes none.</returns>
+    public static int UnitsAtOnce(TradeMarketMap map, ShipModel ship, string tradeSymbol, string buyWaypointSymbol, string sellWaypointSymbol)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
 
         var free = ship.CargoCapacity - ship.CargoCurrent;
-        return free > 0
-            && map.TryGetGood(buyWaypointSymbol, tradeSymbol, out var atBuy)
-            && atBuy.TradeVolume >= free
-            && map.TryGetGood(sellWaypointSymbol, tradeSymbol, out var atSell)
-            && atSell.TradeVolume >= free;
+        if (free <= 0
+            || !map.TryGetGood(buyWaypointSymbol, tradeSymbol, out var atBuy)
+            || !map.TryGetGood(sellWaypointSymbol, tradeSymbol, out var atSell))
+        {
+            return 0;
+        }
+
+        var atOnce = Math.Max(0, Math.Min(free, Math.Min(atBuy.TradeVolume, atSell.TradeVolume)));
+        return atOnce == free || string.Equals(atBuy.Supply, AbundantSupply, StringComparison.OrdinalIgnoreCase) ? atOnce : 0;
     }
 
     /// <summary>
@@ -355,11 +370,12 @@ public static class TradeRoutePlanner
             return false;
         }
 
-        // D56: the whole free hold, in one purchase and one sale, and paid for, or no trip.
+        // D56: the whole free hold, or at an ABUNDANT seller what both markets trade at once (D74); in one purchase and one
+        // sale, and paid for, or no trip.
         var fuelCost = approach.FuelCost + haul.FuelCost;
         var affordable = Math.Max(0, credits - fuelCost) / atBuy.PurchasePrice;
-        var units = ship.CargoCapacity - ship.CargoCurrent;
-        if (!TakesFullHold(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol) || affordable < units)
+        var units = UnitsAtOnce(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol);
+        if (units == 0 || affordable < units)
         {
             return false;
         }
