@@ -7,6 +7,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Docs – Changed (2026-10-04, phase 6 check)
+- `PLAN.md`: where things stand after the server reset of 2026-10-04 (the new agent in X1-FJ91, its contract, its gate); slices 2.11, 2.12, 6.6 and 6.11 merged and deployed instead of "built on branch"; phase 6's checks on the run that ended (6.10b's and 6.10c's met, 6.11's first run); the gembernodes table's merged rows; 4.1's revoke done.
+
 ### Code – Fixed (2026-10-04, B59)
 - The local request budget keeps to the API's rate limiter (B59, step 2), from the headers step 1 logged: 119 429s between 2026-10-03 19:51Z and 2026-10-04 13:00Z, all from the limiter's IP address count. Each window is 100 ms longer (`RequestBudget.JourneyMargin`), for a request's journey to the server: half the 429s came a few milliseconds early. A 429 from the limiter holds every request back until the reset it names (`RequestBudget.PauseUntil`), not only the one it refused: 68 of 118 came within 20 seconds of the one before. A new process starts with its burst spent (`RequestBudget.ForANewProcess`), as the server still counts what the process before it sent in the last minute: the 429s at 10:07:50Z on 2026-10-04 came during a start.
 
