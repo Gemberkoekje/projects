@@ -87,10 +87,14 @@ public sealed class SurveyPlanService(
 
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken, surveyOn: true);
         var fleet = await ships.GetAllAsync(cancellationToken);
-        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+        var active = await assignments.GetAllActiveAsync(cancellationToken);
+        var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
+        var explorers = BusinessSystems.Explorers(active);
 
         var surveying = new Dictionary<string, SurveyWaypointGoal>(StringComparer.OrdinalIgnoreCase);
         var free = new List<ShipModel>();
@@ -129,7 +133,7 @@ public sealed class SurveyPlanService(
         var targets = new List<SurveyPlanTarget>();
         var drones = new Dictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)>(StringComparer.OrdinalIgnoreCase);
         foreach (var system in fleet
-            .Where(ship => board.IsSurveyor(ship) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
+            .Where(ship => board.IsSurveyor(ship) && !explorers.Contains(ship.Symbol) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);

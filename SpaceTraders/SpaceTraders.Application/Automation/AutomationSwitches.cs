@@ -5,11 +5,14 @@ namespace SpaceTraders.Application.Automation;
 
 /// <summary>
 /// The plans the tick runs, in this order. Each has its own on/off setting. The role board (slice 6.9) runs before
-/// the plans whose ships it gives roles.
+/// the plans whose ships it gives roles; the explore plan (asked on 2026-10-04) before them all but the scout plan, so the
+/// command ship it is waiting for goes exploring as soon as its trip ends.
 /// </summary>
+/// <remarks>Only the names are stored (settings, journal lines, metric labels), so a plan can go anywhere in the order.</remarks>
 public enum AutomationPlan
 {
     Scout,
+    Explore,
     Roles,
     Contract,
     ProbeDeployment,
@@ -40,6 +43,7 @@ public static class AutomationSwitches
     public static AutomationPlan? PlanFor(ShipGoal goal) => goal switch
     {
         ScoutWaypointGoal => AutomationPlan.Scout,
+        JumpGoal or ExploreSystemGoal => AutomationPlan.Explore,
         DeployProbeGoal => AutomationPlan.ProbeDeployment,
         SurveyWaypointGoal => AutomationPlan.Survey,
 

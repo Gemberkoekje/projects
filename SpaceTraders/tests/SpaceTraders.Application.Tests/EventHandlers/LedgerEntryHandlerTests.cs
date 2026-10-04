@@ -37,6 +37,24 @@ public sealed class LedgerEntryHandlerTests
     }
 
     [Fact]
+    public async Task AJump_IsALedgerRow_AndCreditsSpentOnAntimatter()
+    {
+        // Exploring (asked on 2026-10-04): a jump buys one ANTIMATTER at the market of the gate it leaves.
+        await _handler.Handle(new ShipJumpedEvent("AGENT-1", "X1-DC53-I55", "X1-KR90-AF5F", 4_520), CancellationToken.None);
+
+        await _ledger.Received(1).AppendAsync(
+            "AGENT-1",
+            LedgerCategory.AntimatterPurchase,
+            -4_520,
+            goodSymbol: "ANTIMATTER",
+            unitPrice: 4_520,
+            units: 1,
+            waypointSymbol: "X1-DC53-I55",
+            cancellationToken: Arg.Any<CancellationToken>());
+        _metrics.Received(1).CreditsSpent("AntimatterPurchase", 4_520);
+    }
+
+    [Fact]
     public async Task ASale_IsALedgerRow_WithItsMarketAndUnitPrice_AndCreditsEarned()
     {
         // B57, found on 2026-10-03: all 1,336 sale rows since the first, on 2026-10-02 at 13:20Z, had no market and no unit

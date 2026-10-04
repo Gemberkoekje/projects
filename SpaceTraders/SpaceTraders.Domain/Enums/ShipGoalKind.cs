@@ -18,4 +18,6 @@ public enum ShipGoalKind
     SurveyWaypoint = 13,
     SiphonAndSell = 14,
     GatherAndSell = 15,
+    Jump = 16,
+    ExploreSystem = 17,
 }

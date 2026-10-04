@@ -494,6 +494,34 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhereOnlyTheExploringCommandShipIs_NoCargoShipIsBought()
+    {
+        // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells shuttles, and a shuttle
+        // there would have a lucrative route; the command ship, exploring, is docked at its shipyard.
+        const string Kr90 = "X1-KR90";
+        SurveyPlanOn();
+        Fleet(CommandShip(waypoint: A1) with { SystemSymbol = Kr90, Status = "DOCKED" });
+        CreditsAre(300_000);
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Explore", A1, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
+        _tradeContexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = A1,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_LIGHT_SHUTTLE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 117_273, FuelCapacity = 300, CargoCapacity = 40 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_AndThenOneMoreOfTheLastType_InTurnWithTheDrones()
     {
         // D21's list, then D43: "alternate drones and cargo ships", one more cargo ship of the list's last type at a time.

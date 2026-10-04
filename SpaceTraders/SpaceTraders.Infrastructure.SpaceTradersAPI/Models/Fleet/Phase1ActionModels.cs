@@ -122,6 +122,9 @@ public sealed class JumpResult
 
     [JsonPropertyName("transaction")]
     public MarketTransaction? Transaction { get; init; }
+
+    [JsonPropertyName("agent")]
+    public Agents.Agent? Agent { get; init; }
 }
 
 public sealed class ChartResult

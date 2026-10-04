@@ -59,6 +59,21 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
+    public async Task Handle(ShipJumpedEvent @event, CancellationToken cancellationToken)
+    {
+        await ledger.AppendAsync(
+            @event.ShipSymbol,
+            LedgerCategory.AntimatterPurchase,
+            -@event.Cost,
+            goodSymbol: "ANTIMATTER",
+            unitPrice: (int)Math.Min(@event.Cost, int.MaxValue),
+            units: 1,
+            waypointSymbol: @event.FromWaypointSymbol,
+            cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.AntimatterPurchase, -@event.Cost);
+        notifier.Notify("ship", @event.ShipSymbol);
+    }
+
     public async Task Handle(ShipRepairedEvent @event, CancellationToken cancellationToken)
     {
         await ledger.AppendAsync(

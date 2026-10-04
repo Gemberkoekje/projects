@@ -13,4 +13,5 @@ public enum LedgerCategory
     MountPurchase,
     Repair,
     Other,
+    AntimatterPurchase,
 }
