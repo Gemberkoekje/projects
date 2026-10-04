@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.17)
+- `GET /status/trading-routes` serves the trading plan's routes in the order it gives them out (D75), as asked on 2026-10-04: "Can you, in a new pr, add the exact logic to the market tree view that is used to determine which trade is done first?" It reads the plan's state as its last pass stored it: the routes traders hold, then the lucrative routes no trader holds, numbered from 1 (a route that feeds a pricier good first, D15, then the most profit after fuel), each with its units, profit after fuel and per unit, what it feeds and the traders that could take it. The markets dashboard shows it under the market tree (gembernodes, same branch).
+
+### Docs – Changed (2026-10-04, slice 2.17)
+- `PLAN.md`: slice 2.17 and decision D75, and slice 6.13 merged and deployed. `docs/HOW_IT_WORKS.md`: the endpoint, in the status endpoints and with the trading plan's state.
+
 ### Code – Added (2026-10-04, slice 2.16)
 - Each ship's profit, as asked on 2026-10-04: "I'd like to see each ships total profit. So -purchase price-market buys+market sales-fuel (plus or minus any other relevant ship-specific credit changes)". `spacetraders_ship_ledger_credits{ship,category}` is each ship's ledger since it joined the fleet, summed by category: earnings positive, costs negative (its purchase, mounts and modules, cargo bought, fuel, a jump's antimatter, the jump gate's materials); summed by ship, what it has made. `PrometheusMetricsService` reads it every 10 seconds in one query grouping the ledger by ship and category, which also gives what each ship cost. The contract's payments are booked to the agent, no ship.
 - In Grafana (gembernodes, same branch): a "Profit by ship" table under Roles, most profitable first, with what each profit is made of and the fleet's totals.

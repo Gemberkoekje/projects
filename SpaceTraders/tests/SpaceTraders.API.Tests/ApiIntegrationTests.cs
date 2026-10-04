@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -486,6 +487,97 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         assignedBody.Should().Contain("Assigned");
         assignedBody.Should().Contain("MINER-1");
     }
+
+    [Fact]
+    public async Task TradingRoutes_ListTheHeldRoutes_ThenTheWaitingOnes_NumberedInTheTradingPlansOrder()
+    {
+        // Slice 2.17 (D75): the order the trading plan gives routes out in, as it stored it at its last pass: a route that
+        // feeds a pricier good first (D15), so FABRICS, which feeds CLOTHING, comes before SHIP_PARTS, which earns more.
+        var updatedAt = new DateTimeOffset(2026, 10, 04, 23, 30, 00, TimeSpan.Zero);
+        _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
+            .Returns(new TradingAutomationPlanState
+            {
+                PlanId = Guid.NewGuid(),
+                CreatedAt = updatedAt.AddHours(-1),
+                UpdatedAt = updatedAt,
+                Opportunities =
+                [
+                    TradingRoute("EQUIPMENT", "X1-AB-K85", "X1-AB-D41", MarketAutomationOpportunityStatus.Assigned, 40, 9_168, "SHIP_PARTS") with { AssignedShipSymbol = "SHIP-1" },
+                    TradingRoute("FABRICS", "X1-AB-C3", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 40, 2_800, "CLOTHING") with { CandidateShipSymbols = ["SHIP-2"] },
+                    TradingRoute("SHIP_PARTS", "X1-AB-D41", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 15, 4_095, string.Empty) with { CandidateShipSymbols = ["SHIP-2", "SHIP-3"] },
+                ],
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/trading-routes");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("updatedAt").GetDateTimeOffset().Should().Be(updatedAt);
+        var routes = json.RootElement.GetProperty("routes");
+        Enumerable.Range(0, routes.GetArrayLength()).Select(i => routes[i].GetProperty("tradeSymbol").GetString())
+            .Should().Equal("EQUIPMENT", "FABRICS", "SHIP_PARTS");
+
+        routes[0].GetProperty("status").GetString().Should().Be("Assigned");
+        routes[0].GetProperty("position").ValueKind.Should().Be(JsonValueKind.Null, "a held route is no longer given out");
+        routes[0].GetProperty("shipSymbol").GetString().Should().Be("SHIP-1");
+        routes[0].GetProperty("feedsTradeSymbol").GetString().Should().Be("SHIP_PARTS");
+
+        routes[1].GetProperty("status").GetString().Should().Be("Pending");
+        routes[1].GetProperty("position").GetInt32().Should().Be(1);
+        routes[1].GetProperty("buyWaypointSymbol").GetString().Should().Be("X1-AB-C3");
+        routes[1].GetProperty("sellWaypointSymbol").GetString().Should().Be("X1-AB-A1");
+        routes[1].GetProperty("candidateShips").GetString().Should().Be("SHIP-2");
+
+        routes[2].GetProperty("position").GetInt32().Should().Be(2);
+        routes[2].GetProperty("units").GetInt32().Should().Be(15);
+        routes[2].GetProperty("expectedProfit").GetInt64().Should().Be(4_095);
+        routes[2].GetProperty("profitPerUnit").GetInt64().Should().Be(273);
+        routes[2].GetProperty("feedsTradeSymbol").GetString().Should().BeEmpty();
+        routes[2].GetProperty("candidateShips").GetString().Should().Be("SHIP-2, SHIP-3");
+    }
+
+    [Fact]
+    public async Task TradingRoutes_BeforeTheTradingPlansFirstPass_AreNone()
+    {
+        _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
+            .Returns((TradingAutomationPlanState?)null);
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/trading-routes");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("updatedAt").ValueKind.Should().Be(JsonValueKind.Null);
+        json.RootElement.GetProperty("routes").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TradingRoutes_WithoutApiKey_Returns401()
+    {
+        using var response = await _client.GetAsync($"{ApiPathBase}/status/trading-routes");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private static TradingAutomationOpportunityState TradingRoute(
+        string good,
+        string buyAt,
+        string sellAt,
+        MarketAutomationOpportunityStatus status,
+        int units,
+        long expectedProfit,
+        string feeds)
+        => new()
+        {
+            OpportunityKey = $"{buyAt}|{sellAt}|{good}",
+            TradeSymbol = good,
+            BuyWaypointSymbol = buyAt,
+            SellWaypointSymbol = sellAt,
+            Status = status,
+            Units = units,
+            ExpectedProfit = expectedProfit,
+            FeedsTradeSymbol = feeds,
+            FirstObservedAt = DateTimeOffset.UnixEpoch,
+            LastObservedAt = DateTimeOffset.UnixEpoch,
+        };
 
     // ── Phase 16a: Fleet status endpoints ────────────────────────────────────
 
