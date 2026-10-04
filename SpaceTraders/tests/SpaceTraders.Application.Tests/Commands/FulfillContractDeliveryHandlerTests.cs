@@ -9,8 +9,10 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Events;
 using Wolverine;
+using static SpaceTraders.Application.Tests.Commands.FuelStopFixture;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
@@ -52,8 +54,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             bus,
             agents,
@@ -134,8 +139,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             dock,
+            Substitute.For<IRefuelSubCommand>(),
             orbit,
+            Substitute.For<IFlightModeSubCommand>(),
             navigate,
             bus,
             Substitute.For<IAgentRepository>(),
@@ -161,6 +169,9 @@ public sealed class FulfillContractDeliveryHandlerTests
         var navigate = Substitute.For<INavigateSubCommand>();
         var bus = Substitute.For<Wolverine.IMessageBus>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
+        var tradeContexts = Substitute.For<ITradeContextReader>();
+        tradeContexts.ReadAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns(new TradeContext(new TradeMarketMap([], [], new Dictionary<string, IReadOnlyList<string>>()), 0, 0));
 
         ships.FindAsync("SHIP-2", Arg.Any<CancellationToken>()).Returns(new ShipModel(
             Symbol: "SHIP-2",
@@ -178,8 +189,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            tradeContexts,
             dock,
+            Substitute.For<IRefuelSubCommand>(),
             orbit,
+            Substitute.For<IFlightModeSubCommand>(),
             navigate,
             bus,
             Substitute.For<IAgentRepository>(),
@@ -250,8 +264,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<Wolverine.IMessageBus>(),
             Substitute.For<IAgentRepository>(),
@@ -297,8 +314,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<Wolverine.IMessageBus>(),
             agents,
@@ -328,8 +348,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<IMessageBus>(),
             Substitute.For<IAgentRepository>(),
@@ -365,8 +388,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<IMessageBus>(),
             Substitute.For<IAgentRepository>(),
@@ -402,8 +428,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<IMessageBus>(),
             Substitute.For<IAgentRepository>(),
@@ -438,8 +467,11 @@ public sealed class FulfillContractDeliveryHandlerTests
             port,
             ships,
             contracts,
+            Substitute.For<ITradeContextReader>(),
             Substitute.For<IDockSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
             Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IFlightModeSubCommand>(),
             Substitute.For<INavigateSubCommand>(),
             Substitute.For<IMessageBus>(),
             Substitute.For<IAgentRepository>(),
@@ -454,6 +486,64 @@ public sealed class FulfillContractDeliveryHandlerTests
 
         // Its round trip is booked when the call succeeds (D46).
         await trips.DidNotReceiveWithAnyArgs().BookContractTripAsync(default!, default, default);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TheDeliveryAfterADrift_GoesInCruise()
+    {
+        // B47, on the cluster on 2026-10-04: the navigation's fallback drifted SPECTER-1 to the contract's asteroid, EF5D,
+        // and left it in DRIFT, so it took the copper the 19 to H60 in DRIFT too: 148 seconds instead of about 30.
+        var ship = new FlyingShip(CommandShip(EF5D, "IN_ORBIT", "DRIFT", fuel: 399, cargo: [new CargoItemModel("COPPER_ORE", 40)]));
+
+        await Handler(ship, Substitute.For<ISpaceTradersPort>())
+            .ExecuteAsync(new FulfillContractDeliveryCommand("SPECTER-1", "C-1", "COPPER_ORE", H60), CancellationToken.None);
+
+        ship.Flights.Should().Equal(new Flight(H60, "CRUISE", 399, 19));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ADeliveryBeyondOneTank_GoesInCruise_RefuellingOnTheWay()
+    {
+        // B47: a delivery from beyond one tank refuels on the way, as the flight to the asteroid does, rather than drifting.
+        // With the copper aboard at J67, H60 is 765 away. Each tick flies a leg, and the next one dead-reckons its arrival.
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.DeliverContractAsync("C-1", "SPECTER-1", "COPPER_ORE", 40, Arg.Any<CancellationToken>())
+            .Returns(Delivered("C-1", required: 120, fulfilled: 80));
+        var ship = new FlyingShip(CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 40)]));
+
+        for (var tick = 0; tick < 4; tick++)
+        {
+            await Handler(ship, port)
+                .ExecuteAsync(new FulfillContractDeliveryCommand("SPECTER-1", "C-1", "COPPER_ORE", H60), CancellationToken.None);
+        }
+
+        ship.Flights.Should().Equal(
+            new Flight(J66, "CRUISE", 400, 119),
+            new Flight(I65, "CRUISE", 400, 372),
+            new Flight(H60, "CRUISE", 400, 274));
+        await port.Received(1).DeliverContractAsync("C-1", "SPECTER-1", "COPPER_ORE", 40, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>A handler for a ship in <see cref="FuelStopFixture"/>, whose contract's terms aren't cached.</summary>
+    private static FulfillContractDeliveryHandler Handler(FlyingShip ship, ISpaceTradersPort port)
+    {
+        var tradeContexts = Substitute.For<ITradeContextReader>();
+        tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context());
+        return new FulfillContractDeliveryHandler(
+            port,
+            ship.Ships,
+            Substitute.For<IContractRepository>(),
+            tradeContexts,
+            ship.Dock,
+            ship.Refuel,
+            ship.Orbit,
+            ship.FlightMode,
+            ship.Navigate,
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IShipAssignmentRepository>(),
+            Substitute.For<ITripBook>(),
+            NullLogger<FulfillContractDeliveryHandler>.Instance);
     }
 
     private static ShipAssignmentDto Assignment(string ship, string contractId)

@@ -5,6 +5,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using Wolverine;
@@ -35,8 +36,11 @@ public sealed class FulfillContractDeliveryHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IContractRepository contracts,
+    ITradeContextReader tradeContexts,
     IDockSubCommand dock,
+    IRefuelSubCommand refuel,
     IOrbitSubCommand orbit,
+    IFlightModeSubCommand flightMode,
     INavigateSubCommand navigate,
     IMessageBus bus,
     IAgentRepository agents,
@@ -72,8 +76,22 @@ public sealed class FulfillContractDeliveryHandler(
 
         if (!atDestination)
         {
+            // The contract's flight to the delivery: in CRUISE, through refuelling stops (B47).
+            var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, cancellationToken)).Map;
+            if (CommandFlight.DocksToRefuel(map, ship, command.DestinationWaypoint))
+            {
+                await dock.ExecuteAsync(ship.Symbol, cancellationToken);
+                ship = await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
+            }
+
             if (ship.LocalStatus == ShipLocalStatus.Docked)
             {
+                // A ship docked where fuel is sold fills its tank before it leaves, as on every flight.
+                if (ship.FuelCurrent < ship.FuelCapacity && map.SellsFuel(ship.WaypointSymbol ?? string.Empty))
+                {
+                    await refuel.ExecuteAsync(ship.Symbol, fromCargo: false, cancellationToken);
+                }
+
                 await orbit.ExecuteAsync(ship.Symbol, cancellationToken);
                 ship = await ships.FindAsync(ship.Symbol, cancellationToken) ?? ship;
             }
@@ -94,7 +112,7 @@ public sealed class FulfillContractDeliveryHandler(
                     ship.WaypointSymbol ?? string.Empty);
             }
 
-            await navigate.ExecuteAsync(ship.Symbol, command.DestinationWaypoint, Guid.Empty, cancellationToken);
+            await CommandFlight.TowardsAsync(map, ship, command.DestinationWaypoint, flightMode, navigate, cancellationToken);
 
             return new ShipCommandResult(
                 ship.Symbol,

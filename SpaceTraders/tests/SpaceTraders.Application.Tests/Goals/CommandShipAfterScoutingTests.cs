@@ -9,6 +9,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -94,7 +95,7 @@ public sealed class CommandShipAfterScoutingTests
             _goals,
             NullLogger<ScoutAllMarketplacesPlanService>.Instance);
         var sut = new ShipGoalExecutorService(
-            [new ScoutWaypointGoalExecutor(_visits, Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
+            [new ScoutWaypointGoalExecutor(_visits, Substitute.For<ITradeContextReader>(), Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
             _goals,
             ships,
             scoutPlan,

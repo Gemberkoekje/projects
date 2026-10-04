@@ -10,6 +10,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -146,8 +147,13 @@ public sealed class ScoutStopSkippedTests
             .Returns(new ShipModel(ShipSymbol, "X1-AB", VisitedStop, "DOCKED", "CRUISE", 400, 400));
         var settings = Substitute.For<ISettingsRepository>();
         settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        // A step for the next stop flies there, and reads the map first.
+        var tradeContexts = Substitute.For<ITradeContextReader>();
+        tradeContexts.ReadAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns(new TradeContext(new TradeMarketMap([], [], new Dictionary<string, IReadOnlyList<string>>()), 0, 0));
         var sut = new ShipGoalExecutorService(
-            [new ScoutWaypointGoalExecutor(_visits, Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
+            [new ScoutWaypointGoalExecutor(_visits, tradeContexts, Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
             _goals,
             ships,
             CreateScoutPlan(),
