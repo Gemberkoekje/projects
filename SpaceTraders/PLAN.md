@@ -112,6 +112,8 @@
   since 19:51Z). Your decision D57, credits held back for a trade trip from the moment it starts until it buys, is merged
   (projects#150); its deploy is gembernodes#48. Your decision D58, drones gather first, is built on branch
   `claude/spacetraders-drones-gather-first`.
+- Slice 2.10 (the API's request rates on the dashboard, and the graphs' legends as tables, asked on 2026-10-03) is built
+  on branch `ccr-ff72b415-uqqj4q` in projects and gembernodes.
 
 ## Known issues
 
@@ -894,6 +896,41 @@ and gembernodes; asked that day)
     stored, `Alerts.WebhookUrl` included, where `SettingChanged` hides it. The URL is empty, so nothing
     has leaked; hiding it there too would take one line.
   - A change reaches the table within about a minute: the 10-second sample, then Prometheus's scrape.
+
+**2.10 The API's request rates, and legends as tables** (built 2026-10-03 on branch `ccr-ff72b415-uqqj4q`, in projects
+and gembernodes; asked that day)
+- Asked: "For spacetraders, can we add a graph similar to this?", with a screenshot of a graph of requests initiated,
+  executed and completed, and rate limited, per second, with each one's minimum, maximum, mean and last in a table under
+  it. Then: "In addition, can we change the legends to table view where appropriate".
+- Done:
+  - A new counter, `spacetraders_api_requests_initiated_total{method,endpoint}`, from a new outermost handler
+    (`ApiRequestInitiatedHandler`): every request the bot initiates, once, as it starts, before the pause after a 502
+    and the local budget. Nothing counted a request before it went out, so "initiated" needed it; the other three lines
+    come from the counters the bot already had.
+  - The dashboard's side is gembernodes (same branch): an **API request rates** graph, full width, above the other API
+    panels: initiated; executed, each request that went out, retries included; completed, each that got an answer; and
+    rate limited, the 429s. Per second over 5 minutes, in the screenshot's colours, with a table of min, max, mean and
+    last. Initiated above executed: requests wait for the budget, or the pause refuses them; executed above initiated:
+    retries.
+  - Every graph with a list legend on both SpaceTraders dashboards has a table under it: mean, max and last for rates
+    and counts per minute or hour; min, max and last for levels (credits, ships, usable surveys, the database size,
+    prices, supply); total, mean and max for the hourly bars of what we sold into a market. Graphs with many series sort
+    by mean (levels by last), so the biggest come first. The graphs with more series grew by two rows, so their tables
+    show three or four lines before they scroll; the panels below moved down.
+  - Tests: `ApiRequestInitiatedHandlerTests` (counted by method and template before the request goes on),
+    `ApiRequestPipelineMetricsTests` (through the client's own handlers: a request retried after a 429 is initiated
+    once and executed twice; one the pause refuses is initiated and never executed), `PrometheusAutomationMetricsTests`
+    and `MetricsEndpointTests` (the scrape lists it, and its first increment reaches Prometheus). The graph's four
+    queries with `promtool test rules` against synthetic series, and both dashboards in Grafana 11.6.1 against a local
+    Prometheus holding a day of synthetic data, at desktop and phone width.
+- Noticed (not changed):
+  - On a phone, a table wider than its graph scrolls sideways: long names, such as the endpoints, push the numbers off
+    to the right, as in the screenshot the graph was asked from.
+  - "429s, failed calls and rate-limit waits" draws a straight line across hours where a series is missing: a new pod
+    has no `status 429` series until its first 429, and the panel joins the gap (`spanNulls`). In the screenshot of
+    2026-10-03 23:11 (local time) it climbs from 0 to about 4 between about 18:10 and 21:20 local time, the hours
+    between the deploy at 16:07Z and the 429s at 19:07Z. The new graph joins gaps of up to 10 minutes only (a restart),
+    and reads 0 for rate limited while the bot runs without a 429 series.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2277,3 +2314,4 @@ your PC, 1Password or kubectl:
 | 4.3 | B44: the bot's error lines get a rule of their own, by log level, instead of the shared rule's word match (merged: PR #13); then a Grafana rollout restart (done 2026-10-02 09:44Z) |
 | 2.9 | The settings table on the SpaceTraders dashboard (branch `ccr-212dac2b-p2ent0`, not merged). It shows data once the bot runs a build with `spacetraders_setting_info`: deploy that build with it |
 | 6.9 | A "Roles" table under the SpaceTraders dashboard's fleet table: each ship's role, why, and what mining, siphoning and trading would earn it per hour (branch `claude/ship-role-profitability-ghjzlb`, not merged). It shows data once the bot runs a build with the role board switched on |
+| 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (branch `ccr-ff72b415-uqqj4q`, not merged). "Initiated" shows data once the bot runs a build with slice 2.10; the rest works without it |
