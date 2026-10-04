@@ -61,7 +61,11 @@ public sealed class StartupRecoveryService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (ship.ArrivesAt.HasValue && ship.ArrivesAt.Value <= now)
+        // Startup sync stores the last route's arrival on every ship, so a docked or orbiting ship keeps an arrival time
+        // in the past. Only a ship marked in transit is recovered as one (B38).
+        var inTransit = ship.LocalStatus == ShipLocalStatus.InTransit;
+
+        if (inTransit && ship.ArrivesAt.HasValue && ship.ArrivesAt.Value <= now)
         {
             var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol ?? string.Empty;
 
@@ -81,7 +85,7 @@ public sealed class StartupRecoveryService(
                 "StartupRecovery: Ship {ShipSymbol} arrived at {WaypointSymbol}; executed goal step (outcome={Outcome}).",
                 ship.Symbol, arrivedWaypoint, result?.Outcome);
         }
-        else if (ship.ArrivesAt.HasValue)
+        else if (inTransit && ship.ArrivesAt.HasValue)
         {
             var destWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol ?? string.Empty;
 
