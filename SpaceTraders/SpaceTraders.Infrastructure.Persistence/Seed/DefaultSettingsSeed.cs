@@ -1,14 +1,21 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SpaceTraders.Infrastructure.Persistence.Entities;
+using SpaceTraders.Infrastructure.Persistence.Repositories;
 
 namespace SpaceTraders.Infrastructure.Persistence.Seed;
 
 /// <summary>
 /// The settings every agent starts with. Each one is read by code that runs (B18, D10); the
 /// <c>Runtime.*</c> keys are status flags. A feature that needs a new setting adds it here.
+/// Every plan is on by default (D69). A run starts with the values chosen for the next runs where
+/// there are any, else with these defaults; a setting nobody has set since follows its default.
 /// </summary>
 public static class DefaultSettingsSeed
 {
+    private const string StatusFlagPrefix = "Runtime.";
+
     private static readonly IReadOnlyList<AgentSetting> Defaults =
     [
         new AgentSetting { Key = "FleetExpansion.MinCreditReserve",       Value = "60000",               Type = "long",    Description = "Credits every ship purchase leaves with no ship that trades: the floor of the credit reserve, which grows by FleetExpansion.ReservePerTradingCargoUnit for every unit the trading ships can carry (D51)" },
@@ -20,16 +27,16 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Trade.MaxHaulDistance",                 Value = "5",                   Type = "int",     Description = "Max jumps between buy/sell waypoints" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
         new AgentSetting { Key = "Automation.Plan.Scout.Enabled",           Value = "true",                Type = "bool",    Description = "Run the scout plan: visit every marketplace in the starting system once" },
-        new AgentSetting { Key = "Automation.Plan.Explore.Enabled",         Value = "false",               Type = "bool",    Description = "Run the explore plan: once its trip ends, the command ship jumps through active jump gates to every system not explored yet, scouts its markets and shipyards, and comes home; a jump keeps FleetExpansion.MinCreditReserve (asked on 2026-10-04)" },
-        new AgentSetting { Key = "Automation.Plan.Roles.Enabled",           Value = "false",               Type = "bool",    Description = "Run the role board: every ship takes the role that earns the fleet most per hour, by what it and the others can do; surveys first, by the ship with the least to lose, and the contract before the rest (D38-D41)" },
+        new AgentSetting { Key = "Automation.Plan.Explore.Enabled",         Value = "true",                Type = "bool",    Description = "Run the explore plan: once its trip ends, the command ship jumps through active jump gates to every system not explored yet, scouts its markets and shipyards, and comes home; a jump keeps FleetExpansion.MinCreditReserve (asked on 2026-10-04)" },
+        new AgentSetting { Key = "Automation.Plan.Roles.Enabled",           Value = "true",                Type = "bool",    Description = "Run the role board: every ship takes the role that earns the fleet most per hour, by what it and the others can do; surveys first, by the ship with the least to lose, and the contract before the rest (D38-D41)" },
         new AgentSetting { Key = "Automation.Plan.Contract.Enabled",        Value = "true",                Type = "bool",    Description = "Run the contract plan: take one mineral contract and fulfil it (may buy a mining drone)" },
-        new AgentSetting { Key = "Automation.Plan.ProbeDeployment.Enabled", Value = "false",               Type = "bool",    Description = "Run the probe plan: a probe for every market in the HQ system, roaming between the stalest nearby markets until there are enough (buys SHIP_PROBE above the credit reserve, D29)" },
-        new AgentSetting { Key = "Automation.Plan.Survey.Enabled",          Value = "false",               Type = "bool",    Description = "Run the survey plan: ships that can survey survey, and only that, the contract's ore first, then ores the markets buy (D20)" },
-        new AgentSetting { Key = "Automation.Plan.Mining.Enabled",          Value = "false",               Type = "bool",    Description = "Run the mining plan: miners mine surveyed ores, else ores in low supply, and sell them (buys mining drones)" },
-        new AgentSetting { Key = "Automation.Plan.Siphon.Enabled",          Value = "false",               Type = "bool",    Description = "Run the siphon plan: siphon drones siphon gases in low supply at gas giants, keep every gas, and sell them (buys siphon drones, Siphon.MaxDrones)" },
-        new AgentSetting { Key = "Automation.Plan.Construction.Enabled",    Value = "false",               Type = "bool",    Description = "Run the construction plan: the ship with the construction role buys the jump gate's materials, a full hold at a time where they aren't SCARCE or LIMITED, after the cargo ships and above the credit reserve, and supplies the gate; it trades while there is nothing it may buy (D64-D67)" },
-        new AgentSetting { Key = "Automation.Plan.Trading.Enabled",         Value = "false",               Type = "bool",    Description = "Run the trading plan: idle ships with a cargo hold carry goods between markets for profit (buys cargo ships, Trade.ShipPurchases)" },
-        new AgentSetting { Key = "Automation.Plan.SpareTime.Enabled",       Value = "false",               Type = "bool",    Description = "Run the spare-time plan: a surveyor with nothing to survey or trade mines or siphons whatever sells at the nearest place it can, and sells it; a survey or a trade interrupts it (D34-D37)" },
+        new AgentSetting { Key = "Automation.Plan.ProbeDeployment.Enabled", Value = "true",                Type = "bool",    Description = "Run the probe plan: a probe for every market in the HQ system, roaming between the stalest nearby markets until there are enough (buys SHIP_PROBE above the credit reserve, D29)" },
+        new AgentSetting { Key = "Automation.Plan.Survey.Enabled",          Value = "true",                Type = "bool",    Description = "Run the survey plan: ships that can survey survey, and only that, the contract's ore first, then ores the markets buy (D20)" },
+        new AgentSetting { Key = "Automation.Plan.Mining.Enabled",          Value = "true",                Type = "bool",    Description = "Run the mining plan: miners mine surveyed ores, else ores in low supply, and sell them (buys mining drones)" },
+        new AgentSetting { Key = "Automation.Plan.Siphon.Enabled",          Value = "true",                Type = "bool",    Description = "Run the siphon plan: siphon drones siphon gases in low supply at gas giants, keep every gas, and sell them (buys siphon drones, Siphon.MaxDrones)" },
+        new AgentSetting { Key = "Automation.Plan.Construction.Enabled",    Value = "true",                Type = "bool",    Description = "Run the construction plan: the ship with the construction role buys the jump gate's materials, a full hold at a time where they aren't SCARCE or LIMITED, after the cargo ships and above the credit reserve, and supplies the gate; it trades while there is nothing it may buy (D64-D67)" },
+        new AgentSetting { Key = "Automation.Plan.Trading.Enabled",         Value = "true",                Type = "bool",    Description = "Run the trading plan: idle ships with a cargo hold carry goods between markets for profit (buys cargo ships, Trade.ShipPurchases)" },
+        new AgentSetting { Key = "Automation.Plan.SpareTime.Enabled",       Value = "true",                Type = "bool",    Description = "Run the spare-time plan: a surveyor with nothing to survey or trade mines or siphons whatever sells at the nearest place it can, and sells it; a survey or a trade interrupts it (D34-D37)" },
         new AgentSetting { Key = "Market.RefreshMinutes",                   Value = "5",                   Type = "int",     Description = "Minutes between price refreshes of a market where one of our ships is (0 = off)" },
         new AgentSetting { Key = "Automation.CircuitBreaker.MaxGoalStepsPerMinute", Value = "60",         Type = "int",     Description = "Goal steps per ship per minute above which the ship's goal is blocked as a runaway (the tick alone takes 12)" },
         new AgentSetting { Key = "Database.SoftLimitMegabytes",             Value = "1024",                Type = "int",     Description = "Database size (MB) above which the bot logs a warning (D8)" },
@@ -69,6 +76,15 @@ public static class DefaultSettingsSeed
 
     private static readonly Dictionary<string, string> Descriptions = Defaults.ToDictionary(setting => setting.Key, setting => setting.Description, StringComparer.Ordinal);
 
+    private static readonly Dictionary<string, string> DefaultValues = Defaults.ToDictionary(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal);
+
+    /// <summary>
+    /// The settings a run can be given a value of its own for, each with its default, type and description, in the
+    /// seed's order: every seeded setting but the <c>Runtime.*</c> status flags (D69).
+    /// </summary>
+    public static IReadOnlyList<(string Key, string Value, string Type, string Description)> RunSettings { get; } =
+        [.. Defaults.Where(setting => !IsStatusFlag(setting.Key)).Select(setting => (setting.Key, setting.Value, setting.Type, setting.Description))];
+
     /// <summary>
     /// What a seeded setting does, as this version describes it; null for a key the seed doesn't hold. A stored setting
     /// keeps the description it was seeded with, which an older version may have written (slice 2.9).
@@ -79,35 +95,85 @@ public static class DefaultSettingsSeed
         => Descriptions.GetValueOrDefault(key);
 
     /// <summary>
-    /// Seeds missing settings (does not overwrite existing values).
+    /// The value the next run starts with when none is chosen for it: the setting's default, as this version has it;
+    /// null for a key that isn't a setting a run starts with (D69).
     /// </summary>
-    public static async Task SeedAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
+    /// <param name="key">The setting's key.</param>
+    /// <returns>The default, or null.</returns>
+    public static string? DefaultOf(string key)
+        => IsRunSetting(key) ? DefaultValues[key] : null;
+
+    /// <summary>
+    /// Whether the runs to come can be given a value of their own for the setting: the seed holds it, and it isn't a
+    /// <c>Runtime.*</c> status flag (D69).
+    /// </summary>
+    /// <param name="key">The setting's key.</param>
+    /// <returns>True for a setting a run starts with.</returns>
+    public static bool IsRunSetting(string key)
+        => Descriptions.ContainsKey(key) && !IsStatusFlag(key);
+
+    /// <summary>
+    /// Seeds the settings the agent doesn't have yet: each with the value chosen for the next runs, else with its
+    /// default. A setting that still follows its default gets the default as this version has it, so a default that
+    /// changes reaches the agent that runs (D69); the status flags and the settings someone set keep their values.
+    /// </summary>
+    public static Task SeedAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
+        => SeedAsync(db, NullLogger.Instance, cancellationToken);
+
+    /// <inheritdoc cref="SeedAsync(SpaceTradersDbContext, CancellationToken)"/>
+    /// <remarks>Each setting it changes is a <c>SettingChanged</c> journal line on <paramref name="logger"/>.</remarks>
+    public static async Task SeedAsync(SpaceTradersDbContext db, ILogger logger, CancellationToken cancellationToken = default)
     {
-        var existingKeys = await db.Settings
+        var chosen = await db.NextRunSettings
             .AsNoTracking()
-            .Select(s => s.Key)
-            .ToHashSetAsync(cancellationToken);
+            .ToDictionaryAsync(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal, cancellationToken);
+        var stored = await db.Settings
+            .ToDictionaryAsync(setting => setting.Key, StringComparer.Ordinal, cancellationToken);
+        var changed = new List<(string Key, string OldValue, string NewValue)>();
 
         foreach (var setting in Defaults)
         {
-            if (!existingKeys.Contains(setting.Key))
+            if (!stored.TryGetValue(setting.Key, out var existing))
             {
+                var value = IsStatusFlag(setting.Key) ? null : chosen.GetValueOrDefault(setting.Key);
                 db.Settings.Add(new AgentSetting
                 {
                     AgentId = db.AgentId,
                     Key = setting.Key,
-                    Value = setting.Value,
+                    Value = value ?? setting.Value,
                     Type = setting.Type,
                     Description = setting.Description,
+                    FollowsDefault = value is null,
+                });
+            }
+            else if (existing.FollowsDefault
+                && !IsStatusFlag(setting.Key)
+                && !string.Equals(existing.Value, setting.Value, StringComparison.Ordinal))
+            {
+                changed.Add((setting.Key, existing.Value, setting.Value));
+                db.Entry(existing).CurrentValues.SetValues(new AgentSetting
+                {
+                    AgentId = existing.AgentId,
+                    Key = existing.Key,
+                    Value = setting.Value,
+                    Type = existing.Type,
+                    Description = existing.Description,
+                    FollowsDefault = true,
                 });
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var (key, oldValue, newValue) in changed)
+        {
+            SettingsRepository.LogIfChanged(logger, key, oldValue, newValue);
+        }
     }
 
     /// <summary>
-    /// Overwrites all settings with their original default values.
+    /// Gives every setting its default back, to follow it from then on, and forgets the values chosen for the next
+    /// runs (D69).
     /// </summary>
     public static async Task ResetAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
     {
@@ -125,6 +191,7 @@ public static class DefaultSettingsSeed
                     Value = defaultSetting.Value,
                     Type = defaultSetting.Type,
                     Description = defaultSetting.Description,
+                    FollowsDefault = true,
                 });
             }
             else
@@ -136,10 +203,15 @@ public static class DefaultSettingsSeed
                     Value = defaultSetting.Value,
                     Type = existing.Type,
                     Description = existing.Description,
+                    FollowsDefault = true,
                 });
             }
         }
 
+        db.NextRunSettings.RemoveRange(await db.NextRunSettings.ToListAsync(cancellationToken));
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static bool IsStatusFlag(string key)
+        => key.StartsWith(StatusFlagPrefix, StringComparison.Ordinal);
 }

@@ -447,6 +447,45 @@ public sealed class AgentBootstrapServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_AfterAServerReset_TheNewAgentStartsWithTheValuesChosenForTheNextRuns()
+    {
+        // D69: the old agent ran with one value; the next run was given another, and the trading plan off.
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        apiClient.RegisterAsync(Arg.Any<RegisterRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(CreateRegistrationResponse("NEW-AGENT", "registered-agent-token")));
+        StubServerResetDate(apiClient);
+
+        using var provider = await BuildProvider(
+            databaseName: Guid.NewGuid().ToString("N"),
+            initialAgentId: null,
+            configureDb: async db =>
+            {
+                db.Settings.Add(new AgentSetting
+                {
+                    AgentId = "NEW-AGENT@2026-09-20",
+                    Key = "Automation.MiningShipPercentage",
+                    Value = "0.5",
+                    Type = "decimal",
+                    Description = string.Empty,
+                });
+                db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.MiningShipPercentage", Value = "0.6" });
+                db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.Plan.Trading.Enabled", Value = "false" });
+                await db.SaveChangesAsync();
+            },
+            configureServices: services => AddRegistrationServices(services, apiClient));
+
+        await provider.GetRequiredService<AgentBootstrapService>().StartAsync(CancellationToken.None);
+
+        await using var scope = provider.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        (await settings.GetRawAsync("Automation.MiningShipPercentage")).Should().Be("0.6");
+        (await settings.GetRawAsync("Automation.Plan.Trading.Enabled")).Should().Be("false");
+        (await settings.GetRawAsync("Automation.Plan.Mining.Enabled")).Should().Be("true");
+        (await settings.GetNextRunSettingsAsync()).Where(setting => !setting.IsDefault).Select(setting => setting.Key)
+            .Should().BeEquivalentTo("Automation.MiningShipPercentage", "Automation.Plan.Trading.Enabled");
+    }
+
+    [Fact]
     public async Task StartAsync_StoresANewAgentUnderItsSymbolAndTheServersResetDate()
     {
         var apiClient = Substitute.For<ISpaceTradersApiClient>();

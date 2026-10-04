@@ -3,7 +3,9 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
+using SpaceTraders.Infrastructure.Persistence.Seed;
 using Testcontainers.PostgreSql;
 
 namespace SpaceTraders.Infrastructure.Tests;
@@ -110,6 +112,127 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
         var surveys = new SpaceTraders.Infrastructure.Persistence.Repositories.SurveyRepository(db);
         await surveys.RecordExtractionAsync("SIG-1");
         (await surveys.GetActiveAsync()).Should().ContainSingle().Which.Extractions.Should().Be(1);
+    }
+
+    [SkippableFact]
+    public async Task InitializeAsync_AddsWhatD69Needs_ToADatabaseFromBeforeIt_AsTheModelWouldCreateIt()
+    {
+        // D69: the cluster's agent_settings was created without "FollowsDefault", and without next_run_settings; a table
+        // that exists is never created again.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        var asTheModelCreatesThem = await ColumnsAsync("next_run_settings", "agent_settings");
+        var keyAsTheModelCreatesIt = await PrimaryKeyAsync("next_run_settings");
+        await ExecuteAsync("""ALTER TABLE agent_settings DROP COLUMN "FollowsDefault"; DROP TABLE next_run_settings;""");
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        (await ColumnsAsync("next_run_settings", "agent_settings")).Should().Equal(asTheModelCreatesThem);
+        (await PrimaryKeyAsync("next_run_settings")).Should().Equal(keyAsTheModelCreatesIt);
+        db.NextRunSettings.Add(new NextRunSetting { Key = "Mining.MaxDrones", Value = "5" });
+        await db.SaveChangesAsync();
+        (await db.NextRunSettings.SingleAsync()).Value.Should().Be("5");
+    }
+
+    [SkippableFact]
+    public async Task InitializeAsync_D69_KeepsWhatWasSetBeforeIt_AndSwitchesOnThePlansThatWereOff()
+    {
+        // The agent the reset of 2026-10-04 13:00Z registered has most plans off (D9's defaults). Before the deploy you
+        // may set a setting, or switch automation off: those keep their values. The plans come on at the deploy's start.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        await ExecuteAsync("""ALTER TABLE agent_settings DROP COLUMN "FollowsDefault"; DROP TABLE next_run_settings;""");
+        await ExecuteAsync("""
+            INSERT INTO agent_settings ("AgentId", "Key", "Value", "Type", "Description") VALUES
+                ('INITIALIZER-TEST@2026-09-27', 'Automation.Plan.Trading.Enabled', 'false', 'bool', ''),
+                ('INITIALIZER-TEST@2026-09-27', 'Automation.Enabled', 'false', 'string', ''),
+                ('INITIALIZER-TEST@2026-09-27', 'Mining.MaxDrones', '5', 'string', ''),
+                ('INITIALIZER-TEST@2026-09-27', 'Trade.MinProfitPerUnit', '200', 'int', '');
+            """);
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+        await DefaultSettingsSeed.SeedAsync(db);
+
+        var settings = await db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key);
+        settings["Automation.Plan.Trading.Enabled"].Should().Match<AgentSetting>(s => s.Value == "true" && s.FollowsDefault);
+        settings["Automation.Enabled"].Should().Match<AgentSetting>(s => s.Value == "false" && !s.FollowsDefault);
+        settings["Mining.MaxDrones"].Should().Match<AgentSetting>(s => s.Value == "5" && !s.FollowsDefault);
+        settings["Trade.MinProfitPerUnit"].Should().Match<AgentSetting>(s => s.Value == "200" && s.FollowsDefault);
+    }
+
+    [SkippableFact]
+    public async Task InitializeAsync_JudgesTheSettingsOnlyWhenItAddsTheColumn()
+    {
+        // Later, a setting that follows its default may differ from the running version's default (a new version
+        // changed it): it must go on following, so the next seed gives it the new default.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        await ExecuteAsync("""
+            INSERT INTO agent_settings ("AgentId", "Key", "Value", "Type", "Description", "FollowsDefault")
+            VALUES ('INITIALIZER-TEST@2026-09-27', 'Mining.MaxDrones', '15', 'int', '', TRUE);
+            """);
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        (await db.Settings.AsNoTracking().SingleAsync()).FollowsDefault.Should().BeTrue();
+    }
+
+    /// <summary>Each column of the tables, with its type, length and nullability, in table and column order.</summary>
+    private async Task<IReadOnlyList<string>> ColumnsAsync(params string[] tables)
+    {
+        await using var connection = new NpgsqlConnection(_pg.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            select table_name || '.' || column_name || ' ' || data_type || coalesce('(' || character_maximum_length || ')', '') || ' ' || is_nullable
+            from information_schema.columns where table_schema = 'public' and table_name = any(@tables)
+            order by table_name, column_name
+            """,
+            connection);
+        command.Parameters.AddWithValue("tables", tables);
+        await using var reader = await command.ExecuteReaderAsync();
+        var columns = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(0));
+        }
+
+        return columns;
+    }
+
+    /// <summary>The table's primary key: its name and columns.</summary>
+    private async Task<IReadOnlyList<string>> PrimaryKeyAsync(string table)
+    {
+        await using var connection = new NpgsqlConnection(_pg.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            select c.conname || ' ' || pg_get_constraintdef(c.oid)
+            from pg_constraint c join pg_class t on t.oid = c.conrelid
+            where t.relname = @table and c.contype = 'p'
+            """,
+            connection);
+        command.Parameters.AddWithValue("table", table);
+        await using var reader = await command.ExecuteReaderAsync();
+        var keys = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            keys.Add(reader.GetString(0));
+        }
+
+        return keys;
     }
 
     private async Task<string[]> TableOptionsAsync(string table)

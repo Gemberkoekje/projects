@@ -132,6 +132,72 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task Settings_Put_AlsoSetsTheValueTheNextRunsStartWith()
+    {
+        // D69: what you set is also what the next runs start with.
+        _factory.SettingsRepository.ClearReceivedCalls();
+
+        using var response = await _clientWithKey.PutAsJsonAsync("/settings/Mining.MaxDrones", new { Value = "7" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await _factory.SettingsRepository.Received(1).SetAsync("Mining.MaxDrones", "7", Arg.Any<CancellationToken>());
+        await _factory.SettingsRepository.Received(1).SetNextRunSettingAsync("Mining.MaxDrones", "7", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SettingsNextRun_Put_LeavesTheRunThatRunsNowAlone()
+    {
+        // D69: a split for the next run, while this run keeps its own.
+        _factory.SettingsRepository.ClearReceivedCalls();
+        _factory.SettingsRepository.SetNextRunSettingAsync("Automation.MiningShipPercentage", "0.6", Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        using var response = await _clientWithKey.PutAsJsonAsync("/settings/next-run/Automation.MiningShipPercentage", new { Value = "0.6" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await _factory.SettingsRepository.Received(1).SetNextRunSettingAsync("Automation.MiningShipPercentage", "0.6", Arg.Any<CancellationToken>());
+        await _factory.SettingsRepository.DidNotReceiveWithAnyArgs().SetAsync<string>(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task SettingsNextRun_PutOrDelete_AKeyARunDoesNotStartWith_Returns404()
+    {
+        // The repository refuses a status flag or a key the seed doesn't hold (the substitute's false).
+        using var put = await _clientWithKey.PutAsJsonAsync("/settings/next-run/Runtime.ApiUnavailable", new { Value = "true" });
+        using var delete = await _clientWithKey.DeleteAsync("/settings/next-run/Runtime.ApiUnavailable");
+
+        put.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        delete.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task SettingsNextRun_Delete_ForgetsTheValue()
+    {
+        _factory.SettingsRepository.ClearReceivedCalls();
+        _factory.SettingsRepository.RemoveNextRunSettingAsync("Trade.MinProfitPerUnit", Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        using var response = await _clientWithKey.DeleteAsync("/settings/next-run/Trade.MinProfitPerUnit");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await _factory.SettingsRepository.Received(1).RemoveNextRunSettingAsync("Trade.MinProfitPerUnit", Arg.Any<CancellationToken>());
+        await _factory.SettingsRepository.DidNotReceiveWithAnyArgs().SetAsync<string>(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task SettingsNextRun_Get_ListsWhatTheNextRunStartsWith()
+    {
+        _factory.SettingsRepository.GetNextRunSettingsAsync(Arg.Any<CancellationToken>())
+            .Returns([("Automation.MiningShipPercentage", "0.6", "decimal", "Fraction of mining-capable ships", false)]);
+
+        using var response = await _clientWithKey.GetAsync("/settings/next-run");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<List<NextRunSettingDto>>()).Should().Equal(
+            new NextRunSettingDto("Automation.MiningShipPercentage", "0.6", "decimal", "Fraction of mining-capable ships", IsDefault: false));
+    }
+
     // ── Control endpoints ─────────────────────────────────────────────────────
 
     [Fact]
@@ -146,6 +212,22 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     {
         using var response = await _clientWithKey.PostAsync("/control/automation/disable", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Control_TheKillSwitch_HoldsForTheNextRunsToo()
+    {
+        // D69: switched off by you, automation stays off after the next server reset.
+        _factory.SettingsRepository.ClearReceivedCalls();
+
+        using var disable = await _clientWithKey.PostAsync("/control/automation/disable", null);
+        using var enable = await _clientWithKey.PostAsync("/control/automation/enable", null);
+
+        Received.InOrder(() =>
+        {
+            _factory.SettingsRepository.SetNextRunSettingAsync("Automation.Enabled", "false", Arg.Any<CancellationToken>());
+            _factory.SettingsRepository.SetNextRunSettingAsync("Automation.Enabled", "true", Arg.Any<CancellationToken>());
+        });
     }
 
     // ── Smoke tests for path-based routing assumptions ────────────────────────

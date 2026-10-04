@@ -91,11 +91,15 @@ public sealed class PrometheusMetricsService(
             .Select(group => new SurveyMetricsSample(group.Key.WaypointSymbol, group.Key.Used, group.Count()))]);
 
         // Slice 2.9: the settings, for the dashboard's settings table. A secret stays hidden, as in SettingChanged; what a
-        // setting does is what this version says, as a stored description is the one it was seeded with.
+        // setting does is what this version says, as a stored description is the one it was seeded with. D69: next to the
+        // value now, the one the next run starts with.
         var settings = await db.Settings.AsNoTracking().ToListAsync(cancellationToken);
+        var chosenForNextRun = await db.NextRunSettings.AsNoTracking()
+            .ToDictionaryAsync(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal, cancellationToken);
         metrics.Settings([.. settings.Select(setting => new SettingMetricsSample(
             setting.Key,
             SettingsRepository.Shown(setting.Key, setting.Value),
+            NextRunValue(setting.Key, chosenForNextRun),
             DefaultSettingsSeed.DescriptionOf(setting.Key) ?? setting.Description))]);
 
         // Slice 6.9: the role board, for the dashboard's roles table, while it is on: switched off, the plans no longer
@@ -153,6 +157,15 @@ public sealed class PrometheusMetricsService(
             ship.Reason,
             ship.Estimates.ToDictionary(estimate => estimate.Role.ToString(), estimate => estimate.CreditsPerHour, StringComparer.Ordinal)))];
     }
+
+    /// <summary>
+    /// The value the next run starts with, as it may be shown (D69): the one chosen for it, else the default; empty for a
+    /// key a run doesn't start with.
+    /// </summary>
+    private static string NextRunValue(string key, Dictionary<string, string> chosen)
+        => DefaultSettingsSeed.DefaultOf(key) is { } defaultValue
+            ? SettingsRepository.Shown(key, chosen.GetValueOrDefault(key) ?? defaultValue)
+            : string.Empty;
 
     /// <summary>Whether a switch's stored value is on, read as the settings repository reads a <c>bool</c>: JSON <c>true</c>.</summary>
     internal static bool IsOn(string? value)

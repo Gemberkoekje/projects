@@ -9,9 +9,10 @@ using SpaceTraders.Infrastructure.Persistence.Seed;
 namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
 /// <summary>
-/// The agent's settings. Every change it stores is a <c>SettingChanged</c> journal line, whoever made
-/// it (the settings endpoints, the kill switch, the size guard); a value that may hold a secret (a
-/// URL) is logged as <c>(hidden)</c>.
+/// The agent's settings, and the values chosen for the next runs (D69). Every change it stores is a
+/// <c>SettingChanged</c> journal line, whoever made it (the settings endpoints, the kill switch, the
+/// size guard), and every change for the next runs a <c>NextRunSettingChanged</c> one; a value that
+/// may hold a secret (a URL) is logged as <c>(hidden)</c>.
 /// </summary>
 public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<SettingsRepository> logger) : ISettingsRepository
 {
@@ -56,7 +57,8 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
             Key = key,
             Value = raw,
             Type = typeof(T).Name.ToLowerInvariant(),
-            Description = existing?.Description ?? string.Empty
+            Description = existing?.Description ?? string.Empty,
+            FollowsDefault = false,
         };
 
         if (existing is null)
@@ -69,7 +71,7 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        LogIfChanged(key, oldValue, raw);
+        LogIfChanged(logger, key, oldValue, raw);
     }
 
     public async Task<IReadOnlyList<(string Key, string Value, string Type, string Description)>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -100,13 +102,76 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
     public async Task ResetToDefaultsAsync(CancellationToken cancellationToken = default)
     {
         var before = await ValuesAsync(cancellationToken);
+        var chosenBefore = await db.NextRunSettings.AsNoTracking().OrderBy(s => s.Key).ToListAsync(cancellationToken);
         await DefaultSettingsSeed.ResetAsync(db, cancellationToken);
         var after = await ValuesAsync(cancellationToken);
 
         foreach (var (key, value) in after)
         {
-            LogIfChanged(key, before.GetValueOrDefault(key), value);
+            LogIfChanged(logger, key, before.GetValueOrDefault(key), value);
         }
+
+        foreach (var setting in chosenBefore)
+        {
+            LogNextRunIfChanged(setting.Key, setting.Value, null);
+        }
+    }
+
+    public async Task<IReadOnlyList<(string Key, string Value, string Type, string Description, bool IsDefault)>> GetNextRunSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var chosen = await db.NextRunSettings
+            .AsNoTracking()
+            .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.Ordinal, cancellationToken);
+
+        return DefaultSettingsSeed.RunSettings
+            .Select(setting => chosen.TryGetValue(setting.Key, out var value)
+                ? (setting.Key, value, setting.Type, setting.Description, IsDefault: false)
+                : (setting.Key, setting.Value, setting.Type, setting.Description, IsDefault: true))
+            .OrderBy(setting => setting.Key, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task<bool> SetNextRunSettingAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        if (!DefaultSettingsSeed.IsRunSetting(key))
+        {
+            return false;
+        }
+
+        var existing = await db.NextRunSettings.FindAsync([key], cancellationToken);
+        var oldValue = existing?.Value;
+        var values = new NextRunSetting { Key = key, Value = value };
+
+        if (existing is null)
+        {
+            db.NextRunSettings.Add(values);
+        }
+        else
+        {
+            db.Entry(existing).CurrentValues.SetValues(values);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        LogNextRunIfChanged(key, oldValue, value);
+        return true;
+    }
+
+    public async Task<bool> RemoveNextRunSettingAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!DefaultSettingsSeed.IsRunSetting(key))
+        {
+            return false;
+        }
+
+        var existing = await db.NextRunSettings.FindAsync([key], cancellationToken);
+        if (existing is not null)
+        {
+            db.NextRunSettings.Remove(existing);
+            await db.SaveChangesAsync(cancellationToken);
+            LogNextRunIfChanged(key, existing.Value, null);
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -128,7 +193,12 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
     private async Task<Dictionary<string, string>> ValuesAsync(CancellationToken cancellationToken)
         => await db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.Ordinal, cancellationToken);
 
-    private void LogIfChanged(string key, string? oldValue, string newValue)
+    /// <summary>A <c>SettingChanged</c> journal line on <paramref name="logger"/>, when the value changed.</summary>
+    /// <param name="logger">Where it is logged.</param>
+    /// <param name="key">The setting's key.</param>
+    /// <param name="oldValue">Its value before, or null when it had none.</param>
+    /// <param name="newValue">Its value now.</param>
+    internal static void LogIfChanged(ILogger logger, string key, string? oldValue, string newValue)
     {
         if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
         {
@@ -141,5 +211,21 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
             key,
             oldValue is null ? "(unset)" : Shown(key, oldValue),
             Shown(key, newValue));
+    }
+
+    /// <summary>A <c>NextRunSettingChanged</c> journal line, when the value changed; null is the default.</summary>
+    private void LogNextRunIfChanged(string key, string? oldValue, string? newValue)
+    {
+        if (string.Equals(oldValue, newValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "{EventKind:l}: {Setting} for the next runs changed from {OldValue} to {NewValue}.",
+            JournalEvents.NextRunSettingChanged,
+            key,
+            oldValue is null ? "(default)" : Shown(key, oldValue),
+            newValue is null ? "(default)" : Shown(key, newValue));
     }
 }

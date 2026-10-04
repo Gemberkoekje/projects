@@ -31,6 +31,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<AgentSetting> Settings => Set<AgentSetting>();
 
+    public DbSet<NextRunSetting> NextRunSettings => Set<NextRunSetting>();
+
     public DbSet<ShipAssignmentRecord> ShipAssignments => Set<ShipAssignmentRecord>();
 
     public DbSet<TradeOpportunity> TradeOpportunities => Set<TradeOpportunity>();
@@ -184,6 +186,15 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.Type).HasMaxLength(50).IsRequired();
             entity.Property(x => x.Description).IsRequired();
             entity.HasQueryFilter(x => x.AgentId == AgentId);
+        });
+
+        // No agent: the values chosen for the next runs outlive the agent that runs now (D69).
+        modelBuilder.Entity<NextRunSetting>(entity =>
+        {
+            entity.ToTable("next_run_settings");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(200);
+            entity.Property(x => x.Value).IsRequired();
         });
 
         modelBuilder.Entity<ShipAssignmentRecord>(entity =>

@@ -97,7 +97,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Dictionary<(string System, string Waypoint, string ShipType), (string Can, string Equipment)> _shipyardShipInfoLabels = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
-    private readonly Dictionary<string, (string Value, string Description)> _settingLabels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Value, string NextRun, string Description)> _settingLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Role, string Reason)> _roleLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string[]> _purchaseNeedLabels = new(StringComparer.Ordinal);
     private readonly HashSet<(string Ship, string Role)> _roleEstimates = [];
@@ -405,9 +405,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "used_for");
         _settingInfo = metrics.CreateGauge(
             "spacetraders_setting_info",
-            "One series per setting the agent has, always 1: its value now (one that may hold a secret shows (hidden)) and what it does.",
+            "One series per setting the agent has, always 1: its value now, the value the next run starts with (one that may hold a secret shows (hidden)) and what it does.",
             "setting",
             "current",
+            "next_run",
             "description");
         _roleInfo = metrics.CreateGauge(
             "spacetraders_ship_role_info",
@@ -889,19 +890,19 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     {
         var current = settings
             .GroupBy(sample => sample.Setting, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => (group.First().Value, group.First().Description), StringComparer.Ordinal);
+            .ToDictionary(group => group.Key, group => (group.First().Value, group.First().NextRun, group.First().Description), StringComparer.Ordinal);
 
         lock (_lock)
         {
             foreach (var (setting, labels) in _settingLabels.Where(series => current.GetValueOrDefault(series.Key) != series.Value).ToList())
             {
-                _settingInfo.RemoveLabelled(setting, labels.Value, labels.Description);
+                _settingInfo.RemoveLabelled(setting, labels.Value, labels.NextRun, labels.Description);
                 _settingLabels.Remove(setting);
             }
 
             foreach (var (setting, labels) in current)
             {
-                _settingInfo.WithLabels(setting, labels.Value, labels.Description).Set(1);
+                _settingInfo.WithLabels(setting, labels.Value, labels.NextRun, labels.Description).Set(1);
                 _settingLabels[setting] = labels;
             }
         }

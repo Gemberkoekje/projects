@@ -165,7 +165,7 @@ public sealed class AgentBootstrapService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await DefaultSettingsSeed.SeedAsync(dbContext, cancellationToken);
+        await DefaultSettingsSeed.SeedAsync(dbContext, _logger, cancellationToken);
 
         var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         await settings.SetAsync("Runtime.TokenResetMismatchDetected", "false", cancellationToken);
@@ -373,7 +373,7 @@ public sealed class AgentBootstrapService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        await DefaultSettingsSeed.SeedAsync(dbContext, cancellationToken);
+        await DefaultSettingsSeed.SeedAsync(dbContext, _logger, cancellationToken);
 
         var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         await settings.SetAsync("Runtime.TokenResetMismatchDetected", "false", cancellationToken);

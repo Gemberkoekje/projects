@@ -124,6 +124,11 @@
   projects and gembernodes. Supplying a construction site pays nothing. X1-DC53's own gate was complete before our ships
   came, so the plan has nothing to build until the server reset (2026-10-04 13:00Z) gives a new home system; it is off
   until you switch it on, and a new agent's settings start at their defaults.
+- Slice 2.12 (asked on 2026-10-04, after that reset left the new agent with only the scout and contract plans on, with your
+  decision D69) is built on branch `ccr-856636cc-qj1te0` in projects and gembernodes: every plan is on by default, the
+  settings you set carry over to the next run (the agent the next reset registers), and `/settings/next-run` sets the next
+  run alone. Its first start switches on the plans the agent of 13:00Z has had off since. With it, "stays off until you
+  switch it on (D9)" in the bullets above no longer holds.
 
 ## Known issues
 
@@ -271,6 +276,7 @@ get the next D-number.
 | D66 | Slice 6.6: each purchase raises a market's price, and a market short of a material asks more for it. Buy at any supply? | **Not at low supply:** no purchase where the material's supply is SCARCE or LIMITED; the builder waits (and trades) until a market is back at MODERATE or better. |
 | D67 | Slice 6.6: one purchase per trip, or several? Then asked: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade volume is a haulers hold." | **A full hold in one purchase:** a load is the builder's free hold, or what the gate still needs when that is less, bought at once, and only where the market's trade volume takes all of it; otherwise the builder waits (and trades), while the purchases after construction in the order keep waiting for it. |
 | D68 | Slice 6.6 (asked on 2026-10-04): "Only the home base jump gate construction should be high priority, any other jump gate construction should be low priority or maybe not even considered at all." | **Only the home gate:** the plan builds only the jump gate of the headquarters' system; a gate elsewhere is never fetched, built or given a role. |
+| D69 | Slice 2.12 (asked on 2026-10-04, after the server reset of 13:00Z left the new agent with only the scout and contract plans on): "After the restart most config items were turned off. Can you ensure everything is on by default? And changes in config changes those defaults?" Asked what the second part should do, you chose to have your changes remembered apart from the agent, the bot's own switch-offs left out, and a setting nobody changed follow the default. Then: "In addition, id like to have a separate set of endpoints to only affect future runs. So I can have a setting for this run (e.g. 50% split between miners and traders) and change those settings for the next run to see if it gives an improvement." | **Every plan on by default, and settings for the next runs:** every plan switch defaults to on, which replaces D9. The next run is the agent the next server reset registers; it starts with the value chosen for each setting, else the default. `PUT /settings/{key}` and the kill switch set a setting now and for the next runs; `PUT /settings/next-run/{key}` only for the next runs, `DELETE` gives them the default back and `GET /settings/next-run` lists them. When the bot switches automation off itself (the size guard, the reset monitor), the next runs keep their value. A setting nobody has set follows its default, also on the agent that runs. `POST /settings/reset` forgets the values chosen for the next runs. |
 
 ## Phases
 
@@ -989,6 +995,53 @@ projects and gembernodes; asked that day)
     caches has no modules)". The cached listings do hold the modules (A2's light hauler, with its two holds and crew
     quarters, on 2026-10-02), so the shipyards table's equipment column answers it whenever the cache holds C39's
     listing in full.
+
+**2.12 The next run's settings, and every plan on by default** (built 2026-10-04 on branch `ccr-856636cc-qj1te0`, in
+projects and gembernodes; asked that day, D69)
+- Asked, after the server reset of 2026-10-04 13:00Z registered a new agent with the seeded settings (only the scout and
+  contract plans on, D9): "After the restart most config items were turned off. Can you ensure everything is on by
+  default? And changes in config changes those defaults?" Then: "In addition, id like to have a separate set of endpoints
+  to only affect future runs. So I can have a setting for this run (e.g. 50% split between miners and traders) and change
+  those settings for the next run to see if it gives an improvement."
+- A run here is one agent, from one server reset to the next. `RunLifecycleService`'s runs also start when a strategy
+  setting changes; a value chosen for the next run only reaches the agent the next reset registers.
+- Done:
+  - Every plan switch defaults to on (`DefaultSettingsSeed`).
+  - A setting follows its default while nobody has set it (`agent_settings."FollowsDefault"`): every start gives it the
+    default as the running version has it, a `SettingChanged` journal line each. Set through `SettingsRepository`, by you
+    or by the bot (the size guard, the reset monitor), a setting keeps its value. The `Runtime.*` status flags never
+    follow.
+  - The settings stored before are judged once, by the start that adds the column, in one transaction with it: one whose
+    value isn't its default was set and keeps it (a setting you change, or automation you switch off, before the deploy);
+    the rest follow, with the plan switches that are off, whose defaults D69 switched on. So the first start of this build
+    switches on the plans the agent of 13:00Z has off, and keeps what was changed before it.
+  - The values the next runs start with live in `next_run_settings`, which has no agent, so the agent cleanup leaves it.
+    `PUT /settings/{key}` and the kill switch set them too; `PUT /settings/next-run/{key}` sets one alone, `DELETE` forgets
+    it, `GET /settings/next-run` lists what the next run starts with, and a key the seed doesn't hold or a status flag is
+    not found (404). A new agent is seeded from them, else from the defaults. `POST /settings/reset` forgets them. Each
+    change is a `NextRunSettingChanged` journal line.
+  - The cluster's database gets the column and the table at the first start: `SpaceTradersDatabaseInitializer.AddedSchema`,
+    renamed from `AddedColumns` as it now adds a table too.
+  - `spacetraders_setting_info` gets the label `next_run`. The dashboard's side is gembernodes (same branch): the Settings
+    table gets a "next run" column with the same on and off as "value", both 180 px wide so they fit side by side on a
+    phone, and its description the endpoints; it no longer says a setting can be changed on the bot's own dashboard, whose
+    Settings page only shows them.
+  - `ControlEndpoints.cs` lost its SA1507 warning (two blank lines). `ApplicationDtos.cs` keeps its QW0028 and QW0029
+    warnings (strongly typed identifiers), as across the code, and `SpaceTradersDbContext.cs` its QW0029.
+  - Tests: `AutomationSwitchesTests` (every plan on), `DefaultSettingsSeedTests` (a new agent starts with the chosen
+    values; a setting that follows its default gets the new one, journaled; a setting someone set and a status flag keep
+    theirs; a restart doesn't take the next run's values), `NextRunSettingsTests` (the run that runs now is left alone;
+    status flags and unknown keys refused; forget, journal with secrets hidden, reset), `ApiIntegrationTests` (the
+    endpoints, and that `PUT /settings/{key}` and the kill switch set the next runs too), `AgentBootstrapServiceTests` (a
+    new agent after a reset), `AgentDataCleanupTests` and `DataRetentionTests` (the new table), `PrometheusMetricsTests`
+    (the label), and against PostgreSQL 16: `DatabaseInitializerTests` (a database from before gets the column and table
+    as the model creates them; of its settings, a plan that is off comes on while a changed setting and automation
+    switched off keep their values; the settings are judged only when the column is added) and
+    `AgentCleanupIntegrationTests` (the chosen values outlive the old agent and reach the new one). The Settings table in Grafana 11.6.1 against a local Prometheus
+    scraping the series as the bot writes them, at desktop and phone width.
+- Noticed (not changed):
+  - `SettingsRepository.SetAsync` stores the type of what it was given, so `PUT /settings/{key}` turns a `bool` setting's
+    type into `string`. Only the bot's own Settings page and the settings snapshot log show it; nothing acts on it.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2588,4 +2641,5 @@ your PC, 1Password or kubectl:
 | 2.10 | An "API request rates" graph on the SpaceTraders dashboard (initiated, executed, completed, rate limited), and table legends on the graphs of both SpaceTraders dashboards (merged: PR #50) |
 | 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (branch `ccr-c7061120-est7c1`, not merged). It shows data once the bot runs a build with slice 6.11, and the systems beyond home once the explore plan is on |
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (branch `ccr-1e461fef-n6hydk`, not merged). The new columns show data once the bot runs a build with slice 2.11: deploy that build with it |
+| 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (branch `ccr-856636cc-qj1te0`, not merged). The column shows data once the bot runs a build with slice 2.12: deploy that build with it |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (branch `ccr-914173a3-6coo89`, not merged). They show data once the bot runs a build with slice 6.6, with the construction plan on and the home gate under construction; the build's deploy is a further image bump there |

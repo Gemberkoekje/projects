@@ -198,6 +198,12 @@ public static class JournalEvents
     /// <summary>A setting changed (<c>Setting</c>, <c>OldValue</c>, <c>NewValue</c>).</summary>
     public const string SettingChanged = nameof(SettingChanged);
 
+    /// <summary>
+    /// The value a setting starts the next runs with changed (<c>Setting</c>, <c>OldValue</c>, <c>NewValue</c>), each
+    /// <c>(default)</c> where none was chosen (D69).
+    /// </summary>
+    public const string NextRunSettingChanged = nameof(NextRunSettingChanged);
+
     /// <summary>The SpaceTraders server was reset (<c>Detail</c>).</summary>
     public const string ResetDetected = nameof(ResetDetected);
 

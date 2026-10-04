@@ -407,22 +407,25 @@ public sealed class PrometheusMetricsServiceTests
     }
 
     /// <summary>
-    /// The dashboard's settings table (slice 2.9): every setting the agent has, with its value and what it does. A value
-    /// that may hold a secret is hidden, as in <c>SettingChanged</c>. A setting keeps the description it was seeded
-    /// with, so the cluster's agent, registered before slice 6.3, still describes the probe plan of before; the table
-    /// says what the running version does.
+    /// The dashboard's settings table (slice 2.9): every setting the agent has, with its value, the value the next run
+    /// starts with (D69) and what it does. A value that may hold a secret is hidden, as in <c>SettingChanged</c>. A
+    /// setting keeps the description it was seeded with, so the cluster's agent, registered before slice 6.3, still
+    /// describes the probe plan of before; the table says what the running version does.
     /// </summary>
     [Fact]
-    public async Task SampleAsync_ExportsEverySetting_WithSecretsHidden_AndWhatItDoesNow()
+    public async Task SampleAsync_ExportsEverySetting_WithSecretsHidden_WhatTheNextRunStartsWith_AndWhatItDoesNow()
     {
         using var provider = BuildProvider();
         await using (var seedScope = provider.CreateAsyncScope())
         {
             var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
             db.Settings.Add(Setting(AgentId, "Automation.Plan.ProbeDeployment.Enabled", "true", "Run the probe plan: park a probe at every market and shipyard in the HQ system (buys probes)"));
+            db.Settings.Add(Setting(AgentId, "Automation.MiningShipPercentage", "0.5", "Fraction of mining-capable ships assigned to resource extraction roles"));
             db.Settings.Add(Setting(AgentId, "Alerts.WebhookUrl", "https://hooks.example.com/services/T000/B000/s3cr3t", "Slack/webhook URL for operator alerts (empty = disabled)"));
             db.Settings.Add(Setting(AgentId, "Custom.ReportUrl", string.Empty, string.Empty));
             db.Settings.Add(Setting("AGENT@2026-09-20", "Automation.Enabled", "false", "Master kill-switch for automation"));
+            db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.MiningShipPercentage", Value = "0.6" });
+            db.NextRunSettings.Add(new NextRunSetting { Key = "Alerts.WebhookUrl", Value = "https://hooks.example.com/services/T000/B000/s3cr3t" });
             await db.SaveChangesAsync();
         }
 
@@ -443,9 +446,10 @@ public sealed class PrometheusMetricsServiceTests
         probePlan.Should().StartWith("Run the probe plan: a probe for every market");
         settings.Should().BeEquivalentTo(new[]
         {
-            new SettingMetricsSample("Automation.Plan.ProbeDeployment.Enabled", "true", probePlan),
-            new SettingMetricsSample("Alerts.WebhookUrl", "(hidden)", "Slack/webhook URL for operator alerts (empty = disabled)"),
-            new SettingMetricsSample("Custom.ReportUrl", string.Empty, string.Empty),
+            new SettingMetricsSample("Automation.Plan.ProbeDeployment.Enabled", "true", "true", probePlan),
+            new SettingMetricsSample("Automation.MiningShipPercentage", "0.5", "0.6", "Fraction of mining-capable ships assigned to resource extraction roles"),
+            new SettingMetricsSample("Alerts.WebhookUrl", "(hidden)", "(hidden)", "Slack/webhook URL for operator alerts (empty = disabled)"),
+            new SettingMetricsSample("Custom.ReportUrl", string.Empty, string.Empty, string.Empty),
         });
     }
 
@@ -1105,19 +1109,20 @@ public sealed class PrometheusAutomationMetricsTests
     {
         _metrics.Settings(
         [
-            new SettingMetricsSample("Automation.Plan.Mining.Enabled", "false", "Run the mining plan"),
-            new SettingMetricsSample("Trade.MinProfitPerUnit", "200", "Credits per unit, after fuel, a trade trip must earn"),
+            new SettingMetricsSample("Automation.Plan.Mining.Enabled", "false", "true", "Run the mining plan"),
+            new SettingMetricsSample("Trade.MinProfitPerUnit", "200", "200", "Credits per unit, after fuel, a trade trip must earn"),
         ]);
 
         var text = await ExportAsync();
-        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",description=\"Run the mining plan\"} 1\n");
-        text.Should().Contain("spacetraders_setting_info{setting=\"Trade.MinProfitPerUnit\",current=\"200\",description=\"Credits per unit, after fuel, a trade trip must earn\"} 1\n");
+        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"true\",description=\"Run the mining plan\"} 1\n");
+        text.Should().Contain("spacetraders_setting_info{setting=\"Trade.MinProfitPerUnit\",current=\"200\",next_run=\"200\",description=\"Credits per unit, after fuel, a trade trip must earn\"} 1\n");
 
-        _metrics.Settings([new SettingMetricsSample("Automation.Plan.Mining.Enabled", "true", "Run the mining plan")]);
+        // D69: a value chosen for the next run alone changes the row too.
+        _metrics.Settings([new SettingMetricsSample("Automation.Plan.Mining.Enabled", "false", "false", "Run the mining plan")]);
 
         text = await ExportAsync();
-        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"true\",description=\"Run the mining plan\"} 1\n");
-        text.Should().NotContain("current=\"false\"");
+        text.Should().Contain("spacetraders_setting_info{setting=\"Automation.Plan.Mining.Enabled\",current=\"false\",next_run=\"false\",description=\"Run the mining plan\"} 1\n");
+        text.Should().NotContain("next_run=\"true\"");
         text.Should().NotContain("setting=\"Trade.MinProfitPerUnit\"");
     }
 
