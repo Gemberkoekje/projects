@@ -38,6 +38,7 @@ public sealed class TradingAutomationServiceTests
     private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly FullHoldSavings _savings = new();
+    private readonly PassedOverShips _passedOver = new();
     private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -359,6 +360,50 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task AShipFreedAfterItsGatheringPlansPass_WaitsForThatPlan_InsteadOfTrading()
+    {
+        // B63, seen on the cluster on 2026-10-04: SPECTER-3, a mining drone with the mining role, sold its ore at H60 at
+        // 19:50:06.749Z in its arrival's goal step, outside the tick, and tick 202's trading plan gave it a route 0.3 s
+        // later. The mining plan had run earlier in that tick, while the drone was still on its trip, so it never passed
+        // the drone over; at the next tick it would have given it a trip, as it did after the drone's other trips (D58:
+        // drones gather first). A ship a gathering plan works with trades only when that plan passed it over.
+        MiningPlanOn();
+        RolesAre(("SHIP-1", FleetRole.Mine));
+        Fleet(CommandShip());
+        _passedOver.Record(AutomationPlan.Mining, own: ["SHIP-1"], passedOver: []);
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AShipItsGatheringPlanPassedOver_Trades()
+    {
+        // D58: a ship with the mining role trades when the mining plan has no trip for it.
+        MiningPlanOn();
+        RolesAre(("SHIP-1", FleetRole.Mine));
+        Fleet(CommandShip());
+        _passedOver.Record(AutomationPlan.Mining, own: ["SHIP-1"], passedOver: ["SHIP-1"]);
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>();
+    }
+
+    [Fact]
+    public async Task AGatheringPlanThatIsOff_HasNoSayInWhoTrades()
+    {
+        RolesAre(("SHIP-1", FleetRole.Mine));
+        Fleet(CommandShip());
+        _passedOver.Record(AutomationPlan.Mining, own: ["SHIP-1"], passedOver: []);
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>();
+    }
+
+    [Fact]
     public async Task WithoutALucrativeRoute_TheTraderWaits()
     {
         Fleet(Drone());
@@ -673,6 +718,9 @@ public sealed class TradingAutomationServiceTests
     private void SurveyPlanOn()
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
 
+    private void MiningPlanOn()
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Mining), Arg.Any<CancellationToken>()).Returns(true);
+
     private void SpareTimePlanOn()
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.SpareTime), Arg.Any<CancellationToken>()).Returns(true);
 
@@ -709,6 +757,7 @@ public sealed class TradingAutomationServiceTests
                 _order,
                 _savings,
                 _constructionSites,
+                _passedOver,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

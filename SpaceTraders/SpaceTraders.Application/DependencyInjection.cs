@@ -62,6 +62,7 @@ public static class DependencyInjection
         // The order ships are bought in (slice 6.10b, D43): what each plan would buy, from tick to tick.
         services.AddSingleton<PurchaseNeeds>();
         services.AddSingleton<FullHoldSavings>();
+        services.AddSingleton<PassedOverShips>();
         services.AddScoped<IPurchaseOrder, PurchaseOrder>();
         services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
         services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();

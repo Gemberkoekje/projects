@@ -56,6 +56,7 @@ public sealed class SiphonAutomationService(
     IShipPurchaseService shipPurchases,
     IRoleAdvisor roles,
     IPurchaseOrder purchaseOrder,
+    PassedOverShips passedOver,
     ILogger<SiphonAutomationService> logger) : ISiphonAutomationService
 {
     /// <summary>The setting that holds the most siphon drones to keep (D32).</summary>
@@ -108,6 +109,7 @@ public sealed class SiphonAutomationService(
         // Before the first drone there is no siphoner: the openings of every system where our ships are show
         // what a drone would be bought for.
         var freeAtStart = free.Count > 0;
+        var gaveTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var opportunities = new List<MiningAutomationOpportunityState>();
         foreach (var systemSymbol in systems)
         {
@@ -119,6 +121,7 @@ public sealed class SiphonAutomationService(
                 if (await GiveTripAsync(map, siphoner, heldKeys, heldBy, covered, cancellationToken))
                 {
                     withTrip.Add(siphoner.Symbol);
+                    gaveTrip.Add(siphoner.Symbol);
                 }
             }
 
@@ -145,6 +148,12 @@ public sealed class SiphonAutomationService(
                 });
             }
         }
+
+        // B63: the trading plan, later in the tick, gives a route only to a siphoner this pass had no trip for.
+        passedOver.Record(
+            AutomationPlan.Siphon,
+            fleet.Where(board.IsSiphoner).Select(ship => ship.Symbol),
+            free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
         await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
         await SaveStateAsync(opportunities, cancellationToken);

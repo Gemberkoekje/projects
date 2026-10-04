@@ -35,6 +35,7 @@ public sealed class ConstructionPlanServiceTests
     private readonly OpenPurchaseOrder _order = new();
     private readonly ConstructionRetries _retries = new();
     private readonly LogRecorder _log = new();
+    private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private ConstructionPlanState? _state;
 
@@ -171,6 +172,7 @@ public sealed class ConstructionPlanServiceTests
         await RunAsync();
 
         _activeGoals.Should().BeEmpty();
+        _passedOver.MayTrade("SHIP-6", [AutomationPlan.Construction]).Should().BeTrue("the pass passed it over (B63)");
     }
 
     [Fact]
@@ -250,6 +252,7 @@ public sealed class ConstructionPlanServiceTests
                 _budget,
                 _order,
                 _retries,
+                _passedOver,
                 _log.For<ConstructionPlanService>())
             .EnsureBootstrappedAsync();
 }
