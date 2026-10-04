@@ -126,25 +126,34 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
         return targets;
     }
 
-    public async Task<IReadOnlyDictionary<string, TradeBetweenMarketsGoal>> GetActiveTradeGoalsAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyDictionary<string, TradeBetweenMarketsGoal>> GetActiveTradeGoalsAsync(CancellationToken cancellationToken = default)
+        => GetActiveGoalsAsync<TradeBetweenMarketsGoal>(ShipGoalKind.TradeBetweenMarkets, cancellationToken);
+
+    public Task<IReadOnlyDictionary<string, SupplyConstructionGoal>> GetActiveConstructionGoalsAsync(CancellationToken cancellationToken = default)
+        => GetActiveGoalsAsync<SupplyConstructionGoal>(ShipGoalKind.SupplyConstruction, cancellationToken);
+
+    /// <summary>The active goal of one kind of every ship that has one, by ship symbol, with its stored status.</summary>
+    private async Task<IReadOnlyDictionary<string, TGoal>> GetActiveGoalsAsync<TGoal>(ShipGoalKind goalKind, CancellationToken cancellationToken)
+        where TGoal : ShipGoal
     {
-        var kind = ShipGoalKind.TradeBetweenMarkets.ToString();
+        var kind = goalKind.ToString();
         var rows = await db.Ships
             .Where(s => s.GoalKind == kind && s.GoalPayloadJson != null)
             .Select(s => new { s.Symbol, s.GoalPayloadJson, s.GoalStatus })
             .ToListAsync(cancellationToken);
 
-        var trips = new Dictionary<string, TradeBetweenMarketsGoal>(StringComparer.OrdinalIgnoreCase);
+        var goals = new Dictionary<string, TGoal>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
         {
             if (row.GoalPayloadJson is not null
-                && JsonSerializer.Deserialize<ShipGoal>(row.GoalPayloadJson, JsonOptions) is TradeBetweenMarketsGoal trip)
+                && JsonSerializer.Deserialize<ShipGoal>(row.GoalPayloadJson, JsonOptions) is TGoal goal)
             {
                 // The GoalStatus column is the authoritative status, as in GetActiveGoalAsync.
-                trips[row.Symbol] = row.GoalStatus.HasValue ? trip with { Status = (GoalStatus)row.GoalStatus.Value } : trip;
+                var stored = row.GoalStatus.HasValue ? (ShipGoal)goal with { Status = (GoalStatus)row.GoalStatus.Value } : goal;
+                goals[row.Symbol] = (TGoal)stored;
             }
         }
 
-        return trips;
+        return goals;
     }
 }

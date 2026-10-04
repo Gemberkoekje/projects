@@ -35,6 +35,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Gauge _contractUnitsRequired;
     private readonly Gauge _contractUnitsFulfilled;
     private readonly Gauge _contractDeadline;
+    private readonly Gauge _constructionUnitsRequired;
+    private readonly Gauge _constructionUnitsFulfilled;
     private readonly ZeroFirstCounter _extractedUnits;
     private readonly ZeroFirstCounter _jettisonedUnits;
     private readonly ZeroFirstCounter _extractions;
@@ -69,6 +71,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly HashSet<(string Role, string State)> _shipCountLabels = [];
     private readonly HashSet<(string Contract, string TradeSymbol)> _deliverables = [];
     private readonly HashSet<string> _contracts = new(StringComparer.Ordinal);
+    private readonly HashSet<(string Site, string TradeSymbol)> _constructionMaterials = [];
     private readonly Dictionary<string, (string Location, string Activity)> _shipInfoLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _shipCapabilityLabels = new(StringComparer.Ordinal);
     private readonly HashSet<string> _shipsInTransit = new(StringComparer.Ordinal);
@@ -193,6 +196,16 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "spacetraders_contract_deadline_timestamp_seconds",
             "Deadline of an accepted contract (Unix time).",
             "contract");
+        _constructionUnitsRequired = metrics.CreateGauge(
+            "spacetraders_construction_units_required",
+            "Units a construction site (the home system's jump gate) requires, per material.",
+            "site",
+            "trade_symbol");
+        _constructionUnitsFulfilled = metrics.CreateGauge(
+            "spacetraders_construction_units_fulfilled",
+            "Units supplied to a construction site (the home system's jump gate), per material, by anyone.",
+            "site",
+            "trade_symbol");
         _extractedUnits = ZeroFirst(
             "spacetraders_extracted_units_total",
             "Units ships extracted, by ship and good: each extraction's or siphon's yield, before what isn't wanted is jettisoned.",
@@ -527,6 +540,29 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             }
 
             _contracts.UnionWith(currentContracts);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Construction(IReadOnlyCollection<ConstructionMetricsSample> materials)
+    {
+        lock (_lock)
+        {
+            foreach (var material in materials)
+            {
+                _constructionUnitsRequired.WithLabels(material.Site, material.TradeSymbol).Set(material.UnitsRequired);
+                _constructionUnitsFulfilled.WithLabels(material.Site, material.TradeSymbol).Set(material.UnitsFulfilled);
+            }
+
+            var current = materials.Select(material => (material.Site, material.TradeSymbol)).ToHashSet();
+            foreach (var gone in _constructionMaterials.Where(material => !current.Contains(material)).ToList())
+            {
+                _constructionUnitsRequired.RemoveLabelled(gone.Site, gone.TradeSymbol);
+                _constructionUnitsFulfilled.RemoveLabelled(gone.Site, gone.TradeSymbol);
+                _constructionMaterials.Remove(gone);
+            }
+
+            _constructionMaterials.UnionWith(current);
         }
     }
 

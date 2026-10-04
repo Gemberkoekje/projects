@@ -510,16 +510,26 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     public async Task<SupplyConstructionActionResult> SupplyConstructionAsync(string systemSymbol, string waypointSymbol, string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
     {
-        var result = await client.SupplyConstructionAsync(
-            systemSymbol,
-            waypointSymbol,
-            new Models.Systems.SupplyConstructionRequest
-            {
-                ShipSymbol = shipSymbol,
-                TradeSymbol = tradeSymbol,
-                Units = units,
-            },
-            cancellationToken);
+        Models.Systems.SupplyConstructionData result;
+        try
+        {
+            result = await client.SupplyConstructionAsync(
+                systemSymbol,
+                waypointSymbol,
+                new Models.Systems.SupplyConstructionRequest
+                {
+                    ShipSymbol = shipSymbol,
+                    TradeSymbol = tradeSymbol,
+                    Units = units,
+                },
+                cancellationToken);
+        }
+        catch (SpaceTradersApiException exception) when (exception.ErrorCode is { } code && ConstructionRefusedException.IsConstructionRefusal(code))
+        {
+            // The site won't take it (slice 6.6): supplied again, it fails again, so the caller ends the trip.
+            throw new ConstructionRefusedException(waypointSymbol, tradeSymbol, code, exception);
+        }
+
         return new SupplyConstructionActionResult(
             MapConstructionSite(result.Construction),
             MapCargo(result.Cargo));

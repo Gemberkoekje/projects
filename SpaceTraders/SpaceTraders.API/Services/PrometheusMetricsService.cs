@@ -77,6 +77,10 @@ public sealed class PrometheusMetricsService(
             .ToListAsync(cancellationToken);
         metrics.Contracts([.. contracts.SelectMany(ToSamples)]);
 
+        // Slice 6.6: the jump gate's materials, as the construction plan last saw them, for the dashboard's progress.
+        var sites = await db.ConstructionSites.AsNoTracking().ToListAsync(cancellationToken);
+        metrics.Construction([.. sites.SelectMany(ToSamples)]);
+
         // Slice 6.4: the usable surveys, used or not yet, for the survey dashboard.
         var surveys = await db.Surveys.AsNoTracking()
             .Where(s => s.Expiration > now)
@@ -107,7 +111,7 @@ public sealed class PrometheusMetricsService(
         metrics.Roles(roleSamples);
 
         // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; the dearest full
-        // hold a trader saves up for (D56); and what the trade trips on their way to buy hold back (D57).
+        // hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D59).
         var roleOf = roleSamples.ToDictionary(
             sample => sample.Ship,
             sample => Enum.TryParse<FleetRole>(sample.Role, out var role) ? role : FleetRole.None,
@@ -186,21 +190,32 @@ public sealed class PrometheusMetricsService(
     }
 
     /// <summary>
-    /// What the trade trips on their way to buy hold back for their cargo (D57), from the goals cached with the ships, with
-    /// the stored status as the goal store reads it.
+    /// What the trade and construction trips on their way to buy hold back for their cargo (D57, D59), from the goals cached
+    /// with the ships, with the stored status as the goal store reads it.
     /// </summary>
     private static long TripHolds(IEnumerable<CachedShip> ships)
     {
-        var trips = new List<KeyValuePair<string, TradeBetweenMarketsGoal>>();
-        foreach (var ship in ships.Where(ship => ship.GoalKind == nameof(ShipGoalKind.TradeBetweenMarkets)))
+        var trades = new List<KeyValuePair<string, TradeBetweenMarketsGoal>>();
+        var constructions = new List<KeyValuePair<string, SupplyConstructionGoal>>();
+        foreach (var ship in ships.Where(ship => ship.GoalKind is nameof(ShipGoalKind.TradeBetweenMarkets) or nameof(ShipGoalKind.SupplyConstruction)))
         {
-            if (ship.GoalPayloadJson is { } json && JsonSerializer.Deserialize<ShipGoal>(json) is TradeBetweenMarketsGoal trip)
+            var goal = ship.GoalPayloadJson is { } json ? JsonSerializer.Deserialize<ShipGoal>(json) : null;
+            if (goal is not null && ship.GoalStatus is { } status)
             {
-                trips.Add(new(ship.Symbol, ship.GoalStatus is { } status ? trip with { Status = (GoalStatus)status } : trip));
+                goal = goal with { Status = (GoalStatus)status };
+            }
+
+            if (goal is TradeBetweenMarketsGoal trade)
+            {
+                trades.Add(new(ship.Symbol, trade));
+            }
+            else if (goal is SupplyConstructionGoal construction)
+            {
+                constructions.Add(new(ship.Symbol, construction));
             }
         }
 
-        return TripReservations.HeldBack(trips);
+        return TripReservations.HeldBack(trades) + TripReservations.HeldBack(constructions);
     }
 
     private static ShipMetricsSample ToSample(
@@ -288,7 +303,8 @@ public sealed class PrometheusMetricsService(
                 GatherAndSellGoal gather => gather.Siphoning ? "siphoning in its spare time" : "mining in its spare time",
                 SellCargoGoal => "selling cargo",
                 DeliverCargoGoal deliver => $"delivering {deliver.TradeSymbol}",
-                SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to a construction site",
+                SupplyConstructionGoal { CargoBought: false } supply => $"buying {supply.TradeSymbol} at {supply.BuyWaypointSymbol} for {supply.ConstructionSiteWaypointSymbol}",
+                SupplyConstructionGoal supply => $"supplying {supply.TradeSymbol} to {supply.ConstructionSiteWaypointSymbol}",
                 TradeBetweenMarketsGoal trade => $"trading {trade.TradeSymbol}",
                 SurveyWaypointGoal survey => $"surveying for {survey.TargetDepositSymbol}",
                 DeployProbeGoal { ForPurchase: true } => "called to a shipyard",
@@ -359,6 +375,22 @@ public sealed class PrometheusMetricsService(
             "IN_TRANSIT" => "IN_ORBIT",
             _ => "UNKNOWN",
         };
+    }
+
+    /// <summary>A cached construction site's materials; none when they can't be read.</summary>
+    private static IEnumerable<ConstructionMetricsSample> ToSamples(CachedConstruction site)
+    {
+        List<ConstructionMaterialModel>? materials;
+        try
+        {
+            materials = string.IsNullOrWhiteSpace(site.MaterialsJson) ? null : JsonSerializer.Deserialize<List<ConstructionMaterialModel>>(site.MaterialsJson);
+        }
+        catch (JsonException)
+        {
+            materials = null;
+        }
+
+        return (materials ?? []).Select(material => new ConstructionMetricsSample(site.WaypointSymbol, material.TradeSymbol, material.Required, material.Fulfilled));
     }
 
     private static IEnumerable<ContractMetricsSample> ToSamples(CachedContract contract)

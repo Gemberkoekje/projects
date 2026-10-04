@@ -13,7 +13,8 @@ namespace SpaceTraders.Application.Orchestration;
 /// <c>FleetExpansion.MinCreditReserve</c> and <c>FleetExpansion.ReservePerTradingCargoUnit</c> a unit, judged from the
 /// cached fleet and the role board on every evaluation; while a trader saves up for a full hold the credits don't pay
 /// for yet, by the dearest such hold (D56, <see cref="FullHoldSavings"/>), so ships are bought after it; and by what the
-/// trade trips on their way to buy hold back for their cargo (D57, <see cref="TripReservations"/>).
+/// trade and construction trips on their way to buy hold back for their cargo (D57, D59, <see cref="TripReservations"/>).
+/// A load of materials for the jump gate is judged like a ship purchase (slice 6.6, D59): it pays nothing back.
 /// </remarks>
 public interface IBudgetPolicy
 {
@@ -86,7 +87,7 @@ public sealed class BudgetPolicy(
 
     /// <summary>
     /// The credit reserve now (D51): the floor, and the credits per unit the ships that trade can carry; the dearest full
-    /// hold a trader saves up for (D56); and what the trade trips on their way to buy hold back (D57).
+    /// hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D59).
     /// </summary>
     private async Task<long> ReserveAsync(CancellationToken cancellationToken)
     {
@@ -96,6 +97,7 @@ public sealed class BudgetPolicy(
         var fleet = await ships.GetAllAsync(cancellationToken);
         return CreditReserve.Of(floor, perUnit, CreditReserve.TradingCargo(fleet, board.RoleOf))
             + savings.Largest()
-            + TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(cancellationToken));
+            + TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(cancellationToken))
+            + TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(cancellationToken));
     }
 }

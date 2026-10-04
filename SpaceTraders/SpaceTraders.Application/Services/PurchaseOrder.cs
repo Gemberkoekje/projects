@@ -15,6 +15,9 @@ namespace SpaceTraders.Application.Services;
 ///   <item>one more surveyor for each area with mining drones that has none (D55);</item>
 ///   <item>the cargo ships of <c>Trade.ShipPurchases</c> (D21), saved up for: while one is still to buy, no probe and no
 ///   other drone is bought;</item>
+///   <item>the jump gate's next load of materials (slice 6.6, D59), while the gate needs materials and a ship has the
+///   construction role: no ship, but materials that are spent for good, so it keeps the credit reserve as a ship does, and
+///   the probes and further ships wait until the gate is done;</item>
 ///   <item>a probe for every market (D29);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy.</item>
@@ -50,6 +53,7 @@ public sealed class PurchaseOrder(
         [AutomationPlan.Mining] = PurchaseTier.Coverage,
         [AutomationPlan.Siphon] = PurchaseTier.Coverage,
         [AutomationPlan.Trading] = PurchaseTier.CargoShips,
+        [AutomationPlan.Construction] = PurchaseTier.Construction,
         [AutomationPlan.ProbeDeployment] = PurchaseTier.Probes,
     };
 
@@ -357,11 +361,17 @@ public enum PurchaseTier
     /// <summary>The next cargo ship of <c>Trade.ShipPurchases</c> (D21), saved up for.</summary>
     CargoShips = 5,
 
+    /// <summary>
+    /// The jump gate's next load of materials (slice 6.6, D59): not a ship, but spent for good, so it keeps the credit
+    /// reserve as one does. While the gate needs materials, everything after it waits.
+    /// </summary>
+    Construction = 6,
+
     /// <summary>A probe, until every market has one (D29).</summary>
-    Probes = 6,
+    Probes = 7,
 
     /// <summary>A drone by the miners' rule (D28, D32), or one more cargo ship of the list's last type, in turn.</summary>
-    Alternating = 7,
+    Alternating = 8,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

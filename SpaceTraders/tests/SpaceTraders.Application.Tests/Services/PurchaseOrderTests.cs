@@ -122,6 +122,27 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task TheJumpGatesMaterials_ComeAfterTheCargoShips_AndTheProbesWaitForThem()
+    {
+        // Slice 6.6 (D59): supplying pays nothing back, so a load is judged as a purchase, after the cargo ships of the list;
+        // while the gate needs materials the probes and further ships wait.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Construction, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ASecondSurveyor_ComesAfterTheDronesForScarceMinerals_AndBeforeTheCargoShips()
     {
         // D55, asked on 2026-10-03: "The second surveyor is lower priority than the first on the buy order": after the drones

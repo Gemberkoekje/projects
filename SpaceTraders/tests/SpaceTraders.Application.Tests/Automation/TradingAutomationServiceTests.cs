@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -37,6 +38,7 @@ public sealed class TradingAutomationServiceTests
     private readonly ICargoJettison _jettison = Substitute.For<ICargoJettison>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly FullHoldSavings _savings = new();
+    private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
@@ -45,6 +47,7 @@ public sealed class TradingAutomationServiceTests
     {
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+        _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ConstructionSiteModel>());
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
         _goals.When(goals => goals.SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>()))
@@ -226,6 +229,38 @@ public sealed class TradingAutomationServiceTests
         _activeGoals.Should().NotContainKey("SHIP-1");
         _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
         saving.Should().Be(new FullHoldSaving("SHIP-1", TradeRoutePlanner.RouteKey("MEDICINE", D41, A1), 194_922));
+    }
+
+    [Fact]
+    public async Task TheCreditsAConstructionTripHoldsBack_AreNotGivenToATrader()
+    {
+        // Slice 6.6 (D59): the jump gate's load holds back its cargo from the start, as a trade trip does (D57). Of the 250,000,
+        // SHIP-6's 130,160 leave too little for a full hold of EQUIPMENT: SHIP-1 saves up for it and takes nothing meanwhile.
+        IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
+        {
+            ["SHIP-6"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = K85, Units = 80, ReservedCredits = 130_160 },
+        };
+        _goals.GetActiveConstructionGoalsAsync(Arg.Any<CancellationToken>()).Returns(construction);
+        Fleet(CommandShip(symbol: "SHIP-1"));
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-1");
+        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
+        saving.RouteKey.Should().Be(TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
+    }
+
+    [Fact]
+    public async Task MaterialsTheJumpGateStillNeeds_StayAboard_WhileTheConstructionPlanIsOn()
+    {
+        // Slice 6.6: no market here buys FAB_MATS, so D42 would jettison them; the construction plan has the ship supply them.
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(true);
+        _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Construction.ConstructionFixture.Site()]);
+        Fleet(CommandShip(cargo: [new CargoItemModel("FAB_MATS", 1)]));
+
+        await RunAsync();
+
+        await _jettison.DidNotReceiveWithAnyArgs().JettisonAsync(default!, default!, default!, default);
     }
 
     [Fact]
@@ -645,6 +680,7 @@ public sealed class TradingAutomationServiceTests
                 _jettison,
                 _order,
                 _savings,
+                _constructionSites,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

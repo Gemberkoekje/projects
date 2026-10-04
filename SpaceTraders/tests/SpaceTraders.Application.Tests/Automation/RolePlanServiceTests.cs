@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
@@ -27,6 +28,7 @@ public sealed class RolePlanServiceTests
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly GatheringRates _rates = new();
     private readonly RoleBoardMemory _memory = new();
+    private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private RolePlanState? _state;
@@ -41,6 +43,7 @@ public sealed class RolePlanServiceTests
         _plans.When(plans => plans.UpsertAsync(PlanTypes.Roles, Arg.Any<RolePlanState>(), Arg.Any<CancellationToken>()))
             .Do(call => _state = call.ArgAt<RolePlanState>(1));
         _settings.GetAsync<int>("Trade.MinProfitPerUnit", Arg.Any<CancellationToken>()).Returns(200);
+        _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ConstructionSiteModel>());
         On(AutomationPlan.Survey, AutomationPlan.Mining, AutomationPlan.Trading);
     }
 
@@ -230,6 +233,29 @@ public sealed class RolePlanServiceTests
         _state.Conditions.Should().EndWith("|contract wants ore");
     }
 
+    [Fact]
+    public async Task WhileTheHomeGateNeedsMaterials_TheLargestHoldBuildsIt_AndItsCompletionFreesItAtOnce()
+    {
+        // Slice 6.6 (D60, D63): a light hauler, the only cargo ship, builds the home system's jump gate; the command ship surveys.
+        On(AutomationPlan.Survey, AutomationPlan.Mining, AutomationPlan.Trading, AutomationPlan.Construction);
+        _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Construction.ConstructionFixture.Site()]);
+        var hauler = new ShipModel("SHIP-6", SystemSymbol, H51, "DOCKED", "CRUISE", 600, 600, CargoCapacity: 80, ShipType: "SHIP_LIGHT_HAULER", MountSymbols: ["MOUNT_TURRET_I"], CargoInventory: []);
+        Fleet(CommandShip(), Drone(), hauler);
+
+        await RunAsync();
+
+        _state!.Ships.Single(ship => ship.ShipSymbol == "SHIP-6").Should().Match<RoleShipState>(ship => ship.Role == FleetRole.Construct && ship.Reason == RolePlanner.Construction);
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-6").Estimates.Select(estimate => estimate.Role).Should().Equal(FleetRole.Trade);
+        _log.Journal.Should().Contain(entry => entry.EventKind == "RoleChanged" && Equals(entry.Properties["ShipSymbol"], "SHIP-6") && Equals(entry.Properties["NewRole"], FleetRole.Construct));
+
+        // The gate is complete: the roles are weighed again at once, and the hauler trades.
+        _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ConstructionSiteModel>());
+
+        await RunAsync();
+
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-6").Role.Should().Be(FleetRole.Trade);
+    }
+
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
     private void HeldBy(string ship, string market, string ore)
@@ -254,6 +280,7 @@ public sealed class RolePlanServiceTests
                 _plans,
                 _rates,
                 _memory,
+                _constructionSites,
                 _log.For<RolePlanService>())
             .EnsureBootstrappedAsync();
 }

@@ -153,6 +153,13 @@ public interface IAutomationMetrics
     void Contracts(IReadOnlyCollection<ContractMetricsSample> deliverables);
 
     /// <summary>
+    /// Records the construction sites' materials (slice 6.6: <c>spacetraders_construction_units_required</c> and
+    /// <c>spacetraders_construction_units_fulfilled</c>, each <c>{site,trade_symbol}</c>), as cached: the home system's jump
+    /// gate, complete or not. A material that is no longer in <paramref name="materials"/> loses its series.
+    /// </summary>
+    void Construction(IReadOnlyCollection<ConstructionMetricsSample> materials);
+
+    /// <summary>
     /// Records the cached markets: when each was observed
     /// (<c>spacetraders_market_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>) and, once a
     /// ship has been there, each good's prices, trade volume, supply and activity
@@ -422,6 +429,28 @@ public sealed record ShipMetricsSample
 
     /// <summary>What was paid for it and for the mounts and modules installed on it, as the ledger has it; 0 for a starting ship.</summary>
     public long Value { get; init; }
+}
+
+/// <summary>One material of a construction site (slice 6.6).</summary>
+public sealed record ConstructionMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ConstructionMetricsSample(string Site, string TradeSymbol, int UnitsRequired, int UnitsFulfilled)
+    {
+        this.Site = Site;
+        this.TradeSymbol = TradeSymbol;
+        this.UnitsRequired = UnitsRequired;
+        this.UnitsFulfilled = UnitsFulfilled;
+    }
+
+    /// <summary>The construction site: the jump gate's waypoint.</summary>
+    public required string Site { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required int UnitsRequired { get; init; }
+
+    public required int UnitsFulfilled { get; init; }
 }
 
 /// <summary>One deliverable of an accepted contract.</summary>

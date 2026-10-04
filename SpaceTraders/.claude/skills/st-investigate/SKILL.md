@@ -88,6 +88,11 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
   2.5 from the middle of X1-DC53 to B7), and `drifting to … to mine …` in `spacetraders_ship_info`. A ship
   in transit is never `ShipStuck`. Its next flight logs `FlightModeSubCommand: … switches from DRIFT to
   CRUISE`; a drone that keeps flying in DRIFT after its drift is a bug.
+- **Construction loses money by design** (slice 6.6, D59–D63): supplying the home jump gate pays nothing, so every
+  `TripEnded` with `Activity` `construction` is a loss and its purchases are `ConstructionBuy` ledger rows. A builder
+  that trades while the construction plan's state (`plan_states`, `Construction`) says `Waiting` (`purchase_order`,
+  `waiting_for_credits`, `low_supply`, `trade_volume`, `no_market`) is waiting by design, and so are the probes and
+  further ships held behind the gate's load in the purchase order.
 - **Starts and deploys:** `|= "Deferred startup initialization completed"` lists every start. When
   lines come from several pods, `logs` prefixes each with the pod's suffix, so a restart or a deploy
   shows as a new suffix. `check` shows the running image; earlier ones are in gembernodes' history.

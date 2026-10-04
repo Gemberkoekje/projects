@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -34,7 +35,8 @@ public interface IRolePlanService
 /// A new role takes effect when the ship's trip ends: the plans only give work to free ships. Each change is
 /// journaled (<c>RoleChanged</c>); the state lists every ship's role, why, and what each role would earn it. One drone
 /// per SCARCE or LIMITED mineral and area keeps gathering it (slice 6.10b, D48, D53), as the mining and siphon plans buy
-/// one per such mineral and area.
+/// one per such mineral and area. While a system's jump gate needs materials and the construction plan is on, the ship
+/// with the largest hold builds it (slice 6.6, D60); the gate's completion weighs the roles again at once.
 /// </summary>
 public sealed class RolePlanService(
     IShipRepository ships,
@@ -46,6 +48,7 @@ public sealed class RolePlanService(
     IPlanRepository plans,
     IGatheringRates rates,
     RoleBoardMemory memory,
+    IConstructionSites constructionSites,
     ILogger<RolePlanService> logger) : IRolePlanService
 {
     /// <summary>How long a ship with more than one role may have no work before the board weighs the roles again.</summary>
@@ -61,10 +64,15 @@ public sealed class RolePlanService(
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var roleSettings = await RoleSettings.ReadAsync(settings, cancellationToken);
+        if (roleSettings.Switches.Contains(AutomationPlan.Construction))
+        {
+            roleSettings = roleSettings with { ConstructionSystems = await ConstructionSystemsAsync(cancellationToken) };
+        }
+
         var contractWantsOre = roleSettings.Switches.Contains(AutomationPlan.Contract)
             && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
             && contract.UnitsFulfilled < contract.UnitsRequired;
-        var conditions = Conditions(roleSettings.Switches, contractWantsOre);
+        var conditions = Conditions(roleSettings.Switches, contractWantsOre, roleSettings.ConstructionSystems);
 
         var state = await plans.GetAsync<RolePlanState>(PlanTypes.Roles, cancellationToken);
         var surveying = (state?.Ships ?? [])
@@ -105,15 +113,29 @@ public sealed class RolePlanService(
 
         var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, cancellationToken);
         var coverage = await CoverageAsync(fleet, trips, cancellationToken);
-        var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage);
+        var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage, roleSettings.ConstructionShips);
         await SaveAsync(state, candidates, decisions, conditions, now, cancellationToken);
         memory.Evaluated(now);
         logger.LogDebug("Role board: weighed the roles of {Ships} ships ({Trigger}).", decisions.Count, trigger);
     }
 
-    /// <summary>What an evaluation weighs besides the ships, as text: a change weighs the roles again.</summary>
-    private static string Conditions(IReadOnlySet<AutomationPlan> switches, bool contractWantsOre)
-        => string.Join(',', switches.Order().Select(plan => plan.ToString())) + (contractWantsOre ? "|contract wants ore" : string.Empty);
+    /// <summary>
+    /// What an evaluation weighs besides the ships, as text: a change weighs the roles again, so the gate's completion frees
+    /// its builder at once (slice 6.6).
+    /// </summary>
+    private static string Conditions(IReadOnlySet<AutomationPlan> switches, bool contractWantsOre, IReadOnlySet<string> constructionSystems)
+        => string.Join(',', switches.Order().Select(plan => plan.ToString()))
+            + (contractWantsOre ? "|contract wants ore" : string.Empty)
+            + (constructionSystems.Count > 0 ? "|gate needs materials in " + string.Join(',', constructionSystems.Order(StringComparer.Ordinal)) : string.Empty);
+
+    /// <summary>
+    /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): the home system, or
+    /// none (D63).
+    /// </summary>
+    private async Task<IReadOnlySet<string>> ConstructionSystemsAsync(CancellationToken cancellationToken)
+        => (await constructionSites.CachedNeedingMaterialsAsync(cancellationToken))
+            .Select(site => ConstructionPlanner.SystemOf(site.WaypointSymbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Why the roles are due to be weighed again, or null when they aren't.</summary>
     private string? Due(
@@ -172,7 +194,7 @@ public sealed class RolePlanService(
             {
                 var roles = roleSettings.Available(ship, contractWantsOre);
                 var options = new List<RoleOption>();
-                if (roles.Any(role => role != FleetRole.Survey) && system.Key.Length > 0)
+                if (roles.Any(role => role is not FleetRole.Survey and not FleetRole.Construct) && system.Key.Length > 0)
                 {
                     if (context is null)
                     {
@@ -185,7 +207,7 @@ public sealed class RolePlanService(
                             rates);
                     }
 
-                    foreach (var role in roles.Where(role => role != FleetRole.Survey))
+                    foreach (var role in roles.Where(role => role is not FleetRole.Survey and not FleetRole.Construct))
                     {
                         options.AddRange(RoleEstimator.Options(context, ship, role, RolePlanner.MaxOptionsPerRole));
                     }
@@ -336,10 +358,10 @@ public sealed class RolePlanService(
             cancellationToken);
     }
 
-    /// <summary>For each role a ship could take but surveying, its best trip per hour.</summary>
+    /// <summary>For each role a ship could take but surveying and building, which have no estimate, its best trip per hour.</summary>
     private static IReadOnlyList<RoleEstimateState> Estimates(RoleCandidate candidate)
         => [.. candidate.Roles
-            .Where(role => role != FleetRole.Survey)
+            .Where(role => role is not FleetRole.Survey and not FleetRole.Construct)
             .Select(role => candidate.Options.Where(option => option.Role == role).MaxBy(option => option.CreditsPerHour) is { } best
                 ? new RoleEstimateState { Role = role, CreditsPerHour = (long)Math.Round(best.CreditsPerHour), Job = best.Job }
                 : new RoleEstimateState { Role = role, CreditsPerHour = 0 })];

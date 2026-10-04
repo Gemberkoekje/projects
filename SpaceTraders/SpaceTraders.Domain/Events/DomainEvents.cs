@@ -362,6 +362,9 @@ public sealed record CargoPurchasedEvent
 
     public required string WaypointSymbol { get; init; }
 
+    /// <summary>True for materials bought for a construction site (slice 6.6), which the ledger books apart from trading.</summary>
+    public bool ForConstruction { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public CargoPurchasedEvent(string ShipSymbol, TradeSymbol Good, int Units, long Cost, long NewAgentCredits, string WaypointSymbol)
     {

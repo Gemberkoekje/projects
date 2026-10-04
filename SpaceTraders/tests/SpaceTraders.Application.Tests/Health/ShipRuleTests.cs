@@ -500,6 +500,32 @@ public sealed class ShipLeftIdleRuleTests
     }
 
     [Fact]
+    public async Task ABuilder_LeftIdleWhileALoadWaitsForIt_IsAnAnomaly()
+    {
+        // Slice 6.6: the construction plan gives a free builder a load waits for at once; idle for long, the plan has stopped.
+        // A builder no load waits for (no credits, low supply) trades meanwhile, by design.
+        _plans.GetAsync<ConstructionPlanState>(PlanTypes.Construction, Arg.Any<CancellationToken>()).Returns(new ConstructionPlanState
+        {
+            Sites = [],
+            BuilderShipSymbols = ["SHIP-6", "SHIP-7"],
+            ReadyShipSymbols = ["SHIP-6"],
+            UpdatedAt = Start,
+        });
+        var hauler = FleetFixture.Drone("SHIP-6", Start) with { ShipType = "SHIP_LIGHT_HAULER", MountSymbols = [], CargoCapacity = 80 };
+        _fleet.Have(hauler, hauler with { Symbol = "SHIP-7" });
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
+
+        var violation = violations.Should().ContainSingle().Which;
+        violation.Subject.Should().Be("SHIP-6");
+        violation.Details.Should().Contain("the Construction plan has work it could do: a load of materials for the jump gate");
+
+        _harness.PlansOn.Remove(AutomationPlan.Construction);
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(12))).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ASurveyorWaiting_WhileEveryOreHasItsStockOfSurveys_IsNotAnAnomaly()
     {
         // D27: with a stock of usable surveys for every ore, there is nothing to survey; the surveyor waits. The command ship can

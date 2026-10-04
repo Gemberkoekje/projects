@@ -57,7 +57,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await getRepo.GetActiveGoalAsync("SHIP-G2");
 
         result.Should().BeOfType<MineResourceGoal>();
-        var mineResult = (MineResourceGoal)result!;
+        var mineResult = (MineResourceGoal)result;
         mineResult.GoalId.Should().Be(goalId);
         mineResult.Status.Should().Be(GoalStatus.Executing);
         mineResult.TradeSymbol.Should().Be("IRON_ORE");
@@ -79,7 +79,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await getRepo.GetActiveGoalAsync("SHIP-G3");
 
         result.Should().BeOfType<IdleGoal>();
-        result!.GoalId.Should().Be(goalId);
+        result.GoalId.Should().Be(goalId);
         result.Kind.Should().Be(ShipGoalKind.Idle);
     }
 
@@ -102,7 +102,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await getRepo.GetActiveGoalAsync("SHIP-G4");
 
         result.Should().BeOfType<SellCargoGoal>();
-        var sellResult = (SellCargoGoal)result!;
+        var sellResult = (SellCargoGoal)result;
         sellResult.DestinationWaypointSymbol.Should().Be("X1-TEST-MKT");
         sellResult.TradeSymbols.Should().BeEquivalentTo(["IRON_ORE", "ALUMINUM_ORE"]);
     }
@@ -179,7 +179,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await getRepo.GetActiveGoalAsync("SHIP-G8");
 
         result.Should().BeOfType<MoveToWaypointGoal>();
-        ((MoveToWaypointGoal)result!).TargetWaypointSymbol.Should().Be("X1-TEST-WP2");
+        ((MoveToWaypointGoal)result).TargetWaypointSymbol.Should().Be("X1-TEST-WP2");
     }
 
     [SkippableFact]
@@ -233,6 +233,30 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
     }
 
     [SkippableFact]
+    public async Task TheFleetsConstructionTrips_AreReadByShip_WithTheirStatus()
+    {
+        // Slice 6.6 (D59): what the construction trips carry or go to buy, and hold back, is read for the whole fleet at once.
+        await SeedShipAsync("SHIP-C1");
+        await SeedShipAsync("SHIP-C2");
+        await SeedShipAsync("SHIP-C3");
+        var buying = new SupplyConstructionGoal { GoalId = Guid.NewGuid(), TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-TEST-I55", BuyWaypointSymbol = "X1-TEST-F49", Units = 80, ReservedCredits = 168_000 };
+        var stuck = new SupplyConstructionGoal { GoalId = Guid.NewGuid(), TradeSymbol = "ADVANCED_CIRCUITRY", ConstructionSiteWaypointSymbol = "X1-TEST-I55", BuyWaypointSymbol = "X1-TEST-D42", Units = 40, CargoBought = true, Spent = 180_000 };
+        var repo = new ShipGoalRepository(Db);
+        await repo.SetActiveGoalAsync("SHIP-C1", buying);
+        await repo.SetActiveGoalAsync("SHIP-C2", stuck);
+        await repo.BlockGoalAsync("SHIP-C2", stuck.GoalId, "runaway");
+        await repo.SetActiveGoalAsync("SHIP-C3", new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-TEST-K85", SellWaypointSymbol = "X1-TEST-A1" });
+
+        await using var fresh = CreateFreshContext();
+        var trips = await new ShipGoalRepository(fresh).GetActiveConstructionGoalsAsync();
+
+        trips.Keys.Should().BeEquivalentTo("SHIP-C1", "SHIP-C2");
+        trips["SHIP-C1"].Should().BeEquivalentTo(buying);
+        trips["SHIP-C2"].Status.Should().Be(GoalStatus.Blocked);
+        trips["SHIP-C2"].Spent.Should().Be(180_000);
+    }
+
+    [SkippableFact]
     public async Task AMiningTrip_IsStoredAndRead_WithWhetherItSells()
     {
         // Slice 6.4: a trip turns to selling once its hold is full, and must stay so across a restart.
@@ -268,7 +292,7 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         var result = await getRepo.GetActiveGoalAsync("SHIP-G11");
 
         result.Should().BeOfType<ScoutWaypointGoal>();
-        result!.GoalId.Should().Be(goalId);
+        result.GoalId.Should().Be(goalId);
         result.Status.Should().Be(GoalStatus.Blocked);
         result.StatusReason.Should().Be("runaway");
     }

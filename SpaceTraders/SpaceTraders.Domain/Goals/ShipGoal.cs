@@ -121,12 +121,39 @@ public sealed record DeliverCargoGoal : ShipGoal
     public override ShipGoalKind Kind => ShipGoalKind.DeliverCargo;
 }
 
-/// <summary>The ship delivers a trade good to an active construction site.</summary>
-public sealed record SupplyConstructionGoal : ShipGoal
+/// <summary>
+/// One construction trip (PLAN.md slice 6.6): the ship buys <see cref="Units"/> of <see cref="TradeSymbol"/> at
+/// <see cref="BuyWaypointSymbol"/> in one purchase (D62), flies them to the construction site
+/// <see cref="ConstructionSiteWaypointSymbol"/>, the jump gate, and supplies them there; then the goal ends, and the
+/// construction plan chooses the next trip. Supplying pays nothing, so what the cargo cost is booked as the trip's loss
+/// (D46). A trip for materials the ship already holds starts with its cargo aboard (<see cref="CargoBought"/>).
+/// </summary>
+public sealed record SupplyConstructionGoal : TripGoal
 {
+    /// <summary>The material the trip carries.</summary>
     public required string TradeSymbol { get; init; }
 
+    /// <summary>The construction site it supplies: the jump gate.</summary>
     public required string ConstructionSiteWaypointSymbol { get; init; }
+
+    /// <summary>Where the trip buys the material; for materials the ship already held, where it was when the trip began.</summary>
+    public string BuyWaypointSymbol { get; init; } = string.Empty;
+
+    /// <summary>The units the trip planned to carry when it was chosen: a full hold, or what the site still needed (D62).</summary>
+    public int Units { get; init; }
+
+    /// <summary>
+    /// The credits the trip holds back for its cargo from the moment it starts towards the buy market until the cargo is
+    /// aboard, as a trade trip does (D57, D59): its units at the price it was chosen with. Other trips and ship purchases
+    /// leave them. 0 for materials the ship already held.
+    /// </summary>
+    public long ReservedCredits { get; init; }
+
+    /// <summary>True once the cargo is aboard: after the purchase, or from the start for materials the ship already held.</summary>
+    public bool CargoBought { get; init; }
+
+    /// <summary>What one unit cost at the buy market; 0 for materials the ship already held.</summary>
+    public long PricePaidPerUnit { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.SupplyConstruction;

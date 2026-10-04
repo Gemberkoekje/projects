@@ -116,7 +116,7 @@ public static class JournalEvents
 
     /// <summary>
     /// A trip ended, with what it made after fuel (D46: <c>ShipSymbol</c>; <c>Activity</c>: <c>trade</c>, <c>mining</c>,
-    /// <c>siphoning</c>, <c>spare_time</c> or <c>contract</c>; <c>Earned</c>, what its sales brought in; <c>Spent</c>, what
+    /// <c>siphoning</c>, <c>spare_time</c>, <c>contract</c> or <c>construction</c>, which earns nothing; <c>Earned</c>, what its sales brought in; <c>Spent</c>, what
     /// its cargo cost; <c>FuelCost</c>, the fuel its ship bought since it started; <c>Profit</c>, the first less the other
     /// two, negative for a loss; <c>Minutes</c> it took; <c>Reason</c>: <c>sold</c>, <c>delivered</c> for a contract round
     /// trip, <c>interrupted</c>, <c>runaway</c>, <c>rejected</c>, <c>nothing_aboard</c>, <c>no_buyer</c>,
@@ -127,9 +127,9 @@ public static class JournalEvents
 
     /// <summary>
     /// The role board gave a ship another role (slice 6.9, D38: <c>ShipSymbol</c>, <c>OldRole</c>, <c>NewRole</c>,
-    /// <c>Reason</c>: <c>only_role</c>, <c>survey_first</c>, <c>contract</c>, <c>most_profitable</c>, <c>no_work</c> or
-    /// <c>no_role</c>; for a role chosen by profit also <c>CreditsPerHour</c> and the <c>Job</c> that decided it). It takes
-    /// effect when the ship's trip ends.
+    /// <c>Reason</c>: <c>only_role</c>, <c>survey_first</c>, <c>contract</c>, <c>coverage</c>, <c>gathers_first</c>,
+    /// <c>construction</c>, <c>most_profitable</c>, <c>no_work</c> or <c>no_role</c>; for a role chosen by profit also
+    /// <c>CreditsPerHour</c> and the <c>Job</c> that decided it). It takes effect when the ship's trip ends.
     /// </summary>
     public const string RoleChanged = nameof(RoleChanged);
 
@@ -139,6 +139,27 @@ public static class JournalEvents
     /// <c>not_worth_the_fuel</c>, the best sale doesn't pay for the fuel to get there).
     /// </summary>
     public const string CargoJettisoned = nameof(CargoJettisoned);
+
+    /// <summary>
+    /// A ship took a construction trip (slice 6.6: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>Units</c>, <c>BuyWaypoint</c>,
+    /// <c>WaypointSymbol</c>: the construction site; for a purchase also <c>BuyPrice</c>, <c>Cost</c> with its fuel and
+    /// <c>FuelCost</c>; <c>Reason</c>: <c>purchase</c>, or <c>held_cargo</c> for materials the ship already held).
+    /// </summary>
+    public const string ConstructionStarted = nameof(ConstructionStarted);
+
+    /// <summary>
+    /// A ship supplied a construction site (slice 6.6: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>Units</c>,
+    /// <c>WaypointSymbol</c>, and the site's <c>Fulfilled</c> and <c>Required</c> units of the material afterwards).
+    /// </summary>
+    public const string ConstructionSupplied = nameof(ConstructionSupplied);
+
+    /// <summary>
+    /// A construction trip was given up (slice 6.6: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c>,
+    /// <c>Reason</c>: at the market <c>not_needed</c>, <c>not_sold_here</c>, <c>low_supply</c> (D61), <c>not_full_hold</c>
+    /// (D62) or <c>over_budget</c> (D59); at the site <c>not_needed</c>; at Warning when the API refused the supply,
+    /// <c>not_needed</c> or <c>wrong_location</c>, with the <c>Units</c> kept aboard). The construction plan chooses again.
+    /// </summary>
+    public const string ConstructionDropped = nameof(ConstructionDropped);
 
     /// <summary>
     /// A probe was sent to a shipyard where a purchase waits for one of our ships, which the API requires

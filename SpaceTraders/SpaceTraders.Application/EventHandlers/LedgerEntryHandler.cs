@@ -33,16 +33,18 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
 
     public async Task Handle(CargoPurchasedEvent @event, CancellationToken cancellationToken)
     {
+        // Materials for a construction site are spent for good (slice 6.6): booked apart from trading's purchases.
+        var category = @event.ForConstruction ? LedgerCategory.ConstructionBuy : LedgerCategory.TradeBuy;
         await ledger.AppendAsync(
             @event.ShipSymbol,
-            LedgerCategory.TradeBuy,
+            category,
             -@event.Cost,
             goodSymbol: @event.Good.Value,
             unitPrice: @event.Units > 0 ? (int)(@event.Cost / @event.Units) : null,
             units: @event.Units,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
-        CountCredits(LedgerCategory.TradeBuy, -@event.Cost);
+        CountCredits(category, -@event.Cost);
         metrics.GoodsBought(@event.WaypointSymbol, @event.Good.Value, @event.Units);
         notifier.Notify("ship", @event.ShipSymbol);
     }

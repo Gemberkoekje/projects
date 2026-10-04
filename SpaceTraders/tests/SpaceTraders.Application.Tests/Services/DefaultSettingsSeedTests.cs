@@ -21,6 +21,7 @@ public sealed class DefaultSettingsSeedTests
         "Automation.Plan.Survey.Enabled",
         "Automation.Plan.Mining.Enabled",
         "Automation.Plan.Siphon.Enabled",
+        "Automation.Plan.Construction.Enabled",
         "Automation.Plan.Trading.Enabled",
         "Automation.Plan.SpareTime.Enabled",
 
@@ -61,10 +62,12 @@ public sealed class DefaultSettingsSeedTests
         // Siphoning (slice 6.7): SiphonAutomationService's cap on siphon drones (D32).
         "Siphon.MaxDrones",
 
-        // The role board (slice 6.9): RoleSettings, read by RolePlanService and RoleAdvisor (D39, D41).
+        // The role board (slice 6.9): RoleSettings, read by RolePlanService and RoleAdvisor (D39, D41); how many ships build
+        // the jump gate, read by RolePlanService and ConstructionPlanService (slice 6.6, D60).
         "Roles.ReconsiderMinutes",
         "Roles.HeadStartPercent",
         "Roles.ChainValueSharePercent",
+        "Construction.Ships",
 
         // Read, without changing what the bot does: the run's strategy label (RunLifecycleService)
         // and the market views (MarketsEndpoints, QueryHandlers).
