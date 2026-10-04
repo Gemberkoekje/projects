@@ -73,10 +73,15 @@ public sealed class SiphonAutomationService(
     {
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
         var fleet = await ships.GetAllAsync(cancellationToken);
-        var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
+        var active = await assignments.GetAllActiveAsync(cancellationToken);
+        var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
+        var explorers = BusinessSystems.Explorers(active);
+        var systems = BusinessSystems.Of(fleet, explorers);
 
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -104,7 +109,7 @@ public sealed class SiphonAutomationService(
         // what a drone would be bought for.
         var freeAtStart = free.Count > 0;
         var opportunities = new List<MiningAutomationOpportunityState>();
-        foreach (var systemSymbol in Systems(fleet))
+        foreach (var systemSymbol in systems)
         {
             var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
             var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -141,18 +146,9 @@ public sealed class SiphonAutomationService(
             }
         }
 
-        await BuyDroneAsync(fleet, board, heldKeys, covered, freeAtStart, cancellationToken);
+        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
         await SaveStateAsync(opportunities, cancellationToken);
     }
-
-    /// <summary>The systems where our ships are, by symbol.</summary>
-    private static IReadOnlyList<string> Systems(IReadOnlyList<ShipModel> fleet)
-        => [.. fleet
-            .Select(ship => ship.SystemSymbol)
-            .OfType<string>()
-            .Where(system => system.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.Ordinal)];
 
     /// <summary>
     /// Gives a free siphoner its next trip: selling goods it holds, else the best siphon target, a scarce gas no siphoner
@@ -255,13 +251,14 @@ public sealed class SiphonAutomationService(
     /// </summary>
     private async Task BuyDroneAsync(
         IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> systems,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         CancellationToken cancellationToken)
     {
-        var need = await DroneNeedAsync(fleet, board, heldKeys, covered, freeAtStart, cancellationToken);
+        var need = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Siphon, need, cancellationToken))
         {
             return;
@@ -292,6 +289,7 @@ public sealed class SiphonAutomationService(
     /// </summary>
     private async Task<PurchaseNeed> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> systems,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
@@ -307,7 +305,7 @@ public sealed class SiphonAutomationService(
         }
 
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
-        foreach (var systemSymbol in Systems(fleet))
+        foreach (var systemSymbol in systems)
         {
             var shipyard = shipyardList
                 .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)

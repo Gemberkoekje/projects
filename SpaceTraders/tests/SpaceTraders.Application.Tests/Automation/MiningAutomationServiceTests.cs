@@ -270,6 +270,34 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhereOnlyTheExploringCommandShipIs_NoDroneIsBought_AndNoOpeningsAreListed()
+    {
+        // Asked on 2026-10-04: while the command ship explores, business stays home ("For now: come home … start simple").
+        // X1-KR90 has a shipyard that sells drones, and ores in short supply; the command ship, exploring, is docked there.
+        const string Kr90 = "X1-KR90";
+        Fleet(CommandShip(waypoint: H52, status: "DOCKED") with { SystemSymbol = Kr90 });
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Explore", H52, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
+        _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _state?.Opportunities.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task WithADroneForEachScarceOre_AndAMinerFree_NoDroneIsBought()
     {
         // D28: a drone beyond one per scarce ore and area waits until every miner works; until then its turn passes to the

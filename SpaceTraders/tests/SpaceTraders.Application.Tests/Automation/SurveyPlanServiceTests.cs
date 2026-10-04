@@ -152,6 +152,24 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task WhereOnlyTheExploringCommandShipIs_NothingIsPlannedForSurveys()
+    {
+        // Asked on 2026-10-04: business stays where our ships work. The command ship explores X1-KR90, whose asteroids and
+        // markets are as here: the survey plan plans no surveys there.
+        const string Kr90 = "X1-KR90";
+        Fleet(CommandShip() with { SystemSymbol = Kr90 });
+        _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new ShipAssignmentDto("SHIP-1", "Explore", XB5C, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
+        _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context());
+
+        await RunAsync();
+
+        await _contexts.DidNotReceive().ReadAsync(Kr90, Arg.Any<CancellationToken>());
+        _activeGoals.Should().BeEmpty();
+        (_state?.Targets ?? []).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task WithoutAContract_ItSurveysTheBestPaidOre_ThatTheMinersCanReach()
     {
         // GOLD pays most, at B7, but the drone can't reach B14: COPPER at XB5C, for H51, it is.

@@ -430,6 +430,12 @@ internal sealed class FleetStatusQueryService(
             DeliverCargoGoal dlv => (ShipGoalKind.DeliverCargo, $"Delivering {dlv.TradeSymbol} to {dlv.DeliveryWaypointSymbol}", null, dlv.DeliveryWaypointSymbol),
             SupplyConstructionGoal sup => (ShipGoalKind.SupplyConstruction, $"Supplying {sup.TradeSymbol} to {sup.ConstructionSiteWaypointSymbol}", null, sup.ConstructionSiteWaypointSymbol),
             ScoutWaypointGoal scout => (ShipGoalKind.ScoutWaypoint, $"Scouting {scout.TargetWaypointSymbol}", null, scout.TargetWaypointSymbol),
+            JumpGoal jump => (ShipGoalKind.Jump, $"Jumping from {jump.GateWaypointSymbol} to {jump.DestinationGateWaypointSymbol}", jump.GateWaypointSymbol, jump.DestinationGateWaypointSymbol),
+            ExploreSystemGoal explore => (
+                ShipGoalKind.ExploreSystem,
+                $"Exploring {explore.SystemSymbol}: market or shipyard {Math.Min(explore.Visited + 1, explore.Stops.Count)} of {explore.Stops.Count}",
+                null,
+                explore.Visited < explore.Stops.Count ? explore.Stops[explore.Visited] : null),
             PatrolMarketGoal patrol => (ShipGoalKind.PatrolMarket, $"Patrolling market at {patrol.TargetWaypointSymbol}", null, patrol.TargetWaypointSymbol),
             _ => (ShipGoalKind.Idle, "Idle", null, null),
         };

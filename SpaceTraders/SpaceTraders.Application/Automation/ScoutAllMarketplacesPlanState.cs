@@ -5,6 +5,7 @@ public static partial class PlanTypes
     public const string ScoutAllMarketplaces = "ScoutAllMarketplaces";
     public const string ContractMineral = "ContractMineral";
     public const string ProbeDeployment = "ProbeDeployment";
+    public const string Explore = "Explore";
 }
 
 public enum ScoutPlanStatus

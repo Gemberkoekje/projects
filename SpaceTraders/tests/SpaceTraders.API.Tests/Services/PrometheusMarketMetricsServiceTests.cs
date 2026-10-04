@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
@@ -88,6 +89,66 @@ public sealed class PrometheusMarketMetricsServiceTests
     }
 
     [Fact]
+    public async Task ASystemOnlyTheCommandShipExplored_KeepsItsSummary_ButNotEachGoodsSeries()
+    {
+        // Asked on 2026-10-04: exploring has no limit, and each explored system's goods would add about a thousand series.
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-H51", SystemSymbol = "X1-AB", Type = "PLANET", HasMarket = true });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-KR90-A1", SystemSymbol = "X1-KR90", Type = "PLANET", HasMarket = true });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-KR90-R1", SystemSymbol = "X1-KR90", Type = "ASTEROID", TraitsJson = """[{"symbol":"COMMON_METAL_DEPOSITS"}]""" });
+            foreach (var (waypoint, system) in new[] { ("X1-AB-H51", "X1-AB"), ("X1-KR90-A1", "X1-KR90") })
+            {
+                db.Markets.Add(new CachedMarket
+                {
+                    AgentId = AgentId,
+                    WaypointSymbol = waypoint,
+                    SystemSymbol = system,
+                    LastObservedAt = Start,
+                    TradeGoodsJson = """[{"symbol":"IRON_ORE","type":"IMPORT","tradeVolume":60,"supply":"SCARCE","activity":"WEAK","purchasePrice":60,"sellPrice":55}]""",
+                });
+            }
+
+            await db.SaveChangesAsync();
+            await seedScope.ServiceProvider.GetRequiredService<IAgentRepository>().UpsertAsync(new AgentModel("AGENT", null, "X1-AB-A1", 100_000, "COSMIC", 2));
+            await seedScope.ServiceProvider.GetRequiredService<IShipRepository>().UpsertAsync(new ShipModel("AGENT-2", "X1-AB", "X1-AB-H51", "DOCKED", "CRUISE", 80, 80));
+            await seedScope.ServiceProvider.GetRequiredService<IPlanRepository>().UpsertAsync("Explore", new ExplorePlanState
+            {
+                ShipSymbol = "AGENT-1",
+                HomeSystemSymbol = "X1-AB",
+                Status = ExploreStatus.Exploring,
+                UpdatedAt = Start,
+                Systems =
+                [
+                    new KnownSystem { SystemSymbol = "X1-AB", GateWaypointSymbol = "X1-AB-I1", Gate = GateState.Active, Connections = ["X1-KR90-AF5F"], ExploredAt = Start },
+                    new KnownSystem { SystemSymbol = "X1-KR90", GateWaypointSymbol = "X1-KR90-AF5F", Gate = GateState.Active, ExploredAt = Start },
+                ],
+            });
+        }
+
+        IReadOnlyCollection<MarketMetricsSample> markets = [];
+        IReadOnlyCollection<SystemSample> systems = [];
+        _metrics.When(m => m.Markets(Arg.Any<IReadOnlyCollection<MarketMetricsSample>>()))
+            .Do(call => markets = call.Arg<IReadOnlyCollection<MarketMetricsSample>>());
+        _metrics.When(m => m.Systems(Arg.Any<IReadOnlyCollection<SystemSample>>()))
+            .Do(call => systems = call.Arg<IReadOnlyCollection<SystemSample>>());
+
+        await Service(provider).SampleAsync(Start, CancellationToken.None);
+
+        markets.Single(m => m.Waypoint == "X1-AB-H51").Goods.Should().ContainSingle("home, where our ships work, keeps each good");
+        markets.Single(m => m.Waypoint == "X1-KR90-A1").Goods.Should().BeEmpty();
+        var kr90 = systems.Single(system => system.System == "X1-KR90");
+        kr90.State.Should().Be("explored");
+        kr90.Jumps.Should().Be(1);
+        kr90.Markets.Should().Be(1);
+        kr90.GatheringSites.Should().ContainKey("IRON_ORE");
+        kr90.RawGoods.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Good = "IRON_ORE", Price = 55, Market = "X1-KR90-A1", Supply = "SCARCE" });
+        systems.Single(system => system.System == "X1-AB").State.Should().Be("home");
+    }
+
+    [Fact]
     public async Task SampleAsync_ExportsTheProductionChainsOnce()
     {
         IReadOnlyDictionary<string, IReadOnlyList<string>> chains = new Dictionary<string, IReadOnlyList<string>> { ["IRON"] = ["IRON_ORE"] };
@@ -139,6 +200,10 @@ public sealed class PrometheusMarketMetricsServiceTests
         services.AddDbContext<SpaceTradersDbContext>(options => options.UseInMemoryDatabase(databaseName));
         services.AddScoped<IMarketRepository, MarketRepository>();
         services.AddScoped<IShipyardRepository, ShipyardRepository>();
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<IShipRepository, ShipRepository>();
+        services.AddScoped<IShipAssignmentRepository, ShipAssignmentRepository>();
         services.AddScoped(_ => _port);
         services.AddSingleton<ISupplyChainCache>(_ => new SupplyChainCache(NullLogger<SupplyChainCache>.Instance));
         return services.BuildServiceProvider();

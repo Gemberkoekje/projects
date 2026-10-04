@@ -88,7 +88,12 @@ public interface ISpaceTradersApiClient
 
     Task<WarpResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
-    Task<JumpResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
+    /// <summary>Jumps a ship in orbit at a jump gate to a gate it connects to, buying one ANTIMATTER at the gate's market.</summary>
+    /// <param name="shipSymbol">The ship.</param>
+    /// <param name="waypointSymbol">The destination: a jump gate the ship's gate connects to.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>Where the ship is now, its cooldown, the antimatter's purchase and the agent's credits.</returns>
+    Task<JumpResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<ChartResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 

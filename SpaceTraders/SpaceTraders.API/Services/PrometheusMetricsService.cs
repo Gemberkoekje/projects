@@ -296,6 +296,8 @@ public sealed class PrometheusMetricsService(
                 PatrolMarketGoal => "watching its market",
                 MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",
                 MoveToWaypointGoal => "moving",
+                JumpGoal jump => $"jumping to {WaypointSymbols.SystemOf(jump.DestinationGateWaypointSymbol)}",
+                ExploreSystemGoal explore => $"exploring {explore.SystemSymbol}",
                 IdleGoal => "idle",
                 _ => goal.Kind.ToString(),
             };
