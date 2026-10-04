@@ -1507,10 +1507,16 @@ Steps 2 to 4 follow the API guide (https://spacetraders.io/api-guide/rate-limits
    and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
    and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
    Warning with the limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them,
-   B59), and the headers are recorded for `/status/rate-limit`.
+   B59), and the headers are recorded for `/status/rate-limit`. A 429 from the rate limiter also
+   holds every other request back until its reset (`RequestBudget.PauseUntil`, B59): the server's
+   budget is empty for them too, and they used to go out and draw 429s of their own.
 4. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
-   both are used. Writes (anything but GET: moving a ship, trading) go before reads (D19): a read
+   both are used. Each window is 100 ms longer (`JourneyMargin`, B59): a request that leaves a
+   second after the one two before it can still reach the server less than a second after it. A
+   new process starts with its burst spent (`RequestBudget.ForANewProcess`, B59), as the server
+   still counts what the process before it sent in the last minute, so it goes at 2 a second for
+   its first minute. Writes (anything but GET: moving a ship, trading) go before reads (D19): a read
    gives way while a write waits for the budget, leaves the last 10 of the burst to writes
    (`WriteReserve`), and stops giving way after 10 seconds (`MaxReadDelay`), so reads can't
    starve. Time spent waiting is counted in `spacetraders_api_rate_limit_wait_seconds_total`, by

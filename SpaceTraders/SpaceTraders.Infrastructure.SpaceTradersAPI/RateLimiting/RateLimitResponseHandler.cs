@@ -9,7 +9,9 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// <c>x-ratelimit-*</c> headers: wait until <c>x-ratelimit-reset</c> (or <c>retry-after</c>), then
 /// retry. A 429 without them comes from the cloud infrastructure: back off exponentially. Either
 /// way it gives up after <see cref="MaxRetries"/> retries and returns the 429. Each 429 is logged with the limiter's
-/// headers (<see cref="RateLimitHeaders"/>, B59): what the server counted, to hold the local budget against.
+/// headers (<see cref="RateLimitHeaders"/>, B59): what the server counted, to hold the local budget against. A 429 from
+/// the rate limiter holds every request back until its reset, not only the one it refused (<see cref="RequestBudget.PauseUntil"/>,
+/// B59): the requests after it went out at once and drew 429s of their own.
 /// </summary>
 public sealed class RateLimitResponseHandler : DelegatingHandler
 {
@@ -29,17 +31,19 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
     private static readonly TimeSpan MaxRateLimiterWait = TimeSpan.FromSeconds(60);
 
     private readonly RateLimitStatus _status;
+    private readonly RequestBudget _budget;
     private readonly ILogger<RateLimitResponseHandler> _logger;
     private readonly IReadOnlyList<TimeSpan> _backoff;
 
-    public RateLimitResponseHandler(RateLimitStatus status, ILogger<RateLimitResponseHandler> logger)
-        : this(status, logger, DefaultBackoff)
+    public RateLimitResponseHandler(RateLimitStatus status, RequestBudget budget, ILogger<RateLimitResponseHandler> logger)
+        : this(status, budget, logger, DefaultBackoff)
     {
     }
 
-    public RateLimitResponseHandler(RateLimitStatus status, ILogger<RateLimitResponseHandler> logger, IReadOnlyList<TimeSpan> backoff)
+    public RateLimitResponseHandler(RateLimitStatus status, RequestBudget budget, ILogger<RateLimitResponseHandler> logger, IReadOnlyList<TimeSpan> backoff)
     {
         _status = status;
+        _budget = budget;
         _logger = logger;
         _backoff = backoff;
     }
@@ -113,9 +117,15 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
                 return response;
             }
 
+            var now = TimeProvider.System.GetUtcNow();
             var wait = fromRateLimiter
-                ? RateLimiterWait(response, TimeProvider.System.GetUtcNow())
+                ? RateLimiterWait(response, now)
                 : _backoff[Math.Min(retry, _backoff.Count - 1)];
+            if (fromRateLimiter)
+            {
+                _budget.PauseUntil(now + wait);
+            }
+
             _logger.LogWarning(
                 "429 from {Source} for {Endpoint}; retrying in {Wait} ({Retry} of {MaxRetries}). The limiter's headers: {RateLimitHeaders:l}.",
                 fromRateLimiter ? "the API's rate limiter" : "the cloud infrastructure",

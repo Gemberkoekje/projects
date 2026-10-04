@@ -170,6 +170,13 @@ public sealed class ApiRequestPipelineMetricsTests : IDisposable
     public void Dispose() => _services.Dispose();
 
     [Fact]
+    public void TheBudget_StartsWithItsBurstSpent()
+    {
+        // B59: the server still counts what the process before this one sent in the last minute.
+        _services.GetRequiredService<RequestBudget>().BurstRemaining(TimeProvider.System.GetUtcNow()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task ARequestRetriedAfterA429_IsInitiatedOnce_AndExecutedTwice()
     {
         _respond = call => call == 1 ? RateLimiter429() : new HttpResponseMessage(HttpStatusCode.OK);

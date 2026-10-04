@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-04, B59)
+- The local request budget keeps to the API's rate limiter (B59, step 2), from the headers step 1 logged: 119 429s between 2026-10-03 19:51Z and 2026-10-04 13:00Z, all from the limiter's IP address count. Each window is 100 ms longer (`RequestBudget.JourneyMargin`), for a request's journey to the server: half the 429s came a few milliseconds early. A 429 from the limiter holds every request back until the reset it names (`RequestBudget.PauseUntil`), not only the one it refused: 68 of 118 came within 20 seconds of the one before. A new process starts with its burst spent (`RequestBudget.ForANewProcess`), as the server still counts what the process before it sent in the last minute: the 429s at 10:07:50Z on 2026-10-04 came during a start.
+
+### Docs – Changed (2026-10-04, B59)
+- `PLAN.md`: B59's row says what the headers showed and what step 2 changed. `docs/HOW_IT_WORKS.md`: the 429 handler's pause and the budget's margin and start.
+
 ### Code – Changed (2026-10-04, slice 2.12)
 - Every plan is on by default (D69), as asked on 2026-10-04 after the server reset of 13:00Z registered a new agent with only the scout and contract plans on: "Can you ensure everything is on by default? And changes in config changes those defaults?" A setting nobody has set follows its default (`agent_settings."FollowsDefault"`): every start gives it the default as the running version has it, a `SettingChanged` journal line each. Of the settings stored before, the start that adds the column keeps one whose value isn't its default as set (a setting changed, or automation switched off, before the deploy) and lets the rest follow, with the plan switches that are off: so this build's first start switches on the plans the current agent has off. A setting set by you or by the bot keeps its value; the `Runtime.*` status flags never follow.
 
