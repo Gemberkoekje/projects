@@ -1401,10 +1401,10 @@ other app (D8):
   with and whether that is the default (`isDefault`). `PUT /settings/next-run/{key}` with
   `{"value": "…"}` chooses a value for the next runs only, and leaves the run that runs now alone;
   `DELETE /settings/next-run/{key}` gives the next runs the default again. Both answer 404 for a key
-  the seed doesn't hold and for a status flag. For example, to run with half the mining-capable
-  ships mining now and try 60% next time, `PUT /settings/Automation.MiningShipPercentage` with
-  `0.5`, then `PUT /settings/next-run/Automation.MiningShipPercentage` with `0.6`; in that order,
-  since the first also sets the next runs.
+  the seed doesn't hold and for a status flag. For example, to trade at 200 credits a unit now and
+  try 300 in the next run, `PUT /settings/Trade.MinProfitPerUnit` with `200`, then
+  `PUT /settings/next-run/Trade.MinProfitPerUnit` with `300`; in that order, since the first also
+  sets the next runs.
 - `POST /settings/reset` gives every setting its default back, to follow it from then on, and
   forgets the values chosen for the next runs.
 - Every change, whoever makes it (these endpoints, the control endpoints, the size guard, the

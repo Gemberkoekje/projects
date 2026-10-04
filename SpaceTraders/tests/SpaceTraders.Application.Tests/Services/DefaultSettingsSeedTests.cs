@@ -103,7 +103,7 @@ public sealed class DefaultSettingsSeedTests
     [Fact]
     public async Task SeedAsync_StartsANewAgent_WithTheValuesChosenForTheNextRuns_AndTheDefaultsForTheRest()
     {
-        // D69: a split tried in this run, another chosen for the next.
+        // D69: values chosen for the next run, which differ from the defaults.
         await using var db = TestDbContextFactory.Create();
         db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.MiningShipPercentage", Value = "0.5" });
         db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.Plan.Trading.Enabled", Value = "false" });

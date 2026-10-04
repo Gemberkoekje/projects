@@ -91,7 +91,7 @@ public sealed class AgentCleanupIntegrationTests : IAsyncLifetime
     [SkippableFact]
     public async Task StartAsync_AfterAReset_TheNewAgentStartsWithTheValuesChosenForTheNextRuns_WhichOutliveTheOldAgent()
     {
-        // D69: the old agent ran with a quarter of its ships mining, and the next run was set to try 60%.
+        // D69: the old agent ran with the default; the next run was given another value.
         await SeedOldAgentAsync();
         await using (var old = CreateContext(OldAgent))
         {

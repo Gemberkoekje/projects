@@ -449,7 +449,7 @@ public sealed class AgentBootstrapServiceTests
     [Fact]
     public async Task StartAsync_AfterAServerReset_TheNewAgentStartsWithTheValuesChosenForTheNextRuns()
     {
-        // D69: the old agent ran with half its ships mining; the next run was set to try 60%, without trading.
+        // D69: the old agent ran with one value; the next run was given another, and the trading plan off.
         var apiClient = Substitute.For<ISpaceTradersApiClient>();
         apiClient.RegisterAsync(Arg.Any<RegisterRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(CreateRegistrationResponse("NEW-AGENT", "registered-agent-token")));
