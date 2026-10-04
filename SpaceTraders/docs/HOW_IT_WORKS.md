@@ -932,7 +932,8 @@ buy.
   ship would have a lucrative route, so the drones' turn comes.
 - **The state** (`plan_states`, `TradingAutomation`) lists the held routes (Assigned) and up to 20
   lucrative routes no trader holds (Pending), each with the free traders that could have taken it,
-  for the `ShipLeftIdle` rule. It is written only when it changes.
+  for the `ShipLeftIdle` rule. It is written only when it changes. `GET /status/trading-routes` serves it (slice 2.16,
+  D75): the held routes, then the others numbered in the order the plan gives them out, for the markets dashboard.
 - **After each purchase and sale** the trip fetches the market again while the ship is still docked
   there (D25, `MarketRefresher`), so the next decisions see what the trade did to the prices. A
   failed fetch is logged at Warning and leaves the trade as it is.
@@ -1664,7 +1665,7 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14); `/startup-snapshots` with each snapshot's `reason` and `discovered`, and the download named `startup-snapshot-…` or `discovery-snapshot-…` (slice 2.15) |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/trading-routes`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14); `/startup-snapshots` with each snapshot's `reason` and `discovered`, and the download named `startup-snapshot-…` or `discovery-snapshot-…` (slice 2.15) |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes` | Read tables that are never written; always 204, `[]` or zeros |
 | Status (credit growth) | `GET /status/anomalies` | A heuristic over the credit samples: credits per hour over the last 24 hours against the last hour. Not the health rules' anomalies (section 12) |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |

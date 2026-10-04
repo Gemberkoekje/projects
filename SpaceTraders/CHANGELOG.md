@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-04, slice 2.16)
+- `GET /status/trading-routes` serves the trading plan's routes in the order it gives them out (D75), as asked on 2026-10-04: "Can you, in a new pr, add the exact logic to the market tree view that is used to determine which trade is done first?" It reads the plan's state as its last pass stored it: the routes traders hold, then the lucrative routes no trader holds, numbered from 1 (a route that feeds a pricier good first, D15, then the most profit after fuel), each with its units, profit after fuel and per unit, what it feeds and the traders that could take it. The markets dashboard shows it under the market tree (gembernodes, same branch).
+
+### Docs – Changed (2026-10-04, slice 2.16)
+- `PLAN.md`: slice 2.16 and decision D75, and slice 6.13 merged and deployed. `docs/HOW_IT_WORKS.md`: the endpoint, in the status endpoints and with the trading plan's state.
+
 ### Code – Changed (2026-10-04, slice 6.13)
 - A trade trip may carry less than a full hold where the buy market's supply of the good is ABUNDANT (D74), as asked on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT, in which case a full hold is not necessary. All other rules for profitability etc. Still stand." It carries what both markets trade at once, the smallest of the free hold and the two trade volumes, still in one purchase and one sale and paid for in full (`TradeRoutePlanner.UnitsAtOnce`, which replaces `TakesFullHold`). Anywhere else a trip is a full hold, as D56 has it. At the buy market the trip is worked out again with the supply its arrival fetched: it buys what the markets trade at once then, and a seller no longer ABUNDANT whose volume fills no hold drops it (`not_full_hold`). The minimum profit per unit (D14), the order of routes (D15) and the credits held back (D17, D24, D57) are unchanged.
 
