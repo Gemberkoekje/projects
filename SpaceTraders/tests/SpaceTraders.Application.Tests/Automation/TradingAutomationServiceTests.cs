@@ -88,7 +88,8 @@ public sealed class TradingAutomationServiceTests
     [Fact]
     public async Task TheCommandShip_AfterScouting_TakesTheBestRoute()
     {
-        // Scouting done (B10): no goal and no assignment, docked where the scout plan ended.
+        // Scouting done (B10): no goal and no assignment, docked where the scout plan ended. SHIP_PARTS are made from EQUIPMENT,
+        // so its routes come first (D82), and A1 pays the most for it.
         Fleet(CommandShip());
 
         await RunAsync();
@@ -96,16 +97,32 @@ public sealed class TradingAutomationServiceTests
         var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
         trip.TradeSymbol.Should().Be("EQUIPMENT");
         trip.BuyWaypointSymbol.Should().Be(K85);
-        trip.SellWaypointSymbol.Should().Be(D41);
+        trip.SellWaypointSymbol.Should().Be(A1);
         trip.Units.Should().Be(40);
-        trip.ExpectedProfit.Should().Be((233 * 40) - (2 * 76));
-        trip.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
+        trip.ExpectedProfit.Should().Be((245 * 40) - (2 * 90));
+        trip.FeedsTradeSymbol.Should().BeEmpty("A1 makes nothing from EQUIPMENT");
         trip.CargoBought.Should().BeFalse();
 
         var started = _log.Journal.Should().ContainSingle().Subject;
         started.EventKind.Should().Be("TradeStarted");
         started.Properties["ShipSymbol"].Should().Be("SHIP-1");
-        started.Properties["FeedsTradeSymbol"].Should().Be("SHIP_PARTS");
+        started.Properties.Should().NotContainKey("FeedsTradeSymbol");
+    }
+
+    [Fact]
+    public async Task ATripToAMarketThatMakesAPricierGoodFromItsCargo_SaysWhichInItsGoalAndTheJournal()
+    {
+        // D15: D41 makes SHIP_PARTS (7,721) from EQUIPMENT; paying 3,520 for it there, it is the best route.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(K85Market(), D41Market(equipmentPrice: 3_520), A1Market())));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.SellWaypointSymbol, trip.FeedsTradeSymbol).Should().Be((D41, "SHIP_PARTS"));
+        _log.Journal.Should().ContainSingle().Which.Properties["FeedsTradeSymbol"].Should().Be("SHIP_PARTS");
+        _state!.Opportunities.Should().ContainSingle(o => o.Status == MarketAutomationOpportunityStatus.Assigned)
+            .Which.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
     }
 
     [Fact]
@@ -148,8 +165,8 @@ public sealed class TradingAutomationServiceTests
     [Fact]
     public async Task WithoutTheCreditsForAllTheUnits_ATraderTakesFewer_AndSavesUpForNoMore()
     {
-        // D79: a trip carries what the credits pay for. From K85 the command ship's best route is 40 EQUIPMENT for D41 (D15),
-        // 130,160 and 152 for fuel; with 100,000 for cargo it takes 30 of them. It noted the saving for the 40 (D56), and setting
+        // D79: a trip carries what the credits pay for. From K85 the command ship's best route is 40 EQUIPMENT for A1 (D82),
+        // 130,160 and 180 for fuel; with 100,000 for cargo it takes 30 of them. It noted the saving for the 40 (D56), and setting
         // off on that route ends it: the trip holds back what its 30 cost instead (D57).
         CreditsAre(100_000);
         Fleet(CommandShip());
@@ -157,7 +174,7 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         var smaller = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
-        (smaller.TradeSymbol, smaller.SellWaypointSymbol, smaller.Units, smaller.ReservedCredits).Should().Be(("EQUIPMENT", D41, 30, 30 * 3_254L));
+        (smaller.TradeSymbol, smaller.SellWaypointSymbol, smaller.Units, smaller.ReservedCredits).Should().Be(("EQUIPMENT", A1, 30, 30 * 3_254L));
         _savings.TryGet("SHIP-1", out _).Should().BeFalse();
         _log.Kept.Should().ContainSingle(message => message.Contains("saves up for 40 EQUIPMENT", StringComparison.Ordinal) && message.Contains("D56", StringComparison.Ordinal));
         _activeGoals.Clear();
@@ -188,7 +205,8 @@ public sealed class TradingAutomationServiceTests
     [Fact]
     public async Task TwoTraders_NeverShareARoute()
     {
-        // Full holds of EQUIPMENT and MEDICINE (D56) cost 325,000.
+        // Full holds of EQUIPMENT and MEDICINE cost 325,000. The first trader takes EQUIPMENT for A1 (D82); EQUIPMENT for D41
+        // comes next, but the first is on its way to buy EQUIPMENT at K85 (D80): the second takes MEDICINE.
         CreditsAre(500_000);
         Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4"));
 
@@ -197,7 +215,7 @@ public sealed class TradingAutomationServiceTests
         var trips = _activeGoals.Values.Cast<TradeBetweenMarketsGoal>().ToList();
         trips.Should().HaveCount(2);
         trips.Select(trip => (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol)).Should().OnlyHaveUniqueItems();
-        trips.Should().Contain(trip => trip.SellWaypointSymbol == D41 && trip.TradeSymbol == "EQUIPMENT");
+        trips.Should().Contain(trip => trip.SellWaypointSymbol == A1 && trip.TradeSymbol == "EQUIPMENT");
         trips.Should().Contain(trip => trip.TradeSymbol == "MEDICINE");
     }
 
@@ -474,8 +492,8 @@ public sealed class TradingAutomationServiceTests
 
         var held = _state!.Opportunities.Should().ContainSingle(o => o.Status == MarketAutomationOpportunityStatus.Assigned).Subject;
         held.AssignedShipSymbol.Should().Be("SHIP-1");
-        held.SellWaypointSymbol.Should().Be(D41);
-        held.FeedsTradeSymbol.Should().Be("SHIP_PARTS");
+        held.SellWaypointSymbol.Should().Be(A1);
+        held.FeedsTradeSymbol.Should().BeEmpty();
 
         // Open for the ShipLeftIdle rule (D13): what SHIP-1 could have done instead, now that it is busy.
         _state.Opportunities.Where(o => o.Status == MarketAutomationOpportunityStatus.Pending)
@@ -487,7 +505,7 @@ public sealed class TradingAutomationServiceTests
     public async Task TheState_SaysWhyEachGoodWithAPriceGap_IsNotTraded()
     {
         // Slice 2.18 (D76), asked on 2026-10-05: "Can the new list also add why the other goods are not considered for
-        // trading?" SHIP-1 takes EQUIPMENT for D41, and EQUIPMENT for A1 and MEDICINE wait. FOOD and FUEL have a price gap, but
+        // trading?" SHIP-1 takes EQUIPMENT for A1, and EQUIPMENT for D41 and MEDICINE wait. FOOD and FUEL have a price gap, but
         // not even their first unit earns the 200 (D14, D79). SHIP_PARTS, which no market here buys, has none.
         Fleet(CommandShip());
 
@@ -670,7 +688,7 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
-        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol, trip.CargoBought).Should().Be(("EQUIPMENT", K85, D41, false));
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol, trip.CargoBought).Should().Be(("EQUIPMENT", K85, A1, false));
     }
 
     [Fact]

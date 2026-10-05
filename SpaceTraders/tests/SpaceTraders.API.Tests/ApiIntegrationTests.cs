@@ -491,8 +491,9 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     [Fact]
     public async Task TradingRoutes_ListTheHeldRoutes_ThenTheWaitingOnes_NumberedInTheTradingPlansOrder()
     {
-        // Slice 2.17 (D75): the order the trading plan gives routes out in, as it stored it at its last pass: a route that
-        // feeds a pricier good first (D15), so FABRICS, which feeds CLOTHING, comes before SHIP_PARTS, which earns more.
+        // Slice 2.17 (D75): the order the trading plan gives routes out in, as it stored it at its last pass: the routes of a
+        // good something is made from first (D82), so FABRICS, which CLOTHING is made from, comes before CLOTHING, which
+        // nothing is made from, though it earns more.
         var updatedAt = new DateTimeOffset(2026, 10, 04, 23, 30, 00, TimeSpan.Zero);
         _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
             .Returns(new TradingAutomationPlanState
@@ -504,7 +505,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
                 [
                     TradingRoute("EQUIPMENT", "X1-AB-K85", "X1-AB-D41", MarketAutomationOpportunityStatus.Assigned, 40, 9_168, "SHIP_PARTS") with { AssignedShipSymbol = "SHIP-1" },
                     TradingRoute("FABRICS", "X1-AB-C3", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 40, 2_800, "CLOTHING") with { CandidateShipSymbols = ["SHIP-2"] },
-                    TradingRoute("SHIP_PARTS", "X1-AB-D41", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 15, 4_095, string.Empty) with { CandidateShipSymbols = ["SHIP-2", "SHIP-3"] },
+                    TradingRoute("CLOTHING", "X1-AB-D41", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 15, 4_095, string.Empty) with { CandidateShipSymbols = ["SHIP-2", "SHIP-3"] },
                 ],
             });
 
@@ -515,7 +516,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         json.RootElement.GetProperty("updatedAt").GetDateTimeOffset().Should().Be(updatedAt);
         var routes = json.RootElement.GetProperty("routes");
         Enumerable.Range(0, routes.GetArrayLength()).Select(i => routes[i].GetProperty("tradeSymbol").GetString())
-            .Should().Equal("EQUIPMENT", "FABRICS", "SHIP_PARTS");
+            .Should().Equal("EQUIPMENT", "FABRICS", "CLOTHING");
 
         routes[0].GetProperty("status").GetString().Should().Be("Assigned");
         routes[0].GetProperty("position").ValueKind.Should().Be(JsonValueKind.Null, "a held route is no longer given out");

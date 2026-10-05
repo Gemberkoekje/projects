@@ -906,9 +906,16 @@ buy.
     average). A flight longer than the tank holds refuels at markets that sell fuel on the way, the
     fewest stops first, then the cheapest fuel, each hop within a full tank. Never DRIFT (B47);
   - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14).
-- **Ranking** (D15): among the lucrative trips, one whose sell market makes a pricier good from the
-  cargo (it imports the good, and exports something made from it, by the game's production chains,
-  at a higher price) comes before any that doesn't; then the most profitable.
+- **Ranking** (D15, D82): among the lucrative trips, those of a good something is made from come before
+  those of an end product, which nothing is made from by the game's production chains
+  (`TradeMarketMap.IsEndProduct`; ships count as made from SHIP_PARTS and SHIP_PLATING), wherever they are
+  sold; then the most profitable. Asked on 2026-10-05: "Why is iron prioritized over ship parts, although the
+  profit would be a lot higher?" D15 had put a trip first only when its sell market makes a pricier good from
+  the cargo, by its exports, so SHIP_PARTS, which sell only at shipyards' markets, never came first. The end
+  products traded in X1-FJ91 are ANTIMATTER, ASSAULT_RIFLES, CLOTHING, DRUGS, FAB_MATS, FIREARMS, FOOD, FUEL,
+  ICE_WATER, JEWELRY, MEDICINE, RELIC_TECH and SUPERGRAINS. Without the production chains every good is one, and
+  the trips go by profit alone. A trip's `FeedsTradeSymbol` still names the pricier good its sell market makes
+  from the cargo, if any, for the journal and the routes view.
 - **Saving up for a trip** (D56, `FullHoldSavings`): "Full hold or nothing, when this occurs the credit
   floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships
   are bought." When a free trader's best route, credits aside, carries more units than the credits for cargo pay for

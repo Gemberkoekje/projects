@@ -11,7 +11,7 @@ namespace SpaceTraders.Application.Tests.Trading;
 /// <summary>
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
 /// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
-/// that feed a pricier good's production come first (D15); two traders never share a route. D79: a trip carries as many
+/// of goods something is made from come before those of end products (D15, D82); two traders never share a route. D79: a trip carries as many
 /// units as each earn the minimum, in batches of each market's trade volume, each batch bought a step dearer and each sold a
 /// step cheaper; D80: one buyer of a good at a market at a time.
 /// </summary>
@@ -57,18 +57,76 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void Rank_PutsARouteThatFeedsAPricierGoodFirst_ThoughAnotherEarnsMore()
+    public void Rank_PutsTheRoutesOfAGoodSomethingIsMadeFromFirst_ThoughAnEndProductEarnsMore()
     {
-        // D15: D41 makes SHIP_PARTS (7,721) from EQUIPMENT, so delivering it there grows that production.
+        // D15, D82: SHIP_PARTS are made from EQUIPMENT, so both its routes come before MEDICINE's, which nothing is made from,
+        // wherever they sell it. D41 makes SHIP_PARTS (7,721) from it; A1 makes nothing from it, and pays more.
         var routes = TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => (route.TradeSymbol, route.BuyWaypointSymbol, route.SellWaypointSymbol)).Should().Equal(
+            ("EQUIPMENT", K85, A1),
             ("EQUIPMENT", K85, D41),
-            ("MEDICINE", D41, A1),
-            ("EQUIPMENT", K85, A1));
-        routes[0].FeedsTradeSymbol.Should().Be("SHIP_PARTS");
-        routes[0].Profit.Should().Be((233 * 40) - (2 * 76));
-        routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
+            ("MEDICINE", D41, A1));
+        routes.Select(route => route.FeedsProduction).Should().Equal(true, true, false);
+        routes.Select(route => route.FeedsTradeSymbol).Should().Equal(string.Empty, "SHIP_PARTS", string.Empty);
+        routes[0].Profit.Should().Be((245 * 40) - (2 * 90));
+        routes[1].Profit.Should().Be((233 * 40) - (2 * 76));
+        routes[2].Profit.Should().BeGreaterThan(routes[0].Profit);
+    }
+
+    [Fact]
+    public void Rank_PutsShipPartsBeforeIronThatFeedsMachinery_WhenTheyEarnMore()
+    {
+        // D82, asked on 2026-10-05: "Why is iron prioritized over ship parts, although the profit would be a lot higher?" and
+        // "Ship parts do feed a factory, being the SHIP factory." IRON went first: the market it sold at makes MACHINERY from
+        // it (D15), while SHIP_PARTS sold only at the three shipyards' markets, which make nothing from them; ships are made
+        // from them there. The prices are X1-FJ91's of that morning, the waypoints this fixture's. DRUGS, which nothing is
+        // made from, earn the most and still come last.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("IRON", "EXPORT", 124, 56, 60), Good("SHIP_PARTS", "EXPORT", 3_920, 1_855, 6), Good("DRUGS", "EXPORT", 2_000, 900, 20), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("IRON", "IMPORT", 310, 154, 60), Good("MACHINERY", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                Market(A1, Good("SHIP_PARTS", "IMPORT", 15_620, 7_738, 6), Good("DRUGS", "IMPORT", 14_000, 7_000, 20), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["MACHINERY"] = ["IRON"],
+                ["SHIP_PARTS"] = ["ELECTRONICS", "EQUIPMENT"],
+                ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "SHIP_PLATING"],
+                ["DRUGS"] = ["AMMONIA_ICE", "POLYNUCLEOTIDES"],
+            });
+
+        var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 5, NoneHeld);
+
+        routes.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON", "DRUGS");
+        routes.Select(route => route.FeedsTradeSymbol).Should().Equal(string.Empty, "MACHINERY", string.Empty);
+        routes[0].Profit.Should().BeGreaterThan(routes[1].Profit);
+        routes[2].Profit.Should().BeGreaterThan(routes[0].Profit);
+    }
+
+    [Fact]
+    public void AnEndProduct_IsAGoodNothingIsMadeFrom_ShipsIncluded()
+    {
+        // D82: the 13 goods traded in X1-FJ91 on 2026-10-05 that nothing is made from, by the API's supply chain, were the ones
+        // asked to come last: "Antimatter, Assault Rifles, Clothing, Drugs, Fab Mats, Firearms, Food, Fuel, Ice Water, Jewelry,
+        // Medicine, Relic Tech and Supergrains."
+        var map = new TradeMarketMap(
+            Waypoints,
+            [K85Market()],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["DRUGS"] = ["AMMONIA_ICE", "POLYNUCLEOTIDES"],
+                ["SHIP_PROBE"] = ["SHIP_PARTS", "SHIP_PLATING"],
+                ["SHIP_PARTS"] = ["ELECTRONICS", "EQUIPMENT"],
+                ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"],
+            });
+
+        new[] { "DRUGS", "FAB_MATS", "FUEL" }.Should().OnlyContain(good => map.IsEndProduct(good));
+        new[] { "SHIP_PARTS", "SHIP_PLATING", "POLYNUCLEOTIDES", "IRON", "EQUIPMENT" }.Should().NotContain(good => map.IsEndProduct(good));
+        Map(K85Market()).IsEndProduct("ship_parts").Should().BeFalse("the chains are read without regard to case");
+        new TradeMarketMap(Waypoints, [K85Market()], new Dictionary<string, IReadOnlyList<string>>()).IsEndProduct("SHIP_PARTS")
+            .Should().BeTrue("without the chains every good is one, and the routes go by profit alone");
     }
 
     [Fact]

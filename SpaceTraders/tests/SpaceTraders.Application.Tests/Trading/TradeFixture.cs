@@ -29,13 +29,17 @@ internal static class TradeFixture
     public const string J57 = "X1-AB-J57";
     public const string I56 = "X1-AB-I56";
 
-    /// <summary>The production chains: what each good is made from.</summary>
+    /// <summary>
+    /// The production chains: what each good is made from, ships included, as the API's supply chain gives them. Nothing is
+    /// made from MEDICINE or FOOD: end products (D82).
+    /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> MadeFrom = new Dictionary<string, IReadOnlyList<string>>
     {
         ["SHIP_PARTS"] = ["ELECTRONICS", "EQUIPMENT"],
         ["MEDICINE"] = ["FABRICS", "POLYNUCLEOTIDES"],
         ["FOOD"] = ["FERTILIZERS"],
         ["EQUIPMENT"] = ["ALUMINUM", "PLASTICS"],
+        ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "SHIP_PLATING"],
     };
 
     public static IReadOnlyList<WaypointCacheModel> Waypoints =>
