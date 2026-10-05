@@ -34,9 +34,11 @@ public interface ITradingAutomationService
 ///   spare-time plan is on (D34, slice 6.8), and otherwise never (D20);</item>
 ///   <item>a trader that holds cargo first sells it where it fetches the most after fuel, when that
 ///   earns anything;</item>
-///   <item>otherwise it gets its best lucrative route (<see cref="TradeRoutePlanner.Rank"/>) that no
-///   other trader holds: two traders never share a route. When several traders are free, the best
-///   route goes first, to the trader it is best for. The credits are those no trip on its way to buy holds back, and a
+///   <item>otherwise it gets its best lucrative route (<see cref="TradeRoutePlanner.Rank(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string}, HeldBuys)"/>) that no
+///   other trader holds: two traders never share a route. Nor is it sent for a good at a market where another trip is on its
+///   way to buy it: one buyer at a time (D80, <see cref="HeldBuys"/>). When several traders are free, the best route goes
+///   first, to the trader it is best for. A route carries as many units as each earn <c>Trade.MinProfitPerUnit</c>, in batches
+///   of each market's trade volume (D79). The credits are those no trip on its way to buy holds back, and a
 ///   trip holds back what its cargo costs from the moment it starts until it buys (D57, <see cref="TripReservations"/>);</item>
 ///   <item>with the spare-time plan on, a ship that gathers in its spare time (the command ship, when the survey
 ///   plan has nothing for it) trades only for a route that waits for it once its hold is sold, after the other
@@ -44,7 +46,7 @@ public interface ITradingAutomationService
 ///   Otherwise the spare-time plan keeps it (D37).</item>
 /// </list>
 /// Its state lists the routes traders hold and the best that wait, and for each other good with a price gap why no route of it
-/// is listed: the check its route failed for the free trader that got furthest with it (<see cref="TradeRoutePlanner.Judge"/>,
+/// is listed: the check its route failed for the free trader that got furthest with it (<see cref="TradeRoutePlanner.Judge(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string}, HeldBuys)"/>,
 /// slice 2.18, D76).
 /// </summary>
 /// <remarks>
@@ -168,8 +170,10 @@ public sealed class TradingAutomationService(
         var judged = new Dictionary<string, JudgedSystem>(StringComparer.OrdinalIgnoreCase);
         var idle = 0;
 
-        // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64).
-        var constructionHolds = TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(cancellationToken));
+        // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64), and its material at its
+        // buy market against other trips (D80).
+        var constructionTrips = await goals.GetActiveConstructionGoalsAsync(cancellationToken);
+        var constructionHolds = TripReservations.HeldBack(constructionTrips);
         foreach (var system in free.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
             var context = await tradeContexts.ReadAsync(system.Key, cancellationToken);
@@ -197,13 +201,13 @@ public sealed class TradingAutomationService(
                 judged[system.Key] = new JudgedSystem(context.Map, judgements);
             }
 
-            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, judgements, constructionHolds, cancellationToken);
+            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, judgements, constructionTrips, constructionHolds, cancellationToken);
             idle += traders.Count;
 
             // After the other traders: a ship that gathers in its spare time takes a route that is left for it.
             foreach (var ship in system.Where(ship => gatherers.Contains(ship.Symbol)))
             {
-                credits = await TradeInsteadOfGatheringAsync(context, credits, ship, onTrip.Contains(ship.Symbol), held, heldKeys, cancellationToken);
+                credits = await TradeInsteadOfGatheringAsync(context, credits, ship, onTrip.Contains(ship.Symbol), held, heldKeys, HeldBuysOf(held, constructionTrips), cancellationToken);
             }
         }
 
@@ -227,7 +231,7 @@ public sealed class TradingAutomationService(
         }
 
         // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, idle, cancellationToken);
+        await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
 
         await SaveStateAsync(held, pending, judged, cancellationToken);
     }
@@ -298,6 +302,7 @@ public sealed class TradingAutomationService(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> businessSystems,
         IReadOnlySet<string> heldKeys,
+        HeldBuys heldBuys,
         int idle,
         CancellationToken cancellationToken)
     {
@@ -344,7 +349,7 @@ public sealed class TradingAutomationService(
             CargoCapacity: forSale.CargoCapacity);
 
         // Beyond the list a ship has nothing to buy while no new one would have work, so the drones' turn comes (D43).
-        var hasWork = idle == 0 && TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys).Count > 0;
+        var hasWork = idle == 0 && TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys).Count > 0;
         var need = inList || hasWork
             ? new PurchaseNeed(inList ? PurchaseTier.CargoShips : PurchaseTier.Alternating, shipType, shipyard.WaypointSymbol, forSale.PurchasePrice)
             : PurchaseNeed.None;
@@ -354,7 +359,7 @@ public sealed class TradingAutomationService(
         }
 
         var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
-        var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys);
+        var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys, heldBuys);
         if (routes.Count == 0)
         {
             logger.LogDebug(
@@ -393,9 +398,10 @@ public sealed class TradingAutomationService(
         bool onTrip,
         List<HeldRoute> held,
         HashSet<string> heldKeys,
+        HeldBuys heldBuys,
         CancellationToken cancellationToken)
     {
-        var routes = TradeRoutePlanner.Rank(context.Map, GatherPlanner.AfterSellingHold(context.Map, ship), credits, context.MinProfitPerUnit, heldKeys);
+        var routes = TradeRoutePlanner.Rank(context.Map, GatherPlanner.AfterSellingHold(context.Map, ship), credits, context.MinProfitPerUnit, heldKeys, heldBuys);
         if (routes.Count == 0)
         {
             return credits;
@@ -484,6 +490,7 @@ public sealed class TradingAutomationService(
         HashSet<string> heldKeys,
         Dictionary<string, PendingRoute> pending,
         List<TradeRouteJudgement> judgements,
+        IReadOnlyDictionary<string, SupplyConstructionGoal> constructionTrips,
         long constructionHolds,
         CancellationToken cancellationToken)
     {
@@ -492,12 +499,13 @@ public sealed class TradingAutomationService(
         var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds);
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
-        // counts as work waiting for it (D13); and the full hold it saves up for, when it does (D56). Its lucrative routes
+        // counts as work waiting for it (D13); and the trip it saves up for, when it does (D56). Its lucrative routes
         // are Rank's; the others say which check they fail (D76).
+        var heldBuys = HeldBuysOf(held, constructionTrips);
         foreach (var trader in traders)
         {
-            NoteSaving(context, trader, credits, heldKeys);
-            var judged = TradeRoutePlanner.Judge(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys);
+            NoteSaving(context, trader, credits, heldKeys, heldBuys);
+            var judged = TradeRoutePlanner.Judge(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
             judgements.AddRange(judged);
             foreach (var route in judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route))
             {
@@ -509,12 +517,14 @@ public sealed class TradingAutomationService(
 
         while (traders.Count > 0)
         {
+            // D80: a route given out this pass holds its good at its buy market as a trip from an earlier pass does.
+            heldBuys = HeldBuysOf(held, constructionTrips);
             var found = false;
             var bestShip = traders[0];
             var bestRoute = new TradeRoute(string.Empty, string.Empty, string.Empty, 0, 0, 0, 0, 0, string.Empty);
             foreach (var trader in traders)
             {
-                var routes = TradeRoutePlanner.Rank(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys);
+                var routes = TradeRoutePlanner.Rank(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
                 if (routes.Count > 0 && (!found || TradeRoutePlanner.CompareBestFirst(routes[0], bestRoute) < 0))
                 {
                     bestShip = trader;
@@ -550,13 +560,13 @@ public sealed class TradingAutomationService(
 
     /// <summary>
     /// Notes what a free trader saves up for (D56): its best route, credits aside, when the credits for cargo don't pay for
-    /// that full hold and the trip's fuel; ships are bought after it (<see cref="FullHoldSavings"/>). Meanwhile it takes the
-    /// best full hold it can pay for, or none. A trader whose best route is one it can pay for saves up for nothing more,
-    /// unless that is the route it saved up for: then the saving lasts until the hold is bought.
+    /// all the units that trip would carry (D79) and its fuel; ships are bought after it (<see cref="FullHoldSavings"/>).
+    /// Meanwhile it takes the best trip it can pay for: fewer units, or another route. A trader whose best route is one it can
+    /// pay for saves up for nothing more, unless that is the route it saved up for: then the saving lasts until it buys.
     /// </summary>
-    private void NoteSaving(TradeContext context, ShipModel trader, long credits, IReadOnlySet<string> heldKeys)
+    private void NoteSaving(TradeContext context, ShipModel trader, long credits, IReadOnlySet<string> heldKeys, HeldBuys heldBuys)
     {
-        var routes = TradeRoutePlanner.Rank(context.Map, trader, AnyCredits, context.MinProfitPerUnit, heldKeys);
+        var routes = TradeRoutePlanner.Rank(context.Map, trader, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys);
         if (routes.Count == 0)
         {
             savings.Clear(trader.Symbol);
@@ -570,7 +580,7 @@ public sealed class TradingAutomationService(
             if (savings.SaveFor(trader.Symbol, best.Key, cost))
             {
                 logger.LogInformation(
-                    "Trading plan: ship {ShipSymbol} saves up for a full hold of {Units} {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}, {Cost} credits with its fuel, against {CreditsForCargo} for cargo now; ships are bought after it (D56).",
+                    "Trading plan: ship {ShipSymbol} saves up for {Units} {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}, {Cost} credits with its fuel, against {CreditsForCargo} for cargo now; ships are bought after it (D56).",
                     trader.Symbol,
                     best.Units,
                     best.TradeSymbol,
@@ -608,8 +618,8 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// A trip along a route: buy at its buy market, sell at its sell market. It holds back what its cargo costs at the price
-    /// it was chosen with until it buys (D57).
+    /// A trip along a route: buy at its buy market, sell at its sell market. It holds back what its cargo is expected to cost,
+    /// batch by batch, until it buys (D57, D79).
     /// </summary>
     private static TradeBetweenMarketsGoal RouteGoal(TradeRoute route)
         => new()
@@ -620,8 +630,15 @@ public sealed class TradingAutomationService(
             Units = route.Units,
             ExpectedProfit = route.Profit,
             FeedsTradeSymbol = route.FeedsTradeSymbol,
-            ReservedCredits = route.Units * route.BuyPrice,
+            ReservedCredits = route.CargoCost,
         };
+
+    /// <summary>
+    /// What the trade and construction trips on their way to buy hold at their buy markets (D80): the trips of earlier passes,
+    /// and the routes this pass has given out so far.
+    /// </summary>
+    private static HeldBuys HeldBuysOf(IEnumerable<HeldRoute> held, IReadOnlyDictionary<string, SupplyConstructionGoal> constructionTrips)
+        => HeldBuys.Of(held.Select(route => route.Goal), constructionTrips.Values);
 
     private void LogRoute(ShipModel ship, TradeRoute route)
     {
@@ -768,7 +785,7 @@ public sealed class TradingAutomationService(
     {
         TradeRouteCheck.BuyMarketOutOfReach => "buy_market_out_of_reach",
         TradeRouteCheck.SellMarketOutOfReach => "sell_market_out_of_reach",
-        TradeRouteCheck.NotFullHold => "not_full_hold",
+        TradeRouteCheck.NoRoom => "no_room",
         TradeRouteCheck.TooFewCredits => "too_few_credits",
         TradeRouteCheck.NotLucrative => "not_lucrative",
         _ => "below_the_listed_routes",

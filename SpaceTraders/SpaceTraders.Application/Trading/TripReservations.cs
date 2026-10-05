@@ -16,16 +16,32 @@ namespace SpaceTraders.Application.Trading;
 /// </remarks>
 public static class TripReservations
 {
+    /// <summary>
+    /// Whether a trip is on its way to buy: started, its cargo not yet aboard, and neither blocked nor done. Until then it holds
+    /// back its credits (D57), and its good at its buy market (D77, <see cref="HeldBuys"/>).
+    /// </summary>
+    /// <param name="trip">The trip.</param>
+    /// <returns>True while it has yet to buy.</returns>
+    public static bool IsOnItsWayToBuy(TradeBetweenMarketsGoal trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return !trip.CargoBought && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed;
+    }
+
+    /// <summary>Whether a construction trip is on its way to buy, as a trade trip can be (slice 6.6, D64).</summary>
+    /// <param name="trip">The trip.</param>
+    /// <returns>True while it has yet to buy.</returns>
+    public static bool IsOnItsWayToBuy(SupplyConstructionGoal trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return !trip.CargoBought && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed;
+    }
+
     /// <summary>What one trip holds back now.</summary>
     /// <param name="trip">The trip.</param>
     /// <returns>Its reserved credits until its cargo is aboard, else 0.</returns>
     public static long HeldBack(TradeBetweenMarketsGoal trip)
-    {
-        ArgumentNullException.ThrowIfNull(trip);
-        return !trip.CargoBought && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed
-            ? Math.Max(0, trip.ReservedCredits)
-            : 0;
-    }
+        => IsOnItsWayToBuy(trip) ? Math.Max(0, trip.ReservedCredits) : 0;
 
     /// <summary>What the fleet's trips hold back now, but one ship's.</summary>
     /// <param name="trips">The trips, by ship symbol.</param>
@@ -43,12 +59,7 @@ public static class TripReservations
     /// <param name="trip">The trip.</param>
     /// <returns>Its reserved credits until its cargo is aboard, else 0.</returns>
     public static long HeldBack(SupplyConstructionGoal trip)
-    {
-        ArgumentNullException.ThrowIfNull(trip);
-        return !trip.CargoBought && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed
-            ? Math.Max(0, trip.ReservedCredits)
-            : 0;
-    }
+        => IsOnItsWayToBuy(trip) ? Math.Max(0, trip.ReservedCredits) : 0;
 
     /// <summary>What the fleet's construction trips hold back now, but one ship's.</summary>
     /// <param name="trips">The trips, by ship symbol.</param>

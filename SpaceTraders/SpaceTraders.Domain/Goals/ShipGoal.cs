@@ -322,7 +322,10 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
     /// <summary>Where the trip sells the good.</summary>
     public required string SellWaypointSymbol { get; init; }
 
-    /// <summary>The units the trip planned to carry when it was chosen; 0 for a goal from before slice 6.5.</summary>
+    /// <summary>
+    /// The units the trip planned to carry when it was chosen (D79); once bought, what it bought, batch by batch. 0 for a goal
+    /// from before slice 6.5.
+    /// </summary>
     public int Units { get; init; }
 
     /// <summary>What the trip was expected to earn after fuel, in credits, when it was chosen.</summary>
@@ -336,8 +339,9 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
 
     /// <summary>
     /// The credits the trip holds back for its cargo from the moment it starts towards the buy market until the cargo is
-    /// aboard (D57): its units at the buy price it was chosen with. Other trips and ship purchases leave them. 0 for cargo
-    /// the ship already held, and for a trip stored before D57.
+    /// aboard (D57): what its units were expected to cost when it was chosen, each batch a step dearer (D79), less what the
+    /// batches bought so far cost. Other trips and ship purchases leave them. 0 for cargo the ship already held, and for a trip
+    /// stored before D57.
     /// </summary>
     public long ReservedCredits { get; init; }
 

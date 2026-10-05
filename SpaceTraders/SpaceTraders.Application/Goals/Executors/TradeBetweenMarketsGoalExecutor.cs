@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -16,20 +17,23 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Executor for <see cref="TradeBetweenMarketsGoal"/>: one trip of a trade route (PLAN.md slice 6.5).
 /// The ship flies to the buy market, buys, flies to the sell market and sells, refuelling on the way
-/// where a market is beyond one tank (<see cref="TradeRoutePlanner.NextStop"/>). A ship can't change
-/// course in flight, so it reconsiders the trip where it lands, with the prices its arrival has just
-/// refreshed (and the newest prices known for the other market):
+/// where a market is beyond one tank (<see cref="TradeRoutePlanner.NextStop"/>). A market trades at most its trade volume at
+/// once, so the ship buys and sells in batches, each at the price quoted then, and each moves the next quote (D79). A ship
+/// can't change course in flight, so it reconsiders the trip where it lands, with the prices its arrival has just refreshed
+/// (and the newest prices known for the other market):
 /// <list type="bullet">
-///   <item>at the buy market, before buying: when the trip is no longer lucrative, or the markets no longer trade its
-///   full hold in one go (D56) and the seller's supply is no longer ABUNDANT (D74), or the credits no other trip holds back
-///   (D57, <see cref="TripReservations"/>) don't pay for it, it gives it up (<c>TradeDropped</c>) and the trading plan
-///   chooses again from there. What it buys is what the markets trade at once now (<see cref="TradeRoutePlanner.UnitsAtOnce"/>);</item>
+///   <item>at the buy market, before buying: when the trip is no longer lucrative, or the credits no other trip holds back
+///   (D57, <see cref="TripReservations"/>) don't pay for a unit, it gives it up (<c>TradeDropped</c>) and the trading plan
+///   chooses again from there. Otherwise it buys a batch at a time, while the next units still earn <c>Trade.MinProfitPerUnit</c>
+///   against what their sale is expected to fetch (<see cref="TradeRoutePlanner.UnitsWorthBuying"/>);</item>
 ///   <item>at the sell market, before selling: when selling there is no longer lucrative and another
-///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip.</item>
+///   market pays more after fuel, it takes the cargo there (<c>TradeRerouted</c>), once per trip. Otherwise it sells a batch at
+///   a time while each still earns the minimum over what the cargo cost; when one wouldn't, the rest goes where it fetches
+///   more, on the same once-per-trip terms, or is sold there all the same.</item>
 /// </list>
-/// The goal keeps what the cargo cost, and however the trip ends, sold or dropped, it is booked with what its
-/// sales brought in (<see cref="ITripBook"/>, D46). A purchase of the full hold the credits were saved up for ends that
-/// saving (<see cref="FullHoldSavings"/>, D56). Its flights are in CRUISE, which the arithmetic assumes: a ship
+/// The goal keeps what the cargo cost and fetched, stored after each batch, and however the trip ends, sold or dropped, it is
+/// booked with what its sales brought in (<see cref="ITripBook"/>, D46). A purchase on the route the credits were saved up for
+/// ends that saving (<see cref="FullHoldSavings"/>, D56). Its flights are in CRUISE, which the arithmetic assumes: a ship
 /// left in DRIFT is switched back before it flies (slice 6.10c).
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
@@ -47,7 +51,6 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 {
     private const string NotLucrative = "not_lucrative";
     private const string NotPossible = "not_possible";
-    private const string NotFullHold = "not_full_hold";
     private const string NotBoughtHere = "not_bought_here";
     private const string CruiseMode = "CRUISE";
 
@@ -86,60 +89,115 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             return GoalExecutionResult.Progressing($"Docking at buy waypoint {trade.BuyWaypointSymbol}.");
         }
 
-        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var system = ship.SystemSymbol ?? string.Empty;
+        var context = await tradeContexts.ReadAsync(system, ct);
 
         // D57: what the other trips hold back on their way to buy is theirs, construction trips' too (D64); what this one holds
         // back is its own to spend.
         var heldByOthers = TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(ct), ship.Symbol)
             + TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(ct));
-        if (!TradeRoutePlanner.TryEvaluate(
-                context.Map,
-                ship,
-                trade.TradeSymbol,
-                trade.BuyWaypointSymbol,
-                trade.SellWaypointSymbol,
-                Math.Max(0, context.CreditsForCargo - heldByOthers),
-                out var route))
+        var credits = Math.Max(0, context.CreditsForCargo - heldByOthers);
+
+        // What the earlier batches bought is aboard, after a restart too; only a trip that has bought nothing yet is weighed
+        // again as a whole, with the prices the arrival fetched and only the fuel still ahead.
+        var bought = Aboard(ship, trade.TradeSymbol);
+        if (bought == 0)
         {
-            // D56: a full hold in one purchase and one sale, as the markets trade now, or at an ABUNDANT seller what both
-            // markets trade at once (D74), or no trip.
-            var reason = context.Map.TryGetGood(trade.BuyWaypointSymbol, trade.TradeSymbol, out _)
-                && context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out _)
-                && TradeRoutePlanner.UnitsAtOnce(context.Map, ship, trade.TradeSymbol, trade.BuyWaypointSymbol, trade.SellWaypointSymbol) == 0
-                    ? NotFullHold
-                    : NotPossible;
-            return await DropAsync(ship, trade, reason, ct);
+            if (!TradeRoutePlanner.TryEvaluate(
+                    context.Map,
+                    ship,
+                    trade.TradeSymbol,
+                    trade.BuyWaypointSymbol,
+                    trade.SellWaypointSymbol,
+                    credits,
+                    context.MinProfitPerUnit,
+                    out var route,
+                    out var check))
+            {
+                return check == TradeRouteCheck.NotLucrative
+                    ? await DropNotLucrativeAsync(ship, trade, route, context.MinProfitPerUnit, ct)
+                    : await DropAsync(ship, trade, NotPossible, ct);
+            }
+
+            if (!route.IsLucrative(context.MinProfitPerUnit))
+            {
+                return await DropNotLucrativeAsync(ship, trade, route, context.MinProfitPerUnit, ct);
+            }
         }
 
-        if (!route.IsLucrative(context.MinProfitPerUnit))
+        // D79: a batch at a time, each at the price quoted then, with the fuel still ahead kept back, while the next units
+        // still earn the minimum against what their sale is expected to fetch at the sell market, as last seen.
+        var fuelAhead = TradeRoutePlanner.TryPlanFlight(context.Map, ship, trade.SellWaypointSymbol, out var haul) ? haul.FuelCost : 0;
+        var spendable = Math.Max(0, credits - fuelAhead);
+        var free = ship.CargoCapacity - ship.CargoCurrent;
+        var map = context.Map;
+        var current = trade;
+        var stop = NotPossible;
+        while (free > 0
+            && map.TryGetGood(trade.BuyWaypointSymbol, trade.TradeSymbol, out var atBuy) && atBuy.PurchasePrice > 0
+            && map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var atSell) && atSell.SellPrice > 0)
         {
-            logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: buying {Units} at {BuyPrice} and selling at {SellPrice} at {SellWaypoint} earns {ExpectedProfit} after fuel, under {MinProfitPerUnit} a unit ({Reason}).",
-                JournalEvents.TradeDropped,
-                ship.Symbol,
-                trade.TradeSymbol,
-                trade.BuyWaypointSymbol,
-                route.Units,
-                route.BuyPrice,
-                route.SellPrice,
-                trade.SellWaypointSymbol,
-                route.Profit,
-                context.MinProfitPerUnit,
-                NotLucrative);
-            await EndTripAsync(ship.Symbol, trade, NotLucrative, ct);
-            return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip is no longer lucrative; dropped.");
+            var affordable = (int)Math.Min(int.MaxValue, spendable / atBuy.PurchasePrice);
+            var most = Math.Min(Math.Min(free, atBuy.TradeVolume > 0 ? atBuy.TradeVolume : free), affordable);
+            var units = TradeRoutePlanner.UnitsWorthBuying(atBuy.PurchasePrice, atSell, bought, most, context.MinProfitPerUnit);
+            if (units == 0)
+            {
+                stop = affordable == 0 ? NotPossible : NotLucrative;
+                break;
+            }
+
+            var cost = await BuyBatchAsync(ship.Symbol, system, trade, units, ct);
+            bought += units;
+            free -= units;
+            spendable -= cost;
+            current = current with
+            {
+                Spent = current.Spent + cost,
+                ReservedCredits = Math.Max(0, current.ReservedCredits - cost),
+            };
+            await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
+            map = (await tradeContexts.ReadAsync(system, ct)).Map;
         }
 
-        var result = await port.BuyCargoAsync(ship.Symbol, trade.TradeSymbol, route.Units, ct);
-        await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
+        if (bought == 0)
+        {
+            return await DropAsync(ship, trade, stop, ct);
+        }
+
+        // D56: the trip the credits were saved up for has bought; ships may be bought again.
+        if (savings.TryGet(ship.Symbol, out var saving)
+            && saving.RouteKey.Equals(TradeRoutePlanner.RouteKey(trade.TradeSymbol, trade.BuyWaypointSymbol, trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase))
+        {
+            savings.Clear(ship.Symbol);
+        }
+
+        await goals.SetActiveGoalAsync(
+            ship.Symbol,
+            current with
+            {
+                CargoBought = true,
+                Units = bought,
+                PricePaidPerUnit = current.Spent / bought,
+            },
+            ct);
+        return GoalExecutionResult.Progressing(
+            $"Bought {bought} {trade.TradeSymbol} at {trade.BuyWaypointSymbol}; next, selling at {trade.SellWaypointSymbol}.");
+    }
+
+    /// <summary>One purchase of a batch, published for the ledger, and the market fetched again: the purchase moved its price (D25).</summary>
+    /// <returns>What the batch cost.</returns>
+    private async Task<long> BuyBatchAsync(string shipSymbol, string system, TradeBetweenMarketsGoal trade, int units, CancellationToken ct)
+    {
+        var result = await port.BuyCargoAsync(shipSymbol, trade.TradeSymbol, units, ct);
+        await ships.UpdateCargoAsync(shipSymbol, result.Cargo, ct);
         await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
 
         // The ledger and the credits-spent metric (B7), and the units bought from this market. The port's "revenue" is
         // the transaction's total.
         await bus.PublishAsync(new CargoPurchasedEvent(
-            ship.Symbol,
+            shipSymbol,
             new TradeSymbol(trade.TradeSymbol),
-            route.Units,
+            units,
             result.Revenue,
             result.AgentCredits,
             trade.BuyWaypointSymbol));
@@ -147,41 +205,19 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
             JournalEvents.CargoBought,
-            ship.Symbol,
-            route.Units,
+            shipSymbol,
+            units,
             trade.TradeSymbol,
             trade.BuyWaypointSymbol,
             result.Revenue);
 
-        // D56: the full hold the credits were saved up for is bought; ships may be bought again.
-        if (savings.TryGet(ship.Symbol, out var saving)
-            && saving.RouteKey.Equals(TradeRoutePlanner.RouteKey(trade.TradeSymbol, trade.BuyWaypointSymbol, trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase))
-        {
-            savings.Clear(ship.Symbol);
-        }
-
-        // The purchase moved the price: the market again, while the ship is still there (D25).
-        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.BuyWaypointSymbol, ship.Symbol, ct);
-
-        await goals.SetActiveGoalAsync(
-            ship.Symbol,
-            trade with
-            {
-                CargoBought = true,
-                Units = route.Units,
-                PricePaidPerUnit = result.Revenue / route.Units,
-                Spent = trade.Spent + result.Revenue,
-            },
-            ct);
-        return GoalExecutionResult.Progressing(
-            $"Bought {route.Units} {trade.TradeSymbol} at {trade.BuyWaypointSymbol}; next, selling at {trade.SellWaypointSymbol}.");
+        await marketRefresher.RefreshAfterTradeAsync(system, trade.BuyWaypointSymbol, shipSymbol, ct);
+        return result.Revenue;
     }
 
     private async Task<GoalExecutionResult> SellStepAsync(ShipModel ship, TradeBetweenMarketsGoal trade, CancellationToken ct)
     {
-        var units = (ship.CargoInventory ?? [])
-            .Where(item => item.Symbol.Equals(trade.TradeSymbol, StringComparison.OrdinalIgnoreCase))
-            .Sum(item => item.Units);
+        var units = Aboard(ship, trade.TradeSymbol);
         if (units <= 0)
         {
             await EndTripAsync(ship.Symbol, trade, TripBook.NothingAboard, ct);
@@ -199,15 +235,11 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             return GoalExecutionResult.Progressing($"Docking at sell waypoint {trade.SellWaypointSymbol}.");
         }
 
-        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var system = ship.SystemSymbol ?? string.Empty;
+        var context = await tradeContexts.ReadAsync(system, ct);
         var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
-        var marginHere = here.SellPrice - trade.PricePaidPerUnit;
-        var lucrativeHere = sellsHere && marginHere > 0 && marginHere >= context.MinProfitPerUnit;
-        if (!lucrativeHere
-            && !trade.SellWaypointChanged
-            && TradeRoutePlanner.TryFindBestSale(context.Map, ship, trade.TradeSymbol, units, out var elsewhere)
-            && !elsewhere.WaypointSymbol.Equals(trade.SellWaypointSymbol, StringComparison.OrdinalIgnoreCase)
-            && elsewhere.NetRevenue > (sellsHere ? (long)here.SellPrice * units : 0))
+        if (!Pays(here, trade, context.MinProfitPerUnit)
+            && TryFindBetterSale(context.Map, ship, trade, units, sellsHere ? here.SellPrice : 0, out var elsewhere))
         {
             return await SellElsewhereAsync(context.Map, ship, trade, elsewhere, sellsHere ? here.SellPrice : 0, ct);
         }
@@ -217,43 +249,92 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             return await DropAsync(ship, trade, NotBoughtHere, ct);
         }
 
-        // One sale may not exceed the market's trade volume, so a larger load goes in several.
-        var batchSize = here.TradeVolume > 0 ? here.TradeVolume : units;
-        var earned = 0L;
-        for (var left = units; left > 0;)
+        // D79: a batch of the market's trade volume at a time, each at the price quoted then, while it still earns the minimum
+        // over what the cargo cost. Each sale lowers the next quote: once one wouldn't pay, the rest goes where it fetches more
+        // after fuel, once per trip, or with nowhere better is sold here all the same. A sale that never paid sells anyway.
+        var sellAnyway = !Pays(here, trade, context.MinProfitPerUnit);
+        var current = trade;
+        var map = context.Map;
+        var left = units;
+        while (left > 0 && map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var now) && now.SellPrice > 0)
         {
-            var batch = Math.Min(left, batchSize);
-            var result = await port.SellCargoAsync(ship.Symbol, trade.TradeSymbol, batch, ct);
-            await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
-            await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
+            if (!sellAnyway && !Pays(now, trade, context.MinProfitPerUnit))
+            {
+                if (TryFindBetterSale(map, ship, current, left, now.SellPrice, out var better))
+                {
+                    return await SellElsewhereAsync(map, ship, current, better, now.SellPrice, ct);
+                }
 
-            // The ledger and the credits-earned metric (B7), and the units sold to this market.
-            await bus.PublishAsync(new ShipCargoSoldEvent(
-                ship.Symbol,
-                new TradeSymbol(trade.TradeSymbol),
-                batch,
-                result.Revenue,
-                result.AgentCredits,
-                trade.SellWaypointSymbol));
+                sellAnyway = true;
+            }
 
-            logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
-                JournalEvents.CargoSold,
-                ship.Symbol,
-                batch,
-                trade.TradeSymbol,
-                trade.SellWaypointSymbol,
-                result.Revenue);
-            earned += result.Revenue;
+            var batch = Math.Min(left, now.TradeVolume > 0 ? now.TradeVolume : left);
+            var revenue = await SellBatchAsync(ship.Symbol, system, trade, batch, ct);
             left -= batch;
+            current = current with { Earned = current.Earned + revenue };
+            await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
+            map = (await tradeContexts.ReadAsync(system, ct)).Map;
         }
 
-        // The sale moved the price: the market again, while the ship is still there (D25).
-        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, trade.SellWaypointSymbol, ship.Symbol, ct);
+        if (left > 0)
+        {
+            // The market stopped buying the good part way: the trading plan sells the rest where it fetches most.
+            return await DropAsync(ship, current, NotBoughtHere, ct);
+        }
 
-        await EndTripAsync(ship.Symbol, trade with { Earned = trade.Earned + earned }, TripBook.Sold, ct);
+        await EndTripAsync(ship.Symbol, current, TripBook.Sold, ct);
         return GoalExecutionResult.Completed(
             $"Sold {units} {trade.TradeSymbol} at {trade.SellWaypointSymbol}; the trip is done.");
+    }
+
+    /// <summary>One sale of a batch, published for the ledger, and the market fetched again: the sale moved its price (D25).</summary>
+    /// <returns>What the batch fetched.</returns>
+    private async Task<long> SellBatchAsync(string shipSymbol, string system, TradeBetweenMarketsGoal trade, int units, CancellationToken ct)
+    {
+        var result = await port.SellCargoAsync(shipSymbol, trade.TradeSymbol, units, ct);
+        await ships.UpdateCargoAsync(shipSymbol, result.Cargo, ct);
+        await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
+
+        // The ledger and the credits-earned metric (B7), and the units sold to this market.
+        await bus.PublishAsync(new ShipCargoSoldEvent(
+            shipSymbol,
+            new TradeSymbol(trade.TradeSymbol),
+            units,
+            result.Revenue,
+            result.AgentCredits,
+            trade.SellWaypointSymbol));
+
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} sold {Units} {TradeSymbol} at {WaypointSymbol} for {Revenue} credits.",
+            JournalEvents.CargoSold,
+            shipSymbol,
+            units,
+            trade.TradeSymbol,
+            trade.SellWaypointSymbol,
+            result.Revenue);
+
+        await marketRefresher.RefreshAfterTradeAsync(system, trade.SellWaypointSymbol, shipSymbol, ct);
+        return result.Revenue;
+    }
+
+    /// <summary>Whether selling a unit at the market's quote earns the minimum over what it cost (D14).</summary>
+    private static bool Pays(TradeGoodSnapshot good, TradeBetweenMarketsGoal trade, int minProfitPerUnit)
+    {
+        var margin = good.SellPrice - trade.PricePaidPerUnit;
+        return good.SellPrice > 0 && margin > 0 && margin >= minProfitPerUnit;
+    }
+
+    /// <summary>
+    /// Another market that pays more for what is aboard than this one, after the fuel to get there, while the sale hasn't moved
+    /// yet: it moves once per trip, so it never flies in circles.
+    /// </summary>
+    private static bool TryFindBetterSale(TradeMarketMap map, ShipModel ship, TradeBetweenMarketsGoal trade, int units, long priceHere, out TradeSale elsewhere)
+    {
+        var found = TradeRoutePlanner.TryFindBestSale(map, ship, trade.TradeSymbol, units, out elsewhere);
+        return found
+            && !trade.SellWaypointChanged
+            && !elsewhere.WaypointSymbol.Equals(trade.SellWaypointSymbol, StringComparison.OrdinalIgnoreCase)
+            && elsewhere.NetRevenue > priceHere * units;
     }
 
     private async Task<GoalExecutionResult> SellElsewhereAsync(
@@ -301,6 +382,53 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 : $"Navigating to {destination}, refuelling at {stop} on the way.");
     }
 
+    /// <summary>
+    /// Gives up a trip no longer worth it at the buy market (D14, D79): its units no longer earn the minimum a unit after fuel,
+    /// or not even the first unit does.
+    /// </summary>
+    private async Task<GoalExecutionResult> DropNotLucrativeAsync(
+        ShipModel ship,
+        TradeBetweenMarketsGoal trade,
+        TradeRoute route,
+        int minProfitPerUnit,
+        CancellationToken ct)
+    {
+        if (route.Units == 0)
+        {
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: a unit bought at {BuyPrice} and sold at {SellPrice} at {SellWaypoint} earns {Margin}, under {MinProfitPerUnit} ({Reason}).",
+                JournalEvents.TradeDropped,
+                ship.Symbol,
+                trade.TradeSymbol,
+                trade.BuyWaypointSymbol,
+                route.BuyPrice,
+                route.SellPrice,
+                trade.SellWaypointSymbol,
+                route.SellPrice - route.BuyPrice,
+                minProfitPerUnit,
+                NotLucrative);
+        }
+        else
+        {
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} drops its {TradeSymbol} trip at {WaypointSymbol}: buying {Units} at {BuyPrice} and selling at {SellPrice} at {SellWaypoint} earns {ExpectedProfit} after fuel, under {MinProfitPerUnit} a unit ({Reason}).",
+                JournalEvents.TradeDropped,
+                ship.Symbol,
+                trade.TradeSymbol,
+                trade.BuyWaypointSymbol,
+                route.Units,
+                route.BuyPrice,
+                route.SellPrice,
+                trade.SellWaypointSymbol,
+                route.Profit,
+                minProfitPerUnit,
+                NotLucrative);
+        }
+
+        await EndTripAsync(ship.Symbol, trade, NotLucrative, ct);
+        return GoalExecutionResult.Completed($"The {trade.TradeSymbol} trip is no longer lucrative; dropped.");
+    }
+
     /// <summary>Gives the trip up: the trading plan chooses again, and sells any cargo where it fetches most.</summary>
     private async Task<GoalExecutionResult> DropAsync(ShipModel ship, TradeBetweenMarketsGoal trade, string reason, CancellationToken ct)
     {
@@ -325,6 +453,11 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         await goals.ClearActiveGoalAsync(shipSymbol, ct);
         await trips.BookAsync(shipSymbol, trade, reason, ct);
     }
+
+    private static int Aboard(ShipModel ship, string tradeSymbol)
+        => (ship.CargoInventory ?? [])
+            .Where(item => item.Symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase))
+            .Sum(item => item.Units);
 
     private static bool IsAt(ShipModel ship, string waypointSymbol)
         => string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase);

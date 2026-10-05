@@ -146,22 +146,21 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
-    public async Task AFullHoldTheCreditsDontPayForYet_IsSavedUpFor_AndShipsAreBoughtAfterIt()
+    public async Task WithoutTheCreditsForAllTheUnits_ATraderTakesFewer_AndSavesUpForNoMore()
     {
-        // D56, asked on 2026-10-03: "Full hold or nothing, when this occurs the credit floor should be temporarily expanded so
-        // any ship purchases wait for the full hold to be bought before new ships are bought." From K85 the command ship's
-        // best route is 40 EQUIPMENT for D41 (D15), 130,160 and 152 for fuel; it has 100,000 for cargo, and FOOD, which it could
-        // pay for, earns too little a unit: no trip, and the credit floor grows by the hold.
+        // D79: a trip carries what the credits pay for. From K85 the command ship's best route is 40 EQUIPMENT for D41 (D15),
+        // 130,160 and 152 for fuel; with 100,000 for cargo it takes 30 of them. It noted the saving for the 40 (D56), and setting
+        // off on that route ends it: the trip holds back what its 30 cost instead (D57).
         CreditsAre(100_000);
         Fleet(CommandShip());
 
         await RunAsync();
 
-        _activeGoals.Should().BeEmpty();
-        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
-        saving.Should().Be(new FullHoldSaving("SHIP-1", TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41), 130_312));
-        _savings.Largest().Should().Be(130_312);
-        _log.Kept.Should().ContainSingle(message => message.Contains("saves up for a full hold", StringComparison.Ordinal) && message.Contains("D56", StringComparison.Ordinal));
+        var smaller = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (smaller.TradeSymbol, smaller.SellWaypointSymbol, smaller.Units, smaller.ReservedCredits).Should().Be(("EQUIPMENT", D41, 30, 30 * 3_254L));
+        _savings.TryGet("SHIP-1", out _).Should().BeFalse();
+        _log.Kept.Should().ContainSingle(message => message.Contains("saves up for 40 EQUIPMENT", StringComparison.Ordinal) && message.Contains("D56", StringComparison.Ordinal));
+        _activeGoals.Clear();
 
         // Once the credits pay for it, the trader takes it, and the saving becomes what the trip holds back until it buys
         // (D57): ships are still bought after the hold, and it isn't counted twice.
@@ -220,23 +219,22 @@ public sealed class TradingAutomationServiceTests
         // D57, asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot
         // happen (waste of time and fuel)." Seen at 19:29Z: SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85; another
         // trader spent about 121,000 before it got there, leaving 54,596, and it dropped the trip with nothing bought. Here
-        // SHIP-4 flies to K85 for 40 EQUIPMENT and holds back 130,160 of the 250,000: MEDICINE, SHIP-1's best route left,
-        // costs 194,680 and 242 for fuel, so SHIP-1 saves up for it (D56) and takes nothing meanwhile.
+        // SHIP-4 flies to K85 for 40 EQUIPMENT and holds back 130,160 of the 250,000, and EQUIPMENT at K85 with it (D80):
+        // MEDICINE, SHIP-1's best route left, gets the 119,840 left, 24 units after its 242 for fuel (D79).
         _activeGoals["SHIP-4"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = K85, SellWaypointSymbol = D41, Units = 40, ReservedCredits = 130_160 };
         Fleet(CommandShip(symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
 
         await RunAsync();
 
-        _activeGoals.Should().NotContainKey("SHIP-1");
-        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
-        saving.Should().Be(new FullHoldSaving("SHIP-1", TradeRoutePlanner.RouteKey("MEDICINE", D41, A1), 194_922));
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.Units, trip.ReservedCredits).Should().Be(("MEDICINE", 24, 24 * 4_867L));
     }
 
     [Fact]
     public async Task TheCreditsAConstructionTripHoldsBack_AreNotGivenToATrader()
     {
         // Slice 6.6 (D64): the jump gate's load holds back its cargo from the start, as a trade trip does (D57). Of the 250,000,
-        // SHIP-6's 130,160 leave too little for a full hold of EQUIPMENT: SHIP-1 saves up for it and takes nothing meanwhile.
+        // SHIP-6's 130,160 leave 119,840: 36 EQUIPMENT after the 152 for fuel, not 40 (D79).
         IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
         {
             ["SHIP-6"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = K85, Units = 80, ReservedCredits = 130_160 },
@@ -246,9 +244,8 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
-        _activeGoals.Should().NotContainKey("SHIP-1");
-        _savings.TryGet("SHIP-1", out var saving).Should().BeTrue();
-        saving.RouteKey.Should().Be(TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.Units).Should().Be(("EQUIPMENT", 36));
     }
 
     [Fact]
@@ -420,6 +417,43 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task TwoTraders_AreNeverSentForAGoodAtTheSameMarket_OneBuyerAtATime()
+    {
+        // D80, seen on 2026-10-05: at 05:33:20Z SPECTER-D and SPECTER-E, 80-unit haulers, were both sent for EQUIPMENT at K94,
+        // one to sell at A4 and one at D52. D bought first, which raised K94's price and ended its ABUNDANT supply, and E dropped
+        // its trip on arrival (`not_full_hold`), its fuel spent for nothing: 7 trips since the reset. Here D41 sells SHIP_PARTS,
+        // and A1 and K85 both buy them: one trader gets them, the other waits.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(ShipPartsSoldAtA1AndK85(), 500_000));
+        Fleet(CommandShip(D41, symbol: "SHIP-1"), CommandShip(D41, symbol: "SHIP-4"));
+
+        await RunAsync();
+
+        _activeGoals.Values.Cast<TradeBetweenMarketsGoal>().Should().ContainSingle(trip => trip.TradeSymbol == "SHIP_PARTS" && trip.BuyWaypointSymbol == D41);
+        _activeGoals.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task ATripOnItsWayToBuy_HoldsItsGoodAtThatMarket_UntilItHasBought()
+    {
+        // D80: SHIP-4 flies to D41 for SHIP_PARTS to sell at A1. SHIP-1, there already, isn't sent for them to K85 meanwhile;
+        // once SHIP-4 has bought, it is (D18 still keeps it off SHIP-4's route to A1).
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(ShipPartsSoldAtA1AndK85(), 500_000));
+        var onItsWay = new TradeBetweenMarketsGoal { TradeSymbol = "SHIP_PARTS", BuyWaypointSymbol = D41, SellWaypointSymbol = A1, Units = 15, ReservedCredits = 15 * 7_721 };
+        _activeGoals["SHIP-4"] = onItsWay;
+        Fleet(CommandShip(D41, symbol: "SHIP-1"), CommandShip(symbol: "SHIP-4") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-1");
+
+        _activeGoals["SHIP-4"] = onItsWay with { CargoBought = true, PricePaidPerUnit = 7_721 };
+
+        await RunAsync();
+
+        _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.SellWaypointSymbol.Should().Be(K85);
+    }
+
+    [Fact]
     public async Task WithoutALucrativeRoute_TheTraderWaits()
     {
         Fleet(Drone());
@@ -454,7 +488,7 @@ public sealed class TradingAutomationServiceTests
     {
         // Slice 2.18 (D76), asked on 2026-10-05: "Can the new list also add why the other goods are not considered for
         // trading?" SHIP-1 takes EQUIPMENT for D41, and EQUIPMENT for A1 and MEDICINE wait. FOOD and FUEL have a price gap, but
-        // earn too little a unit after fuel (D14). SHIP_PARTS, which no market here buys, has none.
+        // not even their first unit earns the 200 (D14, D79). SHIP_PARTS, which no market here buys, has none.
         Fleet(CommandShip());
 
         await RunAsync();
@@ -463,23 +497,23 @@ public sealed class TradingAutomationServiceTests
             .Should().Equal(
                 (SystemSymbol, "FOOD", "not_lucrative", "SHIP-1", K85, A1),
                 (SystemSymbol, "FUEL", "not_lucrative", "SHIP-1", D41, K85));
-        _state.NotTraded[0].Why.Should().Be("SHIP-1: 40 units earn 5,100 after 180 for fuel, 127 a unit; a trip must earn 200 a unit (D14).");
+        _state.NotTraded[0].Why.Should().Be("SHIP-1: a unit bought at 2,360 and sold at 2,492 earns 132 before fuel; each must earn 200 (D14, D79).");
         _state.NotTraded[0].JudgedAt.Should().Be(_state.UpdatedAt);
     }
 
     [Fact]
     public async Task TheState_SaysWhyNot_ForTheFreeTraderThatGotFurthest()
     {
-        // D41 sells SHIP_PARTS 15 at a time, its supply MODERATE: the command ship's 40-unit hold takes no full hold there
-        // (D56, D74); a shuttle with a 15-unit hold does, at 273 a unit after fuel, under the 300 a trip must earn (D14).
+        // SHIP-1, in orbit at K85 with 100 fuel aboard, can't reach D41; the shuttle there can buy SHIP_PARTS, but the first
+        // unit earns 279, under the 300 a trip must earn a unit (D14, D79).
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(ShipPartsMap(supplyAtD41: "MODERATE"), 1_000_000, minProfitPerUnit: 300));
-        Fleet(CommandShip(D41), Shuttle("SHIP-5") with { WaypointSymbol = D41, CargoCapacity = 15 });
+        Fleet(CommandShip(status: "IN_ORBIT", fuel: 100), Shuttle("SHIP-5") with { WaypointSymbol = D41 });
 
         await RunAsync();
 
         var parts = _state!.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "SHIP_PARTS").Subject;
         (parts.Reason, parts.ShipSymbol).Should().Be(("not_lucrative", "SHIP-5"));
-        parts.Why.Should().Be("SHIP-5: 15 units earn 4,095 after 90 for fuel, 273 a unit; a trip must earn 300 a unit (D14).");
+        parts.Why.Should().Be("SHIP-5: a unit bought at 7,721 and sold at 8,000 earns 279 before fuel; each must earn 300 (D14, D79).");
     }
 
     [Fact]
@@ -529,7 +563,7 @@ public sealed class TradingAutomationServiceTests
         _state!.Opportunities.Select(route => route.TradeSymbol).Should().NotContain("G01").And.HaveCount(1 + TradingAutomationService.MaxPendingRoutes);
         var g01 = _state.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "G01").Subject;
         g01.Reason.Should().Be("below_the_listed_routes");
-        g01.Why.Should().Be("SHIP-1: lucrative, 40,248 after fuel, 1,006 a unit. The 20 waiting routes listed rank higher.");
+        g01.Why.Should().Be("SHIP-1: lucrative, 40 units for 40,248 after fuel, 1,006 a unit. The 20 waiting routes listed rank higher.");
     }
 
     [Fact]
@@ -850,6 +884,16 @@ public sealed class TradingAutomationServiceTests
             Market(K85, Good("EQUIPMENT", "EXPORT", 3_254, 1_456, 80), Good("FOOD", "EXPORT", 2_360, 1_069, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
             Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 80), Good("MEDICINE", "EXPORT", 4_867, 2_227, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
             A1Market());
+
+    /// <summary>
+    /// For D80: D41 sells SHIP_PARTS 15 at a time at 7,721; A1 pays 8,000 for them and K85 7,990, 40 at a time. Nothing else
+    /// trades at a profit.
+    /// </summary>
+    private static TradeMarketMap ShipPartsSoldAtA1AndK85()
+        => Map(
+            Market(K85, Good("SHIP_PARTS", "IMPORT", 16_000, 7_990, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+            Market(D41, Good("SHIP_PARTS", "EXPORT", 7_721, 3_478, 15, "ABUNDANT"), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+            Market(A1, Good("SHIP_PARTS", "IMPORT", 16_000, 8_000, 40), Good("FUEL", "EXCHANGE", 90, 76, 180)));
 
     /// <summary>A cargo ship, as the trading plan buys them: a hold and a tank, nothing to mine or survey with.</summary>
     private static ShipModel Shuttle(string symbol)

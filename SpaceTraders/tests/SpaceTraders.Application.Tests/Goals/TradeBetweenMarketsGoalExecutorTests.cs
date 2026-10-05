@@ -18,7 +18,8 @@ namespace SpaceTraders.Application.Tests.Goals;
 /// <summary>
 /// Slice 6.5, rule 4: a trader reconsiders its trip with the newest prices where it lands. At the buy
 /// market it buys only while the trip is still lucrative, and gives it up otherwise; at the sell market
-/// it takes the cargo elsewhere, once, when selling there no longer pays and another market pays more.
+/// it takes the cargo elsewhere, once, when selling there no longer pays and another market pays more. D79: it buys and
+/// sells a batch of the trade volume at a time, each at the price quoted then, while the next still earns the minimum.
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutorTests
 {
@@ -53,17 +54,6 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         CargoBought = bought,
         PricePaidPerUnit = bought ? 3_254 : 0,
         SellWaypointChanged = moved,
-    };
-
-    /// <summary>A trip of 15 SHIP_PARTS from D41 to A1, chosen at an ABUNDANT seller (D74, <see cref="ShipPartsMap"/>).</summary>
-    private static TradeBetweenMarketsGoal ShipPartsTrip() => new()
-    {
-        TradeSymbol = "SHIP_PARTS",
-        BuyWaypointSymbol = D41,
-        SellWaypointSymbol = A1,
-        Units = 15,
-        ExpectedProfit = 4_095,
-        ReservedCredits = 115_815,
     };
 
     private static ShipModel Loaded(string waypoint, int units = 40, string status = "DOCKED")
@@ -154,22 +144,22 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
 
         await StepAsync(CommandShip(K85), Trip());
 
-        await _goals.Received(1).SetActiveGoalAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(g => g.Spent == 130_160 && g.Earned == 0), Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Spent == 130_160 && g.Earned == 0), Arg.Any<CancellationToken>());
         await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
     }
 
     [Fact]
-    public async Task AtTheBuyMarket_AFullHoldTheCreditsAboveTheFuelReserveDontPayFor_IsNotBought()
+    public async Task AtTheBuyMarket_TheCreditsAboveTheFuelReserve_BuyWhatTheyPayFor()
     {
-        // D24, D56 ("full hold or nothing"): 135,311 credits, 5,000 of them kept for fuel and 152 for the trip's own fuel,
-        // are one short of 40 EQUIPMENT at 3,254. Before D56 they bought 39.
+        // D24, D79: 135,311 credits, 5,000 of them kept for fuel and 152 for the trip's own fuel, are one short of 40 EQUIPMENT
+        // at 3,254: the trip buys 39.
         PricesAre(Map(), credits: 135_311, fuelReserve: 5_000);
+        BuyReturns(units: 39, total: 39 * 3_254);
 
         var result = await StepAsync(CommandShip(K85), Trip());
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
-        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 39, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -177,34 +167,35 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     {
         // D57, asked on 2026-10-03: "Let's have these credits reserved as soon as a ship starts towards it, so that this cannot
         // happen (waste of time and fuel)." SHIP-4, on its way to buy MEDICINE at D41, holds back 60,000 of the 190,000 on
-        // hand: the 130,312 this trip needs, cargo and fuel, aren't there for it, and SHIP-4 still finds its own.
+        // hand: of the 130,312 this trip would need, cargo and fuel, 130,000 are there for it, which buy 39 (D79), and SHIP-4
+        // still finds its own.
         PricesAre(Map(), credits: 190_000);
+        BuyReturns(units: 39, total: 39 * 3_254);
         TripsHoldBack(
             ("SHIP-4", new TradeBetweenMarketsGoal { TradeSymbol = "MEDICINE", BuyWaypointSymbol = D41, SellWaypointSymbol = A1, Units = 40, ReservedCredits = 60_000 }),
             ("SHIP-1", Trip() with { ReservedCredits = 130_160 }));
 
-        var result = await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+        await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
-        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 39, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task AtTheBuyMarket_TheCreditsAConstructionTripHoldsBack_AreNotSpent()
     {
-        // Slice 6.6 (D64): the jump gate's load on its way to buy holds back 60,000 of the 190,000, as a trade trip would.
+        // Slice 6.6 (D64): the jump gate's load on its way to buy holds back 60,000 of the 190,000, as a trade trip would: the
+        // trip buys the 39 the rest pays for.
         PricesAre(Map(), credits: 190_000);
+        BuyReturns(units: 39, total: 39 * 3_254);
         IReadOnlyDictionary<string, SupplyConstructionGoal> construction = new Dictionary<string, SupplyConstructionGoal>
         {
             ["SHIP-6"] = new() { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = K85, Units = 40, ReservedCredits = 60_000 },
         };
         _goals.GetActiveConstructionGoalsAsync(Arg.Any<CancellationToken>()).Returns(construction);
 
-        var result = await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+        await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 39, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -225,53 +216,66 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
-    public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheMarketsNoLongerTradeAFullHoldAtOnce()
+    public async Task AtTheBuyMarket_ItBuysInBatchesOfTheTradeVolume_WhileEachStillEarnsTheMinimum()
     {
-        // D56: K85 sells EQUIPMENT 30 at a time now, fewer than the hold: buying it would take two purchases.
-        PricesAre(Map(
-            Market(K85, Good("EQUIPMENT", "EXPORT", 3_254, 1_456, 30), Good("FUEL", "EXCHANGE", 93, 79, 180)),
-            D41Market(),
-            A1Market()));
+        // D79: K85 sells EQUIPMENT 20 at a time. The first 20 cost 3,254, 233 under D41's 3,487; after that purchase K85
+        // quotes 3,280, which still earns 207, so the next 20 go too.
+        BuyQuotes(3_254, 3_280);
 
         var result = await StepAsync(CommandShip(K85), Trip());
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
-        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_full_hold"));
-        await _trips.Received(1).BookAsync("SHIP-1", Arg.Any<TradeBetweenMarketsGoal>(), "not_full_hold", Arg.Any<CancellationToken>());
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(2).BuyCargoAsync("SHIP-1", "EQUIPMENT", 20, Arg.Any<CancellationToken>());
+        await _refresher.Received(2).RefreshAfterTradeAsync(SystemSymbol, K85, "SHIP-1", Arg.Any<CancellationToken>());
+        const long spent = (20 * 3_254) + (20 * 3_280);
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 40 && g.Spent == spent && g.PricePaidPerUnit == spent / 40),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Where(e => e.EventKind == "CargoBought").Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task AtAnAbundantSeller_ItBuysWhatBothMarketsTradeAtOnce_InOnePurchase()
+    public async Task AtTheBuyMarket_ItStopsBuying_OnceTheNextBatchWouldEarnTooLittle()
     {
-        // D74: D41 sells SHIP_PARTS 15 at a time, its supply ABUNDANT, and A1 takes 40 at once: the trip buys 15, though the
-        // hold takes 40.
-        PricesAre(ShipPartsMap());
-        _port.BuyCargoAsync("SHIP-1", "SHIP_PARTS", 15, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult("AGENT", Credits - 115_815, new CargoModel(15, 40, [new CargoItemModel("SHIP_PARTS", 15)]), 115_815));
+        // D79: after the first 20, K85 quotes 3,300, 187 under D41's price: under the 200 a unit, so the trip goes on with 20.
+        BuyQuotes(3_254, 3_300);
 
-        var result = await StepAsync(CommandShip(D41), ShipPartsTrip());
+        var result = await StepAsync(CommandShip(K85), Trip());
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        await _port.Received(1).BuyCargoAsync("SHIP-1", "SHIP_PARTS", 15, Arg.Any<CancellationToken>());
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-1", Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 20), Arg.Any<CancellationToken>());
+        _log.Journal.Should().NotContain(e => e.EventKind == "TradeDropped");
+    }
+
+    [Fact]
+    public async Task BetweenBatches_TheTripIsStored_WithWhatItSpent_AndHoldsBackOnlyWhatIsLeftToBuy()
+    {
+        // D57, D79: a restart between batches goes on from what is aboard, with what the earlier batches cost.
+        BuyQuotes(3_254, 3_300);
+
+        await StepAsync(CommandShip(K85), Trip() with { ReservedCredits = 130_160 });
+
         await _goals.Received(1).SetActiveGoalAsync(
             "SHIP-1",
-            Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 15 && g.PricePaidPerUnit == 7_721),
+            Arg.Is<TradeBetweenMarketsGoal>(g => !g.CargoBought && g.Spent == 65_080 && g.ReservedCredits == 130_160 - 65_080),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheSellerIsNoLongerAbundant_AndNoFullHoldTradesAtOnce()
+    public async Task AfterARestartBetweenBatches_ItBuysWhatIsLeft_WithoutWeighingTheTripAgain()
     {
-        // D74: D41's supply fell to HIGH since the trip was chosen, and 15 at a time fills no 40-unit hold (D56).
-        PricesAre(ShipPartsMap(supplyAtD41: "HIGH"));
+        // The first 20 were bought and stored; K85 now quotes 3,280, which still earns the minimum for the next 20.
+        BuyQuotes(3_280);
 
-        var result = await StepAsync(CommandShip(D41), ShipPartsTrip());
+        await StepAsync(CommandShip(K85, cargo: [new CargoItemModel("EQUIPMENT", 20)]), Trip() with { Spent = 65_080 });
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
-        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_full_hold"));
-        await _trips.Received(1).BookAsync("SHIP-1", Arg.Any<TradeBetweenMarketsGoal>(), "not_full_hold", Arg.Any<CancellationToken>());
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g => g.CargoBought && g.Units == 40 && g.Spent == 65_080 + (20 * 3_280)),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -398,6 +402,42 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task AtTheSellMarket_ItSellsABatchAtATime_AndTakesTheRestElsewhere_OnceTheNextNoLongerPays()
+    {
+        // D79: D41 takes EQUIPMENT 20 at a time. The first 20 fetch 3,487, 233 over what they cost; after that sale D41 quotes
+        // 3,420, 166 over it, and A1 pays 3,499 for 90 of fuel: the other 20 go there, with what the first fetched kept.
+        SellQuotes(3_487, 3_420);
+
+        var result = await StepAsync(Loaded(D41), Trip(bought: true));
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _port.Received(1).SellCargoAsync("SHIP-1", "EQUIPMENT", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g => g.SellWaypointSymbol == A1 && g.SellWaypointChanged && g.Earned == 20 * 3_487),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeRerouted" && Equals(e.Properties["SellPrice"], 3_420L));
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task AtTheSellMarket_TheRestIsSoldAnyway_OnceTheNextNoLongerPays_AndNoOtherMarketPaysMore()
+    {
+        // Without A1 nowhere pays more: the other 20 are sold at D41 all the same.
+        SellQuotes(withA1: false, 3_487, 3_420);
+
+        var result = await StepAsync(Loaded(D41), Trip(bought: true) with { Spent = 130_160 });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.Received(2).SellCargoAsync("SHIP-1", "EQUIPMENT", 20, Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync(
+            "SHIP-1",
+            Arg.Is<TradeBetweenMarketsGoal>(booked => booked.Earned == (20 * 3_487) + (20 * 3_420) && booked.Spent == 130_160),
+            "sold",
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task AtTheSellMarket_ItTakesTheCargoElsewhere_WhenSellingThereNoLongerPays_AndAnotherMarketPaysMore()
     {
         // D41 now pays 3,300: 46 a unit over what the cargo cost. A1 pays 3,499, for 90 of fuel.
@@ -508,6 +548,52 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             K85Market(),
             Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
             A1Market());
+
+    /// <summary>
+    /// K85 selling EQUIPMENT 20 at a time at each quote in turn: the one the arrival fetched, then the one the refresh after each
+    /// purchase fetched. Each purchase costs the quote it was made at.
+    /// </summary>
+    private void BuyQuotes(params int[] quotes)
+    {
+        var purchases = 0;
+        var aboard = 0;
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(_ => Context(
+            Map(
+                Market(K85, Good("EQUIPMENT", "EXPORT", quotes[Math.Min(purchases, quotes.Length - 1)], 1_456, 20), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                D41Market(),
+                A1Market()),
+            Credits));
+        _port.BuyCargoAsync("SHIP-1", "EQUIPMENT", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var units = call.ArgAt<int>(2);
+            var cost = (long)units * quotes[Math.Min(purchases, quotes.Length - 1)];
+            purchases++;
+            aboard += units;
+            return new TradeActionResult("AGENT", Credits - cost, new CargoModel(aboard, 40, [new CargoItemModel("EQUIPMENT", aboard)]), cost);
+        });
+    }
+
+    /// <summary>D41 buying EQUIPMENT 20 at a time at each quote in turn, as <see cref="BuyQuotes"/> for sales.</summary>
+    private void SellQuotes(params int[] quotes) => SellQuotes(withA1: true, quotes);
+
+    private void SellQuotes(bool withA1, params int[] quotes)
+    {
+        var sales = 0;
+        var aboard = 40;
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            var d41 = Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, quotes[Math.Min(sales, quotes.Length - 1)], 20), Good("FUEL", "EXCHANGE", 76, 69, 180));
+            return Context(withA1 ? Map(K85Market(), d41, A1Market()) : Map(K85Market(), d41), Credits);
+        });
+        _port.SellCargoAsync("SHIP-1", "EQUIPMENT", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var units = call.ArgAt<int>(2);
+            var revenue = (long)units * quotes[Math.Min(sales, quotes.Length - 1)];
+            sales++;
+            aboard -= units;
+            return new TradeActionResult("AGENT", Credits + revenue, new CargoModel(aboard, 40, aboard > 0 ? [new CargoItemModel("EQUIPMENT", aboard)] : []), revenue);
+        });
+    }
 
     /// <summary>The trade trips of the fleet, by ship, as the goal store reads them (D57).</summary>
     private void TripsHoldBack(params (string Ship, TradeBetweenMarketsGoal Trip)[] trips)

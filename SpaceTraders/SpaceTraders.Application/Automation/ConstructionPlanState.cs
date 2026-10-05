@@ -28,6 +28,7 @@ public sealed record ConstructionPlanState
     /// <summary>
     /// Why a free builder bought no load, when one didn't: <c>purchase_order</c> (a purchase before it in the order ships are
     /// bought in, D64), <c>waiting_for_credits</c> (the load would dip into the credit reserve), <c>low_supply</c> (D66),
+    /// <c>market_busy</c> (another trip is on its way to buy the material at every market that would sell a load, D80),
     /// <c>no_market</c>; empty otherwise. Meanwhile the builder trades.
     /// </summary>
     public string Waiting { get; init; } = string.Empty;

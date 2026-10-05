@@ -96,6 +96,23 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
+    public async Task AMaterialATraderIsOnItsWayToBuy_IsNotBoughtThere_TheNextOneIs()
+    {
+        // D80: a trader on its way to D42 for ADVANCED_CIRCUITRY holds it there; the builder takes FAB_MATS at F49 meanwhile.
+        IReadOnlyDictionary<string, TradeBetweenMarketsGoal> trades = new Dictionary<string, TradeBetweenMarketsGoal>
+        {
+            ["SHIP-1"] = new() { TradeSymbol = "ADVANCED_CIRCUITRY", BuyWaypointSymbol = D42, SellWaypointSymbol = H51, Units = 40, ReservedCredits = 180_000 },
+        };
+        _goals.GetActiveTradeGoalsAsync(Arg.Any<CancellationToken>()).Returns(trades);
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        Fleet(Hauler());
+
+        await RunAsync();
+
+        _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Which.TradeSymbol.Should().Be("FAB_MATS");
+    }
+
+    [Fact]
     public async Task APurchaseBeforeItInTheOrder_HoldsTheLoadBack()
     {
         // D64: the contract's drone, the surveyors, the drones per scarce mineral and the cargo ships come first.
