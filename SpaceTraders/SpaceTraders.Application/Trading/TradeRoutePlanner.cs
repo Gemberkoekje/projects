@@ -12,8 +12,8 @@ namespace SpaceTraders.Application.Trading;
 ///   times the units, minus the fuel for the trip: from where the ship is to the buy market, and on to
 ///   the sell market;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
-///   <item>among lucrative trips, those of a good something is made from come before those of an end product, which
-///   nothing is made from (D15, D82), and the most profitable first in each.</item>
+///   <item>among lucrative trips, the most profitable first, an end product's (a good nothing is made from) counted at half
+///   its profit (D15, D82, D85).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -75,9 +75,9 @@ public static class TradeRoutePlanner
         => $"{buyWaypointSymbol}|{sellWaypointSymbol}|{tradeSymbol}".ToUpperInvariant();
 
     /// <summary>
-    /// The lucrative routes for a ship, best first: those of a good something is made from, then those of an end product
-    /// (D82), each by profit. Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left out:
-    /// two traders never share a route.
+    /// The lucrative routes for a ship, best first: by profit, an end product's counted at half (<see cref="RankingProfit"/>,
+    /// D82, D85). Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left out: two traders never share
+    /// a route.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
@@ -115,8 +115,8 @@ public static class TradeRoutePlanner
         var routes = new List<TradeRoute>();
         CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, routes, judgements: null);
         return [.. routes
-            .OrderByDescending(route => route.FeedsProduction)
-            .ThenByDescending(route => route.Profit)
+            .OrderByDescending(RankingProfit)
+            .ThenByDescending(route => route.FeedsProduction)
             .ThenBy(route => route.Key, StringComparer.Ordinal)];
     }
 
@@ -165,8 +165,23 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15, D82): one of a good something is made from before one of an end product, then
-    /// the more profitable, then by key.
+    /// What a route counts for when routes are ranked (D82, D85): its profit, or half of it for an end product, a good
+    /// nothing is made from (<see cref="TradeRoute.FeedsProduction"/>). So an end product goes first only when it earns more
+    /// than twice as much. Asked on 2026-10-05, when no trader took FOOD at about 75,000 a load while trips of 302 to 3,864
+    /// went first, D82 having put every end product after every other route: "Half weight".
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <returns>The profit the route ranks by.</returns>
+    public static double RankingProfit(TradeRoute route)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+
+        return route.FeedsProduction ? route.Profit : route.Profit / 2.0;
+    }
+
+    /// <summary>
+    /// Orders two routes as Rank does (D15, D82, D85): by <see cref="RankingProfit"/>, a good something is made from first
+    /// on a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -176,14 +191,14 @@ public static class TradeRoutePlanner
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
 
-        var feeds = y.FeedsProduction.CompareTo(x.FeedsProduction);
-        if (feeds != 0)
+        var profit = RankingProfit(y).CompareTo(RankingProfit(x));
+        if (profit != 0)
         {
-            return feeds;
+            return profit;
         }
 
-        var profit = y.Profit.CompareTo(x.Profit);
-        return profit != 0 ? profit : string.CompareOrdinal(x.Key, y.Key);
+        var feeds = y.FeedsProduction.CompareTo(x.FeedsProduction);
+        return feeds != 0 ? feeds : string.CompareOrdinal(x.Key, y.Key);
     }
 
     /// <summary>
@@ -1077,8 +1092,8 @@ public sealed record TradeRoute
     public string Key => TradeRoutePlanner.RouteKey(TradeSymbol, BuyWaypointSymbol, SellWaypointSymbol);
 
     /// <summary>
-    /// Whether something is made from the good (D15, D82): its routes come before those of an end product, which nothing is
-    /// made from (<see cref="TradeMarketMap.IsEndProduct"/>), wherever it is sold. False unless set.
+    /// Whether something is made from the good (D15, D82): an end product, which nothing is made from
+    /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its profit, wherever it is sold (D85). False unless set.
     /// </summary>
     public bool FeedsProduction { get; init; }
 

@@ -32,7 +32,8 @@ public enum FleetRole
 
     /// <summary>
     /// Collects the ore of drones parked at a far asteroid (a hold and a tank, and no drone): the mining plan's collecting
-    /// rounds (slice 6.18, D83), for the shuttles the mining plan designated for that asteroid. It does nothing else.
+    /// rounds (slice 6.18, D83), for the shuttles the mining plan designated for that asteroid, once a drone is parked there
+    /// (D86). It does nothing else.
     /// </summary>
     Collect = 6,
 }

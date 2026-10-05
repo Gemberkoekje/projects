@@ -6,9 +6,9 @@ using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 namespace SpaceTraders.Application.Tests.Roles;
 
 /// <summary>
-/// Slice 6.18, D83: the shuttle the mining plan bought for a far asteroid collects there, kept in the collecting role by the
-/// role board. It does nothing else: it neither builds nor trades, and as it buys nothing, its hold adds nothing to the
-/// credit reserve (D51).
+/// Slice 6.18, D83: the shuttle the mining plan bought for a far asteroid collects there, once a drone is parked there (D86),
+/// kept in the collecting role by the role board. It does nothing else: it neither builds nor trades, and as it buys nothing,
+/// its hold adds nothing to the credit reserve (D51).
 /// </summary>
 public sealed class CollectionRoleTests
 {

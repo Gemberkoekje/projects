@@ -72,9 +72,10 @@ public sealed class RolePlanService(
         var contractWantsOre = roleSettings.Switches.Contains(AutomationPlan.Contract)
             && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
             && contract.UnitsFulfilled < contract.UnitsRequired;
-        // D83: the shuttles the mining plan designated for its far asteroids keep collecting; a change weighs the roles again.
+        // D83, D86: the shuttles the mining plan designated for its far asteroids collect once a drone is parked there; a
+        // change weighs the roles again.
         var collectors = roleSettings.Switches.Contains(AutomationPlan.Mining)
-            ? Collectors(await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken))
+            ? Collectors(await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken), fleet)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var conditions = Conditions(roleSettings.Switches, contractWantsOre, roleSettings.ConstructionSystems, collectors);
 
@@ -84,7 +85,7 @@ public sealed class RolePlanService(
             .Select(ship => ship.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // A ship that surveys waits for surveys by design, and a collecting shuttle for a drone to park (D83); any other ship
+        // A ship that surveys waits for surveys by design, and a collecting shuttle for its drones' ore (D83); any other ship
         // with a choice of roles that stays without work shows that its role had nothing for it.
         var idle = TimeSpan.Zero;
         var trips = new Dictionary<string, ShipGoal>(StringComparer.OrdinalIgnoreCase);
@@ -133,11 +134,23 @@ public sealed class RolePlanService(
             + (constructionSystems.Count > 0 ? "|gate needs materials in " + string.Join(',', constructionSystems.Order(StringComparer.Ordinal)) : string.Empty)
             + (collectors.Count > 0 ? "|collectors " + string.Join(',', collectors.Order(StringComparer.Ordinal)) : string.Empty);
 
-    /// <summary>The shuttles the mining plan designated for its far asteroids (slice 6.18, D83), by symbol.</summary>
-    private static HashSet<string> Collectors(MiningAutomationPlanState? state)
-        => (state?.CollectionPoints ?? [])
+    /// <summary>
+    /// The shuttles the mining plan designated for its far asteroids (slice 6.18, D83) that collect now, by symbol: those of a
+    /// point where one of its drones is parked at the asteroid, there and not in flight. Until one is, the shuttle is a cargo
+    /// ship like any other and trades (D86, asked on 2026-10-05, when SPECTER-2B waited idle at A2 for three hours while the
+    /// drones drifted to B44: "Trade until parked"); the new role takes effect when its trip ends.
+    /// </summary>
+    private static HashSet<string> Collectors(MiningAutomationPlanState? state, IReadOnlyList<ShipModel> fleet)
+    {
+        var parkedAt = fleet
+            .Where(ship => ship.LocalStatus != ShipLocalStatus.InTransit && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+            .ToDictionary(ship => ship.Symbol, ship => ship.WaypointSymbol!, StringComparer.OrdinalIgnoreCase);
+        return (state?.CollectionPoints ?? [])
+            .Where(point => point.DroneSymbols.Any(drone => parkedAt.TryGetValue(drone, out var at)
+                && at.Equals(point.AsteroidWaypointSymbol, StringComparison.OrdinalIgnoreCase)))
             .SelectMany(point => point.ShuttleSymbols)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): the home system, or

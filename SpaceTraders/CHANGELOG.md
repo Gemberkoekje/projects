@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.20)
+- Trade routes rank by profit, an end product's (a good nothing is made from) counted at half (D85), as chosen on 2026-10-05 ("Half weight") after no trader took FOOD at about 75,000 a load while trips of 302 to 3,864 went first under D82's order. `TradeRoutePlanner.RankingProfit`; `Rank` and `CompareBestFirst` use it.
+- A collection shuttle trades like any cargo ship until one of its point's drones is parked at the asteroid (D86, "Trade until parked"): the role board gives it the `Collect` role only then, from the end of its trip. SPECTER-2B had waited without work for about three hours.
+
+### Docs – Changed (2026-10-05, slice 6.20)
+- `PLAN.md`: slice 6.20, decisions D85 and D86; slice 6.19 merged and deployed. `docs/HOW_IT_WORKS.md`: the ranking of trade routes, the collecting role, and a collection point's shuttle.
+
 ### Code – Fixed (2026-10-05, B66)
 - A good whose route waits for a free trader now says so in the trading plan's goods not traded (`waiting`: "It waits for a free trader: the free traders took routes that rank higher."), as asked on 2026-10-05: "it should at least give that reason for that good in the goods not traded tab". Such a good had no row, being listed, and once every trader was on a trip the waiting routes went and it was in neither list: ASSAULT_RIFLES and FOOD on 2026-10-05.
 
