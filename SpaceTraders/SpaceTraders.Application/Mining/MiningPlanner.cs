@@ -26,13 +26,22 @@ namespace SpaceTraders.Application.Mining;
 ///   <item>a market that makes something from the ore comes before every other (D91): one that exchanges the ore, or
 ///   imports it without making anything from it, only pays for it. Such a wealth target ranks last, is mined for only when
 ///   no market that makes something from an ore is left to serve, shared ones included, and never counts as a market short
-///   of its ore.</item>
+///   of its ore;</item>
+///   <item>while the jump gate needs materials, its smelters (D92, <see cref="GateSmelters"/>): the markets that smelt an
+///   ore into a metal that goes into them. A drone bought for the gate mines only its ore, for those smelters, the lowest
+///   supply first.</item>
 /// </list>
 /// </summary>
 public static class MiningPlanner
 {
     /// <summary>The supply at which a market has all of a good it wants: nobody gathers it for that market (D77).</summary>
     private const string AbundantSupply = "ABUNDANT";
+
+    /// <summary>The supply from which a smelter of the jump gate has enough of its ore: no gate miner is bought for it (D92).</summary>
+    private const string HighSupply = "HIGH";
+
+    private const string ImportType = "IMPORT";
+    private const string ExportType = "EXPORT";
 
     private static readonly IReadOnlySet<string> LowSupplyLevels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SCARCE", "LIMITED" };
     private static readonly IReadOnlySet<string> DemandTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "IMPORT", "EXCHANGE" };
@@ -77,6 +86,14 @@ public static class MiningPlanner
         var rank = Array.FindIndex(SupplyLevels, level => level.Equals(supply, StringComparison.OrdinalIgnoreCase));
         return rank < 0 ? SupplyLevels.Length : rank;
     }
+
+    /// <summary>
+    /// Whether a smelter of the jump gate has enough of its ore (D92): HIGH or ABUNDANT. An unknown level counts as enough, so
+    /// nothing is bought on it. Asked on 2026-10-05: "until each of the smelters have at least HIGH saturation".
+    /// </summary>
+    /// <param name="supply">The supply level, as the API gives it.</param>
+    /// <returns>True from HIGH up.</returns>
+    public static bool HasEnough(string supply) => SupplyRank(supply) >= SupplyRank(HighSupply);
 
     /// <summary>Where a ship is, or, in transit, where it is going.</summary>
     /// <param name="ship">The ship.</param>
@@ -693,6 +710,106 @@ public static class MiningPlanner
     }
 
     /// <summary>
+    /// The jump gate's smelters (PLAN.md slice 6.25, D92): each market that imports an ore and exports a metal made from it, a
+    /// good the production chains make from ores alone, that goes into a material the gate still needs
+    /// (<see cref="TradeMarketMap.GoesIntoConstruction"/>). In X1-FJ91 on 2026-10-05, H60 made IRON from IRON_ORE, which went
+    /// into the gate's FAB_MATS. A factory that takes a mineral directly, as FAB_MATS takes QUARTZ_SAND, is no smelter. None
+    /// while the gate needs nothing, or without the production chains. Asked on 2026-10-05: "extra miners to be bought for the
+    /// ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until
+    /// each of the smelters have at least HIGH saturation."
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <returns>The smelters, by market and ore.</returns>
+    public static IReadOnlyList<GateSmelter> GateSmelters(TradeMarketMap map)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+
+        var smelters = new List<GateSmelter>();
+        if (map.ConstructionMaterials.Count == 0)
+        {
+            return smelters;
+        }
+
+        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
+        {
+            var goods = map.GoodsAt(market).ToList();
+            foreach (var ore in goods
+                .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && good.SellPrice > 0 && good.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(good => good.Symbol, StringComparer.Ordinal))
+            {
+                var metal = goods
+                    .Where(good => good.Type.Equals(ExportType, StringComparison.OrdinalIgnoreCase)
+                        && IsSmeltedFrom(map, good.Symbol, ore.Symbol)
+                        && map.GoesIntoConstruction(good.Symbol))
+                    .Select(good => good.Symbol)
+                    .Order(StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (metal is not null)
+                {
+                    smelters.Add(new GateSmelter(market, ore.Symbol, metal, ore.Supply));
+                }
+            }
+        }
+
+        return smelters;
+    }
+
+    /// <summary>
+    /// The ores a gate miner would be bought for now (D92): each ore with a smelter of the jump gate (<see cref="GateSmelters"/>)
+    /// below HIGH that the drone can serve, in CRUISE reach or a drift away (<see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>);
+    /// the ore whose smelter has the lowest supply first. An ore whose every such smelter has it HIGH or ABUNDANT has enough.
+    /// </summary>
+    /// <param name="context">The system.</param>
+    /// <param name="drone">A drone as it would be bought: at the shipyard, with a full tank.</param>
+    /// <returns>The ores, by the lowest supply among their smelters, then by symbol.</returns>
+    public static IReadOnlyList<string> GateOresShort(MiningContext context, ShipModel drone)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(drone);
+
+        var wanting = GateSmelters(context.Map).Where(smelter => !HasEnough(smelter.Supply)).ToList();
+        if (wanting.Count == 0)
+        {
+            return [];
+        }
+
+        var served = MiningTargets(context, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select(target => target.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. wanting
+            .Where(smelter => served.Contains(smelter.Key))
+            .GroupBy(smelter => smelter.Ore, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(ore => ore.Min(smelter => SupplyRank(smelter.Supply)))
+            .ThenBy(ore => ore.Key, StringComparer.Ordinal)
+            .Select(ore => ore.Key)];
+    }
+
+    /// <summary>
+    /// Where a gate miner mines (D92): its ore, for the jump gate's smelters of it (<see cref="GateSmelters"/>), the lowest
+    /// supply first, then as <see cref="SharedTargets"/> orders them: a pair in CRUISE reach before one a drift away (D45), then
+    /// the pair with the fewest miners. A pair another miner works on counts too: a gate miner shares it. A smelter that has
+    /// the ore ABUNDANT is none (D77), nor one the drone can't reach.
+    /// </summary>
+    /// <param name="context">The drone's system.</param>
+    /// <param name="drone">The gate miner.</param>
+    /// <param name="ore">The ore it was bought for.</param>
+    /// <param name="minersPerPair">How many miners work on each pair, by <see cref="OpportunityKey"/>; a pair it leaves out has none.</param>
+    /// <returns>The targets, best first; none once the gate needs nothing made from the ore.</returns>
+    public static IReadOnlyList<MiningTarget> GateTargets(MiningContext context, ShipModel drone, string ore, IReadOnlyDictionary<string, int> minersPerPair)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(ore);
+
+        var smelters = GateSmelters(context.Map)
+            .Where(smelter => smelter.Ore.Equals(ore, StringComparison.OrdinalIgnoreCase))
+            .Select(smelter => smelter.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return smelters.Count == 0
+            ? []
+            : [.. SharedTargets(context, drone, minersPerPair).Where(target => smelters.Contains(target.Key))];
+    }
+
+    /// <summary>
     /// Orders two mining targets (<see cref="MiningTargets"/>): the one whose market makes something from the ore first
     /// (D91), then the lower supply (D28), then the one in CRUISE reach before a far one (D45), then surveyed first, then the
     /// most an extraction is expected to fetch, then by key.
@@ -759,6 +876,13 @@ public static class MiningPlanner
         return [.. groups
             .Select(group => (IReadOnlyList<string>)[.. group.Order(StringComparer.Ordinal)])
             .OrderBy(group => group[0], StringComparer.Ordinal)];
+    }
+
+    /// <summary>Whether a good is a metal smelted from the ore (D92): the production chains make it from the ore, and from ores alone.</summary>
+    private static bool IsSmeltedFrom(TradeMarketMap map, string good, string ore)
+    {
+        var inputs = map.InputsOf(good);
+        return inputs.Contains(ore, StringComparer.OrdinalIgnoreCase) && inputs.All(AsteroidDeposits.Ores.Contains);
     }
 
     /// <summary>Every market in the system that buys an ore, with what it pays, by symbol.</summary>
@@ -1161,6 +1285,42 @@ public sealed record CollectionPoint
 
     /// <summary>The point's key: its market and asteroid.</summary>
     public string Key => $"{SellWaypointSymbol}|{AsteroidSymbol}".ToUpperInvariant();
+}
+
+/// <summary>
+/// A market that smelts an ore into a metal that goes into a material the jump gate still needs (PLAN.md slice 6.25, D92,
+/// <see cref="MiningPlanner.GateSmelters"/>): H60, which made IRON from IRON_ORE for the gate's FAB_MATS.
+/// </summary>
+public sealed record GateSmelter
+{
+    /// <summary>Creates a smelter.</summary>
+    /// <param name="MarketSymbol">The market.</param>
+    /// <param name="Ore">The ore it imports.</param>
+    /// <param name="Metal">The metal it exports, made from the ore.</param>
+    /// <param name="Supply">Its supply of the ore, as last seen (SCARCE to ABUNDANT).</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public GateSmelter(string MarketSymbol, string Ore, string Metal, string Supply)
+    {
+        this.MarketSymbol = MarketSymbol;
+        this.Ore = Ore;
+        this.Metal = Metal;
+        this.Supply = Supply;
+    }
+
+    /// <summary>The market.</summary>
+    public required string MarketSymbol { get; init; }
+
+    /// <summary>The ore it imports.</summary>
+    public required string Ore { get; init; }
+
+    /// <summary>The metal it exports, made from the ore.</summary>
+    public required string Metal { get; init; }
+
+    /// <summary>Its supply of the ore, as last seen (SCARCE to ABUNDANT).</summary>
+    public required string Supply { get; init; }
+
+    /// <summary>The pair's key, as a mining target's: one per sell market and ore (<see cref="MiningPlanner.OpportunityKey"/>).</summary>
+    public string Key => MiningPlanner.OpportunityKey(MarketSymbol, Ore);
 }
 
 /// <summary>

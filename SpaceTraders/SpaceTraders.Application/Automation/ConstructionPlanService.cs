@@ -41,8 +41,9 @@ public interface IConstructionPlanService
 ///   <item>supplying pays nothing, so a load is judged as a ship purchase (D64): it keeps the credit reserve
 ///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships in the order ships are bought in
 ///   (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so probes and further ships wait until the
-///   gate is done. A trip holds back what its cargo costs from the moment it starts until it buys, as a trade trip does
-///   (D57);</item>
+///   gate is done. It says whether the load waits for its markets: then the mining plan's drones for the gate's smelters
+///   may be bought meanwhile (D92). A trip holds back what its cargo costs from the moment it starts until it buys, as a
+///   trade trip does (D57);</item>
 ///   <item>a builder that gets no load stays free, and the trading plan, which comes next, gives it a trade.</item>
 /// </list>
 /// </summary>
@@ -202,9 +203,13 @@ public sealed class ConstructionPlanService(
         foreach (var (site, map, system) in pass.Sites)
         {
             if (pass.Builders.FirstOrDefault(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)) is { } first
-                && NextLoad(map, first, site, ConstructionPlanner.Needs(site, pass.Trips), spendable, HeldBuysNow()) is { } load)
+                && NextLoad(map, first, site, ConstructionPlanner.Needs(site, pass.Trips), spendable, HeldBuysNow()) is { } next)
             {
-                need = new PurchaseNeed(PurchaseTier.Construction, load.TradeSymbol, load.BuyWaypointSymbol, load.Cost);
+                // D92: a load that waits for its markets lets the gate's miners be bought meanwhile.
+                need = new PurchaseNeed(PurchaseTier.Construction, next.Load.TradeSymbol, next.Load.BuyWaypointSymbol, next.Load.Cost)
+                {
+                    WaitsForMarkets = next.WaitsForMarkets,
+                };
                 break;
             }
         }
@@ -277,16 +282,22 @@ public sealed class ConstructionPlanService(
 
     /// <summary>
     /// What a builder would buy next, for the order ships are bought in: as if its hold were empty and it were where it is
-    /// going, the first load the credits pay for, else the first it may buy, else the first it would buy once the supply and
-    /// trade volume allow it. None when no market it can reach sells what the site needs.
+    /// going, the first load the credits pay for, else the first it may buy, else the first it would buy once the supply
+    /// allows it and no other trip is on its way to buy it there, which waits for its markets (D92). None when no market it
+    /// can reach sells what the site needs.
     /// </summary>
-    private static ConstructionLoad? NextLoad(TradeMarketMap map, ShipModel builder, ConstructionSiteModel site, IReadOnlyList<MaterialNeed> needs, long spendable, HeldBuys heldBuys)
+    private static (ConstructionLoad Load, bool WaitsForMarkets)? NextLoad(TradeMarketMap map, ShipModel builder, ConstructionSiteModel site, IReadOnlyList<MaterialNeed> needs, long spendable, HeldBuys heldBuys)
     {
         var empty = AsIfEmptyWhereItGoes(builder);
         var loads = ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, heldBuys);
-        return loads.FirstOrDefault(load => load.Cost <= spendable)
-            ?? loads.FirstOrDefault()
-            ?? ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, strict: false).FirstOrDefault();
+        if ((loads.FirstOrDefault(load => load.Cost <= spendable) ?? loads.FirstOrDefault()) is { } load)
+        {
+            return (load, false);
+        }
+
+        return ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, strict: false).FirstOrDefault() is { } later
+            ? (later, true)
+            : null;
     }
 
     /// <summary>

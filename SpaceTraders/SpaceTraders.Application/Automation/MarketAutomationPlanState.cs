@@ -32,9 +32,29 @@ public sealed record MiningAutomationPlanState
     /// </summary>
     public IReadOnlyList<CollectionPointState> CollectionPoints { get; init; } = [];
 
+    /// <summary>
+    /// The drones bought for the jump gate's smelters (slice 6.25, D92), while they are in the fleet: each mines only its ore,
+    /// for the smelters that make a metal the gate's materials need from it, until the gate needs nothing made from it; when
+    /// each was bought spaces the next one for its ore. Empty for the siphon plan, and in a state stored before slice 6.25.
+    /// </summary>
+    public IReadOnlyList<GateMinerState> GateMiners { get; init; } = [];
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>A drone the mining plan bought for the jump gate's smelters (slice 6.25, D92), and the ore it mines for them.</summary>
+public sealed record GateMinerState
+{
+    /// <summary>The drone.</summary>
+    public required string ShipSymbol { get; init; }
+
+    /// <summary>The ore it was bought for, such as <c>IRON_ORE</c>.</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>When it was bought: the next drone for the same ore waits <c>Mining.GateMinerIntervalMinutes</c> from then.</summary>
+    public required DateTimeOffset BoughtAt { get; init; }
 }
 
 /// <summary>
