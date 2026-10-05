@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.24)
+- Ore and gases go to the markets that make something from them, and EXCHANGE markets are wealth trades only (D91), as asked on 2026-10-05: "EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as supply trades" and "first redirect the ore to a place that actually generates iron". A market supplies production when it imports the good and exports something made from it (`TradeMarketMap.MakesSomethingFrom`; without the production chains, any import). Miners and siphoners serve such markets first and share such a pair before mining or siphoning for a market that only pays (an exchange, or an import it makes nothing from, like D52's IRON_ORE), which never counts as scarce, buys no drone and is no opening; reason `wealth`. Their leftover cargo goes to such a market whenever that sale pays (`supplyFirst`). A trade route to an exchange never feeds production and ranks last (`TradeRoute.ToExchange`).
+
+### Docs – Changed (2026-10-05, slice 6.24)
+- `PLAN.md`: slice 6.24 and decision D91; slice 6.23 merged and deployed. `docs/HOW_IT_WORKS.md`: supply first, exchanges last, for the miners, the siphoners and the ranking of trade routes.
+
 ### Code – Changed (2026-10-05, slice 6.23)
 - A trade route that feeds a material the jump gate still needs runs while its goods sell for at least what they cost, only its fuel lost (D90), as chosen on 2026-10-05: "Up to its fuel (Recommended)". IRON for the FAB_MATS markets D52 and F58, which paid 150 to 155 while H60 charged up to 157, earned less than the 5 a unit of D14. `TradeRoute.IsWorthIt`; the planner and the trade executor buy such a trip's units while each sells for what it costs, weigh it at no price gap, and sell at its market unless that would fetch less than the cargo cost and another market pays more. "Goods not traded" says "feeds the jump gate's …".
 

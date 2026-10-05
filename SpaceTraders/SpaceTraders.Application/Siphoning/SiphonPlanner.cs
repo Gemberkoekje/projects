@@ -17,15 +17,17 @@ namespace SpaceTraders.Application.Siphoning;
 ///   <item>only trips a ship can make in CRUISE count, through refuelling stops: to the gas giant, and on to the
 ///   market with the fuel left there;</item>
 ///   <item>a market out of that reach that sells fuel counts too (slice 6.10c, D45): the ship drifts there first and
-///   siphons from there, at a gas giant within a CRUISE round trip of it.</item>
+///   siphons from there, at a gas giant within a CRUISE round trip of it;</item>
+///   <item>a market that makes something from the gas comes before every other (D91), as for the miners: one that exchanges
+///   it, or imports it without making anything from it, only pays for it, ranks last and never counts as short of it.</item>
 /// </list>
 /// </summary>
 public static class SiphonPlanner
 {
     /// <summary>
     /// What a siphoner can siphon, best first (D28 for gases): for every market that buys a gas, siphoned at the
-    /// gas giant nearest the market and sold there. The markets shortest of their gas come first; a market that has the gas
-    /// ABUNDANT has all it wants, and isn't one (D77). Within a supply level, the targets in CRUISE reach first, then the
+    /// gas giant nearest the market and sold there. The markets that make something from their gas come first (D91), then
+    /// the markets shortest of their gas; a market that has the gas ABUNDANT has all it wants, and isn't one (D77). Within a supply level, the targets in CRUISE reach first, then the
     /// most a single siphon is expected to fetch (the gas's share of the giant's gases times its price), then the nearest
     /// gas giant. A market out of the siphoner's CRUISE reach that sells fuel is a far target (D45,
     /// <see cref="SiphonTarget.Far"/>): the siphoner drifts there first, and siphons at the gas giant nearest it within a
@@ -74,22 +76,25 @@ public static class SiphonPlanner
             var driftsThere = gases.Count > 0 && MiningPlanner.CanDriftTo(map, siphoner, market);
             foreach (var good in gases)
             {
+                // D91: whether the market makes something from the gas, or only pays for it.
+                var feeds = map.MakesSomethingFrom(market, good.Symbol);
                 if (TryFindNearestGasGiant(map, good.Symbol, market, gasGiant => Gathers(gasGiant, market), out var nearest))
                 {
-                    targets.Add(new SiphonTarget(good.Symbol, nearest, market, good.SellPrice, Share(map, nearest), good.Supply));
+                    targets.Add(new SiphonTarget(good.Symbol, nearest, market, good.SellPrice, Share(map, nearest), good.Supply) { FeedsProduction = feeds });
                 }
                 else if (driftsThere
                     && TryFindNearestGasGiant(map, good.Symbol, market, gasGiant => MiningPlanner.IsWithinRoundTrip(map, siphoner, market, gasGiant), out var far))
                 {
                     // Out of CRUISE reach (D45): the siphoner drifts to the market, which sells fuel, and siphons from there.
-                    targets.Add(new SiphonTarget(good.Symbol, far, market, good.SellPrice, Share(map, far), good.Supply, Far: true));
+                    targets.Add(new SiphonTarget(good.Symbol, far, market, good.SellPrice, Share(map, far), good.Supply, Far: true) { FeedsProduction = feeds });
                 }
             }
         }
 
         var position = MiningPlanner.Position(siphoner);
         return [.. targets
-            .OrderBy(target => MiningPlanner.SupplyRank(target.Supply))
+            .OrderByDescending(target => target.FeedsProduction)
+            .ThenBy(target => MiningPlanner.SupplyRank(target.Supply))
             .ThenBy(target => target.Far)
             .ThenByDescending(target => target.ExpectedValue)
             .ThenBy(target => map.TryGetDistance(position, target.GasGiantSymbol, out var distance) ? distance : double.MaxValue)
@@ -111,8 +116,9 @@ public static class SiphonPlanner
 
     /// <summary>
     /// What a siphon drone siphons once every pair below ABUNDANT it could serve has a siphoner (D77, for siphon drones too,
-    /// as for the miners: <see cref="MiningPlanner.SharedTargets"/>): it shares a pair rather than trade. The lowest supply
-    /// first (D28), a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest siphoners, then in
+    /// as for the miners: <see cref="MiningPlanner.SharedTargets"/>): it shares a pair rather than trade. A pair whose market
+    /// makes something from the gas first (D91), then the lowest supply (D28), a pair in CRUISE reach before one a drift away
+    /// (D45), then the pair with the fewest siphoners, then in
     /// <see cref="SiphonTargets(TradeMarketMap, ShipModel, IReadOnlySet{string})"/>'s order. The siphon plan buys no drone for
     /// a pair it would only share.
     /// </summary>
@@ -125,7 +131,8 @@ public static class SiphonPlanner
         ArgumentNullException.ThrowIfNull(siphonersPerPair);
         return [.. SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
             .Select((target, rank) => (Target: target, Rank: rank))
-            .OrderBy(entry => MiningPlanner.SupplyRank(entry.Target.Supply))
+            .OrderByDescending(entry => entry.Target.FeedsProduction)
+            .ThenBy(entry => MiningPlanner.SupplyRank(entry.Target.Supply))
             .ThenBy(entry => entry.Target.Far)
             .ThenBy(entry => siphonersPerPair.GetValueOrDefault(entry.Target.Key))
             .ThenBy(entry => entry.Rank)
@@ -133,8 +140,8 @@ public static class SiphonPlanner
     }
 
     /// <summary>
-    /// Puts the targets whose gas no siphoner works on first (D48): the SCARCE or LIMITED ones (D22) that no trip in
-    /// <paramref name="covering"/> covers, as a trip covers its gas only at the markets its ship reaches in CRUISE from
+    /// Puts the targets whose gas no siphoner works on first (D48): the SCARCE or LIMITED ones (D22) whose market makes
+    /// something from the gas (D91) that no trip in <paramref name="covering"/> covers, as a trip covers its gas only at the markets its ship reaches in CRUISE from
     /// where it sells (D53, <see cref="CoveringTrip.Covers"/>); those in CRUISE reach before those a drift away (D45), the
     /// nearest gas giant first; then the rest, each group in the order given.
     /// </summary>
@@ -154,7 +161,7 @@ public static class SiphonPlanner
             .Select((target, rank) => (
                 Target: target,
                 Rank: rank,
-                Uncovered: target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Gas, target.SellWaypointSymbol))))
+                Uncovered: target.FeedsProduction && target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Gas, target.SellWaypointSymbol))))
             .OrderByDescending(entry => entry.Uncovered)
             .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.GasGiantSymbol, out var distance) ? distance : double.MaxValue)
@@ -164,7 +171,7 @@ public static class SiphonPlanner
 
     /// <summary>
     /// The SCARCE or LIMITED gases a ship could serve (D48), each once per area (D53): the gases of its low-supply targets
-    /// (D22), whichever siphoner holds them, with the markets short of each grouped by the ship's CRUISE reach
+    /// (D22) whose market makes something from the gas (D91), whichever siphoner holds them, with the markets short of each grouped by the ship's CRUISE reach
     /// (<see cref="MiningPlanner.Areas"/>). A gas that no gas giant it can reach yields, or that no market it can carry it
     /// to is short of, isn't one.
     /// </summary>
@@ -179,13 +186,13 @@ public static class SiphonPlanner
             map,
             ship.FuelCapacity,
             SiphonTargets(map, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-                .Where(target => target.LowSupply)
+                .Where(target => target.FeedsProduction && target.LowSupply)
                 .Select(target => new MineralArea(target.Gas, [target.SellWaypointSymbol])));
     }
 
     /// <summary>
-    /// The low-supply openings of a system (D22): each market with a gas in low supply, and the gas giant nearest
-    /// it. A siphoner that can reach the gas giant can take the opening.
+    /// The low-supply openings of a system (D22): each market with a gas in low supply that it makes something from (D91),
+    /// and the gas giant nearest it. A siphoner that can reach the gas giant can take the opening.
     /// </summary>
     /// <param name="map">The system.</param>
     /// <returns>The openings, by market and gas.</returns>
@@ -197,7 +204,7 @@ public static class SiphonPlanner
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
             foreach (var good in map.GoodsAt(market)
-                .Where(good => GasGiants.Gases.Contains(good.Symbol) && MiningPlanner.IsLowSupply(good))
+                .Where(good => GasGiants.Gases.Contains(good.Symbol) && MiningPlanner.IsLowSupply(good) && map.MakesSomethingFrom(market, good.Symbol))
                 .OrderBy(good => good.Symbol, StringComparer.Ordinal))
             {
                 if (TryFindNearestGasGiant(map, good.Symbol, market, _ => true, out var gasGiant))
@@ -279,6 +286,13 @@ public sealed record SiphonTarget
     /// distance and about ten times slower, refuels, and siphons from there in CRUISE.
     /// </summary>
     public bool Far { get; init; }
+
+    /// <summary>
+    /// Whether the sell market makes something from the gas (D91, <see cref="TradeMarketMap.MakesSomethingFrom"/>). A market
+    /// that exchanges the gas, or imports it without making anything from it, only pays for it: such a target is a wealth
+    /// trade, ranks after every other and never counts as a market short of its gas. True unless set.
+    /// </summary>
+    public bool FeedsProduction { get; init; } = true;
 
     /// <summary>Whether the sell market has the gas in low supply (D22): SCARCE or LIMITED.</summary>
     public bool LowSupply => MiningPlanner.IsLowSupply(Supply);

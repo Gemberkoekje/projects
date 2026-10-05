@@ -230,6 +230,68 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task ADrone_SharesAPairWhoseMarketMakesSomethingFromItsOre_BeforeMiningForOneThatOnlyPaysForIt()
+    {
+        // D91, asked on 2026-10-05: "first redirect the ore to a place that actually generates iron". SHIP-4 mines IRON_ORE
+        // for H51, which makes IRON from it. F49, which makes nothing from it, and XB5C, which exchanges it, are SCARCE and
+        // nobody mines for them: SHIP-3 shares H51's pair all the same.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(IronMap(), [], 129_357, Now));
+        HeldBy("SHIP-4", H51, "IRON_ORE");
+        Fleet(Drone(), Drone("SHIP-4"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("IRON_ORE", H51));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+    }
+
+    [Fact]
+    public async Task WithNoMarketThatMakesSomethingFromAnOre_ADroneMinesForOneThatOnlyPaysForIt()
+    {
+        // D91: "lowest priority and only considered as wealth trades". H51 buys no IRON_ORE here: of what is left, XB5C's
+        // exchange pays most.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(IronMap(withMaker: false), [], 129_357, Now));
+        Fleet(Drone());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("IRON_ORE", XB5C));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("wealth");
+    }
+
+    [Fact]
+    public async Task NoDroneIsBought_ForMarketsThatOnlyPayForTheirOre()
+    {
+        // D91: F49 and XB5C are SCARCE of IRON_ORE, and SHIP-4 mines it for F49, but they only pay for it: no drone is bought
+        // to serve them.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(IronMap(withMaker: false), [], 129_357, Now));
+        HeldBy("SHIP-4", F49, "IRON_ORE");
+        Fleet(Drone("SHIP-4"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
+    public async Task AMinerHoldingOre_SellsItWhereItIsMadeIntoSomething_ThoughOtherMarketsPayMore()
+    {
+        // D91: XB5C, where it is, exchanges IRON_ORE for 64, and F49 pays 62 for it without making anything from it; H51
+        // makes IRON from it, for 58.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(IronMap(), [], 129_357, Now));
+        Fleet(Drone(waypoint: XB5C, status: "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 9)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol, trip.Selling).Should().Be(("IRON_ORE", H51, true));
+    }
+
+    [Fact]
     public async Task WithEveryOreAtAbundant_ADroneGetsNoTrip_AndMayTrade()
     {
         // D77: "Trade until then". Every market that buys an ore has all it wants: nothing is left to mine for, and the trading
@@ -859,7 +921,7 @@ public sealed class MiningAutomationServiceTests
                 Market(
                     B7,
                     Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"),
-                    Good("COPPER_ORE", "EXCHANGE", 68, 58, 180, "SCARCE"),
+                    Good("COPPER_ORE", "IMPORT", 68, 58, 180, "SCARCE"),
                     Good("IRON_ORE", "IMPORT", 118, 61, 60, "LIMITED"),
                     Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
             ]),

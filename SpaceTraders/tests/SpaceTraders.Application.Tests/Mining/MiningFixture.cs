@@ -14,10 +14,13 @@ namespace SpaceTraders.Application.Tests.Mining;
 ///   <item>near it H51, which imports COPPER_ORE (pays 67) and IRON_ORE (58) in LIMITED supply and
 ///   ALUMINUM_ORE (63) in MODERATE; F49, which imports QUARTZ_SAND (26) and SILICON_CRYSTALS (49), both
 ///   SCARCE; and H52, which sells mining drones;</item>
-///   <item>far out, B7, which imports GOLD_ORE (114) and exchanges COPPER_ORE (58), both SCARCE, with the
-///   asteroids B14 (PRECIOUS_METAL_DEPOSITS) and B13 (COMMON_METAL_DEPOSITS) next to it. A drone's 80-unit
-///   tank doesn't get it there: no chain of fuel markets 80 apart leads out of the middle.</item>
+///   <item>far out, B7, which imports GOLD_ORE (114) and COPPER_ORE (58), both SCARCE, with the asteroids B14
+///   (PRECIOUS_METAL_DEPOSITS) and B13 (COMMON_METAL_DEPOSITS) next to it. A drone's 80-unit tank doesn't get it
+///   there: no chain of fuel markets 80 apart leads out of the middle.</item>
 /// </list>
+/// X1-DC53's B7 exchanged its COPPER_ORE. Since D91 a market that exchanges an ore only pays for it, so here B7 imports it:
+/// the tests of far targets and areas keep a market short of an ore out at B7. Without production chains, every market
+/// that imports an ore counts as making something from it.
 /// </summary>
 internal static class MiningFixture
 {
@@ -63,12 +66,30 @@ internal static class MiningFixture
         Market(
             B7,
             Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"),
-            Good("COPPER_ORE", "EXCHANGE", 68, 58, 180, "SCARCE"),
+            Good("COPPER_ORE", "IMPORT", 68, 58, 180, "SCARCE"),
             Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
     ];
 
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? Markets() : markets, new Dictionary<string, IReadOnlyList<string>>());
+
+    /// <summary>
+    /// For D91, the shape X1-FJ91 had on 2026-10-05: H51 makes IRON from IRON_ORE (LIMITED, pays 58), as H60 did; F49 imports
+    /// IRON_ORE and makes nothing from it (SCARCE, pays 62), as D52 did; XB5C exchanges it (SCARCE, pays 64), as B7 did. With
+    /// <paramref name="withMaker"/> false, H51 buys no IRON_ORE.
+    /// </summary>
+    public static TradeMarketMap IronMap(bool withMaker = true)
+        => new(
+            Waypoints,
+            [
+                Market(XB5C, Good("IRON_ORE", "EXCHANGE", 70, 64, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 97, 82, 180, "MODERATE")),
+                withMaker
+                    ? Market(H51, Good("IRON_ORE", "IMPORT", 118, 58, 60, "LIMITED"), Good("IRON", "EXPORT", 310, 150, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE"))
+                    : Market(H51, Good("IRON", "EXPORT", 310, 150, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE")),
+                Market(F49, Good("IRON_ORE", "IMPORT", 124, 62, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 82, 72, 180, "MODERATE")),
+                Market(H52, Good("FUEL", "EXCHANGE", 76, 69, 180, "MODERATE")),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["IRON"] = ["IRON_ORE"] });
 
     public static MiningContext Context(params SurveyModel[] surveys) => new(Map(), surveys, 129_357, Now);
 

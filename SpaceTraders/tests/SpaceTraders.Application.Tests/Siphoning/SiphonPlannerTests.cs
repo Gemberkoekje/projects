@@ -120,9 +120,9 @@ public sealed class SiphonPlannerTests
             .. Markets().Where(market => market.WaypointSymbol != C39),
             Market(
                 C39,
-                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "SCARCE"),
-                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
-                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("HYDROCARBON", "IMPORT", 70, 60, 60, "SCARCE"),
+                Good("LIQUID_HYDROGEN", "IMPORT", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
                 Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         ];
         var held = new HashSet<string> { MiningPlanner.OpportunityKey(G50, "HYDROCARBON") };
@@ -302,6 +302,18 @@ public sealed class SiphonPlannerTests
         GasGiants.CanYield(c38, "COPPER_ORE").Should().BeFalse();
     }
 
+    [Fact]
+    public void AMarketThatMakesSomethingFromTheGas_ComesFirst_ThoughOnesThatOnlyPayForItAreShorterAndPayMore()
+    {
+        // D91, as for the miners: E47 and C39 are SCARCE and pay more, but E47 makes nothing from HYDROCARBON and C39
+        // exchanges it; G50 makes FUEL from it. They are no scarce gas (D48) and no opening either.
+        var targets = SiphonPlanner.SiphonTargets(HydrocarbonMap(), SiphonDrone(), new HashSet<string>(), []);
+
+        targets.Select(target => (target.SellWaypointSymbol, target.FeedsProduction)).Should().Equal((G50, true), (C39, false), (E47, false));
+        SiphonPlanner.ScarceGases(HydrocarbonMap(), SiphonDrone()).Select(area => (area.Good, string.Join(',', area.MarketSymbols))).Should().Equal(("HYDROCARBON", G50));
+        SiphonPlanner.LowSupplyOpportunities(HydrocarbonMap()).Select(opening => opening.SellWaypointSymbol).Should().Equal(G50);
+    }
+
     /// <summary>A siphoner's trip on a gas for a market, by a drone with an 80-unit tank.</summary>
     private static CoveringTrip Covering(string gas, string market) => new(gas, market, 80);
 
@@ -312,9 +324,9 @@ public sealed class SiphonPlannerTests
             .. Markets().Where(market => market.WaypointSymbol != C39),
             Market(
                 C39,
-                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, supply),
-                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
-                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("HYDROCARBON", "IMPORT", 70, 60, 60, supply),
+                Good("LIQUID_HYDROGEN", "IMPORT", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
                 Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         ];
 }

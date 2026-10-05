@@ -158,9 +158,9 @@ public sealed class SiphonAutomationServiceTests
             .. Markets().Where(market => market.WaypointSymbol != C39),
             Market(
                 C39,
-                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "ABUNDANT"),
-                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
-                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("HYDROCARBON", "IMPORT", 70, 60, 60, "ABUNDANT"),
+                Good("LIQUID_HYDROGEN", "IMPORT", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
                 Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         ]));
         var drones = EveryPairHeld();
@@ -231,12 +231,41 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task ASiphonDrone_SharesAPairWhoseMarketMakesSomethingFromItsGas_BeforeSiphoningForOneThatOnlyPaysForIt()
+    {
+        // D91: SHIP-6 siphons HYDROCARBON for G50, which makes FUEL from it; E47 and C39, SCARCE, only pay for it.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(HydrocarbonMap(), 250_000, 200));
+        HeldBy("SHIP-6", G50, "HYDROCARBON");
+        Fleet(SiphonDrone(), SiphonDrone("SHIP-6"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("HYDROCARBON", G50));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "SiphonStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+    }
+
+    [Fact]
+    public async Task ASiphonerHoldingAGas_SellsItWhereItIsMadeIntoSomething_ThoughAnExchangePaysMore()
+    {
+        // D91: C39, beside the gas giant, exchanges HYDROCARBON for 100; G50 makes FUEL from it, for 90.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(HydrocarbonMap(), 250_000, 200));
+        Fleet(SiphonDrone(waypoint: C38, status: "IN_ORBIT", cargo: [new CargoItemModel("HYDROCARBON", 6)]));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol, trip.Selling).Should().Be(("HYDROCARBON", G50, true));
+    }
+
+    [Fact]
     public async Task ASiphonerWithAFullHold_SellsWhatItHolds_EvenWhenTheSaleDoesntPayForItsFuel()
     {
         // Only C39 buys its nitrogen, for 1 a unit: 15 credits against 80 for the fuel there. A siphon trip would
         // turn to selling at once and end without its gas aboard, on every tick.
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(
-            Market(C39, Good("LIQUID_NITROGEN", "EXCHANGE", 2, 1, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+            Market(C39, Good("LIQUID_NITROGEN", "IMPORT", 2, 1, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
             Market(C40, Good("FUEL", "EXCHANGE", 75, 66, 180, "MODERATE")),
             Market(G50, Good("LIQUID_HYDROGEN", "IMPORT", 110, 55, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 82, 72, 180, "MODERATE"))));
         Fleet(SiphonDrone(waypoint: C38, status: "IN_ORBIT", cargo: [new CargoItemModel("LIQUID_NITROGEN", 15)]));
@@ -378,9 +407,9 @@ public sealed class SiphonAutomationServiceTests
             .. Markets().Where(market => market.WaypointSymbol != C39),
             Market(
                 C39,
-                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "SCARCE"),
-                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
-                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("HYDROCARBON", "IMPORT", 70, 60, 60, "SCARCE"),
+                Good("LIQUID_HYDROGEN", "IMPORT", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
                 Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         ]));
         HeldBy("SHIP-6", G50, "HYDROCARBON");

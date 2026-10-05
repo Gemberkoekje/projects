@@ -214,7 +214,7 @@ public sealed class MiningPlannerTests
         var map = Map(
         [
             .. Markets().Where(market => market.WaypointSymbol != B7),
-            Market(B7, Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"), Good("COPPER_ORE", "EXCHANGE", 68, 58, 180, "SCARCE")),
+            Market(B7, Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"), Good("COPPER_ORE", "IMPORT", 68, 58, 180, "SCARCE")),
         ]);
 
         var targets = MiningPlanner.MiningTargets(new MiningContext(map, [], 129_357, Now), Drone(), new HashSet<string>());
@@ -527,6 +527,46 @@ public sealed class MiningPlannerTests
         MiningPlanner.CountAreas(Map(), 80, [H51, F49, B7, B7]).Should().Be(2);
         MiningPlanner.CountAreas(Map(), 400, [H51, F49, B7, B7]).Should().Be(1);
         MiningPlanner.CountAreas(Map(), 80, []).Should().Be(0);
+    }
+
+    [Fact]
+    public void AMarketThatMakesSomethingFromTheOre_ComesFirst_ThoughOnesThatOnlyPayForItAreShorterAndPayMore()
+    {
+        // D91, asked on 2026-10-05: "first redirect the ore to a place that actually generates iron", and "EXCHANGE nodes
+        // should be lowest priority and only considered as wealth trades, never as supply trades." F49 and XB5C are SCARCE
+        // and pay more, but F49 makes nothing from IRON_ORE and XB5C exchanges it: H51, which makes IRON from it, comes
+        // first, even with D48 putting the ores no miner works on first.
+        var context = new MiningContext(IronMap(), [], 129_357, Now);
+
+        var targets = MiningPlanner.MiningTargets(context, Drone(), new HashSet<string>(), []);
+
+        targets.Select(target => (target.SellWaypointSymbol, target.FeedsProduction)).Should().Equal((H51, true), (XB5C, false), (F49, false));
+        targets.Should().OnlyContain(target => target.Ore == "IRON_ORE");
+    }
+
+    [Fact]
+    public void AMarketThatOnlyPaysForAnOre_IsNoScarceOre_NoOpening_AndComesLastToShare()
+    {
+        // D91: F49 and XB5C are SCARCE of IRON_ORE but only pay for it. No drone is wanted for them (D48), they are no
+        // opening that waits for a ship, and a drone shares H51's pair, however many mine it, before it mines for them.
+        var context = new MiningContext(IronMap(), [], 129_357, Now);
+
+        MiningPlanner.ScarceOres(context, Drone()).Select(area => (area.Good, string.Join(',', area.MarketSymbols))).Should().Equal(("IRON_ORE", H51));
+        MiningPlanner.LowSupplyOpportunities(IronMap()).Select(opening => opening.SellWaypointSymbol).Should().Equal(H51);
+        MiningPlanner.SharedTargets(context, Drone(), new Dictionary<string, int> { [MiningPlanner.OpportunityKey(H51, "IRON_ORE")] = 3 })
+            .Select(target => target.SellWaypointSymbol).Should().Equal(H51, XB5C, F49);
+    }
+
+    [Fact]
+    public void AMarketMakesSomethingFromAGood_ThatItImportsAndExportsAGoodMadeOf_AnyImportWithoutTheChains()
+    {
+        // D91: H51 makes IRON from IRON_ORE; F49 imports it and makes nothing from it; XB5C exchanges it. Without the
+        // production chains, as in the fixture's map, any import counts, as before.
+        var map = IronMap();
+
+        (map.MakesSomethingFrom(H51, "IRON_ORE"), map.MakesSomethingFrom(F49, "IRON_ORE"), map.MakesSomethingFrom(XB5C, "IRON_ORE")).Should().Be((true, false, false));
+        (map.Exchanges(XB5C, "IRON_ORE"), map.Exchanges(H51, "IRON_ORE"), map.Exchanges(F49, "IRON_ORE")).Should().Be((true, false, false));
+        Map().MakesSomethingFrom(F49, "QUARTZ_SAND").Should().BeTrue("the fixture's map names no production chains");
     }
 
     /// <summary>A miner's trip on an ore for a market, by a ship with an 80-unit tank unless said otherwise.</summary>

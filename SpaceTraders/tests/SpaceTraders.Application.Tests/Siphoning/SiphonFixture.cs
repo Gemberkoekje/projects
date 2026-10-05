@@ -10,7 +10,7 @@ namespace SpaceTraders.Application.Tests.Siphoning;
 /// supply levels are made up, as none of our ships has been there since scouting:
 /// <list type="bullet">
 ///   <item>the gas giant C38, and C39, the orbital station at the same spot, which sells siphon drones and
-///   exchanges the three gases (all MODERATE here);</item>
+///   imports the three gases (all MODERATE here; X1-DC53's C39 exchanged them, which since D91 only pays for a gas);</item>
 ///   <item>C40, a fuel station 39 from C38, through which a drone's 80-unit tank reaches G50 (imports all three
 ///   gases: LIQUID_HYDROGEN SCARCE, HYDROCARBON LIMITED) and E47 (LIQUID_NITROGEN SCARCE);</item>
 ///   <item>F48, far south, which imports LIQUID_NITROGEN (SCARCE, and pays most) and LIQUID_HYDROGEN (LIMITED).
@@ -46,9 +46,9 @@ internal static class SiphonFixture
     [
         Market(
             C39,
-            Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "MODERATE"),
-            Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
-            Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+            Good("HYDROCARBON", "IMPORT", 70, 60, 60, "MODERATE"),
+            Good("LIQUID_HYDROGEN", "IMPORT", 40, 35, 60, "MODERATE"),
+            Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
             Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         Market(C40, Good("FUEL", "EXCHANGE", 75, 66, 180, "MODERATE")),
         Market(
@@ -71,6 +71,21 @@ internal static class SiphonFixture
 
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? Markets() : markets, new Dictionary<string, IReadOnlyList<string>>());
+
+    /// <summary>
+    /// For D91: G50 makes FUEL from HYDROCARBON (LIMITED, pays 90); E47 imports HYDROCARBON and makes nothing from it (SCARCE,
+    /// pays 95); C39 exchanges it (SCARCE, pays 100).
+    /// </summary>
+    public static TradeMarketMap HydrocarbonMap()
+        => new(
+            Waypoints,
+            [
+                Market(C39, Good("HYDROCARBON", "EXCHANGE", 110, 100, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+                Market(C40, Good("FUEL", "EXCHANGE", 75, 66, 180, "MODERATE")),
+                Market(G50, Good("HYDROCARBON", "IMPORT", 180, 90, 60, "LIMITED"), Good("FUEL", "EXPORT", 82, 72, 180, "MODERATE")),
+                Market(E47, Good("HYDROCARBON", "IMPORT", 190, 95, 60, "SCARCE"), Good("FUEL", "EXCHANGE", 81, 71, 180, "MODERATE")),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["FUEL"] = ["HYDROCARBON"] });
 
     /// <summary>
     /// The system with a second gas giant, D90, 13 from F48: F48, beyond a drone's tank, sells fuel, and D90 is there and

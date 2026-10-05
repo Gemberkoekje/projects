@@ -205,12 +205,16 @@ public sealed class SiphonAutomationService(
             return false;
         }
 
+        // D91: with no pair left whose market makes something from its gas, a siphon drone shares one before it siphons for a
+        // market that only pays for the gas.
         var ranked = SiphonPlanner.SiphonTargets(map, siphoner, heldKeys);
-        if (ranked.Count == 0)
+        if (ranked.Count == 0 || !ranked[0].FeedsProduction)
         {
             // D77, for siphon drones too: they siphon until every gas is ABUNDANT. The command ship keeps D38: it takes what
             // pays it most, so it shares nothing.
-            if (FleetRoles.IsSiphoner(siphoner) && SiphonPlanner.SharedTargets(map, siphoner, siphonersOn).FirstOrDefault() is { } shared)
+            if (FleetRoles.IsSiphoner(siphoner)
+                && SiphonPlanner.SharedTargets(map, siphoner, siphonersOn).FirstOrDefault() is { } shared
+                && (shared.FeedsProduction || ranked.Count == 0))
             {
                 siphonersOn[shared.Key] = siphonersOn.GetValueOrDefault(shared.Key) + 1;
                 covered.Add(new CoveringTrip(shared.Gas, shared.SellWaypointSymbol, siphoner.FuelCapacity));
@@ -218,12 +222,15 @@ public sealed class SiphonAutomationService(
                 return true;
             }
 
-            logger.LogDebug("Siphon plan: nothing to siphon that ship {ShipSymbol} can reach and sell.", siphoner.Symbol);
-            return false;
+            if (ranked.Count == 0)
+            {
+                logger.LogDebug("Siphon plan: nothing to siphon that ship {ShipSymbol} can reach and sell.", siphoner.Symbol);
+                return false;
+            }
         }
 
         var target = SiphonPlanner.UncoveredFirst(map, siphoner, ranked, covered)[0];
-        var reason = target != ranked[0] ? "uncovered" : target.LowSupply ? "low_supply" : "lowest_supply";
+        var reason = !target.FeedsProduction ? "wealth" : target != ranked[0] ? "uncovered" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = siphoner.Symbol;
         siphonersOn[target.Key] = siphonersOn.GetValueOrDefault(target.Key) + 1;
@@ -258,7 +265,8 @@ public sealed class SiphonAutomationService(
     /// <summary>
     /// For a siphoner that holds goods: the good that fetches most where it sells best, after the fuel to get
     /// there, when that is anything at all, or whatever it is when the hold must be emptied. A trip keeps every gas
-    /// it siphons (D33), so this sells the gases its trip didn't, one a trip.
+    /// it siphons (D33), so this sells the gases its trip didn't, one a trip, each at a market that makes something from it
+    /// where such a sale pays (D91).
     /// </summary>
     private static bool TryFindHeldCargoSale(TradeMarketMap map, ShipModel siphoner, bool mustSell, out CargoItemModel cargo, out TradeSale sale)
     {
@@ -267,7 +275,7 @@ public sealed class SiphonAutomationService(
         var found = false;
         foreach (var item in (siphoner.CargoInventory ?? []).Where(item => item.Units > 0))
         {
-            if (TradeRoutePlanner.TryFindBestSale(map, siphoner, item.Symbol, item.Units, out var candidate)
+            if (TradeRoutePlanner.TryFindBestSale(map, siphoner, item.Symbol, item.Units, out var candidate, supplyFirst: true)
                 && (candidate.NetRevenue > 0 || mustSell)
                 && (!found || candidate.NetRevenue > sale.NetRevenue))
             {
@@ -380,7 +388,7 @@ public sealed class SiphonAutomationService(
             }
 
             var targets = SiphonPlanner.SiphonTargets(map, newDrone, heldKeys, covered);
-            if (targets.Count == 0 || !targets[0].LowSupply)
+            if (targets.Count == 0 || !targets[0].FeedsProduction || !targets[0].LowSupply)
             {
                 logger.LogDebug(
                     "Siphon plan: no drone bought in {SystemSymbol}: its first trip would not serve a market short of its gas ({Trip}).",
