@@ -146,6 +146,30 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
+    public async Task ABuilderFlyingItsLoadToTheGate_StillTellsTheOrderTheNextLoad_SoNoShipIsBoughtBeforeIt()
+    {
+        // B65, seen on 2026-10-05: SPECTER-D left D49 for the gate at 08:39:48 with 73 of its 600 fuel left after the flight.
+        // Until it landed at 08:54:41 the plan told the order it needed nothing, and a light hauler was bought at 08:40:32,
+        // ahead of the gate's next load (D64). It judged the next load from the gate with the fuel the flight leaves, and no
+        // market is in reach with that; but the gate sells fuel, and the builder fills its tank there before it flies on.
+        // Here the hauler flies the 530 from D42 to the gate with a full tank and lands with 70.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        _activeGoals["SHIP-6"] = new SupplyConstructionGoal { TradeSymbol = "ADVANCED_CIRCUITRY", ConstructionSiteWaypointSymbol = Gate, BuyWaypointSymbol = D42, Units = 80, CargoBought = true };
+        Fleet(Hauler(waypoint: D42, status: "IN_TRANSIT", cargo: [new CargoItemModel("ADVANCED_CIRCUITRY", 80)]) with
+        {
+            DestWaypointSymbol = Gate,
+            ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            FuelCurrent = 70,
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "FAB_MATS" && need.ShipyardWaypointSymbol == F49);
+        _state!.ReadyShipSymbols.Should().Equal("SHIP-6");
+        _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Which.TradeSymbol.Should().Be("ADVANCED_CIRCUITRY");
+    }
+
+    [Fact]
     public async Task WhereEveryMarketIsShort_TheBuilderWaitsForTheSupply()
     {
         // D66: no purchase at SCARCE or LIMITED; what it waits for is still its place in the order.
