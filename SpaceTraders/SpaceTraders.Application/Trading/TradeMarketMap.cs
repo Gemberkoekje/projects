@@ -17,6 +17,7 @@ public sealed class TradeMarketMap
     private readonly Dictionary<string, (int X, int Y)> _positions;
     private readonly Dictionary<string, Dictionary<string, TradeGoodSnapshot>> _goods;
     private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _madeFrom;
+    private readonly HashSet<string> _madeInto;
     private readonly long _averageFuelPrice;
 
     /// <summary>Builds the map of one system.</summary>
@@ -43,6 +44,7 @@ public sealed class TradeMarketMap
                     .ToDictionary(goods => goods.Key, goods => goods.First(), StringComparer.OrdinalIgnoreCase),
                 StringComparer.OrdinalIgnoreCase);
         _madeFrom = madeFrom;
+        _madeInto = madeFrom.Values.SelectMany(inputs => inputs).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var fuelPrices = _goods.Values
             .Where(goods => goods.TryGetValue(FuelSymbol, out var fuel) && fuel.PurchasePrice > 0)
@@ -113,6 +115,15 @@ public sealed class TradeMarketMap
     /// <returns>The price of one market unit of FUEL.</returns>
     public long FuelPrice(string waypointSymbol)
         => TryGetGood(waypointSymbol, FuelSymbol, out var fuel) && fuel.PurchasePrice > 0 ? fuel.PurchasePrice : _averageFuelPrice;
+
+    /// <summary>
+    /// Whether nothing is made from the good (D82): no good in the production chains is made from it. Ships are made goods
+    /// there too, so SHIP_PARTS and SHIP_PLATING, which every ship is made from, are no end products. In X1-FJ91 on
+    /// 2026-10-05, 13 of the 50 goods traded were, from ANTIMATTER to SUPERGRAINS. Without the chains every good is one.
+    /// </summary>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when nothing is made from the good.</returns>
+    public bool IsEndProduct(string tradeSymbol) => !_madeInto.Contains(tradeSymbol);
 
     /// <summary>
     /// The pricier good a market makes from <paramref name="tradeSymbol"/>: the market imports the good,

@@ -152,10 +152,14 @@
 - Slice 6.14 (drones mine and siphon until every mineral is ABUNDANT, sharing a pair rather than trading, asked on 2026-10-05, with your
   decisions D77 and D78; the cargo ships' purchases stay as they are) is built on branch `claude/eager-allen-5q9biz`.
 - Slice 6.15 (the jump gate's loads bought in batches of the market's trade volume, asked on 2026-10-05, with your decision
-  D81) is built on branch `claude/spacetraders-construction-batches`. The gate had had no load since 10-04 18:09Z.
+  D81) is merged and deployed (projects#172, gembernodes#68). The gate had had no load since 10-04 18:09Z; its first load
+  since, 80 ADVANCED_CIRCUITRY, was supplied at 08:54Z.
 - Slice 6.16 (trade trips in batches, sized with measured price steps and checked live, with one buyer of a good at a market
-  at a time, asked on 2026-10-05, with your decisions D79 and D80) is built on branch `claude/spacetraders-trade-batches`,
-  on top of 6.15. Still to do from D79: learning the price steps per good and market from the bot's own trades.
+  at a time, asked on 2026-10-05, with your decisions D79 and D80) is merged and deployed (projects#173, gembernodes#68,
+  image `6b1481d`, live since 2026-10-05 08:24Z). Still to do from D79: learning the price steps per good and market from
+  the bot's own trades.
+- Slice 6.17 (end products last: the routes of goods something is made from come first, wherever they are sold, asked on
+  2026-10-05, with your decision D82) is built on branch `claude/spacetraders-end-products-last`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -325,6 +329,7 @@ get the next D-number.
 | D79 | Slice 6.16 (asked on 2026-10-05): seven trade trips since the reset were dropped on arrival (`not_full_hold`), each because another trader had been sent, at the same moment, for the same good at the same ABUNDANT market (D74) and bought first, which ended the ABUNDANT supply the second trip needed. Looking into it showed that a market's trade volume is the most one purchase or sale takes, not its stock (the API's own definition: "the maximum number of units that can be purchased or sold at this market in a single trade for this good"); the API gives no stock at all, only supply and activity levels. Asked: "A ship should buy as much as is profitable per trip, and sell as much as is profitable per trip. The problem is, with trade volumes of 6, it's very hard to determine whether something is actually profitable if you trade 80 of them. I'm open to suggestions on this one." Measured on the bot's 222 purchases since the reset: the price paid is the price quoted, and each purchase raises the next quote by a median of 1.8% (a good traded 6 at a time), 3.6% (20) or 5.7% (40 of 60); a sale lowers it about 2%; a raised price is back within 1% after a median of 56 minutes. Offered: estimate, then check live; estimate only; live only. | **Estimate, then check live** ("Estimate, check live"): a trip is sized and ranked with the measured price steps, each batch bought a step dearer and each sold a step cheaper, adding batches while the next still earns `Trade.MinProfitPerUnit`, up to the hold and the credits. At each market it trades one batch at a time and stops when the price the last trade's refresh fetched no longer earns that; the steps are learned per good and market from the bot's own trades. Replaces D56's full hold in one purchase, and with it D74's exception. |
 | D80 | Slice 6.16, with D79: every batch moves the price another trip's estimate started from. Offered: one buyer at a time; share, the second trip's estimate starting from where the first's batches leave the price; share freely. | **One buyer at a time**: while a trip is on its way to buy a good at a market, no other trip is sent for that good there, whatever its sell market; construction trips count too. Amends D18. |
 | D81 | Slice 6.15 (asked on 2026-10-05, with D79): the jump gate got no load from 10-04 18:09Z on. Its builders, the command ship's 40-unit hold and from 00:38Z SPECTER-D's 80, found no market selling FAB_MATS or ADVANCED_CIRCUITRY more than 20 at a time, and D67 wanted the load in one purchase; the plan's state showed no reason while the builder traded. First offered as an amendment of D74 ("Extend D74 to loads", one purchase of what the market trades at once per trip, about 100 trips), which was chosen, then asked again once the trade volume turned out to be per purchase: a full hold in batches, or what one purchase takes per trip. Measured: a purchase of 20 raises the next quote about 3.6%, so 80 in four batches cost about 5% more than four purchases at the first price would, and as a price takes about an hour to recover, a builder back every few minutes pays the rise either way. | **Full hold in batches** ("Full hold in batches (Recommended)"): a load is the builder's free hold, or what the gate still needs, bought at one market in batches of its trade volume, each at the price quoted then; it stops when the supply falls to LIMITED (D66) or the next batch would dip into the credit reserve (D64), and takes what it has to the gate. Its cost is estimated with the measured price steps. Replaces D67. |
+| D82 | Slice 6.17 (asked on 2026-10-05): "Why is iron prioritized over ship parts, although the profit would be a lot higher?" D15 put a route first only when its sell market makes a pricier good from the cargo, by its exports. SHIP_PARTS and SHIP_PLATING sell only at the shipyards' markets (A2, C46, H61), which make ships from them and export nothing made from them, so IRON for MACHINERY, about 30 a unit, came before SHIP_PARTS, 3,800 a unit; so did every raw good with a margin of 2 to 42, before MACHINERY, ELECTRONICS and EQUIPMENT. Then: "Ship parts do feed a factory, being the SHIP factory. So while I understand why things like food have a lower priority, this shouldn't be the case for ship parts." and "According to the market tree, this should be the list of lower-priority goods: Antimatter, Assault Rifles, Clothing, Drugs, Fab Mats, Firearms, Food, Fuel, Ice Water, Jewelry, Medicine, Relic Tech and Supergrains." ("There's a bunch more in the complete list, such as AI Mainframes and Botanical Specimen, but those aren't traded in the starter system.") | **End products last** (2026-10-05): a good nothing is made from, by the API's supply chain, is an end product; ships count as made from SHIP_PARTS and SHIP_PLATING. In X1-FJ91 that is exactly the 13 listed. Among lucrative routes, those of the other goods come first, wherever they are sold, then the end products' ones; the most profitable first in each. Amends D15. |
 
 ## Phases
 
@@ -3176,6 +3181,38 @@ when it is seen for the first time.
     App 1133, Domain 72, API 210 (and 4 skipped), Integration 1.
   - To understand this, start with `TryEvaluateFrom` and `UnitsWorthBuying` in `Trading/TradeRoutePlanner.cs`, then the buy
     and sell steps of `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`, and `Trading/HeldBuys.cs`.
+
+- **6.17 End products last** (built on branch `claude/spacetraders-end-products-last`, asked on 2026-10-05, D82). Asked:
+  "Why is iron prioritized over ship parts, although the profit would be a lot higher?", then "Ship parts do feed a
+  factory, being the SHIP factory. So while I understand why things like food have a lower priority, this shouldn't be the
+  case for ship parts." and "According to the market tree, this should be the list of lower-priority goods: Antimatter,
+  Assault Rifles, Clothing, Drugs, Fab Mats, Firearms, Food, Fuel, Ice Water, Jewelry, Medicine, Relic Tech and
+  Supergrains."
+  - Found, at 09:00Z: the four traders were on trips expected to earn 912 to 2,057 (SILVER, LAB_INSTRUMENTS,
+    PRECIOUS_STONES, POLYNUCLEOTIDES), each to a market that makes a pricier good from it (D15), while 14 lucrative routes
+    worth up to 95,209 for a 40-unit trader waited behind "the 20 waiting routes listed". D15 counted only a sell market's
+    exports: SHIP_PARTS (3,920 at D48, 7,738 at the shipyards' markets) and SHIP_PLATING sell only at A2, C46 and H61, which
+    make ships from them and export nothing made from them; MACHINERY, MICROPROCESSORS, ELECTRONICS, EQUIPMENT, FABRICS and
+    AMMUNITION failed it at their best markets too. What passed were raw and refined goods with margins of 2 to 42 a unit.
+  - The 13 goods asked to come last are exactly those traded in X1-FJ91 that the API's supply chain makes nothing from.
+  - Done: `TradeMarketMap.IsEndProduct` says whether nothing in the production chains is made from a good, ships included;
+    `TradeRoute.FeedsProduction` is now whether the good is no end product, wherever it is sold, and `Rank` and
+    `CompareBestFirst` put those routes first, then the end products' ones, each by profit. Without the chains every good
+    is an end product and the routes go by profit alone, as before.
+  - Unchanged: `FeedsTradeSymbol`, the pricier good the sell market makes from the cargo, in `TradeStarted` ("which makes …
+    from it") and in the routes view; the role board's chain values (D39, D49), which read what a market makes; D14, D18, D79,
+    D80.
+  - Noticed (not changed):
+    - **The routes view** shows nothing in its "feeds" column for a SHIP_PARTS route, which now ranks first: whether a good
+      is an end product isn't in the view. Adding it would be a dashboard change in gembernodes.
+    - **The role board** values trading by the best route `Rank` gives, which is now often SHIP_PARTS or SHIP_PLATING.
+  - Tests: `TradeRoutePlannerTests` (SHIP_PARTS before IRON that feeds MACHINERY, with DRUGS last though it earns most;
+    EQUIPMENT's routes before MEDICINE's wherever it is sold; what an end product is; the first two failed before the
+    change), `TradingAutomationServiceTests` (the command ship's best route is now EQUIPMENT for A1; a trip to a market that
+    makes a pricier good from its cargo still says which), and the API's routes list. App 1136, Domain 72, API 210 (and 4
+    skipped), Integration 1.
+  - To understand this, start with `IsEndProduct` in `Trading/TradeMarketMap.cs`, then `Rank` and the end of
+    `TryEvaluateFrom` in `Trading/TradeRoutePlanner.cs`.
 
 ## Changes in gembernodes
 

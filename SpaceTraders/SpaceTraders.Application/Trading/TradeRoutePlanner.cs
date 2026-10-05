@@ -12,8 +12,8 @@ namespace SpaceTraders.Application.Trading;
 ///   times the units, minus the fuel for the trip: from where the ship is to the buy market, and on to
 ///   the sell market;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
-///   <item>among lucrative trips, one whose sell market makes a pricier good from the cargo comes first
-///   (D15), then the most profitable.</item>
+///   <item>among lucrative trips, those of a good something is made from come before those of an end product, which
+///   nothing is made from (D15, D82), and the most profitable first in each.</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -51,8 +51,8 @@ public static class TradeRoutePlanner
         => $"{buyWaypointSymbol}|{sellWaypointSymbol}|{tradeSymbol}".ToUpperInvariant();
 
     /// <summary>
-    /// The lucrative routes for a ship, best first: those that feed a pricier good's production, then
-    /// by profit. Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left out:
+    /// The lucrative routes for a ship, best first: those of a good something is made from, then those of an end product
+    /// (D82), each by profit. Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left out:
     /// two traders never share a route.
     /// </summary>
     /// <param name="map">The ship's system.</param>
@@ -141,8 +141,8 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15): one that feeds a pricier good's production
-    /// first, then the more profitable, then by key.
+    /// Orders two routes as Rank does (D15, D82): one of a good something is made from before one of an end product, then
+    /// the more profitable, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -571,6 +571,7 @@ public static class TradeRoutePlanner
             map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol))
         {
             CargoCost = cargoCost,
+            FeedsProduction = !map.IsEndProduct(tradeSymbol),
         };
         return true;
     }
@@ -777,8 +778,11 @@ public sealed record TradeRoute
     /// <summary>The route's key (<see cref="TradeRoutePlanner.RouteKey"/>).</summary>
     public string Key => TradeRoutePlanner.RouteKey(TradeSymbol, BuyWaypointSymbol, SellWaypointSymbol);
 
-    /// <summary>Whether the sell market makes a pricier good from the cargo (D15).</summary>
-    public bool FeedsProduction => FeedsTradeSymbol.Length > 0;
+    /// <summary>
+    /// Whether something is made from the good (D15, D82): its routes come before those of an end product, which nothing is
+    /// made from (<see cref="TradeMarketMap.IsEndProduct"/>), wherever it is sold. False unless set.
+    /// </summary>
+    public bool FeedsProduction { get; init; }
 
     /// <summary>
     /// Whether the trip is worth it (D14): it earns something, and at least

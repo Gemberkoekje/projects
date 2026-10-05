@@ -642,7 +642,7 @@ public sealed class TradingAutomationService(
 
     private void LogRoute(ShipModel ship, TradeRoute route)
     {
-        if (route.FeedsProduction)
+        if (route.FeedsTradeSymbol.Length > 0)
         {
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes {FeedsTradeSymbol} from it; about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",

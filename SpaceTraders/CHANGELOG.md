@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.17)
+- Trade routes of goods something is made from come before those of end products, wherever they are sold (D82), as asked on 2026-10-05: "Ship parts do feed a factory, being the SHIP factory. So while I understand why things like food have a lower priority, this shouldn't be the case for ship parts." An end product is a good nothing is made from by the API's supply chain, ships included (`TradeMarketMap.IsEndProduct`): in X1-FJ91 exactly the 13 goods asked to come last, from ANTIMATTER to SUPERGRAINS. Before, a route came first only when its sell market made a pricier good from the cargo, by its exports (D15), so SHIP_PARTS and SHIP_PLATING, sold only at shipyards' markets, never did, nor did MACHINERY, ELECTRONICS or EQUIPMENT at their best markets: the traders took IRON or SILVER for about 2,000 a trip while SHIP_PARTS earned 3,800 a unit. Within each group the most profitable route still comes first; `FeedsTradeSymbol` still names what the sell market makes from the cargo.
+
+### Docs – Changed (2026-10-05, slice 6.17)
+- `PLAN.md`: slice 6.17 and decision D82; slices 6.15 and 6.16 merged and deployed. `docs/HOW_IT_WORKS.md`: the ranking of trade routes.
+
 ### Code – Fixed (2026-10-05, B65)
 - The gate's next load stays in the order ships are bought in while the builder flies a load to the gate (D64). The construction plan judged a builder on its way from where it lands, with the fuel its flight leaves it but as if it couldn't refuel there, so from the far-out gate no market was in reach and the plan told the order it needed nothing: on 2026-10-05 a light hauler was bought for 345,915 at 08:40:32, during SPECTER-D's flight with the gate's first load, ahead of the next one, and raised the credit reserve by 80,000. A builder in transit is now judged docked where it lands, filling its tank where fuel is sold.
 

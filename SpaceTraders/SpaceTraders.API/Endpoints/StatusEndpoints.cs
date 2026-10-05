@@ -115,11 +115,11 @@ public static class StatusEndpoints
         });
 
         // Slice 2.17 (D75): the trading plan's routes as it stored them at its last pass. The routes traders hold come first;
-        // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: one that
-        // feeds a pricier good first, D15, then the most profit after fuel), numbered from 1. Only a pass with a free trader
-        // lists any, and at most 20 (TradingAutomationService.MaxPendingRoutes). Slice 2.18 (D76): and for each other good with
-        // a price gap, why no route of it is listed: the check its route failed for the free trader that got furthest with it,
-        // as the plan's last pass with a free trader in the system found it.
+        // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: those of a
+        // good something is made from before those of an end product, D82, then the most profit after fuel), numbered from 1.
+        // Only a pass with a free trader lists any, and at most 20 (TradingAutomationService.MaxPendingRoutes). Slice 2.18
+        // (D76): and for each other good with a price gap, why no route of it is listed: the check its route failed for the
+        // free trader that got furthest with it, as the plan's last pass with a free trader in the system found it.
         group.MapGet("/trading-routes", async (IPlanRepository plans, CancellationToken ct) =>
         {
             var state = await plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, ct);
@@ -371,7 +371,8 @@ public static class StatusEndpoints
 
     /// <summary>
     /// One route of the trading plan's view (slice 2.17): its place in the order the plan gives routes out (none for a held
-    /// one), the trip as estimated (units, profit after fuel and per unit) and why it ranks where it does (what it feeds, D15).
+    /// one), the trip as estimated (units, profit after fuel and per unit) and the pricier good its sell market makes from the
+    /// good, if any (D15; the order goes by whether the good is an end product, D82).
     /// </summary>
     private static object TradingRoute(TradingAutomationOpportunityState route, int? position) => new
     {
