@@ -249,11 +249,12 @@ public sealed class MineResourceVolumeHandlerTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_TheFlightToAnAsteroidBeyondOneTank_GoesInCruise_RefuellingOnTheWay()
+    public async Task ExecuteAsync_TheFlightToAnAsteroidBeyondOneTank_RefuelsOnTheWay_BurningWhereTheFuelAllows()
     {
         // B47, on the cluster on 2026-10-04: the scout plan left SPECTER-1 at J67, 747 from the contract's asteroid. A
         // 400-unit tank doesn't do that in CRUISE, so the navigation's fallback drifted it there: 87 minutes. The fuel
-        // stations J66 and I65 are on the way. Each tick flies a leg, and the next one dead-reckons its arrival.
+        // stations J66 and I65 are on the way. Each tick flies a leg, and the next one dead-reckons its arrival. A full
+        // tank pays for the 119 to J66 twice over, so that leg burns (D84); the 372 and the 256 after it cruise.
         var ship = new FlyingShip(CommandShip());
         _port.ExtractResourcesAsync("SPECTER-1", Arg.Any<CancellationToken>()).Returns(Extraction("COPPER_ORE", 9));
 
@@ -263,23 +264,36 @@ public sealed class MineResourceVolumeHandlerTests
         }
 
         ship.Flights.Should().Equal(
-            new Flight(J66, "CRUISE", 400, 119),
+            new Flight(J66, "BURN", 400, 238),
             new Flight(I65, "CRUISE", 400, 372),
             new Flight(EF5D, "CRUISE", 400, 256));
         await _port.Received(1).ExtractResourcesAsync("SPECTER-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_AShipLeftInDrift_FliesToTheAsteroidInCruise()
+    public async Task ExecuteAsync_AShipLeftInDrift_NoLongerDrifts()
     {
         // B47: the fallback leaves a ship in DRIFT, ten times slower, and nothing switched SPECTER-1 back for the contract:
         // it delivered to H60 in DRIFT, and stayed in DRIFT until a survey trip asked for CRUISE. Docked at H60 after a
-        // delivery, its next trip to EF5D goes in CRUISE.
+        // delivery, its next trip to EF5D goes in the mode its flight asks for: BURN, since EF5D sells fuel and a full tank
+        // pays for the 19 twice over (D84).
         var ship = new FlyingShip(CommandShip(H60, flightMode: "DRIFT", fuel: 399));
 
         await Handler(ship).ExecuteAsync(new MineResourceVolumeCommand("SPECTER-1", "COPPER_ORE", EF5D, 80), CancellationToken.None);
 
-        ship.Flights.Should().Equal(new Flight(EF5D, "CRUISE", 400, 19));
+        ship.Flights.Should().Equal(new Flight(EF5D, "BURN", 400, 38));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InOrbitAtAFuelMarket_ItFillsTheTankFirst_WhenAFullTankWouldBurn()
+    {
+        // D84: with 30 aboard at H60, the 19 to EF5D cruise; a full tank burns them. The ship docks and refuels first, as a
+        // goal's flight does.
+        var ship = new FlyingShip(CommandShip(H60, "IN_ORBIT", fuel: 30));
+
+        await Handler(ship).ExecuteAsync(new MineResourceVolumeCommand("SPECTER-1", "COPPER_ORE", EF5D, 80), CancellationToken.None);
+
+        ship.Flights.Should().Equal(new Flight(EF5D, "BURN", 400, 38));
     }
 
     private MineResourceVolumeHandler Handler()

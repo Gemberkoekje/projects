@@ -39,6 +39,30 @@ public static class TradeRoutePlanner
 {
     private const int FuelPerMarketUnit = 100;
 
+    /// <summary>The API's flight modes this planner flies in (D84).</summary>
+    public const string CruiseMode = "CRUISE";
+
+    /// <summary>Twice as fast as CRUISE, on twice the fuel (D84).</summary>
+    public const string BurnMode = "BURN";
+
+    /// <summary>1 fuel whatever the distance, ten times slower than CRUISE (D45).</summary>
+    public const string DriftMode = "DRIFT";
+
+    /// <summary>Seconds a unit of distance takes at engine speed 10: the API's multipliers, 25 in CRUISE and 250 in DRIFT, over 10.</summary>
+    private const double CruiseSecondsPerUnit = 2.5;
+
+    /// <summary>See <see cref="CruiseSecondsPerUnit"/>.</summary>
+    private const double DriftSecondsPerUnit = 25;
+
+    /// <summary>What the API adds to every flight.</summary>
+    private const double SecondsPerFlight = 15;
+
+    /// <summary>A refuelling stop's dock, refuel and orbit.</summary>
+    private const double SecondsToRefuel = 10;
+
+    /// <summary>The most states the fastest-way search weighs before it gives up (a 600-unit tank and a hundred waypoints).</summary>
+    private const int MaxMixedStates = 200_000;
+
     /// <summary>A sliver of floating-point error: an exact sum must not round a credit the wrong way.</summary>
     private const double Sliver = 1e-6;
 
@@ -399,6 +423,257 @@ public static class TradeRoutePlanner
             : destination;
 
     /// <summary>
+    /// The next leg of a ship's way to a waypoint, and the flight mode to fly it in (PLAN.md slice 6.19, D84, asked on
+    /// 2026-10-05: "I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if
+    /// they cannot."):
+    /// <list type="bullet">
+    ///   <item>within reach of a chain of fuel markets, the next stop of that flight (<see cref="TryPlanFlight(TradeMarketMap, ShipModel, string, out TradeFlight)"/>),
+    ///   in BURN when the ship has twice the leg's fuel and burning strands nothing (<see cref="Burns"/>), otherwise in
+    ///   CRUISE, unless that flight would land it with an empty tank where no fuel is sold (<see cref="Strands"/>);</item>
+    ///   <item>out of that reach, the first leg of the fastest way there that drifts as little as it can
+    ///   (<see cref="TryPlanMixedFlight"/>): asked on 2026-10-05, "can we optimize the routing for a location where a
+    ///   combination of cruising and drifting is faster than just drifting?" A cruise leg into a market that sells fuel
+    ///   burns there too, when the fuel allows.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="destination">Where it is going.</param>
+    /// <param name="onward">
+    /// Where it must get to from <paramref name="destination"/> next, in CRUISE, when the caller knows (a mining trip's
+    /// market); empty for any market that sells fuel.
+    /// </param>
+    /// <param name="leg">The waypoint to fly to now, and how.</param>
+    /// <returns>False when the ship is there already, or no way there is known.</returns>
+    public static bool TryPlanNextLeg(TradeMarketMap map, ShipModel ship, string destination, string onward, out FlightLeg leg)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+        ArgumentNullException.ThrowIfNull(onward);
+
+        var here = ship.WaypointSymbol ?? string.Empty;
+        var fuel = FuelAtDeparture(map, ship);
+        leg = new FlightLeg(destination, CruiseMode);
+        if (here.Equals(destination, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (TryPlanFlight(map, here, destination, fuel, ship.FuelCapacity, out var flight)
+            && flight.Stops.Count > 0
+            && !Strands(map.SellsFuel(destination), flight.FuelLeft))
+        {
+            var stop = flight.Stops[0];
+            leg = new FlightLeg(stop, Burns(map, here, stop, fuel, ship.FuelCapacity, stop.Equals(destination, StringComparison.OrdinalIgnoreCase) ? onward : string.Empty) ? BurnMode : CruiseMode);
+            return true;
+        }
+
+        if (!TryPlanMixedFlight(map, here, destination, fuel, ship.FuelCapacity, out var legs) || legs.Count == 0)
+        {
+            return false;
+        }
+
+        // The tank fills where a cruise leg ends at a market that sells fuel, so burning there takes nothing from what follows.
+        leg = legs[0].FlightMode == CruiseMode && map.SellsFuel(legs[0].WaypointSymbol) && Burns(map, here, legs[0].WaypointSymbol, fuel, ship.FuelCapacity, string.Empty)
+            ? legs[0] with { FlightMode = BurnMode }
+            : legs[0];
+        return true;
+    }
+
+    /// <summary>
+    /// Whether a leg flies in BURN (D84): the ship has twice its CRUISE fuel, and burning strands nothing. Where the leg ends
+    /// at a market that sells fuel the tank fills there. Elsewhere (an asteroid, a gas giant) what burning leaves must still
+    /// take the ship on as CRUISE would have: to <paramref name="onward"/>, with no refuelling stop more than after a CRUISE
+    /// leg, or, without one, straight to a market that sells fuel (B58). So a drone never burns its way into an asteroid it
+    /// can't carry its ore back from.
+    /// </summary>
+    private static bool Burns(TradeMarketMap map, string from, string to, int fuel, int fuelCapacity, string onward)
+    {
+        if (!map.TryGetDistance(from, to, out var distance))
+        {
+            return false;
+        }
+
+        var cruise = CruiseFuel(from, to, distance);
+        if (cruise == 0 || 2 * cruise > fuel)
+        {
+            return false;
+        }
+
+        if (map.SellsFuel(to))
+        {
+            return true;
+        }
+
+        var left = fuel - (2 * cruise);
+        if (onward.Length > 0 && !onward.Equals(to, StringComparison.OrdinalIgnoreCase))
+        {
+            return TryPlanFlight(map, to, onward, left, fuelCapacity, out var burnt)
+                && TryPlanFlight(map, to, onward, fuel - cruise, fuelCapacity, out var cruised)
+                && burnt.Stops.Count <= cruised.Stops.Count;
+        }
+
+        return map.MarketWaypoints.Any(market => map.SellsFuel(market)
+            && map.TryGetDistance(to, market, out var away)
+            && CruiseFuel(to, market, away) <= left);
+    }
+
+    /// <summary>
+    /// Whether a ship that lands with this much fuel aboard is stuck there for good: an empty tank where no fuel is sold,
+    /// since even a drift takes 1. With 1 left it can always drift on to a market that sells fuel, and such a market fills an
+    /// empty tank (asked on 2026-10-05: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station").
+    /// </summary>
+    private static bool Strands(bool sellsFuel, int fuelLeft) => fuelLeft < 1 && !sellsFuel;
+
+    /// <summary>
+    /// The fastest way to a waypoint that no chain of fuel markets reaches in CRUISE (D84): CRUISE legs between any waypoints
+    /// on the fuel aboard, the tank filled at each market that sells fuel, and DRIFT legs (1 fuel whatever the distance, ten
+    /// times slower) where nothing else gets on, but none that lands the ship with an empty tank where no fuel is sold
+    /// (<see cref="Strands"/>). A* over the waypoints and the fuel aboard, by the API's flight times at one engine speed: 25
+    /// per unit of distance in CRUISE, 250 in DRIFT, 15 seconds a flight and a few seconds to refuel at a stop, guided by the
+    /// straight distance still to go in CRUISE, which no way beats. In X1-FJ91 on 2026-10-05, a drone from H60 to B44
+    /// cruises to F57 by way of A1 and drifts the 244 from there: 2.0 hours, against 2.9 drifting the 368 to B7 and cruising
+    /// on, and it lands with 79 fuel instead of 26.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="from">Where the ship is.</param>
+    /// <param name="to">Where it is going.</param>
+    /// <param name="fuelAtStart">The fuel aboard on leaving <paramref name="from"/>.</param>
+    /// <param name="fuelCapacity">What the tank holds, as filled at each market that sells fuel.</param>
+    /// <param name="legs">The legs, in order, each with its flight mode.</param>
+    /// <returns>False when a position is unknown, or the ship has no fuel to drift with.</returns>
+    public static bool TryPlanMixedFlight(TradeMarketMap map, string from, string to, int fuelAtStart, int fuelCapacity, out IReadOnlyList<FlightLeg> legs)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+
+        legs = [];
+        string[] waypoints =
+        [
+            .. map.Waypoints.Select(waypoint => waypoint.Symbol)
+                .Append(from)
+                .Append(to)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(waypoint => map.TryGetDistance(waypoint, to, out _))
+                .Order(StringComparer.Ordinal),
+        ];
+        var count = waypoints.Length;
+        var start = Array.FindIndex(waypoints, waypoint => waypoint.Equals(from, StringComparison.OrdinalIgnoreCase));
+        var goal = Array.FindIndex(waypoints, waypoint => waypoint.Equals(to, StringComparison.OrdinalIgnoreCase));
+        if (start < 0 || goal < 0 || fuelAtStart < 0)
+        {
+            return false;
+        }
+
+        // Worked out once: each pair's CRUISE fuel, the markets that sell fuel, and the straight distance still to go.
+        var cruise = new int[count, count];
+        var sellsFuel = new bool[count];
+        var toGo = new double[count];
+        for (var a = 0; a < count; a++)
+        {
+            sellsFuel[a] = map.SellsFuel(waypoints[a]);
+            map.TryGetDistance(waypoints[a], to, out toGo[a]);
+            for (var b = 0; b < count; b++)
+            {
+                map.TryGetDistance(waypoints[a], waypoints[b], out var distance);
+                cruise[a, b] = CruiseFuel(waypoints[a], waypoints[b], distance);
+            }
+        }
+
+        // A state is a waypoint and the fuel aboard on landing there; at a market that sells fuel, but for the destination, a
+        // full tank, whatever was left. Landing somewhere no later and with more fuel never does worse, so a state with no
+        // more fuel than the most the ship has landed there with is passed over.
+        var levels = Math.Max(fuelCapacity, fuelAtStart) + 1;
+        var seconds = new double[count * levels];
+        Array.Fill(seconds, double.PositiveInfinity);
+        var previous = new int[count * levels];
+        var drifted = new bool[count * levels];
+        var mostFuel = new int[count];
+        Array.Fill(mostFuel, -1);
+        var first = (start * levels) + fuelAtStart;
+        seconds[first] = 0;
+        previous[first] = -1;
+        var open = new PriorityQueue<int, double>();
+        open.Enqueue(first, toGo[start] * CruiseSecondsPerUnit);
+        var arrived = -1;
+        var weighed = 0;
+        while (open.TryDequeue(out var state, out _))
+        {
+            var here = state / levels;
+            var fuel = state % levels;
+            if (fuel <= mostFuel[here])
+            {
+                continue;
+            }
+
+            mostFuel[here] = fuel;
+            if (here == goal)
+            {
+                arrived = state;
+                break;
+            }
+
+            if (++weighed > MaxMixedStates)
+            {
+                return false;
+            }
+
+            for (var next = 0; next < count; next++)
+            {
+                if (next == here)
+                {
+                    continue;
+                }
+
+                var leg = cruise[here, next];
+                if (leg <= fuel)
+                {
+                    Relax(next, fuel - leg, FlightSeconds(leg, CruiseSecondsPerUnit), drift: false);
+                }
+
+                if (fuel >= 1)
+                {
+                    Relax(next, fuel - 1, FlightSeconds(Math.Max(1, leg), DriftSecondsPerUnit), drift: true);
+                }
+            }
+
+            void Relax(int next, int left, double flight, bool drift)
+            {
+                if (Strands(sellsFuel[next], left))
+                {
+                    return;
+                }
+
+                var refills = next != goal && sellsFuel[next];
+                var kept = refills ? Math.Max(left, fuelCapacity) : left;
+                var reached = (next * levels) + kept;
+                var at = seconds[state] + flight + (refills && left < fuelCapacity ? SecondsToRefuel : 0);
+                if (kept > mostFuel[next] && at < seconds[reached])
+                {
+                    seconds[reached] = at;
+                    previous[reached] = state;
+                    drifted[reached] = drift;
+                    open.Enqueue(reached, at + (toGo[next] * CruiseSecondsPerUnit));
+                }
+            }
+        }
+
+        if (arrived < 0)
+        {
+            return false;
+        }
+
+        var path = new List<FlightLeg>();
+        for (var state = arrived; previous[state] >= 0; state = previous[state])
+        {
+            path.Add(new FlightLeg(waypoints[state / levels], drifted[state] ? DriftMode : CruiseMode));
+        }
+
+        path.Reverse();
+        legs = path;
+        return true;
+    }
+
+    /// <summary>
     /// Runs Rank's checks on every route with a price gap that no other trader holds, of a good no other trip is on its way to
     /// buy at that market (D80): the lucrative routes go to <paramref name="routes"/>, and with <paramref name="judgements"/>
     /// every route goes there too, with the first check it fails (Judge).
@@ -670,6 +945,9 @@ public static class TradeRoutePlanner
     private static long RefuelCost(TradeMarketMap map, int fuel, string refuelAt)
         => fuel == 0 ? 0 : (long)Math.Ceiling(fuel / (double)FuelPerMarketUnit) * map.FuelPrice(refuelAt);
 
+    /// <summary>A flight's seconds at engine speed 10, for comparing ways (<see cref="TryPlanMixedFlight"/>).</summary>
+    private static double FlightSeconds(int distance, double secondsPerUnit) => (distance * secondsPerUnit) + SecondsPerFlight;
+
     /// <summary>The fuel aboard when the ship leaves: a ship docked where fuel is sold fills its tank first.</summary>
     internal static int FuelAtDeparture(TradeMarketMap map, ShipModel ship)
         => ship.LocalStatus == ShipLocalStatus.Docked && map.SellsFuel(ship.WaypointSymbol ?? string.Empty)
@@ -678,6 +956,26 @@ public static class TradeRoutePlanner
 
     /// <summary>The best known way to a stop: its fuel cost, its stops, where it came from, and its last leg's fuel.</summary>
     private sealed record Hop(long Cost, int Stops, string Previous, int LastLeg);
+}
+
+/// <summary>One leg of a flight and the flight mode it flies in (PLAN.md slice 6.19, D84, <see cref="TradeRoutePlanner.TryPlanNextLeg"/>).</summary>
+public sealed record FlightLeg
+{
+    /// <summary>Creates a leg.</summary>
+    /// <param name="WaypointSymbol">Where the leg ends.</param>
+    /// <param name="FlightMode">How it flies: <c>BURN</c>, <c>CRUISE</c> or <c>DRIFT</c>.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public FlightLeg(string WaypointSymbol, string FlightMode)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.FlightMode = FlightMode;
+    }
+
+    /// <summary>Where the leg ends.</summary>
+    public required string WaypointSymbol { get; init; }
+
+    /// <summary>How it flies: <c>BURN</c>, <c>CRUISE</c> or <c>DRIFT</c>.</summary>
+    public required string FlightMode { get; init; }
 }
 
 /// <summary>A flight through refuelling stops (<see cref="TradeRoutePlanner.TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).</summary>

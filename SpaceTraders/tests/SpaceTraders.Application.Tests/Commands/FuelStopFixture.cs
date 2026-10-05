@@ -78,12 +78,14 @@ internal sealed record Flight(string Destination, string FlightMode, int FuelAbo
 /// <summary>
 /// A ship in <see cref="FuelStopFixture"/> as the cache holds it, for a contract command run tick after tick (B47). The
 /// sub-commands change it as the game would: only a docked ship refuels, only a ship in orbit flies, and a flight burns its
-/// CRUISE fuel, or 1 in DRIFT. Navigating flies as the navigation does: in the ship's mode, and in DRIFT when CRUISE needs
-/// more fuel than is aboard (the fallback). Each flight lands before the next tick, which dead-reckons its arrival (B17).
+/// CRUISE fuel, twice that in BURN, or 1 in DRIFT. Navigating flies as the navigation does: in the ship's mode, in CRUISE when
+/// BURN needs more fuel than is aboard, and in DRIFT when CRUISE does (the fallbacks, D84). Each flight lands before the next
+/// tick, which dead-reckons its arrival (B17).
 /// </summary>
 internal sealed class FlyingShip
 {
     private const string Cruise = "CRUISE";
+    private const string Burn = "BURN";
     private const string Drift = "DRIFT";
 
     private readonly TradeMarketMap _map = FuelStopFixture.Map();
@@ -143,8 +145,23 @@ internal sealed class FlyingShip
 
         _map.TryGetDistance(Ship.WaypointSymbol ?? string.Empty, destination, out var distance);
         var cruiseFuel = Math.Max(1, (int)Math.Round(distance, MidpointRounding.AwayFromZero));
-        var mode = Ship.FlightMode == Cruise && cruiseFuel > Ship.FuelCurrent ? Drift : Ship.FlightMode ?? Cruise;
-        var burnt = mode == Drift ? 1 : cruiseFuel;
+        var mode = Ship.FlightMode ?? Cruise;
+        if (mode == Burn && 2 * cruiseFuel > Ship.FuelCurrent)
+        {
+            mode = Cruise;
+        }
+
+        if (mode == Cruise && cruiseFuel > Ship.FuelCurrent)
+        {
+            mode = Drift;
+        }
+
+        var burnt = mode switch
+        {
+            Drift => 1,
+            Burn => 2 * cruiseFuel,
+            _ => cruiseFuel,
+        };
         Flights.Add(new Flight(destination, mode, Ship.FuelCurrent, burnt));
         Ship = Ship with
         {

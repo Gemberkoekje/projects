@@ -162,7 +162,10 @@
   2026-10-05, with your decision D82) and B65 are merged and deployed (projects#175, #174, gembernodes#69, image
   `0da3f31`, live since 2026-10-05 09:56Z).
 - Slice 6.18 (drones parked at a far asteroid hand their ore to a light shuttle that sells it, asked on 2026-10-05, with
-  your decision D83) is built on branch `claude/spacetraders-ore-shuttle`.
+  your decision D83) is merged and deployed (projects#176, gembernodes#70, image `788799b`, live since 2026-10-05
+  10:52Z).
+- Slice 6.19 (the fastest way out of CRUISE reach, cruising as far as it can and drifting the rest, and BURN wherever the
+  fuel allows it, asked on 2026-10-05, with your decision D84) is built on branch `claude/spacetraders-fastest-flights`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -334,6 +337,7 @@ get the next D-number.
 | D81 | Slice 6.15 (asked on 2026-10-05, with D79): the jump gate got no load from 10-04 18:09Z on. Its builders, the command ship's 40-unit hold and from 00:38Z SPECTER-D's 80, found no market selling FAB_MATS or ADVANCED_CIRCUITRY more than 20 at a time, and D67 wanted the load in one purchase; the plan's state showed no reason while the builder traded. First offered as an amendment of D74 ("Extend D74 to loads", one purchase of what the market trades at once per trip, about 100 trips), which was chosen, then asked again once the trade volume turned out to be per purchase: a full hold in batches, or what one purchase takes per trip. Measured: a purchase of 20 raises the next quote about 3.6%, so 80 in four batches cost about 5% more than four purchases at the first price would, and as a price takes about an hour to recover, a builder back every few minutes pays the rise either way. | **Full hold in batches** ("Full hold in batches (Recommended)"): a load is the builder's free hold, or what the gate still needs, bought at one market in batches of its trade volume, each at the price quoted then; it stops when the supply falls to LIMITED (D66) or the next batch would dip into the credit reserve (D64), and takes what it has to the gate. Its cost is estimated with the measured price steps. Replaces D67. |
 | D82 | Slice 6.17 (asked on 2026-10-05): "Why is iron prioritized over ship parts, although the profit would be a lot higher?" D15 put a route first only when its sell market makes a pricier good from the cargo, by its exports. SHIP_PARTS and SHIP_PLATING sell only at the shipyards' markets (A2, C46, H61), which make ships from them and export nothing made from them, so IRON for MACHINERY, about 30 a unit, came before SHIP_PARTS, 3,800 a unit; so did every raw good with a margin of 2 to 42, before MACHINERY, ELECTRONICS and EQUIPMENT. Then: "Ship parts do feed a factory, being the SHIP factory. So while I understand why things like food have a lower priority, this shouldn't be the case for ship parts." and "According to the market tree, this should be the list of lower-priority goods: Antimatter, Assault Rifles, Clothing, Drugs, Fab Mats, Firearms, Food, Fuel, Ice Water, Jewelry, Medicine, Relic Tech and Supergrains." ("There's a bunch more in the complete list, such as AI Mainframes and Botanical Specimen, but those aren't traded in the starter system.") | **End products last** (2026-10-05): a good nothing is made from, by the API's supply chain, is an end product; ships count as made from SHIP_PARTS and SHIP_PLATING. In X1-FJ91 that is exactly the 13 listed. Among lucrative routes, those of the other goods come first, wherever they are sold, then the end products' ones; the most profitable first in each. Amends D15. |
 | D83 | Slice 6.18 (asked on 2026-10-05): "Are there no asteroids in the system that yield silver or gold ore? Or are they too far away?" B44, 53 from B7, yields them; B7 buys them, SCARCE; a drone's 80-unit tank doesn't fly the 106 there and back (D45), so no drone could mine there. Then: "Advanced strategy, hear me out here. We park a light shuttle per ore type at the asteroid, and have the drones drop their ore into the light shuttle. When the light shuttle is full, it sells the ore at the market, then comes back." Offered: per asteroid, any ore, or one per ore type; a survey ship parked there or none; bought with the scarce-mineral drones or after the gate's loads; only out of drones' reach or every asteroid. | **Per asteroid, any ore; a survey ship parked there; with the scarce-mineral drones; only out of drones' reach** (2026-10-05): at an asteroid no drone mines on a round trip of the market that buys its ores, drones park, a drone per SCARCE or LIMITED ore (D48), and hand their ore to a light shuttle that sells everything at that market, a second shuttle bought when drones wait for one. The shuttle and the drones are bought in the Coverage tier, before the cargo ships and the gate's loads; the survey ship by D55's per-area rule. |
+| D84 | Slice 6.19 (asked on 2026-10-05): "The excavators are now drifting for 2 hours. Did they start drifting from the location they were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" They drifted straight from where they were (D52 to B7, 368, about 2 h 52 min). Then: "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I think it is worth it." And: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then drift back to a fuel station with 0 fuel and refuel." | **The fastest mix of CRUISE and DRIFT; BURN where the fuel allows it** (2026-10-05): a way out of CRUISE reach is the fastest mix of CRUISE legs, refuelling at markets that sell fuel, and DRIFT legs; a drone for a collection point (D83) flies straight to its asteroid. A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing (into a market that sells fuel; elsewhere, only when what is left still takes the ship on as cruising would), and cruises otherwise; the extra fuel is accepted. No leg lands a ship with an empty tank where no fuel is sold. |
 
 ## Phases
 
@@ -3273,6 +3277,60 @@ when it is seen for the first time.
   - To understand this, start with `CollectionPoints` in `Mining/MiningPlanner.cs`, then `GiveTripAsync`,
     `TryJoinPointAsync` and `ShuttleNeed` in `Automation/MiningAutomationService.cs`, and the two executors
     `Goals/Executors/MineForShuttleGoalExecutor.cs` and `CollectOreGoalExecutor.cs`.
+
+- **6.19 The fastest way: cruise, drift and burn** (built on branch `claude/spacetraders-fastest-flights`, asked on
+  2026-10-05, D84). Asked: "The excavators are now drifting for 2 hours. Did they start drifting from the location they
+  were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More
+  generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just
+  drifting?", then "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach
+  the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I
+  think it is worth it." And, while it was being built: "A ship can technically land anywhere with 1 fuel and then drift to
+  a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then
+  drift back to a fuel station with 0 fuel and refuel."
+  - Found:
+    - The drones bought for B44's collection point drifted straight from where they were to B7, the point's market: D52 to
+      B7, 368, about 2 hours 52 minutes. Every flight out of CRUISE reach drifted all the way (D45's drift step), where
+      cruising to a market that sells fuel nearer the target and drifting from there is faster: from H60 to B44, cruising
+      to F57 by way of A1 and drifting the 244 from there takes 2.0 hours, against 2.9 by B7, and lands with 79 fuel
+      instead of 26.
+    - Every flight asked for CRUISE, or DRIFT for a drift; nothing burned.
+  - Done:
+    - **The next leg** (`TradeRoutePlanner.TryPlanNextLeg`): within reach of a chain of markets that sell fuel, the next
+      stop of that flight, as before (B47); out of that reach, the first leg of the fastest way (`TryPlanMixedFlight`):
+      A* over the waypoints and the fuel aboard, by the API's flight times at one engine speed (25 per unit of distance
+      in CRUISE, 250 in DRIFT, 15 seconds a flight, 10 to refuel at a stop), guided by the straight distance still to go
+      in CRUISE. On X1-FJ91's 94 waypoints a way takes about a millisecond (1,504 ways: worst 7 ms; a first version
+      without the guide took up to 2 seconds for a 600-unit tank), and none was slower than the first version's.
+    - **BURN** (`Burns`): a leg burns when the tank holds twice its CRUISE fuel and burning strands nothing: a leg into a
+      market that sells fuel, where the tank fills; elsewhere only when what is left still takes the ship on as cruising
+      would, to the trip's market with no more refuelling stops (`onward`), or, without one, to a market that sells fuel
+      in CRUISE (B58). In a way out of reach, a cruise leg into a market that sells fuel burns when the tank allows.
+    - **No empty tank where no fuel is sold** (`Strands`): no leg lands a ship with nothing left where it can't refuel;
+      with 1 left it can always drift on to fuel. A flight in reach whose last leg would empty the tank at an asteroid
+      takes the fastest way that doesn't.
+    - **Every flight flies its leg's mode**: the goals' flights (`GoalFlight`) and the contract's commands
+      (`CommandFlight`). In orbit at a market that sells fuel, a ship docks to fill its tank first when a full tank would
+      fly the leg differently (further, or in BURN). The mining and siphon trips' way to a far market, the survey ship's
+      move and the parked drones' flight (which now goes straight to the asteroid) take the fastest way and journal
+      `DriftStarted` on the leg that drifts, with the property `Leg` for where the drift ends.
+    - **The navigation's fallback** (`NavigateSubCommand`): a leg planned in BURN that the fuel aboard no longer pays for
+      flies in CRUISE before anything drifts.
+  - Choices: as asked; nothing was offered.
+  - Unchanged: the planners count CRUISE for reach, time and fuel (D45's far targets, the collection points, the trade
+    arithmetic), so a trip out of reach is estimated as a drift all the way, which errs long.
+  - Noticed (not changed):
+    - **The trade arithmetic counts CRUISE fuel**; a burnt leg costs twice that: on a 300-unit leg about 216 credits more
+      (fuel at 72 a market unit), against trips worth 30,000 to 107,000 on 2026-10-05. Accepted ("I accept the extra fuel
+      costs this brings").
+  - Tests: `FlightLegTests` (new: BURN into a market and into an asteroid only when what is left cruises on, no extra
+    refuelling stop, B58 without one; the fastest mix, a straight drift when nothing is faster, a cruise leg into a fuel
+    market burns; no empty tank where no fuel is sold, failing without the rule; the example of 2026-10-05),
+    `NavigationFuelGuardTests` (BURN falls back to CRUISE), the executors' flights (each leg's mode; the far trips'
+    first legs and their `DriftStarted`), the contract's flights (`FlyingShip` burns twice the fuel, and falls back as
+    the navigation does) and docking to fill the tank before a burn. App 1189, Domain 75, API 210 (and 4 skipped),
+    Integration 1.
+  - To understand this, start with `TryPlanNextLeg`, `Burns`, `Strands` and `TryPlanMixedFlight` in
+    `Trading/TradeRoutePlanner.cs`, then `Goals/Executors/GoalFlight.cs` and `Commands/Ships/CommandFlight.cs`.
 
 ## Changes in gembernodes
 

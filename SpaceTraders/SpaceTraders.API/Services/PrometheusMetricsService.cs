@@ -336,7 +336,7 @@ public sealed class PrometheusMetricsService(
                 MineAndSellGoal mineAndSell => mineAndSell.Selling ? $"selling {mineAndSell.TradeSymbol}" : $"mining {mineAndSell.TradeSymbol}",
 
                 // Slice 6.18 (D83): a drone parked at a far asteroid, and the shuttle that collects its ore.
-                MineForShuttleGoal { Drifting: true } far => $"drifting to {far.SellWaypointSymbol} to mine at {far.AsteroidWaypointSymbol} for the shuttle",
+                MineForShuttleGoal { Drifting: true } far => $"drifting to {far.AsteroidWaypointSymbol} to mine for the shuttle",
                 MineForShuttleGoal parked => $"mining at {parked.AsteroidWaypointSymbol} for the shuttle",
                 CollectOreGoal { Selling: true } round => $"selling the collected ore at {round.SellWaypointSymbol}",
                 CollectOreGoal round => $"collecting ore at {round.AsteroidWaypointSymbol}",

@@ -489,23 +489,25 @@ public sealed class FulfillContractDeliveryHandlerTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_TheDeliveryAfterADrift_GoesInCruise()
+    public async Task ExecuteAsync_TheDeliveryAfterADrift_NoLongerDrifts()
     {
         // B47, on the cluster on 2026-10-04: the navigation's fallback drifted SPECTER-1 to the contract's asteroid, EF5D,
-        // and left it in DRIFT, so it took the copper the 19 to H60 in DRIFT too: 148 seconds instead of about 30.
+        // and left it in DRIFT, so it took the copper the 19 to H60 in DRIFT too: 148 seconds instead of about 30. H60 sells
+        // fuel and the 399 aboard pay for the 19 twice over, so the delivery burns there (D84).
         var ship = new FlyingShip(CommandShip(EF5D, "IN_ORBIT", "DRIFT", fuel: 399, cargo: [new CargoItemModel("COPPER_ORE", 40)]));
 
         await Handler(ship, Substitute.For<ISpaceTradersPort>())
             .ExecuteAsync(new FulfillContractDeliveryCommand("SPECTER-1", "C-1", "COPPER_ORE", H60), CancellationToken.None);
 
-        ship.Flights.Should().Equal(new Flight(H60, "CRUISE", 399, 19));
+        ship.Flights.Should().Equal(new Flight(H60, "BURN", 399, 38));
     }
 
     [Fact]
-    public async Task ExecuteAsync_ADeliveryBeyondOneTank_GoesInCruise_RefuellingOnTheWay()
+    public async Task ExecuteAsync_ADeliveryBeyondOneTank_RefuelsOnTheWay_BurningWhereTheFuelAllows()
     {
         // B47: a delivery from beyond one tank refuels on the way, as the flight to the asteroid does, rather than drifting.
         // With the copper aboard at J67, H60 is 765 away. Each tick flies a leg, and the next one dead-reckons its arrival.
+        // A full tank pays for the 119 to J66 twice over, so that leg burns (D84); the 372 and the 274 after it cruise.
         var port = Substitute.For<ISpaceTradersPort>();
         port.DeliverContractAsync("C-1", "SPECTER-1", "COPPER_ORE", 40, Arg.Any<CancellationToken>())
             .Returns(Delivered("C-1", required: 120, fulfilled: 80));
@@ -518,7 +520,7 @@ public sealed class FulfillContractDeliveryHandlerTests
         }
 
         ship.Flights.Should().Equal(
-            new Flight(J66, "CRUISE", 400, 119),
+            new Flight(J66, "BURN", 400, 238),
             new Flight(I65, "CRUISE", 400, 372),
             new Flight(H60, "CRUISE", 400, 274));
         await port.Received(1).DeliverContractAsync("C-1", "SPECTER-1", "COPPER_ORE", 40, Arg.Any<CancellationToken>());

@@ -76,7 +76,7 @@ public sealed class FulfillContractDeliveryHandler(
 
         if (!atDestination)
         {
-            // The contract's flight to the delivery: in CRUISE, through refuelling stops (B47).
+            // The contract's flight to the delivery, through refuelling stops (B47), in BURN where that strands nothing (D84).
             var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, cancellationToken)).Map;
             if (CommandFlight.DocksToRefuel(map, ship, command.DestinationWaypoint))
             {

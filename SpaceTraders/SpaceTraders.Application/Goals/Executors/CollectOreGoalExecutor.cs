@@ -70,8 +70,9 @@ public sealed class CollectOreGoalExecutor(
 
         if (!IsAt(ship, round.AsteroidWaypointSymbol))
         {
+            // It burns out there only when that leaves the fuel to carry the ore on to the market (D84).
             var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
-            return await GoalFlight.TowardsAsync(context.Map, ship, round.AsteroidWaypointSymbol, dock, bus, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, round.AsteroidWaypointSymbol, dock, bus, ct, onward: round.SellWaypointSymbol);
         }
 
         // The drones hand over in orbit, where they extract: a transfer needs both ships in the same state.

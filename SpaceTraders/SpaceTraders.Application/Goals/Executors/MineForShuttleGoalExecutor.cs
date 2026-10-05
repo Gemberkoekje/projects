@@ -12,7 +12,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="MineForShuttleGoal"/>: a drone parked at a far asteroid (PLAN.md slice 6.18, D83). It gets there
-/// once, drifting to the market first when that is out of its CRUISE reach (D45), and filling its tank there. At the
+/// once, the fastest way, which cruises as far as it can and drifts the rest (D45, D84): from the middle of X1-FJ91 to B44
+/// it cruised to F57 and drifted from there, 2.0 hours instead of 2.9 by B7, with 79 fuel left instead of 26. At the
 /// asteroid it hands what it holds to a collecting shuttle in orbit there (<see cref="CollectOreGoal"/>), as much as the
 /// shuttle has room for, one transfer per good; it extracts once per cooldown while its hold has room, with the best survey
 /// for its ore (<see cref="MineResourceVolumeCommand"/>, keeping the ores a market buys within one tank, D71); and with its
@@ -54,15 +55,15 @@ public sealed class MineForShuttleGoalExecutor(
             return GoalExecutionResult.WaitingForArrival("Drone is in transit to its collection point.");
         }
 
-        if (job.Drifting)
-        {
-            return await DriftStepAsync(ship, job, ct);
-        }
-
         if (!IsAt(ship, job.AsteroidWaypointSymbol))
         {
-            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
-            return await GoalFlight.TowardsAsync(context.Map, ship, job.AsteroidWaypointSymbol, dock, bus, ct);
+            return await FlyThereAsync(ship, job, ct);
+        }
+
+        if (job.Drifting)
+        {
+            await goals.SetActiveGoalAsync(ship.Symbol, job with { Drifting = false }, ct);
+            return GoalExecutionResult.Progressing($"At {job.AsteroidWaypointSymbol}: mining for the shuttle from here.");
         }
 
         // A transfer needs both ships in the same state: the shuttle waits in orbit, where the drone extracts.
@@ -108,25 +109,28 @@ public sealed class MineForShuttleGoalExecutor(
         return GoalExecutionResult.Progressing($"Mining at {job.AsteroidWaypointSymbol} for the shuttle.");
     }
 
-    /// <summary>The drone's drift to the market, out of its CRUISE reach (D45); from there it flies on to the asteroid in CRUISE.</summary>
-    private async Task<GoalExecutionResult> DriftStepAsync(ShipModel ship, MineForShuttleGoal job, CancellationToken ct)
+    /// <summary>
+    /// One leg of the drone's way to the asteroid, the fastest way (D84): straight there when the fuel will do, else cruising
+    /// as far as it can and drifting the rest. A drift leg logs <c>DriftStarted</c>.
+    /// </summary>
+    private async Task<GoalExecutionResult> FlyThereAsync(ShipModel ship, MineForShuttleGoal job, CancellationToken ct)
     {
-        if (!IsAt(ship, job.SellWaypointSymbol))
+        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var (flown, leg) = await GoalFlight.LegTowardsAsync(context.Map, ship, job.AsteroidWaypointSymbol, dock, bus, ct);
+        if (flown.Outcome == GoalExecutionOutcome.WaitingForArrival && leg.FlightMode == TradeRoutePlanner.DriftMode)
         {
-            var drifting = await GoalFlight.DriftAsync(ship, job.SellWaypointSymbol, bus, ct);
             logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {SellWaypoint}, out of its CRUISE reach, to mine {TradeSymbol} at {SourceWaypoint} for the shuttle there.",
+                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {Leg} on its way to {SourceWaypoint}, out of its CRUISE reach, to mine {TradeSymbol} there for the shuttle that sells at {SellWaypoint}.",
                 JournalEvents.DriftStarted,
                 ship.Symbol,
                 ship.WaypointSymbol ?? string.Empty,
-                job.SellWaypointSymbol,
+                leg.WaypointSymbol,
+                job.AsteroidWaypointSymbol,
                 job.TradeSymbol,
-                job.AsteroidWaypointSymbol);
-            return drifting;
+                job.SellWaypointSymbol);
         }
 
-        await goals.SetActiveGoalAsync(ship.Symbol, job with { Drifting = false }, ct);
-        return GoalExecutionResult.Progressing($"At {job.SellWaypointSymbol}: flying on to {job.AsteroidWaypointSymbol} in CRUISE.");
+        return flown;
     }
 
     /// <summary>A shuttle collecting at the drone's asteroid now: there, in orbit, with room, and not on its way to sell.</summary>

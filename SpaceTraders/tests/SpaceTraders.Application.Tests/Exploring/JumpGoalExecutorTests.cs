@@ -80,11 +80,13 @@ public sealed class JumpGoalExecutorTests
     [Fact]
     public async Task AwayFromTheGate_ItFliesThere()
     {
+        // The gate is 438 from H52, beyond the 400-unit tank, and H52 sells no fuel: the only way there drifts, as the flight
+        // plans it now (D84), where it used to ask for CRUISE and leave the drift to the navigation's fallback.
         var result = await StepAsync(At("X1-DC53-H52", "DOCKED"));
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == HomeGate && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == HomeGate && command.FlightMode == "DRIFT"),
             Arg.Any<CancellationToken>());
         await _port.DidNotReceive().JumpShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
