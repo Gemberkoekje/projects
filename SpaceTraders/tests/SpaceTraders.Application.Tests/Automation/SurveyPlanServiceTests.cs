@@ -374,6 +374,33 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task ASurveyShipAtACollectionPointsAsteroid_StaysThere_ThoughItCantCruiseToTheMarketsArea()
+    {
+        // B68, on 2026-10-05: SPECTER-2C surveyed B44 once, then, with 26 fuel, couldn't cruise the 53 to B7, where the parked
+        // drones count (D83), so its own area had none, and the survey plan moved it to B7 (D54), a 25-minute drift. From B7 it
+        // was sent to survey B44 again: one survey every 28 minutes from 13:49 on, and the drones extracted without one. Here the
+        // survey ship is at B37 with 12 fuel, 68 from B7: it surveys B37 again.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-4", FleetRole.Mine));
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(FarSideMap(), [], 129_357, Now));
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities = [],
+            CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = B37, SellWaypointSymbol = B7, Ores = ["GOLD_ORE"], ScarceOres = ["GOLD_ORE"] }],
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        _activeGoals["SHIP-4"] = new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = B37, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: B37) with { FuelCurrent = 12 }, Drone("SHIP-4", B37, "IN_ORBIT") with { FuelCurrent = 12 });
+
+        await RunAsync();
+
+        var survey = _activeGoals["SHIP-5"].Should().BeOfType<SurveyWaypointGoal>().Subject;
+        (survey.TargetWaypointSymbol, survey.TargetDepositSymbol).Should().Be((B37, "GOLD_ORE"));
+        _log.Entries.Should().NotContain(entry => entry.Message.Contains("moves to", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
     {
         // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.
