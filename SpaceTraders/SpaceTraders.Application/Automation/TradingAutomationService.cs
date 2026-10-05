@@ -231,7 +231,7 @@ public sealed class TradingAutomationService(
         }
 
         // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
+        await BuyCargoShipAsync(fleet, board, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
 
         await SaveStateAsync(held, pending, judged, cancellationToken);
     }
@@ -300,6 +300,7 @@ public sealed class TradingAutomationService(
     /// </summary>
     private async Task BuyCargoShipAsync(
         IReadOnlyList<ShipModel> fleet,
+        FleetRoleBoard board,
         IReadOnlyList<string> businessSystems,
         IReadOnlySet<string> heldKeys,
         HeldBuys heldBuys,
@@ -314,7 +315,8 @@ public sealed class TradingAutomationService(
             return;
         }
 
-        var cargoShips = fleet.Count(FleetRoles.IsCargoShip);
+        // A shuttle collecting at a far asteroid (D83) was bought for that, not from the list.
+        var cargoShips = fleet.Count(ship => FleetRoles.IsCargoShip(ship) && !board.IsCollector(ship));
         var inList = cargoShips < purchases.Length;
         var shipType = inList ? purchases[cargoShips] : purchases[^1];
         var systems = businessSystems.ToHashSet(StringComparer.OrdinalIgnoreCase);

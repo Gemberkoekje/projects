@@ -349,6 +349,31 @@ public sealed class SurveyPlanServiceTests
     }
 
     [Fact]
+    public async Task AtACollectionPointsAsteroid_ASurveyShipSurveys_ThoughItCantFlyOn_AsItStaysParkedThere()
+    {
+        // D83: a drone parked at B37 mines B7's gold for the shuttle there, with 12 fuel left: no miner's trip there and back
+        // shows the target, and B58 would keep the survey ship from B37, 68 from B7. It parks there, as the drones do.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Survey), ("SHIP-4", FleetRole.Mine));
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(FarSideMap(), [], 129_357, Now));
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities = [],
+            CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = B37, SellWaypointSymbol = B7, Ores = ["GOLD_ORE"], ScarceOres = ["GOLD_ORE"] }],
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        _activeGoals["SHIP-4"] = new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = B37, SellWaypointSymbol = B7 };
+        Fleet(SurveyShip(waypoint: B7), Drone("SHIP-4", B37, "IN_ORBIT") with { FuelCurrent = 12 });
+
+        await RunAsync();
+
+        var survey = _activeGoals["SHIP-5"].Should().BeOfType<SurveyWaypointGoal>().Subject;
+        (survey.TargetWaypointSymbol, survey.TargetDepositSymbol).Should().Be((B37, "GOLD_ORE"));
+        _state!.Targets.Should().Contain(target => target.WaypointSymbol == B37 && target.CandidateShipSymbols.Contains("SHIP-5"));
+    }
+
+    [Fact]
     public async Task WithTheRoleBoardOn_OnlyTheShipWithTheSurveyRole_Surveys()
     {
         // Slice 6.9 (D38): a ship that can only survey surveys, so the command ship, with the trade role, doesn't.

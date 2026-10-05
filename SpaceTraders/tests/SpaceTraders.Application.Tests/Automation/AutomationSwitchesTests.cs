@@ -69,6 +69,8 @@ public sealed class AutomationSwitchesTests
         AutomationSwitches.PlanFor(new JumpGoal { GateWaypointSymbol = "X1-AB-I1", DestinationGateWaypointSymbol = "X1-CD-I2" }).Should().Be(AutomationPlan.Explore);
         AutomationSwitches.PlanFor(new ExploreSystemGoal { SystemSymbol = "X1-CD", Stops = ["X1-CD-I2"] }).Should().Be(AutomationPlan.Explore);
         AutomationSwitches.PlanFor(new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55" }).Should().Be(AutomationPlan.Construction);
+        AutomationSwitches.PlanFor(new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }).Should().Be(AutomationPlan.Mining);
+        AutomationSwitches.PlanFor(new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }).Should().Be(AutomationPlan.Mining);
         AutomationSwitches.PlanFor(new IdleGoal()).Should().BeNull();
     }
 }

@@ -29,6 +29,8 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(SurveyWaypointGoal), "SurveyWaypoint")]
 [JsonDerivedType(typeof(JumpGoal), "Jump")]
 [JsonDerivedType(typeof(ExploreSystemGoal), "ExploreSystem")]
+[JsonDerivedType(typeof(MineForShuttleGoal), "MineForShuttle")]
+[JsonDerivedType(typeof(CollectOreGoal), "CollectOre")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -304,6 +306,57 @@ public sealed record GatherAndSellGoal : TripGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.GatherAndSell;
+}
+
+/// <summary>
+/// A drone parked at a far asteroid (PLAN.md slice 6.18, D83): an asteroid out of every drone's CRUISE round trip of the
+/// market that buys its ores, where a shuttle collects (<see cref="CollectOreGoal"/>). The drone gets there once: it drifts
+/// to <see cref="SellWaypointSymbol"/> first when that market is out of its CRUISE reach (<see cref="Drifting"/>, D45),
+/// fills its tank there and flies on. At the asteroid it mines with the best survey for <see cref="TradeSymbol"/>, keeping
+/// every ore a market buys within one tank (D71), and hands what it holds to a collecting shuttle there; with its hold full
+/// and no shuttle there, it waits. It never sells: the shuttle does. The goal lasts while the mining plan keeps the
+/// asteroid's collection open.
+/// </summary>
+public sealed record MineForShuttleGoal : ShipGoal
+{
+    /// <summary>The ore the surveys are chosen for: the market's scarcest that the asteroid yields.</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>Where the drone is parked and mines.</summary>
+    public required string AsteroidWaypointSymbol { get; init; }
+
+    /// <summary>The market the shuttle sells at, where the drone fills its tank on the way.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>
+    /// True while the drone drifts to <see cref="SellWaypointSymbol"/>, out of its CRUISE reach (D45): 1 fuel whatever the
+    /// distance, about ten times slower. Once there, it flies on to the asteroid in CRUISE.
+    /// </summary>
+    public bool Drifting { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.MineForShuttle;
+}
+
+/// <summary>
+/// One round of a collecting shuttle (PLAN.md slice 6.18, D83): it flies to <see cref="AsteroidWaypointSymbol"/> and waits
+/// in orbit while the parked drones hand it their ore (<see cref="MineForShuttleGoal"/>), until its hold is full; then it
+/// sells everything aboard at <see cref="SellWaypointSymbol"/> (<see cref="Selling"/>), and the goal ends. The mining plan
+/// gives the next round. It also leaves with a part hold when no drone is left there. The round is booked as a trip (D46).
+/// </summary>
+public sealed record CollectOreGoal : TripGoal
+{
+    /// <summary>Where the drones are parked.</summary>
+    public required string AsteroidWaypointSymbol { get; init; }
+
+    /// <summary>Where it sells what they mine.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>True once it sells: its hold is full, or no drone is left at the asteroid.</summary>
+    public bool Selling { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.CollectOre;
 }
 
 /// <summary>

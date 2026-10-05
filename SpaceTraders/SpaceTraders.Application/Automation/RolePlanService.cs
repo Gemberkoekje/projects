@@ -72,16 +72,20 @@ public sealed class RolePlanService(
         var contractWantsOre = roleSettings.Switches.Contains(AutomationPlan.Contract)
             && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
             && contract.UnitsFulfilled < contract.UnitsRequired;
-        var conditions = Conditions(roleSettings.Switches, contractWantsOre, roleSettings.ConstructionSystems);
+        // D83: the shuttles the mining plan designated for its far asteroids keep collecting; a change weighs the roles again.
+        var collectors = roleSettings.Switches.Contains(AutomationPlan.Mining)
+            ? Collectors(await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken))
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var conditions = Conditions(roleSettings.Switches, contractWantsOre, roleSettings.ConstructionSystems, collectors);
 
         var state = await plans.GetAsync<RolePlanState>(PlanTypes.Roles, cancellationToken);
         var surveying = (state?.Ships ?? [])
-            .Where(ship => ship.Role == FleetRole.Survey)
+            .Where(ship => ship.Role is FleetRole.Survey or FleetRole.Collect)
             .Select(ship => ship.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // A ship that surveys waits for surveys by design; any other ship with a choice of roles that stays without work
-        // shows that its role had nothing for it.
+        // A ship that surveys waits for surveys by design, and a collecting shuttle for a drone to park (D83); any other ship
+        // with a choice of roles that stays without work shows that its role had nothing for it.
         var idle = TimeSpan.Zero;
         var trips = new Dictionary<string, ShipGoal>(StringComparer.OrdinalIgnoreCase);
         foreach (var ship in fleet)
@@ -113,7 +117,7 @@ public sealed class RolePlanService(
 
         var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, cancellationToken);
         var coverage = await CoverageAsync(fleet, trips, cancellationToken);
-        var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage, roleSettings.ConstructionShips);
+        var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage, collectors, roleSettings.ConstructionShips);
         await SaveAsync(state, candidates, decisions, conditions, now, cancellationToken);
         memory.Evaluated(now);
         logger.LogDebug("Role board: weighed the roles of {Ships} ships ({Trigger}).", decisions.Count, trigger);
@@ -123,10 +127,17 @@ public sealed class RolePlanService(
     /// What an evaluation weighs besides the ships, as text: a change weighs the roles again, so the gate's completion frees
     /// its builder at once (slice 6.6).
     /// </summary>
-    private static string Conditions(IReadOnlySet<AutomationPlan> switches, bool contractWantsOre, IReadOnlySet<string> constructionSystems)
+    private static string Conditions(IReadOnlySet<AutomationPlan> switches, bool contractWantsOre, IReadOnlySet<string> constructionSystems, IReadOnlySet<string> collectors)
         => string.Join(',', switches.Order().Select(plan => plan.ToString()))
             + (contractWantsOre ? "|contract wants ore" : string.Empty)
-            + (constructionSystems.Count > 0 ? "|gate needs materials in " + string.Join(',', constructionSystems.Order(StringComparer.Ordinal)) : string.Empty);
+            + (constructionSystems.Count > 0 ? "|gate needs materials in " + string.Join(',', constructionSystems.Order(StringComparer.Ordinal)) : string.Empty)
+            + (collectors.Count > 0 ? "|collectors " + string.Join(',', collectors.Order(StringComparer.Ordinal)) : string.Empty);
+
+    /// <summary>The shuttles the mining plan designated for its far asteroids (slice 6.18, D83), by symbol.</summary>
+    private static HashSet<string> Collectors(MiningAutomationPlanState? state)
+        => (state?.CollectionPoints ?? [])
+            .SelectMany(point => point.ShuttleSymbols)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): the home system, or

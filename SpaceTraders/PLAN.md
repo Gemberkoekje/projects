@@ -159,7 +159,10 @@
   image `6b1481d`, live since 2026-10-05 08:24Z). Still to do from D79: learning the price steps per good and market from
   the bot's own trades.
 - Slice 6.17 (end products last: the routes of goods something is made from come first, wherever they are sold, asked on
-  2026-10-05, with your decision D82) is built on branch `claude/spacetraders-end-products-last`.
+  2026-10-05, with your decision D82) and B65 are merged and deployed (projects#175, #174, gembernodes#69, image
+  `0da3f31`, live since 2026-10-05 09:56Z).
+- Slice 6.18 (drones parked at a far asteroid hand their ore to a light shuttle that sells it, asked on 2026-10-05, with
+  your decision D83) is built on branch `claude/spacetraders-ore-shuttle`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -330,6 +333,7 @@ get the next D-number.
 | D80 | Slice 6.16, with D79: every batch moves the price another trip's estimate started from. Offered: one buyer at a time; share, the second trip's estimate starting from where the first's batches leave the price; share freely. | **One buyer at a time**: while a trip is on its way to buy a good at a market, no other trip is sent for that good there, whatever its sell market; construction trips count too. Amends D18. |
 | D81 | Slice 6.15 (asked on 2026-10-05, with D79): the jump gate got no load from 10-04 18:09Z on. Its builders, the command ship's 40-unit hold and from 00:38Z SPECTER-D's 80, found no market selling FAB_MATS or ADVANCED_CIRCUITRY more than 20 at a time, and D67 wanted the load in one purchase; the plan's state showed no reason while the builder traded. First offered as an amendment of D74 ("Extend D74 to loads", one purchase of what the market trades at once per trip, about 100 trips), which was chosen, then asked again once the trade volume turned out to be per purchase: a full hold in batches, or what one purchase takes per trip. Measured: a purchase of 20 raises the next quote about 3.6%, so 80 in four batches cost about 5% more than four purchases at the first price would, and as a price takes about an hour to recover, a builder back every few minutes pays the rise either way. | **Full hold in batches** ("Full hold in batches (Recommended)"): a load is the builder's free hold, or what the gate still needs, bought at one market in batches of its trade volume, each at the price quoted then; it stops when the supply falls to LIMITED (D66) or the next batch would dip into the credit reserve (D64), and takes what it has to the gate. Its cost is estimated with the measured price steps. Replaces D67. |
 | D82 | Slice 6.17 (asked on 2026-10-05): "Why is iron prioritized over ship parts, although the profit would be a lot higher?" D15 put a route first only when its sell market makes a pricier good from the cargo, by its exports. SHIP_PARTS and SHIP_PLATING sell only at the shipyards' markets (A2, C46, H61), which make ships from them and export nothing made from them, so IRON for MACHINERY, about 30 a unit, came before SHIP_PARTS, 3,800 a unit; so did every raw good with a margin of 2 to 42, before MACHINERY, ELECTRONICS and EQUIPMENT. Then: "Ship parts do feed a factory, being the SHIP factory. So while I understand why things like food have a lower priority, this shouldn't be the case for ship parts." and "According to the market tree, this should be the list of lower-priority goods: Antimatter, Assault Rifles, Clothing, Drugs, Fab Mats, Firearms, Food, Fuel, Ice Water, Jewelry, Medicine, Relic Tech and Supergrains." ("There's a bunch more in the complete list, such as AI Mainframes and Botanical Specimen, but those aren't traded in the starter system.") | **End products last** (2026-10-05): a good nothing is made from, by the API's supply chain, is an end product; ships count as made from SHIP_PARTS and SHIP_PLATING. In X1-FJ91 that is exactly the 13 listed. Among lucrative routes, those of the other goods come first, wherever they are sold, then the end products' ones; the most profitable first in each. Amends D15. |
+| D83 | Slice 6.18 (asked on 2026-10-05): "Are there no asteroids in the system that yield silver or gold ore? Or are they too far away?" B44, 53 from B7, yields them; B7 buys them, SCARCE; a drone's 80-unit tank doesn't fly the 106 there and back (D45), so no drone could mine there. Then: "Advanced strategy, hear me out here. We park a light shuttle per ore type at the asteroid, and have the drones drop their ore into the light shuttle. When the light shuttle is full, it sells the ore at the market, then comes back." Offered: per asteroid, any ore, or one per ore type; a survey ship parked there or none; bought with the scarce-mineral drones or after the gate's loads; only out of drones' reach or every asteroid. | **Per asteroid, any ore; a survey ship parked there; with the scarce-mineral drones; only out of drones' reach** (2026-10-05): at an asteroid no drone mines on a round trip of the market that buys its ores, drones park, a drone per SCARCE or LIMITED ore (D48), and hand their ore to a light shuttle that sells everything at that market, a second shuttle bought when drones wait for one. The shuttle and the drones are bought in the Coverage tier, before the cargo ships and the gate's loads; the survey ship by D55's per-area rule. |
 
 ## Phases
 
@@ -3213,6 +3217,62 @@ when it is seen for the first time.
     skipped), Integration 1.
   - To understand this, start with `IsEndProduct` in `Trading/TradeMarketMap.cs`, then `Rank` and the end of
     `TryEvaluateFrom` in `Trading/TradeRoutePlanner.cs`.
+
+- **6.18 Ore shuttles at far asteroids** (built on branch `claude/spacetraders-ore-shuttle`, asked on 2026-10-05, D83).
+  Asked: "Are there no asteroids in the system that yield silver or gold ore? Or are they too far away?", then "Advanced
+  strategy, hear me out here. We park a light shuttle per ore type at the asteroid, and have the drones drop their ore into
+  the light shuttle. When the light shuttle is full, it sells the ore at the market, then comes back."
+  - Found: B44 (PRECIOUS_METAL_DEPOSITS) is 53 from B7, the one market that buys GOLD_ORE, SILVER_ORE and PLATINUM_ORE,
+    all three SCARCE there, and B7's GOLD, SILVER and PLATINUM production RESTRICTED. B44 sells no fuel: a drone's 80-unit
+    tank doesn't fly the 106 there and back, and D45 counts a far asteroid only within a CRUISE round trip of its market,
+    so the mining plan had listed the three openings since 10-04 18:09Z with no drone able to take them, and bought none
+    for them (D48: "A mineral no drone can reach ... doesn't count"). The survey ship couldn't survey there either (B58).
+    Only the command ship, with its 400-unit tank, mined there once, unsurveyed: 5 SILVER_ORE in 17 extractions. B7 buys
+    all eight of B44's ores, the other five as exchange goods. The API moves cargo between two of our ships at one
+    waypoint, both docked or both in orbit (`POST my/ships/{ship}/transfer`, v2.3.0), which the bot didn't use.
+  - Done:
+    - **Collection points** (`MiningPlanner.CollectionPoints`): for a market that sells fuel and buys an ore below
+      ABUNDANT (D77) that no drone mines on a round trip of it (D45), the asteroid nearest it that yields the ore, when a
+      drone gets there from the market on a full tank and a light shuttle flies there and back. A drone per SCARCE or
+      LIMITED ore there (D48).
+    - **Parked drones** (`MineForShuttleGoal`): a mining drone whose best target isn't an uncovered ore of its own takes a
+      place at a point that wants more drones, drifting to its market first (D45), and stays there: it mines with the
+      best survey, hands its hold to the shuttle in orbit there, one transfer per good, and with its hold full and no
+      shuttle there waits without an API call. A drone at the asteroid always stays.
+    - **The shuttle's rounds** (`CollectOreGoal`, trip activity `collecting`): once a drone is parked there, it waits in
+      orbit until its hold is full, or no drone is left, then sells everything at the market (its hold fetched from the
+      API first, as the drones' transfers wrote the cache), and the round is booked.
+    - **Purchases** (Coverage, as chosen): a light shuttle for a point where a drone has a place; then a point's scarce
+      ores count a drone each; a second shuttle when a parked drone waits with a full hold while the first is away
+      selling. The shuttle is designated for its point in the mining plan's state; the role board keeps it in the new
+      `Collect` role (reason `collection`), out of trading, building, the credit reserve's trading holds (D51) and the
+      count towards `Trade.ShipPurchases`. A point that is gone releases its shuttles.
+    - **The survey ship** parks too: the survey plan gives each point's ores targets at its asteroid, counts parked
+      drones in their market's area (so D55 buys the area a survey ship, which D54 moves there), and lets a ship that
+      can only survey survey at a point's asteroid it reaches without flying on (B58).
+    - **The API client** transfers cargo (`ISpaceTradersPort.TransferCargoAsync`).
+  - Choices (2026-10-05): "Per asteroid, any ore (Recommended)" rather than one shuttle per ore type; "Yes, park one there
+    (Recommended)" for the survey ship; "With scarce-mineral drones" for the shuttle and the drones (the survey ship
+    comes by D55's per-area rule, the tier right after them); "Only out of drones' reach (Recommended)".
+  - Unchanged: every other mining trip, D45's far targets, sharing (D77), the siphon plan.
+  - Noticed (not changed):
+    - **A collector shuttle still counts as a cargo ship in the purchase order's turns** between drones and cargo ships
+      (`PurchaseOrder.Turn`), which goes by ship type.
+    - **The shuttle's first round** may wait hours: the drones drift to B7 first, about 2.5 hours from the middle, and
+      the shuttle is bought once the first one sets off.
+    - **The command ship's role flips between Trade and Siphon** every one to three minutes at times (105 changes since
+      10-04 18:09Z; 8 between 03:44 and 03:57Z, Trade estimated at 330,000 to 500,000 an hour against 20,000 to 32,000):
+      not the close calls D41's head start is for. Not looked into.
+  - Tests: `MiningPlannerTests` (what a collection point is, ABUNDANT, no shuttle, round trips), `MiningAutomationServiceTests`
+    (a drone with nothing uncovered joins, drifting first; an uncovered ore of its own first; a drone at the asteroid stays;
+    the shuttle collects once a drone is parked, not while they drift; the shuttle bought and designated; the coverage
+    count; a second shuttle when a drone waits, none while the first collects), `MineForShuttleGoalExecutorTests`,
+    `CollectOreGoalExecutorTests`, `CollectionRoleTests`, `SurveyPlanServiceTests` (a survey ship parks at the point's
+    asteroid), and the goal's storage, plan switch, trip book and dispatch. App 1172, Domain 75, API 210 (and 4 skipped),
+    Integration 1.
+  - To understand this, start with `CollectionPoints` in `Mining/MiningPlanner.cs`, then `GiveTripAsync`,
+    `TryJoinPointAsync` and `ShuttleNeed` in `Automation/MiningAutomationService.cs`, and the two executors
+    `Goals/Executors/MineForShuttleGoalExecutor.cs` and `CollectOreGoalExecutor.cs`.
 
 ## Changes in gembernodes
 

@@ -29,4 +29,10 @@ public enum FleetRole
     /// when the construction plan has nothing it may buy.
     /// </summary>
     Construct = 5,
+
+    /// <summary>
+    /// Collects the ore of drones parked at a far asteroid (a hold and a tank, and no drone): the mining plan's collecting
+    /// rounds (slice 6.18, D83), for the shuttles the mining plan designated for that asteroid. It does nothing else.
+    /// </summary>
+    Collect = 6,
 }

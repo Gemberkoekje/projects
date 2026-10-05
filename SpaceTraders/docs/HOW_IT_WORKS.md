@@ -479,6 +479,10 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   - the mining plan to the ships with the mining role, the siphon plan to those with the siphon role; each
     trades when its plan has no trip for it, as before;
   - the construction plan to the ships with the construction role (slice 6.6);
+  - the mining plan's collecting rounds to the ships with the collecting role (slice 6.18, D83): the shuttles the mining
+    plan designated for a collection point keep that role (reason `collection`), whatever else they could do, and do
+    nothing else. Like a surveyor, a collector without work waits by design: it doesn't make the board weigh the roles
+    again, and a change in the designated shuttles does;
   - the trading plan to the ships with the trade role, and those with the mining, siphon or construction role
     that their plan left free;
   - the mining and siphon plans buy a drone beyond one per scarce mineral and area only when the board would give it
@@ -585,7 +589,11 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   each free surveyor gets one survey to take (`SurveyWaypointGoal`), the best target it can reach that
   no other surveyor works on (or the best one when all are taken), from `MiningPlanner.SurveyTargets`. It
   reaches a target when it gets there in CRUISE and, with the fuel left, on to a market that sells fuel
-  (`MiningPlanner.CanSurveyAt`, B58), as a mining trip must get on to its market.
+  (`MiningPlanner.CanSurveyAt`, B58), as a mining trip must get on to its market; a ship that can only survey also
+  reaches a collection point's asteroid it gets to (slice 6.18, D83), as it stays parked there, as the drones do. Drones
+  parked at a collection point count in the areas by their point's market, so the area gets a survey ship of its own
+  (D55), which moves to that market (D54) and on to the asteroid; each collection point's ores at its asteroid are targets
+  for its market.
   The targets are:
   1. the contract's ore at the contract's asteroid, while the contract plan mines it;
   2. each ore a market in the system buys, at the asteroid nearest each market that buys it (D27,
@@ -689,6 +697,29 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      reason `shared`. A drone is passed over to the trading plan (B63) only when nothing below ABUNDANT is left that it
      can reach and sell, or with a full hold nobody it can reach buys (step 1). The command ship shares nothing: it takes
      what pays it most (D38), and is passed over when every pair has a miner.
+- **Far asteroids with a shuttle** (slice 6.18, D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and
+  have the drones drop their ore into the light shuttle. When the light shuttle is full, it sells the ore at the market,
+  then comes back."): a collection point (`MiningPlanner.CollectionPoints`) is, for a market that sells fuel and buys an
+  ore below ABUNDANT that no drone mines on a CRUISE round trip of it (D45), the asteroid nearest it that yields the ore,
+  when a drone gets there from the market on a full tank and a light shuttle (its tank from the cheapest shipyard's
+  listing) flies there and back; one point per asteroid and market, with every such ore. In X1-FJ91 on 2026-10-05: B44,
+  53 from B7, whose GOLD_ORE, SILVER_ORE and PLATINUM_ORE were SCARCE (a drone's 80-unit tank doesn't fly the 106 there
+  and back; B7 buys all eight of B44's ores, the rest as exchange goods). A point wants a drone per SCARCE or LIMITED ore
+  (D48):
+  - a mining drone at a point's asteroid stays there (`MineForShuttleGoal`), before anything else in the steps above;
+  - a free mining drone whose best target isn't an ore no miner covers (step 2's D48) takes a place at a point that
+    wants more drones, before the other targets and sharing: it drifts to the point's market first when that is out of
+    its CRUISE reach (D45), fills its tank there and flies on, for the scarce ore no drone there mines for yet. It logs
+    `MiningStarted`, reason `collection`. The command ship takes none (D38);
+  - a shuttle designated for the point (with the role board on, its role is `Collect`) gets a round
+    (`CollectOreGoal`, journaled `CollectionStarted`) once a drone is parked at the asteroid: a drone's drift there
+    takes hours, which a shuttle would only wait through;
+  - purchases, with the drones for scarce minerals (`PurchaseTier.Coverage`, as chosen on 2026-10-05): first a light
+    shuttle for a point where a drone has a place and no shuttle is designated yet, then the drones (each point's
+    scarce ores count a drone each in the coverage count, below), and a second shuttle, at most, for a point where a
+    drone parked at the asteroid waits with its hold full while the first is away selling ("A second shuttle is bought
+    when drones wait for one"). A shuttle bought for a point is designated for it in the plan's state, which the role
+    board reads. A point that is gone (every ore ABUNDANT) releases its shuttles to the other roles.
 - **What a trip keeps** (D71, asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank
   of fuel, instead of everything they're not specifically mining for"): each extraction keeps the trip's ore, and every
   other ore a market buys within one tank of the asteroid: a full tank's CRUISE flight there without a refuelling stop
@@ -708,7 +739,8 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      short of the ore that such a drone flies between in CRUISE (`MiningPlanner.Areas`): in X1-DC53, the
      middle and B7. It doesn't ask the role board, which keeps one drone mining per scarce ore and area.
      Since slice 6.10c an ore a drift away counts (D45: "new and free drones"), so each ore a far market is
-     short of adds a drone (on 2026-10-03, B7's five);
+     short of adds a drone (on 2026-10-03, B7's five); since slice 6.18 so does each scarce ore of a collection point
+     (D83), after the shuttle the point needs (above);
   2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
@@ -719,7 +751,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
   miner's trip sells there, Pending otherwise, with the free miners that could take it (they reach its
   asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. An opening several drones share names one
-  of them (D77). It is written only when it changes.
+  of them (D77); a parked drone holds its ore's opening at its point's market. Since slice 6.18 it lists the collection
+  points too, each with its ores, its scarce ores, the shuttles designated for it and the drones with a place there. It
+  is written only when it changes.
 
 ### Siphon (`SiphonAutomationService`, slice 6.7)
 
@@ -1172,11 +1206,12 @@ scout and probe plans don't read the roles.
 
 - **Storage:** each ship has at most one active goal, stored in `cached_ships` (`GoalId`,
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
-- **Kinds:** 17 kinds are defined, but only eleven are ever created: `ScoutWaypoint`,
+- **Kinds:** 19 kinds are defined, but only thirteen are ever created: `ScoutWaypoint`,
   `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `GatherAndSell`, `TradeBetweenMarkets`,
   `SurveyWaypoint`, `MoveToWaypoint` (the survey ship's move, D54), the explore plan's `Jump` and `ExploreSystem`
-  (slice 6.11), and `SupplyConstruction` (a construction trip, slice 6.6). The older `SiphonResource`, like
-  `MineResource`, is never created.
+  (slice 6.11), `SupplyConstruction` (a construction trip, slice 6.6), and the mining plan's `MineForShuttle` (a drone
+  parked at a far asteroid) and `CollectOre` (a shuttle's round of collecting there; slice 6.18, D83). The older
+  `SiphonResource`, like `MineResource`, is never created.
 - **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
   Nothing else changes it (B16). A blocked goal also records why, in `StatusReason`
   (`runaway`).
@@ -1199,8 +1234,10 @@ scout and probe plans don't read the roles.
     when the credits no longer pay for it), `ExploreSystemGoalExecutor` after the last stop, and
     `SupplyConstructionGoalExecutor` when the trip has supplied its site or is dropped (slice 6.6);
   - the scout plan, when its last stop is done.
-- **A trip books what it made** (D46, slice 6.10a): the five trip goals (`TradeBetweenMarkets`, `MineAndSell`,
-  `SiphonAndSell`, `GatherAndSell`, and since slice 6.6 `SupplyConstruction`, which earns nothing) derive from `TripGoal`, which keeps `Earned` (sales) and `Spent` (cargo bought)
+- **A trip books what it made** (D46, slice 6.10a): the six trip goals (`TradeBetweenMarkets`, `MineAndSell`,
+  `SiphonAndSell`, `GatherAndSell`, since slice 6.6 `SupplyConstruction`, which earns nothing, and since slice 6.18
+  `CollectOre`, activity `collecting`, which sells what parked drones mined; the parked drone's `MineForShuttle` is no
+  trip) derive from `TripGoal`, which keeps `Earned` (sales) and `Spent` (cargo bought)
   as the executor records them (a goal stored before has both at 0). Every end of a trip clears the goal and then books
   it (`TripBook`): fuel is the ship's `FuelPurchase` ledger rows since the goal's `StartedAt`, profit is earned − spent −
   fuel, logged as a `TripEnded` line and counted by activity. Sales and purchases come from the goal because a sale's
@@ -1262,6 +1299,8 @@ step does the work.
 | `ExploreSystem` | Scouting one system (slice 6.11). At the next stop: fetch its market (`MarketRefresher`) and its shipyard unless they were stored since the goal began (the arrival stores them; a jump doesn't), mark it visited, and record the visit in the goal; after the last stop clear the goal and complete. A fetch that fails is logged and the ship moves on. Before a flight, wait for the cooldown (a jump's); then [cmd] navigate towards the stop (`GoalFlight`). |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `SupplyConstruction` | One construction trip (slice 6.6). [cmd] navigate towards the buy market (`GoalFlight`: in CRUISE, through refuelling stops) and dock. **Docked at the market**, with the prices the arrival has just fetched: the units are the trip's, at most the free hold and what the site still needs less what the other construction trips carry; the trip is dropped (`ConstructionDropped`) when that is nothing (`not_needed`), the market no longer sells the material (`not_sold_here`), its supply is SCARCE or LIMITED (`low_supply`, D66), or the first batch would dip into the credit reserve (`over_budget`, D64; what the trip holds back is its own to spend); otherwise buy them in batches of the market's trade volume (D81): for each, [API] buy it at the price quoted then, publish `CargoPurchasedEvent` (`ForConstruction`: the ledger's `ConstructionBuy`), log `CargoBought`, fetch the market again (D25), and store the goal with what the batch cost, holding back only what is left to buy; a restart goes on from what is aboard. Before each batch it checks the market as the last refresh fetched it: when the supply has fallen to SCARCE or LIMITED, or the batch would dip into the reserve, it buys no more and takes what it has to the site (logged at Information). Then it records the purchase in the goal: the units it bought, what they cost. Then navigate towards the site and dock. **Docked at the site:** with none of the material aboard, clear the goal and complete; else supply as much as the site still needs, as cached (when that says none, it fetches the site once more), [API] supply, store the site and the hold the API answers with, publish `ConstructionSuppliedEvent`, log `ConstructionSupplied`, clear the goal and complete. A supply the API refuses (4800, 4801: `not_needed`; 4802: `wrong_location`) logs `ConstructionDropped` at Warning, fetches the site again and clears the goal, with the cargo aboard; the plan doesn't offer that ship the material again for 10 minutes. Every end books the trip (`TripBook`, `construction`): a loss, as supplying pays nothing. |
+| `MineForShuttle` | A drone parked at a far asteroid (slice 6.18, D83). **Drifting** first, as `MineAndSell`'s, to the point's market when that is out of its CRUISE reach (D45), logging `DriftStarted`; then [cmd] navigate towards the asteroid (`GoalFlight`, filling its tank at the market). **At the asteroid** (orbiting first: the arrival docked it, and a transfer needs both ships in the same state): with cargo aboard and a shuttle with a `CollectOre` round there, in orbit, with room and not selling, [API] transfer each good (`POST my/ships/{ship}/transfer`), as much as the shuttle has room for, storing the drone's hold the API answers with and the shuttle's as it held and was handed, and logging `CargoTransferred`; a refused transfer is logged at Warning and fetches the shuttle's hold again. Otherwise, with room, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step with the best survey for its ore, keeping the ores a market buys within one tank (D71); with its hold full and no shuttle there, wait, without an API call. It never ends on its own: the mining plan gives it again while the point is open. |
+| `CollectOre` | A shuttle's round of collecting (slice 6.18, D83). **Collecting:** [cmd] navigate towards the asteroid (`GoalFlight`); there, orbit, and wait without an API call while the drones hand over, until its hold is full, or no drone with a place there is at the asteroid: then record that it sells. **Selling:** [cmd] navigate towards the market and dock; [API] fetch its hold (the drones wrote the cache from what they handed over), [API] sell each good the market buys in batches of its trade volume, publishing `ShipCargoSoldEvent` and logging `CargoSold`, jettison what the market doesn't buy (D42), fetch the market again (D25), clear the goal and book the trip (`collecting`, `sold`, or `nothing_aboard`). |
 | `Idle` | Unreachable. |
 
 ### Commands
@@ -1808,15 +1847,17 @@ The seven pages in `src/Future` are not routed.
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
   | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
-  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `shared`, `contract`); `ContractId` for the contract |
+  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `shared`, `collection` for a drone's place at a collection point (slice 6.18), `contract`); `ContractId` for the contract |
+  | `CargoTransferred` | Drone executor at a collection point, per good handed over (slice 6.18, D83) | `ShipSymbol`, `TargetShipSymbol` (the shuttle), `TradeSymbol`, `Units`, `WaypointSymbol` (the asteroid) |
+  | `CollectionStarted` | Mining plan, for each round of a collecting shuttle (slice 6.18, D83) | `ShipSymbol`, `WaypointSymbol` (the asteroid), `SellWaypoint`, `Reason` (`collection`) |
   | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |
   | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`, `uncovered`, `shared`) |
   | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45); the move executor, when a ship that can only survey sets off to where most drones mine (D54) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there; for a move, `Destination` |
   | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |
-  | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `Construct`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `coverage`, `gathers_first`, `construction`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
+  | `RoleChanged` | Role board, for each ship whose role changes (slice 6.9) | `ShipSymbol`, `OldRole`, `NewRole` (`Survey`, `Mine`, `Siphon`, `Trade`, `Construct`, `Collect`, `None`), `Reason` (`only_role`, `survey_first`, `contract`, `coverage`, `gathers_first`, `construction`, `collection`, `most_profitable`, `no_work`, `no_role`); for a role chosen by profit, `CreditsPerHour` and `Job`: the trip that decided it |
   | `CargoJettisoned` | `CargoJettison`: the trading and spare-time plans, for cargo nothing will sell or use (D42) | `ShipSymbol`, `Units`, `TradeSymbol`, `WaypointSymbol`, `Reason` (`no_buyer`, `not_worth_the_fuel`) |
-  | `TripEnded` | `TripBook`, when a trade, mining, siphon, spare-time or construction trip ends, and at each contract delivery (D46) | `ShipSymbol`, `Activity` (`trade`, `mining`, `siphoning`, `spare_time`, `contract`, `construction`), `Earned`, `Spent`, `FuelCost`, `Profit`, `Minutes`, `Reason` (`sold`, `delivered`, `interrupted`, `runaway`, `rejected`, `nothing_aboard`, `no_buyer`, `not_bought_here`, `not_lucrative`, `not_possible`; for construction `supplied`, or why it was dropped) |
+  | `TripEnded` | `TripBook`, when a trade, mining, siphon, spare-time, construction or collecting trip ends, and at each contract delivery (D46) | `ShipSymbol`, `Activity` (`trade`, `mining`, `siphoning`, `spare_time`, `contract`, `construction`, `collecting`), `Earned`, `Spent`, `FuelCost`, `Profit`, `Minutes`, `Reason` (`sold`, `delivered`, `interrupted`, `runaway`, `rejected`, `nothing_aboard`, `no_buyer`, `not_bought_here`, `not_lucrative`, `not_possible`; for construction `supplied`, or why it was dropped) |
   | `ConstructionStarted` | Construction plan, for each trip (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `WaypointSymbol` (the site), `Reason` (`purchase`, with `BuyPrice`, `Cost` with its fuel and `FuelCost`; `held_cargo` for materials the ship already holds) |
   | `ConstructionSupplied` | Construction executor, per supply (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, and the site's `Fulfilled` and `Required` units of it afterwards |
   | `ConstructionDropped` | Construction executor, when a trip is given up (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` where the ship is, `SiteWaypoint`, `Reason` (`not_needed`, `not_sold_here`, `low_supply`, `over_budget`, at the market before it bought anything: D81); at Warning, when the API refused the supply, `WaypointSymbol` (the site), `Units` kept aboard and `Reason` (`not_needed`, `wrong_location`) |

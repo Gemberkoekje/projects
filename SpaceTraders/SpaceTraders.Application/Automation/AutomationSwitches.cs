@@ -51,7 +51,7 @@ public static class AutomationSwitches
 
         // Only the survey plan moves ships, to where most drones mine (D54, D55).
         MoveToWaypointGoal => AutomationPlan.Survey,
-        MineAndSellGoal => AutomationPlan.Mining,
+        MineAndSellGoal or MineForShuttleGoal or CollectOreGoal => AutomationPlan.Mining,
         SiphonAndSellGoal => AutomationPlan.Siphon,
         TradeBetweenMarketsGoal => AutomationPlan.Trading,
         GatherAndSellGoal => AutomationPlan.SpareTime,

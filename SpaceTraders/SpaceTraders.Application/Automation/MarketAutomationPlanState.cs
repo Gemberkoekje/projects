@@ -25,9 +25,41 @@ public sealed record MiningAutomationPlanState
 
     public required IReadOnlyList<MiningAutomationOpportunityState> Opportunities { get; init; }
 
+    /// <summary>
+    /// The far asteroids where a shuttle collects what parked drones mine (slice 6.18, D83), with the shuttles designated
+    /// for each, which the role board keeps collecting, and the drones with a place there. Empty for the siphon plan, and in
+    /// a state stored before slice 6.18.
+    /// </summary>
+    public IReadOnlyList<CollectionPointState> CollectionPoints { get; init; } = [];
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// A far asteroid in the mining plan's view (slice 6.18, D83): where a shuttle collects what the drones parked there mine,
+/// and sells it at <see cref="SellWaypointSymbol"/>.
+/// </summary>
+public sealed record CollectionPointState
+{
+    /// <summary>Where the drones are parked.</summary>
+    public required string AsteroidWaypointSymbol { get; init; }
+
+    /// <summary>Where the shuttles sell.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>The market's ores below ABUNDANT that only this point serves.</summary>
+    public IReadOnlyList<string> Ores { get; init; } = [];
+
+    /// <summary>Those the market has SCARCE or LIMITED: a drone is kept for each (D48).</summary>
+    public IReadOnlyList<string> ScarceOres { get; init; } = [];
+
+    /// <summary>The shuttles designated for the point: bought for it, kept collecting by the role board.</summary>
+    public IReadOnlyList<string> ShuttleSymbols { get; init; } = [];
+
+    /// <summary>The drones with a place there: parked, or on their way.</summary>
+    public IReadOnlyList<string> DroneSymbols { get; init; } = [];
 }
 
 /// <summary>

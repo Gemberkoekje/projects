@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -46,6 +47,13 @@ public interface IMiningAutomationService
 ///   free, a drone whose first trip, by the same ranking, would serve a market short of its ore (D22, D28), in turn with
 ///   the cargo ships. A drone that would mine for a market that isn't short is not bought: the opening that paid for it
 ///   would stay open and pay for the next.</item>
+///   <item>far asteroids no drone mines on a CRUISE round trip of the market that buys their ores (slice 6.18, D83,
+///   <see cref="MiningPlanner.CollectionPoints"/>): a mining drone with no uncovered ore to serve takes a place at one that
+///   wants more drones, one per SCARCE or LIMITED ore (D48), drifting to its market first when that is out of its CRUISE
+///   reach (D45), and stays parked there (<see cref="MineForShuttleGoal"/>); the shuttle designated for it collects their
+///   ore (<see cref="CollectOreGoal"/>) once a drone is parked there. With the drones for scarce minerals (Coverage) it buys
+///   a light shuttle for a point where a drone has a place and none is designated yet, and a second when a parked drone
+///   waits for one, its hold full, while the first is away selling.</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -66,6 +74,11 @@ public sealed class MiningAutomationService(
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
+    private const string LightShuttleShipType = "SHIP_LIGHT_SHUTTLE";
+    private const string Collection = "collection";
+
+    /// <summary>The most shuttles a collection point gets: the first, and a second when drones wait for one (D83).</summary>
+    private const int MaxShuttlesPerPoint = 2;
     private const string MaxMiningDronesSettingKey = "Mining.MaxDrones";
     private const int DefaultMaxMiningDrones = 20;
 
@@ -86,6 +99,17 @@ public sealed class MiningAutomationService(
         var explorers = BusinessSystems.Explorers(active);
         var systems = BusinessSystems.Of(fleet, explorers);
 
+        // D83: the shuttles designated for each collection point, by point, as the last pass left them.
+        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);
+        var inFleet = fleet.Select(ship => ship.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var designated = (existing?.CollectionPoints ?? [])
+            .GroupBy(point => PointKey(point.SellWaypointSymbol, point.AsteroidWaypointSymbol), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.SelectMany(point => point.ShuttleSymbols).Where(inFleet.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -95,6 +119,11 @@ public sealed class MiningAutomationService(
         // The miners' trips: a free miner takes a scarce ore that has none near its market first (D48, D53).
         var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
+
+        // D83: the drones with a place at a collection point, parked or on their way, and the shuttles' rounds.
+        var parked = new List<(ShipModel Ship, MineForShuttleGoal Job)>();
+        var rounds = new List<(ShipModel Ship, CollectOreGoal Round)>();
+        var freeCollectors = new List<ShipModel>();
         foreach (var ship in fleet)
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
@@ -106,11 +135,34 @@ public sealed class MiningAutomationService(
                 minersOn[key] = minersOn.GetValueOrDefault(key) + 1;
                 covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
+            else if (goal is MineForShuttleGoal job && job.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                var key = MiningPlanner.OpportunityKey(job.SellWaypointSymbol, job.TradeSymbol);
+                heldKeys.Add(key);
+                heldBy[key] = ship.Symbol;
+                minersOn[key] = minersOn.GetValueOrDefault(key) + 1;
+                covered.Add(new CoveringTrip(job.TradeSymbol, job.SellWaypointSymbol, ship.FuelCapacity));
+                parked.Add((ship, job));
+            }
+            else if (goal is CollectOreGoal round && round.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                rounds.Add((ship, round));
+            }
             else if (board.IsMiner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
                 free.Add(ship);
             }
+            else if (board.IsCollector(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
+            {
+                freeCollectors.Add(ship);
+            }
         }
+
+        // Each point's drones with a place there, and the ore each mines for.
+        var places = parked
+            .GroupBy(entry => PointKey(entry.Job.SellWaypointSymbol, entry.Job.AsteroidWaypointSymbol), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(entry => (entry.Ship.Symbol, entry.Job.TradeSymbol)).ToList(), StringComparer.OrdinalIgnoreCase);
+        var pointsBySystem = new Dictionary<string, IReadOnlyList<CollectionPoint>>(StringComparer.OrdinalIgnoreCase);
 
         var freeAtStart = free.Count > 0;
         var gaveTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -120,14 +172,26 @@ public sealed class MiningAutomationService(
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
+            var points = CollectionPointsIn(context, system.Key, fleet, shipyardList);
+            pointsBySystem[system.Key] = points;
             var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)).ToList();
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var miner in candidates)
             {
-                if (await GiveTripAsync(context, miner, heldKeys, heldBy, minersOn, covered, cancellationToken))
+                if (await GiveTripAsync(context, miner, heldKeys, heldBy, minersOn, covered, points, places, cancellationToken))
                 {
                     withTrip.Add(miner.Symbol);
                     gaveTrip.Add(miner.Symbol);
+                }
+            }
+
+            // D83: a designated shuttle collects once a drone is parked at its point.
+            foreach (var collector in freeCollectors.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (points.FirstOrDefault(point => designated.GetValueOrDefault(point.Key, []).Contains(collector.Symbol, StringComparer.OrdinalIgnoreCase)) is { } point
+                    && parked.Any(entry => IsParkedAt(entry.Ship, point)))
+                {
+                    await StartRoundAsync(collector, point, cancellationToken);
                 }
             }
 
@@ -161,8 +225,8 @@ public sealed class MiningAutomationService(
             fleet.Where(board.IsMiner).Select(ship => ship.Symbol),
             free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
-        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
-        await SaveStateAsync(opportunities, cancellationToken);
+        await BuyAsync(fleet, systems, board, heldKeys, covered, freeAtStart, new Collecting(pointsBySystem, places, designated, parked, rounds), shipyardList, cancellationToken);
+        await SaveStateAsync(existing, opportunities, CollectionPointStates(pointsBySystem, places, designated), cancellationToken);
     }
 
     /// <summary>
@@ -181,8 +245,17 @@ public sealed class MiningAutomationService(
         Dictionary<string, string> heldBy,
         Dictionary<string, int> minersOn,
         List<CoveringTrip> covered,
+        IReadOnlyList<CollectionPoint> points,
+        Dictionary<string, List<(string Ship, string Ore)>> places,
         CancellationToken cancellationToken)
     {
+        // D83: a drone at a collection point's asteroid stays there while the point is open; the shuttle takes its hold.
+        if (FleetRoles.IsMiningDrone(miner) && points.FirstOrDefault(point => IsAt(miner, point.AsteroidSymbol)) is { } here)
+        {
+            await StartParkedAsync(miner, here, drifting: false, heldKeys, heldBy, covered, places, cancellationToken);
+            return true;
+        }
+
         var holdIsFull = miner.CargoCapacity > 0 && miner.CargoCurrent >= miner.CargoCapacity;
         if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, miner, holdIsFull, out var ore, out var sale))
         {
@@ -206,6 +279,11 @@ public sealed class MiningAutomationService(
         var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
         if (ranked.Count == 0)
         {
+            if (await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
+            {
+                return true;
+            }
+
             // D77: "I'd like the miners to only mine, even if there is more profit in trading. They can mine until every
             // mineral is ABUNDANT." The command ship keeps D38: it takes what pays it most, so it shares nothing.
             if (FleetRoles.IsMiningDrone(miner) && MiningPlanner.SharedTargets(context, miner, minersOn).FirstOrDefault() is { } shared)
@@ -221,6 +299,14 @@ public sealed class MiningAutomationService(
         }
 
         var target = MiningPlanner.UncoveredFirst(context.Map, miner, ranked, covered)[0];
+
+        // D83: a far asteroid's scarce ores come after the uncovered ones a drone serves on its own (D48, near before far).
+        var uncovered = target.LowSupply && !covered.Any(trip => trip.Covers(context.Map, target.Ore, target.SellWaypointSymbol));
+        if (!uncovered && await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
+        {
+            return true;
+        }
+
         var reason = target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = miner.Symbol;
@@ -253,6 +339,165 @@ public sealed class MiningAutomationService(
             reason);
     }
 
+    /// <summary>
+    /// A mining drone takes a place at a collection point that wants more drones (D83), one per SCARCE or LIMITED ore (D48),
+    /// drifting to its market first when that is out of its CRUISE reach (D45). The command ship takes none (D38).
+    /// </summary>
+    private async Task<bool> TryJoinPointAsync(
+        MiningContext context,
+        ShipModel drone,
+        IReadOnlyList<CollectionPoint> points,
+        HashSet<string> heldKeys,
+        Dictionary<string, string> heldBy,
+        List<CoveringTrip> covered,
+        Dictionary<string, List<(string Ship, string Ore)>> places,
+        CancellationToken cancellationToken)
+    {
+        if (!FleetRoles.IsMiningDrone(drone))
+        {
+            return false;
+        }
+
+        foreach (var point in points.Where(point => point.DronesWanted > (places.TryGetValue(point.Key, out var there) ? there.Count : 0)))
+        {
+            var reaches = MiningPlanner.CanReach(context.Map, drone, point.SellWaypointSymbol);
+            if (reaches || MiningPlanner.CanDriftTo(context.Map, drone, point.SellWaypointSymbol))
+            {
+                await StartParkedAsync(drone, point, drifting: !reaches, heldKeys, heldBy, covered, places, cancellationToken);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Gives a drone its place at a collection point, for the scarce ore no drone there mines for yet (D48).</summary>
+    private async Task StartParkedAsync(
+        ShipModel drone,
+        CollectionPoint point,
+        bool drifting,
+        HashSet<string> heldKeys,
+        Dictionary<string, string> heldBy,
+        List<CoveringTrip> covered,
+        Dictionary<string, List<(string Ship, string Ore)>> places,
+        CancellationToken cancellationToken)
+    {
+        if (!places.TryGetValue(point.Key, out var there))
+        {
+            there = [];
+            places[point.Key] = there;
+        }
+
+        there.RemoveAll(place => place.Ship.Equals(drone.Symbol, StringComparison.OrdinalIgnoreCase));
+        var taken = there.Select(place => place.Ore).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var ore = point.ScarceOres.FirstOrDefault(scarce => !taken.Contains(scarce))
+            ?? point.ScarceOres.FirstOrDefault()
+            ?? point.Ores[0];
+        there.Add((drone.Symbol, ore));
+
+        var key = MiningPlanner.OpportunityKey(point.SellWaypointSymbol, ore);
+        heldKeys.Add(key);
+        heldBy[key] = drone.Symbol;
+        covered.Add(new CoveringTrip(ore, point.SellWaypointSymbol, drone.FuelCapacity));
+
+        var job = new MineForShuttleGoal
+        {
+            TradeSymbol = ore,
+            AsteroidWaypointSymbol = point.AsteroidSymbol,
+            SellWaypointSymbol = point.SellWaypointSymbol,
+            Drifting = drifting,
+        };
+        await goals.SetActiveGoalAsync(drone.Symbol, job, cancellationToken);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} mines {TradeSymbol} at {WaypointSymbol} and sells it at {SellWaypoint} ({Reason}).",
+            JournalEvents.MiningStarted,
+            drone.Symbol,
+            ore,
+            point.AsteroidSymbol,
+            point.SellWaypointSymbol,
+            Collection);
+    }
+
+    /// <summary>Starts a designated shuttle's round of collecting at its point (D83).</summary>
+    private async Task StartRoundAsync(ShipModel shuttle, CollectionPoint point, CancellationToken cancellationToken)
+    {
+        await goals.SetActiveGoalAsync(
+            shuttle.Symbol,
+            new CollectOreGoal { AsteroidWaypointSymbol = point.AsteroidSymbol, SellWaypointSymbol = point.SellWaypointSymbol },
+            cancellationToken);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} collects at {WaypointSymbol} and sells at {SellWaypoint} ({Reason}).",
+            JournalEvents.CollectionStarted,
+            shuttle.Symbol,
+            point.AsteroidSymbol,
+            point.SellWaypointSymbol,
+            Collection);
+    }
+
+    /// <summary>
+    /// The system's collection points (D83, <see cref="MiningPlanner.CollectionPoints"/>), judged with the tanks of a mining
+    /// drone and a light shuttle as the cheapest shipyard there sells them; none while either isn't sold there.
+    /// </summary>
+    private static IReadOnlyList<CollectionPoint> CollectionPointsIn(
+        MiningContext context,
+        string systemSymbol,
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    {
+        var drone = CheapestListing(shipyardList, systemSymbol, MiningDroneShipType);
+        var shuttle = CheapestListing(shipyardList, systemSymbol, LightShuttleShipType);
+        if (drone is null || shuttle is null)
+        {
+            return [];
+        }
+
+        var droneTank = fleet.FirstOrDefault(FleetRoles.IsMiningDrone)?.FuelCapacity ?? drone.Value.Ship.FuelCapacity;
+        return MiningPlanner.CollectionPoints(
+            context.Map,
+            new ShipModel("NEW-DRONE", systemSymbol, drone.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", droneTank, droneTank, CargoCapacity: drone.Value.Ship.CargoCapacity, ShipType: MiningDroneShipType),
+            new ShipModel("NEW-SHUTTLE", systemSymbol, shuttle.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", shuttle.Value.Ship.FuelCapacity, shuttle.Value.Ship.FuelCapacity, CargoCapacity: shuttle.Value.Ship.CargoCapacity, ShipType: LightShuttleShipType));
+    }
+
+    /// <summary>The cheapest shipyard of a system that sells a ship type with a known price and tank, and its listing.</summary>
+    private static (ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)? CheapestListing(IReadOnlyList<ShipyardWaypointDto> shipyardList, string systemSymbol, string shipType)
+        => shipyardList
+            .Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(shipyard => shipyard.Ships
+                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && ship.FuelCapacity > 0)
+                .Select(ship => ((ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)?)(shipyard, ship)))
+            .OrderBy(listing => listing!.Value.Ship.PurchasePrice)
+            .ThenBy(listing => listing!.Value.Shipyard.WaypointSymbol, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+    /// <summary>Whether a drone with a place at the point is parked at its asteroid: there, and not in flight.</summary>
+    private static bool IsParkedAt(ShipModel drone, CollectionPoint point)
+        => IsAt(drone, point.AsteroidSymbol) && drone.LocalStatus != ShipLocalStatus.InTransit;
+
+    private static bool IsAt(ShipModel ship, string waypointSymbol)
+        => string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A collection point's key: its market and asteroid, as <see cref="CollectionPoint.Key"/> has it.</summary>
+    private static string PointKey(string sellWaypointSymbol, string asteroidSymbol)
+        => $"{sellWaypointSymbol}|{asteroidSymbol}".ToUpperInvariant();
+
+    /// <summary>The collection points for the plan's state, with the shuttles designated for each and the drones there.</summary>
+    private static IReadOnlyList<CollectionPointState> CollectionPointStates(
+        IReadOnlyDictionary<string, IReadOnlyList<CollectionPoint>> pointsBySystem,
+        IReadOnlyDictionary<string, List<(string Ship, string Ore)>> places,
+        IReadOnlyDictionary<string, List<string>> designated)
+        => [.. pointsBySystem.Values
+            .SelectMany(points => points)
+            .OrderBy(point => point.Key, StringComparer.Ordinal)
+            .Select(point => new CollectionPointState
+            {
+                AsteroidWaypointSymbol = point.AsteroidSymbol,
+                SellWaypointSymbol = point.SellWaypointSymbol,
+                Ores = point.Ores,
+                ScarceOres = point.ScarceOres,
+                ShuttleSymbols = [.. designated.GetValueOrDefault(point.Key, []).Order(StringComparer.Ordinal)],
+                DroneSymbols = [.. (places.TryGetValue(point.Key, out var there) ? there : []).Select(place => place.Ship).Order(StringComparer.Ordinal)],
+            })];
+
     /// <summary>Whether the contract plan mines now: it takes every free miner (D23), a bought drone included.</summary>
     private async Task<bool> ContractTakesMinersAsync(CancellationToken cancellationToken)
         => await settings.IsPlanEnabledAsync(AutomationPlan.Contract, cancellationToken)
@@ -260,19 +505,22 @@ public sealed class MiningAutomationService(
             && contract.UnitsFulfilled < contract.UnitsRequired;
 
     /// <summary>
-    /// Says what the plan would buy (<see cref="DroneNeedAsync"/>), and buys it when the order ships are bought in lets it
-    /// (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new drone.
+    /// Says what the plan would buy (<see cref="NeedAsync"/>), and buys it when the order ships are bought in lets it (D43,
+    /// <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new ship. A shuttle
+    /// bought for a collection point is designated for it (D83), which the role board reads to keep it collecting.
     /// </summary>
-    private async Task BuyDroneAsync(
+    private async Task BuyAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
+        Collecting collecting,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
-        var need = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
+        var (need, pointKey) = await NeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, shipyardList, cancellationToken);
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Mining, need, cancellationToken))
         {
             return;
@@ -282,10 +530,64 @@ public sealed class MiningAutomationService(
         if (!purchased.IsSuccess)
         {
             logger.LogDebug(
-                "Mining plan: mining drone purchase denied at {Shipyard} — {Reason}.",
+                "Mining plan: {ShipType} purchase denied at {Shipyard} — {Reason}.",
+                need.ShipType,
                 need.ShipyardWaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");
+            return;
         }
+
+        if (pointKey.Length > 0 && purchased.PurchasedShip is { } shuttle)
+        {
+            if (!collecting.Designated.TryGetValue(pointKey, out var shuttles))
+            {
+                shuttles = [];
+                collecting.Designated[pointKey] = shuttles;
+            }
+
+            shuttles.Add(shuttle.Symbol);
+        }
+    }
+
+    /// <summary>
+    /// A light shuttle for a collection point (D83), with the drones for scarce minerals (<see cref="PurchaseTier.Coverage"/>):
+    /// for a point where a drone has a place and no shuttle is designated yet; else a second for a point where a drone
+    /// parked at the asteroid waits with its hold full while its shuttle is away selling. None while no shipyard of the
+    /// system sells one with a known price.
+    /// </summary>
+    private static (PurchaseNeed Need, string PointKey) ShuttleNeed(string systemSymbol, Collecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    {
+        if (!collecting.PointsBySystem.TryGetValue(systemSymbol, out var points)
+            || points.Count == 0
+            || CheapestListing(shipyardList, systemSymbol, LightShuttleShipType) is not { } listing)
+        {
+            return (PurchaseNeed.None, string.Empty);
+        }
+
+        var need = new PurchaseNeed(PurchaseTier.Coverage, LightShuttleShipType, listing.Shipyard.WaypointSymbol, listing.Ship.PurchasePrice);
+        foreach (var point in points)
+        {
+            var shuttles = collecting.Designated.GetValueOrDefault(point.Key, []);
+            var hasDrones = collecting.Places.TryGetValue(point.Key, out var there) && there.Count > 0;
+            if (hasDrones && shuttles.Count == 0)
+            {
+                return (need, point.Key);
+            }
+
+            var away = collecting.Rounds.Where(entry => entry.Round.AsteroidWaypointSymbol.Equals(point.AsteroidSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
+            var waits = collecting.Parked.Any(entry => IsParkedAt(entry.Ship, point)
+                && entry.Ship.CargoCapacity > 0
+                && entry.Ship.CargoCurrent >= entry.Ship.CargoCapacity);
+            if (shuttles.Count is > 0 and < MaxShuttlesPerPoint
+                && waits
+                && away.Any(entry => entry.Round.Selling)
+                && !away.Any(entry => !entry.Round.Selling))
+            {
+                return (need, point.Key);
+            }
+        }
+
+        return (PurchaseNeed.None, string.Empty);
     }
 
     /// <summary>
@@ -301,6 +603,34 @@ public sealed class MiningAutomationService(
     ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>).</item>
     /// </list>
     /// </summary>
+    private async Task<(PurchaseNeed Need, string PointKey)> NeedAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> systems,
+        FleetRoleBoard board,
+        IReadOnlySet<string> heldKeys,
+        IReadOnlyCollection<CoveringTrip> covered,
+        bool freeAtStart,
+        Collecting collecting,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList,
+        CancellationToken cancellationToken)
+    {
+        if (await ContractTakesMinersAsync(cancellationToken))
+        {
+            return (PurchaseNeed.None, string.Empty);
+        }
+
+        // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one.
+        foreach (var systemSymbol in systems)
+        {
+            if (ShuttleNeed(systemSymbol, collecting, shipyardList) is { Need.Tier: not PurchaseTier.None } shuttle)
+            {
+                return shuttle;
+            }
+        }
+
+        return (await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, shipyardList, cancellationToken), string.Empty);
+    }
+
     private async Task<PurchaseNeed> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
@@ -308,13 +638,10 @@ public sealed class MiningAutomationService(
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
+        Collecting collecting,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
-        if (await ContractTakesMinersAsync(cancellationToken))
-        {
-            return PurchaseNeed.None;
-        }
-
         var maxDrones = await settings.GetAsync<int>(MaxMiningDronesSettingKey, cancellationToken);
         if (maxDrones <= 0)
         {
@@ -328,7 +655,6 @@ public sealed class MiningAutomationService(
             return PurchaseNeed.None;
         }
 
-        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
         foreach (var systemSymbol in systems)
         {
             var shipyard = shipyardList
@@ -357,8 +683,10 @@ public sealed class MiningAutomationService(
                 ShipType: MiningDroneShipType);
             var need = new PurchaseNeed(PurchaseTier.Coverage, MiningDroneShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
 
+            // D83: a far asteroid's SCARCE or LIMITED ores count a drone each too (D48).
             var miningDrones = fleet.Count(ship => FleetRoles.IsMiningDrone(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
-            if (miningDrones < MiningPlanner.ScarceOres(context, newDrone).Count)
+            var pointDrones = collecting.PointsBySystem.GetValueOrDefault(systemSymbol, []).Sum(point => point.DronesWanted);
+            if (miningDrones < MiningPlanner.ScarceOres(context, newDrone).Count + pointDrones)
             {
                 return need;
             }
@@ -394,11 +722,17 @@ public sealed class MiningAutomationService(
         return PurchaseNeed.None;
     }
 
-    /// <summary>Records the openings. Only a change is written: the tick runs every 5 seconds.</summary>
-    private async Task SaveStateAsync(IReadOnlyList<MiningAutomationOpportunityState> opportunities, CancellationToken cancellationToken)
+    /// <summary>
+    /// Records the openings and the collection points, with the shuttles designated for each (D83). Only a change is written:
+    /// the tick runs every 5 seconds.
+    /// </summary>
+    private async Task SaveStateAsync(
+        MiningAutomationPlanState? existing,
+        IReadOnlyList<MiningAutomationOpportunityState> opportunities,
+        IReadOnlyList<CollectionPointState> collectionPoints,
+        CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
-        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);
         var firstSeen = (existing?.Opportunities ?? [])
             .GroupBy(opportunity => opportunity.OpportunityKey, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().FirstObservedAt, StringComparer.OrdinalIgnoreCase);
@@ -414,7 +748,9 @@ public sealed class MiningAutomationService(
                 }),
         ];
 
-        if (existing is not null && Same(existing.Opportunities, dated))
+        if (existing is not null
+            && Same(existing.Opportunities, dated)
+            && JsonSerializer.Serialize(existing.CollectionPoints, CompareOptions) == JsonSerializer.Serialize(collectionPoints, CompareOptions))
         {
             return;
         }
@@ -425,6 +761,7 @@ public sealed class MiningAutomationService(
             {
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = dated,
+                CollectionPoints = collectionPoints,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },
@@ -437,4 +774,15 @@ public sealed class MiningAutomationService(
 
     private static MiningAutomationOpportunityState Undated(MiningAutomationOpportunityState opportunity)
         => opportunity with { FirstObservedAt = default, LastObservedAt = default };
+
+    /// <summary>
+    /// What the plan knows of its collection points at a pass (D83): the points of each system, the drones with a place at
+    /// each, the shuttles designated for each, the parked drones' and the shuttles' goals.
+    /// </summary>
+    private sealed record Collecting(
+        IReadOnlyDictionary<string, IReadOnlyList<CollectionPoint>> PointsBySystem,
+        IReadOnlyDictionary<string, List<(string Ship, string Ore)>> Places,
+        Dictionary<string, List<string>> Designated,
+        IReadOnlyList<(ShipModel Ship, MineForShuttleGoal Job)> Parked,
+        IReadOnlyList<(ShipModel Ship, CollectOreGoal Round)> Rounds);
 }

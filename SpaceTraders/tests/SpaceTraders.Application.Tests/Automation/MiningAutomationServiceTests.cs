@@ -708,6 +708,194 @@ public sealed class MiningAutomationServiceTests
         return [Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"), Drone("SHIP-9", B7), Drone("SHIP-10", B7)];
     }
 
+    [Fact]
+    public async Task ADroneWithNothingUncoveredToServe_TakesAPlaceAtTheFarAsteroid_DriftingToItsMarketFirst()
+    {
+        // D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and have the drones drop their ore into the
+        // light shuttle." B7's iron comes only from B13, 48 away: no drone mines it on a round trip of B7 (D45), so the iron
+        // waits for a drone parked there. Every other pair has a miner; the drone drifts to B7 first, out of its CRUISE reach.
+        CollectingAtB13();
+        Fleet([.. EveryPairHeld(), Drone("SHIP-3")]);
+
+        await RunAsync();
+
+        var job = _activeGoals["SHIP-3"].Should().BeOfType<MineForShuttleGoal>().Subject;
+        (job.TradeSymbol, job.AsteroidWaypointSymbol, job.SellWaypointSymbol, job.Drifting).Should().Be(("IRON_ORE", B13, B7, true));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted" && Equals(entry.Properties["Reason"], "collection"));
+    }
+
+    [Fact]
+    public async Task AnUncoveredOreADroneServesOnItsOwn_ComesBeforeAPlaceAtTheFarAsteroid()
+    {
+        // D48, near before far: F49's silicon has no miner yet.
+        CollectingAtB13();
+        Fleet(Drone("SHIP-3"));
+
+        await RunAsync();
+
+        _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Which.SellWaypointSymbol.Should().Be(F49);
+    }
+
+    [Fact]
+    public async Task ADroneAtTheFarAsteroid_StaysThere_ForTheShuttle()
+    {
+        // Its goal ended (a failed extraction drops it): it is free at B13, with too little fuel to fly anywhere in CRUISE.
+        CollectingAtB13();
+        Fleet(Drone("SHIP-3", B13, "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 6)]) with { FuelCurrent = 32 });
+
+        await RunAsync();
+
+        var job = _activeGoals["SHIP-3"].Should().BeOfType<MineForShuttleGoal>().Subject;
+        (job.AsteroidWaypointSymbol, job.Drifting).Should().Be((B13, false));
+    }
+
+    [Fact]
+    public async Task TheDesignatedShuttle_CollectsOnceADroneIsParkedThere()
+    {
+        CollectingAtB13();
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine), ("SHIP-20", FleetRole.Collect));
+        _state = StateWithShuttles("SHIP-20");
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7 };
+        Fleet(Drone("SHIP-3", B13, "IN_ORBIT"), Shuttle("SHIP-20", B7));
+
+        await RunAsync();
+
+        var round = _activeGoals["SHIP-20"].Should().BeOfType<CollectOreGoal>().Subject;
+        (round.AsteroidWaypointSymbol, round.SellWaypointSymbol, round.Selling).Should().Be((B13, B7, false));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "CollectionStarted");
+    }
+
+    [Fact]
+    public async Task TheDesignatedShuttle_WaitsWhileItsDronesAreOnTheirWay()
+    {
+        // A drift takes hours: a shuttle waiting at the asteroid meanwhile would only wait there.
+        CollectingAtB13();
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine), ("SHIP-20", FleetRole.Collect));
+        _state = StateWithShuttles("SHIP-20");
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Drifting = true };
+        Fleet(Drone("SHIP-3", H51, "IN_TRANSIT"), Shuttle("SHIP-20", B7));
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-20");
+    }
+
+    [Fact]
+    public async Task AFarAsteroidWhereADroneHasAPlace_GetsAShuttle_WithTheDronesForScarceMinerals_DesignatedForIt()
+    {
+        // D83: "With scarce-mineral drones": the Coverage tier. The drone sells nothing without one.
+        CollectingAtB13();
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Drifting = true };
+        _purchases.TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", H52, Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true, PurchasedShip = Shuttle("SHIP-20", H52) });
+        Fleet(Drone("SHIP-3", H51, "IN_TRANSIT"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Coverage && need.ShipType == "SHIP_LIGHT_SHUTTLE" && need.ShipyardWaypointSymbol == H52);
+        var point = _state!.CollectionPoints.Should().ContainSingle().Subject;
+        (point.AsteroidWaypointSymbol, point.SellWaypointSymbol).Should().Be((B13, B7));
+        point.ShuttleSymbols.Should().Equal("SHIP-20");
+        point.DroneSymbols.Should().Equal("SHIP-3");
+    }
+
+    [Fact]
+    public async Task AFarAsteroidsScarceOres_CountADroneEach_WithTheOtherScarceMinerals()
+    {
+        // D48: one drone per SCARCE or LIMITED ore and area: silicon, quartz, copper and iron in the middle, gold and copper at
+        // B7, six drones. B7's iron, which only a drone parked at B13 serves, is one more.
+        CollectingAtB13();
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Coverage && need.ShipType == "SHIP_MINING_DRONE");
+    }
+
+    [Fact]
+    public async Task ASecondShuttle_WhenAParkedDroneWaitsWithAFullHold_WhileTheFirstIsAwaySelling()
+    {
+        // "A second shuttle is bought when drones wait for one."
+        CollectingAtB13();
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine), ("SHIP-20", FleetRole.Collect));
+        _state = StateWithShuttles("SHIP-20");
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7 };
+        _activeGoals["SHIP-20"] = new CollectOreGoal { AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Selling = true };
+        _purchases.TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", H52, Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true, PurchasedShip = Shuttle("SHIP-21", H52) });
+        Fleet(Drone("SHIP-3", B13, "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 15)]), Shuttle("SHIP-20", B7, "IN_TRANSIT"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Coverage && need.ShipType == "SHIP_LIGHT_SHUTTLE");
+        _state.CollectionPoints.Single().ShuttleSymbols.Should().Equal("SHIP-20", "SHIP-21");
+    }
+
+    [Fact]
+    public async Task NoSecondShuttle_WhileTheFirstCollects()
+    {
+        CollectingAtB13();
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-3", FleetRole.Mine), ("SHIP-20", FleetRole.Collect));
+        _state = StateWithShuttles("SHIP-20");
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7 };
+        _activeGoals["SHIP-20"] = new CollectOreGoal { AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7 };
+        Fleet(Drone("SHIP-3", B13, "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 15)]), Shuttle("SHIP-20", B7, "IN_TRANSIT"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).ShipType.Should().NotBe("SHIP_LIGHT_SHUTTLE");
+    }
+
+    /// <summary>
+    /// B7 imports iron as well, which only B13, 48 from B7, yields near it: a far asteroid no drone mines on a round trip (D83).
+    /// H52 sells light shuttles besides drones.
+    /// </summary>
+    private void CollectingAtB13()
+    {
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(
+            Map(
+            [
+                .. Markets().Where(market => market.WaypointSymbol != B7),
+                Market(
+                    B7,
+                    Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"),
+                    Good("COPPER_ORE", "EXCHANGE", 68, 58, 180, "SCARCE"),
+                    Good("IRON_ORE", "IMPORT", 118, 61, 60, "LIMITED"),
+                    Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
+            ]),
+            [],
+            129_357,
+            Now));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE", "SHIP_LIGHT_SHUTTLE"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 },
+                    new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 82_905, FuelCapacity = 300, CargoCapacity = 40 },
+                ],
+            },
+        ]);
+    }
+
+    /// <summary>The plan's state with B13's collection point and these shuttles designated for it.</summary>
+    private static MiningAutomationPlanState StateWithShuttles(params string[] shuttles) => new()
+    {
+        PlanId = Guid.NewGuid(),
+        Opportunities = [],
+        CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Ores = ["IRON_ORE"], ScarceOres = ["IRON_ORE"], ShuttleSymbols = shuttles }],
+        CreatedAt = Now,
+        UpdatedAt = Now,
+    };
+
+    /// <summary>A light shuttle: a 40-unit hold and a 300-unit tank, nothing to mine with.</summary>
+    private static ShipModel Shuttle(string symbol, string waypoint, string status = "DOCKED")
+        => new(symbol, SystemSymbol, waypoint, status, "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: [], CargoInventory: []);
+
     /// <summary>The market, with all the aluminum it wants (D77).</summary>
     private static MarketSnapshot AluminumAbundant(MarketSnapshot market)
         => market with { TradeGoods = [.. market.TradeGoods.Select(good => good.Symbol == "ALUMINUM_ORE" ? good with { Supply = "ABUNDANT" } : good)] };

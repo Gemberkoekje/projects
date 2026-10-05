@@ -51,16 +51,20 @@ public static class CreditReserve
         return fleet.Where(ship => Trades(ship, roleOf(ship))).Sum(ship => ship.CargoCapacity);
     }
 
-    /// <summary>Whether a ship buys cargo: a cargo ship, the command ship, or a ship the role board has trading.</summary>
+    /// <summary>
+    /// Whether a ship buys cargo: a cargo ship, the command ship, or a ship the role board has trading; not a shuttle that
+    /// collects at a far asteroid, which buys nothing (slice 6.18, D83).
+    /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="role">Its role on the role board; <see cref="FleetRole.None"/> with the board off.</param>
     /// <returns>True when its hold counts towards the reserve.</returns>
     public static bool Trades(ShipModel ship, FleetRole role)
     {
         ArgumentNullException.ThrowIfNull(ship);
-        return FleetRoles.IsCargoShip(ship)
-            || ship.ShipType.Equals(CommandShipType, StringComparison.OrdinalIgnoreCase)
-            || role == FleetRole.Trade;
+        return role != FleetRole.Collect
+            && (FleetRoles.IsCargoShip(ship)
+                || ship.ShipType.Equals(CommandShipType, StringComparison.OrdinalIgnoreCase)
+                || role == FleetRole.Trade);
     }
 
     /// <summary>The credits per unit from the setting's stored value: the default without one, 0 or more otherwise.</summary>

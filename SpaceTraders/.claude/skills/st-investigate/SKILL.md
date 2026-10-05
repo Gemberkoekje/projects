@@ -97,6 +97,11 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
   behind the gate's load in the purchase order. A load is bought in batches of the market's trade volume (D81), one
   `CargoBought` each; a builder that takes less than its load to the gate stopped because the supply fell to LIMITED or
   the next batch would dip into the credit reserve, which it logs.
+- **Far asteroids with a shuttle wait by design** (slice 6.18, D83): a drone with a `MineForShuttleGoal` drifts to its
+  collection point's market first (`DriftStarted`, hours), then stays at the asteroid; with its hold full and no shuttle
+  there it waits without API calls ("waiting for the shuttle"). A shuttle with the `Collect` role and no goal waits until a
+  drone is parked there; on its round it waits in orbit ("collecting ore at …") while the drones hand over
+  (`CargoTransferred`). The points, their shuttles and drones are in `plan_states`, `MiningAutomation`, `CollectionPoints`.
 - **Starts and deploys:** `|= "Deferred startup initialization completed"` lists every start. When
   lines come from several pods, `logs` prefixes each with the pod's suffix, so a restart or a deploy
   shows as a new suffix. `check` shows the running image; earlier ones are in gembernodes' history.

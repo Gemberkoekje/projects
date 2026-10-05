@@ -79,6 +79,18 @@ public static class JournalEvents
     public const string MiningStarted = nameof(MiningStarted);
 
     /// <summary>
+    /// A drone parked at a far asteroid handed ore to the shuttle collecting there (slice 6.18, D83: <c>ShipSymbol</c>,
+    /// <c>TargetShipSymbol</c>, <c>TradeSymbol</c>, <c>Units</c>, <c>WaypointSymbol</c>: the asteroid).
+    /// </summary>
+    public const string CargoTransferred = nameof(CargoTransferred);
+
+    /// <summary>
+    /// A shuttle set off on a round of collecting at a far asteroid (slice 6.18, D83: <c>ShipSymbol</c>,
+    /// <c>WaypointSymbol</c>: the asteroid, <c>SellWaypoint</c>: where it sells, <c>Reason</c>: <c>collection</c>).
+    /// </summary>
+    public const string CollectionStarted = nameof(CollectionStarted);
+
+    /// <summary>
     /// A ship siphoned at a gas giant (slice 6.7: <c>ShipSymbol</c>, <c>WaypointSymbol</c>, <c>TradeSymbol</c> it
     /// got, <c>Units</c>, <c>Target</c>: the gas its trip is for). A siphon takes no survey.
     /// </summary>
@@ -130,7 +142,7 @@ public static class JournalEvents
     /// <summary>
     /// The role board gave a ship another role (slice 6.9, D38: <c>ShipSymbol</c>, <c>OldRole</c>, <c>NewRole</c>,
     /// <c>Reason</c>: <c>only_role</c>, <c>survey_first</c>, <c>contract</c>, <c>coverage</c>, <c>gathers_first</c>,
-    /// <c>construction</c>, <c>most_profitable</c>, <c>no_work</c> or <c>no_role</c>; for a role chosen by profit also
+    /// <c>construction</c>, <c>collection</c> (slice 6.18), <c>most_profitable</c>, <c>no_work</c> or <c>no_role</c>; for a role chosen by profit also
     /// <c>CreditsPerHour</c> and the <c>Job</c> that decided it). It takes effect when the ship's trip ends.
     /// </summary>
     public const string RoleChanged = nameof(RoleChanged);

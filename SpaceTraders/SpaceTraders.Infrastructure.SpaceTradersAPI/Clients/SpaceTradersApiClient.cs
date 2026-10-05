@@ -187,6 +187,13 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    public Task<TransferCargoResult> TransferCargoAsync(string shipSymbol, string targetShipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, TransferCargoResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/transfer",
+            new { tradeSymbol, units, shipSymbol = targetShipSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
     public Task<NegotiateContractResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default)
         => PostWrappedAsync<object?, NegotiateContractResult>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/negotiate/contract",

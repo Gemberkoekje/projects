@@ -9,6 +9,13 @@ public sealed class JettisonResult
     required public ShipCargo Cargo { get; init; }
 }
 
+/// <summary>The answer to a cargo transfer: the transferring ship's cargo after it (slice 6.18).</summary>
+public sealed class TransferCargoResult
+{
+    [JsonPropertyName("cargo")]
+    required public ShipCargo Cargo { get; init; }
+}
+
 public sealed class NegotiateContractResult
 {
     [JsonPropertyName("contract")]

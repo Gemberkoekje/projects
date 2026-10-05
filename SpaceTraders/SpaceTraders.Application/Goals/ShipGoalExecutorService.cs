@@ -74,7 +74,9 @@ public sealed class ShipGoalExecutorService(
             and not MoveToWaypointGoal
             and not JumpGoal
             and not ExploreSystemGoal
-            and not SupplyConstructionGoal)
+            and not SupplyConstructionGoal
+            and not MineForShuttleGoal
+            and not CollectOreGoal)
         {
             return null;
         }
