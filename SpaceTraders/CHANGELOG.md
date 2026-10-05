@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-05, B67)
+- The role board credits a ship only with trade routes the trading plan could give it: none another ship's trip holds, nor a good another trip is on its way to buy at that market (D80). A trade job is the good at its buy market, so no two ships are credited with it, and each job offers its best trip. SPECTER-1 had changed role 120 times in 12 hours on estimates of 0.14 to 1.77 million an hour.
+
+### Code – Changed (2026-10-05, slice 6.21)
+- A ship's trade estimate is capped at what the trade trips that ended in the last two hours made per hour of their time (D87, "Cap at realized"; `TradeEarnings`, noted by the trip book).
+- Beyond `Trade.ShipPurchases` the trading plan buys a cargo ship only once a route worth `Trade.ShipPurchaseMinRouteProfit` (10,000), held by no trader, has waited `Trade.ShipPurchaseWaitMinutes` (30) for a ship with every trader busy (D88, "Routes keep waiting"; `TradeShipDemand`). Two new settings.
+
+### Docs – Changed (2026-10-05, slice 6.21)
+- `PLAN.md`: B67, D87, D88, slice 6.21; slice 6.20 and B66 merged and deployed. `docs/HOW_IT_WORKS.md`: what a role earns, and the cargo ships beyond the list.
+
 ### Code – Changed (2026-10-05, slice 6.20)
 - Trade routes rank by profit, an end product's (a good nothing is made from) counted at half (D85), as chosen on 2026-10-05 ("Half weight") after no trader took FOOD at about 75,000 a load while trips of 302 to 3,864 went first under D82's order. `TradeRoutePlanner.RankingProfit`; `Rank` and `CompareBestFirst` use it.
 - A collection shuttle trades like any cargo ship until one of its point's drones is parked at the asteroid (D86, "Trade until parked"): the role board gives it the `Collect` role only then, from the end of its trip. SPECTER-2B had waited without work for about three hours.

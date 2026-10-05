@@ -421,16 +421,23 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      [Construction](#construction-constructionplanservice-slice-66)), and the trading plan when that has nothing
      it may buy. A ship whose one role is constructing and isn't chosen gets `None`;
   7. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
-     takes one trip or none, no two the same trade route (D18) or the same mining or siphon opening, by the
+     takes one trip or none, no two the same good bought at the same market (D18, D80, B67) or the same mining or
+     siphon opening, by the
      assignment that earns most in total (the Hungarian method, `Assignment`). A ship's current role counts
      `Roles.HeadStartPercent` (20) more (D41), so close calls don't flip back and forth. A ship left
      without a trip keeps its role (`no_work`), or takes its first role but surveying and constructing.
 
   A ship with no role whose plan is on gets `None` (`no_role`), and no plan gives it work.
-- **What a role earns** (`RoleEstimator`): the trips its plan would offer the ship, the best 20 per role,
-  each valued per hour:
-  - trade: every lucrative route from where the ship is, or is going, its profit after fuel, as the trading
-    plan reckons it (D14);
+- **What a role earns** (`RoleEstimator`): the trips its plan would offer the ship, the best 20 per role (one per job,
+  its best), each valued per hour:
+  - trade: every lucrative route from where the ship is, or is going, that the trading plan could give it, its profit
+    after fuel, as the trading plan reckons it (D14): none another ship's trip holds, nor of a good another trip is on
+    its way to buy at that market (D80), and the routes of one good from one market are one job (B67: on 2026-10-05 the
+    board credited SPECTER-1 and SPECTER-2B each with MEDICINE bought at D48 while SPECTER-2A took it). No trade trip
+    counts for more an hour than the trade trips that ended in the last two hours made per hour of their time
+    (`TradeEarnings`, D87, asked on 2026-10-05, "Cap at realized", when the board put SPECTER-1's trading at 0.14 to
+    1.77 million an hour, one trip's profit over its flights, while its trades made about 83,000): such a trip says
+    "at most what trading earned lately (D87)". In memory: after a start nothing caps it until a trade trip ends;
   - mine: every mining target (D28's; none for a market that has the ore ABUNDANT, D77), a full hold of the
     target ore, filled at the ship's rate times the ore's share of the extractions (its survey's deposits, or one
     of the asteroid's ores without one), less the fuel there and on to the market;
@@ -1010,10 +1017,14 @@ buy.
   while the fleet has fewer than N cargo ships (a hold and a tank, nothing to mine, siphon or survey
   with), at the shipyard that sells it for the least, and only when the new ship would have a
   lucrative route from the shipyard with the credits left after the purchase. Once the list is bought,
-  one more of its last type at a time, in turn with the drones (D43). `ShipPurchaseService` keeps the
-  credit reserve. One purchase a pass, when the order ships are bought in lets it: a ship of the list is
-  saved up for, whatever the routes; a ship beyond it needs nothing while a trader has no trip or no new
-  ship would have a lucrative route, so the drones' turn comes.
+  one more of its last type at a time, in turn with the drones (D43), and only when the traders can't keep up
+  (D88, asked on 2026-10-05: "can you add a limitation on buying more trade ships unless a trade ship actually adds
+  value?"): a route worth `Trade.ShipPurchaseMinRouteProfit` (10,000) that the new ship would have from the shipyard,
+  and no trader holds, has waited `Trade.ShipPurchaseWaitMinutes` (30) for a ship with every trader busy
+  (`TradeShipDemand`, in memory: a start waits anew). A stable market never gets there. `ShipPurchaseService` keeps
+  the credit reserve. One purchase a pass, when the order ships are bought in lets it: a ship of the list is
+  saved up for, whatever the routes; a ship beyond it needs nothing until a route has waited so, so the drones' turn
+  comes.
 - **The state** (`plan_states`, `TradingAutomation`) lists the held routes (Assigned) and up to 20
   lucrative routes no trader holds (Pending), each with the free traders that could have taken it,
   for the `ShipLeftIdle` rule. It is written only when it changes. `GET /status/trading-routes` serves it (slice 2.17,

@@ -4,6 +4,7 @@ using NSubstitute;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -19,6 +20,7 @@ public sealed class TripBookTests
     private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
     private readonly LogRecorder _log = new();
+    private readonly TradeEarnings _tradeEarnings = new();
 
     /// <summary>Each kind of trip, with the activity it is booked under.</summary>
     public static TheoryData<TripGoal, string> Activities => new()
@@ -52,6 +54,19 @@ public sealed class TripBookTests
         line.Properties["Reason"].Should().Be("sold");
         _metrics.Received(1).TripEnded("trade");
         _metrics.Received(1).TripProfit("trade", 4_320);
+    }
+
+    [Fact]
+    public async Task ATradeTrip_IsNotedForTheRoleBoard_AndAMiningTripIsNot()
+    {
+        // D87: what trading earns caps the board's trade estimates. 7,900 after fuel in 30 minutes: 15,800 an hour.
+        var startedAt = TimeProvider.System.GetUtcNow().AddMinutes(-30);
+        FuelBought("SPECTER-1", startedAt);
+
+        await Book().BookAsync("SPECTER-1", Trade(startedAt) with { Earned = 109_220, Spent = 101_320 }, TripBook.Sold, CancellationToken.None);
+        await Book().BookAsync("SPECTER-3", new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = "X1-AB-XB5C", SellWaypointSymbol = "X1-AB-H51", StartedAt = startedAt, Earned = 900_000 }, TripBook.Sold, CancellationToken.None);
+
+        _tradeEarnings.PerHour(TimeProvider.System.GetUtcNow()).Should().BeApproximately(15_800, 50);
     }
 
     [Fact]
@@ -118,5 +133,5 @@ public sealed class TripBookTests
                 .Select((cost, index) => new LedgerEntryDto(index + 1, since.AddMinutes(index + 1), shipSymbol, null, nameof(LedgerCategory.FuelPurchase), -cost, null, null, null, "X1-AB-K85"))
                 .ToList());
 
-    private TripBook Book() => new(_ledger, _metrics, _log.For<TripBook>());
+    private TripBook Book() => new(_ledger, _metrics, _tradeEarnings, _log.For<TripBook>());
 }

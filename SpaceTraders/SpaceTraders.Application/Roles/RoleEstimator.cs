@@ -3,6 +3,8 @@ using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Siphoning;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Roles;
 
@@ -39,6 +41,18 @@ public sealed record RoleContext
 
     /// <summary>How fast each ship fills its hold.</summary>
     public required IGatheringRates Rates { get; init; }
+
+    /// <summary>
+    /// The fleet's trips under way, by ship (B67): a ship's trade estimate leaves out the routes the other ships' trade trips
+    /// hold, and the goods their trips are on their way to buy at a market (D80), as the trading plan does. None unless set.
+    /// </summary>
+    public IReadOnlyDictionary<string, ShipGoal> Trips { get; init; } = new Dictionary<string, ShipGoal>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// What trading has actually earned lately, per hour of a trader's time (D87, <see cref="TradeEarnings"/>): no trade
+    /// estimate promises more. Infinite, no cap, unless set.
+    /// </summary>
+    public double TradeCreditsPerHourAtMost { get; init; } = double.PositiveInfinity;
 
     /// <summary>The system's map.</summary>
     public TradeMarketMap Map => Mining.Map;
@@ -89,7 +103,9 @@ public sealed record RoleOption
 /// The role board's estimates (PLAN.md slice 6.9), without any I/O: for each role a ship could take, the trips its
 /// plan would offer it, valued per hour.
 /// <list type="bullet">
-///   <item>trade: every lucrative route (D14) from where the ship is, its profit after fuel;</item>
+///   <item>trade: every lucrative route (D14) from where the ship is that the trading plan could give it, its profit after
+///   fuel: none another trip holds, nor of a good another trip is on its way to buy at that market (B67, D80); at most what
+///   trading has actually earned lately per hour (D87);</item>
 ///   <item>mine: every mining target (D28's targets), a full hold of the target ore, as the trip keeps only that,
 ///   filled at the ship's rate times the ore's share of the extractions (its survey's, or one of the asteroid's ores
 ///   without one), at the price the target's market pays, less the fuel there and on to the market;</item>
@@ -140,6 +156,10 @@ public static class RoleEstimator
 
         return [.. options
             .Where(option => option.Credits > 0)
+
+            // One option per job, its best: only one ship can take it (B67), and the others would crowd out other jobs.
+            .GroupBy(option => option.JobKey, StringComparer.Ordinal)
+            .Select(job => job.OrderByDescending(option => option.CreditsPerHour).ThenBy(option => option.Job, StringComparer.Ordinal).First())
             .OrderByDescending(option => option.CreditsPerHour)
             .ThenBy(option => option.JobKey, StringComparer.Ordinal)
             .Take(Math.Max(0, limit))];
@@ -207,8 +227,21 @@ public static class RoleEstimator
         var map = context.Map;
         var speed = FleetRoles.EngineSpeed(ship, DefaultEngineSpeed);
         var credits = Math.Max(0, context.Mining.Credits - context.FuelReserveCredits);
+
+        // B67: the routes the other ships' trips hold, and the goods they are on their way to buy at a market (D80), aren't this
+        // ship's to take, as the trading plan has it.
+        var others = context.Trips
+            .Where(trip => !trip.Key.Equals(ship.Symbol, StringComparison.OrdinalIgnoreCase))
+            .Select(trip => trip.Value)
+            .Where(trip => trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            .ToList();
+        var trades = others.OfType<TradeBetweenMarketsGoal>().ToList();
+        var heldKeys = trades
+            .Select(trip => TradeRoutePlanner.RouteKey(trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var heldBuys = HeldBuys.Of(trades, others.OfType<SupplyConstructionGoal>());
         var options = new List<RoleOption>();
-        foreach (var route in TradeRoutePlanner.Rank(map, ship, credits, context.MinProfitPerUnit, NoneHeld))
+        foreach (var route in TradeRoutePlanner.Rank(map, ship, credits, context.MinProfitPerUnit, heldKeys, heldBuys))
         {
             if (!TradeRoutePlanner.TryPlanFlight(map, ship, route.BuyWaypointSymbol, out var approach)
                 || !TradeRoutePlanner.TryPlanFlight(
@@ -227,16 +260,29 @@ public static class RoleEstimator
                 + (StopSeconds * (Math.Max(1, approach.Stops.Count) + haul.Stops.Count));
             // The chains add at most the route's own margin a unit (D49).
             var chain = route.Units * context.Chains.PerUnitAtMost(route.SellWaypointSymbol, route.TradeSymbol, route.SellPrice - route.BuyPrice);
+            var earns = route.Profit + (long)Math.Round(chain);
+
+            // D87: no more an hour than trading has actually earned lately.
+            var atMost = context.TradeCreditsPerHourAtMost * seconds / 3600;
+            var job = $"{route.TradeSymbol} from {route.BuyWaypointSymbol} to {route.SellWaypointSymbol}";
             options.Add(new RoleOption(
                 FleetRole.Trade,
-                "trade|" + route.Key,
-                $"{route.TradeSymbol} from {route.BuyWaypointSymbol} to {route.SellWaypointSymbol}",
-                route.Profit + (long)Math.Round(chain),
+                TradeJobKey(route),
+                earns > atMost ? job + ", at most what trading earned lately (D87)" : job,
+                earns > atMost ? (long)Math.Floor(atMost) : earns,
                 seconds));
         }
 
         return options;
     }
+
+    /// <summary>
+    /// What only one ship can take at a time of a trade route (D80, B67): the good at its buy market, which one trip at a time
+    /// buys, so the board gives no two ships the same good there for different sell markets.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <returns>The job's key.</returns>
+    internal static string TradeJobKey(TradeRoute route) => $"trade|{route.BuyWaypointSymbol}|{route.TradeSymbol}".ToUpperInvariant();
 
     private static List<RoleOption> MineOptions(RoleContext context, ShipModel ship)
     {

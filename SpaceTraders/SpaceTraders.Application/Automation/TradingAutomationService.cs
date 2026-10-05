@@ -72,6 +72,7 @@ public sealed class TradingAutomationService(
     FullHoldSavings savings,
     IConstructionSites constructionSites,
     PassedOverShips passedOver,
+    TradeShipDemand demand,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -88,6 +89,18 @@ public sealed class TradingAutomationService(
     /// fleet has fewer than N cargo ships; empty buys none.
     /// </summary>
     public const string ShipPurchasesSetting = "Trade.ShipPurchases";
+
+    /// <summary>
+    /// The setting for what a route must earn, from the shipyard, to count as one a new cargo ship beyond the list would take
+    /// (D88).
+    /// </summary>
+    public const string ShipPurchaseMinRouteProfitSetting = "Trade.ShipPurchaseMinRouteProfit";
+
+    /// <summary>
+    /// The setting for how long such a route must have waited, every trader busy, before a cargo ship beyond the list is bought
+    /// (D88).
+    /// </summary>
+    public const string ShipPurchaseWaitMinutesSetting = "Trade.ShipPurchaseWaitMinutes";
 
     /// <summary>Credits that buy a full hold of anything: whether a new cargo ship would have work, whatever the credits now.</summary>
     private const long AnyCredits = long.MaxValue / 4;
@@ -294,12 +307,13 @@ public sealed class TradingAutomationService(
 
     /// <summary>
     /// Buys cargo ships (D21): the next in <c>Trade.ShipPurchases</c>, and once the list is bought, one more of its last type
-    /// (D43), at the shipyard that sells it for the least, when every trader has a trip and the new ship would have a
-    /// lucrative route from there that no trader holds, judged with the credits left after it. The purchase keeps the credit
-    /// reserve (<c>FleetExpansion.MinCreditReserve</c>, <see cref="IShipPurchaseService"/>). The order ships are bought in
-    /// decides when (<see cref="IPurchaseOrder"/>): a ship of the list is saved up for, whatever the routes, after the
-    /// contract's drone, a surveyor and a drone for each scarce mineral; a ship beyond the list takes turns with the drones,
-    /// and needs nothing while a trader has no trip or no new ship would have a route.
+    /// (D43), at the shipyard that sells it for the least, when every trader has a trip and the traders can't keep up: a route
+    /// worth <c>Trade.ShipPurchaseMinRouteProfit</c> that the new ship would have from there, and no trader holds, has waited
+    /// <c>Trade.ShipPurchaseWaitMinutes</c> for a ship (D88, <see cref="TradeShipDemand"/>); the purchase is then judged with the
+    /// credits left after it. The purchase keeps the credit reserve (<c>FleetExpansion.MinCreditReserve</c>,
+    /// <see cref="IShipPurchaseService"/>). The order ships are bought in decides when (<see cref="IPurchaseOrder"/>): a ship
+    /// of the list is saved up for, whatever the routes, after the contract's drone, a surveyor and a drone for each scarce
+    /// mineral; a ship beyond the list takes turns with the drones, and needs nothing until a route has waited so.
     /// </summary>
     private async Task BuyCargoShipAsync(
         IReadOnlyList<ShipModel> fleet,
@@ -353,8 +367,17 @@ public sealed class TradingAutomationService(
             forSale.FuelCapacity,
             CargoCapacity: forSale.CargoCapacity);
 
-        // Beyond the list a ship has nothing to buy while no new one would have work, so the drones' turn comes (D43).
-        var hasWork = idle == 0 && TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys).Count > 0;
+        // D88: beyond the list a cargo ship adds value only when the traders can't keep up: a route worth
+        // Trade.ShipPurchaseMinRouteProfit from the shipyard, that no trader holds, has waited Trade.ShipPurchaseWaitMinutes with
+        // every trader busy. A stable market never gets there; till then the drones' turn comes (D43).
+        var minRouteProfit = await settings.GetAsync<long>(ShipPurchaseMinRouteProfitSetting, cancellationToken);
+        var waited = demand.Note(
+            TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys)
+                .Where(route => route.Profit >= minRouteProfit)
+                .Select(route => route.Key),
+            TimeProvider.System.GetUtcNow());
+        var hasWork = idle == 0
+            && waited >= TimeSpan.FromMinutes(await settings.GetAsync<int>(ShipPurchaseWaitMinutesSetting, cancellationToken));
         var need = inList || hasWork
             ? new PurchaseNeed(inList ? PurchaseTier.CargoShips : PurchaseTier.Alternating, shipType, shipyard.WaypointSymbol, forSale.PurchasePrice)
             : PurchaseNeed.None;

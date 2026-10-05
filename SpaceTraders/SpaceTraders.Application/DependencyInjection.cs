@@ -87,6 +87,11 @@ public static class DependencyInjection
         services.AddSingleton<IGatheringRates, GatheringRates>();
         services.AddSingleton<RoleBoardMemory>();
 
+        // What trade trips actually earned lately, for the board's trade estimates (D87); and the routes a new cargo ship would
+        // have waited for, for the trading plan's purchases beyond its list (D88).
+        services.AddSingleton<TradeEarnings>();
+        services.AddSingleton<TradeShipDemand>();
+
         // The names the bot gives its ships, beside the game's symbols (slice 2.14, D72), kept for the log lines.
         services.AddSingleton<IShipNameBook, ShipNameBook>();
 
