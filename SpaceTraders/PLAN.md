@@ -176,7 +176,9 @@
 - B68 (the collection point's survey ship drifted back to the market after every survey) is merged and deployed
   (projects#181, gembernodes#76, image `89731ac`, live since 2026-10-05 15:52Z).
 - Slice 6.22 (trade routes that feed the jump gate's materials come first, asked on 2026-10-05, with your decision D89)
-  is built on branch `claude/spacetraders-feed-the-gate`.
+  is merged and deployed (projects#182, gembernodes#77, image `30e43cf`, live since 2026-10-05 16:12Z).
+- Slice 6.23 (a trade route that feeds the jump gate runs while its goods sell for what they cost, asked on 2026-10-05,
+  with your decision D90) is built on branch `claude/spacetraders-feed-at-cost`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -356,6 +358,7 @@ get the next D-number.
 | D87 | Slice 6.21 (asked on 2026-10-05, investigating B67): a trip's rate isn't repeatable; one trip's profit over its flights (about a million an hour) was compared with mining's steady 12,000 to 20,000, while SPECTER-1's trading made about 83,000 an hour. Offered: cap a ship's trade estimate at what trading actually earned lately; or the bug fixes only. | **Cap at realized** (2026-10-05): no trade trip counts for more an hour than the trade trips that ended in the last two hours made per hour of their time (`TradeEarnings`); with none in that time, no cap. |
 | D88 | Slice 6.21 (asked on 2026-10-05): "yes, investigate the role board estimates as a bug, and can you add a limitation on buying more trade ships unless a trade ship actually adds value? If the market is stable, we have too many trade ships right now." Beyond the list D43 bought one more cargo ship whenever every trader was busy and a new ship would have any lucrative route, 5 a unit: nearly always. Offered: only while a route worth 10,000 has waited 30 minutes for a ship; only when the traders' earnings would pay a ship back in a day; never beyond the list. | **Routes keep waiting** (2026-10-05): beyond `Trade.ShipPurchases` a cargo ship is bought only once a route worth `Trade.ShipPurchaseMinRouteProfit` (10,000), from the shipyard and held by no trader, has waited `Trade.ShipPurchaseWaitMinutes` (30) for a ship with every trader busy. Amends D43. |
 | D89 | Slice 6.22 (asked on 2026-10-05, after "Could the construction of the gate go faster?"): the gate had 340 of 1,600 FAB_MATS; at about 8.5 an hour since the markets' stock ran out, it would finish between 10-09 and just after the reset. The two FAB_MATS markets, D52 and F58, were RESTRICTED: their IRON was SCARCE (F58 74% of the run, D52 54%), and of the 1,920 IRON the traders carried, F58 got none and D52 220. Offered: the trade routes feeding the gate's material factories first; the builder hauling IRON while it waits. Then: "Please make sure the trade routes prioritize the feeding to the portal construction materials, yes." | **Feed the gate first** (2026-10-05): while the system's jump gate needs a material and the construction plan is on, a lucrative trade route to a market that makes that material from the good (exports the material, imports the good below ABUNDANT, by the production chains) comes before every other route, whatever it earns; the others go as D85 ranks them. |
+| D90 | Slice 6.23 (asked on 2026-10-05, with D89): IRON, the input that kept the FAB_MATS markets D52 and F58 RESTRICTED, sold at H60 for 150 then, while D52 and F58 paid 150 to 155: a trip to them earned less than D14's 5 a unit after fuel, so D89 put no trader on it ("Goods not traded": "40 units earn 55 after 145 for fuel, 1 a unit"). Asked: "Should trade routes that feed the jump gate's factories run even when they earn less than the 5-a-unit minimum?" Offered: up to its fuel, the goods selling for at least what they cost; break even, at least 0 after fuel; keep the minimum. | **Up to its fuel** ("Up to its fuel (Recommended)", 2026-10-05): a trade route that feeds a material the jump gate still needs (D89) is worth taking while its goods sell for at least what they cost, a sale at the price paid included; only its fuel is lost. It buys while a unit's expected sale fetches what the unit costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. Every other route still earns `Trade.MinProfitPerUnit` a unit (D14). Amends D14 and D89. |
 | D84 | Slice 6.19 (asked on 2026-10-05): "The excavators are now drifting for 2 hours. Did they start drifting from the location they were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" They drifted straight from where they were (D52 to B7, 368, about 2 h 52 min). Then: "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I think it is worth it." And: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then drift back to a fuel station with 0 fuel and refuel." | **The fastest mix of CRUISE and DRIFT; BURN where the fuel allows it** (2026-10-05): a way out of CRUISE reach is the fastest mix of CRUISE legs, refuelling at markets that sell fuel, and DRIFT legs; a drone for a collection point (D83) flies straight to its asteroid. A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing (into a market that sells fuel; elsewhere, only when what is left still takes the ship on as cruising would), and cruises otherwise; the extra fuel is accepted. No leg lands a ship with an empty tank where no fuel is sold. |
 
 ## Phases
@@ -3380,6 +3383,41 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.23 Feed the gate at cost** (built on branch `claude/spacetraders-feed-at-cost`, asked on 2026-10-05, D90). Asked:
+  "Should trade routes that feed the jump gate's factories run even when they earn less than the 5-a-unit minimum?";
+  chosen: "Up to its fuel (Recommended)".
+  - Found (read-only, 2026-10-05 15:30 to 16:35Z):
+    - H60 sold IRON for 105 to 157 within an hour, each purchase raising the price; D52 paid 151 to 155 for it and F58
+      150. A trip earned D14's 5 a unit to D52 only while H60 charged at most 146 to 150, and to F58 at most 145.
+    - Once D89 was live (16:12Z), SPECTER-C took IRON from H60 to D52 twice, at 133 (16:19Z) and 144 (16:22Z). D52's IRON
+      went from SCARCE to LIMITED and its FAB_MATS from RESTRICTED to GROWING. F58's IRON stayed SCARCE and its FAB_MATS
+      RESTRICTED. The two purchases raised H60's price to 157, above what either pays.
+  - Done:
+    - `TradeRoute.IsWorthIt`: a route that feeds a material the gate still needs is worth taking while its goods sell for
+      at least what they cost (its profit plus its fuel at least 0); any other route when it is lucrative (D14). `Rank`,
+      `Judge` and the trade executor use it.
+    - The planner buys such a route's units while each sells for at least what it costs (`Earns`, `UnitsWorthBuying`), and
+      weighs such a route when its sell market pays exactly what the buy market charges; other routes still need a price
+      gap.
+    - At the buy market such a trip buys on those terms, and is dropped only when its goods would sell for less than they
+      cost (`TradeDropped` then gives a minimum of 0). At the sell market it sells unless that would fetch less than the
+      cargo cost and another market pays more (`TradeRerouted`, once per trip, as before).
+    - "Goods not traded" reads "feeds the jump gate's FAB_MATS, 40 units for -145 after fuel (D89, D90)" for such a route
+      rather than "lucrative".
+  - Unchanged: D14 for every other route; D80 (one trip at a time buys a good at a market, so one trader at a time carries
+    H60's IRON); D85's order among the routes that feed the gate (D52 before F58 while it pays more); D88 (only a route
+    worth 10,000 asks for another cargo ship); the role board, which weighs only trips that earn something.
+  - Noticed (not changed): such trips count in `TradeEarnings` (D87) at their loss of a few hundred credits, which lowers
+    the cap on the role board's trade estimates a little.
+  - Tests: `TradeRoutePlannerTests` (IRON for a FAB_MATS maker at cost, and at 4 a unit, runs while the gate needs FAB_MATS;
+    not without the need, nor at a loss), `TradeRouteJudgementTests` (the wording; no judgement at a loss),
+    `TradeBetweenMarketsGoalExecutorTests` (a trip at cost buys only when it feeds the gate; one at a loss is dropped with a
+    minimum of 0; it sells at the factory under the minimum, and takes the cargo elsewhere when it would sell below cost),
+    `TradingAutomationServiceTests` (the trading plan starts a trip at cost to the gate's factory before MEDICINE at 386 a
+    unit).
+  - To understand this, start with `IsWorthIt` and `Earns` in `Trading/TradeRoutePlanner.cs`, then `Pays` in
+    `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`.
 
 - **6.22 Feed the gate first** (built on branch `claude/spacetraders-feed-the-gate`, asked on 2026-10-05, D89). Asked:
   "Could the construction of the gate go faster?", then "Please make sure the trade routes prioritize the feeding to the

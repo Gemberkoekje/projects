@@ -97,6 +97,31 @@ public sealed class TradeRouteJudgementTests
     }
 
     [Fact]
+    public void Why_ARouteThatFeedsTheJumpGate_NamesTheMaterial_AndWhatItLoses()
+    {
+        // D90: D41 makes SHIP_PARTS from EQUIPMENT, and the jump gate still needs SHIP_PARTS. At cost the route is one of the
+        // ship's, its fuel lost, where the minimum of 200 a unit would have it fail; with a unit at a loss there is no price gap
+        // to judge.
+        var atCost = GateNeedsShipParts(equipmentAtK85: 3_487);
+        var atALoss = GateNeedsShipParts(equipmentAtK85: 3_488);
+
+        var equipment = EquipmentToD41(atCost).Should().ContainSingle().Subject;
+        equipment.Check.Should().Be(TradeRouteCheck.Lucrative);
+        equipment.Why(atCost).Should().Be("SHIP-1: feeds the jump gate's SHIP_PARTS, 40 units for -152 after fuel (D89, D90).");
+        EquipmentToD41(atALoss).Should().BeEmpty();
+
+        static TradeMarketMap GateNeedsShipParts(int equipmentAtK85)
+            => new(Waypoints, [K85Market(equipmentAtK85), D41Market(), A1Market()], MadeFrom)
+            {
+                ConstructionMaterials = new HashSet<string>(["SHIP_PARTS"], StringComparer.OrdinalIgnoreCase),
+            };
+
+        static IEnumerable<TradeRouteJudgement> EquipmentToD41(TradeMarketMap map)
+            => TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld)
+                .Where(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
+    }
+
+    [Fact]
     public void FurthestPerGood_IsTheRouteAndShipThatPassedTheMostChecks()
     {
         // SHIP-1, whose hold is full, has no room for SHIP_PARTS; SHIP-5's empty hold has, but its first unit earns 279,

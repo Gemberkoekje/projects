@@ -31,6 +31,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 ///   a time while each still earns the minimum over what the cargo cost; when one wouldn't, the rest goes where it fetches
 ///   more, on the same once-per-trip terms, or is sold there all the same.</item>
 /// </list>
+/// A trip that feeds a material the jump gate still needs (D89) only has to sell its goods for what they cost (D90): where the
+/// rules above ask for <c>Trade.MinProfitPerUnit</c>, it asks for nothing lost on a unit, so only its fuel is ever lost.
 /// The goal keeps what the cargo cost and fetched, stored after each batch, and however the trip ends, sold or dropped, it is
 /// booked with what its sales brought in (<see cref="ITripBook"/>, D46). A purchase on the route the credits were saved up for
 /// ends that saving (<see cref="FullHoldSavings"/>, D56). The arithmetic counts its flights in CRUISE; they burn where the
@@ -103,6 +105,10 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         // What the earlier batches bought is aboard, after a restart too; only a trip that has bought nothing yet is weighed
         // again as a whole, with the prices the arrival fetched and only the fuel still ahead.
         var bought = Aboard(ship, trade.TradeSymbol);
+
+        // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
+        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        var minimum = feedsGate ? 0 : context.MinProfitPerUnit;
         if (bought == 0)
         {
             if (!TradeRoutePlanner.TryEvaluate(
@@ -117,13 +123,13 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                     out var check))
             {
                 return check == TradeRouteCheck.NotLucrative
-                    ? await DropNotLucrativeAsync(ship, trade, route, context.MinProfitPerUnit, ct)
+                    ? await DropNotLucrativeAsync(ship, trade, route, minimum, ct)
                     : await DropAsync(ship, trade, NotPossible, ct);
             }
 
-            if (!route.IsLucrative(context.MinProfitPerUnit))
+            if (!route.IsWorthIt(context.MinProfitPerUnit))
             {
-                return await DropNotLucrativeAsync(ship, trade, route, context.MinProfitPerUnit, ct);
+                return await DropNotLucrativeAsync(ship, trade, route, minimum, ct);
             }
         }
 
@@ -141,7 +147,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         {
             var affordable = (int)Math.Min(int.MaxValue, spendable / atBuy.PurchasePrice);
             var most = Math.Min(Math.Min(free, atBuy.TradeVolume > 0 ? atBuy.TradeVolume : free), affordable);
-            var units = TradeRoutePlanner.UnitsWorthBuying(atBuy.PurchasePrice, atSell, bought, most, context.MinProfitPerUnit);
+            var units = TradeRoutePlanner.UnitsWorthBuying(atBuy.PurchasePrice, atSell, bought, most, context.MinProfitPerUnit, feedsGate);
             if (units == 0)
             {
                 stop = affordable == 0 ? NotPossible : NotLucrative;
@@ -240,7 +246,10 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         var system = ship.SystemSymbol ?? string.Empty;
         var context = await tradeContexts.ReadAsync(system, ct);
         var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
-        if (!Pays(here, trade, context.MinProfitPerUnit)
+
+        // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
+        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        if (!Pays(here, trade, context.MinProfitPerUnit, feedsGate)
             && TryFindBetterSale(context.Map, ship, trade, units, sellsHere ? here.SellPrice : 0, out var elsewhere))
         {
             return await SellElsewhereAsync(context.Map, ship, trade, elsewhere, sellsHere ? here.SellPrice : 0, ct);
@@ -254,13 +263,13 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         // D79: a batch of the market's trade volume at a time, each at the price quoted then, while it still earns the minimum
         // over what the cargo cost. Each sale lowers the next quote: once one wouldn't pay, the rest goes where it fetches more
         // after fuel, once per trip, or with nowhere better is sold here all the same. A sale that never paid sells anyway.
-        var sellAnyway = !Pays(here, trade, context.MinProfitPerUnit);
+        var sellAnyway = !Pays(here, trade, context.MinProfitPerUnit, feedsGate);
         var current = trade;
         var map = context.Map;
         var left = units;
         while (left > 0 && map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var now) && now.SellPrice > 0)
         {
-            if (!sellAnyway && !Pays(now, trade, context.MinProfitPerUnit))
+            if (!sellAnyway && !Pays(now, trade, context.MinProfitPerUnit, feedsGate))
             {
                 if (TryFindBetterSale(map, ship, current, left, now.SellPrice, out var better))
                 {
@@ -319,11 +328,14 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         return result.Revenue;
     }
 
-    /// <summary>Whether selling a unit at the market's quote earns the minimum over what it cost (D14).</summary>
-    private static bool Pays(TradeGoodSnapshot good, TradeBetweenMarketsGoal trade, int minProfitPerUnit)
+    /// <summary>
+    /// Whether selling a unit at the market's quote earns the minimum over what it cost (D14); for a trip that feeds the jump
+    /// gate's material, whether it fetches at least what it cost (D90).
+    /// </summary>
+    private static bool Pays(TradeGoodSnapshot good, TradeBetweenMarketsGoal trade, int minProfitPerUnit, bool feedsGate)
     {
         var margin = good.SellPrice - trade.PricePaidPerUnit;
-        return good.SellPrice > 0 && margin > 0 && margin >= minProfitPerUnit;
+        return good.SellPrice > 0 && (feedsGate ? margin >= 0 : margin > 0 && margin >= minProfitPerUnit);
     }
 
     /// <summary>
@@ -383,7 +395,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
     /// <summary>
     /// Gives up a trip no longer worth it at the buy market (D14, D79): its units no longer earn the minimum a unit after fuel,
-    /// or not even the first unit does.
+    /// or not even the first unit does. For a trip that feeds the jump gate's material the minimum is 0 (D90).
     /// </summary>
     private async Task<GoalExecutionResult> DropNotLucrativeAsync(
         ShipModel ship,

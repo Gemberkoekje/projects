@@ -881,6 +881,26 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task ARouteThatFeedsTheJumpGate_IsTaken_ThoughItsGoodsSellForWhatTheyCost()
+    {
+        // D90: K85 now charges 3,487 for EQUIPMENT, what D41 pays; D41 makes FAB_MATS from it (a stand-in chain), and the gate
+        // still needs FAB_MATS. The trip loses only its fuel, and SHIP-1 takes it before MEDICINE, which earns 386 a unit.
+        var markets = new[] { K85Market(equipmentPrice: 3_487), D41Market() with { TradeGoods = [.. D41Market().TradeGoods, Good("FAB_MATS", "EXPORT", 1_800, 850, 20)], Exports = ["FAB_MATS"] }, A1Market() };
+        var map = new TradeMarketMap(Waypoints, markets, new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["EQUIPMENT"] })
+        {
+            ConstructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "FAB_MATS" },
+        };
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        var goal = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (goal.TradeSymbol, goal.SellWaypointSymbol, goal.Units).Should().Be(("EQUIPMENT", D41, 40));
+        goal.ExpectedProfit.Should().BeNegative("only the fuel is lost");
+    }
+
+    [Fact]
     public async Task ACargoShipOfTheList_IsSavedUpFor_ThoughATraderHasNoTripYet()
     {
         // D43: "then save up for cargo ships". The drone has no lucrative route, so nothing is bought now, but nothing after

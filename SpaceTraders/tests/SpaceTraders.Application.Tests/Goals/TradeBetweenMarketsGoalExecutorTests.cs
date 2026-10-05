@@ -4,6 +4,7 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -348,6 +349,47 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "not_possible"));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AtTheBuyMarket_ATripWhoseGoodsSellForWhatTheyCost_BuysOnlyWhenItFeedsTheJumpGate(bool gateNeedsShipParts)
+    {
+        // D90: K85 now charges 3,487, what D41 pays. D41 makes SHIP_PARTS from EQUIPMENT: while the gate needs them, the trip
+        // buys all the same, its fuel lost; otherwise it earns nothing a unit, under 200 (D14), and is dropped.
+        PricesAre(GateNeeds(gateNeedsShipParts, K85Market(equipmentPrice: 3_487), D41Market(), A1Market()));
+        BuyReturns(units: 40, total: 139_480);
+
+        await StepAsync(CommandShip(K85), Trip());
+
+        if (gateNeedsShipParts)
+        {
+            await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 40, Arg.Any<CancellationToken>());
+            _log.Journal.Should().NotContain(e => e.EventKind == "TradeDropped");
+        }
+        else
+        {
+            await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+            _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["MinProfitPerUnit"], 200));
+        }
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ATripThatFeedsTheJumpGate_IsDropped_WhenItsGoodsWouldSellForLessThanTheyCost()
+    {
+        // D90: only the fuel is lost on such a trip. K85 now charges 3,488, one more than D41 pays.
+        PricesAre(GateNeeds(true, K85Market(equipmentPrice: 3_488), D41Market(), A1Market()));
+
+        var result = await StepAsync(CommandShip(K85), Trip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+        var dropped = _log.Journal.Should().ContainSingle().Subject;
+        dropped.EventKind.Should().Be("TradeDropped");
+        dropped.Properties["Reason"].Should().Be("not_lucrative");
+        dropped.Properties["Margin"].Should().Be(-1L);
+        dropped.Properties["MinProfitPerUnit"].Should().Be(0, "a trip that feeds the gate only has to sell its goods for what they cost");
+    }
+
     [Fact]
     public async Task Loaded_ItFliesToTheSellMarket()
     {
@@ -486,6 +528,34 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     }
 
     [Fact]
+    public async Task AtTheSellMarket_ATripThatFeedsTheJumpGate_SellsThere_ThoughItEarnsLessThanTheMinimum()
+    {
+        // D90: D41 now pays 3,300, 46 a unit over what the cargo cost and under 200; A1 pays 3,499. A trip that didn't feed the
+        // gate would take the cargo to A1; this one sells at D41, which makes the gate's SHIP_PARTS from it.
+        PricesAre(GateNeeds(true, K85Market(), D41Market(equipmentPrice: 3_300), A1Market()));
+        SellReturns(total: 132_000);
+
+        var result = await StepAsync(Loaded(D41), Trip(bought: true));
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _port.Received(1).SellCargoAsync("SHIP-1", "EQUIPMENT", 40, Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheSellMarket_ATripThatFeedsTheJumpGate_TakesTheCargoElsewhere_WhenItWouldSellForLessThanItCost()
+    {
+        // D90: only the fuel is lost on such a trip. D41 now pays 3,200, under the 3,254 the cargo cost; A1 pays 3,499.
+        PricesAre(GateNeeds(true, K85Market(), D41Market(equipmentPrice: 3_200), A1Market()));
+
+        var result = await StepAsync(Loaded(D41), Trip(bought: true));
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeRerouted" && Equals(e.Properties["SellWaypoint"], A1));
+    }
+
+    [Fact]
     public async Task AtASellMarketThatNoLongerBuysTheGood_TheTripIsDropped_OnceItHasMoved()
     {
         PricesAre(Map(K85Market(), Market(D41, Good("FUEL", "EXCHANGE", 76, 69, 180))));
@@ -543,6 +613,13 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
             Arg.Any<DeliveryOptions>());
         _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoSold" && Equals(e.Properties["Revenue"], 139_480L));
     }
+
+    /// <summary>The markets given, with the jump gate needing SHIP_PARTS, which D41 makes from EQUIPMENT, or nothing (D89).</summary>
+    private static TradeMarketMap GateNeeds(bool shipParts, params MarketSnapshot[] markets)
+        => new(Waypoints, markets, MadeFrom)
+        {
+            ConstructionMaterials = new HashSet<string>(shipParts ? ["SHIP_PARTS"] : [], StringComparer.OrdinalIgnoreCase),
+        };
 
     /// <summary>The fixture, with D41 taking EQUIPMENT 20 at a time: half the command ship's hold.</summary>
     private static TradeMarketMap MapWhereD41TakesTwenty()

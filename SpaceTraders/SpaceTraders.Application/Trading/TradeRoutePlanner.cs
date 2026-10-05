@@ -224,7 +224,7 @@ public static class TradeRoutePlanner
     /// <returns>
     /// False when the ship can't fly it (a market, a price or a position unknown, no way to get there within its tank) or
     /// can't buy a unit worth it (no free hold, too few credits, or not even the first unit earns
-    /// <paramref name="minProfitPerUnit"/>).
+    /// <paramref name="minProfitPerUnit"/>, or for a delivery that feeds the jump gate's material sells for what it cost, D90).
     /// </returns>
     public static bool TryEvaluate(
         TradeMarketMap map,
@@ -291,13 +291,17 @@ public static class TradeRoutePlanner
     /// <param name="bought">The units the trip has bought so far: where in the sales the next ones come.</param>
     /// <param name="most">The most the purchase may take: the trade volume, the free hold and the credits.</param>
     /// <param name="minProfitPerUnit">The profit each unit must earn; 0 or less means any.</param>
+    /// <param name="feedsGate">
+    /// Whether the trip feeds a material the jump gate still needs (D89): then a unit is worth buying while its sale fetches at
+    /// least what it costs, the trip's fuel being the price of feeding the gate (D90).
+    /// </param>
     /// <returns>The units to buy, from 0.</returns>
-    public static int UnitsWorthBuying(long quote, TradeGoodSnapshot atSell, int bought, int most, int minProfitPerUnit)
+    public static int UnitsWorthBuying(long quote, TradeGoodSnapshot atSell, int bought, int most, int minProfitPerUnit, bool feedsGate = false)
     {
         ArgumentNullException.ThrowIfNull(atSell);
 
         var units = 0;
-        while (units < most && Earns(PriceSteps.SalePriceOf(atSell.SellPrice, bought + units, atSell.TradeVolume) - quote, minProfitPerUnit))
+        while (units < most && Earns(PriceSteps.SalePriceOf(atSell.SellPrice, bought + units, atSell.TradeVolume) - quote, minProfitPerUnit, feedsGate))
         {
             units++;
         }
@@ -699,7 +703,8 @@ public static class TradeRoutePlanner
     /// <summary>
     /// Runs Rank's checks on every route with a price gap that no other trader holds, of a good no other trip is on its way to
     /// buy at that market (D80): the lucrative routes go to <paramref name="routes"/>, and with <paramref name="judgements"/>
-    /// every route goes there too, with the first check it fails (Judge).
+    /// every route goes there too, with the first check it fails (Judge). A delivery that feeds a material the jump gate still
+    /// needs counts at no gap too: its goods only have to sell for what they cost (D90).
     /// </summary>
     private static void CheckRoutes(
         TradeMarketMap map,
@@ -738,7 +743,8 @@ public static class TradeRoutePlanner
                 {
                     if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
                         || !map.TryGetGood(sell, good.Symbol, out var atSell)
-                        || atSell.SellPrice <= good.PurchasePrice
+                        || atSell.SellPrice < good.PurchasePrice
+                        || (atSell.SellPrice == good.PurchasePrice && map.ConstructionMaterialMadeFrom(sell, good.Symbol).Length == 0)
                         || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell))
                         || heldBuys.Holds(good.Symbol, buy))
                     {
@@ -754,7 +760,7 @@ public static class TradeRoutePlanner
                     }
                     else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, minProfitPerUnit, approach, out route, out check))
                     {
-                        check = route.IsLucrative(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
+                        check = route.IsWorthIt(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
                         if (check == TradeRouteCheck.Lucrative)
                         {
                             routes.Add(route);
@@ -807,7 +813,10 @@ public static class TradeRoutePlanner
             return false;
         }
 
-        route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice };
+        // D89, D90: the material the delivery feeds, when the jump gate still needs it; such a unit only has to sell for what it
+        // cost.
+        var material = map.ConstructionMaterialMadeFrom(sellWaypointSymbol, tradeSymbol);
+        route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice, ConstructionMaterial = material };
 
         // The ship docks at the buy market to buy, and fills its tank there when it sells fuel.
         var fuelAtBuy = map.SellsFuel(buyWaypointSymbol) ? ship.FuelCapacity : approach.FuelLeft;
@@ -840,7 +849,7 @@ public static class TradeRoutePlanner
                 break;
             }
 
-            if (!Earns(sell - buy, minProfitPerUnit))
+            if (!Earns(sell - buy, minProfitPerUnit, material.Length > 0))
             {
                 failed = units == 0 ? TradeRouteCheck.NotLucrative : failed;
                 break;
@@ -870,14 +879,17 @@ public static class TradeRoutePlanner
         {
             CargoCost = cargoCost,
             FeedsProduction = !map.IsEndProduct(tradeSymbol),
-            ConstructionMaterial = map.ConstructionMaterialMadeFrom(sellWaypointSymbol, tradeSymbol),
+            ConstructionMaterial = material,
         };
         return true;
     }
 
-    /// <summary>Whether a unit's margin earns the minimum: something, and at least <paramref name="minProfitPerUnit"/> (D14).</summary>
-    private static bool Earns(double margin, int minProfitPerUnit)
-        => margin > 0 && margin + Sliver >= Math.Max(0, minProfitPerUnit);
+    /// <summary>
+    /// Whether a unit's margin earns the minimum: something, and at least <paramref name="minProfitPerUnit"/> (D14); for a unit
+    /// that feeds the jump gate's material, nothing lost on it (D90).
+    /// </summary>
+    private static bool Earns(double margin, int minProfitPerUnit, bool feedsGate = false)
+        => feedsGate ? margin + Sliver >= 0 : margin > 0 && margin + Sliver >= Math.Max(0, minProfitPerUnit);
 
     /// <summary>
     /// Where a ship gets the most for cargo it holds, after the fuel to get there: any market it can
@@ -1124,6 +1136,16 @@ public sealed record TradeRoute
     /// <returns>True when the trip is lucrative.</returns>
     public bool IsLucrative(int minProfitPerUnit)
         => Profit > 0 && Profit >= (long)Math.Max(0, minProfitPerUnit) * Units;
+
+    /// <summary>
+    /// Whether the trip is worth taking: lucrative (D14), or, when it feeds a material the jump gate still needs (D89), its
+    /// goods sell for at least what they cost, its fuel being the price of feeding the gate (D90, asked on 2026-10-05: "Up to
+    /// its fuel"; IRON from H60 at 150 to D52 and F58 at 150 to 155 earned less than the minimum).
+    /// </summary>
+    /// <param name="minProfitPerUnit">The minimum profit per unit; 0 or less means any profit.</param>
+    /// <returns>True when the trip is worth taking.</returns>
+    public bool IsWorthIt(int minProfitPerUnit)
+        => FeedsConstruction ? Units > 0 && Profit + FuelCost >= 0 : IsLucrative(minProfitPerUnit);
 }
 
 /// <summary>Where cargo is sold, and what it fetches there.</summary>

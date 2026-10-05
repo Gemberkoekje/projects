@@ -26,7 +26,8 @@ public enum TradeRouteCheck
 
     /// <summary>
     /// Not even the first unit earns <c>Trade.MinProfitPerUnit</c> (D79), or the trip's units earn less than that a unit after
-    /// fuel, or nothing (D14).
+    /// fuel, or nothing (D14). For a trip that feeds a material the jump gate still needs, not even the first unit sells for
+    /// what it cost (D90).
     /// </summary>
     NotLucrative = 5,
 
@@ -130,6 +131,9 @@ public sealed record TradeRouteJudgement
             TradeRouteCheck.NotLucrative => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: {Route.Units:N0} units earn {Route.Profit:N0} after {Route.FuelCost:N0} for fuel, {Route.Profit / Route.Units:N0} a unit; a trip must earn {MinProfitPerUnit:N0} a unit (D14)."),
+            _ when Route.FeedsConstruction => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{ship}: feeds the jump gate's {Route.ConstructionMaterial}, {Route.Units:N0} units for {Route.Profit:N0} after fuel (D89, D90)."),
             _ => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: lucrative, {Route.Units:N0} units for {Route.Profit:N0} after fuel, {Route.Profit / Route.Units:N0} a unit."),
