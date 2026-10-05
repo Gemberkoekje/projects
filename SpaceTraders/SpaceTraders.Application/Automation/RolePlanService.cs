@@ -48,6 +48,7 @@ public sealed class RolePlanService(
     IPlanRepository plans,
     IGatheringRates rates,
     RoleBoardMemory memory,
+    TradeEarnings tradeEarnings,
     IConstructionSites constructionSites,
     ILogger<RolePlanService> logger) : IRolePlanService
 {
@@ -116,7 +117,7 @@ public sealed class RolePlanService(
             SeedRates(state);
         }
 
-        var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, cancellationToken);
+        var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, trips, now, cancellationToken);
         var coverage = await CoverageAsync(fleet, trips, cancellationToken);
         var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage, collectors, roleSettings.ConstructionShips);
         await SaveAsync(state, candidates, decisions, conditions, now, cancellationToken);
@@ -202,6 +203,8 @@ public sealed class RolePlanService(
         RoleSettings roleSettings,
         bool contractWantsOre,
         RolePlanState? state,
+        IReadOnlyDictionary<string, ShipGoal> trips,
+        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         var current = (state?.Ships ?? [])
@@ -223,12 +226,17 @@ public sealed class RolePlanService(
                     if (context is null)
                     {
                         var mining = await miningContexts.ReadAsync(system.Key, cancellationToken);
+                        // B67, D87: the trips under way hold their routes and buys, and trading's own earnings cap its estimates.
                         context = new RoleContext(
                             mining,
                             roleSettings.MinProfitPerUnit,
                             roleSettings.FuelReserveCredits,
                             new ChainValues(mining.Map, roleSettings.ChainShare),
-                            rates);
+                            rates)
+                        {
+                            Trips = trips,
+                            TradeCreditsPerHourAtMost = tradeEarnings.PerHour(now),
+                        };
                     }
 
                     foreach (var role in roles.Where(role => role is not FleetRole.Survey and not FleetRole.Construct))

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
@@ -47,7 +48,7 @@ public interface ITripBook
 /// later, so the last sale may not be there yet when the trip ends. Fuel is bought when a ship leaves a market, minutes
 /// before its trip ends, so that comes from the ledger.
 /// </remarks>
-public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metrics, ILogger<TripBook> logger) : ITripBook
+public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metrics, TradeEarnings tradeEarnings, ILogger<TripBook> logger) : ITripBook
 {
     /// <summary>A trade trip (<see cref="TradeBetweenMarketsGoal"/>).</summary>
     public const string Trade = "trade";
@@ -145,6 +146,12 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
 
         metrics.TripEnded(activity);
         metrics.TripProfit(activity, profit);
+
+        // D87: what trading actually earns caps the role board's trade estimates.
+        if (activity == Trade)
+        {
+            tradeEarnings.Ended(startedAt, now, profit);
+        }
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} made {Profit} credits on its {Activity} trip in {Minutes} minutes: sold for {Earned}, bought for {Spent}, fuel {FuelCost} ({Reason}).",
             JournalEvents.TripEnded,

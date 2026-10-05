@@ -7,6 +7,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
@@ -28,6 +29,7 @@ public sealed class RolePlanServiceTests
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly GatheringRates _rates = new();
     private readonly RoleBoardMemory _memory = new();
+    private readonly TradeEarnings _tradeEarnings = new();
     private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -313,6 +315,7 @@ public sealed class RolePlanServiceTests
                 _plans,
                 _rates,
                 _memory,
+                _tradeEarnings,
                 _constructionSites,
                 _log.For<RolePlanService>())
             .EnsureBootstrappedAsync();

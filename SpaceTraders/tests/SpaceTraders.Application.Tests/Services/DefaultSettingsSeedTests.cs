@@ -52,11 +52,13 @@ public sealed class DefaultSettingsSeedTests
         "Alerts.WebhookUrl",
 
         // Trading (slice 6.5): TradeContextReader (the trading plan and the trade executor), and
-        // MarketWatchService; slice 6.4: TradeContextReader (D24) and TradingAutomationService (D21).
+        // MarketWatchService; slice 6.4: TradeContextReader (D24) and TradingAutomationService (D21, D88).
         "Trade.MinProfitPerUnit",
         "Market.RefreshMinutes",
         "Trade.FuelReserveCredits",
         "Trade.ShipPurchases",
+        "Trade.ShipPurchaseMinRouteProfit",
+        "Trade.ShipPurchaseWaitMinutes",
 
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",

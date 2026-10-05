@@ -6,6 +6,7 @@ using SpaceTraders.Application.Tests.Mining;
 using SpaceTraders.Application.Tests.Siphoning;
 using SpaceTraders.Application.Tests.Trading;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Roles;
 
@@ -29,18 +30,20 @@ public sealed class RoleEstimatorTests
     [Fact]
     public void ATradeTrip_EarnsItsProfitAfterFuel_InTheTimeItsFlightsAndStopsTake()
     {
-        // The command ship at K85, docked: EQUIPMENT to D41 is the best route there (6.5's dry run).
+        // The command ship at K85, docked: EQUIPMENT to A1 is the best route there. EQUIPMENT to D41 is the same job, the good
+        // bought at K85, which one ship at a time buys (B67, D80), and earns less an hour: the job offers A1's.
         var map = TradeFixture.Map();
         var ship = TradeFixture.CommandShip() with { EngineJson = """{"speed":36}""" };
         var route = TradeRoutePlanner.Rank(map, ship, 250_000, 200, new HashSet<string>())
-            .Single(candidate => candidate.TradeSymbol == "EQUIPMENT" && candidate.SellWaypointSymbol == TradeFixture.D41);
+            .Single(candidate => candidate.TradeSymbol == "EQUIPMENT" && candidate.SellWaypointSymbol == TradeFixture.A1);
 
         var option = RoleEstimator.Options(Context(map), ship, FleetRole.Trade, 20)
-            .Single(candidate => candidate.JobKey == "trade|" + route.Key);
+            .Single(candidate => candidate.JobKey == RoleEstimator.TradeJobKey(route));
 
-        // Bought where it is (one stop), flown to D41 (one stop).
+        // Bought where it is (one stop), flown the 104 to A1 (one stop).
+        option.Job.Should().Be($"EQUIPMENT from {TradeFixture.K85} to {TradeFixture.A1}");
         option.Credits.Should().Be(route.Profit);
-        option.Seconds.Should().BeApproximately(15 + (185 * 25 / 36.0) + (2 * RoleEstimator.StopSeconds), 0.001);
+        option.Seconds.Should().BeApproximately(15 + (104 * 25 / 36.0) + (2 * RoleEstimator.StopSeconds), 0.001);
         option.CreditsPerHour.Should().BeApproximately(route.Profit * 3_600 / option.Seconds, 0.001);
     }
 
@@ -173,7 +176,7 @@ public sealed class RoleEstimatorTests
         var route = TradeRoutePlanner.Rank(map, ship, 250_000, 200, new HashSet<string>())
             .Single(candidate => candidate.TradeSymbol == "EQUIPMENT" && candidate.SellWaypointSymbol == TradeFixture.D41);
         RoleOption Option(double share)
-            => RoleEstimator.Options(Context(map, share), ship, FleetRole.Trade, 20).Single(candidate => candidate.JobKey == "trade|" + route.Key);
+            => RoleEstimator.Options(Context(map, share), ship, FleetRole.Trade, 20).Single(candidate => candidate.JobKey == RoleEstimator.TradeJobKey(route));
 
         route.Units.Should().Be(40);
         Option(0.5).Credits.Should().Be(route.Profit + (long)Math.Round(40 * 172.25), "the chain is less than the margin, and counts in full");
@@ -240,6 +243,41 @@ public sealed class RoleEstimatorTests
 
     private static RoleOption Best(RoleContext context, ShipModel ship, FleetRole role)
         => RoleEstimator.Options(context, ship, role, 1).Single();
+
+    [Fact]
+    public void ATradeEstimate_LeavesOutWhatOtherTripsHold_ButNotTheShipsOwn()
+    {
+        // B67, on 2026-10-05 at 13:30:39: the board credited SPECTER-1 and SPECTER-2B each with MEDICINE bought at D48 while
+        // SPECTER-2A took it. One trip at a time buys a good at a market (D80), and the board counted what other trips held.
+        // Here another ship is on its way to buy EQUIPMENT at K85, for A1.
+        var map = TradeFixture.Map();
+        var ship = TradeFixture.CommandShip() with { EngineJson = """{"speed":36}""" };
+        var trip = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = TradeFixture.K85, SellWaypointSymbol = TradeFixture.A1, Units = 40 };
+        var equipment = $"TRADE|{TradeFixture.K85}|EQUIPMENT";
+
+        var others = RoleEstimator.Options(Context(map) with { Trips = new Dictionary<string, ShipGoal> { ["SHIP-9"] = trip } }, ship, FleetRole.Trade, 20);
+        var own = RoleEstimator.Options(Context(map) with { Trips = new Dictionary<string, ShipGoal> { [ship.Symbol] = trip } }, ship, FleetRole.Trade, 20);
+
+        others.Should().NotBeEmpty().And.NotContain(option => option.JobKey == equipment, "EQUIPMENT for D41 is bought at K85 too");
+        own.Should().ContainSingle(option => option.JobKey == equipment, "the ship's own trip holds nothing from it");
+    }
+
+    [Fact]
+    public void ATradeEstimate_PromisesNoMoreAnHour_ThanTradingEarnedLately()
+    {
+        // D87, asked on 2026-10-05 ("Cap at realized"): the board put SPECTER-1's trading at 0.14 to 1.77 million an hour, one
+        // trip's profit over its flights, while its trades made about 83,000 an hour. Here trading earned 50,000 an hour lately.
+        var map = TradeFixture.Map();
+        var ship = TradeFixture.CommandShip() with { EngineJson = """{"speed":36}""" };
+
+        var free = RoleEstimator.Options(Context(map), ship, FleetRole.Trade, 20);
+        var capped = RoleEstimator.Options(Context(map) with { TradeCreditsPerHourAtMost = 50_000 }, ship, FleetRole.Trade, 20);
+
+        free.Should().OnlyContain(option => option.CreditsPerHour > 50_000);
+        capped.Should().HaveCount(free.Count).And.OnlyContain(option =>
+            option.Credits == (long)Math.Floor(50_000 * option.Seconds / 3_600)
+            && option.Job.EndsWith(", at most what trading earned lately (D87)", StringComparison.Ordinal));
+    }
 
     private static RoleContext Context(TradeMarketMap map, double share = 0, GatheringRates? rates = null)
         => new(new MiningContext(map, [], 250_000, MiningFixture.Now), 200, 0, new ChainValues(map, share), rates ?? new GatheringRates());

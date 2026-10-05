@@ -39,6 +39,7 @@ public sealed class TradingAutomationServiceTests
     private readonly OpenPurchaseOrder _order = new();
     private readonly FullHoldSavings _savings = new();
     private readonly PassedOverShips _passedOver = new();
+    private readonly TradeShipDemand _demand = new();
     private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -816,6 +817,49 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task BeyondTheList_ACargoShipIsBought_OnlyOnceARouteWorthTheMinimumHasWaitedForOne()
+    {
+        // D88, asked on 2026-10-05: "can you add a limitation on buying more trade ships unless a trade ship actually adds value?"
+        // The list is bought and every trader is on a trip. A light hauler from A1 would have EQUIPMENT worth more than 10,000:
+        // the first pass only notes that it waits; once it has waited 30 minutes, the traders can't keep up, and one is bought.
+        SurveyPlanOn();
+        _settings.GetAsync<long>(TradingAutomationService.ShipPurchaseMinRouteProfitSetting, Arg.Any<CancellationToken>()).Returns(10_000L);
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(MapWhereEquipmentFillsAHauler(), 1_000_000));
+        var busy = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) }, busy, busy with { Symbol = "SHIP-6" }, busy with { Symbol = "SHIP-7" });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BeyondTheList_NoCargoShipIsBought_WhileNoRouteIsWorthTheMinimum()
+    {
+        // D88: a market that is stable has only small gaps left; however long they wait, they add no ship.
+        _settings.GetAsync<long>(TradingAutomationService.ShipPurchaseMinRouteProfitSetting, Arg.Any<CancellationToken>()).Returns(10_000_000L);
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(MapWhereEquipmentFillsAHauler(), 1_000_000));
+        var busy = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) }, busy, busy with { Symbol = "SHIP-6" }, busy with { Symbol = "SHIP-7" });
+
+        await RunAsync();
+        _demand.Backdate(TimeSpan.FromHours(5));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task ACargoShipOfTheList_IsSavedUpFor_ThoughATraderHasNoTripYet()
     {
         // D43: "then save up for cargo ships". The drone has no lucrative route, so nothing is bought now, but nothing after
@@ -957,6 +1001,7 @@ public sealed class TradingAutomationServiceTests
                 _savings,
                 _constructionSites,
                 _passedOver,
+                _demand,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }
