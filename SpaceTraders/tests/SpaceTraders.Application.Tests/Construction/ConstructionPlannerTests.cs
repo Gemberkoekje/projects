@@ -9,8 +9,9 @@ namespace SpaceTraders.Application.Tests.Construction;
 
 /// <summary>
 /// Slice 6.6, asked on 2026-10-04: "Finishing this jump node should be top priority, as it opens up the rest of the game."
-/// What the jump gate still needs, and which load a builder takes: a full hold, or what the gate still needs, in one
-/// purchase (D67), where the supply isn't SCARCE or LIMITED (D66), at the market where it costs least with its fuel.
+/// What the jump gate still needs, and which load a builder takes: a full hold, or what the gate still needs, bought in
+/// batches of the market's trade volume (D81), where the supply isn't SCARCE or LIMITED (D66), at the market where it costs
+/// least with its fuel.
 /// </summary>
 public sealed class ConstructionPlannerTests
 {
@@ -32,18 +33,20 @@ public sealed class ConstructionPlannerTests
     }
 
     [Fact]
-    public void AHaulerWithAnEmptyHold_BuysAFullHoldOfFabMats_WhereItCostsLeast()
+    public void AHaulerWithAnEmptyHold_TakesAFullHoldOfEachMaterial_WhereItCostsLeast()
     {
-        // ADVANCED_CIRCUITRY comes first by name at an equal share, but D42 trades 40 at a time, under the hauler's 80 (D67);
-        // A1's FAB_MATS are LIMITED (D66), and dearer anyway.
+        // ADVANCED_CIRCUITRY comes first by name at an equal share: D42 trades 40 at a time, so the hauler's 80 are two
+        // batches, the second estimated 6% dearer (D81). A1's FAB_MATS are LIMITED (D66), and dearer anyway; F49 sells all 80
+        // in one purchase.
         var loads = ConstructionPlanner.Loads(Map(), Hauler(), Gate, ConstructionPlanner.Needs(Site(), []));
 
-        var load = loads.Should().ContainSingle().Subject;
-        (load.TradeSymbol, load.BuyWaypointSymbol, load.Units, load.UnitPrice).Should().Be(("FAB_MATS", F49, 80, 2_100));
-        load.CargoCost.Should().Be(168_000);
+        loads.Select(load => (load.TradeSymbol, load.BuyWaypointSymbol, load.Units, load.UnitPrice))
+            .Should().Equal(("ADVANCED_CIRCUITRY", D42, 80, 4_500), ("FAB_MATS", F49, 80, 2_100));
+        loads[0].CargoCost.Should().Be((40 * 4_500) + (40 * 4_770));
+        loads[1].CargoCost.Should().Be(168_000);
 
         // H51 to F49 is 52 fuel, bought at F49 (82 a unit of 100); F49 to the gate 495, bought at the gate (5 units at 90).
-        load.FuelCost.Should().Be(82 + (5 * 90));
+        loads[1].FuelCost.Should().Be(82 + (5 * 90));
     }
 
     [Fact]
@@ -81,16 +84,18 @@ public sealed class ConstructionPlannerTests
     }
 
     [Fact]
-    public void AMarketWhoseTradeVolumeIsUnderAHold_SellsNoLoad_ButTheCreditsAreSavedUpForIt()
+    public void AMarketWhoseTradeVolumeIsUnderAHold_SellsAFullHoldInBatches()
     {
-        // D67, asked on 2026-10-04: "If the markets trade volume is smaller than a haulers hold, it should wait until the trade
-        // volume is a haulers hold." Not strict, it is what the plan waits for.
+        // D81, asked on 2026-10-05 once a market's trade volume turned out to be the most one purchase takes, not its stock:
+        // "Full hold in batches", which replaced D67's wait for a trade volume of a hauler's hold. F49 sells 60 at a time: 60
+        // at 2,100, then 20 estimated 6% dearer.
         var map = Map(GateMarket(), F49Market(tradeVolume: 60), D42Market(), H51Market(), I56Market());
         var needs = ConstructionPlanner.Needs(Site(), []);
 
-        ConstructionPlanner.Loads(map, Hauler(), Gate, needs).Should().BeEmpty();
-        ConstructionPlanner.Loads(map, Hauler(), Gate, needs, strict: false).Select(load => (load.TradeSymbol, load.Units)).Should().Equal(("ADVANCED_CIRCUITRY", 80), ("FAB_MATS", 80));
-        ConstructionPlanner.WhyNoLoad(map, Hauler(), Gate, needs).Should().Be(ConstructionPlanner.TradeVolume);
+        var load = ConstructionPlanner.Loads(map, Hauler(), Gate, needs).Single(candidate => candidate.TradeSymbol == "FAB_MATS");
+
+        (load.Units, load.CargoCost).Should().Be((80, (60 * 2_100) + (20 * 2_226)));
+        ConstructionPlanner.WhyNoLoad(map, Hauler(), Gate, needs).Should().BeEmpty();
     }
 
     [Fact]

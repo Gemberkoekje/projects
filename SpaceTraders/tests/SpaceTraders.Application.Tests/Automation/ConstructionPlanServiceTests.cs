@@ -58,14 +58,16 @@ public sealed class ConstructionPlanServiceTests
     [Fact]
     public async Task AFreeBuilderWithAnEmptyHold_TakesAFullHold_AndHoldsBackWhatItCosts()
     {
+        // ADVANCED_CIRCUITRY first, by name at an equal share: D42 sells 40 at a time, so the hauler's 80 are two batches, the
+        // second estimated 6% dearer (D81).
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         Fleet(Hauler());
 
         await RunAsync();
 
         var trip = _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Subject;
-        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.ConstructionSiteWaypointSymbol, trip.Units).Should().Be(("FAB_MATS", F49, Gate, 80));
-        trip.ReservedCredits.Should().Be(80 * 2_100);
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.ConstructionSiteWaypointSymbol, trip.Units).Should().Be(("ADVANCED_CIRCUITRY", D42, Gate, 80));
+        trip.ReservedCredits.Should().Be((40 * 4_500) + (40 * 4_770));
         trip.CargoBought.Should().BeFalse();
 
         var started = _log.Journal.Should().ContainSingle().Subject;
@@ -73,7 +75,24 @@ public sealed class ConstructionPlanServiceTests
         started.Properties["Reason"].Should().Be("purchase");
 
         // D64: its place in the order ships are bought in, after the cargo ships.
-        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "FAB_MATS" && need.ShipyardWaypointSymbol == F49);
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "ADVANCED_CIRCUITRY" && need.ShipyardWaypointSymbol == D42);
+    }
+
+    [Fact]
+    public async Task ABuilderWhoseHoldNoMarketSellsAtOnce_TakesAFullHold_ToBuyInBatches()
+    {
+        // D81, seen on 2026-10-05: the plan had given SPECTER-D, an 80-unit hauler, no load since 00:38Z, and the gate none
+        // since 10-04 18:09Z. Every market sold FAB_MATS and ADVANCED_CIRCUITRY 20 at a time, ABUNDANT, and a load had to be
+        // one purchase (D67). A market's trade volume is the most one purchase takes, not its stock.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        Fleet(Hauler());
+        PricesAre(Map(GateMarket(), F49Market(supply: "ABUNDANT", tradeVolume: 20), D42Market(supply: "ABUNDANT", tradeVolume: 20), H51Market(), I56Market()));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Subject;
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.Units).Should().Be(("ADVANCED_CIRCUITRY", D42, 80));
+        _state!.Waiting.Should().BeEmpty();
     }
 
     [Fact]
@@ -94,7 +113,8 @@ public sealed class ConstructionPlanServiceTests
     [Fact]
     public async Task ALoadThatWouldDipIntoTheCreditReserve_Waits_AndTheProbesWaitBehindIt()
     {
-        // 168,000 for the cargo and 532 for fuel; 150,000 above the reserve. The builder trades meanwhile: the trading plan
+        // The first load, ADVANCED_CIRCUITRY, costs 370,800 in two batches (D81) and 625 for fuel: 85 at D42 for the 51 there,
+        // and 6 units at the gate's 90 for the 530 on; 150,000 above the reserve. The builder trades meanwhile: the trading plan
         // comes next. The need stays at its place in the order, so the probes and further ships wait (D64).
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
         Fleet(Hauler());
@@ -105,7 +125,7 @@ public sealed class ConstructionPlanServiceTests
         _activeGoals.Should().BeEmpty();
         _state!.Waiting.Should().Be(ConstructionPlanService.WaitingForCredits);
         _state.ReadyShipSymbols.Should().BeEmpty();
-        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.Price == 168_532);
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.Price == 370_800 + 85 + (6 * 90));
     }
 
     [Fact]
@@ -198,7 +218,7 @@ public sealed class ConstructionPlanServiceTests
         var site = _state!.Sites.Should().ContainSingle().Subject;
         site.WaypointSymbol.Should().Be(Gate);
         site.Materials.Select(material => (material.TradeSymbol, material.Required, material.Fulfilled, material.OnTheWay))
-            .Should().Equal(("FAB_MATS", 1_600, 0, 80), ("ADVANCED_CIRCUITRY", 400, 0, 0));
+            .Should().Equal(("FAB_MATS", 1_600, 0, 0), ("ADVANCED_CIRCUITRY", 400, 0, 80));
         _state.BuilderShipSymbols.Should().Equal("SHIP-6");
         _state.ReadyShipSymbols.Should().Equal("SHIP-6");
         _state.Waiting.Should().BeEmpty();

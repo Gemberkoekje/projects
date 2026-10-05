@@ -157,8 +157,8 @@ public static class JournalEvents
 
     /// <summary>
     /// A construction trip was given up (slice 6.6: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c>,
-    /// <c>Reason</c>: at the market <c>not_needed</c>, <c>not_sold_here</c>, <c>low_supply</c> (D66), <c>not_full_hold</c>
-    /// (D67) or <c>over_budget</c> (D64); at the site <c>not_needed</c>; at Warning when the API refused the supply,
+    /// <c>Reason</c>: at the market <c>not_needed</c>, <c>not_sold_here</c>, <c>low_supply</c> (D66) or <c>over_budget</c>
+    /// (D64), before it bought anything (D81); at the site <c>not_needed</c>; at Warning when the API refused the supply,
     /// <c>not_needed</c> or <c>wrong_location</c>, with the <c>Units</c> kept aboard). The construction plan chooses again.
     /// </summary>
     public const string ConstructionDropped = nameof(ConstructionDropped);

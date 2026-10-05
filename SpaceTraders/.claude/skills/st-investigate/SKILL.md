@@ -93,8 +93,10 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 - **Construction loses money by design** (slice 6.6, D64–D68): supplying the home jump gate pays nothing, so every
   `TripEnded` with `Activity` `construction` is a loss and its purchases are `ConstructionBuy` ledger rows. A builder
   that trades while the construction plan's state (`plan_states`, `Construction`) says `Waiting` (`purchase_order`,
-  `waiting_for_credits`, `low_supply`, `trade_volume`, `no_market`) is waiting by design, and so are the probes and
-  further ships held behind the gate's load in the purchase order.
+  `waiting_for_credits`, `low_supply`, `no_market`) is waiting by design, and so are the probes and further ships held
+  behind the gate's load in the purchase order. A load is bought in batches of the market's trade volume (D81), one
+  `CargoBought` each; a builder that takes less than its load to the gate stopped because the supply fell to LIMITED or
+  the next batch would dip into the credit reserve, which it logs.
 - **Starts and deploys:** `|= "Deferred startup initialization completed"` lists every start. When
   lines come from several pods, `logs` prefixes each with the pod's suffix, so a restart or a deploy
   shows as a new suffix. `check` shows the running image; earlier ones are in gembernodes' history.

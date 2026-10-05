@@ -35,8 +35,8 @@ public interface IConstructionPlanService
 ///   otherwise be sold, or jettisoned where no market buys it;</item>
 ///   <item>a free builder with an empty hold takes a load (<see cref="ConstructionPlanner"/>): the ship with the
 ///   construction role, the largest hold that isn't a drone or the surveyor (D65); with the role board off, the plan picks
-///   it by the same rule. A load is a full hold, or what the gate still needs, in one purchase, at a market whose trade
-///   volume takes it at once (D67) and whose supply isn't SCARCE or LIMITED (D66);</item>
+///   it by the same rule. A load is a full hold, or what the gate still needs, at a market whose supply isn't SCARCE or
+///   LIMITED (D66), bought in batches of its trade volume (D81);</item>
 ///   <item>supplying pays nothing, so a load is judged as a ship purchase (D64): it keeps the credit reserve
 ///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships in the order ships are bought in
 ///   (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so probes and further ships wait until the
