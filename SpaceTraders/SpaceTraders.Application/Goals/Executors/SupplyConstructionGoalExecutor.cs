@@ -132,7 +132,7 @@ public sealed class SupplyConstructionGoalExecutor(
                 }
 
                 logger.LogInformation(
-                    "SupplyConstructionGoalExecutor: ship {ShipSymbol} buys no more {TradeSymbol} at {WaypointSymbol} ({Reason}) and takes the {Units} aboard of {PlannedUnits} to {SiteWaypoint}.",
+                    "SupplyConstructionGoalExecutor: ship {ShipSymbol} buys no more {TradeSymbol} at {WaypointSymbol} ({Reason}) and takes the {Aboard} aboard of {Units} to {SiteWaypoint}.",
                     ship.Symbol,
                     trip.TradeSymbol,
                     trip.BuyWaypointSymbol,
