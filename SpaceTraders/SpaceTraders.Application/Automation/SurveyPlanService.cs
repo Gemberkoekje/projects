@@ -163,7 +163,11 @@ public sealed class SurveyPlanService(
                     .Where(ship => !ship.Symbol.Equals(surveyor.Symbol, StringComparison.OrdinalIgnoreCase) && surveyShipsAt.ContainsKey(ship.Symbol))
                     .Select(ship => surveyShipsAt[ship.Symbol])
                     .ToList();
-                if (FleetRoles.CanOnlySurvey(surveyor) && MiningPlanner.TryFindBusierArea(context.Map, surveyor, droneWaypoints, others, out var move))
+                // B68: a survey ship at a collection point's asteroid stays parked there, as the drones do (D83). From there its own
+                // area, as far as its fuel cruises, may hold none of the point's drones, which count in their market's area.
+                var parked = surveyor.LocalStatus != ShipLocalStatus.InTransit
+                    && systemPoints.Any(point => point.AsteroidSymbol.Equals(surveyor.WaypointSymbol, StringComparison.OrdinalIgnoreCase));
+                if (FleetRoles.CanOnlySurvey(surveyor) && !parked && MiningPlanner.TryFindBusierArea(context.Map, surveyor, droneWaypoints, others, out var move))
                 {
                     await goals.SetActiveGoalAsync(
                         surveyor.Symbol,

@@ -603,7 +603,8 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   reaches a collection point's asteroid it gets to (slice 6.18, D83), as it stays parked there, as the drones do. Drones
   parked at a collection point count in the areas by their point's market, so the area gets a survey ship of its own
   (D55), which moves to that market (D54) and on to the asteroid; each collection point's ores at its asteroid are targets
-  for its market.
+  for its market. A survey ship at a collection point's asteroid isn't moved again (B68): from there, as far as its fuel
+  cruises, its own area may hold none of the point's drones, which count by the market.
   The targets are:
   1. the contract's ore at the contract's asteroid, while the contract plan mines it;
   2. each ore a market in the system buys, at the asteroid nearest each market that buys it (D27,
@@ -625,7 +626,8 @@ The goal is a probe at every market of the HQ system, where the market watch kee
   before it gets a survey, the plan counts the mining drones by where they work (the market their trip sells
   at, a drone still drifting there included; between trips, where they are). Its own area is what it reaches
   in CRUISE; the drones beyond that group into areas as it would fly between them. When an area has more drones
-  than its own (a tie keeps it where it is), it gets a `MoveToWaypointGoal` with `Drifting` instead of a survey:
+  than its own (a tie keeps it where it is), it gets a `MoveToWaypointGoal` with `Drifting` instead of a survey, unless it
+  is at a collection point's asteroid, where it stays parked (B68):
   to the market of that area where the most drones work, among those that sell fuel, and logs "moves to …
   (D54)". It goes there the fastest way (D45, D84: it cruises as far as it can and drifts the rest, 1 fuel whatever
   the distance; drifting all the way took about 2.5 hours from the middle of X1-DC53 to B7), and surveys from

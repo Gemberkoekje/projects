@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-05, B68)
+- A survey ship at a collection point's asteroid stays there and surveys, as D83 meant. With too little fuel to cruise to the point's market, where the parked drones count, the survey plan had moved it back to the market after every survey, a 25-minute drift: SPECTER-2C took one survey at B44 every 28 minutes, and the drones there extracted without one (138 unsurveyed extractions in the hour to 15:30Z).
+
+### Docs – Changed (2026-10-05, B68)
+- `PLAN.md`: B68. `docs/HOW_IT_WORKS.md`: the survey ship at a collection point.
+
 ### Code – Fixed (2026-10-05, B67)
 - The role board credits a ship only with trade routes the trading plan could give it: none another ship's trip holds, nor a good another trip is on its way to buy at that market (D80). A trade job is the good at its buy market, so no two ships are credited with it, and each job offers its best trip. SPECTER-1 had changed role 120 times in 12 hours on estimates of 0.14 to 1.77 million an hour.
 
