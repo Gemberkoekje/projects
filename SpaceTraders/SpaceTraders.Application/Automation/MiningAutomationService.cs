@@ -53,7 +53,15 @@ public interface IMiningAutomationService
 ///   reach (D45), and stays parked there (<see cref="MineForShuttleGoal"/>); the shuttle designated for it collects their
 ///   ore (<see cref="CollectOreGoal"/>) once a drone is parked there. With the drones for scarce minerals (Coverage) it buys
 ///   a light shuttle for a point where a drone has a place and none is designated yet, and a second when a parked drone
-///   waits for one, its hold full, while the first is away selling.</item>
+///   waits for one, its hold full, while the first is away selling;</item>
+///   <item>while the jump gate needs materials (slice 6.25, D92), a mining drone for each ore its smelters are short of
+///   (<see cref="MiningPlanner.GateSmelters"/>: below HIGH, at a smelter a drone from the shipyard can serve), one per ore
+///   every <c>Mining.GateMinerIntervalMinutes</c> (30), at the gate's place in the order ships are bought in, after a load
+///   that can be bought now. Such a gate miner mines only its ore, for the smelter of it with the lowest supply, and never
+///   parks at a collection point, until the gate needs nothing made from its ore; while every smelter of it has the ore
+///   ABUNDANT, or is out of its reach, it follows the rules above. Asked on 2026-10-05: "extra miners to be bought for the
+///   ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until
+///   each of the smelters have at least HIGH saturation."</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -73,9 +81,19 @@ public sealed class MiningAutomationService(
     PassedOverShips passedOver,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
+    /// <summary>
+    /// The setting that holds the minutes between the drones bought for one ore of the jump gate's smelters (slice 6.25, D92):
+    /// "once every half hour".
+    /// </summary>
+    public const string GateMinerIntervalSetting = "Mining.GateMinerIntervalMinutes";
+
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
     private const string LightShuttleShipType = "SHIP_LIGHT_SHUTTLE";
     private const string Collection = "collection";
+    private const string Gate = "gate";
+
+    /// <summary>The minutes between two gate miners for one ore while the setting holds none: half an hour (D92).</summary>
+    private const int DefaultGateMinerIntervalMinutes = 30;
 
     /// <summary>The most shuttles a collection point gets: the first, and a second when drones wait for one (D83).</summary>
     private const int MaxShuttlesPerPoint = 2;
@@ -108,6 +126,12 @@ public sealed class MiningAutomationService(
                 group => group.Key,
                 group => group.SelectMany(point => point.ShuttleSymbols).Where(inFleet.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
                 StringComparer.OrdinalIgnoreCase);
+
+        // D92: the drones bought for the jump gate's smelters, as the last pass left them.
+        var gateMiners = (existing?.GateMiners ?? [])
+            .Where(miner => inFleet.Contains(miner.ShipSymbol))
+            .DistinctBy(miner => miner.ShipSymbol, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
 
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -174,11 +198,13 @@ public sealed class MiningAutomationService(
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             var points = CollectionPointsIn(context, system.Key, fleet, shipyardList);
             pointsBySystem[system.Key] = points;
+            var dedicated = DedicatedIn(context, gateMiners);
             var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)).ToList();
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var miner in candidates)
             {
-                if (await GiveTripAsync(context, miner, heldKeys, heldBy, minersOn, covered, points, places, cancellationToken))
+                var gateOre = dedicated.GetValueOrDefault(miner.Symbol, string.Empty);
+                if (await GiveTripAsync(context, miner, gateOre, heldKeys, heldBy, minersOn, covered, points, places, cancellationToken))
                 {
                     withTrip.Add(miner.Symbol);
                     gaveTrip.Add(miner.Symbol);
@@ -225,8 +251,21 @@ public sealed class MiningAutomationService(
             fleet.Where(board.IsMiner).Select(ship => ship.Symbol),
             free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
-        await BuyAsync(fleet, systems, board, heldKeys, covered, freeAtStart, new Collecting(pointsBySystem, places, designated, parked, rounds), shipyardList, cancellationToken);
-        await SaveStateAsync(existing, opportunities, CollectionPointStates(pointsBySystem, places, designated), cancellationToken);
+        await BuyAsync(fleet, systems, board, heldKeys, covered, freeAtStart, new Collecting(pointsBySystem, places, designated, parked, rounds), gateMiners, shipyardList, cancellationToken);
+        await SaveStateAsync(existing, opportunities, CollectionPointStates(pointsBySystem, places, designated), gateMiners, cancellationToken);
+    }
+
+    /// <summary>
+    /// The gate miners that are dedicated now, with their ores (D92): those whose ore a smelter of the system makes a metal
+    /// from that goes into a material the jump gate still needs (<see cref="MiningPlanner.GateSmelters"/>). Once the gate needs
+    /// nothing made from an ore, or the construction plan is off, its miners are ordinary drones.
+    /// </summary>
+    private static Dictionary<string, string> DedicatedIn(MiningContext context, IEnumerable<GateMinerState> gateMiners)
+    {
+        var ores = MiningPlanner.GateSmelters(context.Map).Select(smelter => smelter.Ore).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return gateMiners
+            .Where(miner => ores.Contains(miner.TradeSymbol))
+            .ToDictionary(miner => miner.ShipSymbol, miner => miner.TradeSymbol, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -237,12 +276,16 @@ public sealed class MiningAutomationService(
     /// trip would turn to selling at once and end without its ore aboard, on every tick. A drone whose every pair below
     /// ABUNDANT has a miner shares one (D77, reason <c>shared</c>): it is passed over to the trading plan only when nothing
     /// below ABUNDANT is left that it can mine and sell. A market that only pays for an ore comes last (D91, reason
-    /// <c>wealth</c>): a drone shares a pair whose market makes something from its ore before it mines for one.
+    /// <c>wealth</c>): a drone shares a pair whose market makes something from its ore before it mines for one. A gate miner
+    /// mines its ore for the jump gate's smelter of it with the lowest supply, after selling what it holds (D92, reason
+    /// <c>gate</c>), and parks at no collection point while it is dedicated.
     /// </summary>
+    /// <param name="gateOre">The ore the miner is dedicated to for the jump gate's smelters (D92); empty for any other.</param>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
         MiningContext context,
         ShipModel miner,
+        string gateOre,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
         Dictionary<string, int> minersOn,
@@ -251,8 +294,11 @@ public sealed class MiningAutomationService(
         Dictionary<string, List<(string Ship, string Ore)>> places,
         CancellationToken cancellationToken)
     {
+        // D92: a gate miner stays on its ore; a place at a far asteroid would keep it there for good.
+        var dedicated = gateOre.Length > 0;
+
         // D83: a drone at a collection point's asteroid stays there while the point is open; the shuttle takes its hold.
-        if (FleetRoles.IsMiningDrone(miner) && points.FirstOrDefault(point => IsAt(miner, point.AsteroidSymbol)) is { } here)
+        if (!dedicated && FleetRoles.IsMiningDrone(miner) && points.FirstOrDefault(point => IsAt(miner, point.AsteroidSymbol)) is { } here)
         {
             await StartParkedAsync(miner, here, drifting: false, heldKeys, heldBy, covered, places, cancellationToken);
             return true;
@@ -278,12 +324,23 @@ public sealed class MiningAutomationService(
             return false;
         }
 
+        // D92: "those miners being dedicated to those ores", sharing a smelter's pair with any other miner there.
+        if (dedicated && MiningPlanner.GateTargets(context, miner, gateOre, minersOn).FirstOrDefault() is { } smelter)
+        {
+            heldKeys.Add(smelter.Key);
+            heldBy[smelter.Key] = miner.Symbol;
+            minersOn[smelter.Key] = minersOn.GetValueOrDefault(smelter.Key) + 1;
+            covered.Add(new CoveringTrip(smelter.Ore, smelter.SellWaypointSymbol, miner.FuelCapacity));
+            await StartAsync(miner, TripTo(smelter), Gate, cancellationToken);
+            return true;
+        }
+
         // D91: with no pair left whose market makes something from its ore, a drone shares one before it mines for a market
         // that only pays for the ore.
         var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
         if (ranked.Count == 0 || !ranked[0].FeedsProduction)
         {
-            if (await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
+            if (!dedicated && await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
             {
                 return true;
             }
@@ -311,7 +368,7 @@ public sealed class MiningAutomationService(
 
         // D83: a far asteroid's scarce ores come after the uncovered ones a drone serves on its own (D48, near before far).
         var uncovered = target.FeedsProduction && target.LowSupply && !covered.Any(trip => trip.Covers(context.Map, target.Ore, target.SellWaypointSymbol));
-        if (!uncovered && await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
+        if (!uncovered && !dedicated && await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
         {
             return true;
         }
@@ -516,7 +573,9 @@ public sealed class MiningAutomationService(
     /// <summary>
     /// Says what the plan would buy (<see cref="NeedAsync"/>), and buys it when the order ships are bought in lets it (D43,
     /// <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new ship. A shuttle
-    /// bought for a collection point is designated for it (D83), which the role board reads to keep it collecting.
+    /// bought for a collection point is designated for it (D83), which the role board reads to keep it collecting. A drone
+    /// bought for the jump gate's smelters is noted with its ore (D92): it mines that ore for them, and the next for the ore
+    /// waits <c>Mining.GateMinerIntervalMinutes</c>.
     /// </summary>
     private async Task BuyAsync(
         IReadOnlyList<ShipModel> fleet,
@@ -526,10 +585,12 @@ public sealed class MiningAutomationService(
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         Collecting collecting,
+        List<GateMinerState> gateMiners,
         IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
-        var (need, pointKey) = await NeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, shipyardList, cancellationToken);
+        var purchase = await NeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken);
+        var need = purchase.Need;
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Mining, need, cancellationToken))
         {
             return;
@@ -546,15 +607,24 @@ public sealed class MiningAutomationService(
             return;
         }
 
-        if (pointKey.Length > 0 && purchased.PurchasedShip is { } shuttle)
+        if (purchase.ShuttlePoint.Length > 0 && purchased.PurchasedShip is { } shuttle)
         {
-            if (!collecting.Designated.TryGetValue(pointKey, out var shuttles))
+            if (!collecting.Designated.TryGetValue(purchase.ShuttlePoint, out var shuttles))
             {
                 shuttles = [];
-                collecting.Designated[pointKey] = shuttles;
+                collecting.Designated[purchase.ShuttlePoint] = shuttles;
             }
 
             shuttles.Add(shuttle.Symbol);
+        }
+
+        if (purchase.GateOre.Length > 0 && purchased.PurchasedShip is { } drone)
+        {
+            gateMiners.Add(new GateMinerState { ShipSymbol = drone.Symbol, TradeSymbol = purchase.GateOre, BoughtAt = TimeProvider.System.GetUtcNow() });
+            logger.LogInformation(
+                "Mining plan: ship {ShipSymbol} was bought for the jump gate's smelters, and mines only {TradeSymbol} for them while the gate needs a material made from it (D92).",
+                drone.Symbol,
+                purchase.GateOre);
         }
     }
 
@@ -564,13 +634,13 @@ public sealed class MiningAutomationService(
     /// parked at the asteroid waits with its hold full while its shuttle is away selling. None while no shipyard of the
     /// system sells one with a known price.
     /// </summary>
-    private static (PurchaseNeed Need, string PointKey) ShuttleNeed(string systemSymbol, Collecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    private static Purchase ShuttleNeed(string systemSymbol, Collecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList)
     {
         if (!collecting.PointsBySystem.TryGetValue(systemSymbol, out var points)
             || points.Count == 0
             || CheapestListing(shipyardList, systemSymbol, LightShuttleShipType) is not { } listing)
         {
-            return (PurchaseNeed.None, string.Empty);
+            return Purchase.Nothing;
         }
 
         var need = new PurchaseNeed(PurchaseTier.Coverage, LightShuttleShipType, listing.Shipyard.WaypointSymbol, listing.Ship.PurchasePrice);
@@ -580,7 +650,7 @@ public sealed class MiningAutomationService(
             var hasDrones = collecting.Places.TryGetValue(point.Key, out var there) && there.Count > 0;
             if (hasDrones && shuttles.Count == 0)
             {
-                return (need, point.Key);
+                return new Purchase(need, point.Key);
             }
 
             var away = collecting.Rounds.Where(entry => entry.Round.AsteroidWaypointSymbol.Equals(point.AsteroidSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -592,11 +662,11 @@ public sealed class MiningAutomationService(
                 && away.Any(entry => entry.Round.Selling)
                 && !away.Any(entry => !entry.Round.Selling))
             {
-                return (need, point.Key);
+                return new Purchase(need, point.Key);
             }
         }
 
-        return (PurchaseNeed.None, string.Empty);
+        return Purchase.Nothing;
     }
 
     /// <summary>
@@ -606,13 +676,17 @@ public sealed class MiningAutomationService(
     ///   <item>a drone for a scarce ore (<see cref="PurchaseTier.Coverage"/>, D48), while the system has fewer mining drones
     ///   than SCARCE or LIMITED ores a new drone could serve, each counted once per area (<see cref="MiningPlanner.ScarceOres"/>,
     ///   D53): one drone per scarce mineral and area, which the role board keeps mining. It doesn't ask the board what pays
-    ///   most;</item>
+    ///   most. A gate miner counts only for its own ore (D92);</item>
+    ///   <item>then, while the jump gate needs materials, a drone for an ore its smelters are short of
+    ///   (<see cref="MiningPlanner.GateOresShort"/>), one per ore every <c>Mining.GateMinerIntervalMinutes</c>, at the gate's
+    ///   place in the order (<see cref="PurchaseTier.Construction"/>, D92), the ore whose smelter has the lowest supply
+    ///   first;</item>
     ///   <item>otherwise, when every miner works, a drone whose first trip by the miners' own ranking (the trips under way
     ///   held) would serve a market short of its ore (<see cref="PurchaseTier.Alternating"/>, D22, D28), which, with the
     ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>).</item>
     /// </list>
     /// </summary>
-    private async Task<(PurchaseNeed Need, string PointKey)> NeedAsync(
+    private async Task<Purchase> NeedAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
         FleetRoleBoard board,
@@ -620,12 +694,13 @@ public sealed class MiningAutomationService(
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         Collecting collecting,
+        IReadOnlyList<GateMinerState> gateMiners,
         IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
         if (await ContractTakesMinersAsync(cancellationToken))
         {
-            return (PurchaseNeed.None, string.Empty);
+            return Purchase.Nothing;
         }
 
         // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one.
@@ -637,10 +712,10 @@ public sealed class MiningAutomationService(
             }
         }
 
-        return (await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, shipyardList, cancellationToken), string.Empty);
+        return await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken);
     }
 
-    private async Task<PurchaseNeed> DroneNeedAsync(
+    private async Task<Purchase> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
         FleetRoleBoard board,
@@ -648,6 +723,7 @@ public sealed class MiningAutomationService(
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         Collecting collecting,
+        IReadOnlyList<GateMinerState> gateMiners,
         IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
@@ -661,9 +737,10 @@ public sealed class MiningAutomationService(
         if (drones >= maxDrones)
         {
             logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
-            return PurchaseNeed.None;
+            return Purchase.Nothing;
         }
 
+        var forSystems = new List<(string System, MiningContext Context, ShipModel NewDrone, PurchaseNeed Need)>();
         foreach (var systemSymbol in systems)
         {
             var shipyard = shipyardList
@@ -691,20 +768,45 @@ public sealed class MiningAutomationService(
                 CargoCapacity: forSale.CargoCapacity,
                 ShipType: MiningDroneShipType);
             var need = new PurchaseNeed(PurchaseTier.Coverage, MiningDroneShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
+            forSystems.Add((systemSymbol, context, newDrone, need));
 
-            // D83: a far asteroid's SCARCE or LIMITED ores count a drone each too (D48).
-            var miningDrones = fleet.Count(ship => FleetRoles.IsMiningDrone(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
+            // D83: a far asteroid's SCARCE or LIMITED ores count a drone each too (D48). D92: a gate miner mines only its ore
+            // while the gate needs a material made from it, so it counts for that ore's areas alone.
+            var dedicated = DedicatedIn(context, gateMiners);
+            var dedicatedOres = dedicated.Values.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var miningDrones = fleet.Count(ship => FleetRoles.IsMiningDrone(ship)
+                && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)
+                && !dedicated.ContainsKey(ship.Symbol));
+            var scarceOres = MiningPlanner.ScarceOres(context, newDrone).Count(area => !dedicatedOres.Contains(area.Good));
             var pointDrones = collecting.PointsBySystem.GetValueOrDefault(systemSymbol, []).Sum(point => point.DronesWanted);
-            if (miningDrones < MiningPlanner.ScarceOres(context, newDrone).Count + pointDrones)
+            if (miningDrones < scarceOres + pointDrones)
             {
-                return need;
+                return new Purchase(need);
             }
+        }
 
-            if (freeAtStart)
+        // D92: while the jump gate needs materials, a drone for an ore its smelters are short of, one per ore every
+        // Mining.GateMinerIntervalMinutes, at the gate's place in the order.
+        var interval = await GateMinerIntervalAsync(cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+        foreach (var (_, context, newDrone, need) in forSystems)
+        {
+            var ore = MiningPlanner.GateOresShort(context, newDrone)
+                .FirstOrDefault(shortOre => !gateMiners.Any(miner => miner.TradeSymbol.Equals(shortOre, StringComparison.OrdinalIgnoreCase)
+                    && now - miner.BoughtAt < interval));
+            if (ore is not null)
             {
-                continue;
+                return new Purchase(need with { Tier = PurchaseTier.Construction }, GateOre: ore);
             }
+        }
 
+        if (freeAtStart)
+        {
+            return Purchase.Nothing;
+        }
+
+        foreach (var (systemSymbol, context, newDrone, need) in forSystems)
+        {
             var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys, covered);
             if (targets.Count == 0 || !targets[0].FeedsProduction || !targets[0].LowSupply)
             {
@@ -725,20 +827,28 @@ public sealed class MiningAutomationService(
                 continue;
             }
 
-            return need with { Tier = PurchaseTier.Alternating };
+            return new Purchase(need with { Tier = PurchaseTier.Alternating });
         }
 
-        return PurchaseNeed.None;
+        return Purchase.Nothing;
+    }
+
+    /// <summary>The minutes between two gate miners for one ore (D92): <c>Mining.GateMinerIntervalMinutes</c>, else half an hour.</summary>
+    private async Task<TimeSpan> GateMinerIntervalAsync(CancellationToken cancellationToken)
+    {
+        var minutes = await settings.GetAsync<int>(GateMinerIntervalSetting, cancellationToken);
+        return TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultGateMinerIntervalMinutes);
     }
 
     /// <summary>
-    /// Records the openings and the collection points, with the shuttles designated for each (D83). Only a change is written:
-    /// the tick runs every 5 seconds.
+    /// Records the openings, the collection points with the shuttles designated for each (D83), and the gate's miners (D92).
+    /// Only a change is written: the tick runs every 5 seconds.
     /// </summary>
     private async Task SaveStateAsync(
         MiningAutomationPlanState? existing,
         IReadOnlyList<MiningAutomationOpportunityState> opportunities,
         IReadOnlyList<CollectionPointState> collectionPoints,
+        IReadOnlyList<GateMinerState> gateMiners,
         CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
@@ -757,9 +867,11 @@ public sealed class MiningAutomationService(
                 }),
         ];
 
+        List<GateMinerState> miners = [.. gateMiners.OrderBy(miner => miner.ShipSymbol, StringComparer.Ordinal)];
         if (existing is not null
             && Same(existing.Opportunities, dated)
-            && JsonSerializer.Serialize(existing.CollectionPoints, CompareOptions) == JsonSerializer.Serialize(collectionPoints, CompareOptions))
+            && JsonSerializer.Serialize(existing.CollectionPoints, CompareOptions) == JsonSerializer.Serialize(collectionPoints, CompareOptions)
+            && JsonSerializer.Serialize(existing.GateMiners, CompareOptions) == JsonSerializer.Serialize(miners, CompareOptions))
         {
             return;
         }
@@ -771,6 +883,7 @@ public sealed class MiningAutomationService(
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = dated,
                 CollectionPoints = collectionPoints,
+                GateMiners = miners,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },
@@ -794,4 +907,14 @@ public sealed class MiningAutomationService(
         Dictionary<string, List<string>> Designated,
         IReadOnlyList<(ShipModel Ship, MineForShuttleGoal Job)> Parked,
         IReadOnlyList<(ShipModel Ship, CollectOreGoal Round)> Rounds);
+
+    /// <summary>
+    /// What the plan would buy this pass: the need it tells the order ships are bought in, the key of the collection point a
+    /// shuttle is for (D83), and the ore a drone for the jump gate's smelters is for (D92); each empty when it isn't one.
+    /// </summary>
+    private sealed record Purchase(PurchaseNeed Need, string ShuttlePoint = "", string GateOre = "")
+    {
+        /// <summary>Nothing to buy.</summary>
+        public static readonly Purchase Nothing = new(PurchaseNeed.None);
+    }
 }

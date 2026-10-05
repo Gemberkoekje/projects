@@ -185,6 +185,27 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
+    public async Task ALoadThatWaitsForItsMarkets_SaysSo_SoTheGatesMinersMayBeBoughtMeanwhile()
+    {
+        // D92: "If the gate can be built, it should be built, otherwise extra miners can be built." Short of credits, a load
+        // that the markets sell now still comes first: the credits are saved up for it.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        Fleet(Hauler());
+        PricesAre(Map(GateMarket(), F49Market(supply: "LIMITED"), D42Market(supply: "SCARCE"), H51Market(), I56Market()));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.WaitsForMarkets);
+
+        PricesAre(Map());
+        Spendable(150_000);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && !need.WaitsForMarkets);
+    }
+
+    [Fact]
     public async Task AShipThatHoldsWhatTheGateNeeds_TakesItThere_WhateverItsRole()
     {
         // A trader left with 40 FAB_MATS, which no market here buys: it would have jettisoned them (D42).

@@ -17,7 +17,9 @@ namespace SpaceTraders.Application.Services;
 ///   other drone is bought;</item>
 ///   <item>the jump gate's next load of materials (slice 6.6, D64), while the gate needs materials and a ship has the
 ///   construction role: no ship, but materials that are spent for good, so it keeps the credit reserve as a ship does, and
-///   the probes and further ships wait until the gate is done;</item>
+///   the probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
+///   (slice 6.25, D92), which waits while a load can be bought: "If the gate can be built, it should be built, otherwise
+///   extra miners can be built.";</item>
 ///   <item>a probe for every market (D29);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy.</item>
@@ -76,7 +78,9 @@ public sealed class PurchaseOrder(
     /// <summary>
     /// What comes before a plan's need in the order (D43): each other plan that is on whose need comes earlier, or, between
     /// drones and cargo ships, is of the kind whose turn it is; and each other plan that is on, could need something
-    /// earlier, and hasn't said what it needs within <see cref="PurchaseNeeds.Lifetime"/>.
+    /// earlier, and hasn't said what it needs within <see cref="PurchaseNeeds.Lifetime"/>. At the jump gate's place, the gate's
+    /// load comes before the gate's miners unless it waits for its markets (D92), and so does the construction plan while
+    /// it hasn't said what it needs.
     /// </summary>
     /// <param name="plan">The plan that would buy.</param>
     /// <param name="need">What it would buy.</param>
@@ -103,8 +107,10 @@ public sealed class PurchaseOrder(
         {
             if (!reported.TryGetValue(other, out var report) || now - report.At > PurchaseNeeds.Lifetime)
             {
-                // Not heard from since the start, or since a pause: what it needs could come first.
-                if (BuyingPlans.TryGetValue(other, out var earliest) && earliest < need.Tier)
+                // Not heard from since the start, or since a pause: what it needs could come first. The gate's load could be
+                // one it may buy now (D92).
+                if (BuyingPlans.TryGetValue(other, out var earliest)
+                    && (earliest < need.Tier || (earliest == need.Tier && IsGateLoadBeforeMiners(other, plan, need))))
                 {
                     ahead.Add($"the {other} plan, not heard from lately");
                 }
@@ -123,7 +129,8 @@ public sealed class PurchaseOrder(
                 || (open.Tier == PurchaseTier.Alternating
                     && need.Tier == PurchaseTier.Alternating
                     && otherKind != kind
-                    && otherKind == turn))
+                    && otherKind == turn)
+                || (open.Tier == need.Tier && !open.WaitsForMarkets && IsGateLoadBeforeMiners(other, plan, need)))
             {
                 ahead.Add($"the {other} plan's {open.ShipType} ({open.Tier})");
             }
@@ -163,6 +170,18 @@ public sealed class PurchaseOrder(
 
         return PurchaseKind.Drone;
     }
+
+    /// <summary>
+    /// Whether another plan's need at the jump gate's place comes before this one (PLAN.md slice 6.25, D92): the gate's load
+    /// before the gate's miners, which the mining plan buys there. Asked on 2026-10-05: "If the gate can be built, it should be
+    /// built, otherwise extra miners can be built." The miners never hold back the load.
+    /// </summary>
+    /// <param name="other">The plan whose need could come first.</param>
+    /// <param name="plan">The plan that would buy.</param>
+    /// <param name="need">What it would buy.</param>
+    /// <returns>True when <paramref name="other"/> is the construction plan, and <paramref name="need"/> another plan's at its place.</returns>
+    private static bool IsGateLoadBeforeMiners(AutomationPlan other, AutomationPlan plan, PurchaseNeed need)
+        => other == AutomationPlan.Construction && plan != AutomationPlan.Construction && need.Tier == PurchaseTier.Construction;
 
     /// <summary>The kind of ship a plan buys when drones and cargo ships take turns.</summary>
     /// <param name="plan">The plan.</param>
@@ -363,7 +382,8 @@ public enum PurchaseTier
 
     /// <summary>
     /// The jump gate's next load of materials (slice 6.6, D64): not a ship, but spent for good, so it keeps the credit
-    /// reserve as one does. While the gate needs materials, everything after it waits.
+    /// reserve as one does. While the gate needs materials, everything after it waits. A mining drone for the gate's smelters
+    /// stands here too (slice 6.25, D92), after a load that can be bought now (<see cref="PurchaseNeed.WaitsForMarkets"/>).
     /// </summary>
     Construction = 6,
 
@@ -418,6 +438,13 @@ public sealed record PurchaseNeed
 
     /// <summary>What the shipyard asks for it, as cached.</summary>
     public required long Price { get; init; }
+
+    /// <summary>
+    /// Whether it can't be bought yet, whatever the credits: the jump gate's next load while every market that sells it has it
+    /// SCARCE or LIMITED (D66), or another trip on its way to buy it there (D80). The gate's miners may be bought meanwhile, at
+    /// the gate's place in the order (slice 6.25, D92). False unless set.
+    /// </summary>
+    public bool WaitsForMarkets { get; init; }
 }
 
 /// <summary>A need as a plan last said it.</summary>

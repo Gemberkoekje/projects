@@ -181,7 +181,10 @@
   with your decision D90) is merged and deployed (projects#183, gembernodes#78, image `9cf8226`, live since 2026-10-05
   16:46Z).
 - Slice 6.24 (ore and gases go to the markets that make something from them, and EXCHANGE markets are wealth trades only,
-  asked on 2026-10-05, with your decision D91) is built on branch `claude/spacetraders-ore-to-makers`.
+  asked on 2026-10-05, with your decision D91) is merged and deployed (projects#184, gembernodes#79, image `78d238f`).
+- Slice 6.25 (the jump gate's miners: a mining drone per ore every half hour for the smelters that make the gate's metals,
+  dedicated to its ore, until each smelter has its ore at HIGH; D91's phase 2, asked on 2026-10-05, with your decision D92)
+  is built on branch `ccr-ca2bf7e9-hweozt` in projects and gembernodes.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -364,6 +367,7 @@ get the next D-number.
 | D90 | Slice 6.23 (asked on 2026-10-05, with D89): IRON, the input that kept the FAB_MATS markets D52 and F58 RESTRICTED, sold at H60 for 150 then, while D52 and F58 paid 150 to 155: a trip to them earned less than D14's 5 a unit after fuel, so D89 put no trader on it ("Goods not traded": "40 units earn 55 after 145 for fuel, 1 a unit"). Asked: "Should trade routes that feed the jump gate's factories run even when they earn less than the 5-a-unit minimum?" Offered: up to its fuel, the goods selling for at least what they cost; break even, at least 0 after fuel; keep the minimum. | **Up to its fuel** ("Up to its fuel (Recommended)", 2026-10-05): a trade route that feeds a material the jump gate still needs (D89) is worth taking while its goods sell for at least what they cost, a sale at the price paid included; only its fuel is lost. It buys while a unit's expected sale fetches what the unit costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. Every other route still earns `Trade.MinProfitPerUnit` a unit (D14). Amends D14 and D89. |
 | D91 | Slice 6.24 (asked on 2026-10-05: "I am still wondering whether just throwing more miners on iron ore would increase the iron production"): H60 never ran short of IRON_ORE (it reached STRONG at least as often with the ore LIMITED as MODERATE), but nobody had seen the ore above MODERATE there. Of the 1,740 IRON_ORE the drones sold in the last 24 hours, 742 went to D52, which imports it and makes nothing from it; B7's and H62's exchanges took 368 SILICON_CRYSTALS, 197 QUARTZ_SAND, 116 COPPER_ORE and 91 ALUMINUM_ORE that factories could have used. Offered: send the ore to the market that makes IRON from it, or add miners. Then: "Yes, EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as supply trades." and "Let's do this in 2 phases, first redirect the ore to a place that actually generates iron, if that's not enough to push it up, we add more miners." | **Supply first, exchanges last** (2026-10-05): a market supplies production with a good when it imports it and exports something made from it (the production chains; without them, any import). Miners and siphoners serve such markets first: a drone shares such a pair before it mines or siphons for a market that only pays for the good (an EXCHANGE, or an import it makes nothing from), which never counts as short of the good, buys no drone and is no opening; leftover cargo goes to such a market whenever that sale pays. A trade route to a market that exchanges the good never feeds production and ranks after every other. Phase 2, more miners, follows if H60's IRON_ORE doesn't reach HIGH or its IRON output doesn't rise. Amends D28, D48, D77 and D85. |
 | D84 | Slice 6.19 (asked on 2026-10-05): "The excavators are now drifting for 2 hours. Did they start drifting from the location they were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" They drifted straight from where they were (D52 to B7, 368, about 2 h 52 min). Then: "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I think it is worth it." And: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then drift back to a fuel station with 0 fuel and refuel." | **The fastest mix of CRUISE and DRIFT; BURN where the fuel allows it** (2026-10-05): a way out of CRUISE reach is the fastest mix of CRUISE legs, refuelling at markets that sell fuel, and DRIFT legs; a drone for a collection point (D83) flies straight to its asteroid. A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing (into a market that sells fuel; elsewhere, only when what is left still takes the ship on as cruising would), and cruises otherwise; the extra fuel is accepted. No leg lands a ship with an empty tank where no fuel is sold. |
+| D92 | Slice 6.25 (asked on 2026-10-05: "For spacetraders, I'd like, as part of the jump gate build phase, extra miners to be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the smelters have at least HIGH saturation."), D91's phase 2. While the gate needs materials its loads hold back every drone after them (D64), and the drones before them are bought only for a SCARCE or LIMITED ore (D48): H60's IRON_ORE at MODERATE got none. Asked which ores count (the smelters', or the factories' QUARTZ_SAND and SILICON_CRYSTALS too), one drone in all or one per ore every half hour, where they stand among the purchases and against `Mining.MaxDrones`, and how long a drone stays dedicated. | **The gate's miners** ("Smelters only (Recommended)", "One per ore", "Same tier as gate loads, capped. If the gate can be built, it should be built, otherwise extra miners can be built.", "Until the gate is done (Recommended)", 2026-10-05): while the gate needs materials, a smelter is a market that imports an ore and exports a metal, a good made from ores alone, that goes into a material the gate still needs, through the production chains (IRON_ORE into IRON for FAB_MATS; COPPER_ORE into COPPER for ADVANCED_CIRCUITRY). For each ore with a smelter below HIGH that a new drone can serve, one mining drone every `Mining.GateMinerIntervalMinutes` (30), the lowest supply first; at the gate's place in the order ships are bought in, after a load the markets sell now (one that waits for SCARCE or LIMITED markets, or for another buyer there, lets them go), within `Mining.MaxDrones` and the credit reserve. Each mines only its ore, for its smelter with the lowest supply, sharing a pair with other miners, and parks at no collection point, until the gate needs nothing made from its ore; while every smelter of it has the ore ABUNDANT, or none is in its reach, it follows the usual rules. It counts among D48's drones for its own ore only. Amends D28, D43, D48, D64 and D83. |
 
 ## Phases
 
@@ -3387,6 +3391,58 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.25 The jump gate's miners** (built on branch `ccr-ca2bf7e9-hweozt` in projects and gembernodes, asked on 2026-10-05,
+  D92). Asked: "For spacetraders, I'd like, as part of the jump gate build phase, extra miners to be bought for the ores that
+  supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the
+  smelters have at least HIGH saturation." It is D91's phase 2: "if that's not enough to push it up, we add more miners".
+  - Found (reading the code; the cluster's data wasn't read from this session):
+    - While the gate needs materials the construction plan reports its next load on every pass, also while every market
+      that sells it is SCARCE or LIMITED (D66), and everything after it in the order waits (D64): the probes and D28's
+      drones. Before it come only the drones for scarce minerals (D48) and the collection points' shuttles (D83), bought for a
+      SCARCE or LIMITED ore alone: no rule bought a drone for H60's IRON_ORE at MODERATE.
+    - D91 sends the drones' ore to the smelters first; nothing kept a drone on a smelter's ore.
+  - Choices (2026-10-05): "Smelters only (Recommended)"; "One per ore"; "Same tier as gate loads, capped. If the gate can be
+    built, it should be built, otherwise extra miners can be built."; "Until the gate is done (Recommended)".
+  - Done:
+    - `TradeMarketMap.InputsOf` and `GoesIntoConstruction`: a material the gate still needs, and every good it is made
+      from through the production chains.
+    - `MiningPlanner.GateSmelters` (a market that imports an ore and exports a metal, made from ores alone, that goes into a
+      material the gate still needs), `GateOresShort` (the ores of the smelters below HIGH that a drone from the shipyard can
+      serve, the lowest supply first), `GateTargets` (a gate miner's pairs, sharing allowed), `HasEnough` (HIGH or ABUNDANT;
+      an unknown supply counts as enough) and the `GateSmelter` record.
+    - The mining plan, after the drones for scarce minerals and before D28's: a drone for the first ore short whose last gate
+      miner was bought `Mining.GateMinerIntervalMinutes` (new, 30) ago or longer, at `PurchaseTier.Construction`, within
+      `Mining.MaxDrones` and the credit reserve; noted in its state (`MiningAutomationPlanState.GateMiners`: ship, ore, when
+      bought; a ship that left the fleet is dropped). A free gate miner sells what it holds first, then mines its ore for the
+      smelter of it with the lowest supply (reason `gate`, `MiningStarted`); it doesn't park at a collection point while its
+      ore goes into a material the gate still needs, and follows the usual rules while it has no smelter to serve (ABUNDANT,
+      or out of reach) and once the gate needs nothing made from its ore. In the count of drones for scarce minerals (D48) a
+      gate miner and its ore's areas are left out.
+    - The order ships are bought in: `PurchaseNeed.WaitsForMarkets`, set by the construction plan when its next load waits
+      for SCARCE or LIMITED markets (D66) or another buyer there (D80). At the gate's place, its load comes before another
+      plan's need unless it waits so, and so does the construction plan while it hasn't said what it needs (after a start the
+      mining plan runs first). The gate's miners never hold the load back; the probes and D28's drones wait for both.
+  - Unchanged: the contract takes every free miner, a gate miner too, and no drone is bought while it mines (D23); a gate
+    miner's trip keeps the other ores it can sell within one tank and sells them on the trips after (D71); QUARTZ_SAND and
+    SILICON_CRYSTALS, which the FAB_MATS, ELECTRONICS and MICROPROCESSORS factories take directly, buy no gate miner.
+  - Noticed (not changed):
+    - `Mining.MaxDrones` (20) counts every ship that can mine, the command ship included: once it is reached no gate miner is
+      bought, whatever the smelters' supply. While the smelters stay below HIGH, a drone per ore is bought every half hour
+      until then.
+    - A smelter out of a drone's CRUISE reach that sells fuel counts, as D45's far markets do: its drone drifts there first.
+  - Tests: `GateSmelterTests` (the chains; smelters, not factories; only what the gate still needs; none without the chains;
+    the ores short by supply until HIGH; a smelter no drone can serve; a gate miner's targets, sharing, and none at
+    ABUNDANT), `GateMinerTests` (a drone at the gate's place for the ore shortest; half an hour per ore; one per ore; none at
+    HIGH, none while the gate needs nothing, none at the cap; the drones for scarce minerals first; a gate miner counts for
+    its own ore only and parks nowhere, both failing without the change; its trip before a scarce mineral nobody mines;
+    sharing; held cargo first; ordinary once the gate needs nothing from its ore; forgotten once gone; kept in the plan's
+    state's JSON, and none in a state stored before them), `PurchaseOrderTests`
+    (the load first unless it waits for its markets; the miners never hold it back; an unheard construction plan holds them,
+    failing without the change), `ConstructionPlanServiceTests` (the need says when it waits for its markets),
+    `DefaultSettingsSeedTests` (the new setting).
+  - To understand this, start with `GateSmelters` in `Mining/MiningPlanner.cs`, then `DroneNeedAsync` and `GiveTripAsync` in
+    `Automation/MiningAutomationService.cs`, and `IsGateLoadBeforeMiners` in `Services/PurchaseOrder.cs`.
 
 - **6.24 Ore to the markets that make something from it** (built on branch `claude/spacetraders-ore-to-makers`, asked on
   2026-10-05, D91). Asked: "I am still wondering whether just throwing more miners on iron ore would increase the iron

@@ -21,6 +21,8 @@ public sealed class TradeMarketMap
     private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _madeFrom;
     private readonly HashSet<string> _madeInto;
     private readonly long _averageFuelPrice;
+    private readonly IReadOnlySet<string> _constructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _goingIntoConstruction = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Builds the map of one system.</summary>
     /// <param name="waypoints">The system's waypoints, with their coordinates.</param>
@@ -65,7 +67,15 @@ public sealed class TradeMarketMap
     /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the
     /// routes that feed the markets making them come first. None unless set.
     /// </summary>
-    public IReadOnlySet<string> ConstructionMaterials { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlySet<string> ConstructionMaterials
+    {
+        get => _constructionMaterials;
+        init
+        {
+            _constructionMaterials = value;
+            _goingIntoConstruction = GoodsGoingInto(value, _madeFrom);
+        }
+    }
 
     /// <summary>The goods a market lists, with their last known prices; empty for an unknown market.</summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
@@ -132,6 +142,25 @@ public sealed class TradeMarketMap
     /// <param name="tradeSymbol">The good.</param>
     /// <returns>True when nothing is made from the good.</returns>
     public bool IsEndProduct(string tradeSymbol) => !_madeInto.Contains(tradeSymbol);
+
+    /// <summary>
+    /// The goods a good is made from, by the production chains: IRON from IRON_ORE, FAB_MATS from IRON and QUARTZ_SAND. None
+    /// for a good nothing makes, or without the chains.
+    /// </summary>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>What it is made from.</returns>
+    public IReadOnlyList<string> InputsOf(string tradeSymbol)
+        => _madeFrom.TryGetValue(tradeSymbol, out var inputs) ? inputs : [];
+
+    /// <summary>
+    /// Whether a good goes into a material the jump gate still needs (PLAN.md slice 6.25, D92): it is one of
+    /// <see cref="ConstructionMaterials"/>, or one of them is made from it, directly or through the goods made from it (the
+    /// production chains). IRON goes into FAB_MATS; COPPER into ADVANCED_CIRCUITRY, through ELECTRONICS and MICROPROCESSORS.
+    /// None while the gate needs nothing.
+    /// </summary>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when more of the good makes more of what the gate needs.</returns>
+    public bool GoesIntoConstruction(string tradeSymbol) => _goingIntoConstruction.Contains(tradeSymbol);
 
     /// <summary>
     /// The pricier good a market makes from <paramref name="tradeSymbol"/>: the market imports the good,
@@ -223,4 +252,23 @@ public sealed class TradeMarketMap
     /// <returns>True when the market lists the good as EXCHANGE.</returns>
     public bool Exchanges(string waypointSymbol, string tradeSymbol)
         => TryGetGood(waypointSymbol, tradeSymbol, out var good) && good.Type.Equals(ExchangeType, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The materials, and every good they are made from, directly or further down the production chains.</summary>
+    private static HashSet<string> GoodsGoingInto(IEnumerable<string> materials, IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom)
+    {
+        var goods = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var next = new Queue<string>(materials);
+        while (next.TryDequeue(out var good))
+        {
+            if (goods.Add(good) && madeFrom.TryGetValue(good, out var inputs))
+            {
+                foreach (var input in inputs)
+                {
+                    next.Enqueue(input);
+                }
+            }
+        }
+
+        return goods;
+    }
 }

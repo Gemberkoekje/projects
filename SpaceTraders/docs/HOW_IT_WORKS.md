@@ -305,7 +305,7 @@ it and the other ships can do and what each role would earn: see
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
 | ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47); then one more for each further area with mining drones, after the drones per scarce mineral (D55) |
-| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
+| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77); a drone bought for the jump gate's smelters mines only its ore for them while the gate needs a material made from it (D92) | Free miners | Low-supply openings (Pending/Assigned), the gate's miners | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53); while the gate needs materials, one per ore its smelters have below HIGH every `Mining.GateMinerIntervalMinutes` (D92); then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
 | Construction | Build the home system's jump gate: buy its materials a full hold at a time and supply them (slice 6.6, D64–D68) | The ship with the construction role: the largest hold that isn't a drone or the surveyor (D65); any free ship that holds what the gate needs | The gate's materials (required, fulfilled, on their way), the builders, why no load was bought | No ship: the gate's next load of materials, after the cargo ships in the order (D64), above the credit reserve |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
@@ -743,6 +743,32 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
     drone parked at the asteroid waits with its hold full while the first is away selling ("A second shuttle is bought
     when drones wait for one"). A shuttle bought for a point is designated for it in the plan's state, which the role
     board reads. A point that is gone (every ore ABUNDANT) releases its shuttles to the other roles.
+- **The jump gate's miners** (slice 6.25, D92, asked on 2026-10-05: "as part of the jump gate build phase, extra miners to
+  be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to
+  those ores) until each of the smelters have at least HIGH saturation"; D91's phase 2). While the construction plan is
+  on and the home gate needs materials (`TradeMarketMap.ConstructionMaterials`):
+  - **a smelter** (`MiningPlanner.GateSmelters`) is a market that imports an ore and exports a metal, a good the
+    production chains make from ores alone, that goes into a material the gate still needs, directly or further down
+    the chains (`TradeMarketMap.GoesIntoConstruction`): IRON_ORE into IRON for FAB_MATS, COPPER_ORE into COPPER for
+    ADVANCED_CIRCUITRY through ELECTRONICS and MICROPROCESSORS. In X1-FJ91, H60 smelts IRON. A factory that takes a
+    mineral directly, as FAB_MATS takes QUARTZ_SAND, is none ("Smelters only"); nor is any market without the chains;
+  - **a drone per ore** (`MiningPlanner.GateOresShort`): for each ore with a smelter that has it below HIGH (SCARCE,
+    LIMITED or MODERATE; an unknown supply counts as enough) and that a drone from the shipyard can serve, in CRUISE
+    reach or a drift away (D45), one mining drone every `Mining.GateMinerIntervalMinutes` (30) since the last one bought
+    for that ore ("One per ore"), the ore whose smelter has the lowest supply first. It is bought after the drones for
+    scarce minerals and before D28's, at the gate's place in the order ships are bought in (`PurchaseTier.Construction`),
+    after a load of the gate that can be bought now ([the order](#the-order-ships-are-bought-in-purchaseorder-slice-610b)),
+    within `Mining.MaxDrones` and the credit reserve, and not
+    while the contract mines (D23). The plan's state notes it with its ore and when it was bought (`GateMiners`), and the
+    log says so;
+  - **dedicated** ("Until the gate is done"): a free gate miner first sells what it holds (step 1), then mines its ore for
+    the smelter of it with the lowest supply that it can reach (`MiningPlanner.GateTargets`), sharing the pair with any
+    other miner there, whatever else is short; `MiningStarted`, reason `gate`. It never takes or keeps a place at a
+    collection point. While every smelter of its ore has it ABUNDANT (D77), or none is in its reach, it follows the steps
+    above; once the gate needs nothing made from its ore (FAB_MATS done, for IRON_ORE), or the construction plan is off,
+    it is an ordinary drone;
+  - in the count of drones for scarce minerals (below), a gate miner, and the areas of its ore, are left out: it covers
+    its own ore only.
 - **What a trip keeps** (D71, asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank
   of fuel, instead of everything they're not specifically mining for"): each extraction keeps the trip's ore, and every
   other ore a market buys within one tank of the asteroid: a full tank's CRUISE flight there without a refuelling stop
@@ -764,7 +790,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      Since slice 6.10c an ore a drift away counts (D45: "new and free drones"), so each ore a far market is
      short of adds a drone (on 2026-10-03, B7's five); since slice 6.18 so does each scarce ore of a collection point
      (D83), after the shuttle the point needs (above);
-  2. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
+  2. then, while the jump gate needs materials, a drone for an ore its smelters are short of (slice 6.25, D92, the
+     jump gate's miners above), one per ore every `Mining.GateMinerIntervalMinutes`, at the gate's place in the order;
+  3. otherwise, when no miner was free, a drone whose first trip by the same ranking (its tank from the
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
      the drone the mining role (`RoleAdvisor`), which, since a drone gathers first (D58), it does.
@@ -775,8 +803,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   miner's trip sells there, Pending otherwise, with the free miners that could take it (they reach its
   asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. An opening several drones share names one
   of them (D77); a parked drone holds its ore's opening at its point's market. Since slice 6.18 it lists the collection
-  points too, each with its ores, its scarce ores, the shuttles designated for it and the drones with a place there. It
-  is written only when it changes.
+  points too, each with its ores, its scarce ores, the shuttles designated for it and the drones with a place there, and
+  since slice 6.25 the jump gate's miners, each with its ore and when it was bought (D92). It is written only when it
+  changes.
 
 ### Siphon (`SiphonAutomationService`, slice 6.7)
 
@@ -873,7 +902,10 @@ buy.
      D64): the first builder's next load, as if its hold were empty where it is going, worth its cost with fuel. A
      builder on its way lands with the fuel its flight leaves it and docks, so where fuel is sold it leaves with a full
      tank (B65: judged without, a builder flying a load to the far-out gate had no market in reach, and the order heard
-     of no load until it landed);
+     of no load until it landed). With no load it may buy now, it tells the one it would buy once the supply allows it,
+     and that it waits for its markets (`PurchaseNeed.WaitsForMarkets`: every market that would sell it has it SCARCE or
+     LIMITED, D66, or another trip on its way to buy it there, D80); the gate's miners may be bought meanwhile (slice
+     6.25, D92, see [Mining](#mining-miningautomationservice-slice-64));
   3. when the order lets construction buy, each free builder with an empty hold takes the first load the credits pay
      for (`ConstructionStarted`, reason `purchase`), leaving the credit reserve;
   4. a builder that takes no load stays free, and the trading plan gives it a trade. The state says why
@@ -897,7 +929,10 @@ buy.
   (`BudgetPolicy`: the floor and the trading holds, D51; the dearest full hold a trader saves up for, D56; and what the
   trips on their way to buy hold back, D57), and waits for every purchase before it in the order ships are bought in:
   the contract's drone, the surveyors, a drone per scarce mineral and area, and the cargo ships of
-  `Trade.ShipPurchases`. While the plan has a load to buy, the probes and the further drones and cargo ships wait.
+  `Trade.ShipPurchases`. While the plan has a load to buy, the probes and the further drones and cargo ships wait. The
+  mining plan's drones for the gate's smelters stand at the same place (D92: "If the gate can be built, it should be
+  built, otherwise extra miners can be built."): they wait while a load can be bought now, the credits aside, and are
+  bought while it waits for its markets.
   A construction trip holds back what its cargo costs from the moment it starts until it buys
   (`SupplyConstructionGoal.ReservedCredits`, as D57): the traders, the other trips and ship purchases leave it. As for
   a ship purchase, nothing holds the traders back while the credits for a load build up.
@@ -1187,7 +1222,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   5. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
   6. `Construction`: no ship, but the home gate's next load of materials (slice 6.6, D64: "after the cargo ships"),
      spent for good, so it keeps the credit reserve as a purchase does; reported with the material as the ship
-     type and its market as the shipyard, worth the load with its fuel;
+     type and its market as the shipyard, worth the load with its fuel. The mining plan's drones for the gate's
+     smelters stand here too (slice 6.25, D92: "Same tier as gate loads, capped. If the gate can be built, it should be
+     built, otherwise extra miners can be built."): the load comes before them unless it waits for its markets
+     (`PurchaseNeed.WaitsForMarkets`: SCARCE or LIMITED, D66, or another buyer there, D80), whatever the credits; they
+     never hold the load back;
   7. `Probes`: a probe for every market (D29);
   8. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
      in turn: the kind not bought last, so after the list's last cargo ship a drone, then a cargo ship, and
@@ -1204,7 +1243,9 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   known shipyard selling the ship. Until each plan that is on, and could need something earlier, has said
   what it needs within the last 2 minutes, nothing after it is bought: after a start, or a pause in which
   no plan ran (a 502 pauses them for 3 minutes), the probe plan, which runs before the survey, mining,
-  siphon and trading plans, waits a tick; a plan that fails before it says holds the purchases after it.
+  siphon and trading plans, waits a tick; a plan that fails before it says holds the purchases after it. The
+  construction plan, which runs after the mining plan, holds back the gate's miners until it has said what it needs
+  (D92): its load could be one it may buy now.
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it
   waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the
@@ -1710,6 +1751,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `FleetExpansion.MinCreditReserve` (60000) | Credits every ship purchase must leave with no ship that trades: the floor of the credit reserve (D51). Seeded at 100,000 before slice 6.10b; a stored value stays as it is |
 | `FleetExpansion.ReservePerTradingCargoUnit` (1000) | Credits the credit reserve grows by for every unit of hold on the ships that trade: the cargo ships, the command ship and any ship the role board has trading (D51); 0 means the floor only |
 | `Mining.MaxDrones` (20) | Cap on drones bought by mining automation |
+| `Mining.GateMinerIntervalMinutes` (30) | Minutes between the drones the mining plan buys for one ore of the jump gate's smelters, while the gate needs materials and a smelter of the ore has it below HIGH (slice 6.25, D92) |
 | `Siphon.MaxDrones` (10) | Cap on the siphon drones the siphon plan keeps; it buys one only for a market short of a gas (D32) |
 | `Survey.StockPerOre` (2) | Usable surveys the survey plan keeps of each ore at its asteroid; with that many for every ore, the surveyors wait until one runs out (D27) |
 | `Trade.MinProfitPerUnit` (200) | Credits per unit, after the fuel for the whole trip, a trade trip must earn to be started, and to be carried on when prices change (D14); 0 means any profit, but see D15 |
@@ -1925,7 +1967,7 @@ The seven pages in `src/Future` are not routed.
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
   | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
-  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `shared`, `collection` for a drone's place at a collection point (slice 6.18), `contract`); `ContractId` for the contract |
+  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `shared`, `wealth` for a market that only pays for the ore (slice 6.24), `collection` for a drone's place at a collection point (slice 6.18), `gate` for a drone bought for the jump gate's smelters (slice 6.25), `contract`); `ContractId` for the contract |
   | `CargoTransferred` | Drone executor at a collection point, per good handed over (slice 6.18, D83) | `ShipSymbol`, `TargetShipSymbol` (the shuttle), `TradeSymbol`, `Units`, `WaypointSymbol` (the asteroid) |
   | `CollectionStarted` | Mining plan, for each round of a collecting shuttle (slice 6.18, D83) | `ShipSymbol`, `WaypointSymbol` (the asteroid), `SellWaypoint`, `Reason` (`collection`) |
   | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |

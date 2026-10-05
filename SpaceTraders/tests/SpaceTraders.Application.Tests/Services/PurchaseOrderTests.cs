@@ -143,6 +143,42 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task TheGatesMiners_WaitForALoadThatCanBeBought_AndAreBoughtWhileItWaitsForItsMarkets()
+    {
+        // Slice 6.25 (D92), asked on 2026-10-05: "Same tier as gate loads, capped. If the gate can be built, it should be
+        // built, otherwise extra miners can be built." The probes wait behind either.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"))).Should().BeFalse();
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("waits for the Construction plan's FAB_MATS (Construction)", StringComparison.Ordinal));
+
+        _needs.Report(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS") with { WaitsForMarkets = true }, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TheGatesMiners_NeverHoldTheGatesLoadBack()
+    {
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UntilTheConstructionPlanHasSaidWhatItNeeds_TheGatesMinersWait()
+    {
+        // After a start the mining plan runs before the construction plan, whose load could be one it may buy now (D92).
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Construction, PurchaseNeed.None, DateTimeOffset.UtcNow - PurchaseNeeds.Lifetime - TimeSpan.FromSeconds(1));
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"))).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ASecondSurveyor_ComesAfterTheDronesForScarceMinerals_AndBeforeTheCargoShips()
     {
         // D55, asked on 2026-10-03: "The second surveyor is lower priority than the first on the buy order": after the drones
