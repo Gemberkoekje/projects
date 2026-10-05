@@ -11,7 +11,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="ScoutWaypointGoal"/>.
-/// Flies to the target waypoint (<see cref="GoalFlight"/>: in CRUISE, through refuelling stops, B47),
+/// Flies to the target waypoint (<see cref="GoalFlight"/>: through refuelling stops, B47, in BURN where that strands nothing, D84),
 /// then marks the waypoint visited once docked.
 /// </summary>
 public sealed class ScoutWaypointGoalExecutor(

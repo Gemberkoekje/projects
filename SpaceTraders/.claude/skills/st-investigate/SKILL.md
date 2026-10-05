@@ -85,11 +85,17 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
   wake-up and the market refresh on arrival log at Debug and never reach Loki. A departure with no
   arrival line after its arrival time means the arrival chain didn't finish: a wake-up it ignored as
   stale (Debug), or a failure, whose error is logged.
-- **A drift takes hours** (slice 6.10c, D45): a mining or siphon trip to a market out of the drone's
-  CRUISE reach drifts there first, with a `DriftStarted` journal line, an `arrives at` hours away (about
-  2.5 from the middle of X1-DC53 to B7), and `drifting to … to mine …` in `spacetraders_ship_info`. A ship
+- **A drift takes hours** (slice 6.10c, D45, slice 6.19, D84): a mining or siphon trip to a market out of
+  the drone's CRUISE reach, a survey ship's move there and a drone on its way to a collection point take the
+  fastest way: they cruise as far as they can, refuelling at markets that sell fuel, and drift the rest. The
+  leg that drifts has a `DriftStarted` journal line (`Leg` is where it ends) and an `arrives at` hours away
+  (about 2 from H60 to B44 in X1-FJ91), and `spacetraders_ship_info` says `drifting to …` the whole way. A ship
   in transit is never `ShipStuck`. Its next flight logs `FlightModeSubCommand: … switches from DRIFT to
-  CRUISE`; a drone that keeps flying in DRIFT after its drift is a bug.
+  CRUISE` (or `BURN`); a drone that keeps flying in DRIFT after its drift is a bug.
+- **Ships burn** (slice 6.19, D84): a leg flies in BURN when the tank holds twice its CRUISE fuel and burning
+  strands nothing, so most legs into a market that sells fuel burn, and fuel bought beyond what the trade
+  arithmetic counts (CRUISE) is expected. No ship lands with an empty tank where no fuel is sold; one that does
+  is a bug.
 - **Construction loses money by design** (slice 6.6, D64–D68): supplying the home jump gate pays nothing, so every
   `TripEnded` with `Activity` `construction` is a loss and its purchases are `ConstructionBuy` ledger rows. A builder
   that trades while the construction plan's state (`plan_states`, `Construction`) says `Waiting` (`purchase_order`,

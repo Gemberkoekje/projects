@@ -12,8 +12,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="ExploreSystemGoal"/> (exploring, asked on 2026-10-04): the command ship visits each market and
-/// shipyard of a system it explores once, as the scout plan does at home. It flies in CRUISE through refuelling stops
-/// (<see cref="GoalFlight"/>); its arrival stores what the market and the shipyard there sell, and a stop whose market or
+/// shipyard of a system it explores once, as the scout plan does at home. It flies through refuelling stops, in BURN where
+/// that strands nothing (<see cref="GoalFlight"/>); its arrival stores what the market and the shipyard there sell, and a stop whose market or
 /// shipyard wasn't stored since the goal began, such as the gate the ship jumped to, is fetched before it moves on. Before
 /// its first flight it waits out the jump's cooldown. The goal keeps its own progress, so the tick and an arrival that step
 /// it one after the other can't skip a stop (B45).

@@ -33,8 +33,10 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// </list>
 /// The goal keeps what the cargo cost and fetched, stored after each batch, and however the trip ends, sold or dropped, it is
 /// booked with what its sales brought in (<see cref="ITripBook"/>, D46). A purchase on the route the credits were saved up for
-/// ends that saving (<see cref="FullHoldSavings"/>, D56). Its flights are in CRUISE, which the arithmetic assumes: a ship
-/// left in DRIFT is switched back before it flies (slice 6.10c).
+/// ends that saving (<see cref="FullHoldSavings"/>, D56). The arithmetic counts its flights in CRUISE; they burn where the
+/// fuel allows it (<see cref="GoalFlight"/>, D84), which costs more fuel than it counts, an extra cost accepted on
+/// 2026-10-05 ("I accept the extra fuel costs this brings"). A ship left in DRIFT is switched out of it before it flies
+/// (slice 6.10c).
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
     IShipRepository ships,
@@ -362,24 +364,21 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             elsewhere.FuelCost,
             NotLucrative);
 
-        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, TradeRoutePlanner.NextStop(map, ship, elsewhere.WaypointSymbol)) { FlightMode = CruiseMode }, ct);
-        return GoalExecutionResult.WaitingForArrival(
-            $"Selling at {elsewhere.WaypointSymbol} instead of {trade.SellWaypointSymbol}.");
+        var flown = await GoalFlight.TowardsAsync(map, ship, elsewhere.WaypointSymbol, dock, bus, ct);
+        return flown.Outcome == GoalExecutionOutcome.WaitingForArrival
+            ? GoalExecutionResult.WaitingForArrival($"Selling at {elsewhere.WaypointSymbol} instead of {trade.SellWaypointSymbol}.")
+            : flown;
     }
 
     /// <summary>
-    /// Flies towards a market: straight there when one tank will do, otherwise to the first market on
-    /// the way where it can refuel. Each arrival refreshes that market's prices and steps the goal again.
+    /// Flies towards a market: straight there when one tank will do, otherwise to the first market on the way where it can
+    /// refuel, in BURN where the fuel allows (<see cref="GoalFlight"/>, D84). Each arrival refreshes that market's prices and
+    /// steps the goal again.
     /// </summary>
     private async Task<GoalExecutionResult> FlyTowardsAsync(ShipModel ship, string destination, CancellationToken ct)
     {
         var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
-        var stop = TradeRoutePlanner.NextStop(context.Map, ship, destination);
-        await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, stop) { FlightMode = CruiseMode }, ct);
-        return GoalExecutionResult.WaitingForArrival(
-            stop.Equals(destination, StringComparison.OrdinalIgnoreCase)
-                ? $"Navigating to {destination}."
-                : $"Navigating to {destination}, refuelling at {stop} on the way.");
+        return await GoalFlight.TowardsAsync(context.Map, ship, destination, dock, bus, ct);
     }
 
     /// <summary>

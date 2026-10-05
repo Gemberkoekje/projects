@@ -69,30 +69,32 @@ public sealed class ScoutWaypointGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_ToATargetBeyondOneTank_FliesInCruise_ToTheFirstFuelStop()
+    public async Task ExecuteStepAsync_ToATargetBeyondOneTank_FliesToTheFirstFuelStop_InBurn()
     {
         // B47: the scout plan's flights asked for no flight mode and made no refuelling stops, so a target beyond one tank
-        // was left to the navigation's fallback, which drifts. From J67, EF5D is 747 away; J66 is on the way.
+        // was left to the navigation's fallback, which drifts. From J67, EF5D is 747 away; J66 is on the way. A full tank
+        // pays for the 119 to J66 twice over, so the leg burns (D84).
         var goal = new ScoutWaypointGoal { TargetWaypointSymbol = EF5D };
 
         var result = await CreateExecutor().ExecuteStepAsync(CommandShip(), goal, new ShipGoalContext(), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == J66 && c.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == J66 && c.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_AShipLeftInDrift_FliesToTheTargetInCruise()
+    public async Task ExecuteStepAsync_AShipLeftInDrift_NoLongerDrifts()
     {
-        // B47: a ship the fallback left in DRIFT flies on in DRIFT, ten times slower, unless its flight asks for CRUISE.
+        // B47: a ship the fallback left in DRIFT flies on in DRIFT, ten times slower, unless its flight asks for a mode: here
+        // BURN, since EF5D sells fuel and the tank pays for the 19 twice over (D84).
         var goal = new ScoutWaypointGoal { TargetWaypointSymbol = EF5D };
 
         await CreateExecutor().ExecuteStepAsync(CommandShip(H60, flightMode: "DRIFT"), goal, new ShipGoalContext(), CancellationToken.None);
 
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == EF5D && c.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == EF5D && c.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 }

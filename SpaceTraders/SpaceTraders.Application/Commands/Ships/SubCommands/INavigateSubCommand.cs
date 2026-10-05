@@ -120,7 +120,29 @@ public sealed class NavigateSubCommand(
             }
         }
 
-        ship = await TrySwitchToDriftForFuelEfficiencyAsync(shipSymbol, ship, cancellationToken);
+        // A leg planned in BURN that the fuel aboard no longer pays for flies in CRUISE before anything drifts (D84).
+        if (ship is not null && string.Equals(ship.FlightMode, "BURN", StringComparison.OrdinalIgnoreCase))
+        {
+            ship = await TrySwitchModeAsync(shipSymbol, ship, "CRUISE", cancellationToken);
+            if (ship is not null && await FuelNeededAsync(ship, destinationWaypoint, cancellationToken) <= ship.FuelCurrent)
+            {
+                try
+                {
+                    var cruised = await port.NavigateShipAsync(shipSymbol, destinationWaypoint, cancellationToken);
+                    return (cruised, destinationWaypoint);
+                }
+                catch (Exception ex) when (IsInsufficientFuelNavigationError(ex.Message))
+                {
+                    logger.LogWarning(
+                        ex,
+                        "NavigateSubCommand: ship {ShipSymbol} lacks fuel for {Destination} in CRUISE too; attempting fallback routing.",
+                        shipSymbol,
+                        destinationWaypoint);
+                }
+            }
+        }
+
+        ship = await TrySwitchModeAsync(shipSymbol, ship, "DRIFT", cancellationToken);
 
         if (ship is null || await FuelNeededAsync(ship, destinationWaypoint, cancellationToken) <= ship.FuelCurrent)
         {
@@ -187,25 +209,26 @@ public sealed class NavigateSubCommand(
         return from is null || to is null ? 0 : FlightFuel.Needed(ship.FlightMode, (double)Distance(from, to));
     }
 
-    private async Task<ShipModel?> TrySwitchToDriftForFuelEfficiencyAsync(
+    private async Task<ShipModel?> TrySwitchModeAsync(
         string shipSymbol,
         ShipModel? ship,
+        string flightMode,
         CancellationToken cancellationToken)
     {
-        if (ship is null || string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+        if (ship is null || string.Equals(ship.FlightMode, flightMode, StringComparison.OrdinalIgnoreCase))
         {
             return ship;
         }
 
         try
         {
-            var nav = await port.PatchShipNavAsync(shipSymbol, "DRIFT", cancellationToken);
+            var nav = await port.PatchShipNavAsync(shipSymbol, flightMode, cancellationToken);
             await ships.UpdateNavAsync(shipSymbol, nav, null, cancellationToken);
             return await ships.FindAsync(shipSymbol, cancellationToken) ?? ship;
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "NavigateSubCommand: unable to switch ship {ShipSymbol} to DRIFT for fuel fallback.", shipSymbol);
+            logger.LogDebug(ex, "NavigateSubCommand: unable to switch ship {ShipSymbol} to {FlightMode} for fuel fallback.", shipSymbol, flightMode);
             return ship;
         }
     }

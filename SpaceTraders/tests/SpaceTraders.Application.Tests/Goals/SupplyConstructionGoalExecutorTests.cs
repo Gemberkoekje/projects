@@ -54,13 +54,14 @@ public sealed class SupplyConstructionGoalExecutorTests
     }
 
     [Fact]
-    public async Task ElsewhereWithoutCargo_ItFliesToTheBuyMarket_InCruise()
+    public async Task ElsewhereWithoutCargo_ItFliesToTheBuyMarket_InBurn()
     {
+        // D84: F49 sells fuel, and the 600 aboard pay for the 52 twice over.
         var result = await StepAsync(Hauler(), Trip());
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "SHIP-6" && c.DestinationWaypoint == F49 && c.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "SHIP-6" && c.DestinationWaypoint == F49 && c.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 

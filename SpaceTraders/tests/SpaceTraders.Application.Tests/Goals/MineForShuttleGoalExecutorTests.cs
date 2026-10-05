@@ -44,16 +44,27 @@ public sealed class MineForShuttleGoalExecutorTests
     }
 
     [Fact]
-    public async Task FromAfar_ItDriftsToTheMarket_NotToTheAsteroid()
+    public async Task FromAfar_ItGoesTheFastestWay_CruisingAsFarAsItCan()
     {
-        // D45: drifting straight to B13 would leave it at an asteroid without the fuel to fly anywhere.
+        // D84: the drone cruises the 52 to F49, drifts the 274 to B7 and cruises the 48 on to B13: faster than drifting the
+        // 343 straight there, or the 311 from F49.
         var result = await StepAsync(Drone(), Job with { Drifting = true });
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == F49 && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().BeEmpty();
+
+        // Its arrival docked it at F49.
+        await StepAsync(Drone(waypoint: F49) with { FuelCurrent = 28 }, Job with { Drifting = true });
+
+        await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B7 && command.FlightMode == "DRIFT"),
             Arg.Any<CancellationToken>());
-        _log.Journal.Should().ContainSingle().Which.EventKind.Should().Be("DriftStarted");
+        var drift = _log.Journal.Should().ContainSingle().Subject;
+        drift.EventKind.Should().Be("DriftStarted");
+        drift.Message.Should().Contain(F49).And.Contain(B7).And.Contain(B13);
     }
 
     [Fact]

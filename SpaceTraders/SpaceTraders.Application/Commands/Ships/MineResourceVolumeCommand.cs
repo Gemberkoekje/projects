@@ -98,7 +98,7 @@ public sealed class MineResourceVolumeHandler(
 
         if (!atSource)
         {
-            // The contract's flight to the asteroid: in CRUISE, through refuelling stops (B47).
+            // The contract's flight to the asteroid, through refuelling stops (B47), in BURN where that strands nothing (D84).
             var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, cancellationToken)).Map;
             if (CommandFlight.DocksToRefuel(map, ship, command.SourceWaypoint))
             {

@@ -17,6 +17,7 @@ public sealed class NavigationFuelGuardTests
     private const string GasGiant = "X1-FJ91-C45";
     private const string Station = "X1-FJ91-C46";
     private const string Planet = "X1-FJ91-G59";
+    private const string Moon = "X1-FJ91-C47";
 
     private static readonly DateTimeOffset ArrivesAt = new(2026, 10, 04, 20, 13, 18, TimeSpan.Zero);
 
@@ -28,12 +29,13 @@ public sealed class NavigationFuelGuardTests
 
     public NavigationFuelGuardTests()
     {
-        // X1-FJ91 as the bot caches it: the gas giant C45 and its station C46 at one spot, G59 93 away.
+        // X1-FJ91 as the bot caches it: the gas giant C45 and its station C46 at one spot, G59 93 away; and a moon 30 away.
         WaypointCacheModel[] cached =
         [
             new(GasGiant, System, "GAS_GIANT", 63, 143, HasMarket: false, HasShipyard: false, DateTimeOffset.UtcNow),
             new(Station, System, "ORBITAL_STATION", 63, 143, HasMarket: true, HasShipyard: false, DateTimeOffset.UtcNow),
             new(Planet, System, "PLANET", 33, 55, HasMarket: true, HasShipyard: false, DateTimeOffset.UtcNow),
+            new(Moon, System, "MOON", 81, 167, HasMarket: false, HasShipyard: false, DateTimeOffset.UtcNow),
         ];
         _waypoints.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => cached.FirstOrDefault(waypoint => waypoint.Symbol == call.Arg<string>()));
@@ -73,6 +75,27 @@ public sealed class NavigationFuelGuardTests
 
         await _port.Received(1).NavigateShipAsync(Ship, Station, Arg.Any<CancellationToken>());
         await _port.DidNotReceive().PatchShipNavAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ABurnTheFuelAboardDoesntPayFor_FliesInCruise_BeforeAnythingDrifts()
+    {
+        // D84: a leg planned in BURN that the fuel aboard no longer pays for flies in CRUISE where that is paid for, rather
+        // than in DRIFT, ten times slower. The moon is 30 from C45: 60 in BURN, 30 in CRUISE, and 37 are aboard.
+        _ship = _ship with { FlightMode = "BURN" };
+        _port.PatchShipNavAsync(Ship, "CRUISE", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            _ship = _ship with { FlightMode = "CRUISE" };
+            return new NavModel("IN_ORBIT", System, GasGiant, "CRUISE", null, null);
+        });
+        _port.NavigateShipAsync(Ship, Moon, Arg.Any<CancellationToken>())
+            .Returns(new NavigateActionResult(new NavModel("IN_TRANSIT", System, Moon, "CRUISE", Moon, ArrivesAt), new FuelModel(7, 80)));
+
+        await NavigateAsync(Moon);
+
+        await _port.Received(1).PatchShipNavAsync(Ship, "CRUISE", Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().PatchShipNavAsync(Ship, "DRIFT", Arg.Any<CancellationToken>());
+        await _port.Received(1).NavigateShipAsync(Ship, Moon, Arg.Any<CancellationToken>());
     }
 
     [Theory]

@@ -11,8 +11,9 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="MoveToWaypointGoal"/>: one flight to a waypoint, and the goal ends there. The survey plan moves a
-/// ship that can only survey to the area where most drones mine (D54): a market out of its CRUISE reach, which it drifts to
-/// (<see cref="GoalFlight.DriftAsync"/>, D45); its arrival docks it there, and the survey plan gives it its next survey.
+/// ship that can only survey to the area where most drones mine (D54): a market out of its CRUISE reach, which it gets to the
+/// fastest way, cruising as far as it can and drifting the rest (<see cref="GoalFlight.LegTowardsAsync"/>, D45, D84); its
+/// arrival docks it there, and the survey plan gives it its next survey.
 /// </summary>
 public sealed class MoveToWaypointGoalExecutor(
     IShipGoalRepository goals,
@@ -44,19 +45,19 @@ public sealed class MoveToWaypointGoalExecutor(
             return GoalExecutionResult.Completed($"Arrived at {move.TargetWaypointSymbol}.");
         }
 
-        if (move.Drifting)
+        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var (flown, leg) = await GoalFlight.LegTowardsAsync(context.Map, ship, move.TargetWaypointSymbol, dock, bus, ct);
+        if (flown.Outcome == GoalExecutionOutcome.WaitingForArrival && leg.FlightMode == TradeRoutePlanner.DriftMode)
         {
-            var drifting = await GoalFlight.DriftAsync(ship, move.TargetWaypointSymbol, bus, ct);
             logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {Destination}, out of its CRUISE reach, to work from there.",
+                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {Leg} on its way to {Destination}, out of its CRUISE reach, to work from there.",
                 JournalEvents.DriftStarted,
                 ship.Symbol,
                 ship.WaypointSymbol ?? string.Empty,
+                leg.WaypointSymbol,
                 move.TargetWaypointSymbol);
-            return drifting;
         }
 
-        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
-        return await GoalFlight.TowardsAsync(context.Map, ship, move.TargetWaypointSymbol, dock, bus, ct);
+        return flown;
     }
 }

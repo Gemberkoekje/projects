@@ -54,11 +54,12 @@ public sealed class CollectOreGoalExecutorTests
     [Fact]
     public async Task AwayFromTheAsteroid_ItFliesThere()
     {
+        // D84: B13 is 48 from B7. Burning there takes 96 of the 300 aboard and leaves the fuel to cruise the ore back.
         var result = await StepAsync(Shuttle(waypoint: B7, status: "DOCKED"), Round);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B13 && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B13 && command.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 

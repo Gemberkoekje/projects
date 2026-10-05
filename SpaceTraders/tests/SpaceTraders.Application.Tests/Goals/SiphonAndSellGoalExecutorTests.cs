@@ -61,7 +61,19 @@ public sealed class SiphonAndSellGoalExecutorTests
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(MapWithAGasGiantNearF48(), 250_000, 200));
         var far = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = D90, SellWaypointSymbol = F48, Drifting = true };
 
+        // D84: the fastest way to F48 burns the 39 to C40, cruises the 70 to E47 and drifts the 126 from there, rather than
+        // drifting the 228 from C39. Each arrival docks the drone.
         (await StepAsync(SiphonDrone(), far)).Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == C40 && command.FlightMode == "BURN"),
+            Arg.Any<CancellationToken>());
+        await StepAsync(SiphonDrone(waypoint: C40) with { FuelCurrent = 2 }, far);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == E47 && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().BeEmpty();
+
+        await StepAsync(SiphonDrone(waypoint: E47) with { FuelCurrent = 10 }, far);
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == F48 && command.FlightMode == "DRIFT"),
             Arg.Any<CancellationToken>());
@@ -71,9 +83,10 @@ public sealed class SiphonAndSellGoalExecutorTests
         (await StepAsync(atF48, far)).Outcome.Should().Be(GoalExecutionOutcome.Progressing);
         await _goals.Received(1).SetActiveGoalAsync("SHIP-5", Arg.Is<SiphonAndSellGoal>(goal => !goal.Drifting && goal.GoalId == far.GoalId), Arg.Any<CancellationToken>());
 
+        // D90 is 13 from F48: burning there leaves the fuel to cruise back.
         await StepAsync(atF48, far with { Drifting = false });
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == D90 && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == D90 && command.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 

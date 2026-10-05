@@ -18,7 +18,7 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="SupplyConstructionGoal"/>: one construction trip (PLAN.md slice 6.6). The ship flies to the buy
-/// market (<see cref="GoalFlight"/>: in CRUISE, through refuelling stops), buys its load in batches of the market's trade
+/// market (<see cref="GoalFlight"/>: through refuelling stops, in BURN where that strands nothing), buys its load in batches of the market's trade
 /// volume, the most one purchase takes, each at the price quoted then (D81), flies to the construction site and supplies it
 /// there. A ship can't change course in flight, so it checks the load again at the market, with the prices its arrival has
 /// just fetched, and again before each batch, with those the last purchase's refresh fetched: when the site no longer needs

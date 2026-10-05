@@ -15,7 +15,8 @@ namespace SpaceTraders.Application.Tests.Goals;
 
 /// <summary>
 /// D54: a move is one flight to a waypoint, and the goal ends there. The survey plan moves a ship that can only survey to
-/// the area where most drones mine, out of its CRUISE reach: such a move drifts (D45).
+/// the area where most drones mine, out of its CRUISE reach: such a move goes the fastest way, which drifts where nothing
+/// faster gets on (D45, D84).
 /// </summary>
 public sealed class MoveToWaypointGoalExecutorTests
 {
@@ -34,29 +35,51 @@ public sealed class MoveToWaypointGoalExecutorTests
     }
 
     [Fact]
-    public async Task AMoveOutOfReach_DriftsThere_AndJournalsIt()
+    public async Task AMoveOutOfReach_GoesTheFastestWay_AndJournalsItsDrift()
     {
+        // D84: from XB5C the survey ship cruises the 63 to F49 and drifts the 274 from there, faster than drifting the 328
+        // straight to B7.
         var result = await StepAsync(SurveyShip(), Drift);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.ShipSymbol == "SHIP-5" && command.DestinationWaypoint == F49 && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().BeEmpty();
+
+        // Its arrival docked it at F49.
+        await StepAsync(SurveyShip(waypoint: F49) with { Status = "DOCKED", FuelCurrent = 17 }, Drift);
+
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(command => command.ShipSymbol == "SHIP-5" && command.DestinationWaypoint == B7 && command.FlightMode == "DRIFT"),
             Arg.Any<CancellationToken>());
         var drift = _log.Journal.Should().ContainSingle().Subject;
         drift.EventKind.Should().Be("DriftStarted");
-        drift.Message.Should().Contain("SHIP-5").And.Contain(XB5C).And.Contain(B7);
+        drift.Message.Should().Contain("SHIP-5").And.Contain(F49).And.Contain(B7);
     }
 
     [Fact]
-    public async Task AMoveInReach_FliesThereInCruise()
+    public async Task AMoveInReach_FliesThere_InBurn_WhenTheTankPaysForItTwice()
     {
+        // D84: H51 sells fuel, and the 80 aboard pay for the 19 twice over.
         var result = await StepAsync(SurveyShip(), new MoveToWaypointGoal { TargetWaypointSymbol = H51 });
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == H51 && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == H51 && command.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
         _log.Journal.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InOrbitAtAFuelMarket_ItDocksToFillTheTank_WhenAFullTankWouldBurn()
+    {
+        // D84: with 20 aboard, the 19 from XB5C to H51 cruise; a full tank burns them. Only a docked ship fills its tank.
+        var result = await StepAsync(SurveyShip() with { FuelCurrent = 20 }, new MoveToWaypointGoal { TargetWaypointSymbol = H51 });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _dock.Received(1).ExecuteAsync("SHIP-5", Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>());
     }
 
     [Fact]

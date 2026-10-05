@@ -5,14 +5,14 @@ using SpaceTraders.Application.Ports;
 namespace SpaceTraders.Application.Commands.Ships.SubCommands;
 
 /// <summary>
-/// Subcommand that sets a ship's flight mode before it flies (PLAN.md slice 6.10c): DRIFT for a drift to a market out of
-/// its CRUISE reach (D45), CRUISE for a flight a goal plans, so a ship left in DRIFT flies in CRUISE again (B47).
+/// Subcommand that sets a ship's flight mode before it flies (PLAN.md slice 6.10c, slice 6.19): the mode the route planner
+/// gives the leg (D84), BURN, CRUISE or DRIFT, so a ship left in DRIFT flies on in the mode asked for (B47).
 /// </summary>
 public interface IFlightModeSubCommand
 {
     /// <summary>Sets the ship's flight mode, calling the API only when the cached mode differs.</summary>
     /// <param name="ship">The ship, as cached.</param>
-    /// <param name="flightMode">The flight mode, as the API names it (<c>CRUISE</c>, <c>DRIFT</c>).</param>
+    /// <param name="flightMode">The flight mode, as the API names it (<c>BURN</c>, <c>CRUISE</c>, <c>DRIFT</c>).</param>
     /// <param name="cancellationToken">Stops the work.</param>
     /// <returns>A task that completes when the ship flies in that mode.</returns>
     Task EnsureAsync(ShipModel ship, string flightMode, CancellationToken cancellationToken);

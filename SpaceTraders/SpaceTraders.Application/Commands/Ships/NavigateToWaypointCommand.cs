@@ -23,8 +23,9 @@ public sealed record NavigateToWaypointCommand
     public required string DestinationWaypoint { get; init; }
 
     /// <summary>
-    /// The flight mode to fly in, set in orbit before the flight (PLAN.md slice 6.10c): DRIFT to a market out of the
-    /// ship's CRUISE reach (D45), CRUISE for a flight a goal plans. Empty keeps the ship's mode.
+    /// The flight mode to fly in, set in orbit before the flight (PLAN.md slice 6.10c, slice 6.19): the leg's, as the route
+    /// planner plans it (D84): BURN where the fuel allows it and strands nothing, CRUISE otherwise, DRIFT where nothing else
+    /// gets on (D45). Empty keeps the ship's mode.
     /// </summary>
     public string FlightMode { get; init; } = string.Empty;
 
@@ -133,8 +134,7 @@ public sealed class NavigateToWaypointHandler(
             return;
         }
 
-        // The flight mode asked for (slice 6.10c), set in orbit, after the orbit's refuel: DRIFT to a market out of
-        // CRUISE reach, CRUISE for a goal's planned flight.
+        // The flight mode asked for (slice 6.10c, D84), set in orbit, after the orbit's refuel: the planned leg's.
         if (command.FlightMode.Length > 0)
         {
             await flightMode.EnsureAsync(ship!, command.FlightMode, cancellationToken);

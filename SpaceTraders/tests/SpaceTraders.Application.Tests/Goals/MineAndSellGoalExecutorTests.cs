@@ -58,32 +58,42 @@ public sealed class MineAndSellGoalExecutorTests
     }
 
     [Fact]
-    public async Task ItsFlights_AskForCruise()
+    public async Task ItsFlights_NoLongerDrift()
     {
         // Slice 6.10c: a ship left in DRIFT, after a drift (D45) or by the navigation's fuel fallback (B47), would fly on in
-        // DRIFT, ten times slower; a trip's planned flights switch it back to CRUISE.
+        // DRIFT, ten times slower; a trip's planned flights ask for the leg's mode: here BURN, since XB5C sells fuel and a
+        // full tank pays for the 19 twice over (D84).
         await StepAsync(Drone() with { FlightMode = "DRIFT" }, Trip);
 
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == XB5C && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == XB5C && command.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ATripToAMarketOutOfReach_DriftsToTheMarket_NotToTheAsteroid()
+    public async Task ATripToAMarketOutOfReach_GoesToTheMarketTheFastestWay_NotToTheAsteroid()
     {
         // D45: "having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal
         // behavior". Drifting straight to B14 would leave the drone at an asteroid without the fuel to sell there, in
-        // DRIFT (B47).
+        // DRIFT (B47). D84: the fastest way to B7 cruises the 52 to F49 and drifts the 274 from there, rather than drifting
+        // the 310 from H51.
         var result = await StepAsync(Drone(), FarTrip);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == F49 && command.FlightMode == "CRUISE"),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Should().BeEmpty();
+
+        // Its arrival docked it at F49.
+        await StepAsync(Drone(waypoint: F49) with { FuelCurrent = 28 }, FarTrip);
+
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B7 && command.FlightMode == "DRIFT"),
             Arg.Any<CancellationToken>());
         var drift = _log.Journal.Should().ContainSingle().Subject;
         drift.EventKind.Should().Be("DriftStarted");
-        drift.Message.Should().Contain(H51).And.Contain(B7).And.Contain("GOLD_ORE");
+        drift.Message.Should().Contain(F49).And.Contain(B7).And.Contain("GOLD_ORE");
     }
 
     [Fact]
@@ -101,12 +111,13 @@ public sealed class MineAndSellGoalExecutorTests
     }
 
     [Fact]
-    public async Task AfterItsDrift_TheTripFliesToTheAsteroidInCruise()
+    public async Task AfterItsDrift_TheTripBurnsToTheAsteroid_WhenTheFuelLeftTakesTheOreBack()
     {
+        // D84: B14 is 25 from B7. Burning there takes 50 of a full tank and leaves 30, enough to cruise back.
         await StepAsync(Drone(waypoint: B7) with { FlightMode = "DRIFT", FuelCurrent = 79 }, FarTrip with { Drifting = false });
 
         await _bus.Received(1).InvokeAsync(
-            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B14 && command.FlightMode == "CRUISE"),
+            Arg.Is<NavigateToWaypointCommand>(command => command.DestinationWaypoint == B14 && command.FlightMode == "BURN"),
             Arg.Any<CancellationToken>());
     }
 

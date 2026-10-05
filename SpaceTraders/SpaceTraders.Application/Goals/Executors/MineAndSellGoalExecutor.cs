@@ -20,8 +20,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// market buys within one tank (D71), until its hold is full. Then it flies to the sell market, docks and
 /// sells the trip's ore, in batches of the market's trade volume, and the goal ends: the mining plan sells
 /// the other ores and chooses the next trip. However the trip ends, it is booked with what its sale brought
-/// in (<see cref="ITripBook"/>, D46). A trip to a market out of the ship's CRUISE reach drifts to that market
-/// first, and mines from there in CRUISE (slice 6.10c, D45).
+/// in (<see cref="ITripBook"/>, D46). A trip to a market out of the ship's CRUISE reach gets to that market first, the
+/// fastest way, which cruises as far as it can and drifts the rest (slice 6.10c, D45, D84), and mines from there.
 /// </summary>
 public sealed class MineAndSellGoalExecutor(
     IShipRepository ships,
@@ -69,35 +69,43 @@ public sealed class MineAndSellGoalExecutor(
     }
 
     /// <summary>
-    /// The trip's drift to its market, out of the ship's CRUISE reach (D45): "having a drone drift to the marketplace that
-    /// buys the mineral first, then refueling and resuming normal behavior". Once there, it mines from that market.
+    /// The trip's way to its market, out of the ship's CRUISE reach (D45): "having a drone drift to the marketplace that
+    /// buys the mineral first, then refueling and resuming normal behavior", the fastest way, which cruises as far as it can
+    /// and drifts the rest (D84). Once there, it mines from that market.
     /// </summary>
     private async Task<GoalExecutionResult> DriftStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)
     {
         if (!IsAt(ship, trip.SellWaypointSymbol))
         {
-            var drifting = await GoalFlight.DriftAsync(ship, trip.SellWaypointSymbol, bus, ct);
-            logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {SellWaypoint}, out of its CRUISE reach, to mine {TradeSymbol} at {SourceWaypoint} from there.",
-                JournalEvents.DriftStarted,
-                ship.Symbol,
-                ship.WaypointSymbol ?? string.Empty,
-                trip.SellWaypointSymbol,
-                trip.TradeSymbol,
-                trip.SourceWaypointSymbol);
-            return drifting;
+            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+            var (flown, leg) = await GoalFlight.LegTowardsAsync(context.Map, ship, trip.SellWaypointSymbol, dock, bus, ct);
+            if (flown.Outcome == GoalExecutionOutcome.WaitingForArrival && leg.FlightMode == TradeRoutePlanner.DriftMode)
+            {
+                logger.LogInformation(
+                    "{EventKind:l}: ship {ShipSymbol} drifts from {WaypointSymbol} to {Leg} on its way to {SellWaypoint}, out of its CRUISE reach, to mine {TradeSymbol} at {SourceWaypoint} from there.",
+                    JournalEvents.DriftStarted,
+                    ship.Symbol,
+                    ship.WaypointSymbol ?? string.Empty,
+                    leg.WaypointSymbol,
+                    trip.SellWaypointSymbol,
+                    trip.TradeSymbol,
+                    trip.SourceWaypointSymbol);
+            }
+
+            return flown;
         }
 
         await goals.SetActiveGoalAsync(ship.Symbol, trip with { Drifting = false }, ct);
-        return GoalExecutionResult.Progressing($"At {trip.SellWaypointSymbol}: mining {trip.TradeSymbol} at {trip.SourceWaypointSymbol} from here, in CRUISE.");
+        return GoalExecutionResult.Progressing($"At {trip.SellWaypointSymbol}: mining {trip.TradeSymbol} at {trip.SourceWaypointSymbol} from here.");
     }
 
     private async Task<GoalExecutionResult> MineStepAsync(ShipModel ship, MineAndSellGoal trip, CancellationToken ct)
     {
         if (!IsAt(ship, trip.SourceWaypointSymbol))
         {
+            // It burns out there only when that leaves the fuel to carry the ore on to its market (D84).
             var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
-            return await GoalFlight.TowardsAsync(context.Map, ship, trip.SourceWaypointSymbol, dock, bus, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, trip.SourceWaypointSymbol, dock, bus, ct, onward: trip.SellWaypointSymbol);
         }
 
         if (ship.CooldownExpiresAt.HasValue && ship.CooldownExpiresAt.Value > TimeProvider.System.GetUtcNow())
