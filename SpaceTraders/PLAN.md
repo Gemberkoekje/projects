@@ -152,9 +152,10 @@
 - Slice 6.14 (drones mine and siphon until every mineral is ABUNDANT, sharing a pair rather than trading, asked on 2026-10-05, with your
   decisions D77 and D78; the cargo ships' purchases stay as they are) is built on branch `claude/eager-allen-5q9biz`.
 - Slice 6.15 (the jump gate's loads bought in batches of the market's trade volume, asked on 2026-10-05, with your decision
-  D81) is built on branch `claude/spacetraders-construction-batches`. The gate had had no load since 10-04 18:09Z. D79 and
-  D80, decided the same morning (trade trips in batches, estimated and checked live; one buyer per good and market), are for
-  slice 6.16, which comes next.
+  D81) is built on branch `claude/spacetraders-construction-batches`. The gate had had no load since 10-04 18:09Z.
+- Slice 6.16 (trade trips in batches, sized with measured price steps and checked live, with one buyer of a good at a market
+  at a time, asked on 2026-10-05, with your decisions D79 and D80) is built on branch `claude/spacetraders-trade-batches`,
+  on top of 6.15. Still to do from D79: learning the price steps per good and market from the bot's own trades.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -3119,6 +3120,61 @@ when it is seen for the first time.
     and `PriceStepsTests`. App 1126, Domain 72, API 210 (and 4 skipped), Integration 1.
   - To understand this, start with the buy step of `Goals/Executors/SupplyConstructionGoalExecutor.cs`, then `TryLoad` in
     `Construction/ConstructionPlanner.cs` and `Trading/PriceSteps.cs`.
+
+- **6.16 Trade trips in batches, one buyer at a time** (built on branch `claude/spacetraders-trade-batches`, on top of 6.15,
+  asked on 2026-10-05, D79 and D80). Asked: "Can you have a look at ships starting to do something, then cancelling without
+  finishing? e.g. traders that cancelled trades, and why?", then, once a market's trade volume turned out to be the most one
+  purchase takes: "A ship should buy as much as is profitable per trip, and sell as much as is profitable per trip. The
+  problem is, with trade volumes of 6, it's very hard to determine whether something is actually profitable if you trade 80
+  of them. I'm open to suggestions on this one."
+  - Found, on the cluster since the reset (2026-10-04 13:00Z to 10-05 07:00Z): of 250 trade trips 240 sold, 7 were dropped
+    on arrival (`not_full_hold`) and 1 as `not_lucrative` (its prices had moved). All 7 had the same cause: the trading plan
+    sent two traders, at the same moment, for the same good at the same market with different sell markets (D18 keeps only
+    the whole route to one trader). Their haulers' 80-unit holds took the trip only through D74 (20 at an ABUNDANT seller);
+    the first purchase ended the ABUNDANT supply, and the second trader dropped its trip on arrival: about 2,000 credits of
+    fuel and 47 minutes of hauler time. Of 377 siphon trips 100 ended `nothing_aboard`, and 9 of 522 mining trips: by design
+    (D33), see Noticed.
+  - Measured for the estimate: the price paid is the price quoted, a full batch bought raises the next quote by a median of
+    1.8%, 3.6% or 5.7% (6, 20, 40 of 60 at a time), a sale lowers it about 2%, and a raised price recovers in about an hour.
+    The bot had never bought or sold more than one batch at a market, so no batch-after-batch figure exists yet.
+  - Done:
+    - **A trip's units** (`TradeRoutePlanner.TryEvaluate`): unit by unit, each priced by its batch (`PriceSteps`: bought 2%,
+      4% or 6% a batch dearer, sold 2% a batch cheaper), while the next earns `Trade.MinProfitPerUnit`, up to the free hold
+      and what the credits pay for once the trip's fuel is kept back; the trip after fuel still earns it a unit (D14). The
+      route's `CargoCost` is what the trip holds back (D57). `UnitsAtOnce` and its supply rule are gone.
+    - **At the buy market** (`TradeBetweenMarketsGoalExecutor`): a trip that has bought nothing is weighed again with the
+      arrival's prices, as before; then it buys a batch at a time while the next units' expected sale still earns the minimum
+      over the price quoted now (`TradeRoutePlanner.UnitsWorthBuying`), refreshing the market after each (D25) and storing
+      the trip, which holds back only what is left to buy. A restart goes on from what is aboard.
+    - **At the sell market:** a batch at a time while the quote earns the minimum over what the cargo cost; when it no
+      longer does, the rest goes where it fetches more after fuel, once per trip, or is sold there all the same.
+    - **One buyer at a time** (`HeldBuys`, D80): a trade or construction trip on its way to buy holds its good at its buy
+      market; the trading plan offers no route of that good from there, and the construction plan buys no load there
+      (`market_busy`), until it has bought. Routes given out earlier in the same pass count.
+    - **Why a good isn't traded** (D76): `not_full_hold` became `no_room` (no room in the hold, or a market without a price
+      or trade volume); a route whose first unit earns too little says what a unit earns.
+    - **Unchanged:** D14, D15, D17, D18, D24, D56's saving (now for the trip's units: a trader that sets off with fewer
+      units on that route ends it), the cargo ships (D21, D43) and the role board, which values trading by the same routes.
+  - Not yet (D79): the price steps are the measured medians for every good and market; learning them per good and market
+    from the bot's own trades comes next.
+  - Noticed (not changed):
+    - **Siphon and mining `nothing_aboard`** (D33): a 15-unit drone's first siphon or extraction brings 11 to 14 units of
+      whatever comes up, so the trip's target is luck; the next trip (`held_cargo`) sells the hold, mostly next door. The
+      books show a loss of about 130 credits on one trip and the gain on the next.
+    - **Liveness probes:** the API pods' liveness probe timed out once at 06:36Z and once at 07:55Z, minutes after a
+      start; neither restarted the pod.
+    - **More API calls a trip:** each batch is a purchase or sale and a market refresh, about 16 calls for 80 units at a
+      trade volume of 20 and 56 at 6.
+  - Tests: `TradingAutomationServiceTests` (two traders are never sent for one good at one market; a trip on its way holds
+    it until it has bought; fewer units where the credits don't pay for all; failed before the change: both traders went),
+    `TradeBetweenMarketsGoalExecutorTests` (batches at rising quotes; it stops when the next would earn too little; the trip
+    stored between batches; a restart buys what is left; the rest of a sale taken elsewhere, or sold anyway),
+    `TradeRoutePlannerTests` (units by batch, bought and sold; fewer units for fewer credits; the first unit too little; the
+    trip after fuel; `UnitsWorthBuying`; one buyer at a time, construction trips too), `TradeRouteJudgementTests`,
+    `ConstructionPlannerTests` and `ConstructionPlanServiceTests` (a material another trip is on its way to buy).
+    App 1133, Domain 72, API 210 (and 4 skipped), Integration 1.
+  - To understand this, start with `TryEvaluateFrom` and `UnitsWorthBuying` in `Trading/TradeRoutePlanner.cs`, then the buy
+    and sell steps of `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`, and `Trading/HeldBuys.cs`.
 
 ## Changes in gembernodes
 

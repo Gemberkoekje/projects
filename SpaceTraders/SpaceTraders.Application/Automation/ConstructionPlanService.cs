@@ -192,11 +192,16 @@ public sealed class ConstructionPlanService(
     private async Task BuyLoadsAsync(Pass pass, CancellationToken cancellationToken)
     {
         var spendable = (await budget.EvaluateAsync(0, cancellationToken)).SpendableCredits;
+
+        // D80: one buyer of a material at a market at a time, a trade trip or a construction trip, those this pass starts too.
+        var tradeTrips = (await goals.GetActiveTradeGoalsAsync(cancellationToken)).Values.ToList();
+        HeldBuys HeldBuysNow() => HeldBuys.Of(tradeTrips, pass.Trips);
+
         var need = PurchaseNeed.None;
         foreach (var (site, map, system) in pass.Sites)
         {
             if (pass.Builders.FirstOrDefault(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)) is { } first
-                && NextLoad(map, first, site, ConstructionPlanner.Needs(site, pass.Trips), spendable) is { } load)
+                && NextLoad(map, first, site, ConstructionPlanner.Needs(site, pass.Trips), spendable, HeldBuysNow()) is { } load)
             {
                 need = new PurchaseNeed(PurchaseTier.Construction, load.TradeSymbol, load.BuyWaypointSymbol, load.Cost);
                 break;
@@ -222,7 +227,7 @@ public sealed class ConstructionPlanService(
             pass.Ready.AddRange(pass.Builders
                 .Where(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)
                     && !(builder.CargoCurrent > 0 && pass.FreeBuilders().Any(other => other.Symbol.Equals(builder.Symbol, StringComparison.OrdinalIgnoreCase)))
-                    && ConstructionPlanner.Loads(map, AsIfEmptyWhereItGoes(builder), site.WaypointSymbol, needs).Any(load => load.Cost <= spendable))
+                    && ConstructionPlanner.Loads(map, AsIfEmptyWhereItGoes(builder), site.WaypointSymbol, needs, HeldBuysNow()).Any(load => load.Cost <= spendable))
                 .Select(builder => builder.Symbol));
         }
 
@@ -233,11 +238,12 @@ public sealed class ConstructionPlanService(
                 .ToList())
             {
                 var needs = ConstructionPlanner.Needs(site, pass.Trips);
-                var loads = ConstructionPlanner.Loads(map, builder, site.WaypointSymbol, needs);
+                var heldBuys = HeldBuysNow();
+                var loads = ConstructionPlanner.Loads(map, builder, site.WaypointSymbol, needs, heldBuys);
                 var load = loads.FirstOrDefault(candidate => candidate.Cost <= spendable);
                 if (load is null)
                 {
-                    pass.Waiting = loads.Count > 0 ? WaitingForCredits : ConstructionPlanner.WhyNoLoad(map, builder, site.WaypointSymbol, needs);
+                    pass.Waiting = loads.Count > 0 ? WaitingForCredits : ConstructionPlanner.WhyNoLoad(map, builder, site.WaypointSymbol, needs, heldBuys);
                     continue;
                 }
 
@@ -273,10 +279,10 @@ public sealed class ConstructionPlanService(
     /// going, the first load the credits pay for, else the first it may buy, else the first it would buy once the supply and
     /// trade volume allow it. None when no market it can reach sells what the site needs.
     /// </summary>
-    private static ConstructionLoad? NextLoad(TradeMarketMap map, ShipModel builder, ConstructionSiteModel site, IReadOnlyList<MaterialNeed> needs, long spendable)
+    private static ConstructionLoad? NextLoad(TradeMarketMap map, ShipModel builder, ConstructionSiteModel site, IReadOnlyList<MaterialNeed> needs, long spendable, HeldBuys heldBuys)
     {
         var empty = AsIfEmptyWhereItGoes(builder);
-        var loads = ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs);
+        var loads = ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, heldBuys);
         return loads.FirstOrDefault(load => load.Cost <= spendable)
             ?? loads.FirstOrDefault()
             ?? ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, strict: false).FirstOrDefault();

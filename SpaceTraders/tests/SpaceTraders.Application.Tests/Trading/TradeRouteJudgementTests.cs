@@ -7,30 +7,40 @@ namespace SpaceTraders.Application.Tests.Trading;
 
 /// <summary>
 /// Slice 2.18 (D76): why a route with a price gap isn't one of a ship's routes, in a sentence, with the figures of the check
-/// it fails; and for each good, the route the free traders got furthest with.
+/// it fails; and for each good, the route the free traders got furthest with. Since D79 a route carries as many units as each
+/// earn the minimum, so it fails on its first unit, or on the whole trip after fuel.
 /// </summary>
 public sealed class TradeRouteJudgementTests
 {
     private static readonly IReadOnlySet<string> NoneHeld = new HashSet<string>();
 
     [Fact]
-    public void Why_ARouteThatEarnsTooLittle_GivesTheProfitAfterFuel_AndTheMinimum()
+    public void Why_ARouteWhoseFirstUnitEarnsTooLittle_GivesWhatAUnitEarns_AndTheMinimum()
     {
         var map = Map();
         var judged = TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld);
 
-        Of(judged, "FOOD").Why(map).Should().Be("SHIP-1: 40 units earn 5,100 after 180 for fuel, 127 a unit; a trip must earn 200 a unit (D14).");
-        Of(judged, "FUEL").Why(map).Should().Be("SHIP-1: 40 units earn -218 after 338 for fuel, -5 a unit; a trip must earn 200 a unit (D14).");
+        Of(judged, "FOOD").Why(map).Should().Be("SHIP-1: a unit bought at 2,360 and sold at 2,492 earns 132 before fuel; each must earn 200 (D14, D79).");
+        Of(judged, "FUEL").Why(map).Should().Be("SHIP-1: a unit bought at 76 and sold at 79 earns 3 before fuel; each must earn 200 (D14, D79).");
     }
 
     [Fact]
-    public void Why_ARouteWhoseTradesDontFillTheHold_GivesBothTradeVolumes_AndTheSellersSupply()
+    public void Why_ATripWhoseUnitsEarnTooLittleAfterFuel_GivesTheProfitAfterFuel_AndTheMinimum()
     {
-        var map = ShipPartsMap(supplyAtD41: "MODERATE");
+        // D14 on the whole trip: each of the 15 SHIP_PARTS earns 279, the trip 4,095 after its 90 for fuel.
+        var map = ShipPartsMap();
+
+        Of(TradeRoutePlanner.Judge(map, CommandShip(D41), 1_000_000, 274, NoneHeld), "SHIP_PARTS").Why(map).Should().Be(
+            "SHIP-1: 15 units earn 4,095 after 90 for fuel, 273 a unit; a trip must earn 274 a unit (D14).");
+    }
+
+    [Fact]
+    public void Why_AMarketThatNamesNoTradeVolume_SaysSo()
+    {
+        var map = ShipPartsMap(atA1: 0);
 
         Of(TradeRoutePlanner.Judge(map, CommandShip(D41), 1_000_000, 200, NoneHeld), "SHIP_PARTS").Why(map).Should().Be(
-            "SHIP-1: one purchase and one sale take 15 of its 40 free units (X1-AB-D41 sells 15 at a time, X1-AB-A1 buys 40); "
-            + "less than a full hold needs ABUNDANT supply at X1-AB-D41, which has MODERATE (D56, D74).");
+            "SHIP-1: X1-AB-D41 or X1-AB-A1 names no price or trade volume for SHIP_PARTS.");
     }
 
     [Fact]
@@ -44,13 +54,13 @@ public sealed class TradeRouteJudgementTests
     }
 
     [Fact]
-    public void Why_ARouteTheCreditsDontPayFor_GivesWhatItCosts_AndTheCreditsFreeForCargo()
+    public void Why_ARouteTheCreditsDontPayAUnitOf_GivesWhatItCosts_AndTheCreditsFreeForCargo()
     {
         var map = Map();
-        var equipment = TradeRoutePlanner.Judge(map, CommandShip(), 130_311, 200, NoneHeld)
+        var equipment = TradeRoutePlanner.Judge(map, CommandShip(), 3_405, 200, NoneHeld)
             .Single(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
 
-        equipment.Why(map).Should().Be("SHIP-1: 40 units at 3,254 and 152 for fuel cost 130,312; 130,311 credits are free for cargo (D56).");
+        equipment.Why(map).Should().Be("SHIP-1: a unit at 3,254 and 152 for the trip's fuel cost 3,406; 3,405 credits are free for cargo.");
     }
 
     [Fact]
@@ -83,18 +93,19 @@ public sealed class TradeRouteJudgementTests
         var equipment = TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld)
             .Single(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
 
-        equipment.Why(map).Should().Be("SHIP-1: lucrative, 9,168 after fuel, 229 a unit.");
+        equipment.Why(map).Should().Be("SHIP-1: lucrative, 40 units for 9,168 after fuel, 229 a unit.");
     }
 
     [Fact]
     public void FurthestPerGood_IsTheRouteAndShipThatPassedTheMostChecks()
     {
-        // D41 sells SHIP_PARTS 15 at a time, its supply MODERATE: the command ship's 40-unit hold takes no full hold there
-        // (D56), and a shuttle's 15-unit hold does, but earns 273 a unit after fuel, under the 300 asked (D14).
-        var map = ShipPartsMap(supplyAtD41: "MODERATE");
-        var shuttle = Drone(D41, "SHIP-5") with { FuelCapacity = 400, FuelCurrent = 400 };
-        var judged = TradeRoutePlanner.Judge(map, CommandShip(D41), 1_000_000, 300, NoneHeld)
-            .Concat(TradeRoutePlanner.Judge(map, shuttle, 1_000_000, 300, NoneHeld));
+        // SHIP-1, whose hold is full, has no room for SHIP_PARTS; SHIP-5's empty hold has, but its first unit earns 279,
+        // under the 300 asked (D14, D79).
+        var map = ShipPartsMap();
+        var full = CommandShip(D41, cargo: [new CargoItemModel("COPPER_ORE", 40)]);
+        var empty = CommandShip(D41, symbol: "SHIP-5");
+        var judged = TradeRoutePlanner.Judge(map, full, 1_000_000, 300, NoneHeld)
+            .Concat(TradeRoutePlanner.Judge(map, empty, 1_000_000, 300, NoneHeld));
 
         var parts = TradeRouteJudgement.FurthestPerGood(judged).Should().ContainSingle(judgement => judgement.Route.TradeSymbol == "SHIP_PARTS").Subject;
 
@@ -114,7 +125,7 @@ public sealed class TradeRouteJudgementTests
 
     [Fact]
     public void FurthestPerGood_ListsTheFurthestFirst_ThenByGood()
-        => TradeRouteJudgement.FurthestPerGood(TradeRoutePlanner.Judge(Map(), CommandShip(), 130_311, 200, NoneHeld))
+        => TradeRouteJudgement.FurthestPerGood(TradeRoutePlanner.Judge(Map(), CommandShip(), 3_000, 200, NoneHeld))
             .Select(judgement => (judgement.Route.TradeSymbol, judgement.Check))
             .Should().Equal(
                 ("FOOD", TradeRouteCheck.NotLucrative),

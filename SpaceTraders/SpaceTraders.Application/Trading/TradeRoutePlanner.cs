@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 
@@ -17,12 +18,13 @@ namespace SpaceTraders.Application.Trading;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A trip is a full hold, bought in one purchase and sold in one sale (D56): a route counts only when both
-/// markets' trade volumes, the most a single trade takes, are at least the ship's free hold, and the credits
-/// pay for all of it. Each trade moves the price, so a hold bought in several purchases costs more per unit
-/// than the first one. Where the buy market's supply of the good is ABUNDANT, a trip may fill less: what both
-/// markets trade at once, still in one purchase and one sale (D74). Cargo may use the credit reserve (D17); the
-/// trip's fuel is kept back.
+/// A trip carries as many units as each earn <c>Trade.MinProfitPerUnit</c> (D79, asked on 2026-10-05: "A ship should buy as
+/// much as is profitable per trip, and sell as much as is profitable per trip"), up to the ship's free hold and what the
+/// credits pay for. A market's trade volume is the most a single purchase or sale takes, not its stock, so more goes in
+/// batches, and each purchase raises the next quote and each sale lowers it: a unit's price is estimated by its batch
+/// (<see cref="PriceSteps"/>), and as each further unit earns less, the units stop at the first that wouldn't earn the
+/// minimum. The trade executor checks each batch against the price it is quoted then. Cargo may use the credit reserve
+/// (D17); the trip's fuel is kept back.
 /// </para>
 /// <para>
 /// Ships fly CRUISE, which burns one unit of fuel per unit of distance (at least 1). A ship docked at
@@ -37,8 +39,8 @@ public static class TradeRoutePlanner
 {
     private const int FuelPerMarketUnit = 100;
 
-    /// <summary>The supply at which a seller's trade volume may fill less than the hold (D74).</summary>
-    private const string AbundantSupply = "ABUNDANT";
+    /// <summary>A sliver of floating-point error: an exact sum must not round a credit the wrong way.</summary>
+    private const double Sliver = 1e-6;
 
     /// <summary>The key that identifies a route: good, buy market and sell market.</summary>
     /// <param name="tradeSymbol">The good.</param>
@@ -65,9 +67,29 @@ public static class TradeRoutePlanner
         long credits,
         int minProfitPerUnit,
         IReadOnlySet<string> heldRouteKeys)
+        => Rank(map, ship, credits, minProfitPerUnit, heldRouteKeys, HeldBuys.None);
+
+    /// <summary>
+    /// The lucrative routes for a ship, best first, as <see cref="Rank(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string})"/>
+    /// gives them, less those of a good at a market where another trip is on its way to buy it: one buyer at a time (D80).
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="credits">The credits on hand.</param>
+    /// <param name="minProfitPerUnit">The profit per unit, after fuel, a trip must earn.</param>
+    /// <param name="heldRouteKeys">The routes other traders hold (<see cref="RouteKey"/>).</param>
+    /// <param name="heldBuys">The goods the trips on their way to buy hold at their buy markets.</param>
+    /// <returns>The lucrative routes, best first; empty when there is none.</returns>
+    public static IReadOnlyList<TradeRoute> Rank(
+        TradeMarketMap map,
+        ShipModel ship,
+        long credits,
+        int minProfitPerUnit,
+        IReadOnlySet<string> heldRouteKeys,
+        HeldBuys heldBuys)
     {
         var routes = new List<TradeRoute>();
-        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, routes, judgements: null);
+        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, routes, judgements: null);
         return [.. routes
             .OrderByDescending(route => route.FeedsProduction)
             .ThenByDescending(route => route.Profit)
@@ -75,9 +97,9 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Every route with a price gap that no other trader holds, as <see cref="Rank"/> checks it for a ship: a market sells the
-    /// good for less than another pays for it. Each says the first check it fails, in the order Rank runs them, or
-    /// <see cref="TradeRouteCheck.Lucrative"/>: those are Rank's routes (slice 2.18, D76).
+    /// Every route with a price gap that no other trader holds, as <see cref="Rank(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string})"/>
+    /// checks it for a ship: a market sells the good for less than another pays for it. Each says the first check it fails, in
+    /// the order Rank runs them, or <see cref="TradeRouteCheck.Lucrative"/>: those are Rank's routes (slice 2.18, D76).
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
@@ -91,14 +113,35 @@ public static class TradeRoutePlanner
         long credits,
         int minProfitPerUnit,
         IReadOnlySet<string> heldRouteKeys)
+        => Judge(map, ship, credits, minProfitPerUnit, heldRouteKeys, HeldBuys.None);
+
+    /// <summary>
+    /// Every route with a price gap that no other trip keeps out, as <see cref="Rank(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string}, HeldBuys)"/>
+    /// checks it for a ship, each with the first check it fails (slice 2.18, D76). A route of a good at a market where another
+    /// trip is on its way to buy it (D80) is left out, as a held route is.
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="credits">The credits on hand.</param>
+    /// <param name="minProfitPerUnit">The profit per unit, after fuel, a trip must earn.</param>
+    /// <param name="heldRouteKeys">The routes other traders hold (<see cref="RouteKey"/>).</param>
+    /// <param name="heldBuys">The goods the trips on their way to buy hold at their buy markets.</param>
+    /// <returns>A judgement per route; empty when no market pays more for a good than another charges.</returns>
+    public static IReadOnlyList<TradeRouteJudgement> Judge(
+        TradeMarketMap map,
+        ShipModel ship,
+        long credits,
+        int minProfitPerUnit,
+        IReadOnlySet<string> heldRouteKeys,
+        HeldBuys heldBuys)
     {
         var judgements = new List<TradeRouteJudgement>();
-        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, [], judgements);
+        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, [], judgements);
         return judgements;
     }
 
     /// <summary>
-    /// Orders two routes as <see cref="Rank"/> does (D15): one that feeds a pricier good's production
+    /// Orders two routes as Rank does (D15): one that feeds a pricier good's production
     /// first, then the more profitable, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
@@ -129,11 +172,12 @@ public static class TradeRoutePlanner
     /// <param name="buyWaypointSymbol">The buy market.</param>
     /// <param name="sellWaypointSymbol">The sell market.</param>
     /// <param name="credits">The credits on hand.</param>
+    /// <param name="minProfitPerUnit">The profit per unit each further unit must earn (D14, D79).</param>
     /// <param name="route">The route's figures.</param>
     /// <returns>
-    /// False when the ship can't fly it (a market, a price or a position unknown, no way to get there
-    /// within its tank) or can't trade its units in one go (<see cref="UnitsAtOnce"/>: no free hold, a trade volume
-    /// below it at a seller whose supply isn't ABUNDANT, too few credits for them).
+    /// False when the ship can't fly it (a market, a price or a position unknown, no way to get there within its tank) or
+    /// can't buy a unit worth it (no free hold, too few credits, or not even the first unit earns
+    /// <paramref name="minProfitPerUnit"/>).
     /// </returns>
     public static bool TryEvaluate(
         TradeMarketMap map,
@@ -142,53 +186,76 @@ public static class TradeRoutePlanner
         string buyWaypointSymbol,
         string sellWaypointSymbol,
         long credits,
+        int minProfitPerUnit,
         out TradeRoute route)
-    {
-        ArgumentNullException.ThrowIfNull(map);
-        ArgumentNullException.ThrowIfNull(ship);
-
-        if (TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, buyWaypointSymbol, FuelAtDeparture(map, ship), ship.FuelCapacity, out var approach)
-            && TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, approach, out route, out _))
-        {
-            return true;
-        }
-
-        route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
-        return false;
-    }
+        => TryEvaluate(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, minProfitPerUnit, out route, out _);
 
     /// <summary>
-    /// The units a trip of a good carries, as the markets were last seen, bought in one purchase and sold in one sale:
-    /// <list type="bullet">
-    ///   <item>the ship's whole free hold, when both markets' trade volumes take it at once (D56). Asked on 2026-10-03: "The
-    ///   entire goal is to buy full holds in one go, because it makes no sense to buy more times than one.";</item>
-    ///   <item>otherwise, where the buy market's supply of the good is ABUNDANT, what both markets trade at once (D74). Asked
-    ///   on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT, in which
-    ///   case a full hold is not necessary";</item>
-    ///   <item>otherwise none.</item>
-    /// </list>
+    /// Works out one route for a ship where it is now, as <see cref="TryEvaluate(TradeMarketMap, ShipModel, string, string, string, long, int, out TradeRoute)"/>
+    /// does, and says the first check it fails.
     /// </summary>
     /// <param name="map">The ship's system.</param>
-    /// <param name="ship">The ship.</param>
+    /// <param name="ship">The ship, where it is now.</param>
     /// <param name="tradeSymbol">The good.</param>
     /// <param name="buyWaypointSymbol">The buy market.</param>
     /// <param name="sellWaypointSymbol">The sell market.</param>
-    /// <returns>The units; 0 when the trip takes none.</returns>
-    public static int UnitsAtOnce(TradeMarketMap map, ShipModel ship, string tradeSymbol, string buyWaypointSymbol, string sellWaypointSymbol)
+    /// <param name="credits">The credits on hand.</param>
+    /// <param name="minProfitPerUnit">The profit per unit each further unit must earn (D14, D79).</param>
+    /// <param name="route">The route's figures; as far as the checks got when it fails.</param>
+    /// <param name="failed">The first check it fails; <see cref="TradeRouteCheck.Lucrative"/> when it has units, lucrative or not.</param>
+    /// <returns>False when the ship can't fly it or can't buy a unit worth it.</returns>
+    public static bool TryEvaluate(
+        TradeMarketMap map,
+        ShipModel ship,
+        string tradeSymbol,
+        string buyWaypointSymbol,
+        string sellWaypointSymbol,
+        long credits,
+        int minProfitPerUnit,
+        out TradeRoute route,
+        out TradeRouteCheck failed)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
 
-        var free = ship.CargoCapacity - ship.CargoCurrent;
-        if (free <= 0
-            || !map.TryGetGood(buyWaypointSymbol, tradeSymbol, out var atBuy)
-            || !map.TryGetGood(sellWaypointSymbol, tradeSymbol, out var atSell))
+        if (!TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, buyWaypointSymbol, FuelAtDeparture(map, ship), ship.FuelCapacity, out var approach))
         {
-            return 0;
+            route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
+            failed = TradeRouteCheck.BuyMarketOutOfReach;
+            return false;
         }
 
-        var atOnce = Math.Max(0, Math.Min(free, Math.Min(atBuy.TradeVolume, atSell.TradeVolume)));
-        return atOnce == free || string.Equals(atBuy.Supply, AbundantSupply, StringComparison.OrdinalIgnoreCase) ? atOnce : 0;
+        if (!TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, minProfitPerUnit, approach, out route, out failed))
+        {
+            return false;
+        }
+
+        failed = TradeRouteCheck.Lucrative;
+        return true;
+    }
+
+    /// <summary>
+    /// How many of the next units are worth buying in one purchase at the price quoted now (D79): those whose expected sale,
+    /// each batch sold a step cheaper (<see cref="PriceSteps.SalePriceOf"/>), still earns <paramref name="minProfitPerUnit"/>
+    /// over that price, up to <paramref name="most"/>. Each further unit earns less, so they stop at the first that doesn't.
+    /// </summary>
+    /// <param name="quote">What a unit costs at the buy market now.</param>
+    /// <param name="atSell">The good at the sell market, as last seen.</param>
+    /// <param name="bought">The units the trip has bought so far: where in the sales the next ones come.</param>
+    /// <param name="most">The most the purchase may take: the trade volume, the free hold and the credits.</param>
+    /// <param name="minProfitPerUnit">The profit each unit must earn; 0 or less means any.</param>
+    /// <returns>The units to buy, from 0.</returns>
+    public static int UnitsWorthBuying(long quote, TradeGoodSnapshot atSell, int bought, int most, int minProfitPerUnit)
+    {
+        ArgumentNullException.ThrowIfNull(atSell);
+
+        var units = 0;
+        while (units < most && Earns(PriceSteps.SalePriceOf(atSell.SellPrice, bought + units, atSell.TradeVolume) - quote, minProfitPerUnit))
+        {
+            units++;
+        }
+
+        return units;
     }
 
     /// <summary>
@@ -332,9 +399,9 @@ public static class TradeRoutePlanner
             : destination;
 
     /// <summary>
-    /// Runs <see cref="Rank"/>'s checks on every route with a price gap that no other trader holds: the lucrative routes go to
-    /// <paramref name="routes"/>, and with <paramref name="judgements"/> every route goes there too, with the first check it
-    /// fails (<see cref="Judge"/>).
+    /// Runs Rank's checks on every route with a price gap that no other trader holds, of a good no other trip is on its way to
+    /// buy at that market (D80): the lucrative routes go to <paramref name="routes"/>, and with <paramref name="judgements"/>
+    /// every route goes there too, with the first check it fails (Judge).
     /// </summary>
     private static void CheckRoutes(
         TradeMarketMap map,
@@ -342,12 +409,14 @@ public static class TradeRoutePlanner
         long credits,
         int minProfitPerUnit,
         IReadOnlySet<string> heldRouteKeys,
+        HeldBuys heldBuys,
         List<TradeRoute> routes,
         List<TradeRouteJudgement>? judgements)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
         ArgumentNullException.ThrowIfNull(heldRouteKeys);
+        ArgumentNullException.ThrowIfNull(heldBuys);
 
         var here = ship.WaypointSymbol ?? string.Empty;
         var fuelAtStart = FuelAtDeparture(map, ship);
@@ -372,7 +441,8 @@ public static class TradeRoutePlanner
                     if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
                         || !map.TryGetGood(sell, good.Symbol, out var atSell)
                         || atSell.SellPrice <= good.PurchasePrice
-                        || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell)))
+                        || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell))
+                        || heldBuys.Holds(good.Symbol, buy))
                     {
                         continue;
                     }
@@ -384,7 +454,7 @@ public static class TradeRoutePlanner
                         route = new TradeRoute(good.Symbol, buy, sell, 0, good.PurchasePrice, atSell.SellPrice, 0, 0, string.Empty);
                         check = TradeRouteCheck.BuyMarketOutOfReach;
                     }
-                    else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, approach, out route, out check))
+                    else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, minProfitPerUnit, approach, out route, out check))
                     {
                         check = route.IsLucrative(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
                         if (check == TradeRouteCheck.Lucrative)
@@ -400,15 +470,19 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Works out a route from its buy market on, the flight there being <paramref name="approach"/>.
+    /// Works out a route from its buy market on, the flight there being <paramref name="approach"/>: as many units as each earn
+    /// <paramref name="minProfitPerUnit"/>, each batch bought a step dearer and each sold a step cheaper than the one before
+    /// (D79, <see cref="PriceSteps"/>), up to the free hold and what the credits pay for once the trip's fuel is kept back.
     /// </summary>
     /// <param name="failed">
-    /// When it can't be flown or traded, the first check it fails; a market, a price or a trade volume unknown counts as
-    /// <see cref="TradeRouteCheck.NotFullHold"/>, which one sale of none would be.
+    /// When it can't be flown or traded, the first check it fails: a market, a price or a trade volume unknown, or no room in
+    /// the hold, counts as <see cref="TradeRouteCheck.NoRoom"/>; no unit the credits pay for as
+    /// <see cref="TradeRouteCheck.TooFewCredits"/>; not even the first unit earning the minimum as
+    /// <see cref="TradeRouteCheck.NotLucrative"/>.
     /// </param>
     /// <param name="route">
     /// The route's figures; when it fails, as far as the checks got: the prices once both markets are known, the fuel once the
-    /// flight is, and the units and the profit once the hold is.
+    /// flight is.
     /// </param>
     private static bool TryEvaluateFrom(
         TradeMarketMap map,
@@ -417,12 +491,13 @@ public static class TradeRoutePlanner
         string buyWaypointSymbol,
         string sellWaypointSymbol,
         long credits,
+        int minProfitPerUnit,
         TradeFlight approach,
         out TradeRoute route,
         out TradeRouteCheck failed)
     {
         route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
-        failed = TradeRouteCheck.NotFullHold;
+        failed = TradeRouteCheck.NoRoom;
         if (buyWaypointSymbol.Equals(sellWaypointSymbol, StringComparison.OrdinalIgnoreCase)
             || !map.TryGetGood(buyWaypointSymbol, tradeSymbol, out var atBuy)
             || atBuy.PurchasePrice <= 0
@@ -444,25 +519,46 @@ public static class TradeRoutePlanner
             return false;
         }
 
-        // D56: the whole free hold, or at an ABUNDANT seller what both markets trade at once (D74); in one purchase and one
-        // sale, and paid for, or no trip.
         var fuelCost = approach.FuelCost + haul.FuelCost;
-        var affordable = Math.Max(0, credits - fuelCost) / atBuy.PurchasePrice;
-        var units = UnitsAtOnce(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol);
+        route = route with { FuelCost = fuelCost };
+        var free = ship.CargoCapacity - ship.CargoCurrent;
+        if (free <= 0)
+        {
+            return false;
+        }
+
+        // D79: unit by unit, while the next earns the minimum and the credits left after the trip's fuel pay for it.
+        var budget = Math.Max(0, credits - fuelCost);
+        var units = 0;
+        var cost = 0.0;
+        var revenue = 0.0;
+        while (units < free)
+        {
+            var buy = PriceSteps.PurchasePriceOf(atBuy.PurchasePrice, units, atBuy.TradeVolume);
+            var sell = PriceSteps.SalePriceOf(atSell.SellPrice, units, atSell.TradeVolume);
+            if (cost + buy > budget + Sliver)
+            {
+                failed = units == 0 ? TradeRouteCheck.TooFewCredits : failed;
+                break;
+            }
+
+            if (!Earns(sell - buy, minProfitPerUnit))
+            {
+                failed = units == 0 ? TradeRouteCheck.NotLucrative : failed;
+                break;
+            }
+
+            cost += buy;
+            revenue += sell;
+            units++;
+        }
+
         if (units == 0)
         {
-            route = route with { FuelCost = fuelCost };
             return false;
         }
 
-        var profit = ((long)(atSell.SellPrice - atBuy.PurchasePrice) * units) - fuelCost;
-        if (affordable < units)
-        {
-            route = route with { Units = units, FuelCost = fuelCost, Profit = profit };
-            failed = TradeRouteCheck.TooFewCredits;
-            return false;
-        }
-
+        var cargoCost = (long)Math.Ceiling(cost - Sliver);
         route = new TradeRoute(
             tradeSymbol,
             buyWaypointSymbol,
@@ -471,10 +567,17 @@ public static class TradeRoutePlanner
             atBuy.PurchasePrice,
             atSell.SellPrice,
             fuelCost,
-            profit,
-            map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol));
+            (long)Math.Floor(revenue + Sliver) - cargoCost - fuelCost,
+            map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol))
+        {
+            CargoCost = cargoCost,
+        };
         return true;
     }
+
+    /// <summary>Whether a unit's margin earns the minimum: something, and at least <paramref name="minProfitPerUnit"/> (D14).</summary>
+    private static bool Earns(double margin, int minProfitPerUnit)
+        => margin > 0 && margin + Sliver >= Math.Max(0, minProfitPerUnit);
 
     /// <summary>
     /// Where a ship gets the most for cargo it holds, after the fuel to get there: any market it can
@@ -608,9 +711,9 @@ public sealed record TradeRoute
     /// <param name="TradeSymbol">The good.</param>
     /// <param name="BuyWaypointSymbol">Where it is bought.</param>
     /// <param name="SellWaypointSymbol">Where it is sold.</param>
-    /// <param name="Units">The units one purchase can carry.</param>
-    /// <param name="BuyPrice">What a unit costs at the buy market.</param>
-    /// <param name="SellPrice">What a unit fetches at the sell market.</param>
+    /// <param name="Units">The units the trip carries, in batches of each market's trade volume (D79).</param>
+    /// <param name="BuyPrice">What a unit costs at the buy market now: the first batch's price.</param>
+    /// <param name="SellPrice">What a unit fetches at the sell market now: the first batch's price.</param>
     /// <param name="FuelCost">The fuel for the trip: to the buy market, then on to the sell market.</param>
     /// <param name="Profit">What the trip earns after fuel.</param>
     /// <param name="FeedsTradeSymbol">The pricier good the sell market makes from the good, or empty.</param>
@@ -635,6 +738,7 @@ public sealed record TradeRoute
         this.FuelCost = FuelCost;
         this.Profit = Profit;
         this.FeedsTradeSymbol = FeedsTradeSymbol;
+        CargoCost = Units * BuyPrice;
     }
 
     /// <summary>The good.</summary>
@@ -646,13 +750,13 @@ public sealed record TradeRoute
     /// <summary>Where it is sold.</summary>
     public required string SellWaypointSymbol { get; init; }
 
-    /// <summary>The units one purchase can carry.</summary>
+    /// <summary>The units the trip carries, in batches of each market's trade volume (D79).</summary>
     public required int Units { get; init; }
 
-    /// <summary>What a unit costs at the buy market.</summary>
+    /// <summary>What a unit costs at the buy market now: the first batch's price.</summary>
     public required long BuyPrice { get; init; }
 
-    /// <summary>What a unit fetches at the sell market.</summary>
+    /// <summary>What a unit fetches at the sell market now: the first batch's price.</summary>
     public required long SellPrice { get; init; }
 
     /// <summary>The fuel for the trip: to the buy market, then on to the sell market.</summary>
@@ -663,6 +767,12 @@ public sealed record TradeRoute
 
     /// <summary>The pricier good the sell market makes from the good, or empty.</summary>
     public required string FeedsTradeSymbol { get; init; }
+
+    /// <summary>
+    /// What the units are expected to cost, each batch a step dearer than the one before (<see cref="PriceSteps"/>); the units
+    /// at <see cref="BuyPrice"/> unless set. What the trip holds back until it buys (D57).
+    /// </summary>
+    public long CargoCost { get; init; }
 
     /// <summary>The route's key (<see cref="TradeRoutePlanner.RouteKey"/>).</summary>
     public string Key => TradeRoutePlanner.RouteKey(TradeSymbol, BuyWaypointSymbol, SellWaypointSymbol);

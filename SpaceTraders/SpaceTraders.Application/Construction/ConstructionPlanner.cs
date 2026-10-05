@@ -34,6 +34,9 @@ public static class ConstructionPlanner
     /// <summary>Every market that sells a material the site needs has it SCARCE or LIMITED (D66).</summary>
     public const string LowSupply = "low_supply";
 
+    /// <summary>Every market that would sell a load has another trip on its way to buy the material there (D80).</summary>
+    public const string MarketBusy = "market_busy";
+
     /// <summary>The system of a waypoint: its symbol up to the last dash.</summary>
     /// <param name="waypointSymbol">The waypoint, such as <c>X1-DC53-I55</c>.</param>
     /// <returns>The system, such as <c>X1-DC53</c>.</returns>
@@ -122,7 +125,29 @@ public static class ConstructionPlanner
         string siteWaypointSymbol,
         IReadOnlyList<MaterialNeed> needs,
         bool strict = true)
+        => Loads(map, ship, siteWaypointSymbol, needs, HeldBuys.None, strict);
+
+    /// <summary>
+    /// The loads a ship could take for a site, as <see cref="Loads(TradeMarketMap, ShipModel, string, IReadOnlyList{MaterialNeed}, bool)"/>
+    /// gives them; when strict, not at a market where another trip is on its way to buy the material: one buyer at a time
+    /// (D80).
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now, with its hold.</param>
+    /// <param name="siteWaypointSymbol">The construction site.</param>
+    /// <param name="needs">What the site still needs (<see cref="Needs"/>).</param>
+    /// <param name="heldBuys">The goods the trade and construction trips on their way to buy hold at their markets.</param>
+    /// <param name="strict">True for the loads the ship may buy now; false for what the credits are saved up for.</param>
+    /// <returns>At most one load per material; none when the ship has no free hold.</returns>
+    public static IReadOnlyList<ConstructionLoad> Loads(
+        TradeMarketMap map,
+        ShipModel ship,
+        string siteWaypointSymbol,
+        IReadOnlyList<MaterialNeed> needs,
+        HeldBuys heldBuys,
+        bool strict = true)
     {
+        ArgumentNullException.ThrowIfNull(heldBuys);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
         ArgumentNullException.ThrowIfNull(needs);
@@ -140,7 +165,7 @@ public static class ConstructionPlanner
             ConstructionLoad? best = null;
             foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
             {
-                if (TryLoad(map, ship, siteWaypointSymbol, need.TradeSymbol, market, units, strict, out var load)
+                if (TryLoad(map, ship, siteWaypointSymbol, need.TradeSymbol, market, units, !heldBuys.Holds(need.TradeSymbol, market), strict, out var load)
                     && (best is null || load.Cost < best.Cost))
                 {
                     best = load;
@@ -166,17 +191,36 @@ public static class ConstructionPlanner
     /// <param name="needs">What the site still needs (<see cref="Needs"/>).</param>
     /// <returns>The reason, or an empty string.</returns>
     public static string WhyNoLoad(TradeMarketMap map, ShipModel ship, string siteWaypointSymbol, IReadOnlyList<MaterialNeed> needs)
+        => WhyNoLoad(map, ship, siteWaypointSymbol, needs, HeldBuys.None);
+
+    /// <summary>
+    /// Why a ship has no load it may buy now, as <see cref="WhyNoLoad(TradeMarketMap, ShipModel, string, IReadOnlyList{MaterialNeed})"/>
+    /// says, or <see cref="MarketBusy"/> when every market that would sell one has another trip on its way to buy the material
+    /// there (D80).
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now, with its hold.</param>
+    /// <param name="siteWaypointSymbol">The construction site.</param>
+    /// <param name="needs">What the site still needs (<see cref="Needs"/>).</param>
+    /// <param name="heldBuys">The goods the trade and construction trips on their way to buy hold at their markets.</param>
+    /// <returns>The reason, or an empty string.</returns>
+    public static string WhyNoLoad(TradeMarketMap map, ShipModel ship, string siteWaypointSymbol, IReadOnlyList<MaterialNeed> needs, HeldBuys heldBuys)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
         ArgumentNullException.ThrowIfNull(needs);
 
-        if (Loads(map, ship, siteWaypointSymbol, needs).Count > 0)
+        if (Loads(map, ship, siteWaypointSymbol, needs, heldBuys).Count > 0)
         {
             return string.Empty;
         }
 
-        return Loads(map, ship, siteWaypointSymbol, needs, strict: false).Count == 0 ? NoMarket : LowSupply;
+        if (Loads(map, ship, siteWaypointSymbol, needs, strict: false).Count == 0)
+        {
+            return NoMarket;
+        }
+
+        return Loads(map, ship, siteWaypointSymbol, needs).Count > 0 ? MarketBusy : LowSupply;
     }
 
     /// <summary>
@@ -197,7 +241,10 @@ public static class ConstructionPlanner
             .Take(Math.Max(0, count))];
     }
 
-    /// <summary>One load at one market, when the ship can fly it and, when strict, the market's supply allows it.</summary>
+    /// <summary>
+    /// One load at one market, when the ship can fly it and, when strict, the market's supply allows it and no other trip is on
+    /// its way to buy the material there.
+    /// </summary>
     private static bool TryLoad(
         TradeMarketMap map,
         ShipModel ship,
@@ -205,13 +252,14 @@ public static class ConstructionPlanner
         string tradeSymbol,
         string market,
         int units,
+        bool unheld,
         bool strict,
         out ConstructionLoad load)
     {
         load = new ConstructionLoad(tradeSymbol, market, siteWaypointSymbol, units, 0, 0);
         if (!map.TryGetGood(market, tradeSymbol, out var good)
             || good.PurchasePrice <= 0
-            || (strict && MiningPlanner.IsLowSupply(good.Supply))
+            || (strict && (!unheld || MiningPlanner.IsLowSupply(good.Supply)))
             || !TradeRoutePlanner.TryPlanFlight(map, ship, market, out var approach))
         {
             return false;

@@ -4,7 +4,7 @@ using SpaceTraders.Application.Ports;
 namespace SpaceTraders.Application.Trading;
 
 /// <summary>
-/// How far a route got through the checks <see cref="TradeRoutePlanner.Rank"/> runs on it, in the order they run: a route that
+/// How far a route got through the checks <see cref="TradeRoutePlanner.Rank(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string}, HeldBuys)"/> runs on it, in the order they run: a route that
 /// fails one isn't checked further (slice 2.18, D76).
 /// </summary>
 public enum TradeRouteCheck
@@ -18,16 +18,16 @@ public enum TradeRouteCheck
     /// <summary>No such flight takes it on from the buy market to the sell market.</summary>
     SellMarketOutOfReach = 2,
 
-    /// <summary>
-    /// One purchase and one sale don't fill the ship's free hold, and the buy market's supply of the good isn't ABUNDANT (D56,
-    /// D74); or the hold has no room.
-    /// </summary>
-    NotFullHold = 3,
+    /// <summary>The ship's hold has no room, or a market names no price or trade volume for the good.</summary>
+    NoRoom = 3,
 
-    /// <summary>The credits for cargo, less the trip's fuel, don't pay for the units (D56).</summary>
+    /// <summary>The credits for cargo, less the trip's fuel, don't pay for a single unit.</summary>
     TooFewCredits = 4,
 
-    /// <summary>The trip earns less than <c>Trade.MinProfitPerUnit</c> a unit after fuel, or nothing (D14).</summary>
+    /// <summary>
+    /// Not even the first unit earns <c>Trade.MinProfitPerUnit</c> (D79), or the trip's units earn less than that a unit after
+    /// fuel, or nothing (D14).
+    /// </summary>
     NotLucrative = 5,
 
     /// <summary>The trip passes every check: it is one of the ship's routes.</summary>
@@ -35,13 +35,11 @@ public enum TradeRouteCheck
 }
 
 /// <summary>
-/// A route with a price gap, as one ship's checks found it (<see cref="TradeRoutePlanner.Judge"/>): one market sells the good
+/// A route with a price gap, as one ship's checks found it (<see cref="TradeRoutePlanner.Judge(TradeMarketMap, ShipModel, long, int, IReadOnlySet{string}, HeldBuys)"/>): one market sells the good
 /// for less than another pays for it (slice 2.18, D76).
 /// </summary>
 public sealed record TradeRouteJudgement
 {
-    private const string AbundantSupply = "ABUNDANT";
-
     /// <summary>Creates a judgement.</summary>
     /// <param name="Ship">The ship, where it was when judged.</param>
     /// <param name="Check">The first check the route failed, or <see cref="TradeRouteCheck.Lucrative"/>.</param>
@@ -65,8 +63,8 @@ public sealed record TradeRouteJudgement
     public required TradeRouteCheck Check { get; init; }
 
     /// <summary>
-    /// The route's figures, as far as the checks got: the prices always; the fuel from <see cref="TradeRouteCheck.NotFullHold"/>
-    /// on; the units and the profit from <see cref="TradeRouteCheck.TooFewCredits"/> on.
+    /// The route's figures, as far as the checks got: the prices always; the fuel from <see cref="TradeRouteCheck.NoRoom"/> on;
+    /// the units and the profit for a route that has units.
     /// </summary>
     public required TradeRoute Route { get; init; }
 
@@ -122,16 +120,19 @@ public sealed record TradeRouteJudgement
             TradeRouteCheck.SellMarketOutOfReach => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: can't fly on from {buy} to {sell} with {FuelAtBuyMarket(map):N0} fuel aboard, refuelling at markets on the way ({Ship.FuelCapacity:N0}-unit tank)."),
-            TradeRouteCheck.NotFullHold => NotFullHold(map),
+            TradeRouteCheck.NoRoom => NoRoom(),
             TradeRouteCheck.TooFewCredits => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{ship}: {Route.Units:N0} units at {Route.BuyPrice:N0} and {Route.FuelCost:N0} for fuel cost {(Route.Units * Route.BuyPrice) + Route.FuelCost:N0}; {Credits:N0} credits are free for cargo (D56)."),
+                $"{ship}: a unit at {Route.BuyPrice:N0} and {Route.FuelCost:N0} for the trip's fuel cost {Route.BuyPrice + Route.FuelCost:N0}; {Credits:N0} credits are free for cargo."),
+            TradeRouteCheck.NotLucrative when Route.Units == 0 => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{ship}: a unit bought at {Route.BuyPrice:N0} and sold at {Route.SellPrice:N0} earns {Route.SellPrice - Route.BuyPrice:N0} before fuel; each must earn {MinProfitPerUnit:N0} (D14, D79)."),
             TradeRouteCheck.NotLucrative => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: {Route.Units:N0} units earn {Route.Profit:N0} after {Route.FuelCost:N0} for fuel, {Route.Profit / Route.Units:N0} a unit; a trip must earn {MinProfitPerUnit:N0} a unit (D14)."),
             _ => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{ship}: lucrative, {Route.Profit:N0} after fuel, {Route.Profit / Route.Units:N0} a unit."),
+                $"{ship}: lucrative, {Route.Units:N0} units for {Route.Profit:N0} after fuel, {Route.Profit / Route.Units:N0} a unit."),
         };
     }
 
@@ -141,26 +142,8 @@ public sealed record TradeRouteJudgement
             ? Ship.FuelCapacity
             : approach.FuelLeft;
 
-    private string NotFullHold(TradeMarketMap map)
-    {
-        var free = Ship.CargoCapacity - Ship.CargoCurrent;
-        map.TryGetGood(Route.BuyWaypointSymbol, Route.TradeSymbol, out var atBuy);
-        map.TryGetGood(Route.SellWaypointSymbol, Route.TradeSymbol, out var atSell);
-        if (free <= 0)
-        {
-            return $"{Ship.Symbol}: no room in its hold.";
-        }
-
-        if (atSell.TradeVolume <= 0 || string.Equals(atBuy.Supply, AbundantSupply, StringComparison.OrdinalIgnoreCase))
-        {
-            // At an ABUNDANT seller a trip takes what both markets trade at once (D74): none, only where the buyer trades none.
-            return $"{Ship.Symbol}: {Route.SellWaypointSymbol} names no trade volume for {Route.TradeSymbol}.";
-        }
-
-        var atOnce = Math.Min(free, Math.Min(atBuy.TradeVolume, atSell.TradeVolume));
-        var supply = atBuy.Supply.Length > 0 ? atBuy.Supply : "no supply level listed";
-        return string.Create(
-            CultureInfo.InvariantCulture,
-            $"{Ship.Symbol}: one purchase and one sale take {atOnce:N0} of its {free:N0} free units ({Route.BuyWaypointSymbol} sells {atBuy.TradeVolume:N0} at a time, {Route.SellWaypointSymbol} buys {atSell.TradeVolume:N0}); less than a full hold needs ABUNDANT supply at {Route.BuyWaypointSymbol}, which has {supply} (D56, D74).");
-    }
+    private string NoRoom()
+        => Ship.CargoCapacity - Ship.CargoCurrent <= 0
+            ? $"{Ship.Symbol}: no room in its hold."
+            : $"{Ship.Symbol}: {Route.BuyWaypointSymbol} or {Route.SellWaypointSymbol} names no price or trade volume for {Route.TradeSymbol}.";
 }

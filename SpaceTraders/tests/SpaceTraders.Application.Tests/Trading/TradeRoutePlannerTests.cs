@@ -2,6 +2,8 @@ using FluentAssertions;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Trading.TradeFixture;
 
 namespace SpaceTraders.Application.Tests.Trading;
@@ -9,9 +11,9 @@ namespace SpaceTraders.Application.Tests.Trading;
 /// <summary>
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
 /// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
-/// that feed a pricier good's production come first (D15); two traders never share a route. D56: a trip is a
-/// full hold, bought in one purchase and sold in one sale, or none; D74: at a seller whose supply is ABUNDANT, what both
-/// markets trade at once, in one purchase and one sale, when that fills less.
+/// that feed a pricier good's production come first (D15); two traders never share a route. D79: a trip carries as many
+/// units as each earn the minimum, in batches of each market's trade volume, each batch bought a step dearer and each sold a
+/// step cheaper; D80: one buyer of a good at a market at a time.
 /// </summary>
 public sealed class TradeRoutePlannerTests
 {
@@ -21,9 +23,9 @@ public sealed class TradeRoutePlannerTests
     public void Profit_IsTheMarginTimesTheUnits_MinusTheFuelForBothLegs()
     {
         // From K85: 185 to D41 (2 FUEL at D41, 76 each), then 95 to A1 (1 FUEL at A1, 90).
-        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "MEDICINE", D41, A1, 250_000, out var route).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "MEDICINE", D41, A1, 250_000, 200, out var route).Should().BeTrue();
 
-        route.Units.Should().Be(40, "both markets trade MEDICINE 40 at a time: the command ship's full hold (D56)");
+        route.Units.Should().Be(40, "every unit earns 386, and both markets trade MEDICINE 40 at a time: one batch each (D79)");
         route.BuyPrice.Should().Be(4_867);
         route.SellPrice.Should().Be(5_253);
         route.FuelCost.Should().Be((2 * 76) + 90);
@@ -118,8 +120,8 @@ public sealed class TradeRoutePlannerTests
         // buy, and fills its tank before it leaves.
         var ship = CommandShip(status: "IN_ORBIT", fuel: 100);
 
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "MEDICINE", D41, A1, 250_000, out _).Should().BeFalse();
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, out _).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "MEDICINE", D41, A1, 250_000, 200, out _).Should().BeFalse();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, 200, out _).Should().BeTrue();
     }
 
     [Fact]
@@ -170,103 +172,121 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void WithoutTheCreditsForAFullHold_ThereIsNoRoute_TheFuelKeptBack()
+    public void ARouteCarries_AsManyUnitsAsEachEarnTheMinimum_EachBatchBoughtAStepDearer()
     {
-        // D56, "full hold or nothing"; D17: cargo may use the credit reserve, but not the trip's fuel. 40 EQUIPMENT at 3,254
-        // and 152 for fuel come to 130,312.
-        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_312, out var route).Should().BeTrue();
-        route.Units.Should().Be(40);
-        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_311, out _).Should().BeFalse();
+        // D79, asked on 2026-10-05: "A ship should buy as much as is profitable per trip". D41 sells SHIP_PARTS 15 at a time at
+        // 7,721; each further batch is estimated 4% dearer: 8,029.84, then 8,351.03. Where A1 pays 8,000, only the first batch
+        // earns anything; where it pays 9,000, all three earn the 200 a unit, and the hold's 40 go.
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, 200, out var fifteen).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(ShipPartsSoldFor(9_000), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, 200, out var forty).Should().BeTrue();
+
+        (fifteen.Units, fifteen.CargoCost, fifteen.Profit).Should().Be((15, 15 * 7_721, ((8_000 - 7_721) * 15) - 90));
+        forty.Units.Should().Be(40);
+        forty.CargoCost.Should().Be(PriceSteps.CostInBatches(7_721, 40, 15));
+        forty.Profit.Should().Be((40 * 9_000) - PriceSteps.CostInBatches(7_721, 40, 15) - 90);
     }
 
     [Fact]
-    public void ARoute_IsOnlyOneWhereOnePurchaseAndOneSaleTakeTheFullHold()
+    public void EachBatchSold_IsEstimatedAStepCheaper()
     {
-        // D56, asked on 2026-10-03: "The entire goal is to buy full holds in one go, because it makes no sense to buy more
-        // times than one", and to sell them in one sale too. D41 sells SHIP_PARTS 15 at a time: a drone's 15-unit hold, not
-        // the command ship's 40. A1 takes EQUIPMENT 20 at a time here: neither fills the command ship's hold.
-        var map = Map(
-            K85Market(),
-            D41Market(),
-            Market(
-                A1,
-                Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 20),
-                Good("SHIP_PARTS", "IMPORT", 16_000, 8_000, 40),
-                Good("FUEL", "EXCHANGE", 90, 76, 180)));
+        // D79: A1 takes EQUIPMENT 20 at a time here. The first 20 sell at 3,499, 245 over K85's 3,254; the next 20 are
+        // estimated 2% cheaper, at 3,429.02, 175 over it: under the 200 a unit, so the trip carries 20. Any profit takes 40.
+        var map = Map(K85Market(), D41Market(), Market(A1, Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 20), Good("FUEL", "EXCHANGE", 90, 76, 180)));
 
-        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "SHIP_PARTS", D41, A1, 1_000_000, out _).Should().BeFalse();
-        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "EQUIPMENT", K85, A1, 1_000_000, out _).Should().BeFalse();
-        TradeRoutePlanner.TryEvaluate(map, Drone(D41) with { FuelCapacity = 400, FuelCurrent = 400 }, "SHIP_PARTS", D41, A1, 1_000_000, out var drone)
-            .Should().BeTrue();
-        drone.Units.Should().Be(15);
+        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "EQUIPMENT", K85, A1, 1_000_000, 200, out var twenty).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(map, CommandShip(), "EQUIPMENT", K85, A1, 1_000_000, 0, out var forty).Should().BeTrue();
+
+        twenty.Units.Should().Be(20);
+        forty.Units.Should().Be(40);
+        forty.Profit.Should().Be((20 * 3_499) + (long)Math.Floor(20 * 3_499 * 0.98) - (40 * 3_254) - 180);
     }
 
     [Fact]
-    public void AtAnAbundantSeller_ARouteTakesWhatBothMarketsTradeAtOnce_ThoughThatFillsNoHold()
+    public void TheSellersSupply_DoesNotSizeATrip()
     {
-        // D74, asked on 2026-10-04: "either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT,
-        // in which case a full hold is not necessary", still in one purchase and one sale. D41 sells SHIP_PARTS 15 at a time;
-        // the flight to A1 burns 95, one FUEL at A1's 90.
-        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, out var route).Should().BeTrue();
-
-        route.Units.Should().Be(15, "one purchase at D41 takes 15, and A1 takes them in one sale");
-        route.FuelCost.Should().Be(90);
-        route.Profit.Should().Be(((8_000 - 7_721) * 15) - 90);
-    }
-
-    [Theory]
-    [InlineData(15, 40, 0, 15)]
-    [InlineData(15, 6, 0, 6)]
-    [InlineData(15, 40, 36, 4)]
-    [InlineData(60, 60, 0, 40)]
-    public void AtAnAbundantSeller_TheUnitsAreTheSmallestOfTheFreeHoldAndBothTradeVolumes(int atD41, int atA1, int aboard, int units)
-    {
-        // One purchase and one sale (D74): what A1 takes at once limits the trip as much as what D41 sells at once, and a hold
-        // both trade at once is still filled.
-        var ship = CommandShip(D41, cargo: aboard == 0 ? null : [new CargoItemModel("COPPER_ORE", aboard)]);
-
-        TradeRoutePlanner.TryEvaluate(ShipPartsMap(atD41: atD41, atA1: atA1), ship, "SHIP_PARTS", D41, A1, 1_000_000, out var route)
+        // D79 replaced D74: at any supply a trip carries what earns the minimum, batch by batch.
+        TradeRoutePlanner.TryEvaluate(ShipPartsMap(supplyAtD41: "MODERATE"), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, 200, out var route)
             .Should().BeTrue();
 
-        route.Units.Should().Be(units);
-    }
-
-    [Theory]
-    [InlineData("SCARCE")]
-    [InlineData("LIMITED")]
-    [InlineData("MODERATE")]
-    [InlineData("HIGH")]
-    public void AtASellerThatIsntAbundant_ThereIsNoRouteWithoutAFullHold(string supply)
-        => TradeRoutePlanner.TryEvaluate(ShipPartsMap(supplyAtD41: supply), CommandShip(D41), "SHIP_PARTS", D41, A1, 1_000_000, out _)
-            .Should().BeFalse("D56 holds: 15 at a time fills no 40-unit hold");
-
-    [Fact]
-    public void TheBuyersSupply_OpensNoException()
-        => TradeRoutePlanner.TryEvaluate(
-                ShipPartsMap(supplyAtD41: "MODERATE", supplyAtA1: "ABUNDANT"),
-                CommandShip(D41),
-                "SHIP_PARTS",
-                D41,
-                A1,
-                1_000_000,
-                out _)
-            .Should().BeFalse("D74 names the seller's supply, not the buyer's");
-
-    [Fact]
-    public void AtAnAbundantSeller_TheCreditsStillPayForAllTheUnits()
-    {
-        // D56's credits stand: 15 SHIP_PARTS at 7,721 and 90 for fuel come to 115,905.
-        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 115_905, out _).Should().BeTrue();
-        TradeRoutePlanner.TryEvaluate(ShipPartsMap(), CommandShip(D41), "SHIP_PARTS", D41, A1, 115_904, out _).Should().BeFalse();
+        route.Units.Should().Be(15);
     }
 
     [Fact]
-    public void AtAnAbundantSeller_TheMinimumProfitPerUnitStillHolds()
+    public void WithoutTheCreditsForAllTheUnits_TheTripCarriesFewer_TheFuelKeptBack()
     {
-        // D14: 4,095 after fuel over 15 units is 273 a unit.
+        // D79, and D17: cargo may use the credit reserve, but not the trip's fuel. 40 EQUIPMENT at 3,254 and 152 for fuel
+        // come to 130,312; one credit less buys 39. A unit and the fuel come to 3,406.
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_312, 200, out var forty).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 130_311, 200, out var fewer).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "EQUIPMENT", K85, D41, 3_405, 200, out var none, out var check).Should().BeFalse();
+
+        (forty.Units, fewer.Units).Should().Be((40, 39));
+        check.Should().Be(TradeRouteCheck.TooFewCredits);
+        (none.Units, none.BuyPrice, none.FuelCost).Should().Be((0, 3_254L, 152L));
+    }
+
+    [Fact]
+    public void ARouteWhoseFirstUnitEarnsTooLittle_IsNoRoute_AndSaysSo()
+    {
+        // D14 and D79: FOOD from K85 to A1 earns 132 a unit, under the 200.
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "FOOD", K85, A1, 250_000, 200, out var route, out var check).Should().BeFalse();
+
+        check.Should().Be(TradeRouteCheck.NotLucrative);
+        (route.Units, route.BuyPrice, route.SellPrice).Should().Be((0, 2_360L, 2_492L));
+    }
+
+    [Fact]
+    public void TheTripsUnits_StillEarnTheMinimumAUnitAfterFuel()
+    {
+        // D14 on the whole trip: each of the 15 SHIP_PARTS earns 279, and with the 90 for fuel the trip 4,095, 273 a unit.
         TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 273, NoneHeld)
             .Should().ContainSingle(route => route.TradeSymbol == "SHIP_PARTS" && route.Units == 15);
         TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 274, NoneHeld).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(3_254, 0, 40, 20)]
+    [InlineData(3_254, 20, 20, 0)]
+    [InlineData(3_200, 0, 40, 40)]
+    [InlineData(3_200, 0, 25, 25)]
+    public void UnitsWorthBuying_StopAtTheFirstWhoseSaleWouldEarnTooLittle(long quote, int bought, int most, int units)
+    {
+        // D79 at the buy market: A1 pays 3,499 for the first 20 and an estimated 3,429.02 for the next 20, 20 at a time.
+        var atA1 = Good("EQUIPMENT", "IMPORT", 7_052, 3_499, 20);
+
+        TradeRoutePlanner.UnitsWorthBuying(quote, atA1, bought, most, 200).Should().Be(units);
+    }
+
+    [Fact]
+    public void Rank_LeavesOutEveryRouteOfAGood_AtAMarketWhereAnotherTripIsOnItsWayToBuyIt()
+    {
+        // D80, "One buyer at a time": another ship flies to D41 for SHIP_PARTS to sell at K85. Its purchase would raise the
+        // price this route was worked out with, so no trip of SHIP_PARTS from D41 is offered, to A1 either.
+        var held = HeldBuys.Of([ShipPartsTripFromD41()], []);
+
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, held).Should().BeEmpty();
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, HeldBuys.None).Should().ContainSingle();
+    }
+
+    [Fact]
+    public void AConstructionTripOnItsWayToBuy_HoldsItsMaterial_AtItsBuyMarket()
+    {
+        // D80 for the jump gate's loads too (slice 6.6).
+        var held = HeldBuys.Of([], [new SupplyConstructionGoal { TradeSymbol = "SHIP_PARTS", ConstructionSiteWaypointSymbol = "X1-AB-I55", BuyWaypointSymbol = D41, Units = 15 }]);
+
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, held).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ATripThatHasBought_OrIsBlocked_HoldsNothing()
+    {
+        // D80: as with the credits it holds back (D57), a trip holds its good until its cargo is aboard, and a blocked trip
+        // will buy nothing.
+        var bought = HeldBuys.Of([ShipPartsTripFromD41() with { CargoBought = true }], []);
+        var blocked = HeldBuys.Of([ShipPartsTripFromD41() with { Status = GoalStatus.Blocked }], []);
+
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, bought).Should().ContainSingle();
+        TradeRoutePlanner.Rank(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, blocked).Should().ContainSingle();
     }
 
     [Fact]
@@ -289,7 +309,7 @@ public sealed class TradeRoutePlannerTests
             ]);
         judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route)
             .Should().BeEquivalentTo(TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld));
-        judged.Single(judgement => judgement.Route.TradeSymbol == "FOOD").Route.Profit.Should().Be((132 * 40) - (2 * 90));
+        judged.Single(judgement => judgement.Route.TradeSymbol == "FOOD").Route.Units.Should().Be(0, "its first unit earns 132, under the 200 (D79)");
     }
 
     [Fact]
@@ -310,22 +330,24 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void Judge_TellsARouteWhoseTradesDontFillTheHold_AtASellerThatIsntAbundant()
-        => TradeRoutePlanner.Judge(ShipPartsMap(supplyAtD41: "MODERATE"), CommandShip(D41), 1_000_000, 200, NoneHeld)
-            .Should().ContainSingle(judgement => judgement.Route.TradeSymbol == "SHIP_PARTS")
-            .Which.Check.Should().Be(TradeRouteCheck.NotFullHold, "D56: 15 at a time fills no 40-unit hold, and D74 needs ABUNDANT");
-
-    [Fact]
-    public void Judge_TellsARouteTheCreditsDontPayFor_WithTheUnitsAndTheFuel()
+    public void Judge_TellsARouteTheCreditsDontPayAUnitOf_WithThePriceAndTheFuel()
     {
-        // 40 EQUIPMENT at 3,254 and 152 for fuel come to 130,312; FOOD, which the credits pay for, earns too little.
-        var judged = TradeRoutePlanner.Judge(Map(), CommandShip(), 130_311, 200, NoneHeld);
+        // A unit of EQUIPMENT at 3,254 and 152 for fuel come to 3,406; FOOD, which the credits pay a unit of, earns too little.
+        var judged = TradeRoutePlanner.Judge(Map(), CommandShip(), 3_405, 200, NoneHeld);
 
         var equipment = judged.Single(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
         equipment.Check.Should().Be(TradeRouteCheck.TooFewCredits);
-        (equipment.Route.Units, equipment.Route.BuyPrice, equipment.Route.FuelCost).Should().Be((40, 3_254L, 152L));
-        equipment.Credits.Should().Be(130_311);
+        (equipment.Route.BuyPrice, equipment.Route.FuelCost).Should().Be((3_254L, 152L));
+        equipment.Credits.Should().Be(3_405);
         judged.Single(judgement => judgement.Route.TradeSymbol == "FOOD").Check.Should().Be(TradeRouteCheck.NotLucrative);
+    }
+
+    [Fact]
+    public void Judge_LeavesOutTheRoutesOfAGoodAnotherTripIsOnItsWayToBuyThere()
+    {
+        // D80, as a held route is: the good is bought by the trip that holds it.
+        TradeRoutePlanner.Judge(ShipPartsMap(), CommandShip(D41), 1_000_000, 200, NoneHeld, HeldBuys.Of([ShipPartsTripFromD41()], []))
+            .Should().NotContain(judgement => judgement.Route.TradeSymbol == "SHIP_PARTS" && judgement.Route.BuyWaypointSymbol == D41);
     }
 
     [Fact]
@@ -343,7 +365,7 @@ public sealed class TradeRoutePlannerTests
     {
         var ship = CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 35)]);
 
-        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, out var route).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), ship, "EQUIPMENT", K85, D41, 250_000, 200, out var route).Should().BeTrue();
 
         route.Units.Should().Be(5);
     }
@@ -405,4 +427,15 @@ public sealed class TradeRoutePlannerTests
         map.SellsFuel(Asteroid).Should().BeFalse();
         map.FuelPrice(Asteroid).Should().Be((long)Math.Ceiling((93 + 76 + 90) / 3.0), "where no fuel is sold, the system's average is the estimate");
     }
+
+    /// <summary>A trip on its way to D41 for 15 SHIP_PARTS, to sell at K85 (D80).</summary>
+    private static TradeBetweenMarketsGoal ShipPartsTripFromD41()
+        => new() { TradeSymbol = "SHIP_PARTS", BuyWaypointSymbol = D41, SellWaypointSymbol = K85, Units = 15, ReservedCredits = 15 * 7_721 };
+
+    /// <summary>D41 selling SHIP_PARTS 15 at a time at 7,721, at MODERATE supply; A1 paying the given price, 40 at a time.</summary>
+    private static TradeMarketMap ShipPartsSoldFor(int priceAtA1)
+        => Map(
+            K85Market(),
+            Market(D41, Good("SHIP_PARTS", "EXPORT", 7_721, 3_478, 15), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+            Market(A1, Good("SHIP_PARTS", "IMPORT", 16_000, priceAtA1, 40), Good("FUEL", "EXCHANGE", 90, 76, 180)));
 }

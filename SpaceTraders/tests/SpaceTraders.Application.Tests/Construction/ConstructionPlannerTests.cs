@@ -1,6 +1,7 @@
 using FluentAssertions;
 using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
@@ -96,6 +97,22 @@ public sealed class ConstructionPlannerTests
 
         (load.Units, load.CargoCost).Should().Be((80, (60 * 2_100) + (20 * 2_226)));
         ConstructionPlanner.WhyNoLoad(map, Hauler(), Gate, needs).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AMarketWhereAnotherTripIsOnItsWayToBuyTheMaterial_SellsNoLoadNow()
+    {
+        // D80, "One buyer at a time": a trader on its way to F49 for FAB_MATS would leave the price higher than this load was
+        // worked out with. A1 recovered to MODERATE, so the load goes there; without it, the builder waits for F49.
+        var trader = new TradeBetweenMarketsGoal { TradeSymbol = "FAB_MATS", BuyWaypointSymbol = F49, SellWaypointSymbol = H51, Units = 40 };
+        var held = HeldBuys.Of([trader], []);
+        var withA1 = Map(GateMarket(), F49Market(), A1Market(supply: "MODERATE"), D42Market(), H51Market(), I56Market());
+        var needs = ConstructionPlanner.Needs(Site(circuitry: 400), []);
+
+        ConstructionPlanner.Loads(withA1, Hauler(), Gate, needs, held).Should().ContainSingle().Which.BuyWaypointSymbol.Should().Be(A1);
+        ConstructionPlanner.Loads(Map(), Hauler(), Gate, needs, held).Should().BeEmpty();
+        ConstructionPlanner.WhyNoLoad(Map(), Hauler(), Gate, needs, held).Should().Be(ConstructionPlanner.MarketBusy);
+        ConstructionPlanner.Loads(Map(), Hauler(), Gate, needs, held, strict: false).Should().ContainSingle("the credits are still saved up for it");
     }
 
     [Fact]

@@ -557,8 +557,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         // Slice 2.18 (D76): for each good with a price gap that no listed route carries, why not, for the free trader that got
         // furthest with it, as the trading plan's last pass with a free trader in the system found it.
         var judgedAt = new DateTimeOffset(2026, 10, 05, 01, 30, 00, TimeSpan.Zero);
-        const string Why = "SHIP-1: one purchase and one sale take 6 of its 40 free units (X1-AB-D41 sells 6 at a time, X1-AB-A1 buys 40); "
-            + "less than a full hold needs ABUNDANT supply at X1-AB-D41, which has MODERATE (D56, D74).";
+        const string Why = "SHIP-1: a unit bought at 7,721 and sold at 8,000 earns 279 before fuel; each must earn 300 (D14, D79).";
         _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
             .Returns(new TradingAutomationPlanState
             {
@@ -572,7 +571,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
                     {
                         SystemSymbol = "X1-AB",
                         TradeSymbol = "SHIP_PARTS",
-                        Reason = "not_full_hold",
+                        Reason = "not_lucrative",
                         ShipSymbol = "SHIP-1",
                         BuyWaypointSymbol = "X1-AB-D41",
                         SellWaypointSymbol = "X1-AB-A1",
@@ -591,7 +590,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         notTraded.GetArrayLength().Should().Be(1);
         notTraded[0].GetProperty("systemSymbol").GetString().Should().Be("X1-AB");
         notTraded[0].GetProperty("tradeSymbol").GetString().Should().Be("SHIP_PARTS");
-        notTraded[0].GetProperty("reason").GetString().Should().Be("not_full_hold");
+        notTraded[0].GetProperty("reason").GetString().Should().Be("not_lucrative");
         notTraded[0].GetProperty("shipSymbol").GetString().Should().Be("SHIP-1");
         notTraded[0].GetProperty("buyWaypointSymbol").GetString().Should().Be("X1-AB-D41");
         notTraded[0].GetProperty("sellWaypointSymbol").GetString().Should().Be("X1-AB-A1");

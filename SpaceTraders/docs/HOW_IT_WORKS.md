@@ -814,7 +814,9 @@ buy.
   3. when the order lets construction buy, each free builder with an empty hold takes the first load the credits pay
      for (`ConstructionStarted`, reason `purchase`), leaving the credit reserve;
   4. a builder that takes no load stays free, and the trading plan gives it a trade. The state says why
-     (`Waiting`): `purchase_order`, `waiting_for_credits`, `low_supply` (D66) or `no_market`. It does so only when the
+     (`Waiting`): `purchase_order`, `waiting_for_credits`, `low_supply` (D66), `market_busy` (another trip, a trade or
+     construction trip, is on its way to buy the material at every market that would sell a load: one buyer at a time,
+     D80) or `no_market`. It does so only when the
      builder is free with an empty hold; while it trades, `ReadyShipSymbols` says whether a load waits for it.
 - **A load** (`ConstructionPlanner.Loads`, no I/O) is one material: the builder's free hold, or what the gate still
   needs when that is less, less what our construction trips carry or go to buy, bought at one market in batches of its
@@ -884,23 +886,21 @@ buy.
   - its profit is what the sell market pays minus what the buy market charges, times the units,
     minus the fuel for the whole trip: from where the ship is to the buy market, then on to the sell
     market;
-  - the units are the ship's whole free hold, in one purchase and one sale (D56, asked on 2026-10-03: "The
-    entire goal is to buy full holds in one go, because it makes no sense to buy more times than one"): a
-    route counts only when both markets' trade volumes, the most a single trade takes, are at least the free
-    hold, and the credits no other trip holds back (D57) pay for all of it (cargo may use the credit reserve,
-    D17; the trip's fuel and `Trade.FuelReserveCredits`, 5,000, are kept back, D24: below them only fuel is
-    bought). Each trade moves the
-    price (a whole trade volume bought raised it 9% on 2026-10-03, a smaller purchase 4 to 7%), so a hold
-    bought in several purchases would cost more a unit than its first. Where the buy market's supply of the good
-    is ABUNDANT, a trip may fill less (D74, asked on 2026-10-04: "either a full hold needs to be obtained, or the
-    supply of the seller needs to be ABUNDANT, in which case a full hold is not necessary"): it carries what both
-    markets trade at once, the smallest of the free hold and the two trade volumes, still in one purchase and one
-    sale, and the credits pay for all of it (`TradeRoutePlanner.UnitsAtOnce`). Otherwise there is no trip, and the
-    ship takes other work: a drone mines or siphons. In X1-DC53 on 2026-10-03 (18:25Z), 84 of the 124 goods the
-    markets listed, fuel aside, traded at least 40 at once, and 26 at least 80: 158 pairs of markets, for 24
-    goods, took a 40-unit hold, and 18 pairs, for 9 goods, an 80-unit one. SHIP_PARTS, bought 15 at a time at
-    D41 and sold 6 to 13 at a time, filled no hold, not even a drone's 15. In X1-FJ91 on 2026-10-04 they were
-    ABUNDANT with a trade volume of 6, which led to D74;
+  - the units are as many as each earn `Trade.MinProfitPerUnit` (D79, asked on 2026-10-05: "A ship should buy as
+    much as is profitable per trip, and sell as much as is profitable per trip"), up to the ship's free hold and what
+    the credits no other trip holds back (D57) pay for (cargo may use the credit reserve, D17; the trip's fuel and
+    `Trade.FuelReserveCredits`, 5,000, are kept back, D24: below them only fuel is bought). A market's trade volume is the
+    most one purchase or sale takes, not its stock (the API's own definition), and the API gives no stock at all, only
+    supply and activity levels; more goes in batches, each at the price quoted then. Each purchase raises the next quote
+    and each sale lowers it, so a unit's price is estimated by its batch (`PriceSteps`): each batch bought 2%, 4% or 6%
+    dearer than the one before, for a good traded up to 6, up to 20 or more at a time, and each sold 2% cheaper (measured
+    on 2026-10-05 from the bot's 222 purchases since the reset: medians of 1.8%, 3.6% and 5.7% a full batch bought, 1.8%
+    and 2.1% sold; a raised price was back within 1% after a median of 56 minutes). As each further unit earns less, the
+    units stop at the first that wouldn't earn the minimum (`TradeRoutePlanner.TryEvaluate`). The trip holds back what
+    they are expected to cost (`TradeRoute.CargoCost`). In X1-FJ91 every trade volume was 6, 18, 20, 60 or 180, by kind
+    of good, and none moved in the run's first 18 hours; in X1-DC53, a week into its reset, 20 of 150 moved over two days,
+    in steps of about 10%, up to three times where they started. D79 replaced D56's full hold in one purchase and one sale
+    and D74's exception for ABUNDANT sellers;
   - the fuel is CRUISE, the distance rounded, at least 1 per flight, paid in whole FUEL units of 100
     at the market each flight ends at, at that market's price (where it sells none, the system's
     average). A flight longer than the tank holds refuels at markets that sell fuel on the way, the
@@ -909,20 +909,20 @@ buy.
 - **Ranking** (D15): among the lucrative trips, one whose sell market makes a pricier good from the
   cargo (it imports the good, and exports something made from it, by the game's production chains,
   at a higher price) comes before any that doesn't; then the most profitable.
-- **Saving up for a full hold** (D56, `FullHoldSavings`): "Full hold or nothing, when this occurs the credit
+- **Saving up for a trip** (D56, `FullHoldSavings`): "Full hold or nothing, when this occurs the credit
   floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships
-  are bought." When a free trader's best route, credits aside, is a full hold the credits for cargo don't pay for
-  (with the trip's fuel), the plan notes it ("saves up for a full hold … (D56)"), and the trader takes the best full
-  hold it can pay for meanwhile, or none. The credit reserve every ship purchase keeps grows by the dearest such
+  are bought." When a free trader's best route, credits aside, carries more units than the credits for cargo pay for
+  (with the trip's fuel), the plan notes it ("saves up for … (D56)"), and the trader takes the best trip it can pay for
+  meanwhile: fewer units (D79), or another route. The credit reserve every ship purchase keeps grows by the dearest such
   hold (`BudgetPolicy`), so ships are bought after it. The saving ends when the trader sets off for that hold (what
   the trip holds back takes its place, D57, so ships still wait until it is bought), when the trader's best route is
   another it can pay for, or when the ship no longer trades. In memory: a restart forgets it, and the plan notes it
-  again at its first pass. A part hold at an ABUNDANT seller (D74) is saved up for the same way; the log line still
-  says "full hold".
+  again at its first pass. Setting off with fewer units on the route it saved up for ends the saving too.
 - **Credits held back for a trip** (D57, `TripReservations`): "Let's have these credits reserved as soon as a ship
-  starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo costs at
-  the price it was chosen with (`TradeBetweenMarketsGoal.ReservedCredits`), from the moment it starts towards the buy
-  market until the cargo is aboard; a trip that is blocked or done holds back nothing. The plan gives the other
+  starts towards it, so that this cannot happen (waste of time and fuel)." A trip holds back what its cargo was expected
+  to cost when it was chosen, batch by batch (`TradeBetweenMarketsGoal.ReservedCredits`, D79), from the moment it starts
+  towards the buy market until the cargo is aboard, less what each batch bought so far cost; a trip that is blocked or
+  done holds back nothing. The plan gives the other
   traders only the credits no trip holds back, a trip at its buy market spends its own and those no other trip holds
   back, and every ship purchase leaves them (`BudgetPolicy`). Kept with the trip's goal, so a restart keeps it. A
   price that rose since the trip was chosen is paid from the credits no trip holds back. Seen on 2026-10-03 at 19:29Z:
@@ -936,7 +936,12 @@ buy.
     the contract stays aboard while the contract wants it, and so do the materials the home gate still needs while
     the construction plan is on (slice 6.6), which that plan, bootstrapped first, has the ship supply;
   - otherwise the best route goes first, to the trader it is best for, and a route one trader holds
-    is not offered to another (D18). It logs `TradeStarted`.
+    is not offered to another (D18). Nor is a good at a market where another trip is on its way to buy it, a trade or a
+    construction trip, those given out earlier in the same pass included: one buyer at a time (D80, `HeldBuys`, asked on
+    2026-10-05). Every purchase raises the price, so a second trip would find the market the first left behind: on
+    2026-10-05 SPECTER-D and SPECTER-E were both sent for EQUIPMENT at K94, D bought first and E dropped its trip on
+    arrival, seven times since the reset. A trip holds the good from when it starts until its cargo is aboard. It logs
+    `TradeStarted`.
 - **A surveyor with cargo** that the survey plan left free (nothing to survey), and that doesn't gather in
   its spare time, sells its hold the same way, one good a trip, and jettisons what doesn't pay (D42): it
   would otherwise carry it for good. A ship that gathers in its spare time keeps its hold for its next trip
@@ -962,11 +967,12 @@ buy.
 - **Why a good isn't traded** (slice 2.18, D76): where the plan lists a free trader's lucrative routes, it puts every
   route with a price gap (a market in the system sells the good for less than another pays for it) through the same
   checks `Rank` runs, in their order (`TradeRoutePlanner.Judge`): the buy market in reach, the sell market in reach from
-  it, a full hold in one purchase and one sale or an ABUNDANT seller (D56, D74), the credits for cargo less the trip's
-  fuel (D56), the profit after fuel (D14). The state's `NotTraded` keeps, for each such good that no listed route
+  it, room in the hold and a price and trade volume at both markets, a unit the credits for cargo pay for after the
+  trip's fuel, and the first unit and the trip after fuel earning the minimum (D14, D79). A good another trip is on its
+  way to buy at that market (D80) is left out, as a held route is. The state's `NotTraded` keeps, for each such good that no listed route
   carries, the check its route failed for the free trader that got furthest with it (then the largest price gap), in a
   sentence with the figures (`TradeRouteJudgement.Why`): `buy_market_out_of_reach`, `sell_market_out_of_reach`,
-  `not_full_hold`, `too_few_credits`, `not_lucrative`, or `below_the_listed_routes` for a lucrative one beyond the 20
+  `no_room`, `too_few_credits`, `not_lucrative`, or `below_the_listed_routes` for a lucrative one beyond the 20
   waiting routes kept. A system without a free trader at a pass, every trader there on a trip, keeps what was found there
   before, with its time, less the goods a listed route now carries. Ships that gather in their spare time aren't judged.
   `/status/trading-routes` serves it as `notTraded`.
@@ -1057,7 +1063,7 @@ last, gives it something to do then; your decisions are D34–D37.
   the role board has in the trade role. Drones that gather, probes and surveyors buy no cargo: with every
   hold counted, the 205 units of 2026-10-03 would have asked 265,000, above what the credits peaked at.
   With the command ship alone the reserve is 100,000; a light shuttle (40) makes it 140,000, a light hauler
-  (80) 220,000, a second 300,000. While a trader saves up for a full hold the credits don't pay for yet
+  (80) 220,000, a second 300,000. While a trader saves up for a trip the credits don't pay for yet
   (D56, see [Trading](#trading-tradingautomationservice-slice-65)), the reserve grows by the dearest such hold, and
   by what the trade and construction trips on their way to buy hold back for their cargo (D57, D64). It is judged from
   the cached fleet, the role board and the trips' goals at every evaluation, and exported as
@@ -1190,7 +1196,7 @@ scout and probe plans don't read the roles.
   fuel, logged as a `TripEnded` line and counted by activity. Sales and purchases come from the goal because a sale's
   ledger row is written after the goal has ended; fuel, bought at departures minutes earlier, is in the ledger by then.
   The ends: sold, and every way a trip stops early (`rejected`, `nothing_aboard`, `not_bought_here`, `no_buyer`, and a
-  trade's `not_lucrative`, `not_possible` and `not_full_hold`), `interrupted` when the survey or trading plan takes a spare-time trip
+  trade's `not_lucrative`, `not_possible` and `not_bought_here`), `interrupted` when the survey or trading plan takes a spare-time trip
   over, and `runaway` when the circuit breaker blocks a trip; a construction trip's `supplied`, or why it was dropped
   (`not_needed`, `not_sold_here`, `low_supply`, `over_budget`, `wrong_location`). Not booked: a contract round trip closed without a
   delivery (released at a restart, or when the contract is fulfilled), goals an agent reset wipes, and the earlier
@@ -1240,7 +1246,7 @@ step does the work.
 | `MineAndSell` | One trip (slice 6.4). **Drifting** (slice 6.10c, D45), first, for a trip to a market out of the ship's CRUISE reach: [cmd] navigate to that market in DRIFT (1 fuel whatever the distance, about ten times slower) and log `DriftStarted`; at the market (the arrival docked it), record that the drift has ended; the trip's next flight refuels there and flies in CRUISE. **Mining:** [cmd] navigate towards the asteroid (`GoalFlight`: in CRUISE, which switches a ship left in DRIFT back; refuelling stops when it is beyond one tank, never DRIFT; in orbit at a fuel market without the fuel for the flight, dock first so the navigation refuels); there, wait for the cooldown, then [cmd] `MineResourceVolumeCommand` once per step, which extracts with the best survey for the ore and keeps the other ores a market buys within one tank (`KeepOtherOres`, D71). A full hold, of any ores, turns the trip to selling. **Selling:** with none of the trip's ore aboard, clear the goal and complete (the plan sells the other ores); else navigate towards the sell market, dock, [API] sell the trip's ore in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the ore, or an extraction the command rejects, clears the goal; the plan chooses again. |
 | `SiphonAndSell` | One trip (slice 6.7), as `MineAndSell`, a drift first included (slice 6.10c). **Siphoning:** [cmd] navigate towards the gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `SiphonResourcesCommand` once per step, which keeps every gas a market it can reach buys (D33). A full hold, of any gases, turns the trip to selling. **Selling:** with none of the trip's gas aboard, clear the goal and complete (the plan sells the other gases); else navigate towards the sell market, dock, [API] sell the trip's gas in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), clear the goal and complete. A market that no longer buys the gas, or a siphon the command rejects, clears the goal; the plan chooses again. |
 | `GatherAndSell` | One spare-time trip (slice 6.8). **Gathering:** [cmd] navigate towards its asteroid or gas giant (`GoalFlight`); there, wait for the cooldown, then [cmd] `ExtractResourcesCommand` at an asteroid or `SiphonResourcesCommand` (for `whatever sells`) at a gas giant, once per step, keeping every good a market it can reach buys. A source that no longer yields anything a market buys ends the trip. A full hold turns the trip to selling. **Selling:** choose the good that fetches most after fuel (with a full hold, even at a loss on the fuel) and record the sale in the goal; navigate there, dock, [API] sell it in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, fetch the market again (D25), and clear the sale from the goal; the next step chooses the next. A market that no longer buys the good: the next step chooses again. Nothing left that pays for its fuel: clear the goal and complete. An extraction or siphon the command rejects clears the goal; the plan chooses again. |
-| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); still lucrative, and still a full hold both markets trade at once (D56) or, at a seller whose supply is ABUNDANT, what both trade at once (D74), and the credits pay for it, its own and those no other trip holds back (D57): [API] buy those units in one purchase and publish `CargoPurchasedEvent`, record the purchase in the goal, and end the saving for that hold, if any; otherwise clear the goal (`TradeDropped`, `not_full_hold` when the markets no longer trade the full hold at once and the seller's supply isn't ABUNDANT), and the plan chooses again from there. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise [API] sell, in batches of the market's trade volume, publishing `ShipCargoSoldEvent` for each, then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
+| `TradeBetweenMarkets` | [cmd] navigate towards the buy market, in CRUISE (slice 6.10c: a ship left in DRIFT is switched back), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** with nothing bought yet, work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); when not even a unit earns the minimum, the trip no longer earns it a unit after fuel (`not_lucrative`), or the credits, its own and those no other trip holds back (D57), don't pay for a unit (`not_possible`), clear the goal (`TradeDropped`) and the plan chooses again from there. Otherwise buy in batches (D79): each [API] purchase takes the units of the next batch of the trade volume whose sale, as last seen at the sell market and each batch sold a step cheaper (`PriceSteps`), still earns `Trade.MinProfitPerUnit` over the price quoted now (`TradeRoutePlanner.UnitsWorthBuying`), up to the free hold and what the credits pay for with the fuel ahead kept back; it publishes `CargoPurchasedEvent`, logs `CargoBought`, fetches the market again (D25) and stores the goal with what the batch cost, holding back only what is left to buy; a restart goes on from what is aboard. The first batch whose units wouldn't earn the minimum ends the buying; then record the purchase in the goal and end the saving for that route, if any. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise sell in batches of the market's trade volume (D79): [API] sell one, publishing `ShipCargoSoldEvent` and logging `CargoSold`, fetch the market again and store what it fetched, and go on while the quote still earns the minimum. When it no longer does, the rest goes where it fetches more after fuel, on the same once-per-trip terms (`TradeRerouted`), or with nowhere better is sold there all the same; a sale that never earned it sells anyway. Then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. |
 | `MoveToWaypoint` | One flight to a waypoint (D54). At the target (its arrival docked it): clear the goal and complete. **Drifting**, for a move out of the ship's CRUISE reach: [cmd] navigate there in DRIFT and log `DriftStarted`. Otherwise: [cmd] navigate towards it in CRUISE (`GoalFlight`). The survey plan moves a ship that can only survey this way. |
 | `Jump` | One jump (slice 6.11). Not at the system's gate: [cmd] navigate towards it (`GoalFlight`). At the gate: wait for the cooldown; when the credits after the antimatter (its price at the gate's market as last seen; fetched once if never seen) fall below `FleetExpansion.MinCreditReserve`, clear the goal (the plan holds the jump); docked, refuel when the gate sells fuel and the tank isn't full, then orbit; [API] jump to the destination gate, store the nav and the cooldown, store the credits, publish `ShipJumpedEvent`, log `Jumped`, clear the goal and complete. In the destination's system already: clear the goal and complete. A refused jump (`JumpRefusedException`): block the goal with `jump_refused` and log `ShipBlocked` at Warning; the plan chooses again. |
 | `ExploreSystem` | Scouting one system (slice 6.11). At the next stop: fetch its market (`MarketRefresher`) and its shipyard unless they were stored since the goal began (the arrival stores them; a jump doesn't), mark it visited, and record the visit in the goal; after the last stop clear the goal and complete. A fetch that fails is logged and the ship moves on. Before a flight, wait for the cooldown (a jump's); then [cmd] navigate towards the stop (`GoalFlight`). |
@@ -1788,7 +1794,7 @@ The seven pages in `src/Future` are not routed.
   | `CargoBought`, `CargoSold` | Trade, mining, siphon and spare-time executors; `CargoBought` also the construction executor (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
   | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it |
   | `TradeRerouted` | Trade executor, at the sell market | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellPrice`, `SellWaypoint`, `NewSellPrice`, `FuelCost`, `Reason` |
-  | `TradeDropped` | Trade executor | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellWaypoint`, `Reason`: `not_lucrative` (with `Units`, `BuyPrice`, `SellPrice`, `ExpectedProfit`, `MinProfitPerUnit`), `not_possible`, `not_full_hold` (a market no longer trades the full hold at once, and the seller's supply isn't ABUNDANT: D56, D74) or `not_bought_here` |
+  | `TradeDropped` | Trade executor | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellWaypoint`, `Reason`: `not_lucrative` (with `Units`, `BuyPrice`, `SellPrice`, `ExpectedProfit`, `MinProfitPerUnit`; when not even a unit earns the minimum, `BuyPrice`, `SellPrice`, `Margin` and `MinProfitPerUnit`), `not_possible` or `not_bought_here` (also when a market stops buying part way through a sale) |
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
   | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
