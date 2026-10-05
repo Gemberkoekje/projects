@@ -810,7 +810,10 @@ buy.
      (`ConstructionStarted`, reason `held_cargo`), as much as the gate still needs: the trading plan would sell it, or
      jettison it where no market buys it. While the plan is on, the trading plan jettisons no such cargo;
   2. the plan tells the order ships are bought in what construction would buy next (`PurchaseTier.Construction`,
-     D64): the first builder's next load, as if its hold were empty where it is going, worth its cost with fuel;
+     D64): the first builder's next load, as if its hold were empty where it is going, worth its cost with fuel. A
+     builder on its way lands with the fuel its flight leaves it and docks, so where fuel is sold it leaves with a full
+     tank (B65: judged without, a builder flying a load to the far-out gate had no market in reach, and the order heard
+     of no load until it landed);
   3. when the order lets construction buy, each free builder with an empty hold takes the first load the credits pay
      for (`ConstructionStarted`, reason `purchase`), leaving the credit reserve;
   4. a builder that takes no load stays free, and the trading plan gives it a trade. The state says why

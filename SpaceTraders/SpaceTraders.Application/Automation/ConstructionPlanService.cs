@@ -9,6 +9,7 @@ using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
@@ -288,9 +289,24 @@ public sealed class ConstructionPlanService(
             ?? ConstructionPlanner.Loads(map, empty, site.WaypointSymbol, needs, strict: false).FirstOrDefault();
     }
 
-    /// <summary>A builder as it will be for its next load: where it is going, its trip's cargo supplied.</summary>
+    /// <summary>
+    /// A builder as it will be for its next load: where it is going, its trip's cargo supplied. A ship in transit lands with
+    /// the fuel the flight leaves it (the API takes a flight's fuel when it sets off) and docks to supply or sell its cargo,
+    /// so where fuel is sold it fills its tank before it flies on (B65): from the gate with the fuel left after the flight
+    /// there, no market was in reach, and the order heard of no load while the builder flew one.
+    /// </summary>
     private static ShipModel AsIfEmptyWhereItGoes(ShipModel builder)
-        => builder with { WaypointSymbol = MiningPlanner.Position(builder), CargoCurrent = 0, CargoInventory = [] };
+        => builder.LocalStatus == ShipLocalStatus.InTransit
+            ? builder with
+            {
+                WaypointSymbol = MiningPlanner.Position(builder),
+                Status = "DOCKED",
+                DestWaypointSymbol = null,
+                ArrivesAt = null,
+                CargoCurrent = 0,
+                CargoInventory = [],
+            }
+            : builder with { CargoCurrent = 0, CargoInventory = [] };
 
     /// <summary>Records the sites, the builders and why no load was bought. Only a change is written.</summary>
     private async Task SaveStateAsync(Pass pass, DateTimeOffset now, CancellationToken cancellationToken)
