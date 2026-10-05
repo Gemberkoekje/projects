@@ -33,9 +33,13 @@ public interface ISiphonAutomationService
 ///   <item>otherwise it takes the best of its siphon targets (<see cref="SiphonPlanner"/>): a SCARCE or LIMITED gas no
 ///   siphoner works on first, the nearest gas giant first (D48), where a trip covers its gas only at the markets its ship
 ///   reaches in CRUISE from where it sells (D53); then the market shortest of a gas (D28), SCARCE, then LIMITED, and once
-///   none is short, the lowest supply there is. One siphoner per sell market and gas. There are no surveys: a siphon takes
-///   none. A market out of the siphoner's CRUISE reach counts after the reachable ones of its supply level: the trip
-///   drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
+///   none is short, the lowest supply there is, but never a market that has the gas ABUNDANT (D77). One siphoner per sell
+///   market and gas. There are no surveys: a siphon takes none. A market out of the siphoner's CRUISE reach counts after
+///   the reachable ones of its supply level: the trip drifts there first (slice 6.10c, D45), and so a drone may be bought
+///   for it;</item>
+///   <item>a siphon drone whose every pair below ABUNDANT has a siphoner shares one, the lowest supply and then the fewest
+///   siphoners first (D77, for siphon drones as for the miners): only with nothing below ABUNDANT left does the trading plan
+///   give it a route. The command ship shares nothing: it takes what pays it most (D38);</item>
 ///   <item>it buys <c>SHIP_SIPHON_DRONE</c>s, one a pass, up to <c>Siphon.MaxDrones</c>, within the credit reserve and when
 ///   the order ships are bought in lets it (D43), at the shipyard that sells it for the least in a system where our ships
 ///   are: first a drone for each SCARCE or LIMITED gas a new drone could serve, once per area (D48, D53); then, when no
@@ -87,6 +91,9 @@ public sealed class SiphonAutomationService(
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        // How many siphoners work on each pair: a drone that shares one takes the pair with the fewest (D77).
+        var siphonersOn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         // The siphoners' trips: a free siphoner takes a scarce gas that has none near its market first (D48, D53).
         var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
@@ -98,6 +105,7 @@ public sealed class SiphonAutomationService(
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
+                siphonersOn[key] = siphonersOn.GetValueOrDefault(key) + 1;
                 covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
             else if (board.IsSiphoner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
@@ -118,7 +126,7 @@ public sealed class SiphonAutomationService(
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var siphoner in candidates)
             {
-                if (await GiveTripAsync(map, siphoner, heldKeys, heldBy, covered, cancellationToken))
+                if (await GiveTripAsync(map, siphoner, heldKeys, heldBy, siphonersOn, covered, cancellationToken))
                 {
                     withTrip.Add(siphoner.Symbol);
                     gaveTrip.Add(siphoner.Symbol);
@@ -163,7 +171,9 @@ public sealed class SiphonAutomationService(
     /// Gives a free siphoner its next trip: selling goods it holds, else the best siphon target, a scarce gas no siphoner
     /// works on near its market first (D48, D53); the reason says <c>uncovered</c> when that came before D28's choice. A
     /// full hold only sells, even where the sale doesn't pay for its fuel: a siphon trip would turn to selling at once, and
-    /// end without its gas aboard, on every tick.
+    /// end without its gas aboard, on every tick. A siphon drone whose every pair below ABUNDANT has a siphoner shares one
+    /// (D77, reason <c>shared</c>): it is passed over to the trading plan only when nothing below ABUNDANT is left that it
+    /// can siphon and sell.
     /// </summary>
     /// <returns>False when there is nothing it can siphon and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -171,6 +181,7 @@ public sealed class SiphonAutomationService(
         ShipModel siphoner,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
+        Dictionary<string, int> siphonersOn,
         List<CoveringTrip> covered,
         CancellationToken cancellationToken)
     {
@@ -197,6 +208,16 @@ public sealed class SiphonAutomationService(
         var ranked = SiphonPlanner.SiphonTargets(map, siphoner, heldKeys);
         if (ranked.Count == 0)
         {
+            // D77, for siphon drones too: they siphon until every gas is ABUNDANT. The command ship keeps D38: it takes what
+            // pays it most, so it shares nothing.
+            if (FleetRoles.IsSiphoner(siphoner) && SiphonPlanner.SharedTargets(map, siphoner, siphonersOn).FirstOrDefault() is { } shared)
+            {
+                siphonersOn[shared.Key] = siphonersOn.GetValueOrDefault(shared.Key) + 1;
+                covered.Add(new CoveringTrip(shared.Gas, shared.SellWaypointSymbol, siphoner.FuelCapacity));
+                await StartAsync(siphoner, TripTo(shared), "shared", cancellationToken);
+                return true;
+            }
+
             logger.LogDebug("Siphon plan: nothing to siphon that ship {ShipSymbol} can reach and sell.", siphoner.Symbol);
             return false;
         }
@@ -205,16 +226,21 @@ public sealed class SiphonAutomationService(
         var reason = target != ranked[0] ? "uncovered" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = siphoner.Symbol;
+        siphonersOn[target.Key] = siphonersOn.GetValueOrDefault(target.Key) + 1;
         covered.Add(new CoveringTrip(target.Gas, target.SellWaypointSymbol, siphoner.FuelCapacity));
-        await StartAsync(siphoner, new SiphonAndSellGoal
+        await StartAsync(siphoner, TripTo(target), reason, cancellationToken);
+        return true;
+    }
+
+    /// <summary>A trip that siphons a target's gas at its gas giant and sells it at its market, drifting there first when it is far (D45).</summary>
+    private static SiphonAndSellGoal TripTo(SiphonTarget target)
+        => new()
         {
             TradeSymbol = target.Gas,
             SourceWaypointSymbol = target.GasGiantSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
             Drifting = target.Far,
-        }, reason, cancellationToken);
-        return true;
-    }
+        };
 
     private async Task StartAsync(ShipModel siphoner, SiphonAndSellGoal trip, string reason, CancellationToken cancellationToken)
     {

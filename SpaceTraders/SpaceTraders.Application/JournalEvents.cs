@@ -72,8 +72,9 @@ public static class JournalEvents
     /// A miner took mining work (slice 6.4): a trip to mine and sell, or a place in the contract's work
     /// (<c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it mines at, <c>SellWaypoint</c>,
     /// <c>Reason</c>: <c>contract</c>, <c>surveyed</c>, <c>low_supply</c>, <c>lowest_supply</c> (no market is
-    /// short of an ore, D28), <c>uncovered</c> (an ore no miner works on, D48) or <c>held_cargo</c>). A trip to a
-    /// market out of the ship's CRUISE reach logs <see cref="DriftStarted"/> when it sets off (D45).
+    /// short of an ore, D28), <c>uncovered</c> (an ore no miner works on, D48), <c>shared</c> (a drone shares a pair, as
+    /// every pair below ABUNDANT has a miner, D77) or <c>held_cargo</c>). A trip to a market out of the ship's CRUISE reach
+    /// logs <see cref="DriftStarted"/> when it sets off (D45).
     /// </summary>
     public const string MiningStarted = nameof(MiningStarted);
 
@@ -86,8 +87,9 @@ public static class JournalEvents
     /// <summary>
     /// A siphoner took a siphon trip (slice 6.7: <c>ShipSymbol</c>, <c>TradeSymbol</c>, <c>WaypointSymbol</c> it
     /// siphons at, <c>SellWaypoint</c>, <c>Reason</c>: <c>low_supply</c>, <c>lowest_supply</c> (no market is short
-    /// of a gas, D28), <c>uncovered</c> (a gas no siphoner works on, D48) or <c>held_cargo</c>). A trip to a market
-    /// out of the ship's CRUISE reach logs <see cref="DriftStarted"/> when it sets off (D45).
+    /// of a gas, D28), <c>uncovered</c> (a gas no siphoner works on, D48), <c>shared</c> (a siphon drone shares a pair, as
+    /// every pair below ABUNDANT has a siphoner, D77) or <c>held_cargo</c>). A trip to a market out of the ship's CRUISE
+    /// reach logs <see cref="DriftStarted"/> when it sets off (D45).
     /// </summary>
     public const string SiphonStarted = nameof(SiphonStarted);
 

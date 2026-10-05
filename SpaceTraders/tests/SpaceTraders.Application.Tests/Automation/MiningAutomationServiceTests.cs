@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -22,7 +23,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// a drone is bought only when its first trip would serve a market short of an ore (D22, D28). Slice 6.10b: a
 /// scarce ore no miner works on comes first, and a drone is bought for each scarce ore before anything else that
 /// mines (D48), when the order ships are bought in lets it (D43). D53: a trip covers its ore only near the market it sells
-/// at, and a drone is bought for each scarce ore in each area.
+/// at, and a drone is bought for each scarce ore in each area. D77: a drone mines until every ore is ABUNDANT, sharing a
+/// pair once every pair below ABUNDANT has a miner, and trades only then.
 /// </summary>
 public sealed class MiningAutomationServiceTests
 {
@@ -161,8 +163,9 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
-    public async Task TwoMiners_NeverShareASellMarketAndOre()
+    public async Task TwoMiners_TakeTwoPairs_WhilePairsNobodyWorksAreLeft()
     {
+        // One miner per sell market and ore, while a pair below ABUNDANT has none (D77).
         Fleet(Drone("SHIP-3"), Drone("SHIP-4"));
 
         await RunAsync();
@@ -170,6 +173,102 @@ public sealed class MiningAutomationServiceTests
         _activeGoals.Values.Cast<MineAndSellGoal>()
             .Select(trip => (trip.SellWaypointSymbol, trip.TradeSymbol))
             .Should().BeEquivalentTo([(F49, "SILICON_CRYSTALS"), (F49, "QUARTZ_SAND")]);
+    }
+
+    [Fact]
+    public async Task OnceEveryPairBelowAbundantHasADrone_AFreeDroneSharesOne_InsteadOfTrading()
+    {
+        // D77, asked on 2026-10-05: "I'd like the miners to only mine, even if there is more profit in trading. They can mine
+        // until every mineral is ABUNDANT." Every pair has a drone, F49's silicon two. SHIP-3 shares the SCARCE pair in reach
+        // with the fewest, F49's quartz, instead of being passed over to the trading plan (B63).
+        HeldBy("SHIP-11", F49, "SILICON_CRYSTALS");
+        Fleet([Drone(), .. EveryPairHeld(), Drone("SHIP-11")]);
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SourceWaypointSymbol, trip.SellWaypointSymbol, trip.Drifting).Should().Be(("QUARTZ_SAND", XB5C, F49, false));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+        _passedOver.MayTrade("SHIP-3", [AutomationPlan.Mining]).Should().BeFalse("this pass gave it a trip (B63)");
+    }
+
+    [Fact]
+    public async Task TwoFreeDrones_ShareTwoPairs_TheFewestMinersFirst()
+    {
+        // D77: the first drone to share counts for the next, in the same pass. Silicon and quartz have a drone each; SHIP-3
+        // takes silicon, which pays more, and SHIP-11 quartz, which then has fewer.
+        Fleet([Drone(), .. EveryPairHeld(), Drone("SHIP-11")]);
+
+        await RunAsync();
+
+        ((MineAndSellGoal)_activeGoals["SHIP-3"]).TradeSymbol.Should().Be("SILICON_CRYSTALS");
+        ((MineAndSellGoal)_activeGoals["SHIP-11"]).TradeSymbol.Should().Be("QUARTZ_SAND");
+    }
+
+    [Fact]
+    public async Task ADroneShares_RatherThanMineForAMarketThatHasAllItWants()
+    {
+        // D77: H51 has all the aluminum it wants, and nobody mines it for H51; every other pair has a drone. SHIP-3 shares F49's
+        // silicon, SCARCE and in reach, which pays more than F49's quartz.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
+            .Returns(new MiningContext(Map([.. Markets().Select(market => market.WaypointSymbol == H51 ? AluminumAbundant(market) : market)]), [], 129_357, Now));
+        HeldBy("SHIP-4", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-5", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-6", H51, "COPPER_ORE");
+        HeldBy("SHIP-7", H51, "IRON_ORE");
+        HeldBy("SHIP-9", B7, "GOLD_ORE", B14);
+        HeldBy("SHIP-10", B7, "COPPER_ORE", B14);
+        Fleet(Drone(), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-9", B7), Drone("SHIP-10", B7));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("SILICON_CRYSTALS", F49));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "MiningStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+    }
+
+    [Fact]
+    public async Task WithEveryOreAtAbundant_ADroneGetsNoTrip_AndMayTrade()
+    {
+        // D77: "Trade until then". Every market that buys an ore has all it wants: nothing is left to mine for, and the trading
+        // plan may give the drone a route until an ore drops below ABUNDANT again (B63).
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
+            .Returns(new MiningContext(Map([.. Markets().Select(OresAbundant)]), [], 129_357, Now));
+        Fleet(Drone());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _passedOver.MayTrade("SHIP-3", [AutomationPlan.Mining]).Should().BeTrue("the pass had nothing for it to mine (B63)");
+    }
+
+    [Fact]
+    public async Task TheCommandShip_SharesNoPair_ItTakesWhatPaysItMost()
+    {
+        // D77 is for the drones. The command ship, in the mining role, keeps D38: with every pair taken the plan has no trip for
+        // it, and the trading plan may give it a route, until the role board weighs its roles again.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Mine));
+        Fleet([CommandShip(), .. EveryPairHeld()]);
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-1");
+        _passedOver.MayTrade("SHIP-1", [AutomationPlan.Mining]).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task NoDroneIsBought_ForAPairItWouldOnlyShare()
+    {
+        // D77 changes what a drone does, not when one is bought (D28): with a drone on every pair and none free, a new drone
+        // would only share one, so none is bought.
+        Fleet(EveryPairHeld());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]
@@ -592,6 +691,30 @@ public sealed class MiningAutomationServiceTests
         HeldBy("SHIP-8", B7, "COPPER_ORE", B14);
         Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7", B7), Drone("SHIP-8", B7));
     }
+
+    /// <summary>
+    /// A drone on each of the fixture's seven pairs: silicon and quartz for F49 and copper, iron and aluminum for H51, in reach
+    /// of the middle, and B7's gold and copper, a drift away (D45).
+    /// </summary>
+    private ShipModel[] EveryPairHeld()
+    {
+        HeldBy("SHIP-4", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-5", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-6", H51, "COPPER_ORE");
+        HeldBy("SHIP-7", H51, "IRON_ORE");
+        HeldBy("SHIP-8", H51, "ALUMINUM_ORE");
+        HeldBy("SHIP-9", B7, "GOLD_ORE", B14);
+        HeldBy("SHIP-10", B7, "COPPER_ORE", B14);
+        return [Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6"), Drone("SHIP-7"), Drone("SHIP-8"), Drone("SHIP-9", B7), Drone("SHIP-10", B7)];
+    }
+
+    /// <summary>The market, with all the aluminum it wants (D77).</summary>
+    private static MarketSnapshot AluminumAbundant(MarketSnapshot market)
+        => market with { TradeGoods = [.. market.TradeGoods.Select(good => good.Symbol == "ALUMINUM_ORE" ? good with { Supply = "ABUNDANT" } : good)] };
+
+    /// <summary>The market, with all of every good it wants but fuel (D77).</summary>
+    private static MarketSnapshot OresAbundant(MarketSnapshot market)
+        => market with { TradeGoods = [.. market.TradeGoods.Select(good => good.Symbol == "FUEL" ? good : good with { Supply = "ABUNDANT" })] };
 
     private void HeldBy(string ship, string market, string ore, string asteroid = XB5C)
         => _activeGoals[ship] = new MineAndSellGoal { TradeSymbol = ore, SourceWaypointSymbol = asteroid, SellWaypointSymbol = market };

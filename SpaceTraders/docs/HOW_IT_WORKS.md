@@ -305,8 +305,8 @@ it and the other ships can do and what each role would earn: see
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
 | ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47); then one more for each further area with mining drones, after the drones per scarce mineral (D55) |
-| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
-| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
+| Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77) | Free miners | Low-supply openings (Pending/Assigned) | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53), then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
+| Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
 | Construction | Build the home system's jump gate: buy its materials a full hold at a time and supply them (slice 6.6, D64–D68) | The ship with the construction role: the largest hold that isn't a drone or the surveyor (D65); any free ship that holds what the gate needs | The gate's materials (required, fulfilled, on their way), the builders, why no load was bought | No ship: the gate's next load of materials, after the cargo ships in the order (D64), above the credit reserve |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
 | SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
@@ -408,9 +408,10 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   5. every other drone gathers too (`gathers_first`, D58): "Mining drones should be mining drones first, and
      traders second, and they should not leave gaps when trading in a way that results in endless drones being
      bought." A drone (it can mine or siphon, and trade, and nothing else: no surveyor) takes its gathering role
-     whatever trading would pay, and trades only when its plan has no trip for it. Moved to trading for profit,
-     drones left the ores they had mined short, and the plans bought drones for them (on 2026-10-03 the board
-     moved SPECTER-3 between mining and trading three times in 30 minutes);
+     whatever trading would pay, and trades only when its plan has no trip for it: since D77, once nothing it can
+     gather is below ABUNDANT, as it shares a pair before that (see [Mining](#mining-miningautomationservice-slice-64)).
+     Moved to trading for profit, drones left the ores they had mined short, and the plans bought drones for them (on
+     2026-10-03 the board moved SPECTER-3 between mining and trading three times in 30 minutes);
   6. while the home system's jump gate needs materials, the ship with the largest hold there of those left
      that can construct builds it (`construction`, slice 6.6, D65), as many as `Construction.Ships` (1):
      supplying pays nothing, so no estimate could choose it, and finishing the gate comes first. Drones and the
@@ -430,12 +431,12 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   each valued per hour:
   - trade: every lucrative route from where the ship is, or is going, its profit after fuel, as the trading
     plan reckons it (D14);
-  - mine: every mining target (D28's), a full hold of the target ore, filled at the ship's rate times the
-    ore's share of the extractions (its survey's deposits, or one of the asteroid's ores without one), less
-    the fuel there and on to the market;
-  - siphon: every siphon target, a full hold of the gases a market buys (a trip keeps them all, D33): the
-    trip's own gas at the market it sells it to, each other gas where it counts most among the markets the
-    ship can carry it to from the gas giant, less the fuel;
+  - mine: every mining target (D28's; none for a market that has the ore ABUNDANT, D77), a full hold of the
+    target ore, filled at the ship's rate times the ore's share of the extractions (its survey's deposits, or one
+    of the asteroid's ores without one), less the fuel there and on to the market;
+  - siphon: every siphon target (none for a market that has the gas ABUNDANT, D77), a full hold of the gases a
+    market buys (a trip keeps them all, D33): the trip's own gas at the market it sells it to, each other gas where
+    it counts most among the markets the ship can carry it to from the gas giant, less the fuel;
   - each with the production chains' share (D39, `ChainValues`): a good sold to a market that makes a
     pricier good from it (it imports the good and exports something made from it, by the game's production
     chains, as D15 reads them) counts `Roles.ChainValueSharePercent` (50) of the price difference, and that
@@ -667,7 +668,8 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      refuelling stops, leaving with a full tank (D53, `CoveringTrip`): a drone mining for B7 doesn't cover
      the middle, nor one in the middle B7, while the command ship's 400-unit tank reaches both. Then the
      market shortest of its ore (D28): SCARCE, then LIMITED (low supply, D22), and once
-     no market is short, the lowest supply there is, even when it pays less. Within a supply level, a
+     no market is short, the lowest supply there is, even when it pays less. A market that has the ore ABUNDANT
+     has all it wants, and is no target (D77, `MiningPlanner.IsAbundant`); HIGH still is. Within a supply level, a
      surveyed ore first, then the most a single extraction is expected to fetch: the ore's share of the
      survey's deposits (without a survey, one of the asteroid's ores) times its price. One miner per
      sell market and ore. It logs `MiningStarted`, reason `uncovered` (D48 chose it over D28's first),
@@ -678,7 +680,15 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      about ten times slower, and mines from there in CRUISE. A far target ranks after every reachable one of
      its supply level, and among D48's uncovered ores after those in reach. In X1-DC53 on 2026-10-03 that was
      B7, SCARCE or LIMITED in five ores that B14, 25 from it, yields; from the middle a drone drifts there in
-     about 2.5 hours. Once it is there, B7's ores are in reach, and the middle is the drift away.
+     about 2.5 hours. Once it is there, B7's ores are in reach, and the middle is the drift away;
+  4. **sharing** (slice 6.14, D77, asked on 2026-10-05: "I'd like the miners to only mine, even if there is more profit in
+     trading. They can mine until every mineral is ABUNDANT."): a mining drone (`FleetRoles.IsMiningDrone`) whose every
+     pair below ABUNDANT, in reach or a drift away, already has a miner shares one (`MiningPlanner.SharedTargets`): the
+     lowest supply first, a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest ships on it
+     (the trips under way, and those given out earlier in the same pass), then step 2's order. It logs `MiningStarted`,
+     reason `shared`. A drone is passed over to the trading plan (B63) only when nothing below ABUNDANT is left that it
+     can reach and sell, or with a full hold nobody it can reach buys (step 1). The command ship shares nothing: it takes
+     what pays it most (D38), and is passed over when every pair has a miner.
 - **What a trip keeps** (D71, asked on 2026-10-04: "only throw out minerals that they cannot sell within a single tank
   of fuel, instead of everything they're not specifically mining for"): each extraction keeps the trip's ore, and every
   other ore a market buys within one tank of the asteroid: a full tank's CRUISE flight there without a refuelling stop
@@ -703,10 +713,13 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      shipyard's listing, the trips under way held) would serve a market short of its ore (SCARCE or
      LIMITED, D28), in turn with the cargo ships. With the role board on, only when the board would give
      the drone the mining role (`RoleAdvisor`), which, since a drone gathers first (D58), it does.
+
+  A pair a drone would only share buys no drone (D77): the first trip is judged with the pairs under way held, as
+  before.
 - **The state** (`plan_states`, `MiningAutomation`) lists the low-supply openings: Assigned while a
   miner's trip sells there, Pending otherwise, with the free miners that could take it (they reach its
-  asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. It is written only when it
-  changes.
+  asteroid, or would drift to its market, D45), for the `ShipLeftIdle` rule. An opening several drones share names one
+  of them (D77). It is written only when it changes.
 
 ### Siphon (`SiphonAutomationService`, slice 6.7)
 
@@ -729,13 +742,18 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
      LIMITED gas no siphoner's trip covers (D53, as for the miners) comes first, the nearest gas giant first
      (D48); then the
      market shortest of its gas (D28): SCARCE, then LIMITED (low supply, D22), and once no market is
-     short, the lowest supply there is. Within a supply level, the most a single siphon is expected to
-     fetch (one of the gas giant's three gases times the price), then the nearest gas giant. One siphoner
-     per sell market and gas. It logs `SiphonStarted`, reason `uncovered`, `low_supply` or
-     `lowest_supply`;
+     short, the lowest supply there is; a market that has the gas ABUNDANT is no target (D77). Within a supply level,
+     the most a single siphon is expected to fetch (one of the gas giant's three gases times the price), then the
+     nearest gas giant. One siphoner per sell market and gas. It logs `SiphonStarted`, reason `uncovered`, `low_supply`
+     or `lowest_supply`;
   3. **far targets** (slice 6.10c, D45), as for the miners: a market out of the siphoner's CRUISE reach that
      sells fuel, with a gas giant within a CRUISE round trip of it; the trip drifts there first. X1-DC53 has
-     none: its one gas giant, C38, has every buyer in reach of a siphon drone.
+     none: its one gas giant, C38, has every buyer in reach of a siphon drone;
+  4. **sharing** (slice 6.14, D77, siphon drones as the mining drones): a siphon drone (`FleetRoles.IsSiphoner`) whose
+     every pair below ABUNDANT already has a siphoner shares one (`SiphonPlanner.SharedTargets`), by the miners' order:
+     the lowest supply, in CRUISE reach before a drift away, then the fewest ships on it. It logs `SiphonStarted`, reason
+     `shared`, and is passed over to the trading plan only when nothing below ABUNDANT is left that it can reach and
+     sell. The command ship, in the siphon role, shares nothing (D38).
 - **Drones** (D32, the miners' rule): one a tick, at the shipyard that sells `SHIP_SIPHON_DRONE` for the
   least in a system where our ships are, up to `Siphon.MaxDrones` (default 10), within the credit reserve
   and when the order ships are bought in lets it (D43): first one per SCARCE or LIMITED gas and area a drone
@@ -752,7 +770,8 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
 - **The state** (`plan_states`, `SiphonAutomation`, as the mining plan's) lists the low-supply openings
   of every system where our ships are, before the first drone too: Assigned while a siphoner's trip
   sells there, Pending otherwise, with the free siphoners that could take it (they reach the gas giant, or
-  would drift to the market, D45), for the `ShipLeftIdle` rule. It is written only when it changes.
+  would drift to the market, D45), for the `ShipLeftIdle` rule. An opening several drones share names one of them, and a
+  pair a drone would only share buys no drone (D77). It is written only when it changes.
 
 **What a gas giant yields** (`GasGiants`): the game doesn't publish it, and a gas giant's traits name no
 gas (X1-DC53's C38 has only STRONG_MAGNETOSPHERE), so every gas giant counts as yielding the game's
@@ -840,7 +859,8 @@ buy.
   open assignment, and isn't in transit, and that the survey, mining and siphon plans, which go first,
   left free. With the survey plan on, a ship that can survey never trades (D20), unless the spare-time
   plan is on (below); a miner trades only when neither the contract nor the mining plan has work for
-  it, and a siphoner only when the siphon plan has none. With the role board on (slice 6.9), a trader is a
+  it, and a siphoner only when the siphon plan has none: for a drone, since D77, once nothing it can gather is below
+  ABUNDANT, as it shares a pair before that. With the role board on (slice 6.9), a trader is a
   ship with the trade role, or with the mining or siphon role when that plan had no trip for it.
   "Had no trip for it" is what that plan recorded at its pass in the same tick (`PassedOverShips`, B63): the
   mining, siphon and construction plans each note the ships they work with and the free ones they gave no
@@ -1120,7 +1140,8 @@ scout and probe plans don't read the roles.
   while the contract needs units (D23), and the mining plan otherwise.
 - With the role board on, the command ship surveys while it is the only ship that can survey and a drone
   can mine (D38); every drone mines for the contract while the contract wants ore (D40), and otherwise
-  mines, siphons or trades, whichever earns the fleet most per hour.
+  gathers whatever trading would pay (D58): it shares a pair once every pair below ABUNDANT has a drone, and trades
+  only once nothing it can gather is below ABUNDANT (D77).
 
 ---
 
@@ -1766,9 +1787,9 @@ The seven pages in `src/Future` are not routed.
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |
   | `SurveyEnded` | `SurveyKeeper`: the survey plan for expired surveys, the extraction command for refused ones | `Signature`, `WaypointSymbol`, `Size`, `Reason` (`expired`, `exhausted`, `not_verified`), `Extractions` made with it, `ShipSymbol` that took it, `SurveyedAt` |
   | `Extracted` | `MineResourceVolumeCommand`, per extraction; `ExtractResourcesCommand`, per spare-time extraction (slice 6.8) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target` it mines for (`whatever sells` in spare time), `Signature` of the survey (empty without one) |
-  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `contract`); `ContractId` for the contract |
+  | `MiningStarted` | Mining plan (a trip), contract plan (a miner joining, D23) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it mines at, `SellWaypoint`, `Reason` (`held_cargo`, `surveyed`, `low_supply`, `lowest_supply`, `uncovered`, `shared`, `contract`); `ContractId` for the contract |
   | `Siphoned` | `SiphonResourcesCommand`, per siphon (slice 6.7) | `ShipSymbol`, `Units`, `TradeSymbol` it got, `WaypointSymbol`, `Target`: the gas its trip is for (`whatever sells` in spare time) |
-  | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`, `uncovered`) |
+  | `SiphonStarted` | Siphon plan (a trip) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` it siphons at, `SellWaypoint`, `Reason` (`held_cargo`, `low_supply`, `lowest_supply`, `uncovered`, `shared`) |
   | `DriftStarted` | Mining and siphon executors, when a trip sets off in DRIFT to a market out of its ship's CRUISE reach (slice 6.10c, D45); the move executor, when a ship that can only survey sets off to where most drones mine (D54) | `ShipSymbol`, `WaypointSymbol` it leaves, `SellWaypoint` it drifts to, `TradeSymbol`, `SourceWaypoint` it gathers at from there; for a move, `Destination` |
   | `GatheringStarted` | Spare-time plan (a trip, slice 6.8) | `ShipSymbol`, `WaypointSymbol` it gathers at, `Method` (`mines`, `siphons`) |
   | `GatheringInterrupted` | Survey and trading plans, taking a ship off a spare-time trip that fills its hold (D34, D37) | `ShipSymbol`, `WaypointSymbol` it gathered at, `Reason` (`survey`, which keeps the hold aboard; `trade`, which sells it first), `Units` aboard |

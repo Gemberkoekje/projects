@@ -14,9 +14,10 @@ namespace SpaceTraders.Application.Mining;
 ///   in the system buys, at the asteroid nearest the market that pays most for it. Ores without a usable
 ///   survey there come first, then the best paid;</item>
 ///   <item>a miner serves the market shortest of an ore first (D28): SCARCE, then LIMITED (low supply, D22),
-///   and once no market is short, the lowest supply there is. It mines at an asteroid with a usable survey
-///   holding the ore, else at the asteroid nearest the market, and sells there. Within a supply level,
-///   surveyed ores first, then the most a single extraction is expected to fetch;</item>
+///   and once no market is short, the lowest supply there is, but never a market that has the ore ABUNDANT (D77). It
+///   mines at an asteroid with a usable survey holding the ore, else at the asteroid nearest the market, and sells
+///   there. Within a supply level, surveyed ores first, then the most a single extraction is expected to fetch. One
+///   miner per sell market and ore, until every pair below ABUNDANT has one: then a drone shares a pair (D77);</item>
 ///   <item>only trips a ship can make in CRUISE count, through refuelling stops (the drones' 80-unit tanks keep
 ///   them near the markets that sell fuel): to the asteroid, and on to the market with the fuel left;</item>
 ///   <item>a market out of that reach that sells fuel counts too (slice 6.10c, D45): the ship drifts there first,
@@ -26,13 +27,16 @@ namespace SpaceTraders.Application.Mining;
 /// </summary>
 public static class MiningPlanner
 {
+    /// <summary>The supply at which a market has all of a good it wants: nobody gathers it for that market (D77).</summary>
+    private const string AbundantSupply = "ABUNDANT";
+
     private static readonly IReadOnlySet<string> LowSupplyLevels = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "SCARCE", "LIMITED" };
     private static readonly IReadOnlySet<string> DemandTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "IMPORT", "EXCHANGE" };
 
     /// <summary>A market's supply of a good, from the shortest: the order miners serve markets in (D28).</summary>
-    private static readonly string[] SupplyLevels = ["SCARCE", "LIMITED", "MODERATE", "HIGH", "ABUNDANT"];
+    private static readonly string[] SupplyLevels = ["SCARCE", "LIMITED", "MODERATE", "HIGH", AbundantSupply];
 
-    /// <summary>The key of a mining opportunity: one miner per sell market and ore.</summary>
+    /// <summary>The key of a mining opportunity: one miner per sell market and ore; a drone shares one only once every pair below ABUNDANT has a miner (D77).</summary>
     /// <param name="sellWaypointSymbol">Where the ore is sold.</param>
     /// <param name="ore">The ore.</param>
     /// <returns>The key, in upper case.</returns>
@@ -52,6 +56,14 @@ public static class MiningPlanner
     /// <param name="supply">The supply level, as the API gives it.</param>
     /// <returns>True for SCARCE and LIMITED.</returns>
     public static bool IsLowSupply(string supply) => LowSupplyLevels.Contains(supply ?? string.Empty);
+
+    /// <summary>
+    /// Whether a market has all of a good it wants (D77): ABUNDANT. No miner mines an ore for it then, and no siphoner
+    /// siphons a gas for it. Asked on 2026-10-05: "They can mine until every mineral is ABUNDANT."
+    /// </summary>
+    /// <param name="supply">The supply level, as the API gives it.</param>
+    /// <returns>True for ABUNDANT.</returns>
+    public static bool IsAbundant(string supply) => string.Equals(supply, AbundantSupply, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Where a supply level stands, from the shortest: SCARCE is 0, an unknown level comes last (D28).</summary>
     /// <param name="supply">The supply level, as the API gives it.</param>
@@ -242,12 +254,13 @@ public static class MiningPlanner
     /// What a miner can mine, best first (D28): for every market that buys an ore, mined at an asteroid with a
     /// usable survey holding it, or else at the asteroid nearest the market, and sold there. The markets shortest
     /// of their ore come first, so a miner serves a SCARCE market before a LIMITED one, and once no market is
-    /// short, the one with the lowest supply, even when it pays less. Within a supply level, the targets in CRUISE
-    /// reach first, then surveyed ores, then the most a single extraction is expected to fetch (the ore's share of
-    /// the deposits times its price), then the nearest asteroid. A market out of the miner's CRUISE reach that sells
-    /// fuel is a far target (D45, <see cref="MiningTarget.Far"/>): the miner drifts there first, and mines at the
-    /// asteroid nearest it within a CRUISE round trip. Opportunities other miners hold are left out: one miner per
-    /// sell market and ore. The mining plan buys a drone only when its first trip here would serve a market short
+    /// short, the one with the lowest supply, even when it pays less; a market that has the ore ABUNDANT has all it wants,
+    /// and isn't one (D77). Within a supply level, the targets in CRUISE reach first, then surveyed ores, then the most a
+    /// single extraction is expected to fetch (the ore's share of the deposits times its price), then the nearest asteroid.
+    /// A market out of the miner's CRUISE reach that sells fuel is a far target (D45, <see cref="MiningTarget.Far"/>): the
+    /// miner drifts there first, and mines at the asteroid nearest it within a CRUISE round trip. Opportunities other miners
+    /// hold are left out: one miner per sell market and ore (a drone shares one only when none is left,
+    /// <see cref="SharedTargets"/>). The mining plan buys a drone only when its first trip here would serve a market short
     /// of its ore.
     /// </summary>
     /// <param name="context">The miner's system.</param>
@@ -312,7 +325,10 @@ public static class MiningPlanner
             .ToList();
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
-            var ores = map.GoodsAt(market).Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good)).ToList();
+            // D77: a market that has all of an ore it wants gets none mined for it.
+            var ores = map.GoodsAt(market)
+                .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good) && !IsAbundant(good.Supply))
+                .ToList();
             var driftsThere = ores.Count > 0 && CanDriftTo(map, miner, market);
             foreach (var good in ores)
             {
@@ -358,6 +374,30 @@ public static class MiningPlanner
     {
         ArgumentNullException.ThrowIfNull(context);
         return UncoveredFirst(context.Map, miner, MiningTargets(context, miner, heldKeys), covering);
+    }
+
+    /// <summary>
+    /// What a drone mines once every pair below ABUNDANT it could serve has a miner (D77, asked on 2026-10-05: "I'd like the
+    /// miners to only mine, even if there is more profit in trading. They can mine until every mineral is ABUNDANT."): it
+    /// shares a pair rather than trade. The lowest supply first (D28), a pair in CRUISE reach before one a drift away (D45),
+    /// then the pair with the fewest miners, then in
+    /// <see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>'s order. The mining plan buys no drone for a
+    /// pair it would only share.
+    /// </summary>
+    /// <param name="context">The drone's system.</param>
+    /// <param name="drone">The drone.</param>
+    /// <param name="minersPerPair">How many miners work on each pair, by <see cref="OpportunityKey"/>; a pair it leaves out has none.</param>
+    /// <returns>The targets, best first.</returns>
+    public static IReadOnlyList<MiningTarget> SharedTargets(MiningContext context, ShipModel drone, IReadOnlyDictionary<string, int> minersPerPair)
+    {
+        ArgumentNullException.ThrowIfNull(minersPerPair);
+        return [.. MiningTargets(context, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select((target, rank) => (Target: target, Rank: rank))
+            .OrderBy(entry => SupplyRank(entry.Target.Supply))
+            .ThenBy(entry => entry.Target.Far)
+            .ThenBy(entry => minersPerPair.GetValueOrDefault(entry.Target.Key))
+            .ThenBy(entry => entry.Rank)
+            .Select(entry => entry.Target)];
     }
 
     /// <summary>

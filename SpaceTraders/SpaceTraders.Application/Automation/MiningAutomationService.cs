@@ -32,9 +32,14 @@ public interface IMiningAutomationService
 ///   <item>otherwise it takes the best of its mining targets (<see cref="MiningPlanner"/>): a SCARCE or LIMITED ore no
 ///   miner works on first, the nearest asteroid first (D48), where a trip covers its ore only at the markets its ship
 ///   reaches in CRUISE from where it sells (D53); then the market shortest of an ore (D28), SCARCE, then LIMITED, and
-///   once none is short, the lowest supply there is; within a supply level, a surveyed ore first. One miner per sell
-///   market and ore. A market out of the miner's CRUISE reach counts after the reachable ones of its supply level: the
-///   trip drifts there first (slice 6.10c, D45), and so a drone may be bought for it;</item>
+///   once none is short, the lowest supply there is, but never a market that has the ore ABUNDANT (D77); within a supply
+///   level, a surveyed ore first. One miner per sell market and ore. A market out of the miner's CRUISE reach counts
+///   after the reachable ones of its supply level: the trip drifts there first (slice 6.10c, D45), and so a drone may be
+///   bought for it;</item>
+///   <item>a drone whose every pair below ABUNDANT has a miner shares one, the lowest supply and then the fewest miners
+///   first (D77): "I'd like the miners to only mine, even if there is more profit in trading. They can mine until every
+///   mineral is ABUNDANT." Only with nothing below ABUNDANT left does the trading plan give it a route. The command ship
+///   shares nothing: it takes what pays it most (D38);</item>
 ///   <item>it buys mining drones, one a pass, up to <c>Mining.MaxDrones</c>, within the credit reserve and when the order
 ///   ships are bought in lets it (D43); not while the contract plan mines, which would take the drone (D23). First a
 ///   drone for each SCARCE or LIMITED ore a new drone could serve, once per area (D48, D53); then, when no miner was
@@ -84,6 +89,9 @@ public sealed class MiningAutomationService(
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        // How many miners work on each pair: a drone that shares one takes the pair with the fewest (D77).
+        var minersOn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         // The miners' trips: a free miner takes a scarce ore that has none near its market first (D48, D53).
         var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
@@ -95,6 +103,7 @@ public sealed class MiningAutomationService(
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);
                 heldKeys.Add(key);
                 heldBy[key] = ship.Symbol;
+                minersOn[key] = minersOn.GetValueOrDefault(key) + 1;
                 covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
             else if (board.IsMiner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
@@ -115,7 +124,7 @@ public sealed class MiningAutomationService(
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var miner in candidates)
             {
-                if (await GiveTripAsync(context, miner, heldKeys, heldBy, covered, cancellationToken))
+                if (await GiveTripAsync(context, miner, heldKeys, heldBy, minersOn, covered, cancellationToken))
                 {
                     withTrip.Add(miner.Symbol);
                     gaveTrip.Add(miner.Symbol);
@@ -161,7 +170,8 @@ public sealed class MiningAutomationService(
     /// near its market first (D48, D53). The reason says <c>uncovered</c> when that came before D28's choice. A full hold
     /// only sells, even where the sale doesn't pay for its fuel: a trip keeps the other ores a market buys within one tank
     /// (D71), so its hold can fill with them, and a mining trip would turn to selling at once and end without its ore
-    /// aboard, on every tick.
+    /// aboard, on every tick. A drone whose every pair below ABUNDANT has a miner shares one (D77, reason <c>shared</c>):
+    /// it is passed over to the trading plan only when nothing below ABUNDANT is left that it can mine and sell.
     /// </summary>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -169,6 +179,7 @@ public sealed class MiningAutomationService(
         ShipModel miner,
         HashSet<string> heldKeys,
         Dictionary<string, string> heldBy,
+        Dictionary<string, int> minersOn,
         List<CoveringTrip> covered,
         CancellationToken cancellationToken)
     {
@@ -195,6 +206,16 @@ public sealed class MiningAutomationService(
         var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
         if (ranked.Count == 0)
         {
+            // D77: "I'd like the miners to only mine, even if there is more profit in trading. They can mine until every
+            // mineral is ABUNDANT." The command ship keeps D38: it takes what pays it most, so it shares nothing.
+            if (FleetRoles.IsMiningDrone(miner) && MiningPlanner.SharedTargets(context, miner, minersOn).FirstOrDefault() is { } shared)
+            {
+                minersOn[shared.Key] = minersOn.GetValueOrDefault(shared.Key) + 1;
+                covered.Add(new CoveringTrip(shared.Ore, shared.SellWaypointSymbol, miner.FuelCapacity));
+                await StartAsync(miner, TripTo(shared), "shared", cancellationToken);
+                return true;
+            }
+
             logger.LogDebug("Mining plan: nothing to mine that ship {ShipSymbol} can reach and sell.", miner.Symbol);
             return false;
         }
@@ -203,16 +224,21 @@ public sealed class MiningAutomationService(
         var reason = target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = miner.Symbol;
+        minersOn[target.Key] = minersOn.GetValueOrDefault(target.Key) + 1;
         covered.Add(new CoveringTrip(target.Ore, target.SellWaypointSymbol, miner.FuelCapacity));
-        await StartAsync(miner, new MineAndSellGoal
+        await StartAsync(miner, TripTo(target), reason, cancellationToken);
+        return true;
+    }
+
+    /// <summary>A trip that mines a target's ore at its asteroid and sells it at its market, drifting there first when it is far (D45).</summary>
+    private static MineAndSellGoal TripTo(MiningTarget target)
+        => new()
         {
             TradeSymbol = target.Ore,
             SourceWaypointSymbol = target.AsteroidSymbol,
             SellWaypointSymbol = target.SellWaypointSymbol,
             Drifting = target.Far,
-        }, reason, cancellationToken);
-        return true;
-    }
+        };
 
     private async Task StartAsync(ShipModel miner, MineAndSellGoal trip, string reason, CancellationToken cancellationToken)
     {

@@ -9,9 +9,11 @@ namespace SpaceTraders.Application.Siphoning;
 /// any I/O, so the plan and its tests decide alike:
 /// <list type="bullet">
 ///   <item>a siphoner serves the market shortest of a gas first (D28): SCARCE, then LIMITED (low supply, D22),
-///   and once no market is short, the lowest supply there is. It siphons at the gas giant nearest the market and
-///   sells there. Within a supply level, the targets in CRUISE reach first, then the most a single siphon is
-///   expected to fetch, then the nearest gas giant. No survey comes first: a siphon takes none;</item>
+///   and once no market is short, the lowest supply there is, but never a market that has the gas ABUNDANT (D77). It
+///   siphons at the gas giant nearest the market and sells there. Within a supply level, the targets in CRUISE reach
+///   first, then the most a single siphon is expected to fetch, then the nearest gas giant. No survey comes first: a
+///   siphon takes none. One siphoner per sell market and gas, until every pair below ABUNDANT has one: then a siphon
+///   drone shares a pair (D77);</item>
 ///   <item>only trips a ship can make in CRUISE count, through refuelling stops: to the gas giant, and on to the
 ///   market with the fuel left there;</item>
 ///   <item>a market out of that reach that sells fuel counts too (slice 6.10c, D45): the ship drifts there first and
@@ -22,13 +24,15 @@ public static class SiphonPlanner
 {
     /// <summary>
     /// What a siphoner can siphon, best first (D28 for gases): for every market that buys a gas, siphoned at the
-    /// gas giant nearest the market and sold there. The markets shortest of their gas come first; within a supply
-    /// level, the targets in CRUISE reach first, then the most a single siphon is expected to fetch (the gas's share of
-    /// the giant's gases times its price), then the nearest gas giant. A market out of the siphoner's CRUISE reach that
-    /// sells fuel is a far target (D45, <see cref="SiphonTarget.Far"/>): the siphoner drifts there first, and siphons at
-    /// the gas giant nearest it within a CRUISE round trip. Openings other siphoners hold are left out: one siphoner per
-    /// sell market and gas (<see cref="MiningPlanner.OpportunityKey"/>). The siphon plan buys a drone only when its first
-    /// trip here would serve a market short of its gas.
+    /// gas giant nearest the market and sold there. The markets shortest of their gas come first; a market that has the gas
+    /// ABUNDANT has all it wants, and isn't one (D77). Within a supply level, the targets in CRUISE reach first, then the
+    /// most a single siphon is expected to fetch (the gas's share of the giant's gases times its price), then the nearest
+    /// gas giant. A market out of the siphoner's CRUISE reach that sells fuel is a far target (D45,
+    /// <see cref="SiphonTarget.Far"/>): the siphoner drifts there first, and siphons at the gas giant nearest it within a
+    /// CRUISE round trip. Openings other siphoners hold are left out: one siphoner per sell market and gas
+    /// (<see cref="MiningPlanner.OpportunityKey"/>; a siphon drone shares one only when none is left,
+    /// <see cref="SharedTargets"/>). The siphon plan buys a drone only when its first trip here would serve a market short
+    /// of its gas.
     /// </summary>
     /// <param name="map">The siphoner's system.</param>
     /// <param name="siphoner">The siphoner.</param>
@@ -60,9 +64,11 @@ public static class SiphonPlanner
         var targets = new List<SiphonTarget>();
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
+            // D77: a market that has all of a gas it wants gets none siphoned for it.
             var gases = map.GoodsAt(market)
                 .Where(good => GasGiants.Gases.Contains(good.Symbol)
                     && MiningPlanner.IsDemanded(good)
+                    && !MiningPlanner.IsAbundant(good.Supply)
                     && !heldKeys.Contains(MiningPlanner.OpportunityKey(market, good.Symbol)))
                 .ToList();
             var driftsThere = gases.Count > 0 && MiningPlanner.CanDriftTo(map, siphoner, market);
@@ -102,6 +108,29 @@ public static class SiphonPlanner
     /// <returns>The targets, best first.</returns>
     public static IReadOnlyList<SiphonTarget> SiphonTargets(TradeMarketMap map, ShipModel siphoner, IReadOnlySet<string> heldKeys, IReadOnlyCollection<CoveringTrip> covering)
         => UncoveredFirst(map, siphoner, SiphonTargets(map, siphoner, heldKeys), covering);
+
+    /// <summary>
+    /// What a siphon drone siphons once every pair below ABUNDANT it could serve has a siphoner (D77, for siphon drones too,
+    /// as for the miners: <see cref="MiningPlanner.SharedTargets"/>): it shares a pair rather than trade. The lowest supply
+    /// first (D28), a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest siphoners, then in
+    /// <see cref="SiphonTargets(TradeMarketMap, ShipModel, IReadOnlySet{string})"/>'s order. The siphon plan buys no drone for
+    /// a pair it would only share.
+    /// </summary>
+    /// <param name="map">The drone's system.</param>
+    /// <param name="drone">The siphon drone.</param>
+    /// <param name="siphonersPerPair">How many siphoners work on each pair, by <see cref="MiningPlanner.OpportunityKey"/>; a pair it leaves out has none.</param>
+    /// <returns>The targets, best first.</returns>
+    public static IReadOnlyList<SiphonTarget> SharedTargets(TradeMarketMap map, ShipModel drone, IReadOnlyDictionary<string, int> siphonersPerPair)
+    {
+        ArgumentNullException.ThrowIfNull(siphonersPerPair);
+        return [.. SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select((target, rank) => (Target: target, Rank: rank))
+            .OrderBy(entry => MiningPlanner.SupplyRank(entry.Target.Supply))
+            .ThenBy(entry => entry.Target.Far)
+            .ThenBy(entry => siphonersPerPair.GetValueOrDefault(entry.Target.Key))
+            .ThenBy(entry => entry.Rank)
+            .Select(entry => entry.Target)];
+    }
 
     /// <summary>
     /// Puts the targets whose gas no siphoner works on first (D48): the SCARCE or LIMITED ones (D22) that no trip in
