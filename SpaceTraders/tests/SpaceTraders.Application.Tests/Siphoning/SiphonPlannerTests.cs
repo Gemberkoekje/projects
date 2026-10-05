@@ -9,7 +9,8 @@ namespace SpaceTraders.Application.Tests.Siphoning;
 
 /// <summary>
 /// Slice 6.7: what a siphoner siphons, by the miners' rules (D28) for gases: the markets shortest of a gas
-/// first, siphoned at the gas giant nearest the market and sold there; no surveys, as a siphon takes none.
+/// first, siphoned at the gas giant nearest the market and sold there; no surveys, as a siphon takes none. D77: no market
+/// that has the gas ABUNDANT, and a drone shares a pair once every pair below ABUNDANT has a siphoner.
 /// </summary>
 public sealed class SiphonPlannerTests
 {
@@ -52,6 +53,61 @@ public sealed class SiphonPlannerTests
 
         targets.Should().NotContain(target => target.Key == MiningPlanner.OpportunityKey(G50, "LIQUID_HYDROGEN"));
         (targets[0].Gas, targets[0].SellWaypointSymbol).Should().Be(("LIQUID_NITROGEN", E47));
+    }
+
+    [Theory]
+    [InlineData("HIGH", true)]
+    [InlineData("ABUNDANT", false)]
+    public void AMarketThatHasAllTheGasItWants_IsNoSiphonTarget(string supply, bool isTarget)
+    {
+        // D77, asked on 2026-10-05, for siphon drones too: they siphon until every gas is ABUNDANT. At ABUNDANT, C39 has all
+        // the hydrocarbon it wants; at HIGH it is still the lowest supply left to siphon for (D28).
+        var targets = SiphonPlanner.SiphonTargets(Map(MarketsWithHydrocarbonAtC39(supply)), SiphonDrone(), new HashSet<string>());
+
+        targets.Any(target => target.Gas == "HYDROCARBON" && target.SellWaypointSymbol == C39).Should().Be(isTarget);
+        targets.Should().Contain(target => target.Gas == "LIQUID_HYDROGEN" && target.SellWaypointSymbol == C39, "C39's other gases still count");
+    }
+
+    [Fact]
+    public void ASiphonDroneThatShares_TakesTheLowestSupply_ThenThePairWithTheFewestSiphoners()
+    {
+        // D77: once every pair below ABUNDANT has a siphoner, a drone shares one rather than trade. G50's hydrogen has two
+        // drones and E47's nitrogen one, both SCARCE: nitrogen first, though hydrogen pays more. Of the MODERATE pairs, C39's
+        // hydrocarbon, which pays most, has two.
+        var siphoners = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            [MiningPlanner.OpportunityKey(G50, "LIQUID_HYDROGEN")] = 2,
+            [MiningPlanner.OpportunityKey(E47, "LIQUID_NITROGEN")] = 1,
+            [MiningPlanner.OpportunityKey(G50, "HYDROCARBON")] = 1,
+            [MiningPlanner.OpportunityKey(C39, "HYDROCARBON")] = 2,
+            [MiningPlanner.OpportunityKey(E47, "LIQUID_HYDROGEN")] = 1,
+            [MiningPlanner.OpportunityKey(G50, "LIQUID_NITROGEN")] = 1,
+            [MiningPlanner.OpportunityKey(C39, "LIQUID_HYDROGEN")] = 1,
+            [MiningPlanner.OpportunityKey(C39, "LIQUID_NITROGEN")] = 1,
+        };
+
+        var targets = SiphonPlanner.SharedTargets(Map(), SiphonDrone(), siphoners);
+
+        targets.Select(target => (target.Gas, target.SellWaypointSymbol)).Should().Equal(
+            ("LIQUID_NITROGEN", E47),
+            ("LIQUID_HYDROGEN", G50),
+            ("HYDROCARBON", G50),
+            ("LIQUID_HYDROGEN", E47),
+            ("LIQUID_NITROGEN", G50),
+            ("LIQUID_HYDROGEN", C39),
+            ("LIQUID_NITROGEN", C39),
+            ("HYDROCARBON", C39));
+    }
+
+    [Fact]
+    public void ASiphonDroneShares_NoPairAtAbundant()
+    {
+        // D77: sharing is for the pairs below ABUNDANT; C39 has all the hydrocarbon it wants.
+        var siphoners = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [MiningPlanner.OpportunityKey(C39, "HYDROCARBON")] = 1 };
+
+        var targets = SiphonPlanner.SharedTargets(Map(MarketsWithHydrocarbonAtC39("ABUNDANT")), SiphonDrone(), siphoners);
+
+        targets.Should().NotContain(target => target.Gas == "HYDROCARBON" && target.SellWaypointSymbol == C39);
     }
 
     [Fact]
@@ -248,4 +304,17 @@ public sealed class SiphonPlannerTests
 
     /// <summary>A siphoner's trip on a gas for a market, by a drone with an 80-unit tank.</summary>
     private static CoveringTrip Covering(string gas, string market) => new(gas, market, 80);
+
+    /// <summary>The fixture's markets, with C39's hydrocarbon at the supply given: MODERATE in the fixture.</summary>
+    private static MarketSnapshot[] MarketsWithHydrocarbonAtC39(string supply)
+        =>
+        [
+            .. Markets().Where(market => market.WaypointSymbol != C39),
+            Market(
+                C39,
+                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, supply),
+                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+        ];
 }

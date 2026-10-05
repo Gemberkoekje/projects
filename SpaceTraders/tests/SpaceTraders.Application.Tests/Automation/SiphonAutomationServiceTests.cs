@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
@@ -21,7 +22,8 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// can neither mine nor survey siphons, and a drone is bought only when its first trip would serve a market short
 /// of a gas, up to <c>Siphon.MaxDrones</c> (D32). Slice 6.10b: a scarce gas no siphoner works on comes first, and a drone
 /// is bought for each scarce gas first (D48), when the order ships are bought in lets it (D43). D53: a trip covers its gas
-/// only near the market it sells at, and a drone is bought for each scarce gas in each area.
+/// only near the market it sells at, and a drone is bought for each scarce gas in each area. D77: a drone siphons until every
+/// gas is ABUNDANT, sharing a pair once every pair below ABUNDANT has a siphoner, and trades only then.
 /// </summary>
 public sealed class SiphonAutomationServiceTests
 {
@@ -116,8 +118,9 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
-    public async Task TwoSiphoners_NeverShareASellMarketAndGas()
+    public async Task TwoSiphoners_TakeTwoPairs_WhilePairsNobodyWorksAreLeft()
     {
+        // One siphoner per sell market and gas, while a pair below ABUNDANT has none (D77).
         Fleet(SiphonDrone("SHIP-5"), SiphonDrone("SHIP-6"));
 
         await RunAsync();
@@ -125,6 +128,93 @@ public sealed class SiphonAutomationServiceTests
         _activeGoals.Values.Cast<SiphonAndSellGoal>()
             .Select(trip => (trip.SellWaypointSymbol, trip.TradeSymbol))
             .Should().BeEquivalentTo([(G50, "LIQUID_HYDROGEN"), (E47, "LIQUID_NITROGEN")]);
+    }
+
+    [Fact]
+    public async Task OnceEveryPairBelowAbundantHasADrone_AFreeSiphonDroneSharesOne_InsteadOfTrading()
+    {
+        // D77, asked on 2026-10-05, for siphon drones too: they siphon until every gas is ABUNDANT. Every pair has a drone,
+        // G50's hydrogen two. SHIP-5 shares the SCARCE pair with the fewest, E47's nitrogen, instead of being passed over to
+        // the trading plan (B63).
+        HeldBy("SHIP-16", G50, "LIQUID_HYDROGEN");
+        Fleet([SiphonDrone(), .. EveryPairHeld(), SiphonDrone("SHIP-16")]);
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SourceWaypointSymbol, trip.SellWaypointSymbol, trip.Drifting).Should().Be(("LIQUID_NITROGEN", C38, E47, false));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "SiphonStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+        _passedOver.MayTrade("SHIP-5", [AutomationPlan.Siphon]).Should().BeFalse("this pass gave it a trip (B63)");
+    }
+
+    [Fact]
+    public async Task ASiphonDroneShares_RatherThanSiphonForAMarketThatHasAllItWants()
+    {
+        // D77: C39 has all the hydrocarbon it wants, and nobody siphons it for C39; every other pair has a drone. SHIP-5 shares
+        // G50's hydrogen, SCARCE, which pays more than E47's nitrogen.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(
+        [
+            .. Markets().Where(market => market.WaypointSymbol != C39),
+            Market(
+                C39,
+                Good("HYDROCARBON", "EXCHANGE", 70, 60, 60, "ABUNDANT"),
+                Good("LIQUID_HYDROGEN", "EXCHANGE", 40, 35, 60, "MODERATE"),
+                Good("LIQUID_NITROGEN", "EXCHANGE", 34, 30, 60, "MODERATE"),
+                Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+        ]));
+        var drones = EveryPairHeld();
+        _activeGoals.Remove("SHIP-9");
+        Fleet([SiphonDrone(), .. drones.Where(drone => drone.Symbol != "SHIP-9")]);
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("LIQUID_HYDROGEN", G50));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "SiphonStarted")
+            .Which.Properties["Reason"].Should().Be("shared");
+    }
+
+    [Fact]
+    public async Task WithEveryGasAtAbundant_ASiphonDroneGetsNoTrip_AndMayTrade()
+    {
+        // D77: "Trade until then". Every market that buys a gas has all it wants: nothing is left to siphon for, and the
+        // trading plan may give the drone a route until a gas drops below ABUNDANT again (B63).
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context([.. Markets().Select(GasesAbundant)]));
+        Fleet(SiphonDrone());
+
+        await RunAsync();
+
+        _activeGoals.Should().BeEmpty();
+        _passedOver.MayTrade("SHIP-5", [AutomationPlan.Siphon]).Should().BeTrue("the pass had nothing for it to siphon (B63)");
+    }
+
+    [Fact]
+    public async Task TheCommandShip_SharesNoPair_ItTakesWhatPaysItMost()
+    {
+        // D77 is for the drones. The command ship, in the siphon role, keeps D38: with every pair taken the plan has no trip
+        // for it, and the trading plan may give it a route, until the role board weighs its roles again.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Siphon));
+        Fleet([CommandShip(), .. EveryPairHeld()]);
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SHIP-1");
+        _passedOver.MayTrade("SHIP-1", [AutomationPlan.Siphon]).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task NoSiphonDroneIsBought_ForAPairItWouldOnlyShare()
+    {
+        // D77 changes what a drone does, not when one is bought (D32): with a drone on every pair and none free, a new drone
+        // would only share one, so none is bought. The cap is above the ten drones.
+        _settings.GetAsync<int>(SiphonAutomationService.MaxDronesSetting, Arg.Any<CancellationToken>()).Returns(20);
+        Fleet(EveryPairHeld());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]
@@ -416,6 +506,29 @@ public sealed class SiphonAutomationServiceTests
         _activeGoals["SHIP-7"] = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = C39, SellWaypointSymbol = G50 };
         Fleet(SiphonDrone("SHIP-5"), SiphonDrone("SHIP-6"), SiphonDrone("SHIP-7"));
     }
+
+    /// <summary>
+    /// A drone on each of the fixture's ten pairs: G50's three gases, E47's two and C39's three, in reach of C38, and F48's
+    /// two, which only the command ship's tank reaches.
+    /// </summary>
+    private ShipModel[] EveryPairHeld()
+    {
+        HeldBy("SHIP-6", G50, "LIQUID_HYDROGEN");
+        HeldBy("SHIP-7", E47, "LIQUID_NITROGEN");
+        HeldBy("SHIP-8", G50, "HYDROCARBON");
+        HeldBy("SHIP-9", C39, "HYDROCARBON");
+        HeldBy("SHIP-10", E47, "LIQUID_HYDROGEN");
+        HeldBy("SHIP-11", G50, "LIQUID_NITROGEN");
+        HeldBy("SHIP-12", C39, "LIQUID_HYDROGEN");
+        HeldBy("SHIP-13", C39, "LIQUID_NITROGEN");
+        HeldBy("SHIP-14", F48, "LIQUID_NITROGEN");
+        HeldBy("SHIP-15", F48, "LIQUID_HYDROGEN");
+        return [.. Enumerable.Range(6, 10).Select(number => SiphonDrone($"SHIP-{number}"))];
+    }
+
+    /// <summary>The market, with all of every good it wants but fuel (D77).</summary>
+    private static MarketSnapshot GasesAbundant(MarketSnapshot market)
+        => market with { TradeGoods = [.. market.TradeGoods.Select(good => good.Symbol == "FUEL" ? good : good with { Supply = "ABUNDANT" })] };
 
     private void HeldBy(string ship, string market, string gas)
         => _activeGoals[ship] = new SiphonAndSellGoal { TradeSymbol = gas, SourceWaypointSymbol = C38, SellWaypointSymbol = market };

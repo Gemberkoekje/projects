@@ -9,7 +9,8 @@ namespace SpaceTraders.Application.Tests.Mining;
 /// <summary>
 /// Slice 6.4: what a surveyor surveys (the contract's ore first, then sellable ores near the market that
 /// buys them, each until it has a stock of usable surveys, D27) and what a miner mines (the markets shortest
-/// of an ore first, D28; within a supply level, surveyed ores first).
+/// of an ore first, D28; within a supply level, surveyed ores first). D77: no market that has the ore ABUNDANT, and a drone
+/// shares a pair once every pair below ABUNDANT has a miner.
 /// </summary>
 public sealed class MiningPlannerTests
 {
@@ -278,6 +279,60 @@ public sealed class MiningPlannerTests
         targets.Should().Contain(target => target.Ore == "COPPER_ORE" && target.AsteroidSymbol == B14 && target.SellWaypointSymbol == B7, "B14 yields copper too, and is nearer B7 than B13");
     }
 
+    [Theory]
+    [InlineData("HIGH", true)]
+    [InlineData("ABUNDANT", false)]
+    public void AMarketThatHasAllTheOreItWants_IsNoMiningTarget(string supply, bool isTarget)
+    {
+        // D77, asked on 2026-10-05: "They can mine until every mineral is ABUNDANT." At ABUNDANT, H51 has all the aluminum it
+        // wants, and no miner mines it for H51; at HIGH it is still the lowest supply left to mine for (D28).
+        var targets = MiningPlanner.MiningTargets(new MiningContext(MapWithAluminumAtH51(supply), [], 129_357, Now), Drone(), new HashSet<string>());
+
+        targets.Any(target => target.Ore == "ALUMINUM_ORE").Should().Be(isTarget);
+        targets.Should().Contain(target => target.Ore == "COPPER_ORE" && target.SellWaypointSymbol == H51, "H51's other ores still count");
+    }
+
+    [Fact]
+    public void ADroneThatShares_TakesTheLowestSupply_InReachFirst_ThenThePairWithTheFewestMiners()
+    {
+        // D77, asked on 2026-10-05: once every pair below ABUNDANT has a miner, a drone shares one rather than trade. F49's
+        // silicon has two drones and its quartz one, both SCARCE and in reach: quartz first, though silicon pays more. B7's
+        // SCARCE gold and copper are a drift away, so they come after F49's, whatever their drones (D45). At H51, LIMITED,
+        // copper has two drones and iron one; MODERATE aluminum comes last.
+        var miners = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            [MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS")] = 2,
+            [MiningPlanner.OpportunityKey(F49, "QUARTZ_SAND")] = 1,
+            [MiningPlanner.OpportunityKey(B7, "GOLD_ORE")] = 1,
+            [MiningPlanner.OpportunityKey(B7, "COPPER_ORE")] = 1,
+            [MiningPlanner.OpportunityKey(H51, "COPPER_ORE")] = 2,
+            [MiningPlanner.OpportunityKey(H51, "IRON_ORE")] = 1,
+            [MiningPlanner.OpportunityKey(H51, "ALUMINUM_ORE")] = 1,
+        };
+
+        var targets = MiningPlanner.SharedTargets(Context(), Drone(), miners);
+
+        targets.Select(target => (target.Ore, target.SellWaypointSymbol)).Should().Equal(
+            ("QUARTZ_SAND", F49),
+            ("SILICON_CRYSTALS", F49),
+            ("GOLD_ORE", B7),
+            ("COPPER_ORE", B7),
+            ("IRON_ORE", H51),
+            ("COPPER_ORE", H51),
+            ("ALUMINUM_ORE", H51));
+    }
+
+    [Fact]
+    public void ADroneShares_NoPairAtAbundant()
+    {
+        // D77: sharing is for the pairs below ABUNDANT; H51 has all the aluminum it wants.
+        var miners = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [MiningPlanner.OpportunityKey(H51, "ALUMINUM_ORE")] = 1 };
+
+        var targets = MiningPlanner.SharedTargets(new MiningContext(MapWithAluminumAtH51("ABUNDANT"), [], 129_357, Now), Drone(), miners);
+
+        targets.Should().NotContain(target => target.Ore == "ALUMINUM_ORE");
+    }
+
     [Fact]
     public void TheLowSupplyOpenings_AreEveryMarketWithAnOreInLowSupply_WithTheAsteroidNearestIt()
     {
@@ -479,6 +534,19 @@ public sealed class MiningPlannerTests
     /// <summary>Drones on silicon and quartz for F49, and on copper and iron for H51: every ore short near the middle.</summary>
     private static CoveringTrip[] MiddleCovered()
         => [Covering("SILICON_CRYSTALS", F49), Covering("QUARTZ_SAND", F49), Covering("COPPER_ORE", H51), Covering("IRON_ORE", H51)];
+
+    /// <summary>The fixture's markets, with H51's aluminum at the supply given: MODERATE in the fixture.</summary>
+    private static TradeMarketMap MapWithAluminumAtH51(string supply)
+        => Map(
+        [
+            .. Markets().Where(market => market.WaypointSymbol != H51),
+            Market(
+                H51,
+                Good("COPPER_ORE", "IMPORT", 138, 67, 123, "LIMITED"),
+                Good("IRON_ORE", "IMPORT", 118, 58, 100, "LIMITED"),
+                Good("ALUMINUM_ORE", "IMPORT", 130, 63, 149, supply),
+                Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE")),
+        ]);
 
     /// <summary>The fixture's markets, with B7 importing iron as well, which only B13, 48 from B7, yields near it.</summary>
     private static TradeMarketMap MapWithIronAtB7()
