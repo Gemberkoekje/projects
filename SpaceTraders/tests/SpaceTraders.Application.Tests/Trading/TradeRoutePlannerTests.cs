@@ -11,7 +11,7 @@ namespace SpaceTraders.Application.Tests.Trading;
 /// <summary>
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
 /// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
-/// of goods something is made from come before those of end products (D15, D82); two traders never share a route. D79: a trip carries as many
+/// of end products, which nothing is made from, rank at half their profit (D15, D82, D85); two traders never share a route. D79: a trip carries as many
 /// units as each earn the minimum, in batches of each market's trade volume, each batch bought a step dearer and each sold a
 /// step cheaper; D80: one buyer of a good at a market at a time.
 /// </summary>
@@ -59,8 +59,9 @@ public sealed class TradeRoutePlannerTests
     [Fact]
     public void Rank_PutsTheRoutesOfAGoodSomethingIsMadeFromFirst_ThoughAnEndProductEarnsMore()
     {
-        // D15, D82: SHIP_PARTS are made from EQUIPMENT, so both its routes come before MEDICINE's, which nothing is made from,
-        // wherever they sell it. D41 makes SHIP_PARTS (7,721) from it; A1 makes nothing from it, and pays more.
+        // D15, D82, D85: SHIP_PARTS are made from EQUIPMENT, so both its routes come before MEDICINE's, which nothing is made
+        // from, wherever they sell it: MEDICINE earns more, but less than twice as much, and counts at half. D41 makes
+        // SHIP_PARTS (7,721) from it; A1 makes nothing from it, and pays more.
         var routes = TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => (route.TradeSymbol, route.BuyWaypointSymbol, route.SellWaypointSymbol)).Should().Equal(
@@ -72,6 +73,36 @@ public sealed class TradeRoutePlannerTests
         routes[0].Profit.Should().Be((245 * 40) - (2 * 90));
         routes[1].Profit.Should().Be((233 * 40) - (2 * 76));
         routes[2].Profit.Should().BeGreaterThan(routes[0].Profit);
+        (routes[2].Profit / 2.0).Should().BeLessThan(routes[1].Profit);
+    }
+
+    [Fact]
+    public void Rank_PutsAnEndProductFirst_WhenItEarnsMoreThanTwiceAsMuch()
+    {
+        // D85, asked on 2026-10-05: no trader took FOOD from K94 at 1,502 to A1 at 2,488, about 75,000 a load, while trips of
+        // 302 to 3,864 went first, every end product having come after every other route (D82). Counted at half, FOOD still
+        // earns more than IRON, which feeds MACHINERY, and goes first. The prices are X1-FJ91's of that day, the waypoints this
+        // fixture's.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("FOOD", "EXPORT", 1_502, 711, 60), Good("IRON", "EXPORT", 124, 56, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("IRON", "IMPORT", 310, 154, 60), Good("MACHINERY", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                Market(A1, Good("FOOD", "IMPORT", 5_022, 2_488, 60), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["MACHINERY"] = ["IRON"],
+                ["CLOTHING"] = ["FABRICS"],
+            });
+
+        var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 5, NoneHeld);
+
+        routes.Select(route => (route.TradeSymbol, route.FeedsProduction)).Should().Equal(("FOOD", false), ("IRON", true));
+        (routes[0].Profit / 2.0).Should().BeGreaterThan(routes[1].Profit);
+        TradeRoutePlanner.CompareBestFirst(routes[0], routes[1]).Should().BeNegative();
+        TradeRoutePlanner.RankingProfit(routes[0]).Should().Be(routes[0].Profit / 2.0);
+        TradeRoutePlanner.RankingProfit(routes[1]).Should().Be(routes[1].Profit);
     }
 
     [Fact]
@@ -81,7 +112,7 @@ public sealed class TradeRoutePlannerTests
         // "Ship parts do feed a factory, being the SHIP factory." IRON went first: the market it sold at makes MACHINERY from
         // it (D15), while SHIP_PARTS sold only at the three shipyards' markets, which make nothing from them; ships are made
         // from them there. The prices are X1-FJ91's of that morning, the waypoints this fixture's. DRUGS, which nothing is
-        // made from, earn the most and still come last.
+        // made from, earn the most: counted at half (D85), less than SHIP_PARTS and more than IRON.
         var map = new TradeMarketMap(
             Waypoints,
             [
@@ -99,10 +130,11 @@ public sealed class TradeRoutePlannerTests
 
         var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 5, NoneHeld);
 
-        routes.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON", "DRUGS");
-        routes.Select(route => route.FeedsTradeSymbol).Should().Equal(string.Empty, "MACHINERY", string.Empty);
-        routes[0].Profit.Should().BeGreaterThan(routes[1].Profit);
-        routes[2].Profit.Should().BeGreaterThan(routes[0].Profit);
+        routes.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "DRUGS", "IRON");
+        routes.Select(route => route.FeedsTradeSymbol).Should().Equal(string.Empty, string.Empty, "MACHINERY");
+        routes[0].Profit.Should().BeGreaterThan(routes[2].Profit);
+        routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
+        (routes[1].Profit / 2.0).Should().BeLessThan(routes[0].Profit).And.BeGreaterThan(routes[2].Profit);
     }
 
     [Fact]

@@ -256,6 +256,39 @@ public sealed class RolePlanServiceTests
         _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-6").Role.Should().Be(FleetRole.Trade);
     }
 
+    [Fact]
+    public async Task ACollectionShuttle_Trades_UntilADroneIsParkedAtItsAsteroid_ThenCollects()
+    {
+        // D86, asked on 2026-10-05: SPECTER-2B, the shuttle bought for B44's collection point, waited idle at A2 for three
+        // hours while the point's drones drifted there: "Trade until parked". Until one of its point's drones is parked at the
+        // asteroid, the shuttle is a cargo ship like any other.
+        var shuttle = new ShipModel("SHIP-7", SystemSymbol, H52, "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: [], CargoInventory: []);
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities = [],
+            CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Ores = ["IRON_ORE"], ScarceOres = ["IRON_ORE"], ShuttleSymbols = ["SHIP-7"], DroneSymbols = ["SHIP-3"] }],
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Drifting = true };
+        Fleet(CommandShip(), Drone("SHIP-3", waypoint: B7, status: "IN_TRANSIT"), shuttle);
+
+        await RunAsync();
+
+        _state!.Conditions.Should().NotContain("collectors");
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Role.Should().Be(FleetRole.Trade);
+
+        // The drone is parked at B13: the conditions change, the roles are weighed again at once, and the shuttle collects
+        // once its trip ends.
+        Fleet(CommandShip(), Drone("SHIP-3", waypoint: B13, status: "IN_ORBIT"), shuttle);
+
+        await RunAsync();
+
+        _state.Conditions.Should().EndWith("|collectors SHIP-7");
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Should().Match<RoleShipState>(ship => ship.Role == FleetRole.Collect && ship.Reason == RolePlanner.Collection);
+    }
+
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
     private void HeldBy(string ship, string market, string ore)

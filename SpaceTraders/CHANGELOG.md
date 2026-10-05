@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.20)
+- Trade routes rank by profit, an end product's (a good nothing is made from) counted at half (D85), as chosen on 2026-10-05 ("Half weight") after no trader took FOOD at about 75,000 a load while trips of 302 to 3,864 went first under D82's order. `TradeRoutePlanner.RankingProfit`; `Rank` and `CompareBestFirst` use it.
+- A collection shuttle trades like any cargo ship until one of its point's drones is parked at the asteroid (D86, "Trade until parked"): the role board gives it the `Collect` role only then, from the end of its trip. SPECTER-2B had waited without work for about three hours.
+
+### Docs – Changed (2026-10-05, slice 6.20)
+- `PLAN.md`: slice 6.20, decisions D85 and D86; slice 6.19 merged and deployed. `docs/HOW_IT_WORKS.md`: the ranking of trade routes, the collecting role, and a collection point's shuttle.
+
 ### Code – Changed (2026-10-05, slice 6.19)
 - A flight out of CRUISE reach takes the fastest way (D84), as asked on 2026-10-05: "can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" It cruises as far as it can, refuelling at markets that sell fuel, and drifts the rest (`TradeRoutePlanner.TryPlanMixedFlight`, A* over the waypoints and the fuel aboard, about a millisecond in X1-FJ91). From H60 to B44 a drone cruises to F57 and drifts from there: 2.0 hours rather than 2.9 by B7. Drones for a collection point (D83) fly straight to their asteroid.
 - Ships burn (D84), as asked on 2026-10-05: "I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings". A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing: into a market that sells fuel, or elsewhere when what is left still takes the ship on as cruising would (`TradeRoutePlanner.TryPlanNextLeg`). A ship in orbit at a market that sells fuel docks to fill its tank first when a full tank would burn. The navigation flies a BURN the fuel no longer pays for in CRUISE before anything drifts.

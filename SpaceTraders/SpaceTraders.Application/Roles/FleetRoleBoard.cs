@@ -143,7 +143,8 @@ public sealed class FleetRoleBoard
 
     /// <summary>
     /// Whether the ship collects the ore of the drones parked at a far asteroid (slice 6.18, D83): the collecting role (the
-    /// board). Only with the board on: the mining plan designates the shuttles, and the board keeps them collecting.
+    /// board). Only with the board on: the mining plan designates the shuttles, and the board has one collect once a drone is
+    /// parked at its asteroid (D86).
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>True for a ship the mining plan gives collecting rounds.</returns>

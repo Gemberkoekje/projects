@@ -480,10 +480,11 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   - the mining plan to the ships with the mining role, the siphon plan to those with the siphon role; each
     trades when its plan has no trip for it, as before;
   - the construction plan to the ships with the construction role (slice 6.6);
-  - the mining plan's collecting rounds to the ships with the collecting role (slice 6.18, D83): the shuttles the mining
-    plan designated for a collection point keep that role (reason `collection`), whatever else they could do, and do
-    nothing else. Like a surveyor, a collector without work waits by design: it doesn't make the board weigh the roles
-    again, and a change in the designated shuttles does;
+  - the mining plan's collecting rounds to the ships with the collecting role (slice 6.18, D83): a shuttle the mining
+    plan designated for a collection point has that role (reason `collection`) once one of the point's drones is parked
+    at the asteroid, whatever else it could do, and does nothing else; until then it is a cargo ship like any other, and
+    trades (D86). Like a surveyor, a collector without work waits by design: it doesn't make the board weigh the roles
+    again, and a change in the collecting shuttles does;
   - the trading plan to the ships with the trade role, and those with the mining, siphon or construction role
     that their plan left free;
   - the mining and siphon plans buy a drone beyond one per scarce mineral and area only when the board would give it
@@ -716,9 +717,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
     CRUISE reach it cruises as far as it can and drifts the rest, rather than by the point's market as D45's trips go),
     for the scarce ore no drone there mines for yet. It logs
     `MiningStarted`, reason `collection`. The command ship takes none (D38);
-  - a shuttle designated for the point (with the role board on, its role is `Collect`) gets a round
-    (`CollectOreGoal`, journaled `CollectionStarted`) once a drone is parked at the asteroid: a drone's drift there
-    takes hours, which a shuttle would only wait through;
+  - a shuttle designated for the point trades like any cargo ship until a drone is parked at the asteroid (D86, asked on
+    2026-10-05: "Trade until parked"; a drone's way there takes hours). Then, with the role board on, its role is
+    `Collect`, and once its trip ends it gets a round (`CollectOreGoal`, journaled `CollectionStarted`);
   - purchases, with the drones for scarce minerals (`PurchaseTier.Coverage`, as chosen on 2026-10-05): first a light
     shuttle for a point where a drone has a place and no shuttle is designated yet, then the drones (each point's
     scarce ores count a drone each in the coverage count, below), and a second shuttle, at most, for a point where a
@@ -950,15 +951,17 @@ buy.
     burn where the fuel allows it (slice 6.19, D84), which costs up to twice the fuel counted here, an extra
     cost accepted on 2026-10-05 ("I accept the extra fuel costs this brings");
   - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14).
-- **Ranking** (D15, D82): among the lucrative trips, those of a good something is made from come before
-  those of an end product, which nothing is made from by the game's production chains
-  (`TradeMarketMap.IsEndProduct`; ships count as made from SHIP_PARTS and SHIP_PLATING), wherever they are
-  sold; then the most profitable. Asked on 2026-10-05: "Why is iron prioritized over ship parts, although the
-  profit would be a lot higher?" D15 had put a trip first only when its sell market makes a pricier good from
-  the cargo, by its exports, so SHIP_PARTS, which sell only at shipyards' markets, never came first. The end
-  products traded in X1-FJ91 are ANTIMATTER, ASSAULT_RIFLES, CLOTHING, DRUGS, FAB_MATS, FIREARMS, FOOD, FUEL,
-  ICE_WATER, JEWELRY, MEDICINE, RELIC_TECH and SUPERGRAINS. Without the production chains every good is one, and
-  the trips go by profit alone. A trip's `FeedsTradeSymbol` still names the pricier good its sell market makes
+- **Ranking** (D15, D82, D85): among the lucrative trips, the most profitable first, an end product's counted at
+  half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it earns more than twice as much. An
+  end product is a good nothing is made from by the game's production chains (`TradeMarketMap.IsEndProduct`; ships
+  count as made from SHIP_PARTS and SHIP_PLATING), wherever it is sold. Asked on 2026-10-05: "Why is iron
+  prioritized over ship parts, although the profit would be a lot higher?" D15 had put a trip first only when its
+  sell market makes a pricier good from the cargo, by its exports, so SHIP_PARTS, which sell only at shipyards'
+  markets, never came first. D82 then put every end product after every other trip, until no trader took FOOD at
+  about 75,000 a load while trips of 302 to 3,864 went first; D85, "Half weight", replaced that. The end products
+  traded in X1-FJ91 are ANTIMATTER, ASSAULT_RIFLES, CLOTHING, DRUGS, FAB_MATS, FIREARMS, FOOD, FUEL, ICE_WATER,
+  JEWELRY, MEDICINE, RELIC_TECH and SUPERGRAINS. Without the production chains every good is one, and the trips go by
+  profit alone. A trip's `FeedsTradeSymbol` still names the pricier good its sell market makes
   from the cargo, if any, for the journal and the routes view.
 - **Saving up for a trip** (D56, `FullHoldSavings`): "Full hold or nothing, when this occurs the credit
   floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships

@@ -153,7 +153,10 @@ public static class RolePlanner
     /// <summary>The ship builds the jump gate: of those that can, it has the largest hold (slice 6.6, D65).</summary>
     public const string Construction = "construction";
 
-    /// <summary>The shuttle collects at the far asteroid the mining plan designated it for (slice 6.18, D83).</summary>
+    /// <summary>
+    /// The shuttle collects at the far asteroid the mining plan designated it for, where a drone is parked (slice 6.18, D83,
+    /// D86).
+    /// </summary>
     public const string Collection = "collection";
 
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
@@ -200,8 +203,8 @@ public static class RolePlanner
     /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
     /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
     /// <param name="collectors">
-    /// The shuttles the mining plan designated to collect at a far asteroid (slice 6.18, D83), by symbol: each keeps the
-    /// collecting role, whatever else it could do.
+    /// The shuttles the mining plan designated to collect at a far asteroid where a drone is parked (slice 6.18, D83, D86),
+    /// by symbol: each keeps the collecting role, whatever else it could do.
     /// </param>
     /// <param name="builders">
     /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
