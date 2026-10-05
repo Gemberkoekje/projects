@@ -1023,12 +1023,15 @@ buy.
   checks `Rank` runs, in their order (`TradeRoutePlanner.Judge`): the buy market in reach, the sell market in reach from
   it, room in the hold and a price and trade volume at both markets, a unit the credits for cargo pay for after the
   trip's fuel, and the first unit and the trip after fuel earning the minimum (D14, D79). A good another trip is on its
-  way to buy at that market (D80) is left out, as a held route is. The state's `NotTraded` keeps, for each such good that no listed route
-  carries, the check its route failed for the free trader that got furthest with it (then the largest price gap), in a
-  sentence with the figures (`TradeRouteJudgement.Why`): `buy_market_out_of_reach`, `sell_market_out_of_reach`,
-  `no_room`, `too_few_credits`, `not_lucrative`, or `below_the_listed_routes` for a lucrative one beyond the 20
-  waiting routes kept. A system without a free trader at a pass, every trader there on a trip, keeps what was found there
-  before, with its time, less the goods a listed route now carries. Ships that gather in their spare time aren't judged.
+  way to buy at that market (D80) is left out, as a held route is. The state's `NotTraded` keeps, for each such good that no
+  trader's route carries, the check its route failed for the free trader that got furthest with it (then the largest price
+  gap), in a sentence with the figures (`TradeRouteJudgement.Why`): `buy_market_out_of_reach`, `sell_market_out_of_reach`,
+  `no_room`, `too_few_credits`, `not_lucrative`, `waiting` for a lucrative one among the 20 waiting routes kept ("It waits
+  for a free trader"), or `below_the_listed_routes` for a lucrative one beyond them. B66: a good whose route waited had no
+  row, being listed, and once no trader was free the waiting routes went and the good was in neither list (asked on
+  2026-10-05: "Assault Rifles should make a tidy profit at 2191, yet it doesn't even show up in the Goods not traded and why
+  tab"). A system without a free trader at a pass, every trader there on a trip, keeps what was found there before, with
+  its time, less the goods a trader's route now carries. Ships that gather in their spare time aren't judged.
   `/status/trading-routes` serves it as `notTraded`.
 - **After each purchase and sale** the trip fetches the market again while the ship is still docked
   there (D25, `MarketRefresher`), so the next decisions see what the trade did to the prices. A

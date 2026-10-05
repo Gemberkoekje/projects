@@ -505,18 +505,20 @@ public sealed class TradingAutomationServiceTests
     public async Task TheState_SaysWhyEachGoodWithAPriceGap_IsNotTraded()
     {
         // Slice 2.18 (D76), asked on 2026-10-05: "Can the new list also add why the other goods are not considered for
-        // trading?" SHIP-1 takes EQUIPMENT for A1, and EQUIPMENT for D41 and MEDICINE wait. FOOD and FUEL have a price gap, but
-        // not even their first unit earns the 200 (D14, D79). SHIP_PARTS, which no market here buys, has none.
+        // trading?" SHIP-1 takes EQUIPMENT for A1, and EQUIPMENT for D41 and MEDICINE wait: MEDICINE waits for a free trader
+        // (B66), and EQUIPMENT is traded. FOOD and FUEL have a price gap, but not even their first unit earns the 200 (D14, D79).
+        // SHIP_PARTS, which no market here buys, has none.
         Fleet(CommandShip());
 
         await RunAsync();
 
         _state!.NotTraded.Select(good => (good.SystemSymbol, good.TradeSymbol, good.Reason, good.ShipSymbol, good.BuyWaypointSymbol, good.SellWaypointSymbol))
             .Should().Equal(
+                (SystemSymbol, "MEDICINE", "waiting", "SHIP-1", D41, A1),
                 (SystemSymbol, "FOOD", "not_lucrative", "SHIP-1", K85, A1),
                 (SystemSymbol, "FUEL", "not_lucrative", "SHIP-1", D41, K85));
-        _state.NotTraded[0].Why.Should().Be("SHIP-1: a unit bought at 2,360 and sold at 2,492 earns 132 before fuel; each must earn 200 (D14, D79).");
-        _state.NotTraded[0].JudgedAt.Should().Be(_state.UpdatedAt);
+        _state.NotTraded[1].Why.Should().Be("SHIP-1: a unit bought at 2,360 and sold at 2,492 earns 132 before fuel; each must earn 200 (D14, D79).");
+        _state.NotTraded[1].JudgedAt.Should().Be(_state.UpdatedAt);
     }
 
     [Fact]
@@ -551,9 +553,30 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task AGoodWhoseRouteWaits_SaysSo_AndKeepsItsReason_WhileNoTraderIsFree()
+    {
+        // B66, asked on 2026-10-05: "Assault Rifles should make a tidy profit at 2191, yet it doesn't even show up in the Goods
+        // not traded and why tab." A good whose route waited for a free trader had no reason, being listed; once no trader was
+        // free, the waiting routes went, and the good was in neither list. Here SHIP-1 takes EQUIPMENT for A1, and MEDICINE's
+        // route waits.
+        Fleet(CommandShip());
+        await RunAsync();
+
+        var medicine = _state!.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "MEDICINE").Subject;
+        (medicine.Reason, medicine.ShipSymbol, medicine.BuyWaypointSymbol, medicine.SellWaypointSymbol).Should().Be(("waiting", "SHIP-1", D41, A1));
+        medicine.Why.Should().Be("SHIP-1: lucrative, 40 units for 15,198 after fuel, 379 a unit. It waits for a free trader: the free traders took routes that rank higher.");
+
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+        await RunAsync();
+
+        _state.Opportunities.Should().ContainSingle("the routes that waited for SHIP-1 wait for no one now");
+        _state.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "MEDICINE").Which.Should().Be(medicine);
+    }
+
+    [Fact]
     public async Task AKeptReason_IsDropped_OnceItsGoodIsInTheList()
     {
-        // A route of FOOD is held now, so FOOD is traded, though no free trader judged it again.
+        // A route of FOOD is held now, so FOOD is traded, though no free trader judged it again. MEDICINE still waits (B66).
         Fleet(CommandShip());
         await RunAsync();
         _activeGoals["SHIP-1"] = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = K85, SellWaypointSymbol = A1, Units = 40 };
@@ -561,7 +584,7 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
-        _state!.NotTraded.Select(good => good.TradeSymbol).Should().Equal("FUEL");
+        _state!.NotTraded.Select(good => good.TradeSymbol).Should().Equal("MEDICINE", "FUEL");
     }
 
     [Fact]
