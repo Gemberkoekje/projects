@@ -18,12 +18,14 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="SupplyConstructionGoal"/>: one construction trip (PLAN.md slice 6.6). The ship flies to the buy
-/// market (<see cref="GoalFlight"/>: in CRUISE, through refuelling stops), buys its load in one purchase, flies to the
-/// construction site and supplies it there. A ship can't change course in flight, so it checks the load again at the
-/// market, with the prices its arrival has just fetched: when the site no longer needs it, the market's supply has dropped
-/// to SCARCE or LIMITED (D66), its trade volume no longer takes the load at once (D67), or the load would dip into the
-/// credit reserve (D64), it drops the trip (<c>ConstructionDropped</c>) and the construction plan chooses again. Supplying
-/// pays nothing: the trip books what its cargo and fuel cost as a loss (D46).
+/// market (<see cref="GoalFlight"/>: in CRUISE, through refuelling stops), buys its load in batches of the market's trade
+/// volume, the most one purchase takes, each at the price quoted then (D81), flies to the construction site and supplies it
+/// there. A ship can't change course in flight, so it checks the load again at the market, with the prices its arrival has
+/// just fetched, and again before each batch, with those the last purchase's refresh fetched: when the site no longer needs
+/// it, the market's supply has dropped to SCARCE or LIMITED (D66), or the batch would dip into the credit reserve (D64), it
+/// buys no more. Before the first batch that drops the trip (<c>ConstructionDropped</c>) and the construction plan chooses
+/// again; after it, the ship takes what it has bought to the site. Supplying pays nothing: the trip books what its cargo and
+/// fuel cost as a loss (D46).
 /// </summary>
 public sealed class SupplyConstructionGoalExecutor(
     IShipRepository ships,
@@ -41,7 +43,6 @@ public sealed class SupplyConstructionGoalExecutor(
     ILogger<SupplyConstructionGoalExecutor> logger) : IShipGoalExecutor
 {
     private const string NotSoldHere = "not_sold_here";
-    private const string NotFullHold = "not_full_hold";
     private const string OverBudget = "over_budget";
 
     /// <inheritdoc />
@@ -83,44 +84,91 @@ public sealed class SupplyConstructionGoalExecutor(
         var remaining = site is null || site.IsComplete
             ? 0
             : ConstructionPlanner.Needs(site, others).FirstOrDefault(need => need.TradeSymbol.Equals(trip.TradeSymbol, StringComparison.OrdinalIgnoreCase))?.Remaining ?? 0;
-        var units = Math.Min(Math.Min(trip.Units, ship.CargoCapacity - ship.CargoCurrent), remaining);
-        if (units <= 0)
-        {
-            return await DropAsync(ship, trip, TripBook.NotNeeded, ct);
-        }
 
-        var map = (await tradeContexts.ReadAsync(system, ct)).Map;
-        if (!map.TryGetGood(trip.BuyWaypointSymbol, trip.TradeSymbol, out var good) || good.PurchasePrice <= 0)
+        // What the earlier batches bought is aboard, after a restart too.
+        var aboard = Aboard(ship, trip.TradeSymbol);
+        var units = Math.Min(Math.Min(trip.Units, aboard + ship.CargoCapacity - ship.CargoCurrent), remaining);
+        if (units <= aboard)
         {
-            return await DropAsync(ship, trip, NotSoldHere, ct);
-        }
-
-        if (MiningPlanner.IsLowSupply(good.Supply))
-        {
-            return await DropAsync(ship, trip, ConstructionPlanner.LowSupply, ct);
-        }
-
-        if (good.TradeVolume < units)
-        {
-            return await DropAsync(ship, trip, NotFullHold, ct);
+            return aboard > 0
+                ? await LoadedAsync(ship.Symbol, trip, aboard, ct)
+                : await DropAsync(ship, trip, TripBook.NotNeeded, ct);
         }
 
         // D64: a load keeps the credit reserve, as a ship purchase does; what this trip holds back is its own to spend.
         var decision = await budget.EvaluateAsync(0, ct);
         var spendable = Math.Max(0, decision.AvailableCredits - Math.Max(0, decision.ReservedCredits - TripReservations.HeldBack(trip)));
-        if ((long)units * good.PurchasePrice > spendable)
+
+        // D81: batches of the market's trade volume, each at the price quoted then, with the prices the arrival or the last
+        // purchase's refresh fetched. The trip is stored after each, so a restart goes on from what is aboard.
+        var current = trip;
+        while (aboard < units)
         {
-            return await DropAsync(ship, trip, OverBudget, ct);
+            var map = (await tradeContexts.ReadAsync(system, ct)).Map;
+            var stop = string.Empty;
+            var batch = 0;
+            if (!map.TryGetGood(trip.BuyWaypointSymbol, trip.TradeSymbol, out var good) || good.PurchasePrice <= 0)
+            {
+                stop = NotSoldHere;
+            }
+            else if (MiningPlanner.IsLowSupply(good.Supply))
+            {
+                stop = ConstructionPlanner.LowSupply;
+            }
+            else
+            {
+                batch = Math.Min(units - aboard, good.TradeVolume > 0 ? good.TradeVolume : units - aboard);
+                if ((long)batch * good.PurchasePrice > spendable)
+                {
+                    stop = OverBudget;
+                }
+            }
+
+            if (stop.Length > 0)
+            {
+                if (aboard == 0)
+                {
+                    return await DropAsync(ship, current, stop, ct);
+                }
+
+                logger.LogInformation(
+                    "SupplyConstructionGoalExecutor: ship {ShipSymbol} buys no more {TradeSymbol} at {WaypointSymbol} ({Reason}) and takes the {Units} aboard of {PlannedUnits} to {SiteWaypoint}.",
+                    ship.Symbol,
+                    trip.TradeSymbol,
+                    trip.BuyWaypointSymbol,
+                    stop,
+                    aboard,
+                    units,
+                    trip.ConstructionSiteWaypointSymbol);
+                break;
+            }
+
+            var cost = await BuyBatchAsync(ship.Symbol, system, trip, batch, ct);
+            aboard += batch;
+            spendable -= cost;
+            current = current with
+            {
+                Spent = current.Spent + cost,
+                ReservedCredits = Math.Max(0, current.ReservedCredits - cost),
+            };
+            await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
         }
 
-        var result = await port.BuyCargoAsync(ship.Symbol, trip.TradeSymbol, units, ct);
-        await ships.UpdateCargoAsync(ship.Symbol, result.Cargo, ct);
+        return await LoadedAsync(ship.Symbol, current, aboard, ct);
+    }
+
+    /// <summary>One purchase of a batch, booked apart from trading's, and the market fetched again: the purchase moved its price.</summary>
+    /// <returns>What the batch cost.</returns>
+    private async Task<long> BuyBatchAsync(string shipSymbol, string system, SupplyConstructionGoal trip, int units, CancellationToken ct)
+    {
+        var result = await port.BuyCargoAsync(shipSymbol, trip.TradeSymbol, units, ct);
+        await ships.UpdateCargoAsync(shipSymbol, result.Cargo, ct);
         await agents.SetCreditsAsync(bus, result.AgentCredits, ct);
 
         // The ledger books it apart from trading's purchases, and counts the units bought from this market. The port's
         // "revenue" is the transaction's total.
         await bus.PublishAsync(new CargoPurchasedEvent(
-            ship.Symbol,
+            shipSymbol,
             new TradeSymbol(trip.TradeSymbol),
             units,
             result.Revenue,
@@ -133,35 +181,42 @@ public sealed class SupplyConstructionGoalExecutor(
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} bought {Units} {TradeSymbol} at {WaypointSymbol} for {Cost} credits.",
             JournalEvents.CargoBought,
-            ship.Symbol,
+            shipSymbol,
             units,
             trip.TradeSymbol,
             trip.BuyWaypointSymbol,
             result.Revenue);
 
         // The purchase moved the price: the market again, while the ship is still there (D25).
-        await marketRefresher.RefreshAfterTradeAsync(system, trip.BuyWaypointSymbol, ship.Symbol, ct);
+        await marketRefresher.RefreshAfterTradeAsync(system, trip.BuyWaypointSymbol, shipSymbol, ct);
+        return result.Revenue;
+    }
 
+    /// <summary>The load is aboard, whole or as far as the market and the credits allowed: next, the site.</summary>
+    private async Task<GoalExecutionResult> LoadedAsync(string shipSymbol, SupplyConstructionGoal trip, int aboard, CancellationToken ct)
+    {
         await goals.SetActiveGoalAsync(
-            ship.Symbol,
+            shipSymbol,
             trip with
             {
                 CargoBought = true,
-                Units = units,
-                PricePaidPerUnit = result.Revenue / units,
-                Spent = trip.Spent + result.Revenue,
+                Units = aboard,
+                PricePaidPerUnit = trip.Spent / aboard,
             },
             ct);
         return GoalExecutionResult.Progressing(
-            $"Bought {units} {trip.TradeSymbol} at {trip.BuyWaypointSymbol}; next, supplying {trip.ConstructionSiteWaypointSymbol}.");
+            $"Bought {aboard} {trip.TradeSymbol} at {trip.BuyWaypointSymbol}; next, supplying {trip.ConstructionSiteWaypointSymbol}.");
     }
+
+    private static int Aboard(ShipModel ship, string tradeSymbol)
+        => (ship.CargoInventory ?? [])
+            .Where(item => item.Symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase))
+            .Sum(item => item.Units);
 
     private async Task<GoalExecutionResult> SupplyStepAsync(ShipModel ship, SupplyConstructionGoal trip, CancellationToken ct)
     {
         var system = ship.SystemSymbol ?? string.Empty;
-        var aboard = (ship.CargoInventory ?? [])
-            .Where(item => item.Symbol.Equals(trip.TradeSymbol, StringComparison.OrdinalIgnoreCase))
-            .Sum(item => item.Units);
+        var aboard = Aboard(ship, trip.TradeSymbol);
         if (aboard <= 0)
         {
             await EndTripAsync(ship.Symbol, trip, TripBook.NothingAboard, ct);

@@ -21,9 +21,9 @@ using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 namespace SpaceTraders.Application.Tests.Goals;
 
 /// <summary>
-/// Slice 6.6: one construction trip. The builder buys its load in one purchase (D67), checked again with the prices its
-/// arrival fetched (D66, D67) and against the credit reserve (D64), flies it to the jump gate and supplies it. Supplying pays
-/// nothing: the trip books what it cost.
+/// Slice 6.6: one construction trip. The builder buys its load in batches of the market's trade volume (D81), each checked
+/// with the prices its arrival or the last purchase's refresh fetched (D66) and against the credit reserve (D64), flies it to
+/// the jump gate and supplies it. Supplying pays nothing: the trip books what it cost.
 /// </summary>
 public sealed class SupplyConstructionGoalExecutorTests
 {
@@ -101,14 +101,13 @@ public sealed class SupplyConstructionGoalExecutorTests
     }
 
     [Theory]
-    [InlineData("LIMITED", 80, "low_supply")]
-    [InlineData("SCARCE", 80, "low_supply")]
-    [InlineData("MODERATE", 60, "not_full_hold")]
-    public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheMarketNoLongerSellsTheLoadAsItMay(string supply, int tradeVolume, string reason)
+    [InlineData("LIMITED", "low_supply")]
+    [InlineData("SCARCE", "low_supply")]
+    public async Task AtTheBuyMarket_ItDropsTheTrip_WhenTheMarketsSupplyHasFallen(string supply, string reason)
     {
-        // D66 and D67, with the prices its arrival fetched.
+        // D66, with the prices its arrival fetched.
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>())
-            .Returns(new TradeContext(Map(GateMarket(), F49Market(supply: supply, tradeVolume: tradeVolume), D42Market(), H51Market(), I56Market()), 1_000_000, 200, 5_000));
+            .Returns(new TradeContext(Map(GateMarket(), F49Market(supply: supply), D42Market(), H51Market(), I56Market()), 1_000_000, 200, 5_000));
 
         var result = await StepAsync(Hauler(waypoint: F49), Trip());
 
@@ -117,6 +116,88 @@ public sealed class SupplyConstructionGoalExecutorTests
         await _goals.Received(1).ClearActiveGoalAsync("SHIP-6", Arg.Any<CancellationToken>());
         await _trips.Received(1).BookAsync("SHIP-6", Arg.Any<SupplyConstructionGoal>(), reason, Arg.Any<CancellationToken>());
         _log.Journal.Should().ContainSingle(e => e.EventKind == "ConstructionDropped" && Equals(e.Properties["Reason"], reason));
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ItBuysTheLoadInBatchesOfTheTradeVolume_EachAtThePriceQuotedThen()
+    {
+        // D81: F49 sells FAB_MATS 20 at a time, and each purchase raises the quote the refresh after it fetches (D25).
+        Quotes((2_100, "ABUNDANT"), (2_184, "ABUNDANT"), (2_271, "HIGH"), (2_362, "HIGH"));
+        Budget(available: 1_000_000, reserved: 268_000);
+
+        var result = await StepAsync(Hauler(waypoint: F49), Trip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(4).BuyCargoAsync("SHIP-6", "FAB_MATS", 20, Arg.Any<CancellationToken>());
+        await _refresher.Received(4).RefreshAfterTradeAsync(SystemSymbol, F49, "SHIP-6", Arg.Any<CancellationToken>());
+        await _bus.Received(4).PublishAsync(Arg.Is<CargoPurchasedEvent>(e => e.ForConstruction && e.Units == 20 && e.WaypointSymbol == F49), Arg.Any<DeliveryOptions>());
+        const long spent = 20L * (2_100 + 2_184 + 2_271 + 2_362);
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-6",
+            Arg.Is<SupplyConstructionGoal>(g => g.CargoBought && g.Units == 80 && g.Spent == spent && g.PricePaidPerUnit == spent / 80),
+            Arg.Any<CancellationToken>());
+        _log.Journal.Where(e => e.EventKind == "CargoBought").Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task BetweenBatches_TheTripIsStored_WithWhatItSpent_AndHoldsBackOnlyWhatIsLeftToBuy()
+    {
+        // A restart between batches goes on from what is aboard, with what the earlier ones cost (D57, D81).
+        Quotes((2_100, "ABUNDANT"), (2_184, "ABUNDANT"));
+        Budget(available: 1_000_000, reserved: 268_000);
+
+        await StepAsync(Hauler(waypoint: F49), Trip() with { Units = 40, ReservedCredits = 84_000 });
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-6",
+            Arg.Is<SupplyConstructionGoal>(g => !g.CargoBought && g.Spent == 42_000 && g.ReservedCredits == 42_000),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AfterARestartBetweenBatches_ItBuysWhatIsLeft()
+    {
+        // Two batches were bought and stored before the restart: 40 of the 80 aboard.
+        Quotes((2_271, "ABUNDANT"), (2_362, "ABUNDANT"));
+        Budget(available: 1_000_000, reserved: 268_000);
+        var trip = Trip() with { Spent = 85_680, ReservedCredits = 168_000 - 85_680 };
+
+        await StepAsync(Hauler(waypoint: F49, cargo: [new CargoItemModel("FAB_MATS", 40)]), trip);
+
+        await _port.Received(2).BuyCargoAsync("SHIP-6", "FAB_MATS", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-6",
+            Arg.Is<SupplyConstructionGoal>(g => g.CargoBought && g.Units == 80 && g.Spent == 85_680 + (20L * 2_271) + (20L * 2_362)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_WhenTheSupplyFallsToLimited_ItBuysNoMore_AndTakesWhatItHasToTheGate()
+    {
+        // D66 between batches: after two purchases F49's FAB_MATS are LIMITED. The trip goes on with 40.
+        Quotes((2_100, "MODERATE"), (2_184, "MODERATE"), (2_271, "LIMITED"));
+        Budget(available: 1_000_000, reserved: 268_000);
+
+        var result = await StepAsync(Hauler(waypoint: F49), Trip());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(2).BuyCargoAsync("SHIP-6", "FAB_MATS", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-6", Arg.Is<SupplyConstructionGoal>(g => g.CargoBought && g.Units == 40), Arg.Any<CancellationToken>());
+        await _trips.DidNotReceiveWithAnyArgs().BookAsync(default!, default!, default!, default);
+        _log.Journal.Should().NotContain(e => e.EventKind == "ConstructionDropped");
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_WhenTheCreditsRunOutPartWay_ItTakesWhatItHasToTheGate()
+    {
+        // D64 before each batch: the 100,000 it may spend pay for 42,000 and 43,680, not 45,420 more.
+        Quotes((2_100, "ABUNDANT"), (2_184, "ABUNDANT"), (2_271, "ABUNDANT"));
+        Budget(available: 200_000, reserved: 268_000);
+
+        await StepAsync(Hauler(waypoint: F49), Trip());
+
+        await _port.Received(2).BuyCargoAsync("SHIP-6", "FAB_MATS", 20, Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-6", Arg.Is<SupplyConstructionGoal>(g => g.CargoBought && g.Units == 40), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -238,6 +319,29 @@ public sealed class SupplyConstructionGoalExecutorTests
 
     private static ShipModel Loaded(string waypoint, string status = "DOCKED")
         => Hauler(waypoint: waypoint, status: status, cargo: [new CargoItemModel("FAB_MATS", 80)]);
+
+    /// <summary>
+    /// F49 selling FAB_MATS 20 at a time at each quote in turn: the one the arrival fetched, then the one the refresh after each
+    /// purchase fetched. Each purchase costs the quote it was made at.
+    /// </summary>
+    private void Quotes(params (int Price, string Supply)[] quotes)
+    {
+        var purchases = 0;
+        var aboard = 0;
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            var (price, supply) = quotes[Math.Min(purchases, quotes.Length - 1)];
+            return new TradeContext(Map(GateMarket(), F49Market(supply: supply, tradeVolume: 20, price: price), D42Market(), H51Market(), I56Market()), 1_000_000, 200, 5_000);
+        });
+        _port.BuyCargoAsync("SHIP-6", "FAB_MATS", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var units = call.ArgAt<int>(2);
+            var cost = (long)units * quotes[Math.Min(purchases, quotes.Length - 1)].Price;
+            purchases++;
+            aboard += units;
+            return new TradeActionResult("AGENT", 1_000_000 - cost, new CargoModel(aboard, 80, [new CargoItemModel("FAB_MATS", aboard)]), cost);
+        });
+    }
 
     private void Budget(long available, long reserved)
         => _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())

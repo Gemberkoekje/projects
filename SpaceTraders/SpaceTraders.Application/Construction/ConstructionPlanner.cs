@@ -13,10 +13,10 @@ namespace SpaceTraders.Application.Construction;
 /// Supplying a construction site pays nothing (the API's supply call answers with the site and the ship's cargo, without
 /// credits), so every load is spent for good:
 /// <list type="bullet">
-///   <item>a load is one purchase of one material: a full hold, or what the site still needs when that is less, at a
-///   market whose trade volume takes it in one go (D67: "If the markets trade volume is smaller than a haulers hold, it
-///   should wait until the trade volume is a haulers hold"), and whose supply of it isn't SCARCE or LIMITED (D66); then
-///   carried to the site through refuelling stops, in CRUISE;</item>
+///   <item>a load is one material: a full hold, or what the site still needs when that is less, bought at one market whose
+///   supply of it isn't SCARCE or LIMITED (D66), in batches of the market's trade volume, the most one purchase takes (D81,
+///   which replaced D67's one purchase: "Full hold in batches"); then carried to the site through refuelling stops, in
+///   CRUISE. Each batch raises the price, so its cost is estimated batch by batch (<see cref="PriceSteps"/>);</item>
 ///   <item>of the materials the site still needs, the one it has the smallest share of comes first, so the markets that
 ///   sell them get to recover in turn; of the markets, the one where the load costs least with its fuel;</item>
 ///   <item>whether the money allows it is the plan's to judge: a load keeps the credit reserve, as a ship purchase does,
@@ -33,9 +33,6 @@ public static class ConstructionPlanner
 
     /// <summary>Every market that sells a material the site needs has it SCARCE or LIMITED (D66).</summary>
     public const string LowSupply = "low_supply";
-
-    /// <summary>No market that sells a material the site needs trades the whole load at once (D67).</summary>
-    public const string TradeVolume = "trade_volume";
 
     /// <summary>The system of a waypoint: its symbol up to the last dash.</summary>
     /// <param name="waypointSymbol">The waypoint, such as <c>X1-DC53-I55</c>.</param>
@@ -107,15 +104,16 @@ public static class ConstructionPlanner
     /// <summary>
     /// The loads a ship could take for a site, the first material first: for each material the site still needs, the
     /// smallest share of what it needs first, the market where a load costs least with its fuel (to the market, and on to
-    /// the site). A load is the ship's free hold, or what the site still needs when that is less, in one purchase.
+    /// the site). A load is the ship's free hold, or what the site still needs when that is less, bought in batches of the
+    /// market's trade volume (D81).
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now, with its hold.</param>
     /// <param name="siteWaypointSymbol">The construction site.</param>
     /// <param name="needs">What the site still needs (<see cref="Needs"/>).</param>
     /// <param name="strict">
-    /// True for the loads the ship may buy now: the market's supply isn't SCARCE or LIMITED (D66), and its trade volume takes
-    /// the whole load at once (D67). False for what it would buy once they are: what the credits are saved up for.
+    /// True for the loads the ship may buy now: the market's supply isn't SCARCE or LIMITED (D66). False for what it would buy
+    /// once it isn't: what the credits are saved up for.
     /// </param>
     /// <returns>At most one load per material; none when the ship has no free hold.</returns>
     public static IReadOnlyList<ConstructionLoad> Loads(
@@ -160,8 +158,7 @@ public static class ConstructionPlanner
 
     /// <summary>
     /// Why a ship has no load it may buy now, though it has room: no market it can reach sells what the site needs
-    /// (<see cref="NoMarket"/>), every one has it SCARCE or LIMITED (<see cref="LowSupply"/>, D66), or none trades the whole
-    /// load at once (<see cref="TradeVolume"/>, D67). Empty when it has a load.
+    /// (<see cref="NoMarket"/>), or every one has it SCARCE or LIMITED (<see cref="LowSupply"/>, D66). Empty when it has a load.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now, with its hold.</param>
@@ -179,18 +176,7 @@ public static class ConstructionPlanner
             return string.Empty;
         }
 
-        if (Loads(map, ship, siteWaypointSymbol, needs, strict: false).Count == 0)
-        {
-            return NoMarket;
-        }
-
-        // A market whose supply allows it doesn't trade the whole load at once; else the supply is low everywhere.
-        return needs.Any(need => need.Remaining > 0
-            && map.MarketWaypoints.Any(market => map.TryGetGood(market, need.TradeSymbol, out var good)
-                && good.PurchasePrice > 0
-                && !MiningPlanner.IsLowSupply(good.Supply)))
-                ? TradeVolume
-                : LowSupply;
+        return Loads(map, ship, siteWaypointSymbol, needs, strict: false).Count == 0 ? NoMarket : LowSupply;
     }
 
     /// <summary>
@@ -211,7 +197,7 @@ public static class ConstructionPlanner
             .Take(Math.Max(0, count))];
     }
 
-    /// <summary>One load at one market, when the ship can fly it and, when strict, the market's supply and trade volume allow it.</summary>
+    /// <summary>One load at one market, when the ship can fly it and, when strict, the market's supply allows it.</summary>
     private static bool TryLoad(
         TradeMarketMap map,
         ShipModel ship,
@@ -225,7 +211,7 @@ public static class ConstructionPlanner
         load = new ConstructionLoad(tradeSymbol, market, siteWaypointSymbol, units, 0, 0);
         if (!map.TryGetGood(market, tradeSymbol, out var good)
             || good.PurchasePrice <= 0
-            || (strict && (MiningPlanner.IsLowSupply(good.Supply) || good.TradeVolume < units))
+            || (strict && MiningPlanner.IsLowSupply(good.Supply))
             || !TradeRoutePlanner.TryPlanFlight(map, ship, market, out var approach))
         {
             return false;
@@ -238,7 +224,10 @@ public static class ConstructionPlanner
             return false;
         }
 
-        load = new ConstructionLoad(tradeSymbol, market, siteWaypointSymbol, units, good.PurchasePrice, approach.FuelCost + haul.FuelCost);
+        load = new ConstructionLoad(tradeSymbol, market, siteWaypointSymbol, units, good.PurchasePrice, approach.FuelCost + haul.FuelCost)
+        {
+            CargoCost = PriceSteps.CostInBatches(good.PurchasePrice, units, good.TradeVolume),
+        };
         return true;
     }
 }
@@ -279,15 +268,15 @@ public sealed record MaterialNeed
     public double Share => Required <= 0 ? 1 : Math.Min(1, (double)(Fulfilled + OnTheWay) / Required);
 }
 
-/// <summary>One load of materials: one purchase at a market, carried to the construction site (<see cref="ConstructionPlanner.Loads"/>).</summary>
+/// <summary>One load of materials: bought at a market, carried to the construction site (<see cref="ConstructionPlanner.Loads"/>).</summary>
 public sealed record ConstructionLoad
 {
     /// <summary>Creates a load.</summary>
     /// <param name="TradeSymbol">The material.</param>
     /// <param name="BuyWaypointSymbol">The market it is bought at.</param>
     /// <param name="SiteWaypointSymbol">The construction site it is carried to.</param>
-    /// <param name="Units">The units, in one purchase.</param>
-    /// <param name="UnitPrice">What a unit costs at the market, as last seen.</param>
+    /// <param name="Units">The units, bought in batches of the market's trade volume (D81).</param>
+    /// <param name="UnitPrice">What a unit costs at the market, as last seen: the first batch's price.</param>
     /// <param name="FuelCost">The fuel to the market and on to the site.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ConstructionLoad(string TradeSymbol, string BuyWaypointSymbol, string SiteWaypointSymbol, int Units, long UnitPrice, long FuelCost)
@@ -298,6 +287,7 @@ public sealed record ConstructionLoad
         this.Units = Units;
         this.UnitPrice = UnitPrice;
         this.FuelCost = FuelCost;
+        CargoCost = Units * UnitPrice;
     }
 
     /// <summary>The material.</summary>
@@ -309,17 +299,20 @@ public sealed record ConstructionLoad
     /// <summary>The construction site it is carried to.</summary>
     public required string SiteWaypointSymbol { get; init; }
 
-    /// <summary>The units, in one purchase.</summary>
+    /// <summary>The units, bought in batches of the market's trade volume (D81).</summary>
     public required int Units { get; init; }
 
-    /// <summary>What a unit costs at the market, as last seen.</summary>
+    /// <summary>What a unit costs at the market, as last seen: the first batch's price.</summary>
     public required long UnitPrice { get; init; }
 
     /// <summary>The fuel to the market and on to the site.</summary>
     public required long FuelCost { get; init; }
 
-    /// <summary>What the cargo costs: the credits the trip holds back until it buys (D57, D64).</summary>
-    public long CargoCost => Units * UnitPrice;
+    /// <summary>
+    /// What the cargo is expected to cost, each batch a step dearer than the last (<see cref="PriceSteps"/>); the units at the
+    /// first batch's price unless set. The credits the trip holds back until it buys (D57, D64).
+    /// </summary>
+    public long CargoCost { get; init; }
 
     /// <summary>What the load costs with its fuel.</summary>
     public long Cost => CargoCost + FuelCost;

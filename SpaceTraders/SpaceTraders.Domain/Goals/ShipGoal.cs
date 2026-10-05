@@ -125,7 +125,7 @@ public sealed record DeliverCargoGoal : ShipGoal
 
 /// <summary>
 /// One construction trip (PLAN.md slice 6.6): the ship buys <see cref="Units"/> of <see cref="TradeSymbol"/> at
-/// <see cref="BuyWaypointSymbol"/> in one purchase (D67), flies them to the construction site
+/// <see cref="BuyWaypointSymbol"/> in batches of the market's trade volume (D81), flies them to the construction site
 /// <see cref="ConstructionSiteWaypointSymbol"/>, the jump gate, and supplies them there; then the goal ends, and the
 /// construction plan chooses the next trip. Supplying pays nothing, so what the cargo cost is booked as the trip's loss
 /// (D46). A trip for materials the ship already holds starts with its cargo aboard (<see cref="CargoBought"/>).
@@ -141,7 +141,10 @@ public sealed record SupplyConstructionGoal : TripGoal
     /// <summary>Where the trip buys the material; for materials the ship already held, where it was when the trip began.</summary>
     public string BuyWaypointSymbol { get; init; } = string.Empty;
 
-    /// <summary>The units the trip planned to carry when it was chosen: a full hold, or what the site still needed (D67).</summary>
+    /// <summary>
+    /// The units the trip planned to carry when it was chosen: a full hold, or what the site still needed (D81); once bought,
+    /// what it bought, which the market's supply or the credits may have cut short.
+    /// </summary>
     public int Units { get; init; }
 
     /// <summary>

@@ -24,7 +24,7 @@ public interface ITripBook
     /// <see cref="TripBook.Rejected"/>, <see cref="TripBook.NothingAboard"/>, <see cref="TripBook.NoBuyer"/>, or why a trade
     /// was dropped (<c>not_bought_here</c>, <c>not_lucrative</c>, <c>not_possible</c>); for a construction trip
     /// <see cref="TripBook.Supplied"/>, or why it was dropped (<see cref="TripBook.NotNeeded"/>, <c>low_supply</c>,
-    /// <c>not_full_hold</c>, <c>over_budget</c>, <c>not_sold_here</c>, <c>wrong_location</c>).
+    /// <c>over_budget</c>, <c>not_sold_here</c>, <c>wrong_location</c>).
     /// </param>
     /// <param name="cancellationToken">Stops the work.</param>
     /// <returns>A task that completes once the trip is booked.</returns>

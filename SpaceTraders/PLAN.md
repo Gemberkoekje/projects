@@ -151,6 +151,10 @@
   D76) is built on branch `ccr-f3fba810-ie3vm6` in projects and gembernodes.
 - Slice 6.14 (drones mine and siphon until every mineral is ABUNDANT, sharing a pair rather than trading, asked on 2026-10-05, with your
   decisions D77 and D78; the cargo ships' purchases stay as they are) is built on branch `claude/eager-allen-5q9biz`.
+- Slice 6.15 (the jump gate's loads bought in batches of the market's trade volume, asked on 2026-10-05, with your decision
+  D81) is built on branch `claude/spacetraders-construction-batches`. The gate had had no load since 10-04 18:09Z. D79 and
+  D80, decided the same morning (trade trips in batches, estimated and checked live; one buyer per good and market), are for
+  slice 6.16, which comes next.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -316,6 +320,9 @@ get the next D-number.
 | D76 | Slice 2.18 (asked on 2026-10-05): "Can the new list also add why the other goods are not considered for trading?" Why a good isn't traded depends on the trader: its hold, fuel and position, and the credits it may use. Asked which trader a good's reason is for, and which goods get one. | **The free traders of the plan's last pass, one row per good, for the trader that got furthest** ("Free traders, last pass"), and **only the goods with a price gap** ("Goods with a price gap"): one market in the system sells the good for less than another pays for it. The reason is the first of the trading plan's own checks (`TradeRoutePlanner.Rank`) the route fails: the buy market or the sell market out of reach, no full hold in one purchase and one sale (D56, D74), too few credits (D56), too little profit after fuel (D14); a lucrative one ranks below the 20 waiting routes listed. While every trader is on a trip the plan checks nothing, and the rows of its last pass with a free trader stay, with that time. |
 | D77 | Slice 6.14 (asked on 2026-10-05): "I'd like the miners to only mine, even if there is more profit in trading. They can mine until every mineral is ABUNDANT." Since D58 the role board keeps every drone in its gathering role whatever trading pays, so profit no longer moved them; a drone traded when its plan had no trip for it. With one miner per sell market and ore (D28), a drone whose every pair in reach was taken was passed over to the trading plan (B63), and a market that had the ore ABUNDANT was still mined for, as the lowest supply left (D28). Asked what a drone does once every pair below ABUNDANT has one (share a pair, or wait), what the drones do once every market has its minerals ABUNDANT (wait, trade, or keep mining), and whether siphon drones follow the same rule. | **Share a pair, trade only once everything is ABUNDANT, siphon drones too** ("Share a pair", "Trade until then", "Siphon drones too"): a market that has a mineral ABUNDANT is no target for the mining and siphon plans. A drone takes a pair no ship works first, as before; once every pair below ABUNDANT it can serve has one, it shares one: the lowest supply first, a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest ships on it. Only with nothing below ABUNDANT left does the trading plan give it a route. Drone purchases are unchanged: a drone is bought only for a pair no drone works (D28, D32), so sharing buys none. The command ship keeps taking what pays it most (D38). Amends D28 and D58. |
 | D78 | Asked on 2026-10-05, with D77: "Can you check if trade ships are only bought if there are unserved routes for them? I now have 2 trade ships that are mostly idling." They are, at one pass: the trading plan buys a cargo ship only when no free trader was left without a route and a new one would have a lucrative route from the shipyard that no trader holds, with the credits left after it (D21). Nothing checks that the traders have been busy for a while, and each trade moves the prices (D56), so that route can be gone soon after. While `Trade.ShipPurchases` has a ship left to buy, it is saved up for whatever the routes, and everything after it in the order waits (D43): the jump gate's loads (D64), probes and further drones. Asked whether to make it stricter: buy only once no trader has been without a route for a set time (10 minutes, a new setting), and, while a trader is idle, stop the list's next ship holding back the purchases after it. | **Leave it as is** ("Leave it as is"): the one-pass check and D43 stay. `Trade.ShipPurchases` is the setting for fewer cargo ships. |
+| D79 | Slice 6.16 (asked on 2026-10-05): seven trade trips since the reset were dropped on arrival (`not_full_hold`), each because another trader had been sent, at the same moment, for the same good at the same ABUNDANT market (D74) and bought first, which ended the ABUNDANT supply the second trip needed. Looking into it showed that a market's trade volume is the most one purchase or sale takes, not its stock (the API's own definition: "the maximum number of units that can be purchased or sold at this market in a single trade for this good"); the API gives no stock at all, only supply and activity levels. Asked: "A ship should buy as much as is profitable per trip, and sell as much as is profitable per trip. The problem is, with trade volumes of 6, it's very hard to determine whether something is actually profitable if you trade 80 of them. I'm open to suggestions on this one." Measured on the bot's 222 purchases since the reset: the price paid is the price quoted, and each purchase raises the next quote by a median of 1.8% (a good traded 6 at a time), 3.6% (20) or 5.7% (40 of 60); a sale lowers it about 2%; a raised price is back within 1% after a median of 56 minutes. Offered: estimate, then check live; estimate only; live only. | **Estimate, then check live** ("Estimate, check live"): a trip is sized and ranked with the measured price steps, each batch bought a step dearer and each sold a step cheaper, adding batches while the next still earns `Trade.MinProfitPerUnit`, up to the hold and the credits. At each market it trades one batch at a time and stops when the price the last trade's refresh fetched no longer earns that; the steps are learned per good and market from the bot's own trades. Replaces D56's full hold in one purchase, and with it D74's exception. |
+| D80 | Slice 6.16, with D79: every batch moves the price another trip's estimate started from. Offered: one buyer at a time; share, the second trip's estimate starting from where the first's batches leave the price; share freely. | **One buyer at a time**: while a trip is on its way to buy a good at a market, no other trip is sent for that good there, whatever its sell market; construction trips count too. Amends D18. |
+| D81 | Slice 6.15 (asked on 2026-10-05, with D79): the jump gate got no load from 10-04 18:09Z on. Its builders, the command ship's 40-unit hold and from 00:38Z SPECTER-D's 80, found no market selling FAB_MATS or ADVANCED_CIRCUITRY more than 20 at a time, and D67 wanted the load in one purchase; the plan's state showed no reason while the builder traded. First offered as an amendment of D74 ("Extend D74 to loads", one purchase of what the market trades at once per trip, about 100 trips), which was chosen, then asked again once the trade volume turned out to be per purchase: a full hold in batches, or what one purchase takes per trip. Measured: a purchase of 20 raises the next quote about 3.6%, so 80 in four batches cost about 5% more than four purchases at the first price would, and as a price takes about an hour to recover, a builder back every few minutes pays the rise either way. | **Full hold in batches** ("Full hold in batches (Recommended)"): a load is the builder's free hold, or what the gate still needs, bought at one market in batches of its trade volume, each at the price quoted then; it stops when the supply falls to LIMITED (D66) or the next batch would dip into the credit reserve (D64), and takes what it has to the gate. Its cost is estimated with the measured price steps. Replaces D67. |
 
 ## Phases
 
@@ -3071,6 +3078,47 @@ when it is seen for the first time.
     passes too. App 1114, Domain 72, API 210 (and 4 skipped), Integration 1.
   - To understand this, start with `SharedTargets` and `MiningTargets` in `SpaceTraders.Application/Mining/MiningPlanner.cs`,
     then `GiveTripAsync` in `Automation/MiningAutomationService.cs`; the siphon plan mirrors them.
+
+- **6.15 The jump gate's loads in batches** (built on branch `claude/spacetraders-construction-batches`, asked on 2026-10-05,
+  D81). Asked: "Also, I'm at 836k, construction should start at 624k. Why isn't construction started?"
+  - Found, on the cluster (image `486f581`): the construction plan had started at 10-04 18:09Z and bought nothing since: no
+    `ConstructionStarted` at all. The money wasn't it (838,786 credits against a reserve of 314,080). Its builder, SPECTER-D
+    with the construction role since 00:38Z (the command ship before it), has an 80-unit hold, and every market in X1-FJ91
+    sold the gate's materials 20 at a time: FAB_MATS at F58 (1,084) and D52 (1,159), ADVANCED_CIRCUITRY at D49 (3,578), all
+    ABUNDANT. D67 wanted a load in one purchase, so `ConstructionPlanner.Loads` found none, and the builder traded meanwhile.
+    The state's `Waiting` stayed empty, as the plan names a reason only for a free builder with an empty hold, and SPECTER-D
+    was never both.
+  - Found while asking what to do: a market's trade volume is the most one purchase takes, not its stock, and the API gives
+    no stock (D79). Across the 170 goods of X1-FJ91 the trade volume was one of 6, 18, 20, 60 or 180, by kind of good, and
+    none moved in the run's first 18 hours; in X1-DC53, a week into its reset, 20 of 150 moved over two days, in steps of
+    about 10%, up to three times where they started.
+  - Done:
+    - **A load** (`ConstructionPlanner.Loads`): the builder's free hold, or what the gate still needs, at one market whose
+      supply isn't SCARCE or LIMITED (D66), whatever its trade volume. Its cost (`ConstructionLoad.CargoCost`, what the trip
+      holds back, D57) is estimated batch by batch (`PriceSteps.CostInBatches`: each batch 2%, 4% or 6% dearer for a good
+      traded up to 6, up to 20 or more at a time, the measured medians rounded up), so the credit check (D64) and the
+      choice of market count the rise. `WhyNoLoad` names `no_market` or `low_supply`; `trade_volume` is gone.
+    - **The purchase** (`SupplyConstructionGoalExecutor`): one batch of the trade volume at a time, each at the price quoted
+      then, with `CargoBought` and the market fetched again after each (D25). Before each batch it checks the market as the
+      last refresh fetched it: a supply fallen to SCARCE or LIMITED, or a batch that would dip into the reserve, stops the
+      buying. Before the first batch that drops the trip, as before; after it, the ship takes what it has to the gate
+      (logged at Information). The trip is stored after each batch with what it spent, and holds back only what is left to
+      buy, so a restart goes on from what is aboard.
+    - **Unchanged:** the order of materials (the smallest share supplied first, then by name) and markets (the cheapest with
+      fuel), the purchase order (D64), the reserve, and the trading plan: trade trips still follow D56 and D74 until slice
+      6.16 (D79, D80).
+  - Noticed (not changed):
+    - **The first load:** with D42-style markets now loadable, ADVANCED_CIRCUITRY comes first on an unbuilt gate, by name at
+      an equal share of nothing supplied; in X1-FJ91 that is 80 at D49 for about 304,000.
+    - **The state:** `Waiting` says nothing while the builder trades. `ReadyShipSymbols` shows whether a load waits for it,
+      but a builder that never comes free with an empty hold would hide the reason again.
+  - Tests: `ConstructionPlanServiceTests` (an 80-unit builder at markets that sell 20 at a time takes a full hold; failed
+    before the change, with no load), `SupplyConstructionGoalExecutorTests` (four batches at rising prices; the trip stored
+    between batches; a restart buys what is left; LIMITED, or the reserve, part way stops the buying and the ship goes on
+    with what it has), `ConstructionPlannerTests` (a full hold where the market sells less at once, its cost batch by batch)
+    and `PriceStepsTests`. App 1126, Domain 72, API 210 (and 4 skipped), Integration 1.
+  - To understand this, start with the buy step of `Goals/Executors/SupplyConstructionGoalExecutor.cs`, then `TryLoad` in
+    `Construction/ConstructionPlanner.cs` and `Trading/PriceSteps.cs`.
 
 ## Changes in gembernodes
 
