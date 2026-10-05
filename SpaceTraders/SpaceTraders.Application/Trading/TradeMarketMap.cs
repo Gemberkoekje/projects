@@ -13,6 +13,7 @@ public sealed class TradeMarketMap
     private const string FuelSymbol = "FUEL";
     private const string ImportType = "IMPORT";
     private const string ExportType = "EXPORT";
+    private const string AbundantSupply = "ABUNDANT";
 
     private readonly Dictionary<string, (int X, int Y)> _positions;
     private readonly Dictionary<string, Dictionary<string, TradeGoodSnapshot>> _goods;
@@ -58,6 +59,12 @@ public sealed class TradeMarketMap
 
     /// <summary>The waypoints that have a market with known prices.</summary>
     public IReadOnlyCollection<string> MarketWaypoints => _goods.Keys;
+
+    /// <summary>
+    /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the
+    /// routes that feed the markets making them come first. None unless set.
+    /// </summary>
+    public IReadOnlySet<string> ConstructionMaterials { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The goods a market lists, with their last known prices; empty for an unknown market.</summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
@@ -149,6 +156,35 @@ public sealed class TradeMarketMap
             .OrderByDescending(export => export.PurchasePrice)
             .ThenBy(export => export.Symbol, StringComparer.Ordinal)
             .Select(export => export.Symbol)
+            .FirstOrDefault() ?? string.Empty;
+    }
+
+    /// <summary>
+    /// The jump gate's material a market makes from a good delivered there (D89): the market imports the good, below ABUNDANT,
+    /// and exports one of <see cref="ConstructionMaterials"/> made from it (the production chains), so more of the good grows
+    /// that production. On 2026-10-05 the two FAB_MATS markets, D52 and F58, made 1 to 4 units a tick while their IRON was
+    /// SCARCE, and the gate needed 1,260 more.
+    /// </summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <param name="tradeSymbol">The good delivered.</param>
+    /// <returns>The material, or empty when delivering the good there feeds none.</returns>
+    public string ConstructionMaterialMadeFrom(string waypointSymbol, string tradeSymbol)
+    {
+        if (ConstructionMaterials.Count == 0
+            || !TryGetGood(waypointSymbol, tradeSymbol, out var input)
+            || !input.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
+            || input.Supply.Equals(AbundantSupply, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return GoodsAt(waypointSymbol)
+            .Where(export => export.Type.Equals(ExportType, StringComparison.OrdinalIgnoreCase)
+                && ConstructionMaterials.Contains(export.Symbol)
+                && _madeFrom.TryGetValue(export.Symbol, out var inputs)
+                && inputs.Contains(tradeSymbol, StringComparer.OrdinalIgnoreCase))
+            .Select(export => export.Symbol)
+            .Order(StringComparer.Ordinal)
             .FirstOrDefault() ?? string.Empty;
     }
 }

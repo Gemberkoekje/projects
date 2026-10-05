@@ -670,7 +670,24 @@ public sealed class TradingAutomationService(
 
     private void LogRoute(ShipModel ship, TradeRoute route)
     {
-        if (route.FeedsTradeSymbol.Length > 0)
+        if (route.FeedsConstruction)
+        {
+            // D89: a route that feeds the jump gate's materials comes before every other; the journal says so.
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes the jump gate's {ConstructionMaterial} from it (D89); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",
+                JournalEvents.TradeStarted,
+                ship.Symbol,
+                route.Units,
+                route.TradeSymbol,
+                route.BuyWaypointSymbol,
+                route.BuyPrice,
+                route.SellWaypointSymbol,
+                route.SellPrice,
+                route.ConstructionMaterial,
+                route.Profit,
+                route.FuelCost);
+        }
+        else if (route.FeedsTradeSymbol.Length > 0)
         {
             logger.LogInformation(
                 "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes {FeedsTradeSymbol} from it; about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",

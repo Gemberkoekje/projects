@@ -106,6 +106,41 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_PutsTheRoutesThatFeedTheJumpGatesMaterialsFirst_WhileTheGateNeedsThem()
+    {
+        // D89, asked on 2026-10-05: "Please make sure the trade routes prioritize the feeding to the portal construction
+        // materials". D41 makes FAB_MATS from IRON, SCARCE there, and the gate still needs FAB_MATS: IRON for D41 goes before
+        // SHIP_PARTS for A1, which earn far more. Without the need, or with D41's IRON ABUNDANT, the routes go by profit again.
+        TradeMarketMap MapWith(string ironAtD41, params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("IRON", "EXPORT", 124, 56, 60), Good("SHIP_PARTS", "EXPORT", 3_920, 1_855, 6), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("IRON", "IMPORT", 310, 154, 60, ironAtD41), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("SHIP_PARTS", "IMPORT", 15_620, 7_738, 6), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"],
+                    ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "SHIP_PLATING"],
+                })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+            };
+
+        var needed = TradeRoutePlanner.Rank(MapWith("SCARCE", "FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+        var done = TradeRoutePlanner.Rank(MapWith("SCARCE"), CommandShip(), 250_000, 5, NoneHeld);
+        var abundant = TradeRoutePlanner.Rank(MapWith("ABUNDANT", "FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+
+        needed.Select(route => (route.TradeSymbol, route.ConstructionMaterial)).Should().Equal(("IRON", "FAB_MATS"), ("SHIP_PARTS", string.Empty));
+        needed[1].Profit.Should().BeGreaterThan(10 * needed[0].Profit);
+        TradeRoutePlanner.CompareBestFirst(needed[0], needed[1]).Should().BeNegative();
+        done.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON");
+        done.Should().OnlyContain(route => !route.FeedsConstruction);
+        abundant.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON");
+    }
+
+    [Fact]
     public void Rank_PutsShipPartsBeforeIronThatFeedsMachinery_WhenTheyEarnMore()
     {
         // D82, asked on 2026-10-05: "Why is iron prioritized over ship parts, although the profit would be a lot higher?" and

@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.22)
+- Trade routes that feed the jump gate's materials come first (D89), as asked on 2026-10-05: "Please make sure the trade routes prioritize the feeding to the portal construction materials". While the gate needs a material and the construction plan is on, a lucrative route to a market that makes it from the good (exports the material, imports the good below ABUNDANT) goes before every other: IRON for the FAB_MATS markets D52 and F58, RESTRICTED while their IRON was SCARCE. `TradeMarketMap.ConstructionMaterials`, `ConstructionMaterialMadeFrom`; `TradeRoute.ConstructionMaterial`. `TradeStarted` says "which makes the jump gate's … from it (D89)".
+
+### Docs – Changed (2026-10-05, slice 6.22)
+- `PLAN.md`: slice 6.22 and decision D89; B68 merged and deployed. `docs/HOW_IT_WORKS.md`: feeding the jump gate first.
+
 ### Code – Fixed (2026-10-05, B68)
 - A survey ship at a collection point's asteroid stays there and surveys, as D83 meant. With too little fuel to cruise to the point's market, where the parked drones count, the survey plan had moved it back to the market after every survey, a 25-minute drift: SPECTER-2C took one survey at B44 every 28 minutes, and the drones there extracted without one (138 unsurveyed extractions in the hour to 15:30Z).
 

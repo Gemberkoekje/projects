@@ -1,3 +1,5 @@
+using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -62,6 +64,7 @@ public sealed class TradeContextReader(
     IAgentRepository agents,
     ISettingsRepository settings,
     ISupplyChainCache supplyChain,
+    IConstructionSites constructionSites,
     ISpaceTradersPort port) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
@@ -81,8 +84,20 @@ public sealed class TradeContextReader(
         var minProfitPerUnit = await settings.GetAsync<int>(MinProfitPerUnitSetting, cancellationToken);
         var fuelReserve = await settings.GetAsync<long>(FuelReserveCreditsSetting, cancellationToken);
 
+        // D89: while the system's jump gate needs materials and the construction plan buys them, the routes that feed the
+        // markets making them come first.
+        var materials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (await settings.IsPlanEnabledAsync(AutomationPlan.Construction, cancellationToken))
+        {
+            materials.UnionWith((await constructionSites.CachedNeedingMaterialsAsync(cancellationToken))
+                .Where(site => WaypointSymbols.SystemOf(site.WaypointSymbol).Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(site => site.Materials)
+                .Where(material => material.Fulfilled < material.Required)
+                .Select(material => material.TradeSymbol));
+        }
+
         return new TradeContext(
-            new TradeMarketMap(systemWaypoints, systemMarkets, chains),
+            new TradeMarketMap(systemWaypoints, systemMarkets, chains) { ConstructionMaterials = materials },
             agent?.Credits ?? 0,
             Math.Max(0, minProfitPerUnit),
             Math.Max(0, fuelReserve));

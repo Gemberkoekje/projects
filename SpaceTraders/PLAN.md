@@ -173,6 +173,10 @@
 - Slice 6.21 (the role board's trade estimates count only what the trading plan could give, capped at what trading
   earned lately, and cargo ships beyond the list only while routes wait for one; B67, with your decisions D87 and D88)
   is merged and deployed (projects#180, gembernodes#75, image `0d60234`, live since 2026-10-05 14:25Z).
+- B68 (the collection point's survey ship drifted back to the market after every survey) is merged and deployed
+  (projects#181, gembernodes#76, image `89731ac`, live since 2026-10-05 15:52Z).
+- Slice 6.22 (trade routes that feed the jump gate's materials come first, asked on 2026-10-05, with your decision D89)
+  is built on branch `claude/spacetraders-feed-the-gate`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -351,6 +355,7 @@ get the next D-number.
 | D86 | Slice 6.20 (asked on 2026-10-05, with D85): the idle ship was SPECTER-2B, the light shuttle bought at 10:57Z for B44's collection point (D83), which waits without work until a drone is parked there: about three hours this time, while the drones drifted there. Offered: trade until a drone is parked; keep waiting. | **Trade until parked** (2026-10-05): until one of its point's drones is parked at the asteroid, a designated shuttle trades like any cargo ship; once one is, the role board has it collect, from the end of its trip. |
 | D87 | Slice 6.21 (asked on 2026-10-05, investigating B67): a trip's rate isn't repeatable; one trip's profit over its flights (about a million an hour) was compared with mining's steady 12,000 to 20,000, while SPECTER-1's trading made about 83,000 an hour. Offered: cap a ship's trade estimate at what trading actually earned lately; or the bug fixes only. | **Cap at realized** (2026-10-05): no trade trip counts for more an hour than the trade trips that ended in the last two hours made per hour of their time (`TradeEarnings`); with none in that time, no cap. |
 | D88 | Slice 6.21 (asked on 2026-10-05): "yes, investigate the role board estimates as a bug, and can you add a limitation on buying more trade ships unless a trade ship actually adds value? If the market is stable, we have too many trade ships right now." Beyond the list D43 bought one more cargo ship whenever every trader was busy and a new ship would have any lucrative route, 5 a unit: nearly always. Offered: only while a route worth 10,000 has waited 30 minutes for a ship; only when the traders' earnings would pay a ship back in a day; never beyond the list. | **Routes keep waiting** (2026-10-05): beyond `Trade.ShipPurchases` a cargo ship is bought only once a route worth `Trade.ShipPurchaseMinRouteProfit` (10,000), from the shipyard and held by no trader, has waited `Trade.ShipPurchaseWaitMinutes` (30) for a ship with every trader busy. Amends D43. |
+| D89 | Slice 6.22 (asked on 2026-10-05, after "Could the construction of the gate go faster?"): the gate had 340 of 1,600 FAB_MATS; at about 8.5 an hour since the markets' stock ran out, it would finish between 10-09 and just after the reset. The two FAB_MATS markets, D52 and F58, were RESTRICTED: their IRON was SCARCE (F58 74% of the run, D52 54%), and of the 1,920 IRON the traders carried, F58 got none and D52 220. Offered: the trade routes feeding the gate's material factories first; the builder hauling IRON while it waits. Then: "Please make sure the trade routes prioritize the feeding to the portal construction materials, yes." | **Feed the gate first** (2026-10-05): while the system's jump gate needs a material and the construction plan is on, a lucrative trade route to a market that makes that material from the good (exports the material, imports the good below ABUNDANT, by the production chains) comes before every other route, whatever it earns; the others go as D85 ranks them. |
 | D84 | Slice 6.19 (asked on 2026-10-05): "The excavators are now drifting for 2 hours. Did they start drifting from the location they were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" They drifted straight from where they were (D52 to B7, 368, about 2 h 52 min). Then: "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I think it is worth it." And: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then drift back to a fuel station with 0 fuel and refuel." | **The fastest mix of CRUISE and DRIFT; BURN where the fuel allows it** (2026-10-05): a way out of CRUISE reach is the fastest mix of CRUISE legs, refuelling at markets that sell fuel, and DRIFT legs; a drone for a collection point (D83) flies straight to its asteroid. A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing (into a market that sells fuel; elsewhere, only when what is left still takes the ship on as cruising would), and cruises otherwise; the extra fuel is accepted. No leg lands a ship with an empty tank where no fuel is sold. |
 
 ## Phases
@@ -3375,6 +3380,42 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.22 Feed the gate first** (built on branch `claude/spacetraders-feed-the-gate`, asked on 2026-10-05, D89). Asked:
+  "Could the construction of the gate go faster?", then "Please make sure the trade routes prioritize the feeding to the
+  portal construction materials, yes."
+  - Found (read-only analysis, 2026-10-05 15:00 to 15:50Z):
+    - The gate had FAB_MATS 340 of 1,600 and ADVANCED_CIRCUITRY 220 of 400. After the markets' overnight stock ran out
+      (FAB_MATS 11:08, ADVANCED_CIRCUITRY 12:05), FAB_MATS came at about 8.5 an hour: finished between 10-09 04:00Z and
+      10-11 20:00Z, against the reset at 10-11 13:00Z.
+    - Each 20-unit batch turned a market from MODERATE to LIMITED (D66 then stops the load); a market took 83 to 211
+      minutes back to MODERATE. Production, not the builder, its hold or the credits (2.23M), set the pace.
+    - Both FAB_MATS markets were RESTRICTED: in all 10 activity changes seen, an export was RESTRICTED exactly while an
+      input was SCARCE. IRON was SCARCE at F58 74% of the run and at D52 54%; of the 1,920 IRON the traders carried, F58
+      got none and D52 220 (prices at the six IRON buyers within 0 to 5 a unit). While GROWING, the markets made 4 to 8
+      times as much. ADVANCED_CIRCUITRY at D49 left RESTRICTED for about 2 hours after each 40 ELECTRONICS sold there.
+    - Asked how much buying at LIMITED or SCARCE would push the price: each batch below MODERATE costs about 9 to 12%
+      more than the one before; down to SCARCE gives 120 to 160 FAB_MATS once (8 to 11 hours) for about 1M more on the
+      rest. D66 stays (2026-10-05: "Keep MODERATE").
+  - Done:
+    - `TradeMarketMap.ConstructionMaterials` (the materials the gate still needs, read by `TradeContextReader` from the
+      construction cache while the construction plan is on) and `ConstructionMaterialMadeFrom`: the material a market makes
+      from a good delivered there, when it exports the material, imports the good below ABUNDANT, and the production chains
+      make the one from the other.
+    - `TradeRoute.ConstructionMaterial`; `Rank` and `CompareBestFirst` put the routes that feed the gate first, then D85's
+      order. D80 still lets one trip at a time buy a good at a market, so one trader at a time carries H60's IRON.
+    - `TradeStarted` for such a route says "which makes the jump gate's FAB_MATS from it (D89)".
+  - Choices (2026-10-05): the trade routes, rather than the builder hauling IRON while it waits.
+  - Unchanged: D66 (the construction plan buys at MODERATE or better), D14 (a route must still earn the minimum), the
+    mining plan (QUARTZ_SAND for D52 and F58 stays a mining target as before).
+  - Noticed (not changed): the construction plan keeps only its current waiting reason and doesn't log it; its credit
+    check is costed for a full 80-unit hold even when D66 stops the load after 20.
+  - Tests: `TradeRoutePlannerTests` (IRON for a FAB_MATS maker before SHIP_PARTS that earn more than ten times as much,
+    while the gate needs FAB_MATS; not without the need, nor with the IRON ABUNDANT), `TradeContextReaderTests` (the needed
+    materials of the system's gate, none with the construction plan off), `TradingAutomationServiceTests` (the route is
+    taken first, and the journal says so).
+  - To understand this, start with `ConstructionMaterialMadeFrom` in `Trading/TradeMarketMap.cs`, then `ReadAsync` in
+    `Trading/TradeContextReader.cs` and `Rank` in `Trading/TradeRoutePlanner.cs`.
 
 - **6.21 Honest trade estimates, and cargo ships only while routes wait** (built on branch
   `claude/spacetraders-b67-trade-estimates`, asked on 2026-10-05, B67, D87, D88). Asked: "yes, investigate the role board
