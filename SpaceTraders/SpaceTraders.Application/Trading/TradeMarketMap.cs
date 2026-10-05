@@ -13,6 +13,7 @@ public sealed class TradeMarketMap
     private const string FuelSymbol = "FUEL";
     private const string ImportType = "IMPORT";
     private const string ExportType = "EXPORT";
+    private const string ExchangeType = "EXCHANGE";
     private const string AbundantSupply = "ABUNDANT";
 
     private readonly Dictionary<string, (int X, int Y)> _positions;
@@ -187,4 +188,39 @@ public sealed class TradeMarketMap
             .Order(StringComparer.Ordinal)
             .FirstOrDefault() ?? string.Empty;
     }
+
+    /// <summary>
+    /// Whether a market makes something from a good delivered there (D91): it imports the good and exports something made
+    /// from it (the production chains); without the chains, any import counts, as before. A market that exchanges the good,
+    /// or imports it without making anything from it, only pays for it: a sale there is a wealth trade, never a supply trade.
+    /// In X1-FJ91 on 2026-10-05, H60 made IRON from IRON_ORE, D52 imported IRON_ORE and made nothing from it, and B7 and H62
+    /// exchanged ores.
+    /// </summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <param name="tradeSymbol">The good delivered.</param>
+    /// <returns>True when delivering the good there feeds the market's production.</returns>
+    public bool MakesSomethingFrom(string waypointSymbol, string tradeSymbol)
+    {
+        if (!TryGetGood(waypointSymbol, tradeSymbol, out var input)
+            || !input.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return _madeFrom.Count == 0
+            || GoodsAt(waypointSymbol).Any(export => export.Type.Equals(ExportType, StringComparison.OrdinalIgnoreCase)
+                && _madeFrom.TryGetValue(export.Symbol, out var inputs)
+                && inputs.Contains(tradeSymbol, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Whether a market exchanges a good (D91): it buys and sells it, and makes nothing from it. A sale there is a wealth
+    /// trade, considered last, never a supply trade. Asked on 2026-10-05: "EXCHANGE nodes should be lowest priority and only
+    /// considered as wealth trades, never as supply trades."
+    /// </summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when the market lists the good as EXCHANGE.</returns>
+    public bool Exchanges(string waypointSymbol, string tradeSymbol)
+        => TryGetGood(waypointSymbol, tradeSymbol, out var good) && good.Type.Equals(ExchangeType, StringComparison.OrdinalIgnoreCase);
 }

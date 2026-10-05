@@ -674,8 +674,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   free miners it wants (D23).
 - **Each tick** every free miner gets one trip (`MineAndSellGoal`); the trip ends when it is sold,
   and the plan chooses the next one:
-  1. a miner that holds ore a market buys sells it first, one good a trip, where each fetches most after fuel
-     (reason `held_cargo`, `TradeRoutePlanner.TryFindBestCargoSale`): ore left over from the contract, and the other
+  1. a miner that holds ore a market buys sells it first, one good a trip, at a market that makes something from it where
+     such a sale pays (slice 6.24, D91, `supplyFirst`), else where it fetches most after fuel (reason `held_cargo`,
+     `TradeRoutePlanner.TryFindBestCargoSale`): ore left over from the contract, and the other
      ores a trip keeps (D71, below). A full hold only sells, even where the sale doesn't pay for its fuel: a mining trip
      would turn to selling at once and end without its ore aboard, on every tick. A full hold no market it can reach
      buys gets no trip, so the trading plan jettisons it (D42);
@@ -693,8 +694,14 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      has all it wants, and is no target (D77, `MiningPlanner.IsAbundant`); HIGH still is. Within a supply level, a
      surveyed ore first, then the most a single extraction is expected to fetch: the ore's share of the
      survey's deposits (without a survey, one of the asteroid's ores) times its price. One miner per
-     sell market and ore. It logs `MiningStarted`, reason `uncovered` (D48 chose it over D28's first),
-     `surveyed`, `low_supply` or `lowest_supply`;
+     sell market and ore. A market that makes something from its ore comes before every other (slice 6.24, D91,
+     `TradeMarketMap.MakesSomethingFrom`: it imports the ore and exports a good made from it; without the production
+     chains, any import counts). A market that exchanges the ore, or imports it without making anything from it, only
+     pays for it: a wealth target, after every other, never uncovered (D48), never a scarce ore and no opening. Asked on
+     2026-10-05: "EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as supply
+     trades." In X1-FJ91 D52 imported IRON_ORE and made nothing from it, and B7 and H62 exchanged ores. It logs
+     `MiningStarted`, reason `uncovered` (D48 chose it over D28's first), `surveyed`, `low_supply`, `lowest_supply` or
+     `wealth`;
   3. **far targets** (slice 6.10c, D45): a market out of the miner's CRUISE reach that sells fuel counts
      too, mined at the asteroid nearest it within a CRUISE round trip of it (out with a full tank, back
      with what is left): the trip (`Drifting`) gets to the market first, the fastest way (D84: it cruises as far
@@ -707,8 +714,9 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      trading. They can mine until every mineral is ABUNDANT."): a mining drone (`FleetRoles.IsMiningDrone`) whose every
      pair below ABUNDANT, in reach or a drift away, already has a miner shares one (`MiningPlanner.SharedTargets`): the
      lowest supply first, a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest ships on it
-     (the trips under way, and those given out earlier in the same pass), then step 2's order. It logs `MiningStarted`,
-     reason `shared`. A drone is passed over to the trading plan (B63) only when nothing below ABUNDANT is left that it
+     (the trips under way, and those given out earlier in the same pass), then step 2's order. A pair whose market makes
+     something from its ore is shared before a drone mines for a wealth target (D91): those come last of all. It logs
+     `MiningStarted`, reason `shared`. A drone is passed over to the trading plan (B63) only when nothing below ABUNDANT is left that it
      can reach and sell, or with a full hold nobody it can reach buys (step 1). The command ship shares nothing: it takes
      what pays it most (D38), and is passed over when every pair has a miner.
 - **Far asteroids with a shuttle** (slice 6.18, D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and
@@ -781,8 +789,9 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
   role, which the command ship can have too.
 - **Each tick** every free siphoner gets one trip (`SiphonAndSellGoal`); the trip ends when its gas is
   sold, and the plan chooses the next one:
-  1. a siphoner that holds goods a market buys sells them first, one good a trip, where each fetches
-     most after fuel (reason `held_cargo`): a trip keeps every gas it siphons (D33), and sells only its
+  1. a siphoner that holds goods a market buys sells them first, one good a trip, at a market that makes something from
+     it where such a sale pays (D91), else where each fetches most after fuel (reason `held_cargo`): a trip keeps every gas
+     it siphons (D33), and sells only its
      own. A full hold only sells, even where the sale doesn't pay for its fuel: a siphon trip would turn
      to selling at once and end without its gas aboard, on every tick;
   2. otherwise the best of `SiphonPlanner.SiphonTargets`: every market that buys a gas (imported or
@@ -793,15 +802,17 @@ The mining plan for gases, by the same rules, without surveys: the API's siphon 
      market shortest of its gas (D28): SCARCE, then LIMITED (low supply, D22), and once no market is
      short, the lowest supply there is; a market that has the gas ABUNDANT is no target (D77). Within a supply level,
      the most a single siphon is expected to fetch (one of the gas giant's three gases times the price), then the
-     nearest gas giant. One siphoner per sell market and gas. It logs `SiphonStarted`, reason `uncovered`, `low_supply`
-     or `lowest_supply`;
+     nearest gas giant. One siphoner per sell market and gas. A market that makes something from its gas comes first, as
+     for the miners (D91): one that exchanges it, or imports it without making anything from it, is a wealth target, last
+     (C46 exchanged the three gases in X1-FJ91, which G59, F57 and D51 import). It logs `SiphonStarted`, reason
+     `uncovered`, `low_supply`, `lowest_supply` or `wealth`;
   3. **far targets** (slice 6.10c, D45), as for the miners: a market out of the siphoner's CRUISE reach that
      sells fuel, with a gas giant within a CRUISE round trip of it; the trip drifts there first. X1-DC53 has
      none: its one gas giant, C38, has every buyer in reach of a siphon drone;
   4. **sharing** (slice 6.14, D77, siphon drones as the mining drones): a siphon drone (`FleetRoles.IsSiphoner`) whose
      every pair below ABUNDANT already has a siphoner shares one (`SiphonPlanner.SharedTargets`), by the miners' order:
-     the lowest supply, in CRUISE reach before a drift away, then the fewest ships on it. It logs `SiphonStarted`, reason
-     `shared`, and is passed over to the trading plan only when nothing below ABUNDANT is left that it can reach and
+     a pair whose market makes something from its gas first (D91), the lowest supply, in CRUISE reach before a drift away,
+     then the fewest ships on it. It logs `SiphonStarted`, reason `shared`, and is passed over to the trading plan only when nothing below ABUNDANT is left that it can reach and
      sell. The command ship, in the siphon role, shares nothing (D38).
 - **Drones** (D32, the miners' rule): one a tick, at the shipyard that sells `SHIP_SIPHON_DRONE` for the
   least in a system where our ships are, up to `Siphon.MaxDrones` (default 10), within the credit reserve
@@ -975,8 +986,9 @@ buy.
     costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. H60
     sold IRON for 105 to 157 within an hour on 2026-10-05, while D52 paid 151 to 155 and F58 150. "Goods not traded" shows
     such a route as "feeds the jump gate's …, … units for … after fuel (D89, D90)".
-- **Ranking** (D15, D82, D85): among the lucrative trips (after those that feed the jump gate, D89), the most profitable
-  first, an end product's counted at half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it
+- **Ranking** (D15, D82, D85): among the lucrative trips (after those that feed the jump gate, D89, and before those to a
+  market that exchanges the good, which come last and never count as feeding production, D91, `TradeRoute.ToExchange`),
+  the most profitable first, an end product's counted at half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it
   earns more than twice as much. An
   end product is a good nothing is made from by the game's production chains (`TradeMarketMap.IsEndProduct`; ships
   count as made from SHIP_PARTS and SHIP_PLATING), wherever it is sold. Asked on 2026-10-05: "Why is iron

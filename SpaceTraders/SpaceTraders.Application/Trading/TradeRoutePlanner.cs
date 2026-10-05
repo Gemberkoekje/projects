@@ -66,6 +66,9 @@ public static class TradeRoutePlanner
     /// <summary>A sliver of floating-point error: an exact sum must not round a credit the wrong way.</summary>
     private const double Sliver = 1e-6;
 
+    /// <summary>Where a sale that pays nothing stands with <c>supplyFirst</c> (D91): after every sale that pays.</summary>
+    private const int UnpaidSaleTier = 3;
+
     /// <summary>The key that identifies a route: good, buy market and sell market.</summary>
     /// <param name="tradeSymbol">The good.</param>
     /// <param name="buyWaypointSymbol">The buy market.</param>
@@ -117,6 +120,7 @@ public static class TradeRoutePlanner
         CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, routes, judgements: null);
         return [.. routes
             .OrderByDescending(route => route.FeedsConstruction)
+            .ThenBy(route => route.ToExchange)
             .ThenByDescending(RankingProfit)
             .ThenByDescending(route => route.FeedsProduction)
             .ThenBy(route => route.Key, StringComparer.Ordinal)];
@@ -182,8 +186,9 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15, D82, D85, D89): one that feeds the jump gate's materials first, then by
-    /// <see cref="RankingProfit"/>, a good something is made from first on a tie, then by key.
+    /// Orders two routes as Rank does (D15, D82, D85, D89, D91): one that feeds the jump gate's materials first, one that sells
+    /// to a market that exchanges the good last, then by <see cref="RankingProfit"/>, a good something is made from first on
+    /// a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -197,6 +202,12 @@ public static class TradeRoutePlanner
         if (gate != 0)
         {
             return gate;
+        }
+
+        var exchange = x.ToExchange.CompareTo(y.ToExchange);
+        if (exchange != 0)
+        {
+            return exchange;
         }
 
         var profit = RankingProfit(y).CompareTo(RankingProfit(x));
@@ -818,6 +829,9 @@ public static class TradeRoutePlanner
         var material = map.ConstructionMaterialMadeFrom(sellWaypointSymbol, tradeSymbol);
         route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice, ConstructionMaterial = material };
 
+        // D91: a sale to a market that exchanges the good is a wealth trade: it never feeds production, and ranks last.
+        var toExchange = map.Exchanges(sellWaypointSymbol, tradeSymbol);
+
         // The ship docks at the buy market to buy, and fills its tank there when it sells fuel.
         var fuelAtBuy = map.SellsFuel(buyWaypointSymbol) ? ship.FuelCapacity : approach.FuelLeft;
         if (!TryPlanFlight(map, buyWaypointSymbol, sellWaypointSymbol, fuelAtBuy, ship.FuelCapacity, out var haul))
@@ -878,8 +892,9 @@ public static class TradeRoutePlanner
             map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol))
         {
             CargoCost = cargoCost,
-            FeedsProduction = !map.IsEndProduct(tradeSymbol),
+            FeedsProduction = !map.IsEndProduct(tradeSymbol) && !toExchange,
             ConstructionMaterial = material,
+            ToExchange = toExchange,
         };
         return true;
     }
@@ -893,20 +908,25 @@ public static class TradeRoutePlanner
 
     /// <summary>
     /// Where a ship gets the most for cargo it holds, after the fuel to get there: any market it can
-    /// reach that buys the good, the one it is at included. A tie goes to where it is.
+    /// reach that buys the good, the one it is at included. A tie goes to where it is. With
+    /// <paramref name="supplyFirst"/>, a sale that pays to a market that makes something from the good comes first, then
+    /// one to a market that imports it without making anything from it, then one to a market that exchanges it (D91,
+    /// <see cref="TradeMarketMap.MakesSomethingFrom"/>); a sale that pays nothing comes after every one that does.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
     /// <param name="tradeSymbol">The good it holds.</param>
     /// <param name="units">The units it holds.</param>
     /// <param name="sale">The best place to sell, and what it fetches there.</param>
+    /// <param name="supplyFirst">Whether markets that make something from the good come first: miners and siphoners (D91).</param>
     /// <returns>False when no market it can reach buys the good.</returns>
     public static bool TryFindBestSale(
         TradeMarketMap map,
         ShipModel ship,
         string tradeSymbol,
         int units,
-        out TradeSale sale)
+        out TradeSale sale,
+        bool supplyFirst = false)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
@@ -915,6 +935,7 @@ public static class TradeRoutePlanner
         var here = ship.WaypointSymbol ?? string.Empty;
         var fuelAtStart = FuelAtDeparture(map, ship);
         var found = false;
+        var bestTier = int.MaxValue;
         foreach (var market in map.MarketWaypoints.OrderBy(market => market, StringComparer.Ordinal))
         {
             if (!map.TryGetGood(market, tradeSymbol, out var good)
@@ -925,16 +946,27 @@ public static class TradeRoutePlanner
             }
 
             var candidate = new TradeSale(market, good.SellPrice, flight.FuelCost, ((long)good.SellPrice * units) - flight.FuelCost);
+            var tier = supplyFirst && candidate.NetRevenue > 0 ? SaleTier(map, market, tradeSymbol) : UnpaidSaleTier;
             var isHere = market.Equals(here, StringComparison.OrdinalIgnoreCase);
-            if (!found || candidate.NetRevenue > sale.NetRevenue || (candidate.NetRevenue == sale.NetRevenue && isHere))
+            if (!found
+                || tier < bestTier
+                || (tier == bestTier && (candidate.NetRevenue > sale.NetRevenue || (candidate.NetRevenue == sale.NetRevenue && isHere))))
             {
                 sale = candidate;
+                bestTier = tier;
                 found = true;
             }
         }
 
         return found;
     }
+
+    /// <summary>
+    /// Where a sale stands with <c>supplyFirst</c> (D91): 0 where the market makes something from the good, 1 where it imports
+    /// it without making anything from it, 2 where it exchanges it.
+    /// </summary>
+    private static int SaleTier(TradeMarketMap map, string market, string tradeSymbol)
+        => map.MakesSomethingFrom(market, tradeSymbol) ? 0 : map.Exchanges(market, tradeSymbol) ? 2 : 1;
 
     /// <summary>
     /// For a ship that holds cargo: the good that fetches the most where it sells best
@@ -947,8 +979,12 @@ public static class TradeRoutePlanner
     /// <param name="mustSell">Whether to sell even where the sale doesn't pay for its fuel.</param>
     /// <param name="cargo">The good to sell, and the units aboard.</param>
     /// <param name="sale">Where to sell it, and what it fetches there.</param>
+    /// <param name="supplyFirst">
+    /// Whether each good goes to a market that makes something from it first (D91, <see cref="TryFindBestSale"/>): the
+    /// miners' rule. The trading plan and the spare-time trips sell where each good fetches most.
+    /// </param>
     /// <returns>False when nothing aboard is worth selling, or no market the ship can reach buys it.</returns>
-    public static bool TryFindBestCargoSale(TradeMarketMap map, ShipModel ship, bool mustSell, out CargoItemModel cargo, out TradeSale sale)
+    public static bool TryFindBestCargoSale(TradeMarketMap map, ShipModel ship, bool mustSell, out CargoItemModel cargo, out TradeSale sale, bool supplyFirst = false)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
@@ -958,7 +994,7 @@ public static class TradeRoutePlanner
         var found = false;
         foreach (var item in (ship.CargoInventory ?? []).Where(item => item.Units > 0))
         {
-            if (TryFindBestSale(map, ship, item.Symbol, item.Units, out var candidate)
+            if (TryFindBestSale(map, ship, item.Symbol, item.Units, out var candidate, supplyFirst)
                 && (candidate.NetRevenue > 0 || mustSell)
                 && (!found || candidate.NetRevenue > sale.NetRevenue))
             {
@@ -1114,7 +1150,8 @@ public sealed record TradeRoute
 
     /// <summary>
     /// Whether something is made from the good (D15, D82): an end product, which nothing is made from
-    /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its profit, wherever it is sold (D85). False unless set.
+    /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its profit, wherever it is sold (D85); a sale to a market
+    /// that exchanges the good never feeds production (D91, <see cref="ToExchange"/>). False unless set.
     /// </summary>
     public bool FeedsProduction { get; init; }
 
@@ -1127,6 +1164,12 @@ public sealed record TradeRoute
 
     /// <summary>Whether the route feeds a material the jump gate still needs (<see cref="ConstructionMaterial"/>, D89).</summary>
     public bool FeedsConstruction => ConstructionMaterial.Length > 0;
+
+    /// <summary>
+    /// Whether the sell market exchanges the good (D91, <see cref="TradeMarketMap.Exchanges"/>): a wealth trade, which never
+    /// feeds production and ranks after every other route. False unless set.
+    /// </summary>
+    public bool ToExchange { get; init; }
 
     /// <summary>
     /// Whether the trip is worth it (D14): it earns something, and at least

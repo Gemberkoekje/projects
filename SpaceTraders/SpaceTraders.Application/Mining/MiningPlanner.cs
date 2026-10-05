@@ -22,7 +22,11 @@ namespace SpaceTraders.Application.Mining;
 ///   them near the markets that sell fuel): to the asteroid, and on to the market with the fuel left;</item>
 ///   <item>a market out of that reach that sells fuel counts too (slice 6.10c, D45): the ship drifts there first,
 ///   1 fuel whatever the distance, and mines from there, at an asteroid within a CRUISE round trip of it. Such a far
-///   target ranks after every reachable one of its supply level.</item>
+///   target ranks after every reachable one of its supply level;</item>
+///   <item>a market that makes something from the ore comes before every other (D91): one that exchanges the ore, or
+///   imports it without making anything from it, only pays for it. Such a wealth target ranks last, is mined for only when
+///   no market that makes something from an ore is left to serve, shared ones included, and never counts as a market short
+///   of its ore.</item>
 /// </list>
 /// </summary>
 public static class MiningPlanner
@@ -361,25 +365,30 @@ public static class MiningPlanner
             var driftsThere = ores.Count > 0 && CanDriftTo(map, miner, market);
             foreach (var good in ores)
             {
+                // D91: whether the market makes something from the ore, or only pays for it.
+                var feeds = map.MakesSomethingFrom(market, good.Symbol);
                 foreach (var asteroid in surveyed)
                 {
                     if (SurveySelection.TryPickBest(context.Surveys, asteroid, good.Symbol, context.Now, out var best)
                         && Gathers(asteroid, market))
                     {
-                        Offer(new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, SurveySelection.Share(best, good.Symbol), Surveyed: true, good.Supply));
+                        Offer(new MiningTarget(good.Symbol, asteroid, market, good.SellPrice, SurveySelection.Share(best, good.Symbol), Surveyed: true, good.Supply)
+                        {
+                            FeedsProduction = feeds,
+                        });
                     }
                 }
 
                 if (TryFindNearestAsteroid(map, good.Symbol, market, asteroid => Gathers(asteroid, market), out var nearest))
                 {
-                    Offer(Nearest(context, good, nearest, market, far: false));
+                    Offer(Nearest(context, good, nearest, market, far: false) with { FeedsProduction = feeds });
                 }
 
                 // Out of CRUISE reach (D45): the miner drifts to the market, which sells fuel, and mines from there.
                 if (driftsThere
                     && TryFindNearestAsteroid(map, good.Symbol, market, asteroid => RoundTrip(market, asteroid), out var far))
                 {
-                    Offer(Nearest(context, good, far, market, far: true));
+                    Offer(Nearest(context, good, far, market, far: true) with { FeedsProduction = feeds });
                 }
             }
         }
@@ -408,8 +417,8 @@ public static class MiningPlanner
     /// <summary>
     /// What a drone mines once every pair below ABUNDANT it could serve has a miner (D77, asked on 2026-10-05: "I'd like the
     /// miners to only mine, even if there is more profit in trading. They can mine until every mineral is ABUNDANT."): it
-    /// shares a pair rather than trade. The lowest supply first (D28), a pair in CRUISE reach before one a drift away (D45),
-    /// then the pair with the fewest miners, then in
+    /// shares a pair rather than trade. A pair whose market makes something from the ore first (D91), then the lowest supply
+    /// (D28), a pair in CRUISE reach before one a drift away (D45), then the pair with the fewest miners, then in
     /// <see cref="MiningTargets(MiningContext, ShipModel, IReadOnlySet{string})"/>'s order. The mining plan buys no drone for a
     /// pair it would only share.
     /// </summary>
@@ -422,7 +431,8 @@ public static class MiningPlanner
         ArgumentNullException.ThrowIfNull(minersPerPair);
         return [.. MiningTargets(context, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
             .Select((target, rank) => (Target: target, Rank: rank))
-            .OrderBy(entry => SupplyRank(entry.Target.Supply))
+            .OrderByDescending(entry => entry.Target.FeedsProduction)
+            .ThenBy(entry => SupplyRank(entry.Target.Supply))
             .ThenBy(entry => entry.Target.Far)
             .ThenBy(entry => minersPerPair.GetValueOrDefault(entry.Target.Key))
             .ThenBy(entry => entry.Rank)
@@ -430,10 +440,10 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) that no trip in
-    /// <paramref name="covering"/> covers, as a trip covers its ore only at the markets its ship reaches in CRUISE from
-    /// where it sells (D53, <see cref="CoveringTrip.Covers"/>); those in CRUISE reach before those a drift away (D45), the
-    /// nearest asteroid first; then the rest, each group in the order given.
+    /// Puts the targets whose ore no miner works on first (D48): the SCARCE or LIMITED ones (D22) whose market makes
+    /// something from the ore (D91) that no trip in <paramref name="covering"/> covers, as a trip covers its ore only at the
+    /// markets its ship reaches in CRUISE from where it sells (D53, <see cref="CoveringTrip.Covers"/>); those in CRUISE reach
+    /// before those a drift away (D45), the nearest asteroid first; then the rest, each group in the order given.
     /// </summary>
     /// <param name="map">The miner's system.</param>
     /// <param name="miner">The miner.</param>
@@ -451,7 +461,7 @@ public static class MiningPlanner
             .Select((target, rank) => (
                 Target: target,
                 Rank: rank,
-                Uncovered: target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Ore, target.SellWaypointSymbol))))
+                Uncovered: target.FeedsProduction && target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Ore, target.SellWaypointSymbol))))
             .OrderByDescending(entry => entry.Uncovered)
             .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.AsteroidSymbol, out var distance) ? distance : double.MaxValue)
@@ -461,9 +471,10 @@ public static class MiningPlanner
 
     /// <summary>
     /// The SCARCE or LIMITED ores a ship could serve (D48), each once per area (D53): the ores of its low-supply targets
-    /// (D22), whichever miner holds them, with the markets short of each grouped by the ship's CRUISE reach
-    /// (<see cref="Areas"/>). An ore that no asteroid it can reach yields, or that no market it can carry it to is short
-    /// of, isn't one. In X1-DC53 a drone's areas are the middle and B7: an ore short in both counts twice.
+    /// (D22) whose market makes something from the ore (D91), whichever miner holds them, with the markets short of each
+    /// grouped by the ship's CRUISE reach (<see cref="Areas"/>). An ore that no asteroid it can reach yields, or that no market
+    /// it can carry it to is short of, isn't one. In X1-DC53 a drone's areas are the middle and B7: an ore short in both
+    /// counts twice.
     /// </summary>
     /// <param name="context">The ship's system.</param>
     /// <param name="ship">The ship, as it is or as it would be bought.</param>
@@ -477,7 +488,7 @@ public static class MiningPlanner
             context.Map,
             ship.FuelCapacity,
             MiningTargets(context, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-                .Where(target => target.LowSupply)
+                .Where(target => target.FeedsProduction && target.LowSupply)
                 .Select(target => new MineralArea(target.Ore, [target.SellWaypointSymbol])));
     }
 
@@ -593,8 +604,10 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// The low-supply opportunities of a system (D22): each market with an ore in low supply, and the asteroid
-    /// nearest it whose traits yield the ore. A ship that can reach the asteroid can take the opportunity.
+    /// The low-supply opportunities of a system (D22): each market with an ore in low supply that it makes something from
+    /// (D91), and the asteroid nearest it whose traits yield the ore. A ship that can reach the asteroid can take the
+    /// opportunity. A market that only pays for the ore is mined for only when nothing else is left, so it is no opening that
+    /// waits for a ship.
     /// </summary>
     /// <param name="map">The system.</param>
     /// <returns>The opportunities, by market and ore.</returns>
@@ -606,7 +619,7 @@ public static class MiningPlanner
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
             foreach (var good in map.GoodsAt(market)
-                .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsLowSupply(good))
+                .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsLowSupply(good) && map.MakesSomethingFrom(market, good.Symbol))
                 .OrderBy(good => good.Symbol, StringComparer.Ordinal))
             {
                 if (TryFindNearestAsteroid(map, good.Symbol, market, _ => true, out var asteroid))
@@ -680,8 +693,9 @@ public static class MiningPlanner
     }
 
     /// <summary>
-    /// Orders two mining targets (<see cref="MiningTargets"/>): the lower supply first (D28), then the one in CRUISE
-    /// reach before a far one (D45), then surveyed first, then the most an extraction is expected to fetch, then by key.
+    /// Orders two mining targets (<see cref="MiningTargets"/>): the one whose market makes something from the ore first
+    /// (D91), then the lower supply (D28), then the one in CRUISE reach before a far one (D45), then surveyed first, then the
+    /// most an extraction is expected to fetch, then by key.
     /// </summary>
     /// <param name="x">One target.</param>
     /// <param name="y">The other target.</param>
@@ -690,6 +704,12 @@ public static class MiningPlanner
     {
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
+
+        var feeds = y.FeedsProduction.CompareTo(x.FeedsProduction);
+        if (feeds != 0)
+        {
+            return feeds;
+        }
 
         var supply = SupplyRank(x.Supply).CompareTo(SupplyRank(y.Supply));
         if (supply != 0)
@@ -990,6 +1010,13 @@ public sealed record MiningTarget
     /// distance and about ten times slower, refuels, and mines from there in CRUISE.
     /// </summary>
     public bool Far { get; init; }
+
+    /// <summary>
+    /// Whether the sell market makes something from the ore (D91, <see cref="TradeMarketMap.MakesSomethingFrom"/>). A market
+    /// that exchanges the ore, or imports it without making anything from it, only pays for it: such a target is a wealth
+    /// trade, ranks after every other and never counts as a market short of its ore. True unless set.
+    /// </summary>
+    public bool FeedsProduction { get; init; } = true;
 
     /// <summary>Whether the sell market has the ore in low supply (D22): SCARCE or LIMITED.</summary>
     public bool LowSupply => MiningPlanner.IsLowSupply(Supply);

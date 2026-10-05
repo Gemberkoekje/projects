@@ -177,6 +177,50 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_PutsARouteToAMarketThatExchangesTheGood_AfterEveryOther_AsAWealthTradeThatFeedsNoProduction()
+    {
+        // D91, asked on 2026-10-05: "EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as
+        // supply trades." A1 exchanges IRON_ORE and pays more than D41, which makes IRON from it: A1's route earns more, and
+        // still comes last, feeding no production.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("IRON_ORE", "EXPORT", 40, 19, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("IRON_ORE", "IMPORT", 124, 62, 60), Good("IRON", "EXPORT", 310, 150, 60), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                Market(A1, Good("IRON_ORE", "EXCHANGE", 130, 120, 60), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["IRON"] = ["IRON_ORE"] });
+
+        var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 5, NoneHeld);
+
+        routes.Select(route => (route.SellWaypointSymbol, route.ToExchange, route.FeedsProduction)).Should().Equal((D41, false, true), (A1, true, false));
+        routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
+        TradeRoutePlanner.CompareBestFirst(routes[0], routes[1]).Should().BeNegative();
+    }
+
+    [Fact]
+    public void TheBestSale_WithSupplyFirst_IsWhereTheGoodIsMadeIntoSomething_WhileThatSalePays()
+    {
+        // D91, the miners' rule: K85, where the ship is, exchanges IRON_ORE for 75, and A1 pays 70 for it without making
+        // anything from it; D41 makes IRON from it, for 62. One unit at D41 doesn't pay for the fuel there: the best sale
+        // that pays is K85's.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("IRON_ORE", "EXCHANGE", 80, 75, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("IRON_ORE", "IMPORT", 124, 62, 60), Good("IRON", "EXPORT", 310, 150, 60), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                Market(A1, Good("IRON_ORE", "IMPORT", 140, 70, 60), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["IRON"] = ["IRON_ORE"] });
+
+        TradeRoutePlanner.TryFindBestSale(map, CommandShip(), "IRON_ORE", 40, out var supply, supplyFirst: true).Should().BeTrue();
+        TradeRoutePlanner.TryFindBestSale(map, CommandShip(), "IRON_ORE", 40, out var most).Should().BeTrue();
+        TradeRoutePlanner.TryFindBestSale(map, CommandShip(), "IRON_ORE", 1, out var one, supplyFirst: true).Should().BeTrue();
+
+        (supply.WaypointSymbol, most.WaypointSymbol, one.WaypointSymbol).Should().Be((D41, K85, K85));
+    }
+
+    [Fact]
     public void Rank_PutsShipPartsBeforeIronThatFeedsMachinery_WhenTheyEarnMore()
     {
         // D82, asked on 2026-10-05: "Why is iron prioritized over ship parts, although the profit would be a lot higher?" and

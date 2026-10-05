@@ -230,12 +230,14 @@ public sealed class MiningAutomationService(
     }
 
     /// <summary>
-    /// Gives a free miner its next trip: selling ore it holds, else the best mining target, a scarce ore no miner works on
-    /// near its market first (D48, D53). The reason says <c>uncovered</c> when that came before D28's choice. A full hold
-    /// only sells, even where the sale doesn't pay for its fuel: a trip keeps the other ores a market buys within one tank
-    /// (D71), so its hold can fill with them, and a mining trip would turn to selling at once and end without its ore
-    /// aboard, on every tick. A drone whose every pair below ABUNDANT has a miner shares one (D77, reason <c>shared</c>):
-    /// it is passed over to the trading plan only when nothing below ABUNDANT is left that it can mine and sell.
+    /// Gives a free miner its next trip: selling ore it holds, at a market that makes something from it where such a sale
+    /// pays (D91), else the best mining target, a scarce ore no miner works on near its market first (D48, D53). The reason
+    /// says <c>uncovered</c> when that came before D28's choice. A full hold only sells, even where the sale doesn't pay for
+    /// its fuel: a trip keeps the other ores a market buys within one tank (D71), so its hold can fill with them, and a mining
+    /// trip would turn to selling at once and end without its ore aboard, on every tick. A drone whose every pair below
+    /// ABUNDANT has a miner shares one (D77, reason <c>shared</c>): it is passed over to the trading plan only when nothing
+    /// below ABUNDANT is left that it can mine and sell. A market that only pays for an ore comes last (D91, reason
+    /// <c>wealth</c>): a drone shares a pair whose market makes something from its ore before it mines for one.
     /// </summary>
     /// <returns>False when there is nothing it can mine and sell.</returns>
     private async Task<bool> GiveTripAsync(
@@ -257,7 +259,7 @@ public sealed class MiningAutomationService(
         }
 
         var holdIsFull = miner.CargoCapacity > 0 && miner.CargoCurrent >= miner.CargoCapacity;
-        if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, miner, holdIsFull, out var ore, out var sale))
+        if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, miner, holdIsFull, out var ore, out var sale, supplyFirst: true))
         {
             covered.Add(new CoveringTrip(ore.Symbol, sale.WaypointSymbol, miner.FuelCapacity));
             await StartAsync(miner, new MineAndSellGoal
@@ -276,8 +278,10 @@ public sealed class MiningAutomationService(
             return false;
         }
 
+        // D91: with no pair left whose market makes something from its ore, a drone shares one before it mines for a market
+        // that only pays for the ore.
         var ranked = MiningPlanner.MiningTargets(context, miner, heldKeys);
-        if (ranked.Count == 0)
+        if (ranked.Count == 0 || !ranked[0].FeedsProduction)
         {
             if (await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
             {
@@ -286,7 +290,9 @@ public sealed class MiningAutomationService(
 
             // D77: "I'd like the miners to only mine, even if there is more profit in trading. They can mine until every
             // mineral is ABUNDANT." The command ship keeps D38: it takes what pays it most, so it shares nothing.
-            if (FleetRoles.IsMiningDrone(miner) && MiningPlanner.SharedTargets(context, miner, minersOn).FirstOrDefault() is { } shared)
+            if (FleetRoles.IsMiningDrone(miner)
+                && MiningPlanner.SharedTargets(context, miner, minersOn).FirstOrDefault() is { } shared
+                && (shared.FeedsProduction || ranked.Count == 0))
             {
                 minersOn[shared.Key] = minersOn.GetValueOrDefault(shared.Key) + 1;
                 covered.Add(new CoveringTrip(shared.Ore, shared.SellWaypointSymbol, miner.FuelCapacity));
@@ -294,20 +300,23 @@ public sealed class MiningAutomationService(
                 return true;
             }
 
-            logger.LogDebug("Mining plan: nothing to mine that ship {ShipSymbol} can reach and sell.", miner.Symbol);
-            return false;
+            if (ranked.Count == 0)
+            {
+                logger.LogDebug("Mining plan: nothing to mine that ship {ShipSymbol} can reach and sell.", miner.Symbol);
+                return false;
+            }
         }
 
         var target = MiningPlanner.UncoveredFirst(context.Map, miner, ranked, covered)[0];
 
         // D83: a far asteroid's scarce ores come after the uncovered ones a drone serves on its own (D48, near before far).
-        var uncovered = target.LowSupply && !covered.Any(trip => trip.Covers(context.Map, target.Ore, target.SellWaypointSymbol));
+        var uncovered = target.FeedsProduction && target.LowSupply && !covered.Any(trip => trip.Covers(context.Map, target.Ore, target.SellWaypointSymbol));
         if (!uncovered && await TryJoinPointAsync(context, miner, points, heldKeys, heldBy, covered, places, cancellationToken))
         {
             return true;
         }
 
-        var reason = target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
+        var reason = !target.FeedsProduction ? "wealth" : target != ranked[0] ? "uncovered" : target.Surveyed ? "surveyed" : target.LowSupply ? "low_supply" : "lowest_supply";
         heldKeys.Add(target.Key);
         heldBy[target.Key] = miner.Symbol;
         minersOn[target.Key] = minersOn.GetValueOrDefault(target.Key) + 1;
@@ -697,7 +706,7 @@ public sealed class MiningAutomationService(
             }
 
             var targets = MiningPlanner.MiningTargets(context, newDrone, heldKeys, covered);
-            if (targets.Count == 0 || !targets[0].LowSupply)
+            if (targets.Count == 0 || !targets[0].FeedsProduction || !targets[0].LowSupply)
             {
                 logger.LogDebug(
                     "Mining plan: no drone bought in {SystemSymbol}: its first trip would not serve a market short of its ore ({Trip}).",
