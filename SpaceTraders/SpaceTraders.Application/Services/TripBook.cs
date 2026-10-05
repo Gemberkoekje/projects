@@ -67,6 +67,9 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
     /// <summary>A construction trip (<see cref="SupplyConstructionGoal"/>, slice 6.6): supplying pays nothing, so it books a loss.</summary>
     public const string Construction = "construction";
 
+    /// <summary>A collecting shuttle's round (<see cref="CollectOreGoal"/>, slice 6.18): it sells what parked drones mined.</summary>
+    public const string Collecting = "collecting";
+
     /// <summary>The trip sold its cargo, or what of it pays for its fuel.</summary>
     public const string Sold = "sold";
 
@@ -115,6 +118,7 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
         SiphonAndSellGoal => Siphoning,
         GatherAndSellGoal => SpareTime,
         SupplyConstructionGoal => Construction,
+        CollectOreGoal => Collecting,
         _ => throw new ArgumentOutOfRangeException(nameof(trip), trip.Kind, "A trip the book has no activity for."),
     };
 

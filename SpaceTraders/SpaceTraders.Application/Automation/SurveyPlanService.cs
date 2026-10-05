@@ -130,6 +130,12 @@ public sealed class SurveyPlanService(
 
         var contract = await contractPlans.GetAsync(cancellationToken);
         var stock = await settings.ThresholdAsync(StockPerOreSetting, DefaultStockPerOre, cancellationToken);
+
+        // D83: the mining plan's collection points, as its last pass left them: their asteroids get surveys, and a survey ship
+        // that reaches one parks there, as the drones do.
+        var points = ((await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken))?.CollectionPoints ?? [])
+            .Select(point => new CollectionPoint(point.AsteroidWaypointSymbol, point.SellWaypointSymbol, point.Ores, point.ScarceOres))
+            .ToList();
         var targets = new List<SurveyPlanTarget>();
         var drones = new Dictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)>(StringComparer.OrdinalIgnoreCase);
         foreach (var system in fleet
@@ -138,7 +144,15 @@ public sealed class SurveyPlanService(
         {
             var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
             var miners = await MinersAsync(fleet, board, system.Key, cancellationToken);
-            var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock);
+            var systemPoints = points.Where(point => context.Map.MarketWaypoints.Contains(point.SellWaypointSymbol, StringComparer.OrdinalIgnoreCase)).ToList();
+            var systemTargets = MiningPlanner.SurveyTargets(context, ContractOres(contract, system.Key), miners, stock, systemPoints);
+
+            // B58: a surveyor surveys where it can fly on from; at a collection point's asteroid a survey ship stays parked.
+            bool CanSurvey(ShipModel surveyor, string asteroid)
+                => MiningPlanner.CanSurveyAt(context.Map, surveyor, asteroid)
+                    || (FleetRoles.CanOnlySurvey(surveyor)
+                        && systemPoints.Any(point => point.AsteroidSymbol.Equals(asteroid, StringComparison.OrdinalIgnoreCase))
+                        && MiningPlanner.CanReach(context.Map, surveyor, asteroid));
             var droneWaypoints = await DroneWaypointsAsync(fleet, system.Key, cancellationToken);
             drones[system.Key] = (context.Map, droneWaypoints);
 
@@ -167,7 +181,7 @@ public sealed class SurveyPlanService(
                 }
 
                 var reachable = systemTargets
-                    .Where(target => target.NeedsSurvey && MiningPlanner.CanSurveyAt(context.Map, surveyor, target.AsteroidSymbol))
+                    .Where(target => target.NeedsSurvey && CanSurvey(surveyor, target.AsteroidSymbol))
                     .ToList();
                 var beyondStock = reachable.Count == 0 && FleetRoles.CanOnlySurvey(surveyor);
                 if (beyondStock)
@@ -175,7 +189,7 @@ public sealed class SurveyPlanService(
                     // D52: "A (single role) surveyor which is idle is allowed to keep surveying, starting with whichever ore is
                     // lowest": with every ore it reaches at its stock, the ore with the fewest usable surveys first.
                     reachable = [.. systemTargets
-                        .Where(target => MiningPlanner.CanSurveyAt(context.Map, surveyor, target.AsteroidSymbol))
+                        .Where(target => CanSurvey(surveyor, target.AsteroidSymbol))
                         .OrderBy(target => target.UsableSurveys)
                         .ThenByDescending(target => target.ForContract)
                         .ThenByDescending(target => target.SellPrice)
@@ -221,14 +235,14 @@ public sealed class SurveyPlanService(
                     beyondStock ? " beyond its stock (D52)" : string.Empty);
             }
 
-            // The surveyors that can survey at each asteroid and fly on: only for those is a target work the plan could give
-            // (B55, B58).
+            // The surveyors that can survey at each asteroid and fly on, or park there (D83): only for those is a target work the
+            // plan could give (B55, B58).
             var reachedBy = systemTargets
                 .Select(target => target.AsteroidSymbol)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     asteroid => asteroid,
-                    asteroid => (IReadOnlyList<string>)[.. system.Where(surveyor => MiningPlanner.CanSurveyAt(context.Map, surveyor, asteroid)).Select(surveyor => surveyor.Symbol).Order(StringComparer.Ordinal)],
+                    asteroid => (IReadOnlyList<string>)[.. system.Where(surveyor => CanSurvey(surveyor, asteroid)).Select(surveyor => surveyor.Symbol).Order(StringComparer.Ordinal)],
                     StringComparer.OrdinalIgnoreCase);
             targets.AddRange(systemTargets.Select(target => new SurveyPlanTarget
             {
@@ -346,7 +360,7 @@ public sealed class SurveyPlanService(
         foreach (var ship in fleet.Where(ship => board.MinesForContract(ship)
             && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
         {
-            if (await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken) is not MineAndSellGoal { Drifting: true })
+            if (await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken) is not MineAndSellGoal { Drifting: true } and not MineForShuttleGoal { Drifting: true })
             {
                 miners.Add(ship);
             }
@@ -369,6 +383,11 @@ public sealed class SurveyPlanService(
             if (goal is MineAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
             {
                 waypoints.Add(trip.SellWaypointSymbol);
+            }
+            else if (goal is MineForShuttleGoal job && job.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                // D83: a drone parked at a far asteroid works from its collection point's market's area.
+                waypoints.Add(job.SellWaypointSymbol);
             }
             else if (goal is null || goal.Status is GoalStatus.Blocked or GoalStatus.Completed)
             {

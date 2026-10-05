@@ -142,6 +142,15 @@ public sealed class FleetRoleBoard
         => RolesOn && RoleOf(ship) == FleetRole.Construct && FleetRoles.CanConstruct(ship);
 
     /// <summary>
+    /// Whether the ship collects the ore of the drones parked at a far asteroid (slice 6.18, D83): the collecting role (the
+    /// board). Only with the board on: the mining plan designates the shuttles, and the board keeps them collecting.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship the mining plan gives collecting rounds.</returns>
+    public bool IsCollector(ShipModel ship)
+        => RolesOn && RoleOf(ship) == FleetRole.Collect && ship.IsTradingCapable;
+
+    /// <summary>
     /// Whether the trading plan may give the ship a route: a hold and a tank, and the trade role, or the mining, siphon or
     /// construction role when that plan had no trip for it (the board); with the board off, any such ship that doesn't
     /// survey (D20). A ship that gathers in its spare time trades by its own rule (D34).

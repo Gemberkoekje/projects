@@ -1,6 +1,7 @@
 using FluentAssertions;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Trading;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
 
@@ -548,15 +549,53 @@ public sealed class MiningPlannerTests
                 Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE")),
         ]);
 
+    [Fact]
+    public void AFarAsteroidNoDroneMinesOnARoundTripOfItsMarket_IsACollectionPoint()
+    {
+        // D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and have the drones drop their ore into the
+        // light shuttle." B7's iron comes only from B13, 48 away: a drone gets there from B7 on a full tank, but not back
+        // (D45), and a shuttle's 300-unit tank flies there and back. B7's gold comes from B14, on a drone's round trip.
+        var points = MiningPlanner.CollectionPoints(MapWithIronAtB7(), Drone(), Shuttle());
+
+        var point = points.Should().ContainSingle().Subject;
+        (point.AsteroidSymbol, point.SellWaypointSymbol).Should().Be((B13, B7));
+        point.Ores.Should().Equal("IRON_ORE");
+        point.ScarceOres.Should().Equal("IRON_ORE");
+        point.DronesWanted.Should().Be(1);
+    }
+
+    [Fact]
+    public void AnOreAtCollectionPoint_CountsWhileTheMarketHasItBelowAbundant_ADroneOnlyWhileItIsShort()
+    {
+        // D77: nobody mines for a market that has an ore ABUNDANT; D48: a drone per SCARCE or LIMITED ore.
+        MiningPlanner.CollectionPoints(MapWithIronAtB7(supply: "ABUNDANT"), Drone(), Shuttle()).Should().BeEmpty();
+
+        var point = MiningPlanner.CollectionPoints(MapWithIronAtB7(supply: "MODERATE"), Drone(), Shuttle()).Should().ContainSingle().Subject;
+        point.Ores.Should().Equal("IRON_ORE");
+        point.ScarceOres.Should().BeEmpty();
+        point.DronesWanted.Should().Be(0);
+    }
+
+    [Fact]
+    public void WhereADroneMinesOnARoundTrip_OrNoShuttleFliesThereAndBack_ThereIsNoCollectionPoint()
+    {
+        MiningPlanner.CollectionPoints(Map(), Drone(), Shuttle()).Should().BeEmpty("B14 is on a drone's round trip of B7 (D45)");
+        MiningPlanner.CollectionPoints(MapWithIronAtB7(), Drone(), Drone(symbol: "SHIP-7")).Should().BeEmpty("an 80-unit tank doesn't fly the 96 to B13 and back");
+    }
+
+    /// <summary>A light shuttle: a 40-unit hold and a 300-unit tank, nothing to mine with.</summary>
+    private static ShipModel Shuttle()
+        => new("SHIP-7", SystemSymbol, H52, "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: [], CargoInventory: []);
+
     /// <summary>The fixture's markets, with B7 importing iron as well, which only B13, 48 from B7, yields near it.</summary>
-    private static TradeMarketMap MapWithIronAtB7()
+    private static TradeMarketMap MapWithIronAtB7(string supply = "LIMITED")
         => Map(
         [
             .. Markets().Where(market => market.WaypointSymbol != B7),
             Market(
                 B7,
                 Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"),
-                Good("IRON_ORE", "IMPORT", 118, 61, 60, "LIMITED"),
+                Good("IRON_ORE", "IMPORT", 118, 61, 60, supply),
                 Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
         ]);
 }

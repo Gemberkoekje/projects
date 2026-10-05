@@ -153,6 +153,9 @@ public static class RolePlanner
     /// <summary>The ship builds the jump gate: of those that can, it has the largest hold (slice 6.6, D65).</summary>
     public const string Construction = "construction";
 
+    /// <summary>The shuttle collects at the far asteroid the mining plan designated it for (slice 6.18, D83).</summary>
+    public const string Collection = "collection";
+
     /// <summary>The role earns the fleet the most per hour (D38).</summary>
     public const string MostProfitable = "most_profitable";
 
@@ -189,9 +192,33 @@ public static class RolePlanner
         double headStart,
         IReadOnlyList<MineralCoverage> coverage,
         int builders = 1)
+        => Decide(ships, contractWantsOre, headStart, coverage, new HashSet<string>(StringComparer.OrdinalIgnoreCase), builders);
+
+    /// <summary>Decides every ship's role, the shuttles the mining plan designated keeping the collecting role.</summary>
+    /// <param name="ships">The fleet, but for its probes.</param>
+    /// <param name="contractWantsOre">Whether the contract plan is on and its contract still wants ore (D40).</param>
+    /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
+    /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
+    /// <param name="collectors">
+    /// The shuttles the mining plan designated to collect at a far asteroid (slice 6.18, D83), by symbol: each keeps the
+    /// collecting role, whatever else it could do.
+    /// </param>
+    /// <param name="builders">
+    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
+    /// role available: only where the gate needs materials.
+    /// </param>
+    /// <returns>A decision per ship, by symbol.</returns>
+    public static IReadOnlyList<RoleDecision> Decide(
+        IReadOnlyList<RoleCandidate> ships,
+        bool contractWantsOre,
+        double headStart,
+        IReadOnlyList<MineralCoverage> coverage,
+        IReadOnlySet<string> collectors,
+        int builders = 1)
     {
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(coverage);
+        ArgumentNullException.ThrowIfNull(collectors);
 
         var bonus = 1 + Math.Max(0, headStart);
         var decisions = new Dictionary<string, RoleDecision>(StringComparer.OrdinalIgnoreCase);
@@ -202,6 +229,12 @@ public static class RolePlanner
             decisions[ship.Ship.Symbol] = ship.Roles.Count == 0
                 ? new RoleDecision(ship.Ship.Symbol, FleetRole.None, NoRole, null)
                 : new RoleDecision(ship.Ship.Symbol, ship.Roles[0], OnlyRole, null);
+        }
+
+        // D83: a shuttle the mining plan designated for a far asteroid collects there, and does nothing else.
+        foreach (var collector in ships.Where(ship => collectors.Contains(ship.Ship.Symbol) && FleetRoles.IsCargoShip(ship.Ship)))
+        {
+            decisions[collector.Ship.Symbol] = new RoleDecision(collector.Ship.Symbol, FleetRole.Collect, Collection, null);
         }
 
         foreach (var surveyor in SurveyHolders(ships, bonus))

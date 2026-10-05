@@ -188,10 +188,30 @@ public static class MiningPlanner
         IReadOnlyList<ContractOre> contracts,
         IReadOnlyList<ShipModel> miners,
         int stock)
+        => SurveyTargets(context, contracts, miners, stock, []);
+
+    /// <summary>
+    /// What surveyors survey, as <see cref="SurveyTargets(MiningContext, IReadOnlyList{ContractOre}, IReadOnlyList{ShipModel}, int)"/>
+    /// gives it, and each collection point's ores at its asteroid for its market (slice 6.18, D83): the drones parked there
+    /// mine them for the shuttle, which no miner's trip there and back would show.
+    /// </summary>
+    /// <param name="context">The system.</param>
+    /// <param name="contracts">The contract's ore and asteroid, while the contract plan mines; else none.</param>
+    /// <param name="miners">The ships that mine with the surveys; a drone still drifting to a far market doesn't yet.</param>
+    /// <param name="stock">The usable surveys to keep of each ore.</param>
+    /// <param name="points">The system's collection points.</param>
+    /// <returns>The targets, best first.</returns>
+    public static IReadOnlyList<SurveyTarget> SurveyTargets(
+        MiningContext context,
+        IReadOnlyList<ContractOre> contracts,
+        IReadOnlyList<ShipModel> miners,
+        int stock,
+        IReadOnlyList<CollectionPoint> points)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(contracts);
         ArgumentNullException.ThrowIfNull(miners);
+        ArgumentNullException.ThrowIfNull(points);
 
         var map = context.Map;
         var targets = new List<SurveyTarget>();
@@ -227,7 +247,16 @@ public static class MiningPlanner
         {
             foreach (var (buyer, price) in Buyers(map, ore))
             {
-                if (!TryFindNearestAsteroid(map, ore, buyer, asteroid => miners.Count == 0 || miners.Any(miner => Mines(miner, asteroid, buyer)), out var asteroid)
+                if (!TryFindNearestAsteroid(
+                        map,
+                        ore,
+                        buyer,
+                        asteroid => miners.Count == 0
+                            || miners.Any(miner => Mines(miner, asteroid, buyer))
+                            || points.Any(point => point.AsteroidSymbol.Equals(asteroid, StringComparison.OrdinalIgnoreCase)
+                                && point.SellWaypointSymbol.Equals(buyer, StringComparison.OrdinalIgnoreCase)
+                                && point.Ores.Contains(ore, StringComparer.OrdinalIgnoreCase)),
+                        out var asteroid)
                     || (sellable.TryGetValue((ore, asteroid), out var known) && known.SellPrice >= price))
                 {
                     continue;
@@ -588,6 +617,66 @@ public static class MiningPlanner
         }
 
         return opportunities;
+    }
+
+    /// <summary>
+    /// The far asteroids where a shuttle collects what parked drones mine (PLAN.md slice 6.18, D83, asked on 2026-10-05: "We
+    /// park a light shuttle ... at the asteroid, and have the drones drop their ore into the light shuttle. When the light
+    /// shuttle is full, it sells the ore at the market, then comes back."). For each market that sells fuel and buys an ore
+    /// below ABUNDANT (D77) that no drone mines on a CRUISE round trip of it (D45): the asteroid nearest it that yields the
+    /// ore, when a drone gets there from the market with a full tank and a shuttle flies there and back in CRUISE. One point
+    /// per asteroid and market, with every such ore, and the SCARCE or LIMITED ones among them (D22), a drone each (D48). In
+    /// X1-FJ91 on 2026-10-05: B44, 53 from B7, whose GOLD_ORE, SILVER_ORE and PLATINUM_ORE were SCARCE; a drone's 80-unit
+    /// tank doesn't fly the 106 there and back.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="drone">A mining drone, for its tank; where it is doesn't matter.</param>
+    /// <param name="shuttle">A collecting shuttle, for its tank.</param>
+    /// <returns>The points, by market and asteroid.</returns>
+    public static IReadOnlyList<CollectionPoint> CollectionPoints(TradeMarketMap map, ShipModel drone, ShipModel shuttle)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(drone);
+        ArgumentNullException.ThrowIfNull(shuttle);
+
+        var points = new Dictionary<(string Market, string Asteroid), (List<string> Ores, List<string> Scarce)>();
+        foreach (var market in map.MarketWaypoints.Where(map.SellsFuel).Order(StringComparer.Ordinal))
+        {
+            foreach (var good in map.GoodsAt(market)
+                .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsDemanded(good) && !IsAbundant(good.Supply))
+                .OrderBy(good => good.Symbol, StringComparer.Ordinal))
+            {
+                // A drone mines it on a round trip of the market (D45): nobody needs to collect it.
+                if (TryFindNearestAsteroid(map, good.Symbol, market, asteroid => IsWithinRoundTrip(map, drone, market, asteroid), out _)
+                    || !TryFindNearestAsteroid(
+                        map,
+                        good.Symbol,
+                        market,
+                        asteroid => TradeRoutePlanner.TryPlanFlight(map, market, asteroid, drone.FuelCapacity, drone.FuelCapacity, out _)
+                            && IsWithinRoundTrip(map, shuttle, market, asteroid),
+                        out var asteroid))
+                {
+                    continue;
+                }
+
+                if (!points.TryGetValue((market, asteroid), out var point))
+                {
+                    point = ([], []);
+                    points[(market, asteroid)] = point;
+                }
+
+                point.Ores.Add(good.Symbol);
+                if (IsLowSupply(good))
+                {
+                    point.Scarce.Add(good.Symbol);
+                }
+            }
+        }
+
+        return [.. points
+            .OrderBy(entry => entry.Key.Market, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Key.Asteroid, StringComparer.Ordinal)
+            .Select(entry => new CollectionPoint(entry.Key.Asteroid, entry.Key.Market, entry.Value.Ores, entry.Value.Scarce))];
     }
 
     /// <summary>
@@ -1006,6 +1095,45 @@ public sealed record MineralArea
 
     /// <summary>The markets, by symbol.</summary>
     public required IReadOnlyList<string> MarketSymbols { get; init; }
+}
+
+/// <summary>
+/// A far asteroid where a shuttle collects what parked drones mine, and the market it sells at (PLAN.md slice 6.18, D83,
+/// <see cref="MiningPlanner.CollectionPoints"/>).
+/// </summary>
+public sealed record CollectionPoint
+{
+    /// <summary>Creates a collection point.</summary>
+    /// <param name="AsteroidSymbol">Where the drones are parked.</param>
+    /// <param name="SellWaypointSymbol">Where the shuttle sells, and the drones and the shuttle fill their tanks.</param>
+    /// <param name="Ores">The market's ores below ABUNDANT that only this point serves, by symbol.</param>
+    /// <param name="ScarceOres">Those the market has SCARCE or LIMITED (D22), by symbol: a drone is kept for each (D48).</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CollectionPoint(string AsteroidSymbol, string SellWaypointSymbol, IReadOnlyList<string> Ores, IReadOnlyList<string> ScarceOres)
+    {
+        this.AsteroidSymbol = AsteroidSymbol;
+        this.SellWaypointSymbol = SellWaypointSymbol;
+        this.Ores = Ores;
+        this.ScarceOres = ScarceOres;
+    }
+
+    /// <summary>Where the drones are parked.</summary>
+    public required string AsteroidSymbol { get; init; }
+
+    /// <summary>Where the shuttle sells, and the drones and the shuttle fill their tanks.</summary>
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>The market's ores below ABUNDANT that only this point serves, by symbol.</summary>
+    public required IReadOnlyList<string> Ores { get; init; }
+
+    /// <summary>Those the market has SCARCE or LIMITED (D22), by symbol: a drone is kept for each (D48).</summary>
+    public required IReadOnlyList<string> ScarceOres { get; init; }
+
+    /// <summary>The drones the point wants: one per SCARCE or LIMITED ore (D48).</summary>
+    public int DronesWanted => ScarceOres.Count;
+
+    /// <summary>The point's key: its market and asteroid.</summary>
+    public string Key => $"{SellWaypointSymbol}|{AsteroidSymbol}".ToUpperInvariant();
 }
 
 /// <summary>

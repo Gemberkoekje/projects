@@ -130,6 +130,8 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, ScoutWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MineAndSellGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, MineForShuttleGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, CollectOreGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SiphonAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, GatherAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();

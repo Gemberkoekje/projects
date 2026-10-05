@@ -149,7 +149,32 @@ public sealed class ShipGoalSerializationTests
         new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = "X1-AB-XB5C", SellWaypointSymbol = "X1-AB-H51", Selling = true, Earned = 1_005 },
         new SiphonAndSellGoal { TradeSymbol = "LIQUID_HYDROGEN", SourceWaypointSymbol = "X1-AB-C38", SellWaypointSymbol = "X1-AB-G50", Selling = true, Earned = 330 },
         new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-XB5C", Selling = true, Earned = 1_340 },
+        new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B13", SellWaypointSymbol = "X1-AB-B7", Selling = true, Earned = 2_440 },
     };
+
+    [Fact]
+    public void AParkedDronesGoal_RoundTrip_KeepsItsPlaceAndItsDrift()
+    {
+        // Slice 6.18 (D83): a drone on its way to a far asteroid drifts to the market first, for hours; a restart in between
+        // must not lose that, nor where it is parked.
+        var goal = new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7", Drifting = true };
+
+        var result = JsonSerializer.Deserialize<ShipGoal>(JsonSerializer.Serialize<ShipGoal>(goal));
+
+        result.Should().BeOfType<MineForShuttleGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Kind.Should().Be(ShipGoalKind.MineForShuttle);
+    }
+
+    [Fact]
+    public void AShuttlesRound_RoundTrip_KeepsWhetherItSells()
+    {
+        var goal = new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7", Selling = true };
+
+        var result = JsonSerializer.Deserialize<ShipGoal>(JsonSerializer.Serialize<ShipGoal>(goal));
+
+        result.Should().BeOfType<CollectOreGoal>().Which.Should().BeEquivalentTo(goal);
+        result.Kind.Should().Be(ShipGoalKind.CollectOre);
+    }
 
     [Theory]
     [MemberData(nameof(Trips))]

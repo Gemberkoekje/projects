@@ -53,6 +53,18 @@ public interface ISpaceTradersPort
 
     Task<JettisonActionResult> JettisonCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Moves cargo from one of our ships to another at the same waypoint (slice 6.18, D83): both docked or both in orbit,
+    /// the receiver with room for it.
+    /// </summary>
+    /// <param name="shipSymbol">The ship that hands the cargo over.</param>
+    /// <param name="targetShipSymbol">The ship that takes it.</param>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <param name="units">How many units.</param>
+    /// <param name="cancellationToken">Stops the call.</param>
+    /// <returns>The transferring ship's cargo after the transfer; the API answers with no more.</returns>
+    Task<CargoModel> TransferCargoAsync(string shipSymbol, string targetShipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
+
     Task<NegotiateContractActionResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     Task<NavModel> PatchShipNavAsync(string shipSymbol, string flightMode, CancellationToken cancellationToken = default);

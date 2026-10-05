@@ -393,6 +393,27 @@ public sealed class ShipGoalExecutorServiceTests
         await _executor.Received(1).ExecuteStepAsync(Arg.Any<ShipModel>(), goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("MineForShuttle")]
+    [InlineData("CollectOre")]
+    public async Task ExecuteAsync_WhenActiveGoalCollectsAtAFarAsteroid_DispatchesToExecutor(string kind)
+    {
+        // Slice 6.18 (D83) brings two goal types, which this service must list, as B56's move showed.
+        ShipGoal goal = kind == "MineForShuttle"
+            ? new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }
+            : new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" };
+        var expected = GoalExecutionResult.WaitingForCooldown("waiting");
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(goal);
+        _executor.CanExecute(goal).Returns(true);
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>()).Returns(expected);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().Be(expected);
+        await _executor.Received(1).ExecuteStepAsync(Arg.Any<ShipModel>(), goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task ExecuteAsync_WhenActiveGoalIsAConstructionTrip_DispatchesToExecutor()
     {

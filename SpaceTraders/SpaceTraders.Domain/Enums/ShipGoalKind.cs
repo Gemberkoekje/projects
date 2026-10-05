@@ -20,4 +20,10 @@ public enum ShipGoalKind
     GatherAndSell = 15,
     Jump = 16,
     ExploreSystem = 17,
+
+    /// <summary>A drone parked at a far asteroid, mining for the shuttle that collects there (slice 6.18, D83).</summary>
+    MineForShuttle = 18,
+
+    /// <summary>A shuttle collecting the parked drones' ore at a far asteroid and selling it (slice 6.18, D83).</summary>
+    CollectOre = 19,
 }

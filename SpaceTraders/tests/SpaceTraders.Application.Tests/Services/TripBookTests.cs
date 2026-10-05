@@ -27,6 +27,7 @@ public sealed class TripBookTests
         { new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = "X1-AB-XB5C", SellWaypointSymbol = "X1-AB-H51" }, "mining" },
         { new SiphonAndSellGoal { TradeSymbol = "LIQUID_HYDROGEN", SourceWaypointSymbol = "X1-AB-C38", SellWaypointSymbol = "X1-AB-G50" }, "siphoning" },
         { new GatherAndSellGoal { SourceWaypointSymbol = "X1-AB-XB5C" }, "spare_time" },
+        { new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }, "collecting" },
     };
 
     [Fact]

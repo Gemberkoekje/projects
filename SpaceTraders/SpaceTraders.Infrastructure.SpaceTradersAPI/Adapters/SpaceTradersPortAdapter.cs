@@ -258,6 +258,12 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return new JettisonActionResult(MapCargo(result.Cargo));
     }
 
+    public async Task<CargoModel> TransferCargoAsync(string shipSymbol, string targetShipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+    {
+        var result = await client.TransferCargoAsync(shipSymbol, targetShipSymbol, tradeSymbol, units, cancellationToken);
+        return MapCargo(result.Cargo);
+    }
+
     public async Task<NegotiateContractActionResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default)
     {
         var result = await client.NegotiateContractAsync(shipSymbol, cancellationToken);
