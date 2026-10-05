@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-05, B66)
+- A good whose route waits for a free trader now says so in the trading plan's goods not traded (`waiting`: "It waits for a free trader: the free traders took routes that rank higher."), as asked on 2026-10-05: "it should at least give that reason for that good in the goods not traded tab". Such a good had no row, being listed, and once every trader was on a trip the waiting routes went and it was in neither list: ASSAULT_RIFLES and FOOD on 2026-10-05.
+
+### Docs – Changed (2026-10-05, B66)
+- `PLAN.md`: B66. `docs/HOW_IT_WORKS.md`: why a good isn't traded.
+
 ### Code – Changed (2026-10-05, slice 6.19)
 - A flight out of CRUISE reach takes the fastest way (D84), as asked on 2026-10-05: "can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" It cruises as far as it can, refuelling at markets that sell fuel, and drifts the rest (`TradeRoutePlanner.TryPlanMixedFlight`, A* over the waypoints and the fuel aboard, about a millisecond in X1-FJ91). From H60 to B44 a drone cruises to F57 and drifts from there: 2.0 hours rather than 2.9 by B7. Drones for a collection point (D83) fly straight to their asteroid.
 - Ships burn (D84), as asked on 2026-10-05: "I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings". A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing: into a market that sells fuel, or elsewhere when what is left still takes the ship on as cruising would (`TradeRoutePlanner.TryPlanNextLeg`). A ship in orbit at a market that sells fuel docks to fill its tank first when a full tank would burn. The navigation flies a BURN the fuel no longer pays for in CRUISE before anything drifts.

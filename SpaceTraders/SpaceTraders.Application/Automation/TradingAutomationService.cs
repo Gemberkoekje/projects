@@ -77,6 +77,9 @@ public sealed class TradingAutomationService(
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
     internal const int MaxPendingRoutes = 20;
 
+    /// <summary>A good with a price gap whose route waits for a free trader, as the state names it (B66).</summary>
+    private const string Waiting = "waiting";
+
     /// <summary>The plans whose ships trade only when their own plan passed them over (B63, D58).</summary>
     private static readonly AutomationPlan[] GatheringPlans = [AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Construction];
 
@@ -730,17 +733,17 @@ public sealed class TradingAutomationService(
                 }),
         ];
 
-        // D76: a good that a listed route carries is traded. A system without a free trader at this pass keeps what the plan
-        // found there before.
-        var listed = opportunities
-            .Select(route => GoodKey(WaypointSymbols.SystemOf(route.BuyWaypointSymbol), route.TradeSymbol))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // D76, B66: a good that a trader's route carries is traded; every other good with a price gap says why not, one whose
+        // route waits for a free trader included: the waiting routes go once no trader is free, and its reason stays. A system
+        // without a free trader at this pass keeps what the plan found there before.
+        var traded = GoodsOf(opportunities.Where(route => route.Status == MarketAutomationOpportunityStatus.Assigned));
+        var waiting = GoodsOf(opportunities.Where(route => route.Status == MarketAutomationOpportunityStatus.Pending));
         List<TradingAutomationGoodNotTradedState> notTraded =
         [
             .. (existing?.NotTraded ?? [])
                 .Where(good => !judged.ContainsKey(good.SystemSymbol))
-                .Concat(judged.SelectMany(system => NotTradedIn(system.Key, system.Value, now)))
-                .Where(good => !listed.Contains(GoodKey(good.SystemSymbol, good.TradeSymbol)))
+                .Concat(judged.SelectMany(system => NotTradedIn(system.Key, system.Value, waiting, now)))
+                .Where(good => !traded.Contains(GoodKey(good.SystemSymbol, good.TradeSymbol)))
                 .OrderBy(good => good.SystemSymbol, StringComparer.Ordinal),
         ];
 
@@ -764,23 +767,39 @@ public sealed class TradingAutomationService(
 
     /// <summary>
     /// Why the goods with a price gap in a system aren't traded (D76): for each, the route and free trader that got furthest
-    /// through the checks. A good whose furthest route is lucrative ranks below the waiting routes the state keeps, unless one of
-    /// its routes is listed after all.
+    /// through the checks. A good whose furthest route is lucrative waits for a free trader when one of its routes is among the
+    /// waiting routes the state keeps (B66), and otherwise ranks below them.
     /// </summary>
-    private static IEnumerable<TradingAutomationGoodNotTradedState> NotTradedIn(string systemSymbol, JudgedSystem system, DateTimeOffset now)
-        => TradeRouteJudgement.FurthestPerGood(system.Judgements).Select(judgement => new TradingAutomationGoodNotTradedState
+    private static IEnumerable<TradingAutomationGoodNotTradedState> NotTradedIn(
+        string systemSymbol,
+        JudgedSystem system,
+        IReadOnlySet<string> waiting,
+        DateTimeOffset now)
+        => TradeRouteJudgement.FurthestPerGood(system.Judgements).Select(judgement =>
         {
-            SystemSymbol = systemSymbol,
-            TradeSymbol = judgement.Route.TradeSymbol,
-            Reason = ReasonOf(judgement.Check),
-            ShipSymbol = judgement.Ship.Symbol,
-            BuyWaypointSymbol = judgement.Route.BuyWaypointSymbol,
-            SellWaypointSymbol = judgement.Route.SellWaypointSymbol,
-            Why = judgement.Check == TradeRouteCheck.Lucrative
-                ? string.Create(CultureInfo.InvariantCulture, $"{judgement.Why(system.Map)} The {MaxPendingRoutes} waiting routes listed rank higher.")
-                : judgement.Why(system.Map),
-            JudgedAt = now,
+            var waits = judgement.Check == TradeRouteCheck.Lucrative && waiting.Contains(GoodKey(systemSymbol, judgement.Route.TradeSymbol));
+            return new TradingAutomationGoodNotTradedState
+            {
+                SystemSymbol = systemSymbol,
+                TradeSymbol = judgement.Route.TradeSymbol,
+                Reason = waits ? Waiting : ReasonOf(judgement.Check),
+                ShipSymbol = judgement.Ship.Symbol,
+                BuyWaypointSymbol = judgement.Route.BuyWaypointSymbol,
+                SellWaypointSymbol = judgement.Route.SellWaypointSymbol,
+                Why = judgement.Check != TradeRouteCheck.Lucrative
+                    ? judgement.Why(system.Map)
+                    : waits
+                        ? $"{judgement.Why(system.Map)} It waits for a free trader: the free traders took routes that rank higher."
+                        : string.Create(CultureInfo.InvariantCulture, $"{judgement.Why(system.Map)} The {MaxPendingRoutes} waiting routes listed rank higher."),
+                JudgedAt = now,
+            };
         });
+
+    /// <summary>The goods the routes carry, by system (<see cref="GoodKey"/>).</summary>
+    private static HashSet<string> GoodsOf(IEnumerable<TradingAutomationOpportunityState> routes)
+        => routes
+            .Select(route => GoodKey(WaypointSymbols.SystemOf(route.BuyWaypointSymbol), route.TradeSymbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The check a good's route failed, as the state names it (D76).</summary>
     private static string ReasonOf(TradeRouteCheck check) => check switch

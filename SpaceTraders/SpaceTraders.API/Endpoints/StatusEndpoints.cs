@@ -118,8 +118,9 @@ public static class StatusEndpoints
         // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: those of a
         // good something is made from before those of an end product, D82, then the most profit after fuel), numbered from 1.
         // Only a pass with a free trader lists any, and at most 20 (TradingAutomationService.MaxPendingRoutes). Slice 2.18
-        // (D76): and for each other good with a price gap, why no route of it is listed: the check its route failed for the
-        // free trader that got furthest with it, as the plan's last pass with a free trader in the system found it.
+        // (D76): and for each good with a price gap that no trader carries, why not: the check its route failed for the free
+        // trader that got furthest with it, or that it waits for a free trader (B66), as the plan's last pass with a free
+        // trader in the system found it.
         group.MapGet("/trading-routes", async (IPlanRepository plans, CancellationToken ct) =>
         {
             var state = await plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, ct);
