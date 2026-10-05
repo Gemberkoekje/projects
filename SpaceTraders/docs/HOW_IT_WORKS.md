@@ -959,7 +959,8 @@ buy.
     fewest stops first, then the cheapest fuel, each hop within a full tank. Never DRIFT (B47). The flights
     burn where the fuel allows it (slice 6.19, D84), which costs up to twice the fuel counted here, an extra
     cost accepted on 2026-10-05 ("I accept the extra fuel costs this brings");
-  - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14).
+  - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14); a trip that feeds the jump
+    gate's material is worth taking while its goods sell for at least what they cost (D90, below).
 - **Feeding the jump gate first** (slice 6.22, D89, asked on 2026-10-05: "Please make sure the trade routes prioritize
   the feeding to the portal construction materials"): while the system's jump gate needs materials and the construction
   plan is on, a lucrative trip that delivers a good to a market making one of those materials from it (the market exports
@@ -968,6 +969,12 @@ buy.
   materials still needed from the construction cache (`TradeContextReader`). On 2026-10-05 the FAB_MATS markets D52 and
   F58 made 1 to 4 units a tick while their IRON was SCARCE: IRON for them now goes first. Such a trip's `TradeStarted` says
   "which makes the jump gate's … from it (D89)".
+  - **At cost** (slice 6.23, D90, chosen on 2026-10-05: "Up to its fuel (Recommended)"): such a trip doesn't have to earn
+    `Trade.MinProfitPerUnit`. It is worth taking while its goods sell for at least what they cost, only its fuel lost
+    (`TradeRoute.IsWorthIt`), a sale at the price paid included; it buys while a unit's expected sale fetches what the unit
+    costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. H60
+    sold IRON for 105 to 157 within an hour on 2026-10-05, while D52 paid 151 to 155 and F58 150. "Goods not traded" shows
+    such a route as "feeds the jump gate's …, … units for … after fuel (D89, D90)".
 - **Ranking** (D15, D82, D85): among the lucrative trips (after those that feed the jump gate, D89), the most profitable
   first, an end product's counted at half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it
   earns more than twice as much. An

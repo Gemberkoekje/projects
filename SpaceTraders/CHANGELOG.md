@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-05, slice 6.23)
+- A trade route that feeds a material the jump gate still needs runs while its goods sell for at least what they cost, only its fuel lost (D90), as chosen on 2026-10-05: "Up to its fuel (Recommended)". IRON for the FAB_MATS markets D52 and F58, which paid 150 to 155 while H60 charged up to 157, earned less than the 5 a unit of D14. `TradeRoute.IsWorthIt`; the planner and the trade executor buy such a trip's units while each sells for what it costs, weigh it at no price gap, and sell at its market unless that would fetch less than the cargo cost and another market pays more. "Goods not traded" says "feeds the jump gate's …".
+
+### Docs – Changed (2026-10-05, slice 6.23)
+- `PLAN.md`: slice 6.23 and decision D90; slice 6.22 merged and deployed. `docs/HOW_IT_WORKS.md`: feeding the jump gate at cost.
+
 ### Code – Changed (2026-10-05, slice 6.22)
 - Trade routes that feed the jump gate's materials come first (D89), as asked on 2026-10-05: "Please make sure the trade routes prioritize the feeding to the portal construction materials". While the gate needs a material and the construction plan is on, a lucrative route to a market that makes it from the good (exports the material, imports the good below ABUNDANT) goes before every other: IRON for the FAB_MATS markets D52 and F58, RESTRICTED while their IRON was SCARCE. `TradeMarketMap.ConstructionMaterials`, `ConstructionMaterialMadeFrom`; `TradeRoute.ConstructionMaterial`. `TradeStarted` says "which makes the jump gate's … from it (D89)".
 

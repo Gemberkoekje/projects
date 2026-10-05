@@ -141,6 +141,42 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_TakesARouteThatFeedsTheJumpGate_WhileItsGoodsSellForWhatTheyCost()
+    {
+        // D90, asked on 2026-10-05: "Up to its fuel". H60 sold IRON at 150, and D52 and F58, which make FAB_MATS from it, paid
+        // 150 to 155: less than D14's 5 a unit, so no trader fed them. A route that feeds a material the gate still needs runs
+        // while its goods sell for at least what they cost, its fuel lost; one batch here, as the next would sell for less.
+        // Without the need it is no route, and at a loss on the goods, not even with it.
+        TradeMarketMap MapWith(int ironAtD41, params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("IRON", "EXPORT", 150, 70, 20), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("IRON", "IMPORT", 300, ironAtD41, 20, "SCARCE"), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"] })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+            };
+
+        var atCost = TradeRoutePlanner.Rank(MapWith(150, "FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+        var aboveCost = TradeRoutePlanner.Rank(MapWith(154, "FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+        var notNeeded = TradeRoutePlanner.Rank(MapWith(154), CommandShip(), 250_000, 5, NoneHeld);
+        var atALoss = TradeRoutePlanner.Rank(MapWith(149, "FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+
+        var route = atCost.Should().ContainSingle().Subject;
+        (route.TradeSymbol, route.BuyWaypointSymbol, route.SellWaypointSymbol, route.ConstructionMaterial).Should().Be(("IRON", K85, D41, "FAB_MATS"));
+        route.Units.Should().Be(20);
+        route.FuelCost.Should().BePositive();
+        route.Profit.Should().Be(-route.FuelCost, "the goods sell for what they cost: only the fuel is lost");
+        route.IsLucrative(5).Should().BeFalse();
+        route.IsWorthIt(5).Should().BeTrue();
+        aboveCost.Should().ContainSingle().Which.Units.Should().Be(20, "4 a unit is under the minimum, and still at least what IRON costs");
+        notNeeded.Should().BeEmpty("without the gate's need, 4 a unit is under the minimum");
+        atALoss.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Rank_PutsShipPartsBeforeIronThatFeedsMachinery_WhenTheyEarnMore()
     {
         // D82, asked on 2026-10-05: "Why is iron prioritized over ship parts, although the profit would be a lot higher?" and
