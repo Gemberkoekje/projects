@@ -960,8 +960,17 @@ buy.
     burn where the fuel allows it (slice 6.19, D84), which costs up to twice the fuel counted here, an extra
     cost accepted on 2026-10-05 ("I accept the extra fuel costs this brings");
   - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14).
-- **Ranking** (D15, D82, D85): among the lucrative trips, the most profitable first, an end product's counted at
-  half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it earns more than twice as much. An
+- **Feeding the jump gate first** (slice 6.22, D89, asked on 2026-10-05: "Please make sure the trade routes prioritize
+  the feeding to the portal construction materials"): while the system's jump gate needs materials and the construction
+  plan is on, a lucrative trip that delivers a good to a market making one of those materials from it (the market exports
+  the material, imports the good below ABUNDANT, and the production chains make the material from the good;
+  `TradeMarketMap.ConstructionMaterialMadeFrom`) comes before every other, whatever it earns. The trade context reads the
+  materials still needed from the construction cache (`TradeContextReader`). On 2026-10-05 the FAB_MATS markets D52 and
+  F58 made 1 to 4 units a tick while their IRON was SCARCE: IRON for them now goes first. Such a trip's `TradeStarted` says
+  "which makes the jump gate's … from it (D89)".
+- **Ranking** (D15, D82, D85): among the lucrative trips (after those that feed the jump gate, D89), the most profitable
+  first, an end product's counted at half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it
+  earns more than twice as much. An
   end product is a good nothing is made from by the game's production chains (`TradeMarketMap.IsEndProduct`; ships
   count as made from SHIP_PARTS and SHIP_PLATING), wherever it is sold. Asked on 2026-10-05: "Why is iron
   prioritized over ship parts, although the profit would be a lot higher?" D15 had put a trip first only when its

@@ -12,8 +12,8 @@ namespace SpaceTraders.Application.Trading;
 ///   times the units, minus the fuel for the trip: from where the ship is to the buy market, and on to
 ///   the sell market;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
-///   <item>among lucrative trips, the most profitable first, an end product's (a good nothing is made from) counted at half
-///   its profit (D15, D82, D85).</item>
+///   <item>among lucrative trips, first those that feed a market making a material the jump gate still needs (D89), then the
+///   most profitable, an end product's (a good nothing is made from) counted at half its profit (D15, D82, D85).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -75,9 +75,10 @@ public static class TradeRoutePlanner
         => $"{buyWaypointSymbol}|{sellWaypointSymbol}|{tradeSymbol}".ToUpperInvariant();
 
     /// <summary>
-    /// The lucrative routes for a ship, best first: by profit, an end product's counted at half (<see cref="RankingProfit"/>,
-    /// D82, D85). Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left out: two traders never share
-    /// a route.
+    /// The lucrative routes for a ship, best first: those that feed the jump gate's materials (D89,
+    /// <see cref="TradeRoute.ConstructionMaterial"/>), then by profit, an end product's counted at half
+    /// (<see cref="RankingProfit"/>, D82, D85). Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left
+    /// out: two traders never share a route.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
@@ -115,7 +116,8 @@ public static class TradeRoutePlanner
         var routes = new List<TradeRoute>();
         CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, routes, judgements: null);
         return [.. routes
-            .OrderByDescending(RankingProfit)
+            .OrderByDescending(route => route.FeedsConstruction)
+            .ThenByDescending(RankingProfit)
             .ThenByDescending(route => route.FeedsProduction)
             .ThenBy(route => route.Key, StringComparer.Ordinal)];
     }
@@ -180,8 +182,8 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15, D82, D85): by <see cref="RankingProfit"/>, a good something is made from first
-    /// on a tie, then by key.
+    /// Orders two routes as Rank does (D15, D82, D85, D89): one that feeds the jump gate's materials first, then by
+    /// <see cref="RankingProfit"/>, a good something is made from first on a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -190,6 +192,12 @@ public static class TradeRoutePlanner
     {
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
+
+        var gate = y.FeedsConstruction.CompareTo(x.FeedsConstruction);
+        if (gate != 0)
+        {
+            return gate;
+        }
 
         var profit = RankingProfit(y).CompareTo(RankingProfit(x));
         if (profit != 0)
@@ -862,6 +870,7 @@ public static class TradeRoutePlanner
         {
             CargoCost = cargoCost,
             FeedsProduction = !map.IsEndProduct(tradeSymbol),
+            ConstructionMaterial = map.ConstructionMaterialMadeFrom(sellWaypointSymbol, tradeSymbol),
         };
         return true;
     }
@@ -1096,6 +1105,16 @@ public sealed record TradeRoute
     /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its profit, wherever it is sold (D85). False unless set.
     /// </summary>
     public bool FeedsProduction { get; init; }
+
+    /// <summary>
+    /// The jump gate's material the sell market makes from the good, while the gate needs it (D89,
+    /// <see cref="TradeMarketMap.ConstructionMaterialMadeFrom"/>): such a route comes before every other. Empty for none, and
+    /// unless set.
+    /// </summary>
+    public string ConstructionMaterial { get; init; } = string.Empty;
+
+    /// <summary>Whether the route feeds a material the jump gate still needs (<see cref="ConstructionMaterial"/>, D89).</summary>
+    public bool FeedsConstruction => ConstructionMaterial.Length > 0;
 
     /// <summary>
     /// Whether the trip is worth it (D14): it earns something, and at least

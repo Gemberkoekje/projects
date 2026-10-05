@@ -860,6 +860,27 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task ARouteThatFeedsTheJumpGatesMaterials_IsTakenFirst_AndTheJournalSaysSo()
+    {
+        // D89: D41 makes FAB_MATS from EQUIPMENT here (a stand-in chain), the gate still needs FAB_MATS, and D41 isn't ABUNDANT
+        // in EQUIPMENT: SHIP-1 takes EQUIPMENT for D41, though A1 pays more for it.
+        var markets = new[] { K85Market(), D41Market() with { TradeGoods = [.. D41Market().TradeGoods, Good("FAB_MATS", "EXPORT", 1_800, 850, 20)], Exports = ["FAB_MATS"] }, A1Market() };
+        var map = new TradeMarketMap(Waypoints, markets, new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["EQUIPMENT"] })
+        {
+            ConstructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "FAB_MATS" },
+        };
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        var goal = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (goal.TradeSymbol, goal.SellWaypointSymbol).Should().Be(("EQUIPMENT", D41));
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "TradeStarted")
+            .Which.Message.Should().Contain("which makes the jump gate's FAB_MATS from it (D89)");
+    }
+
+    [Fact]
     public async Task ACargoShipOfTheList_IsSavedUpFor_ThoughATraderHasNoTripYet()
     {
         // D43: "then save up for cargo ships". The drone has no lucrative route, so nothing is bought now, but nothing after
