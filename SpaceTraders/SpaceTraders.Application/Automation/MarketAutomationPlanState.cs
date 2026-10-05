@@ -67,7 +67,8 @@ public sealed record MiningAutomationOpportunityState
 
 /// <summary>
 /// The trading plan's view after its last pass (slice 6.5): the routes its traders hold, and the
-/// lucrative routes no trader holds. Written only when it changes.
+/// lucrative routes no trader holds; and why the other goods with a price gap aren't traded (slice 2.18). Written only when it
+/// changes.
 /// </summary>
 public sealed record TradingAutomationPlanState
 {
@@ -76,9 +77,47 @@ public sealed record TradingAutomationPlanState
     /// <summary>The held routes (Assigned) and the lucrative routes without a trader (Pending).</summary>
     public required IReadOnlyList<TradingAutomationOpportunityState> Opportunities { get; init; }
 
+    /// <summary>
+    /// For each good with a price gap that no route in <see cref="Opportunities"/> carries, why not (slice 2.18, D76): one
+    /// market sells it for less than another pays for it. By system, the furthest first, then by good.
+    /// </summary>
+    public IReadOnlyList<TradingAutomationGoodNotTradedState> NotTraded { get; init; } = [];
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// Why a good with a price gap isn't traded (slice 2.18, D76): the check its route got furthest with failed, for the free trader
+/// that got furthest with it, at the trading plan's last pass with a free trader in its system. While every trader there is on a
+/// trip the plan checks no route, and this stays, until a route of the good is listed.
+/// </summary>
+public sealed record TradingAutomationGoodNotTradedState
+{
+    public required string SystemSymbol { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>
+    /// The check that failed: buy_market_out_of_reach, sell_market_out_of_reach, not_full_hold (D56, D74), too_few_credits
+    /// (D56) or not_lucrative (D14); below_the_listed_routes when the route was lucrative, but the state keeps only the best
+    /// waiting routes.
+    /// </summary>
+    public required string Reason { get; init; }
+
+    /// <summary>The free trader that got furthest with the good.</summary>
+    public required string ShipSymbol { get; init; }
+
+    public required string BuyWaypointSymbol { get; init; }
+
+    public required string SellWaypointSymbol { get; init; }
+
+    /// <summary>The reason in a sentence, with the figures of the check that failed.</summary>
+    public required string Why { get; init; }
+
+    /// <summary>When the trading plan found it: its last pass with a free trader in the system, when the state was written.</summary>
+    public required DateTimeOffset JudgedAt { get; init; }
 }
 
 /// <summary>One trade route in the trading plan's view.</summary>

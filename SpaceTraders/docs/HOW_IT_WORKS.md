@@ -934,6 +934,17 @@ buy.
   lucrative routes no trader holds (Pending), each with the free traders that could have taken it,
   for the `ShipLeftIdle` rule. It is written only when it changes. `GET /status/trading-routes` serves it (slice 2.17,
   D75): the held routes, then the others numbered in the order the plan gives them out, for the markets dashboard.
+- **Why a good isn't traded** (slice 2.18, D76): where the plan lists a free trader's lucrative routes, it puts every
+  route with a price gap (a market in the system sells the good for less than another pays for it) through the same
+  checks `Rank` runs, in their order (`TradeRoutePlanner.Judge`): the buy market in reach, the sell market in reach from
+  it, a full hold in one purchase and one sale or an ABUNDANT seller (D56, D74), the credits for cargo less the trip's
+  fuel (D56), the profit after fuel (D14). The state's `NotTraded` keeps, for each such good that no listed route
+  carries, the check its route failed for the free trader that got furthest with it (then the largest price gap), in a
+  sentence with the figures (`TradeRouteJudgement.Why`): `buy_market_out_of_reach`, `sell_market_out_of_reach`,
+  `not_full_hold`, `too_few_credits`, `not_lucrative`, or `below_the_listed_routes` for a lucrative one beyond the 20
+  waiting routes kept. A system without a free trader at a pass, every trader there on a trip, keeps what was found there
+  before, with its time, less the goods a listed route now carries. Ships that gather in their spare time aren't judged.
+  `/status/trading-routes` serves it as `notTraded`.
 - **After each purchase and sale** the trip fetches the market again while the ship is still docked
   there (D25, `MarketRefresher`), so the next decisions see what the trade did to the prices. A
   failed fetch is logged at Warning and leaves the trade as it is.
@@ -1665,7 +1676,7 @@ everything is open. `/metrics` isn't on this port: see [Hosting](#hosting-spacet
 | Group | Endpoints | Notes |
 |---|---|---|
 | Health | `GET /health/live`, `/ready`, `/startup`, `/automation`, `/rate-limit/history` | No key needed |
-| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/trading-routes`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14); `/startup-snapshots` with each snapshot's `reason` and `discovered`, and the download named `startup-snapshot-…` or `discovery-snapshot-…` (slice 2.15) |
+| Status | `GET /status/agent`, `/ships`, `/ships/{s}/diagnostics`, `/waypoints/{s}`, `/contracts`, `/rate-limit`, `/activity?page&size&ship`, `/mining-opportunities`, `/trading-routes`, `/startup-snapshots` (+ `/{id}/download`), `/system-alerts` | Cached data; `/ships` with each ship's `name` (slice 2.14); `/startup-snapshots` with each snapshot's `reason` and `discovered`, and the download named `startup-snapshot-…` or `discovery-snapshot-…` (slice 2.15); `/trading-routes` with the trading plan's routes in its order (slice 2.17) and why the other goods with a price gap aren't traded, `notTraded` (slice 2.18) |
 | Status (empty) | `GET /status/trade-opportunities`, `/top-trade-routes` | Read tables that are never written; always 204, `[]` or zeros |
 | Status (credit growth) | `GET /status/anomalies` | A heuristic over the credit samples: credits per hour over the last 24 hours against the last hour. Not the health rules' anomalies (section 12) |
 | Universe | `GET /universe/systems`, `/jump-connections` | Jump connections are always `[]` |

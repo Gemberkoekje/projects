@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-10-05, slice 2.18)
+- Why the other goods aren't traded (D76), as asked on 2026-10-05: "Can the new list also add why the other goods are not considered for trading?" Where the trading plan lists a free trader's lucrative routes, it puts every route with a price gap (a market sells the good for less than another pays for it) through the checks `TradeRoutePlanner.Rank` runs, in their order (`TradeRoutePlanner.Judge`; `Rank` runs the same `CheckRoutes`): the buy market in reach, the sell market in reach from it, a full hold in one purchase and one sale or an ABUNDANT seller (D56, D74), the credits, the profit after fuel (D14). Its state's `NotTraded` keeps, for each such good that no listed route carries, the check its route failed for the free trader that got furthest with it, in a sentence with the figures (`TradeRouteJudgement`), or that it ranks below the 20 waiting routes kept. While every trader in a system is on a trip, what the last pass with a free trader found there stays, with its time. Only a change is written, as before. `GET /status/trading-routes` serves it as `notTraded`, and the markets dashboard's trade routes table lists it after the routes (gembernodes, same branch). `Rank`'s routes are unchanged.
+
+### Docs – Changed (2026-10-05, slice 2.18)
+- `PLAN.md`: slice 2.18 and decision D76; slices 2.13 to 2.17, 6.12 and 6.13 merged and deployed. `docs/HOW_IT_WORKS.md`: why a good isn't traded, with the trading plan's state, and `notTraded` in the status endpoints.
+
 ### Code – Added (2026-10-04, slice 2.17)
 - `GET /status/trading-routes` serves the trading plan's routes in the order it gives them out (D75), as asked on 2026-10-04: "Can you, in a new pr, add the exact logic to the market tree view that is used to determine which trade is done first?" It reads the plan's state as its last pass stored it: the routes traders hold, then the lucrative routes no trader holds, numbered from 1 (a route that feeds a pricier good first, D15, then the most profit after fuel), each with its units, profit after fuel and per unit, what it feeds and the traders that could take it. The markets dashboard shows it under the market tree (gembernodes, same branch).
 

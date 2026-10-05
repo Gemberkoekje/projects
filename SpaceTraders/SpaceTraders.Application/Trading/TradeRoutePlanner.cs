@@ -66,46 +66,35 @@ public static class TradeRoutePlanner
         int minProfitPerUnit,
         IReadOnlySet<string> heldRouteKeys)
     {
-        ArgumentNullException.ThrowIfNull(map);
-        ArgumentNullException.ThrowIfNull(ship);
-        ArgumentNullException.ThrowIfNull(heldRouteKeys);
-
-        var here = ship.WaypointSymbol ?? string.Empty;
-        var fuelAtStart = FuelAtDeparture(map, ship);
         var routes = new List<TradeRoute>();
-        foreach (var buy in map.MarketWaypoints)
-        {
-            var goods = map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0).ToList();
-            if (goods.Count == 0 || !TryPlanFlight(map, here, buy, fuelAtStart, ship.FuelCapacity, out var approach))
-            {
-                continue;
-            }
-
-            foreach (var good in goods)
-            {
-                foreach (var sell in map.MarketWaypoints)
-                {
-                    if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
-                        || !map.TryGetGood(sell, good.Symbol, out var atSell)
-                        || atSell.SellPrice <= good.PurchasePrice
-                        || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell)))
-                    {
-                        continue;
-                    }
-
-                    if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, approach, out var route)
-                        && route.IsLucrative(minProfitPerUnit))
-                    {
-                        routes.Add(route);
-                    }
-                }
-            }
-        }
-
+        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, routes, judgements: null);
         return [.. routes
             .OrderByDescending(route => route.FeedsProduction)
             .ThenByDescending(route => route.Profit)
             .ThenBy(route => route.Key, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Every route with a price gap that no other trader holds, as <see cref="Rank"/> checks it for a ship: a market sells the
+    /// good for less than another pays for it. Each says the first check it fails, in the order Rank runs them, or
+    /// <see cref="TradeRouteCheck.Lucrative"/>: those are Rank's routes (slice 2.18, D76).
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="credits">The credits on hand.</param>
+    /// <param name="minProfitPerUnit">The profit per unit, after fuel, a trip must earn.</param>
+    /// <param name="heldRouteKeys">The routes other traders hold (<see cref="RouteKey"/>).</param>
+    /// <returns>A judgement per route; empty when no market pays more for a good than another charges.</returns>
+    public static IReadOnlyList<TradeRouteJudgement> Judge(
+        TradeMarketMap map,
+        ShipModel ship,
+        long credits,
+        int minProfitPerUnit,
+        IReadOnlySet<string> heldRouteKeys)
+    {
+        var judgements = new List<TradeRouteJudgement>();
+        CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, [], judgements);
+        return judgements;
     }
 
     /// <summary>
@@ -158,13 +147,14 @@ public static class TradeRoutePlanner
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
 
-        if (!TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, buyWaypointSymbol, FuelAtDeparture(map, ship), ship.FuelCapacity, out var approach))
+        if (TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, buyWaypointSymbol, FuelAtDeparture(map, ship), ship.FuelCapacity, out var approach)
+            && TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, approach, out route, out _))
         {
-            route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
-            return false;
+            return true;
         }
 
-        return TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, approach, out route);
+        route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
+        return false;
     }
 
     /// <summary>
@@ -341,6 +331,85 @@ public static class TradeRoutePlanner
             ? flight.Stops[0]
             : destination;
 
+    /// <summary>
+    /// Runs <see cref="Rank"/>'s checks on every route with a price gap that no other trader holds: the lucrative routes go to
+    /// <paramref name="routes"/>, and with <paramref name="judgements"/> every route goes there too, with the first check it
+    /// fails (<see cref="Judge"/>).
+    /// </summary>
+    private static void CheckRoutes(
+        TradeMarketMap map,
+        ShipModel ship,
+        long credits,
+        int minProfitPerUnit,
+        IReadOnlySet<string> heldRouteKeys,
+        List<TradeRoute> routes,
+        List<TradeRouteJudgement>? judgements)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+        ArgumentNullException.ThrowIfNull(heldRouteKeys);
+
+        var here = ship.WaypointSymbol ?? string.Empty;
+        var fuelAtStart = FuelAtDeparture(map, ship);
+        foreach (var buy in map.MarketWaypoints)
+        {
+            var goods = map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0).ToList();
+            if (goods.Count == 0)
+            {
+                continue;
+            }
+
+            var reachable = TryPlanFlight(map, here, buy, fuelAtStart, ship.FuelCapacity, out var approach);
+            if (!reachable && judgements is null)
+            {
+                continue;
+            }
+
+            foreach (var good in goods)
+            {
+                foreach (var sell in map.MarketWaypoints)
+                {
+                    if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
+                        || !map.TryGetGood(sell, good.Symbol, out var atSell)
+                        || atSell.SellPrice <= good.PurchasePrice
+                        || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell)))
+                    {
+                        continue;
+                    }
+
+                    TradeRoute route;
+                    TradeRouteCheck check;
+                    if (!reachable)
+                    {
+                        route = new TradeRoute(good.Symbol, buy, sell, 0, good.PurchasePrice, atSell.SellPrice, 0, 0, string.Empty);
+                        check = TradeRouteCheck.BuyMarketOutOfReach;
+                    }
+                    else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, approach, out route, out check))
+                    {
+                        check = route.IsLucrative(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
+                        if (check == TradeRouteCheck.Lucrative)
+                        {
+                            routes.Add(route);
+                        }
+                    }
+
+                    judgements?.Add(new TradeRouteJudgement(ship, check, route, credits, minProfitPerUnit));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Works out a route from its buy market on, the flight there being <paramref name="approach"/>.
+    /// </summary>
+    /// <param name="failed">
+    /// When it can't be flown or traded, the first check it fails; a market, a price or a trade volume unknown counts as
+    /// <see cref="TradeRouteCheck.NotFullHold"/>, which one sale of none would be.
+    /// </param>
+    /// <param name="route">
+    /// The route's figures; when it fails, as far as the checks got: the prices once both markets are known, the fuel once the
+    /// flight is, and the units and the profit once the hold is.
+    /// </param>
     private static bool TryEvaluateFrom(
         TradeMarketMap map,
         ShipModel ship,
@@ -349,9 +418,11 @@ public static class TradeRoutePlanner
         string sellWaypointSymbol,
         long credits,
         TradeFlight approach,
-        out TradeRoute route)
+        out TradeRoute route,
+        out TradeRouteCheck failed)
     {
         route = new TradeRoute(tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, 0, 0, 0, 0, 0, string.Empty);
+        failed = TradeRouteCheck.NotFullHold;
         if (buyWaypointSymbol.Equals(sellWaypointSymbol, StringComparison.OrdinalIgnoreCase)
             || !map.TryGetGood(buyWaypointSymbol, tradeSymbol, out var atBuy)
             || atBuy.PurchasePrice <= 0
@@ -363,10 +434,13 @@ public static class TradeRoutePlanner
             return false;
         }
 
+        route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice };
+
         // The ship docks at the buy market to buy, and fills its tank there when it sells fuel.
         var fuelAtBuy = map.SellsFuel(buyWaypointSymbol) ? ship.FuelCapacity : approach.FuelLeft;
         if (!TryPlanFlight(map, buyWaypointSymbol, sellWaypointSymbol, fuelAtBuy, ship.FuelCapacity, out var haul))
         {
+            failed = TradeRouteCheck.SellMarketOutOfReach;
             return false;
         }
 
@@ -375,8 +449,17 @@ public static class TradeRoutePlanner
         var fuelCost = approach.FuelCost + haul.FuelCost;
         var affordable = Math.Max(0, credits - fuelCost) / atBuy.PurchasePrice;
         var units = UnitsAtOnce(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol);
-        if (units == 0 || affordable < units)
+        if (units == 0)
         {
+            route = route with { FuelCost = fuelCost };
+            return false;
+        }
+
+        var profit = ((long)(atSell.SellPrice - atBuy.PurchasePrice) * units) - fuelCost;
+        if (affordable < units)
+        {
+            route = route with { Units = units, FuelCost = fuelCost, Profit = profit };
+            failed = TradeRouteCheck.TooFewCredits;
             return false;
         }
 
@@ -388,7 +471,7 @@ public static class TradeRoutePlanner
             atBuy.PurchasePrice,
             atSell.SellPrice,
             fuelCost,
-            ((long)(atSell.SellPrice - atBuy.PurchasePrice) * units) - fuelCost,
+            profit,
             map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol));
         return true;
     }
@@ -484,7 +567,7 @@ public static class TradeRoutePlanner
         => fuel == 0 ? 0 : (long)Math.Ceiling(fuel / (double)FuelPerMarketUnit) * map.FuelPrice(refuelAt);
 
     /// <summary>The fuel aboard when the ship leaves: a ship docked where fuel is sold fills its tank first.</summary>
-    private static int FuelAtDeparture(TradeMarketMap map, ShipModel ship)
+    internal static int FuelAtDeparture(TradeMarketMap map, ShipModel ship)
         => ship.LocalStatus == ShipLocalStatus.Docked && map.SellsFuel(ship.WaypointSymbol ?? string.Empty)
             ? ship.FuelCapacity
             : ship.FuelCurrent;

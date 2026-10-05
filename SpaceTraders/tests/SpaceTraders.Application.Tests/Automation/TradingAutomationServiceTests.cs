@@ -450,6 +450,104 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task TheState_SaysWhyEachGoodWithAPriceGap_IsNotTraded()
+    {
+        // Slice 2.18 (D76), asked on 2026-10-05: "Can the new list also add why the other goods are not considered for
+        // trading?" SHIP-1 takes EQUIPMENT for D41, and EQUIPMENT for A1 and MEDICINE wait. FOOD and FUEL have a price gap, but
+        // earn too little a unit after fuel (D14). SHIP_PARTS, which no market here buys, has none.
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _state!.NotTraded.Select(good => (good.SystemSymbol, good.TradeSymbol, good.Reason, good.ShipSymbol, good.BuyWaypointSymbol, good.SellWaypointSymbol))
+            .Should().Equal(
+                (SystemSymbol, "FOOD", "not_lucrative", "SHIP-1", K85, A1),
+                (SystemSymbol, "FUEL", "not_lucrative", "SHIP-1", D41, K85));
+        _state.NotTraded[0].Why.Should().Be("SHIP-1: 40 units earn 5,100 after 180 for fuel, 127 a unit; a trip must earn 200 a unit (D14).");
+        _state.NotTraded[0].JudgedAt.Should().Be(_state.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task TheState_SaysWhyNot_ForTheFreeTraderThatGotFurthest()
+    {
+        // D41 sells SHIP_PARTS 15 at a time, its supply MODERATE: the command ship's 40-unit hold takes no full hold there
+        // (D56, D74); a shuttle with a 15-unit hold does, at 273 a unit after fuel, under the 300 a trip must earn (D14).
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(ShipPartsMap(supplyAtD41: "MODERATE"), 1_000_000, minProfitPerUnit: 300));
+        Fleet(CommandShip(D41), Shuttle("SHIP-5") with { WaypointSymbol = D41, CargoCapacity = 15 });
+
+        await RunAsync();
+
+        var parts = _state!.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "SHIP_PARTS").Subject;
+        (parts.Reason, parts.ShipSymbol).Should().Be(("not_lucrative", "SHIP-5"));
+        parts.Why.Should().Be("SHIP-5: 15 units earn 4,095 after 90 for fuel, 273 a unit; a trip must earn 300 a unit (D14).");
+    }
+
+    [Fact]
+    public async Task TheState_KeepsTheReasonsAndTheirTime_WhileNoTraderIsFree()
+    {
+        // With every trader on a trip the plan checks no route: what its last pass with a free trader found stays.
+        Fleet(CommandShip());
+        await RunAsync();
+        var reasons = _state!.NotTraded;
+        reasons.Should().NotBeEmpty();
+
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+        await RunAsync();
+
+        _state.Opportunities.Should().ContainSingle("the routes that waited for SHIP-1 wait for no one now");
+        _state.NotTraded.Should().Equal(reasons);
+    }
+
+    [Fact]
+    public async Task AKeptReason_IsDropped_OnceItsGoodIsInTheList()
+    {
+        // A route of FOOD is held now, so FOOD is traded, though no free trader judged it again.
+        Fleet(CommandShip());
+        await RunAsync();
+        _activeGoals["SHIP-1"] = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = K85, SellWaypointSymbol = A1, Units = 40 };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+
+        await RunAsync();
+
+        _state!.NotTraded.Select(good => good.TradeSymbol).Should().Equal("FUEL");
+    }
+
+    [Fact]
+    public async Task ALucrativeGood_WhoseRoutesAllRankBelowTheListedOnes_SaysSo()
+    {
+        // The state keeps the best 20 waiting routes. Here 22 goods are lucrative from K85 to D41, each 10 a unit dearer at D41
+        // than the one before: SHIP-1 takes G22, and G01 ranks below the 20 that wait.
+        var goods = Enumerable.Range(1, 22).Select(i => $"G{i:00}").ToList();
+        var map = Map(
+            Market(K85, [.. goods.Select(good => Good(good, "EXPORT", 100, 50, 40)), Good("FUEL", "EXCHANGE", 93, 79, 180)]),
+            Market(D41, [.. goods.Select((good, i) => Good(good, "IMPORT", 3_000, 1_110 + (10 * i), 40)), Good("FUEL", "EXCHANGE", 76, 69, 180)]));
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map));
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _state!.Opportunities.Select(route => route.TradeSymbol).Should().NotContain("G01").And.HaveCount(1 + TradingAutomationService.MaxPendingRoutes);
+        var g01 = _state.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "G01").Subject;
+        g01.Reason.Should().Be("below_the_listed_routes");
+        g01.Why.Should().Be("SHIP-1: lucrative, 40,248 after fuel, 1,006 a unit. The 20 waiting routes listed rank higher.");
+    }
+
+    [Fact]
+    public async Task WhileATraderWaitsForALucrativeRoute_TheReasonsAreWrittenOnce()
+    {
+        // The drone, with no lucrative route, is free at every pass, and the plan checks its routes again each time; the tick
+        // runs every 5 seconds, and nothing changes.
+        Fleet(Drone());
+
+        await RunAsync();
+        await RunAsync();
+        await RunAsync();
+
+        _state!.NotTraded.Should().NotBeEmpty();
+        await _plans.Received(1).UpsertAsync(PlanTypes.TradingAutomation, Arg.Any<TradingAutomationPlanState>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TheState_IsWrittenOnlyWhenItChanges()
     {
         // The tick runs every 5 seconds; while nothing happens the plan writes nothing.
