@@ -548,6 +548,55 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         json.RootElement.GetProperty("updatedAt").ValueKind.Should().Be(JsonValueKind.Null);
         json.RootElement.GetProperty("routes").GetArrayLength().Should().Be(0);
+        json.RootElement.GetProperty("notTraded").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task TradingRoutes_SayWhyTheOtherGoodsWithAPriceGap_AreNotTraded()
+    {
+        // Slice 2.18 (D76): for each good with a price gap that no listed route carries, why not, for the free trader that got
+        // furthest with it, as the trading plan's last pass with a free trader in the system found it.
+        var judgedAt = new DateTimeOffset(2026, 10, 05, 01, 30, 00, TimeSpan.Zero);
+        const string Why = "SHIP-1: one purchase and one sale take 6 of its 40 free units (X1-AB-D41 sells 6 at a time, X1-AB-A1 buys 40); "
+            + "less than a full hold needs ABUNDANT supply at X1-AB-D41, which has MODERATE (D56, D74).";
+        _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
+            .Returns(new TradingAutomationPlanState
+            {
+                PlanId = Guid.NewGuid(),
+                CreatedAt = judgedAt.AddHours(-1),
+                UpdatedAt = judgedAt.AddMinutes(5),
+                Opportunities = [TradingRoute("EQUIPMENT", "X1-AB-K85", "X1-AB-D41", MarketAutomationOpportunityStatus.Assigned, 40, 9_168, "SHIP_PARTS") with { AssignedShipSymbol = "SHIP-1" }],
+                NotTraded =
+                [
+                    new TradingAutomationGoodNotTradedState
+                    {
+                        SystemSymbol = "X1-AB",
+                        TradeSymbol = "SHIP_PARTS",
+                        Reason = "not_full_hold",
+                        ShipSymbol = "SHIP-1",
+                        BuyWaypointSymbol = "X1-AB-D41",
+                        SellWaypointSymbol = "X1-AB-A1",
+                        Why = Why,
+                        JudgedAt = judgedAt,
+                    },
+                ],
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/trading-routes");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("routes").GetArrayLength().Should().Be(1);
+        var notTraded = json.RootElement.GetProperty("notTraded");
+        notTraded.GetArrayLength().Should().Be(1);
+        notTraded[0].GetProperty("systemSymbol").GetString().Should().Be("X1-AB");
+        notTraded[0].GetProperty("tradeSymbol").GetString().Should().Be("SHIP_PARTS");
+        notTraded[0].GetProperty("reason").GetString().Should().Be("not_full_hold");
+        notTraded[0].GetProperty("shipSymbol").GetString().Should().Be("SHIP-1");
+        notTraded[0].GetProperty("buyWaypointSymbol").GetString().Should().Be("X1-AB-D41");
+        notTraded[0].GetProperty("sellWaypointSymbol").GetString().Should().Be("X1-AB-A1");
+        notTraded[0].GetProperty("why").GetString().Should().Be(Why);
+        notTraded[0].GetProperty("judgedAt").GetDateTimeOffset().Should().Be(judgedAt);
     }
 
     [Fact]

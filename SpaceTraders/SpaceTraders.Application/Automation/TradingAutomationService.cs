@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Construction;
@@ -17,7 +18,7 @@ public interface ITradingAutomationService
 {
     /// <summary>
     /// One pass of the plan: gives every free trader a trip, and records the routes that are held and
-    /// the lucrative ones that aren't.
+    /// the lucrative ones that aren't, and why the other goods with a price gap aren't traded (D76).
     /// </summary>
     /// <param name="cancellationToken">Stops the pass.</param>
     /// <returns>A task that completes when the pass is done.</returns>
@@ -42,6 +43,9 @@ public interface ITradingAutomationService
 ///   traders (D34): then it sells its hold first, and a spare-time trip that fills its hold is interrupted for it.
 ///   Otherwise the spare-time plan keeps it (D37).</item>
 /// </list>
+/// Its state lists the routes traders hold and the best that wait, and for each other good with a price gap why no route of it
+/// is listed: the check its route failed for the free trader that got furthest with it (<see cref="TradeRoutePlanner.Judge"/>,
+/// slice 2.18, D76).
 /// </summary>
 /// <remarks>
 /// The trip itself, with its check against the newest prices at each market, is the
@@ -161,6 +165,7 @@ public sealed class TradingAutomationService(
 
         var heldKeys = held.Select(route => route.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pending = new Dictionary<string, PendingRoute>(StringComparer.OrdinalIgnoreCase);
+        var judged = new Dictionary<string, JudgedSystem>(StringComparer.OrdinalIgnoreCase);
         var idle = 0;
 
         // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64).
@@ -184,7 +189,15 @@ public sealed class TradingAutomationService(
                 }
             }
 
-            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, constructionHolds, cancellationToken);
+            // D76: why the goods with a price gap that no route will carry aren't traded, as the free traders' checks found it.
+            // Without a free trader the plan checks no route here, and what it found before stays.
+            var judgements = new List<TradeRouteJudgement>();
+            if (traders.Count > 0)
+            {
+                judged[system.Key] = new JudgedSystem(context.Map, judgements);
+            }
+
+            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, judgements, constructionHolds, cancellationToken);
             idle += traders.Count;
 
             // After the other traders: a ship that gathers in its spare time takes a route that is left for it.
@@ -216,7 +229,7 @@ public sealed class TradingAutomationService(
         // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
         await BuyCargoShipAsync(fleet, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, idle, cancellationToken);
 
-        await SaveStateAsync(held, pending, cancellationToken);
+        await SaveStateAsync(held, pending, judged, cancellationToken);
     }
 
     /// <summary>
@@ -462,6 +475,7 @@ public sealed class TradingAutomationService(
     /// Gives the free traders of one system their routes, best route first: each round, the trader whose
     /// best route ranks highest gets it, and that route is no longer open to the others.
     /// </summary>
+    /// <param name="judgements">Gets how each trader's routes with a price gap fared (D76).</param>
     /// <returns>The credits left for cargo once the routes' purchases are counted.</returns>
     private async Task<long> AssignRoutesAsync(
         TradeContext context,
@@ -469,6 +483,7 @@ public sealed class TradingAutomationService(
         List<HeldRoute> held,
         HashSet<string> heldKeys,
         Dictionary<string, PendingRoute> pending,
+        List<TradeRouteJudgement> judgements,
         long constructionHolds,
         CancellationToken cancellationToken)
     {
@@ -477,11 +492,14 @@ public sealed class TradingAutomationService(
         var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds);
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
-        // counts as work waiting for it (D13); and the full hold it saves up for, when it does (D56).
+        // counts as work waiting for it (D13); and the full hold it saves up for, when it does (D56). Its lucrative routes
+        // are Rank's; the others say which check they fail (D76).
         foreach (var trader in traders)
         {
             NoteSaving(context, trader, credits, heldKeys);
-            foreach (var route in TradeRoutePlanner.Rank(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys))
+            var judged = TradeRoutePlanner.Judge(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys);
+            judgements.AddRange(judged);
+            foreach (var route in judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route))
             {
                 pending[route.Key] = pending.TryGetValue(route.Key, out var known)
                     ? known.WithCandidate(trader.Symbol, route)
@@ -641,12 +659,13 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// Records the held routes and the best pending ones. Only a change is written: the state is the
-    /// same pass after pass while nothing happens, and the tick runs every 5 seconds.
+    /// Records the held routes and the best pending ones, and why the other goods with a price gap aren't traded (D76). Only a
+    /// change is written: the state is the same pass after pass while nothing happens, and the tick runs every 5 seconds.
     /// </summary>
     private async Task SaveStateAsync(
         IReadOnlyList<HeldRoute> held,
         IReadOnlyDictionary<string, PendingRoute> pending,
+        IReadOnlyDictionary<string, JudgedSystem> judged,
         CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
@@ -692,7 +711,21 @@ public sealed class TradingAutomationService(
                 }),
         ];
 
-        if (existing is not null && SameRoutes(existing.Opportunities, opportunities))
+        // D76: a good that a listed route carries is traded. A system without a free trader at this pass keeps what the plan
+        // found there before.
+        var listed = opportunities
+            .Select(route => GoodKey(WaypointSymbols.SystemOf(route.BuyWaypointSymbol), route.TradeSymbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<TradingAutomationGoodNotTradedState> notTraded =
+        [
+            .. (existing?.NotTraded ?? [])
+                .Where(good => !judged.ContainsKey(good.SystemSymbol))
+                .Concat(judged.SelectMany(system => NotTradedIn(system.Key, system.Value, now)))
+                .Where(good => !listed.Contains(GoodKey(good.SystemSymbol, good.TradeSymbol)))
+                .OrderBy(good => good.SystemSymbol, StringComparer.Ordinal),
+        ];
+
+        if (existing is not null && SameRoutes(existing.Opportunities, opportunities) && SameGoods(existing.NotTraded, notTraded))
         {
             return;
         }
@@ -703,17 +736,57 @@ public sealed class TradingAutomationService(
             {
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = opportunities,
+                NotTraded = notTraded,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },
             cancellationToken);
     }
 
+    /// <summary>
+    /// Why the goods with a price gap in a system aren't traded (D76): for each, the route and free trader that got furthest
+    /// through the checks. A good whose furthest route is lucrative ranks below the waiting routes the state keeps, unless one of
+    /// its routes is listed after all.
+    /// </summary>
+    private static IEnumerable<TradingAutomationGoodNotTradedState> NotTradedIn(string systemSymbol, JudgedSystem system, DateTimeOffset now)
+        => TradeRouteJudgement.FurthestPerGood(system.Judgements).Select(judgement => new TradingAutomationGoodNotTradedState
+        {
+            SystemSymbol = systemSymbol,
+            TradeSymbol = judgement.Route.TradeSymbol,
+            Reason = ReasonOf(judgement.Check),
+            ShipSymbol = judgement.Ship.Symbol,
+            BuyWaypointSymbol = judgement.Route.BuyWaypointSymbol,
+            SellWaypointSymbol = judgement.Route.SellWaypointSymbol,
+            Why = judgement.Check == TradeRouteCheck.Lucrative
+                ? string.Create(CultureInfo.InvariantCulture, $"{judgement.Why(system.Map)} The {MaxPendingRoutes} waiting routes listed rank higher.")
+                : judgement.Why(system.Map),
+            JudgedAt = now,
+        });
+
+    /// <summary>The check a good's route failed, as the state names it (D76).</summary>
+    private static string ReasonOf(TradeRouteCheck check) => check switch
+    {
+        TradeRouteCheck.BuyMarketOutOfReach => "buy_market_out_of_reach",
+        TradeRouteCheck.SellMarketOutOfReach => "sell_market_out_of_reach",
+        TradeRouteCheck.NotFullHold => "not_full_hold",
+        TradeRouteCheck.TooFewCredits => "too_few_credits",
+        TradeRouteCheck.NotLucrative => "not_lucrative",
+        _ => "below_the_listed_routes",
+    };
+
+    private static string GoodKey(string systemSymbol, string tradeSymbol) => $"{systemSymbol}|{tradeSymbol}";
+
     /// <summary>Whether two lists of routes say the same, apart from when they were seen.</summary>
     private static bool SameRoutes(
         IReadOnlyList<TradingAutomationOpportunityState> before,
         IReadOnlyList<TradingAutomationOpportunityState> after)
         => JsonSerializer.Serialize(before.Select(Undated), CompareOptions) == JsonSerializer.Serialize(after.Select(Undated), CompareOptions);
+
+    /// <summary>Whether two lists of goods not traded say the same, apart from when they were found.</summary>
+    private static bool SameGoods(
+        IReadOnlyList<TradingAutomationGoodNotTradedState> before,
+        IReadOnlyList<TradingAutomationGoodNotTradedState> after)
+        => before.Select(good => good with { JudgedAt = default }).SequenceEqual(after.Select(good => good with { JudgedAt = default }));
 
     private static TradingAutomationOpportunityState Undated(TradingAutomationOpportunityState opportunity)
         => opportunity with { FirstObservedAt = default, LastObservedAt = default };
@@ -723,6 +796,9 @@ public sealed class TradingAutomationService(
     {
         public string Key => TradeRoutePlanner.RouteKey(Goal.TradeSymbol, Goal.BuyWaypointSymbol, Goal.SellWaypointSymbol);
     }
+
+    /// <summary>A system whose free traders' routes were checked at this pass, and the map they were checked on (D76).</summary>
+    private sealed record JudgedSystem(TradeMarketMap Map, List<TradeRouteJudgement> Judgements);
 
     /// <summary>A lucrative route no trader holds, and the free traders that could have taken it.</summary>
     private sealed record PendingRoute(TradeRoute Best, IReadOnlyList<string> CandidateShipSymbols)

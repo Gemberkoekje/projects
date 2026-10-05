@@ -270,6 +270,75 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Judge_FindsRanksRoutesLucrative_AndForEveryOtherRouteWithAPriceGap_TheCheckItFails()
+    {
+        // Slice 2.18 (D76), asked on 2026-10-05: "Can the new list also add why the other goods are not considered for
+        // trading?" From K85, Rank's routes are EQUIPMENT for D41 and A1, and MEDICINE. FOOD earns 127 a unit (D14); D41 sells
+        // FUEL at 76 and K85 buys it at 79, which doesn't pay for the fuel. SHIP_PARTS, which no market here buys, and EQUIPMENT
+        // from D41, which no market buys for more, have no price gap.
+        var judged = TradeRoutePlanner.Judge(Map(), CommandShip(), 250_000, 200, NoneHeld);
+
+        judged.Select(judgement => (judgement.Route.TradeSymbol, judgement.Route.BuyWaypointSymbol, judgement.Route.SellWaypointSymbol, judgement.Check))
+            .Should().BeEquivalentTo(
+            [
+                ("EQUIPMENT", K85, D41, TradeRouteCheck.Lucrative),
+                ("EQUIPMENT", K85, A1, TradeRouteCheck.Lucrative),
+                ("MEDICINE", D41, A1, TradeRouteCheck.Lucrative),
+                ("FOOD", K85, A1, TradeRouteCheck.NotLucrative),
+                ("FUEL", D41, K85, TradeRouteCheck.NotLucrative),
+            ]);
+        judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route)
+            .Should().BeEquivalentTo(TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld));
+        judged.Single(judgement => judgement.Route.TradeSymbol == "FOOD").Route.Profit.Should().Be((132 * 40) - (2 * 90));
+    }
+
+    [Fact]
+    public void Judge_TellsWhichMarketIsOutOfReach()
+    {
+        // The drone's 80-unit tank reaches no market from K85: it can buy where it is, but not fly on to D41 or A1.
+        var judged = TradeRoutePlanner.Judge(Map(), Drone(), 250_000, 0, NoneHeld);
+
+        judged.Select(judgement => (judgement.Route.TradeSymbol, judgement.Route.BuyWaypointSymbol, judgement.Route.SellWaypointSymbol, judgement.Check))
+            .Should().BeEquivalentTo(
+            [
+                ("EQUIPMENT", K85, D41, TradeRouteCheck.SellMarketOutOfReach),
+                ("EQUIPMENT", K85, A1, TradeRouteCheck.SellMarketOutOfReach),
+                ("FOOD", K85, A1, TradeRouteCheck.SellMarketOutOfReach),
+                ("MEDICINE", D41, A1, TradeRouteCheck.BuyMarketOutOfReach),
+                ("FUEL", D41, K85, TradeRouteCheck.BuyMarketOutOfReach),
+            ]);
+    }
+
+    [Fact]
+    public void Judge_TellsARouteWhoseTradesDontFillTheHold_AtASellerThatIsntAbundant()
+        => TradeRoutePlanner.Judge(ShipPartsMap(supplyAtD41: "MODERATE"), CommandShip(D41), 1_000_000, 200, NoneHeld)
+            .Should().ContainSingle(judgement => judgement.Route.TradeSymbol == "SHIP_PARTS")
+            .Which.Check.Should().Be(TradeRouteCheck.NotFullHold, "D56: 15 at a time fills no 40-unit hold, and D74 needs ABUNDANT");
+
+    [Fact]
+    public void Judge_TellsARouteTheCreditsDontPayFor_WithTheUnitsAndTheFuel()
+    {
+        // 40 EQUIPMENT at 3,254 and 152 for fuel come to 130,312; FOOD, which the credits pay for, earns too little.
+        var judged = TradeRoutePlanner.Judge(Map(), CommandShip(), 130_311, 200, NoneHeld);
+
+        var equipment = judged.Single(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
+        equipment.Check.Should().Be(TradeRouteCheck.TooFewCredits);
+        (equipment.Route.Units, equipment.Route.BuyPrice, equipment.Route.FuelCost).Should().Be((40, 3_254L, 152L));
+        equipment.Credits.Should().Be(130_311);
+        judged.Single(judgement => judgement.Route.TradeSymbol == "FOOD").Check.Should().Be(TradeRouteCheck.NotLucrative);
+    }
+
+    [Fact]
+    public void Judge_LeavesOutTheRoutesOtherTradersHold()
+    {
+        var held = new HashSet<string> { TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41) };
+
+        TradeRoutePlanner.Judge(Map(), CommandShip(), 250_000, 200, held)
+            .Should().NotContain(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41))
+            .And.HaveCount(4);
+    }
+
+    [Fact]
     public void Units_AreTheFreeHold()
     {
         var ship = CommandShip(cargo: [new CargoItemModel("COPPER_ORE", 35)]);

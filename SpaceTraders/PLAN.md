@@ -133,22 +133,22 @@
   is on by default, the settings you set carry over to the next run (the agent the next reset registers), and
   `/settings/next-run` sets the next run alone. Its first start switched on, at 18:09Z, the plans the agent of 13:00Z had
   had off. With it, "stays off until you switch it on (D9)" in the bullets above no longer holds.
-- Slice 2.13 (Grafana data per server reset, asked on 2026-10-04, with your decision D70) is built on branch
-  `claude/spacetraders-run-label` in projects and gembernodes: every metric and log line carries the reset date, and the
-  three SpaceTraders dashboards show one reset's run at a time.
+- Slice 2.13 (Grafana data per server reset, asked on 2026-10-04, with your decision D70) is merged and deployed
+  (projects#162, its dashboards gembernodes#56, deployed by gembernodes#57): every metric and log line carries the reset
+  date, and the three SpaceTraders dashboards show one reset's run at a time.
 - Slices 6.12 (mining drones keep the ores they can sell within one tank, D71) and 2.14 (the bot's own ship names beside
-  the game's symbols, D72), both asked on 2026-10-04, are built on branch `claude/dreamy-albattani-zo7njw` in projects and
-  gembernodes.
+  the game's symbols, D72), both asked on 2026-10-04, are merged and deployed (projects#165, gembernodes#60).
 - Slice 2.15 (snapshots of every cached shipyard and market, taken at every discovery too, and in Grafana, asked on
-  2026-10-04, with your decision D73) is built on branch `ccr-a2ff9235-gidedj` in projects and gembernodes. It found and
-  fixed B64.
+  2026-10-04, with your decision D73) is merged and deployed (projects#166, gembernodes#62). It found and fixed B64.
 - Slice 6.13 (a trade trip may carry less than a full hold where the seller's supply is ABUNDANT, asked on 2026-10-04,
   with your decision D74) is merged and deployed (projects#167, gembernodes#63), and so are the market tree's trade
   volumes, asked just before it (gembernodes#61), with D74 in the panel's description.
-- Slice 2.16 (each ship's profit, asked on 2026-10-04) is built on branch `ccr-fea929ec-ptl3vh` in projects and
-  gembernodes: each ship's ledger by category as a metric, and a "Profit by ship" table on the SpaceTraders dashboard.
+- Slice 2.16 (each ship's profit, asked on 2026-10-04) is merged and deployed (projects#169, gembernodes#64): each ship's
+  ledger by category as a metric, and a "Profit by ship" table on the SpaceTraders dashboard.
 - Slice 2.17 (the trading plan's order of routes under the market tree, asked on 2026-10-04, with your decision D75) is
-  built on branch `ccr-f3fba810-ie3vm6` in projects and gembernodes.
+  merged and deployed (projects#168, gembernodes#65).
+- Slice 2.18 (why the other goods with a price gap aren't traded, in that list, asked on 2026-10-05, with your decision
+  D76) is built on branch `ccr-f3fba810-ie3vm6` in projects and gembernodes.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -311,6 +311,7 @@ get the next D-number.
 | D73 | Slice 2.15 (asked on 2026-10-04): "Can you expand the JSON export to include shipyard information, and can you make these jsons available through Grafana? If we do that, is everything from the webUI covered in Grafana?", then "I'd like the snapshots to be made whenever a new discovery is made. So a shipyard with a new ship type or a market with a new good type, in addition to the times they are currently made." The JSON export is the startup snapshot, which held a shipyard only where a ship stood. Asked how Grafana should get the snapshots (it reads only Prometheus and Loki, which can't hold a JSON document), what counts as a discovery, and which snapshots to keep, you chose the Infinity data source reading the bot's internal API with its API key, a ship type or good new to the run, and retention as it is. | **Snapshots of everything cached, at every discovery, in Grafana:** a snapshot holds every market and shipyard the bot has cached, as last seen, also where no ship is. Besides the one at every start, one is taken whenever the cached shipyards or markets list a ship type or good no snapshot of the run held yet (new to the run, not to a place), and says what was new and where. The agent's first snapshot and the 10 newest are kept, whatever the reason. Grafana's Infinity data source reads the bot's internal API with its key, copied from 1Password into the monitoring namespace, for a snapshots dashboard: the list, a download of each as JSON, and what the picked one holds. The key also lets Grafana's users call the API's write endpoints, as it lets anyone who opens the bot's own dashboard (B22). |
 | D74 | Slice 6.13 (asked on 2026-10-04): SHIP_PARTS could be bought for 2,870 and sold for 7,878, yet no trader took them. They were ABUNDANT with a trade volume of 6, which filled no hold, so D56 left them out; the SpaceTraders changelog says a market's trade volume grows when the good is traded. Asked: "Can you change and update the rule, that either a full hold needs to be obtained, or the supply of the seller needs to be ABUNDANT, in which case a full hold is not necessary. All other rules for profitability etc. Still stand." Then: how much should such a trip carry? What both markets trade at once, in one purchase and one sale; the seller's trade volume bought at once and sold in batches; or a full hold bought in batches? | **What both markets trade at once, where the seller is ABUNDANT** ("One purchase, one sale"): where the buy market's supply of the good is ABUNDANT and the trade volumes don't take the free hold at once, a trip carries the smallest of the free hold and the two trade volumes, still in one purchase and one sale. Anywhere else D56 holds. The credits pay for all of it (D17, D24, D56, D57); the minimum profit per unit (D14), the order of routes (D15) and the rest stand. Amends D56. |
 | D75 | Slice 2.17 (asked on 2026-10-04): "Can you, in a new pr, add the exact logic to the market tree view that is used to determine which trade is done first?" The order exists only inside the bot: the trading plan ranks each free trader's routes with its hold, fuel, position and the credits (`TradeRoutePlanner.Rank`), which Grafana can't recompute from Prometheus, and `/status/trade-opportunities` and `/top-trade-routes` read tables nothing writes. Asked whether the bot should publish its ranking, Grafana approximate it, or the market tree's description only state the rules. | **The bot publishes its ranking** ("Bot publishes its ranking"): `GET /status/trading-routes` serves the trading plan's state as its last pass stored it, the routes traders hold and then the lucrative ones none holds, numbered in the order the plan gives them out, and a table under the market tree reads it through the SpaceTraders API data source (slice 2.15). Two PRs: projects first, then gembernodes with the image bump. |
+| D76 | Slice 2.18 (asked on 2026-10-05): "Can the new list also add why the other goods are not considered for trading?" Why a good isn't traded depends on the trader: its hold, fuel and position, and the credits it may use. Asked which trader a good's reason is for, and which goods get one. | **The free traders of the plan's last pass, one row per good, for the trader that got furthest** ("Free traders, last pass"), and **only the goods with a price gap** ("Goods with a price gap"): one market in the system sells the good for less than another pays for it. The reason is the first of the trading plan's own checks (`TradeRoutePlanner.Rank`) the route fails: the buy market or the sell market out of reach, no full hold in one purchase and one sale (D56, D74), too few credits (D56), too little profit after fuel (D14); a lucrative one ranks below the 20 waiting routes listed. While every trader is on a trip the plan checks nothing, and the rows of its last pass with a free trader stay, with that time. |
 
 ## Phases
 
@@ -1077,8 +1078,8 @@ which deployed it at 18:09Z; built on branch `ccr-856636cc-qj1te0`; asked that d
   - `SettingsRepository.SetAsync` stores the type of what it was given, so `PUT /settings/{key}` turns a `bool` setting's
     type into `string`. Only the bot's own Settings page and the settings snapshot log show it; nothing acts on it.
 
-**2.13 Grafana data per server reset** (built 2026-10-04 on branch `claude/spacetraders-run-label`, in projects and
-gembernodes; asked that day, D70)
+**2.13 Grafana data per server reset** (done: merged 2026-10-04 as projects#162 and gembernodes#56, deployed by
+gembernodes#57; asked that day, D70)
 - Asked, after the server reset of 2026-10-04: "Can we key all the Grafana data off the agent ID (or something else that's
   different between resets) so data does not mix between different agents/different resets?"
 - The bot registers the same symbol after every reset (SPECTER), so the agent's and its ships' symbols repeat: a counter of
@@ -1122,8 +1123,7 @@ gembernodes; asked that day, D70)
   `PrometheusAutomationMetrics.cs` and `ZeroFirstCounter.cs`; in gembernodes, the `reset_date` variable of
   `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
-**2.14 Ship names** (built 2026-10-04 on branch `claude/dreamy-albattani-zo7njw`, in projects and gembernodes; asked that
-day, D72)
+**2.14 Ship names** (done: merged 2026-10-04 as projects#165 and gembernodes#60; asked that day, D72)
 - Asked: "SHIPS are now named by the game in ascending order. Can we make custom names within the API which should be
   type-number, so COMMAND-1, SATTELITE-1, EXCAVATOR-1. Bonus points if there's a list of relevant names for each of the
   types, one of which is picked per reset to call that type, e.g. all sattelites being called SPUTNIK-1, SPUTNIK-2 etc.
@@ -1177,8 +1177,8 @@ day, D72)
   `SpaceTraders.API/Services/ShipNameEnricher.cs`; in gembernodes, the Fleet table's query H in
   `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
-**2.15 Snapshots of every shipyard and market, at every discovery, and in Grafana** (built 2026-10-04 on branch
-`ccr-a2ff9235-gidedj`, in projects and gembernodes; asked that day, D73)
+**2.15 Snapshots of every shipyard and market, at every discovery, and in Grafana** (done: merged 2026-10-04 as
+projects#166 and gembernodes#62; asked that day, D73)
 - Asked: "Can you expand the JSON export to include shipyard information, and can you make these jsons available through
   Grafana? If we do that, is everything from the webUI covered in Grafana?" Then: "I'd like the snapshots to be made
   whenever a new discovery is made. So a shipyard with a new ship type or a market with a new good type, in addition to
@@ -1261,7 +1261,7 @@ day, D72)
   `DiscoverySnapshotService.cs`; in gembernodes, `infrastructure/monitoring/dashboards/spacetraders-snapshots-dashboard.json`
   and the SpaceTraders API data source in `infrastructure/monitoring/grafana-release.yaml`.
 
-**2.16 Each ship's profit** (built 2026-10-04 on branch `ccr-fea929ec-ptl3vh`, in projects and gembernodes; asked that day)
+**2.16 Each ship's profit** (done: merged 2026-10-04 as projects#169 and gembernodes#64; asked that day)
 - Asked: "For spacetraders, I'd like to see each ships total profit. So -purchase price-market buys+market sales-fuel (plus
   or minus any other relevant ship-specific credit changes)"
 - The ledger already books every credit change to the ship it is about (`LedgerEntryHandler`): its purchase, each cargo
@@ -1298,8 +1298,8 @@ day, D72)
   `Details` in `PrometheusAutomationMetrics.cs`; in gembernodes, the "Profit by ship" panel of
   `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`.
 
-**2.17 The trading plan's order under the market tree** (built 2026-10-04 on branch `ccr-f3fba810-ie3vm6`, in projects
-and gembernodes; asked that day, D75)
+**2.17 The trading plan's order under the market tree** (done: merged as projects#168 on 2026-10-04 and gembernodes#65
+on 2026-10-05; asked on 2026-10-04, D75)
 - Asked: "Can you, in a new pr, add the exact logic to the market tree view that is used to determine which trade is
   done first?" The market tree shows, per good, where it is cheapest and where it sells best; the trading plan ranks
   routes per trader, with what Grafana doesn't have: the trader's hold, fuel and position, and the credits.
@@ -1321,6 +1321,40 @@ and gembernodes; asked that day, D75)
 - To understand this, start with `TradingRoute` and `/trading-routes` in `SpaceTraders.API/Endpoints/StatusEndpoints.cs`,
   then `SaveStateAsync` in `Automation/TradingAutomationService.cs`; in gembernodes,
   `infrastructure/monitoring/dashboards/spacetraders-markets-dashboard.json`.
+
+**2.18 Why the other goods aren't traded** (built 2026-10-05 on branch `ccr-f3fba810-ie3vm6`, in projects and gembernodes;
+asked that day, D76)
+- Asked: "Can the new list also add why the other goods are not considered for trading?" The list is slice 2.17's: the
+  routes traders hold and the lucrative ones that wait. Why a good isn't in it depends on the trader, so you chose the
+  free traders of the plan's last pass, one row per good, for the trader that got furthest, and only the goods with a
+  price gap (D76).
+- Done:
+  - **`TradeRoutePlanner.Judge`**: every route with a price gap that no other trader holds, through `Rank`'s own checks in
+    the order they run (`CheckRoutes`, which `Rank` runs too, so the two can't differ): the buy market in reach, the
+    sell market in reach from it, a full hold in one purchase and one sale or an ABUNDANT seller (D56, D74), the credits
+    (D56), the profit after fuel (D14). Each route says the first check it fails, with its figures so far; the lucrative
+    ones are `Rank`'s routes. `TradeRouteJudgement.Why` puts the check in a sentence with those figures, and
+    `FurthestPerGood` keeps, per good, the route and trader that got furthest, then the largest price gap.
+  - **The trading plan** judges each free trader's routes where it listed their lucrative ones (D13), and its state gets
+    `NotTraded`: for each good with a price gap that no listed route carries, by system, the check that failed, the
+    trader, the route, the sentence and when it was found. A good whose furthest route is lucrative ranks below the 20
+    waiting routes the state keeps (`MaxPendingRoutes`). A system without a free trader at a pass keeps what was found
+    there before, less the goods now listed. Only a change is written, as before: when it was found doesn't count as one.
+  - **`GET /status/trading-routes`** serves them as `notTraded`.
+  - **In gembernodes:** the trade routes table lists them after the routes, as "not traded", with a "why not" column.
+- What it shows, and doesn't: the reasons as the checks found them for the traders that were free. Ships that gather in
+  their spare time (D34) aren't judged. A route another trader holds isn't either, and its good is in the list.
+- Tests: `TradeRoutePlannerTests` (Judge's lucrative routes are Rank's; each check; the figures; held routes left out),
+  `TradeRouteJudgementTests` (each sentence; the furthest per good), `TradingAutomationServiceTests` (the reasons in the
+  state; for the trader that got furthest; kept with their time while no trader is free; dropped once the good is
+  listed; below the listed routes; written once while a trader waits) and `ApiIntegrationTests` (`notTraded`). They
+  failed before `Judge` existed. App 1095, Domain 72, API 210 (and 4 skipped), Integration 1.
+- Noticed (not changed): a ship that gathers in its spare time and takes a route that waited for a trader (D34) holds it,
+  but the route stays among the waiting ones too (`TradeInsteadOfGatheringAsync` doesn't take it out of `pending`), so
+  the state and the table list it twice: held, and waiting.
+- To understand this, start with `CheckRoutes` and `TryEvaluateFrom` in `Trading/TradeRoutePlanner.cs`, then
+  `Trading/TradeRouteJudgement.cs`, then `SaveStateAsync` in `Automation/TradingAutomationService.cs`; in gembernodes,
+  the trade routes panel of `infrastructure/monitoring/dashboards/spacetraders-markets-dashboard.json`.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -2923,8 +2957,8 @@ when it is seen for the first time.
     `ShipGoalExecutorServiceTests`), Domain 72, API 167 (and 6 skipped: the sandbox, and Postgres without Docker),
     Integration 1. `ShipyardRepositoryTests` (Infrastructure) need Docker and didn't run here.
 
-- **6.12 Mining drones keep what they can sell within one tank** (built 2026-10-04 on branch
-  `claude/dreamy-albattani-zo7njw`; asked that day, D71). Asked: "I'd like to have the configuration for mining drones only
+- **6.12 Mining drones keep what they can sell within one tank** (done: merged 2026-10-04 as projects#165, deployed by
+  gembernodes#60; asked that day, D71). Asked: "I'd like to have the configuration for mining drones only
   to throw out minerals that they cannot sell within a single tank of fuel, instead of everything they're not specifically
   mining for. They still should use the survey with the highest chance of getting the minerals they want, just added with
   some extra trips to sell other ores as well."
@@ -2959,8 +2993,8 @@ when it is seen for the first time.
     `SpaceTraders.Application/Commands/Ships/MineResourceVolumeCommand.cs`, then `MiningPlanner.IsSellableWithinOneTank`
     and `GiveTripAsync` in `Automation/MiningAutomationService.cs`.
 
-- **6.13 Less than a full hold where the seller's supply is ABUNDANT** (built 2026-10-04 on branch `ccr-f3fba810-ie3vm6`;
-  asked that day, D74). SHIP_PARTS went untraded in X1-FJ91 at a difference of 5,008 a unit: they were ABUNDANT with a
+- **6.13 Less than a full hold where the seller's supply is ABUNDANT** (done: merged 2026-10-04 as projects#167, deployed
+  by gembernodes#63; asked that day, D74). SHIP_PARTS went untraded in X1-FJ91 at a difference of 5,008 a unit: they were ABUNDANT with a
   trade volume of 6, and D56 wants a full hold. Asked: "either a full hold needs to be obtained, or the supply
   of the seller needs to be ABUNDANT, in which case a full hold is not necessary. All other rules for profitability etc.
   Still stand."
@@ -3012,10 +3046,11 @@ your PC, 1Password or kubectl:
 | 6.11 | A systems dashboard, uid `spacetraders-systems` (`dashboards/spacetraders-systems-dashboard.json` plus its `configMapGenerator` entry), and links to it from the two other SpaceTraders dashboards (merged: PR #51). It shows the systems beyond home once the explore plan has jumped |
 | 2.11 | The markets dashboard's shipyards table: "can do", fuel, cargo and equipment for each ship for sale, and the table at full width (merged: PR #52, which deployed the build) |
 | 2.12 | The Settings table's "next run" column, "value" and "next run" 180 px wide, and its description (merged: PR #55, which deployed the build) |
-| 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (branch `claude/spacetraders-run-label`, PR #56, not merged). It shows data once the bot runs a build with slice 2.13: deploy that build with it |
-| 2.14 | A "name" column in the SpaceTraders dashboard's Fleet and Roles tables, and the ship's name in brackets in front of a journal line about it, in the journal, the survey journal and the exploring journal (branch `claude/dreamy-albattani-zo7njw`, not merged). It shows data once the bot runs a build with slice 2.14: deploy that build with it |
-| 2.15 | The Infinity data source (Grafana's background preinstall, pinned to 3.11.1), the SpaceTraders API data source with the bot's API key (`spacetraders-secrets.yaml`, the 1Password item copied into the monitoring namespace), a snapshots dashboard, uid `spacetraders-snapshots`, and links to it from the three other SpaceTraders dashboards (branch `ccr-a2ff9235-gidedj`, not merged). The download and the tables need a build with slice 2.15; the list works with any |
+| 2.13 | A "Reset" picker on the SpaceTraders, markets and systems dashboards, and every query filtered on it, the logs' too (merged: PR #56; PR #57 deployed the build) |
+| 2.14 | A "name" column in the SpaceTraders dashboard's Fleet and Roles tables, and the ship's name in brackets in front of a journal line about it, in the journal, the survey journal and the exploring journal (merged: PR #60, which deployed the build) |
+| 2.15 | The Infinity data source (Grafana's background preinstall, pinned to 3.11.1), the SpaceTraders API data source with the bot's API key (`spacetraders-secrets.yaml`, the 1Password item copied into the monitoring namespace), a snapshots dashboard, uid `spacetraders-snapshots`, and links to it from the three other SpaceTraders dashboards (merged: PR #62, which deployed the build) |
 | 6.13 | The markets dashboard's market tree: the trade volume where each good is cheapest and where it sells best ("buy volume", "sell volume"), and a description that says when such a pair is traded (merged: PR #61); D74 in that description (merged: PR #63, which deployed the build) |
 | 6.6 | "Jump gate progress", "Jump gate: materials still needed" and "Jump gate materials" on the SpaceTraders dashboard, and the Roles, Purchase order, Spent per hour and Profit per hour descriptions brought up to date (merged: PR #53). They show data while the home gate is under construction, as X1-FJ91's is |
-| 2.16 | A "Profit by ship" table under the SpaceTraders dashboard's Roles table: each ship's profit, its purchase, market buys, market sales, fuel and other, and the fleet's totals; the panels below moved down by its height (branch `ccr-fea929ec-ptl3vh`, not merged). Its numbers show once the bot runs a build with slice 2.16: deploy that build with it |
-| 2.17 | "Trade routes, in the order traders take them" under the market tree on the markets dashboard, from `/status/trading-routes` through the SpaceTraders API data source (branch `ccr-f3fba810-ie3vm6`, not merged). It shows data once the bot runs a build with slice 2.17: deploy that build with it |
+| 2.16 | A "Profit by ship" table under the SpaceTraders dashboard's Roles table: each ship's profit, its purchase, market buys, market sales, fuel and other, and the fleet's totals; the panels below moved down by its height (merged: PR #64, which deployed the build) |
+| 2.17 | "Trade routes, in the order traders take them" under the market tree on the markets dashboard, from `/status/trading-routes` through the SpaceTraders API data source (merged: PR #65, which deployed the build) |
+| 2.18 | The trade routes table under the market tree: after the routes, a row for each other good with a price gap, "not traded", with why not in a new "why not" column, and the description that says so (branch `ccr-f3fba810-ie3vm6`, not merged). Its rows show once the bot runs a build with slice 2.18: deploy that build with it |
