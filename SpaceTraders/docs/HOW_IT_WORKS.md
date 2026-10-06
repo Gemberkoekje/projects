@@ -291,7 +291,7 @@ too: then the command ship, with nothing to survey, trades (D34), and with no tr
 siphons in its spare time (slice 6.8); a ship that can mine mines (the contract first, D23, then the
 mining plan's trips); a ship that can siphon, and can neither mine nor survey, siphons (slice 6.7);
 trading takes what the others leave free, and the spare-time plan what trading leaves. With the construction
-plan on (slice 6.6), the ship with the largest hold builds the home system's jump gate while it needs materials,
+plan on (slice 6.6), every ship that can build builds the home system's jump gate while it needs materials (D93),
 and trades when it has no load it may buy. With the role
 board on (slice 6.9), which plan a ship works for follows from the role the board gives it instead, by what
 it and the other ships can do and what each role would earn: see
@@ -307,7 +307,7 @@ it and the other ships can do and what each role would earn: see
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47); then one more for each further area with mining drones, after the drones per scarce mineral (D55) |
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77); a drone bought for the jump gate's smelters mines only its ore for them while the gate needs a material made from it (D92) | Free miners | Low-supply openings (Pending/Assigned), the gate's miners | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53); while the gate needs materials, one per ore its smelters have below HIGH every `Mining.GateMinerIntervalMinutes` (D92); then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
-| Construction | Build the home system's jump gate: buy its materials a full hold at a time and supply them (slice 6.6, D64–D68) | The ship with the construction role: the largest hold that isn't a drone or the surveyor (D65); any free ship that holds what the gate needs | The gate's materials (required, fulfilled, on their way), the builders, why no load was bought | No ship: the gate's next load of materials, after the cargo ships in the order (D64), above the credit reserve |
+| Construction | Build the home system's jump gate: buy its materials a full hold at a time and supply them (slice 6.6, D64–D68) | The ships with the construction role: every ship that isn't a drone or the surveyor, or the largest holds up to `Construction.Ships` (D65, D93); any free ship that holds what the gate needs | The gate's materials (required, fulfilled, on their way), the builders, why no load was bought | No ship: the gate's next load of materials, after the cargo ships in the order (D64), above the credit reserve |
 | Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
 | SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
 
@@ -412,12 +412,12 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      gather is below ABUNDANT, as it shares a pair before that (see [Mining](#mining-miningautomationservice-slice-64)).
      Moved to trading for profit, drones left the ores they had mined short, and the plans bought drones for them (on
      2026-10-03 the board moved SPECTER-3 between mining and trading three times in 30 minutes);
-  6. while the home system's jump gate needs materials, the ship with the largest hold there of those left
-     that can construct builds it (`construction`, slice 6.6, D65), as many as `Construction.Ships` (1):
-     supplying pays nothing, so no estimate could choose it, and finishing the gate comes first. Drones and the
-     ship that surveys are decided by then. A light hauler (80) builds before a light shuttle (40); of two equal
-     holds the one that builds now keeps it, else the one that can do least else (the shuttle before the command
-     ship). The construction plan gives the builder work (see
+  6. while the home system's jump gate needs materials, every ship left there that can construct builds it
+     (`construction`, slice 6.6, D65, D93), or the largest holds, as many as `Construction.Ships` when that is
+     above 0 (the default, 0, sets no limit): supplying pays nothing, so no estimate could choose it, and finishing
+     the gate comes first. Drones and the ship that surveys are decided by then. With a limit, a light hauler (80)
+     builds before a light shuttle (40); of two equal holds the one that builds now keeps it, else the one that can
+     do least else (the shuttle before the command ship). The construction plan gives the builders work (see
      [Construction](#construction-constructionplanservice-slice-66)), and the trading plan when that has nothing
      it may buy. A ship whose one role is constructing and isn't chosen gets `None`;
   7. the rest share the work for the most credits per hour across the fleet (`most_profitable`): each ship
@@ -896,10 +896,14 @@ buy.
     under construction is complete, `PlanCompleted`.
   - Supplying pays nothing: the API's supply call (`POST systems/{system}/waypoints/{waypoint}/construction/supply`)
     answers with the site and the ship's cargo, without credits.
-- **Who builds** (D65): the ships with the construction role, `Construction.Ships` (1) of them: the largest holds
-  that aren't drones, probes or the surveyor (`FleetRoles.CanConstruct`). The role board gives the role (reason
-  `construction`, see [Role board](#role-board-roleplanservice-slice-69)); with the board off the plan picks the
-  builders by the same rule, among the ships that don't survey (`ConstructionPlanner.PickBuilders`).
+- **Who builds** (D65, D93): the ships with the construction role: every ship that isn't a drone, a probe or the
+  surveyor (`FleetRoles.CanConstruct`), or the largest holds, as many as `Construction.Ships` when that is above 0
+  (the default, 0, sets no limit). The role board gives the role (reason `construction`, see
+  [Role board](#role-board-roleplanservice-slice-69)); with the board off the plan picks the builders by the same rule,
+  among the ships that don't survey (`ConstructionPlanner.PickBuilders`). However many build, a load takes only what no
+  other trip carries or goes to buy (`MaterialNeed.OnTheWay`, the trips this pass starts included), and only one trip
+  buys a material at a market at a time (D80): of three builders and the last 40 FAB_MATS, one takes the 40 and the
+  others trade.
 - **Each tick:**
   1. a free ship in the home system that holds a material the gate still needs supplies it first, whatever its role
      (`ConstructionStarted`, reason `held_cargo`), as much as the gate still needs: the trading plan would sell it, or
@@ -957,8 +961,8 @@ buy.
   ADVANCED_CIRCUITRY 400/400, QUANTUM_STABILIZERS 1/1), so the plan finds nothing to build there. Its neighbours
   X1-HZ59-I59 and X1-BG54-I54 were under construction, needing the same.
 - **And exploring** (slice 6.11): a jump needs the gates at both ends built, so the explore plan can't take the command
-  ship away while the home gate needs materials, and the two take turns: the command ship may build first, when it has
-  the largest hold, and explore after. A ship on an explore assignment isn't free, so it gets no load. The explore plan
+  ship away while the home gate needs materials, and the two take turns: the command ship may build first, as every
+  ship that can does (D93), and explore after. A ship on an explore assignment isn't free, so it gets no load. The explore plan
   looks at a gate under construction again hourly (`ExploreAtlas.RecheckAfter`), so it may set off up to an hour after
   this plan has seen the gate complete.
 - **Off** (the default): nothing is fetched or bought, no ship gets the construction role, and a trip under way
@@ -1278,7 +1282,7 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
 | Survey | a `SurveyWaypointGoal` | it has a surveyor mount, is not in transit, and has no assignment and no goal (or a finished or blocked one), or is on a spare-time trip that fills its hold (D37) |
 | Mining | a `MineAndSellGoal` | it is a miner, not in transit, and has no assignment and no goal (or a finished or blocked one) |
 | Siphon | a `SiphonAndSellGoal` | it is a siphoner (`FleetRoles.IsSiphoner`: a gas siphon, a hold and a tank, nothing to mine or survey with), not in transit, and has no assignment and no goal (or a finished or blocked one) |
-| Construction | a `SupplyConstructionGoal` | it is in the home system and not a probe, not in transit, and has no assignment and no goal (or a finished or blocked one); a load goes only to a builder with an empty hold (the construction role, or with the role board off one of the `Construction.Ships` largest holds that don't survey), a delivery of held materials to any such ship |
+| Construction | a `SupplyConstructionGoal` | it is in the home system and not a probe, not in transit, and has no assignment and no goal (or a finished or blocked one); a load goes only to a builder with an empty hold (the construction role, or with the role board off a ship that can build and doesn't survey, the largest holds up to `Construction.Ships` when that is above 0), a delivery of held materials to any such ship |
 | Trading | a `TradeBetweenMarketsGoal` | it has a cargo hold and a fuel tank, isn't a surveyor while the survey plan is on, is not in transit, and has no assignment and no goal (or a finished or blocked one). With the spare-time plan on, a ship that gathers in its spare time too, free or on a spare-time trip that fills its hold, but only for a route that waits for it (D34) |
 | SpareTime | a `GatherAndSellGoal` | it gathers in its spare time (`FleetRoles.GathersInSpareTime`: a surveyor, with the survey plan on, with a mining laser or a gas siphon, a hold and a tank), is not in transit, and has no assignment and no goal (or a finished or blocked one) |
 
@@ -1763,7 +1767,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 |---|---|
 | `Automation.Enabled` (true) | Off: no plans, goal steps or contract work, whatever would trigger them. Startup recovery skips. |
 | `Automation.Plan.Scout.Enabled`, `.Contract.Enabled`, `.Explore.Enabled`, `.Roles.Enabled`, `.ProbeDeployment.Enabled`, `.Survey.Enabled`, `.Mining.Enabled`, `.Siphon.Enabled`, `.Construction.Enabled`, `.Trading.Enabled`, `.SpareTime.Enabled` (true, D69) | Off: the plan isn't bootstrapped, buys nothing and its ships' goals wait (D9). With the survey plan on, a ship that can survey only surveys (D20); with the spare-time plan on too, the command ship trades or mines and siphons when it has nothing to survey (D34–D37). With the role board on, every ship works for the plan of the role the board gives it instead (D38–D41). With the construction plan on, the largest hold builds the home system's jump gate while it needs materials (slice 6.6, D64–D68) |
-| `Construction.Ships` (1) | Ships that build the home system's jump gate while it needs materials: the largest holds that aren't drones, probes or the surveyor. The role board gives them the construction role; with the board off, the construction plan picks them (D65) |
+| `Construction.Ships` (0) | The most ships that build the home system's jump gate while it needs materials, the largest holds that aren't drones, probes or the surveyor; 0 for every such ship (D93). The role board gives them the construction role; with the board off, the construction plan picks them (D65). Each takes a load only of what no other trip carries |
 | `Roles.ReconsiderMinutes` (10) | Minutes between the role board's evaluations of the whole fleet; a new ship, a plan switched, the contract starting or stopping to want ore, the home gate starting or stopping to need materials, or a ship left without work weighs the roles at once (D41) |
 | `Roles.HeadStartPercent` (20) | Percent more a ship's current role counts on the role board, so close calls don't flip back and forth (D41); 0 means none |
 | `Roles.ChainValueSharePercent` (50) | Percent of the price difference to the pricier good a market makes from what a ship sells it that the role board counts, and that share again of the step after; fully while the market is SCARCE of it, not at ABUNDANT (D39); at most what the trip earns on a unit (D49); 0 means none |

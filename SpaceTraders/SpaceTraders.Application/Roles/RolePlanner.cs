@@ -120,10 +120,11 @@ public sealed record MineralCoverage
 ///   <item>every other drone gathers too (<see cref="GathersFirst"/>, D58): a drone, which can mine or siphon and trade and
 ///   nothing else, takes its gathering role whatever trading would pay, and trades only when its plan has no trip for it.
 ///   Moved to trading for profit, drones left the minerals they had mined short, and the plans bought drones for them;</item>
-///   <item>while a system's jump gate needs materials, the ships with the largest holds there, as many as
-///   <c>Construction.Ships</c> (one), build it (<see cref="Construction"/>, slice 6.6, D65): supplying pays nothing, so no
-///   estimate could choose it, and finishing the gate comes first. Drones and the ship that surveys are decided by then.
-///   Of two equal holds, the one that builds now keeps it, else the one that can do least else;</item>
+///   <item>while a system's jump gate needs materials, every other ship there that can build builds it, or the largest holds,
+///   as many as <c>Construction.Ships</c> when that is above 0 (<see cref="Construction"/>, slice 6.6, D65, D93): supplying
+///   pays nothing, so no estimate could choose it, and finishing the gate comes first. Each takes a load only of what no
+///   other trip carries, one buyer at a market (D80), and trades meanwhile. Drones and the ship that surveys are decided by
+///   then. Of two equal holds, the one that builds now keeps it, else the one that can do least else;</item>
 ///   <item>the rest share the work for the most credits per hour across the fleet (<see cref="MostProfitable"/>): each
 ///   takes one trip, and no two the same trade route (D18) or the same mining or siphon opening. A ship's current role
 ///   counts the head start more (D41), so a close call doesn't flip back and forth. A ship left without a trip keeps
@@ -185,8 +186,8 @@ public static class RolePlanner
     /// <param name="headStart">How much more a ship's current role counts: 0.2 for 20% (D41).</param>
     /// <param name="coverage">The SCARCE or LIMITED minerals, each to keep a drone gathering (D48).</param>
     /// <param name="builders">
-    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
-    /// role available: only where the gate needs materials.
+    /// The most ships per system that build its jump gate (<c>Construction.Ships</c>, D65, D93), of those that have the
+    /// construction role available (only where the gate needs materials); 0 for all of them.
     /// </param>
     /// <returns>A decision per ship, by symbol.</returns>
     public static IReadOnlyList<RoleDecision> Decide(
@@ -194,7 +195,7 @@ public static class RolePlanner
         bool contractWantsOre,
         double headStart,
         IReadOnlyList<MineralCoverage> coverage,
-        int builders = 1)
+        int builders = RoleSettings.DefaultConstructionShips)
         => Decide(ships, contractWantsOre, headStart, coverage, new HashSet<string>(StringComparer.OrdinalIgnoreCase), builders);
 
     /// <summary>Decides every ship's role, the shuttles the mining plan designated keeping the collecting role.</summary>
@@ -207,8 +208,8 @@ public static class RolePlanner
     /// by symbol: each keeps the collecting role, whatever else it could do.
     /// </param>
     /// <param name="builders">
-    /// How many ships per system build its jump gate (<c>Construction.Ships</c>, D65), of those that have the construction
-    /// role available: only where the gate needs materials.
+    /// The most ships per system that build its jump gate (<c>Construction.Ships</c>, D65, D93), of those that have the
+    /// construction role available (only where the gate needs materials); 0 for all of them.
     /// </param>
     /// <returns>A decision per ship, by symbol.</returns>
     public static IReadOnlyList<RoleDecision> Decide(
@@ -217,7 +218,7 @@ public static class RolePlanner
         double headStart,
         IReadOnlyList<MineralCoverage> coverage,
         IReadOnlySet<string> collectors,
-        int builders = 1)
+        int builders = RoleSettings.DefaultConstructionShips)
     {
         ArgumentNullException.ThrowIfNull(ships);
         ArgumentNullException.ThrowIfNull(coverage);
@@ -310,10 +311,10 @@ public static class RolePlanner
     }
 
     /// <summary>
-    /// The ships that build each system's jump gate (slice 6.6, D65): of those not yet decided that have the construction
-    /// role available (only where the gate needs materials), the largest holds, as many as <paramref name="count"/>; of two
-    /// equal holds, the one that builds now, then the one that can do least else (a cargo ship before the command ship), then
-    /// by symbol.
+    /// The ships that build each system's jump gate (slice 6.6, D65, D93): every one not yet decided that has the construction
+    /// role available (only where the gate needs materials), or, when <paramref name="count"/> is above 0, the largest holds,
+    /// as many as that; of two equal holds, the one that builds now, then the one that can do least else (a cargo ship before
+    /// the command ship), then by symbol.
     /// </summary>
     private static IEnumerable<RoleCandidate> Builders(
         IReadOnlyList<RoleCandidate> ships,
@@ -322,12 +323,15 @@ public static class RolePlanner
         => ships
             .Where(ship => !decided.ContainsKey(ship.Ship.Symbol) && ship.Roles.Contains(FleetRole.Construct))
             .GroupBy(ship => ship.Ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(system => system
-                .OrderByDescending(ship => ship.Ship.CargoCapacity)
-                .ThenByDescending(ship => ship.Current == FleetRole.Construct)
-                .ThenBy(ship => ship.Roles.Count)
-                .ThenBy(ship => ship.Ship.Symbol, StringComparer.Ordinal)
-                .Take(Math.Max(0, count)))
+            .SelectMany(system =>
+            {
+                var largestFirst = system
+                    .OrderByDescending(ship => ship.Ship.CargoCapacity)
+                    .ThenByDescending(ship => ship.Current == FleetRole.Construct)
+                    .ThenBy(ship => ship.Roles.Count)
+                    .ThenBy(ship => ship.Ship.Symbol, StringComparer.Ordinal);
+                return count > 0 ? largestFirst.Take(count) : largestFirst;
+            })
             .ToList();
 
     /// <summary>

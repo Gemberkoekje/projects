@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-06, slice 6.26)
+- Every ship that can build builds the jump gate (D93), as asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for the final 40 FAB MATS." `Construction.Ships` is now an optional cap, 0 (the new default) for no limit; with a cap, the largest holds build, as before (D65). The underway count was there already: a load takes only what no other trip carries or goes to buy (`MaterialNeed.OnTheWay`), and one trip buys a material at a market at a time (D80), so of three builders and the last 40 FAB_MATS one takes them and the others trade.
+
+### Docs – Changed (2026-10-06, slice 6.26)
+- `PLAN.md`: slice 6.26 and decision D93. `docs/HOW_IT_WORKS.md`: who builds the gate, and the setting.
+
 ### Code – Fixed (2026-10-06, B70)
 - A ship whose arrival was never handled gets it again (`LostArrivals`): a goal step for a ship still stored in transit more than 5 minutes past its arrival time schedules its arrival again, for its active goal, at most once every 5 minutes, and logs a warning. Only the arrival's dock takes a ship out of transit in the cache, and an arrival whose dock failed four times was dropped: SPECTER-5's, at 00:42:53Z on 2026-10-06 in a 35-second outage of the game's API, left it waiting for hours, until a restart.
 
