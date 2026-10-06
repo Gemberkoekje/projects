@@ -162,6 +162,7 @@ public sealed class ScoutStopSkippedTests
             new ShipGoalStepGuard(), // Its own per step, so the interleaved steps both run: this tests B45's fix, not B46's guard.
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
+            new LostArrivals(Substitute.For<IShipEventScheduler>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         await sut.ExecuteAsync(ShipSymbol, CancellationToken.None);
