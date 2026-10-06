@@ -32,7 +32,8 @@ public interface IProbeDeploymentPlanService
 ///   surveyor, a drone for each scarce mineral and the cargo ships of <c>Trade.ShipPurchases</c> go first;</item>
 ///   <item>it flies the free probes (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
 ///   waits for one of our ships (<see cref="ShipyardCalls"/>, D30), the others between nearby markets, the
-///   one whose prices are oldest first, until there is a probe at every market.</item>
+///   one whose prices are oldest first, until there is a probe for every market; then each market keeps one, and
+///   the spares settle at the markets without one (B69).</item>
 /// </list>
 /// A probe is any probe in the system, the starting one included (B25); a probe in flight, or with a flight
 /// to make, keeps its market, so no target is bought or flown to twice (B15).
