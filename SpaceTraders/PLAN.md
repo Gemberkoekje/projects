@@ -28,8 +28,8 @@
   X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z; the
   explore plan saw it at 04:12Z and has taken the command ship out since (6.11): by 09:14Z it had explored nine systems,
   out to X1-DR50, nine jumps away, and was on its way to X1-FC19.
-- **In review:** slice 6.28 (D97, D101: probes at the markets abroad, through the gates), on branch
-  `claude/spacetraders-probes-abroad` in projects and gembernodes.
+- **In review:** slice 6.28 (D97, D101: probes at the markets abroad, through the gates): projects#192 and its dashboard,
+  gembernodes#83 (branch `claude/spacetraders-probes-abroad` in both). A deploy PR bumps the images once #192 is merged.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.27, listed under [Phases](#phases).
 - **Still open:**
   - Slices 6.28–6.31, across systems (D94–D101): planned under [Phases](#phases), built in that order, one PR each, with a
