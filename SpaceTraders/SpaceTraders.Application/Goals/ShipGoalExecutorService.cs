@@ -74,6 +74,7 @@ public sealed class ShipGoalExecutorService(
             and not SurveyWaypointGoal
             and not MoveToWaypointGoal
             and not JumpGoal
+            and not WarpGoal
             and not ExploreSystemGoal
             and not SupplyConstructionGoal
             and not MineForShuttleGoal

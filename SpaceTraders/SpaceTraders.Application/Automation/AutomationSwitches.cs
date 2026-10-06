@@ -45,7 +45,7 @@ public static class AutomationSwitches
     public static AutomationPlan? PlanFor(ShipGoal goal) => goal switch
     {
         ScoutWaypointGoal => AutomationPlan.Scout,
-        JumpGoal or ExploreSystemGoal => AutomationPlan.Explore,
+        JumpGoal or ExploreSystemGoal or WarpGoal => AutomationPlan.Explore,
         DeployProbeGoal => AutomationPlan.ProbeDeployment,
         SurveyWaypointGoal => AutomationPlan.Survey,
 

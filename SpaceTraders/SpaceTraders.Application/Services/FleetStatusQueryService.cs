@@ -433,6 +433,7 @@ internal sealed class FleetStatusQueryService(
             SupplyConstructionGoal sup => (ShipGoalKind.SupplyConstruction, $"Supplying {sup.TradeSymbol} to {sup.ConstructionSiteWaypointSymbol}", null, sup.ConstructionSiteWaypointSymbol),
             ScoutWaypointGoal scout => (ShipGoalKind.ScoutWaypoint, $"Scouting {scout.TargetWaypointSymbol}", null, scout.TargetWaypointSymbol),
             JumpGoal jump => (ShipGoalKind.Jump, $"Jumping from {jump.GateWaypointSymbol} to {jump.DestinationGateWaypointSymbol}", jump.GateWaypointSymbol, jump.DestinationGateWaypointSymbol),
+            WarpGoal warp => (ShipGoalKind.Warp, $"Warping to {warp.DestinationWaypointSymbol}", null, warp.DestinationWaypointSymbol),
             ExploreSystemGoal explore => (
                 ShipGoalKind.ExploreSystem,
                 $"Exploring {explore.SystemSymbol}: market or shipyard {Math.Min(explore.Visited + 1, explore.Stops.Count)} of {explore.Stops.Count}",

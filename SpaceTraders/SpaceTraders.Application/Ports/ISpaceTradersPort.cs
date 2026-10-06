@@ -75,7 +75,18 @@ public interface ISpaceTradersPort
 
     Task<SiphonActionResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Warps a ship in orbit, with a warp drive, to <paramref name="waypointSymbol"/>, a waypoint of another system (PLAN.md slice
+    /// 6.31): it burns fuel by the systems' distance and its flight mode, and arrives after a while, as a flight does. A refusal is
+    /// a <see cref="WarpRefusedException"/>.
+    /// </summary>
     Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Scans for the systems around a ship with a sensor array (PLAN.md slice 6.31, D105): each with its position and its distance
+    /// from the ship. The scan starts a cooldown.
+    /// </summary>
+    Task<ScanSystemsActionResult> ScanSystemsAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Jumps a ship in orbit at a jump gate to <paramref name="waypointSymbol"/>, a gate the first connects to; the jump buys

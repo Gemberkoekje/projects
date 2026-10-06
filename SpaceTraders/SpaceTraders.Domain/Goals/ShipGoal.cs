@@ -31,6 +31,7 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(ExploreSystemGoal), "ExploreSystem")]
 [JsonDerivedType(typeof(MineForShuttleGoal), "MineForShuttle")]
 [JsonDerivedType(typeof(CollectOreGoal), "CollectOre")]
+[JsonDerivedType(typeof(WarpGoal), "Warp")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -456,6 +457,21 @@ public sealed record JumpGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.Jump;
+}
+
+/// <summary>
+/// One warp of an explorer (PLAN.md slice 6.31, D100, D101): it warps to <see cref="DestinationWaypointSymbol"/>, a waypoint of
+/// another system, from wherever it is in its own: its warp drive needs no gate. The warp is fuel-safe: it lands where the
+/// ship can refuel, or keeps the fuel to warp back. A ship short of the fuel fills its tank first, at its system's nearest
+/// market. The goal ends in the destination's system; the explore plan chooses the next step.
+/// </summary>
+public sealed record WarpGoal : ShipGoal
+{
+    /// <summary>The waypoint of another system it warps to.</summary>
+    public required string DestinationWaypointSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.Warp;
 }
 
 /// <summary>

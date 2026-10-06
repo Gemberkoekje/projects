@@ -17,9 +17,21 @@ public enum ExploreStepKind
 
     /// <summary>Nothing reachable is left to explore, and no active gate leads home from here.</summary>
     NoWayHome = 4,
+
+    /// <summary>
+    /// Nothing is left for a ship with a warp drive to explore, and it is in a system the gates don't reach from home: it goes
+    /// to the nearest one they do (PLAN.md slice 6.31), by a warp, so that it isn't left where the traders can't go.
+    /// </summary>
+    Rejoin = 5,
+
+    /// <summary>Nothing is left for a ship with a warp drive to explore, and it is in a system the gates reach from home (slice 6.31).</summary>
+    NothingLeft = 6,
 }
 
-/// <summary>The explore plan's next step: a jump from the gate the ship is in front of, or why there is none.</summary>
+/// <summary>
+/// The explore plan's next step: a jump from the gate the ship is in front of, or, for a ship with a warp drive, a warp
+/// (PLAN.md slice 6.31); or why there is none.
+/// </summary>
 public sealed record ExploreStep
 {
     /// <summary>What to do.</summary>
@@ -31,11 +43,20 @@ public sealed record ExploreStep
     /// <summary>For a jump: the gate to jump to.</summary>
     public string DestinationGateWaypointSymbol { get; init; } = string.Empty;
 
+    /// <summary>For a warp (slice 6.31): the waypoint of the next system it lands at; empty for a jump.</summary>
+    public string WarpWaypointSymbol { get; init; } = string.Empty;
+
     /// <summary>The system the jumps lead to: the one to explore, or home.</summary>
     public string TargetSystemSymbol { get; init; } = string.Empty;
 
     /// <summary>How many jumps away that system is.</summary>
     public int Jumps { get; init; }
+
+    /// <summary>For a ship with a warp drive (slice 6.31): how many warps its way to that system takes.</summary>
+    public int Warps { get; init; }
+
+    /// <summary>For a ship with a warp drive (slice 6.31): the seconds its way to that system takes, as reckoned.</summary>
+    public double Seconds { get; init; }
 }
 
 /// <summary>One jump of a way between systems (PLAN.md slice 6.28, D101): from a system's gate to a gate it connects to.</summary>
@@ -155,9 +176,136 @@ public static class ExploreAtlas
     }
 
     /// <summary>
+    /// The next step of an exploring ship with a warp drive (PLAN.md slice 6.31, D100, D101, D106): the nearest system not
+    /// explored yet that no other exploring ship has taken, by the fastest way, through the gates or by warps
+    /// (<see cref="SystemWays"/>). Asked on 2026-10-06, "Reach first, then nearest" (D106): a system within
+    /// <paramref name="reach"/> jumps of home through the gates comes before any other (D103); after those, the nearest by the
+    /// seconds its way takes, whether jumps or warps get there. It waits while something that could change the choice isn't
+    /// known yet: a gate it reaches that was never looked at (as <see cref="Next"/>), or the waypoints of a system only a warp
+    /// reaches, within a warp of an explored system, never fetched (<see cref="WarpLooks"/>): until they are, nobody knows where
+    /// a ship could refuel there. With nothing left, a ship in a system the gates don't reach from home goes to the nearest one
+    /// they do (<see cref="ExploreStepKind.Rejoin"/>); one where they do has <see cref="ExploreStepKind.NothingLeft"/>.
+    /// </summary>
+    /// <param name="state">What the plan knows.</param>
+    /// <param name="chart">The gates, the systems' positions and their waypoints.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <param name="taken">The systems the other exploring ships explore or are on their way to; none when null.</param>
+    /// <param name="reach">The jumps from home within which a system comes first (<c>Trade.MaxHaulDistance</c>); 0 for none.</param>
+    /// <returns>The step.</returns>
+    public static ExploreStep NextByWays(ExplorePlanState state, WayChart chart, WayShip ship, DateTimeOffset now, IReadOnlySet<string>? taken = null, int reach = 0)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(chart);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        var atlas = new Atlas(state, now);
+        var here = ship.SystemSymbol;
+        if (atlas.BySystem.ContainsKey(here) && atlas.Search(here).Order.Any(atlas.IsCharting))
+        {
+            return new ExploreStep { Kind = ExploreStepKind.Wait };
+        }
+
+        var positions = chart.Systems.ToDictionary(system => system, system => chart.TryGetPosition(system, out var at) ? at : default, StringComparer.OrdinalIgnoreCase);
+        var fetched = chart.Systems.Where(system => chart.WaypointsOf(system).Count > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (WarpLooks(state, positions, fetched, [(here, ship.MaxWarp)], now).Any(system => atlas.BySystem.TryGetValue(system, out var known) && known.WaypointsCheckedAt is null))
+        {
+            return new ExploreStep { Kind = ExploreStepKind.Wait };
+        }
+
+        var ways = SystemWays.From(chart, ship);
+        var fromHome = Reachable(state, state.HomeSystemSymbol, now);
+        var target = state.Systems
+            .Where(system => system.ExploredAt is null && taken?.Contains(system.SystemSymbol) != true && ways.ContainsKey(system.SystemSymbol))
+            .OrderBy(system => reach > 0 && fromHome.TryGetValue(system.SystemSymbol, out var jumps) && jumps <= reach ? 0 : 1)
+            .ThenBy(system => ways[system.SystemSymbol].Seconds)
+            .ThenBy(system => system.SystemSymbol, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (target is not null)
+        {
+            return Along(ways[target.SystemSymbol], target.SystemSymbol, ExploreStepKind.Explore);
+        }
+
+        if (fromHome.ContainsKey(here))
+        {
+            return new ExploreStep { Kind = ExploreStepKind.NothingLeft, TargetSystemSymbol = here };
+        }
+
+        var back = ways
+            .Where(way => fromHome.ContainsKey(way.Key))
+            .OrderBy(way => way.Value.Seconds)
+            .ThenBy(way => way.Key, StringComparer.Ordinal)
+            .Select(way => way.Key)
+            .FirstOrDefault();
+        return back is null
+            ? new ExploreStep { Kind = ExploreStepKind.NoWayHome, TargetSystemSymbol = state.HomeSystemSymbol }
+            : Along(ways[back], back, ExploreStepKind.Rejoin);
+    }
+
+    /// <summary>
+    /// The systems only a warp reaches whose waypoints the explore plan is still to fetch (PLAN.md slice 6.31), the most needed
+    /// first: known, not explored, not reached from home through usable gates, no waypoint cached and never fetched, and never
+    /// asked for, or asked for at least <see cref="RetryAfter"/> ago without an answer; within the farthest warp of the ships
+    /// with a warp drive from an explored system
+    /// or from where such a ship is. A system whose position isn't known comes first: the plan knows it only from a gate's
+    /// connections (behind a gate under construction), so it lies next to a system the gates reach.
+    /// </summary>
+    /// <param name="state">What the plan knows.</param>
+    /// <param name="positions">Where each system lies, by symbol, as cached.</param>
+    /// <param name="fetched">The systems whose waypoints are cached.</param>
+    /// <param name="ships">The ships with a warp drive: the system each is in, and the farthest it warps (<see cref="WayShip.MaxWarp"/>).</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <returns>The systems, the nearest first.</returns>
+    public static IReadOnlyList<string> WarpLooks(
+        ExplorePlanState state,
+        IReadOnlyDictionary<string, (int X, int Y)> positions,
+        IReadOnlySet<string> fetched,
+        IReadOnlyCollection<(string SystemSymbol, int MaxWarp)> ships,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(positions);
+        ArgumentNullException.ThrowIfNull(fetched);
+        ArgumentNullException.ThrowIfNull(ships);
+
+        var maxWarp = ships.Count == 0 ? 0 : ships.Max(ship => ship.MaxWarp);
+        if (maxWarp <= 0)
+        {
+            return [];
+        }
+
+        var fromHome = Reachable(state, state.HomeSystemSymbol, now);
+        List<(int X, int Y)> origins =
+        [
+            .. state.Systems.Where(system => system.ExploredAt is not null).Select(system => system.SystemSymbol)
+                .Concat(ships.Select(ship => ship.SystemSymbol))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(positions.ContainsKey)
+                .Select(system => positions[system]),
+        ];
+        return
+        [
+            .. state.Systems
+                .Where(system => system.ExploredAt is null
+                    && !fromHome.ContainsKey(system.SystemSymbol)
+                    && !fetched.Contains(system.SystemSymbol)
+                    && system.WaypointsFetchedAt is null
+                    && (system.WaypointsCheckedAt is null || now - system.WaypointsCheckedAt.Value >= RetryAfter))
+                .Select(system => (system.SystemSymbol, Distance: !positions.TryGetValue(system.SystemSymbol, out var at)
+                    ? 0
+                    : origins.Count == 0 ? double.PositiveInfinity : origins.Min(origin => Warps.Distance(origin, at))))
+                .Where(entry => entry.Distance <= maxWarp)
+                .OrderBy(entry => entry.Distance)
+                .ThenBy(entry => entry.SystemSymbol, StringComparer.Ordinal)
+                .Select(entry => entry.SystemSymbol),
+        ];
+    }
+
+    /// <summary>
     /// How many systems are left to explore (slice 6.30, D102): those the plan knows, hasn't explored and reaches from home
     /// through usable gates (<see cref="IsUsable"/>). A system whose gate is under construction, or was refused within the
-    /// hour, doesn't count until a ship can jump there.
+    /// hour, doesn't count until a ship can jump there. Asked on 2026-10-06 (slice 6.31, D107), "No, gates only": a system only
+    /// a warp reaches doesn't count either.
     /// </summary>
     /// <param name="state">What the plan knows.</param>
     /// <param name="now">The time to judge the gates by.</param>
@@ -304,6 +452,24 @@ public static class ExploreAtlas
         way.Reverse();
         jumps = way;
         return true;
+    }
+
+    /// <summary>The first step of a way between systems (slice 6.31), towards <paramref name="target"/>: a jump or a warp.</summary>
+    private static ExploreStep Along(SystemWay way, string target, ExploreStepKind kind)
+    {
+        var first = way.Steps[0];
+        return first.Kind == WayStepKind.Warp
+            ? new ExploreStep { Kind = kind, WarpWaypointSymbol = first.ToWaypointSymbol, TargetSystemSymbol = target, Jumps = way.Jumps, Warps = way.Warps, Seconds = way.Seconds }
+            : new ExploreStep
+            {
+                Kind = kind,
+                GateWaypointSymbol = first.FromWaypointSymbol,
+                DestinationGateWaypointSymbol = first.ToWaypointSymbol,
+                TargetSystemSymbol = target,
+                Jumps = way.Jumps,
+                Warps = way.Warps,
+                Seconds = way.Seconds,
+            };
     }
 
     private static ExploreStep Towards(

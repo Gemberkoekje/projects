@@ -221,6 +221,21 @@ public sealed record PurchaseShipActionResult
 
     public required long Cost { get; init; }
 
+    /// <summary>The bought ship's mounts, as startup sync caches them (PLAN.md slice 6.31): an explorer's sensor array among them.</summary>
+    public IReadOnlyList<string>? MountSymbols { get; init; }
+
+    /// <summary>The bought ship's modules, as JSON, as startup sync caches them (slice 6.31): an explorer's warp drive among them.</summary>
+    public string? ModulesJson { get; init; }
+
+    /// <summary>The bought ship's frame, as JSON, as startup sync caches it (slice 6.31).</summary>
+    public string? FrameJson { get; init; }
+
+    /// <summary>The bought ship's reactor, as JSON, as startup sync caches it (slice 6.31).</summary>
+    public string? ReactorJson { get; init; }
+
+    /// <summary>The bought ship's engine, as JSON, as startup sync caches it (slice 6.31): its speed times its flights and warps.</summary>
+    public string? EngineJson { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public PurchaseShipActionResult(AgentModel Agent, string ShipSymbol, NavModel ShipNav, FuelModel ShipFuel, CargoModel ShipCargo, long Cost)
     {
@@ -963,6 +978,71 @@ public sealed record WarpActionResult
         this.Nav = Nav;
         this.Fuel = Fuel;
     }
+}
+
+/// <summary>A system a ship's sensor array found (PLAN.md slice 6.31, D105).</summary>
+public sealed record ScannedSystemModel
+{
+    /// <summary>Creates a scanned system.</summary>
+    /// <param name="Symbol">The system.</param>
+    /// <param name="SectorSymbol">Its sector.</param>
+    /// <param name="Type">Its star's type.</param>
+    /// <param name="X">Where it lies, across.</param>
+    /// <param name="Y">Where it lies, up.</param>
+    /// <param name="Distance">Its distance from the ship, as the API gives it.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ScannedSystemModel(string Symbol, string SectorSymbol, string Type, int X, int Y, int Distance)
+    {
+        this.Symbol = Symbol;
+        this.SectorSymbol = SectorSymbol;
+        this.Type = Type;
+        this.X = X;
+        this.Y = Y;
+        this.Distance = Distance;
+    }
+
+    /// <summary>The system.</summary>
+    public required string Symbol { get; init; }
+
+    /// <summary>Its sector.</summary>
+    public required string SectorSymbol { get; init; }
+
+    /// <summary>Its star's type.</summary>
+    public required string Type { get; init; }
+
+    /// <summary>Where it lies, across.</summary>
+    public required int X { get; init; }
+
+    /// <summary>Where it lies, up.</summary>
+    public required int Y { get; init; }
+
+    /// <summary>Its distance from the ship, as the API gives it.</summary>
+    public required int Distance { get; init; }
+}
+
+/// <summary>What a ship's scan for the systems around it found (PLAN.md slice 6.31, D105), and the cooldown it started.</summary>
+public sealed record ScanSystemsActionResult
+{
+    /// <summary>Creates the result.</summary>
+    /// <param name="Systems">The systems found.</param>
+    /// <param name="CooldownSeconds">The cooldown the scan started, in seconds.</param>
+    /// <param name="CooldownExpiresAt">When that cooldown ends; null when the API gave no time.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ScanSystemsActionResult(IReadOnlyList<ScannedSystemModel> Systems, int CooldownSeconds, DateTimeOffset? CooldownExpiresAt)
+    {
+        this.Systems = Systems;
+        this.CooldownSeconds = CooldownSeconds;
+        this.CooldownExpiresAt = CooldownExpiresAt;
+    }
+
+    /// <summary>The systems found.</summary>
+    public required IReadOnlyList<ScannedSystemModel> Systems { get; init; }
+
+    /// <summary>The cooldown the scan started, in seconds.</summary>
+    public required int CooldownSeconds { get; init; }
+
+    /// <summary>When that cooldown ends; null when the API gave no time.</summary>
+    public DateTimeOffset? CooldownExpiresAt { get; init; }
 }
 
 /// <summary>

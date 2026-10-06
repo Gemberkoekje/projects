@@ -26,4 +26,7 @@ public enum ShipGoalKind
 
     /// <summary>A shuttle collecting the parked drones' ore at a far asteroid and selling it (slice 6.18, D83).</summary>
     CollectOre = 19,
+
+    /// <summary>An explorer warping to another system (slice 6.31, D100, D101).</summary>
+    Warp = 20,
 }

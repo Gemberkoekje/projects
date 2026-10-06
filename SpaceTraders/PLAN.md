@@ -23,25 +23,22 @@
 
 ## Where things stand (2026-10-06)
 
-- **Running:** projects main `7555d61` (projects#194: slice 6.29), deployed by gembernodes#85, live since 2026-10-06
-  12:01Z. The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on
-  (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z; the explore plan has taken the command ship
-  out since (6.11): at 12:12Z it jumped on from X1-JV87 to X1-QT24. 6.29 checked after the deploy: no anomalies, and by
-  12:14Z three traders had taken routes abroad, among them SPECTER-E's 80 LAB_INSTRUMENTS from X1-NF46 to home, 4 jumps,
-  about 55,309 after 21,404 for antimatter.
-- **In review:** slice 6.30 (the explorers and charting, D98, D99, D102, D103) with B73's fix: projects#195, its dashboard
-  gembernodes#86.
-- **Done:** phases 0–5, and phase 6's slices 6.1–6.29, listed under [Phases](#phases).
+- **Running:** projects main `8c37dd7e` (projects#195: slice 6.30, the explorers and charting, with B73's fix), deployed by
+  gembernodes#86 with its systems dashboard, live since 2026-10-06 13:19Z. The agent is SPECTER of the reset of 2026-10-04
+  13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at
+  2026-10-06 03:17Z. Since the deploy the explore plan wants 2 explorers for the 19 systems left; at 13:25Z the command
+  ship set off from X1-QT24 to X1-GT9-AE7B to buy the first, and at 14:23Z it was at X1-PX46.
+- **In review:** slice 6.31 (warping, D100, D101, D104–D107): projects#196, its dashboard gembernodes#87. In this reset
+  the home gate is built, so it works as soon as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices
+  across systems wait for the new home system's gate (D68).
+- **Done:** phases 0–5, and phase 6's slices 6.1–6.30, listed under [Phases](#phases).
 - **Still open:**
-  - Slice 6.31, warping (D100, D101): planned under [Phases](#phases), after 6.30, with a stop for your check. In this reset
-    the home gate is built, so it works as soon as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the
-    slices across systems wait for the new home system's gate (D68).
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
     last check, a full reset period on the cluster, is the same one.
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
-  - B17 in part, and B24 (below); B73 is fixed on slice 6.30's branch.
+  - B17 in part, and B24 (below).
 - **The cluster** (gembernodes):
   - Postgres is one Bitnami instance every app shares (`postgresql.flux-system`, LAN address 192.168.1.232). Its 32Gi
     volume sits on the QNAP NFS share that every PVC uses, and the NFS CSI driver most likely doesn't enforce the 32Gi,
@@ -56,7 +53,7 @@
 
 ## Known issues
 
-The open bugs. The fixed ones, B1–B72 but B17 and B24, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
+The open bugs. The fixed ones, B1–B73 but B17 and B24, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
 fixes: look there before giving a symptom a new number. Each fix starts with a test that reproduces the misbehaviour.
 
 ### Bugs: behaviour that contradicts the code's own intent
@@ -65,7 +62,6 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 |---|---|---|---|
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 (done for the mining and survey trips, which navigate with their goal; the contract commands still dead-reckon for themselves) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
-| B73 | **The explore plan took a free command ship home after each trade trip abroad, once nothing was left to explore** (found on 2026-10-06 while slice 6.30 was built, not seen live yet).<br>• Since slice 6.29 a ship whose role is trading takes routes across systems, and "a trader stays where its last sale leaves it" (D96); the command ship trades once it is released.<br>• With nothing left to explore, the plan's next step for a free command ship away from home was the jump home (D60), so it took the ship, flew it home and released it there, after every trip that ended abroad. D60 brings home a ship that explored. | `DecideAsync` in `Exploring/ExplorePlanService.cs`; `ExplorersTests.ACommandShipThatTradesAbroad_IsNotTakenHome_WithNothingLeftToExplore` (failed before the fix) | 6.30 (fixed on the same branch: only a ship the plan has, one that explored, is brought home) |
 
 ### Decisions
 
@@ -176,7 +172,11 @@ get the next D-number.
 | D100 | Slice 6.31: should the explorer warp to the systems the gates don't reach? Five gates seen on 2026-10-06 are under construction, X1-XJ90's, next to home, among them. How a warp costs fuel and time isn't documented: the spec says only that it uses fuel, the drive lists a range of 2,000, and X1-HN44, the nearest system, is 840 from home against an 800-unit tank. | **Research how warping works, then measure, then fuel-safe** ("Research how the warp works exactly, then measure, then fuel-safe.", 2026-10-06): first find out exactly how a warp's fuel and time follow from distance and flight mode, and what the range limits; then one warp checks it; then the explorer warps only where it can refuel or warp back, and charts what it finds (D99). |
 | D101 | Slices 6.28 and 6.31 (suggested on 2026-10-06, while this plan was written): "We have a planner that decides whether to cruise, burn or drift to get to a location fastest. I'd suggest expanding that for jumps: Whether to jump or use a warp drive if the ship has one, based on distance and fuel." | **One planner for every way** (2026-10-06): D84's fastest-way planner, which picks CRUISE, BURN or DRIFT for each leg, also plans the ways between systems: jumps through built gates (6.28; each costs one ANTIMATTER and a cooldown) and, for a ship with a warp drive, warps (6.31, once D100's research and measurement give their fuel and time), choosing by distance and fuel; a warp is also the way into a system the gates don't reach. Every executor flies through it. Read as D84's "fastest", with the antimatter counted in a trade route's rate (D95). Amends D84. |
 | D102 | Slice 6.30 (asked on 2026-10-06, with the go for it): "I'd like more explorers to be added when there are more systems to be discovered. Maybe 1 explorer for every 10 undiscovered systems?" D98 gave one, configurable. The explore plan knew 21 systems it hadn't explored, 16 behind built gates and 5 behind gates under construction, and each system it had explored had shown it about 1.5 new ones; credits 1.91M, the credit reserve 632,325; X1-GT9-AE7B, 4 jumps from home, the one shipyard seen that sells SHIP_EXPLORER (702,315, HIGH). Asked which systems count and how to round, whether there is a cap, where the extra explorers stand in the order ships are bought in, and what an explorer does with no system left to explore (the plan said: home, like the command ship, where it takes no work). | **One for every 10 systems the gates reach, rounded up, at most a setting; the first before the probes, the rest last; trading in between** ("Reachable, round up (Recommended)", "Cap as a setting (Recommended)", "First before probes, rest last (Recommended)", and "Explorers can trade with 40 cargo space, so they can trade at the location they are at until a new unexplored location comes up.", 2026-10-06): the explorers wanted are one for each 10 systems, or part of 10, that the explore plan knows, hasn't explored and reaches through built gates (16 that day: 2; `Explore.SystemsPerExplorer`, new, 10), at most `Explore.MaxExplorers` (new, 5; 0 for no cap). The first is bought at D98's place, before the probes, and the command ship fetches it; every further one after the drones and cargo ships that take turns, before the far probes, bought once one of our ships is in the shipyard's system (6.28 gives X1-GT9's markets probes), so no explorer turns back for one. An explorer with no system left to take trades from where it is, with its 40-unit hold (D96), until one turns up. Replaces D98's `Explore.Explorers` and its explorer coming home. |
-| D103 | Slice 6.30 (asked on 2026-10-06, during the work): "Can we add a bit of prioritization? So first the systems within 5 jumps are explored before going further? I'm open to suggestions what the most effective pattern is." Each exploring ship took the system nearest to it (D59), so by 12:42Z the command ship had explored a chain 16 jumps deep, one system a jump (X1-HN44 at 1 to X1-QT24 at 15, on its way to X1-MN30 at 16), while X1-QA35 and X1-QR21 (1 jump from home), X1-VY81 (2), X1-BC61 (3) and X1-GY77 (4) waited. Offered: the reach first, then the nearest; or rings from home, the fewest jumps from home first, which zigzags; and as the radius the trade reach or a setting of its own. | **Reach first, then nearest; the trade reach** ("Reach first, then nearest (Recommended)", "The trade reach (Recommended)", 2026-10-06): every exploring ship takes a system within `Trade.MaxHaulDistance` (5) jumps of home before any beyond it, the nearest to the ship first in each; a system another exploring ship has taken stays its own (6.30). Amends D59. |
+| D103 | Slice 6.30 (asked on 2026-10-06, during the work): "Can we add a bit of prioritization? So first the systems within 5 jumps are explored before going further? I'm open to suggestions what the most effective pattern is." Each exploring ship took the system nearest to it (D59), so by 12:42Z the command ship had explored a chain 16 jumps deep, one system a jump (X1-HN44 at 1 to X1-QT24 at 15, on its way to X1-MN30 at 16), while X1-QA35 and X1-QR21 (1 jump from home), X1-VY81 (2), X1-BC61 (3) and X1-GY77 (4) waited. Offered: the reach first, then the nearest; or rings from home, the fewest jumps from home first, which zigzags; and as the radius the trade reach or a setting of its own. | **Reach first, then nearest; the trade reach** ("Reach first, then nearest (Recommended)", "The trade reach (Recommended)", 2026-10-06): every exploring ship takes a system within `Trade.MaxHaulDistance` (5) jumps of home before any beyond it, the nearest to the ship first in each; a system another exploring ship has taken stays its own (6.30). Amends D59. **Amended by D106:** beyond the reach, the nearest by the seconds its way takes, jumps or warps. |
+| D104 | Slice 6.31 (asked on 2026-10-06, after the research): should the explorer warp in DRIFT where no CRUISE warp reaches? A CRUISE warp reaches at most its 800-unit tank; a DRIFT warp costs 1 fuel at any distance within the drive's range of 2,000, but takes about six times as long, by a multiplier not confirmed since API 2.1: X1-XJ90, next to home, lies 955 from every system known, about 2.2 hours, and was charted already. | **CRUISE/BURN only** ("CRUISE/BURN only (Recommended)", 2026-10-06): a warp goes as far as the fuel aboard pays for, in BURN where the fuel pays for it and that strands nothing (as D84 flies), in CRUISE otherwise, never a drift. X1-XJ90 stays out of reach unless a system nearer to it turns up. |
+| D105 | Slice 6.31: which systems does the explorer warp to? The plan knows only the systems a gate's connections show; the explorer's sensor array can scan for the systems around it with no gate connection (a call, then a cooldown), and those may still be uncharted. | **Scan when none left** ("Scan when none left (Recommended)", 2026-10-06): the systems known first (the five behind gates under construction that day); once none is left within its ways, the explorer scans from where it is, caches what it finds, and warps to those systems, nearest first. Read as: once from each system; the systems within its warps (800) join the plan, the others are cached with their position. |
+| D106 | Slice 6.31: where do the systems only a warp reaches stand in the explorers' order? D103 explores the gate systems within the trade reach of home first; traders can't use a system without a built gate. | **Reach first, then nearest** ("Reach first, then nearest (Recommended)", 2026-10-06): the gate systems within the trade reach first, as D103; after them, the nearest by travel time, whether jumps or a warp get there. Amends D103. |
+| D107 | Slice 6.31: should the systems only a warp reaches count towards the explorers wanted? D102 buys one explorer for every 10 systems left, counting those the gates reach. | **No, gates only** ("No, gates only (Recommended)", 2026-10-06): D102 stays as it is; the explorers bought explore the systems only a warp reaches too. |
 
 ## Phases
 
@@ -258,12 +258,13 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.27 Profit per hour (D95), the first of the slices across systems below
 - 6.28 Probes at the markets abroad (D97, D101; B72)
 - 6.29 Trade across systems (D96)
-- 6.30 The explorers, and charting (D98, D99, D102, D103), in review (projects#195)
+- 6.30 The explorers, and charting (D98, D99, D102, D103; B73)
+- 6.31 Warping (D100, D101, D104–D107), in review (projects#196)
 
-The slices across systems, as planned on 2026-10-06 (D94–D101, and D102 and D103 with 6.30's go). 6.27–6.29 are done, 6.30 is in
-review; 6.31 is next:
+The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's). 6.27–6.30
+are done; 6.31 is in review:
 
-- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D103; 6.27–6.29 done, 6.30 in review; numbered after projects#189's
+- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107; 6.27–6.30 done, 6.31 in review; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
   system so other systems actually get considered and used. I want a "profit per time unit" so the system can choose
   between a short route that pays less or a long route that pays more. 3. I'd like the new ship type, EXPLORER, to be bought
@@ -293,111 +294,114 @@ review; 6.31 is next:
     in `docs/archive/PLAN_HISTORY.md`.
   - **6.29 Trade across systems** (D95, D96): done, merged as projects#194, its routes table's jumps column and the deploy
     as gembernodes#85 (image `7555d61`, live since 2026-10-06 12:01Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
-  - **6.30 The explorers, and charting** (D98, D99, D102, D103). Built on branch `claude/spacetraders-explorer-charting`, in
-    review as projects#195 with B73's fix, its dashboard as gembernodes#86.
-    - Found (read-only, 2026-10-06 about 12:05Z, image `7555d61`):
-      - The explore plan knew 35 systems and had explored 14; of the 21 left, 16 lay behind built gates and 5 behind gates
-        under construction (X1-XJ90, X1-JU15, X1-ZZ69, X1-YG40, X1-JX83). By D102 that is 2 explorers.
-      - X1-GT9-AE7B, an orbital station with a market, 4 jumps from home, is the one shipyard seen that sells SHIP_EXPLORER:
-        702,315 at 05:55Z, supply HIGH. It sells nothing else. An explorer has an 800-unit tank, a 40-unit hold, a warp
-        drive, a sensor array and a gas siphon: by what it carries the plans would take it for a siphon drone.
-      - Every waypoint cached in the 15 systems seen is charted, by other agents. The API's chart call answers with the
-        waypoint, its traits shown, and the agent's credits; the reward isn't given apart.
-      - Credits 1.91M, the credit reserve 632,325.
-    - Found too (2026-10-06 12:42Z, while it was built): each exploring ship took the system nearest to it (D59), so the
-      command ship had explored a chain 16 jumps deep, one system a jump, and was on its way to X1-MN30, 16 jumps out, while
-      X1-QA35 and X1-QR21 (1 jump from home), X1-VY81 (2), X1-BC61 (3) and X1-GY77 (4) waited: D103. 17 systems were left.
+  - **6.30 The explorers, and charting** (D98, D99, D102, D103): done, merged as projects#195 with B73's fix, its systems
+    dashboard and the deploy as gembernodes#86 (image `8c37dd7e`, live since 2026-10-06 13:19Z). Its details are in
+    `docs/archive/PLAN_HISTORY.md`.
+  - **6.31 Warping** (D100, D101, D104–D107). Built on branch `claude/spacetraders-warp`, in review as projects#196, its
+    dashboard as gembernodes#87.
+    - Research (2026-10-06, D100: "Research how the warp works exactly"). The sources: the API's docs, "Ship Navigation",
+      read in a browser (a warp "behaves very similar to normal waypoint travel in that it takes time and consumes normal
+      fuel"); the OpenAPI spec 2.3.0 in `SpaceTradersAPI/api-docs` (`POST my/ships/{ship}/warp` to a waypoint of another
+      system, from orbit, with a warp drive installed, answered with the nav and the fuel; the docs' guide shows a
+      `systemSymbol`, the spec and the client a `waypointSymbol`); the docs' error codes (4235 `warpInsideSystemError`, 4241
+      `shipMissingWarpDriveError`, 4203 `navigateInsufficientFuelError`, none for a warp out of range); and the api-docs
+      wiki's "Travel Fuel and Time", which the players compiled:
+      - The distance is the straight one between the two systems' positions, rounded.
+      - The fuel is a flight's: the distance in CRUISE and STEALTH, twice that in BURN, 1 in DRIFT; at least 1.
+      - The seconds are round(round(distance) × multiplier / engine speed + 15). A warp's multiplier is 50 in CRUISE, twice
+        a flight's 25; the wiki marks DRIFT's 300, BURN's 25 and STEALTH's 60 as not confirmed since API 2.1.
+      - The drive's range: "Warp-drives have a maximum range given, although you are generally limited by the amount of
+        fuel rather than the warp range."
+      - To compare, a jump: no time, then a cooldown of 17 seconds plus 0.311 a unit of the systems' distance before the
+        next jump (`TradeGates`, fitted on SPECTER-1's jumps), and one ANTIMATTER, 5,024 to 5,654 that day. A jump's cooldown
+        holds back no warp.
+      - Refuelling: a market unit of FUEL fills 100 of the tank, and every market seen sold FUEL (248 of 248, the gates' and
+        the fuel stations' among them).
+    - Found (read-only, 2026-10-06 between 13:30Z and 14:25Z, image `8c37dd7e`):
+      - The explorer X1-GT9-AE7B sells: an Ion Drive II of speed 36, an 800-unit tank, a Warp Drive I of range 2,000, a
+        Sensor Array II, a gas siphon and a 40-unit hold. So a CRUISE warp reaches 800 at most, 1.39 seconds a unit (800 in
+        19 minutes), BURN 400 at half that; a DRIFT warp would cost 1 fuel at 8.3 seconds a unit.
+      - The explore plan knew 41 systems: 19 left behind built gates, and 5 behind gates under construction, which only a
+        warp reaches: X1-ZZ69 (531 from X1-GT9), X1-JU15 (540 from X1-AD37), X1-YG40 (441 from X1-TA92), X1-JX83 (459 from
+        X1-AA31) and X1-XJ90 (955 from home, 1,497 or more from every other system known). Other agents had charted all
+        five; each has 25 to 27 markets, fuel stations among them.
+      - Only the 17 systems explored had a cached position.
+      - The command ship set off from X1-QT24 to X1-GT9-AE7B for the first explorer at 13:25Z; at 14:23Z it was at X1-PX46.
+    - Asked on 2026-10-06, after the research, all as recommended: "CRUISE/BURN only" (D104), "Scan when none left" (D105),
+      "Reach first, then nearest" (D106) and "No, gates only" (D107).
     - Done:
-      - **How many** (D102, `CountAsync` in `Exploring/ExplorePlanService.cs`): one explorer for every
-        `Explore.SystemsPerExplorer` (new, 10) systems left, or part of that, at most `Explore.MaxExplorers` (new, 5; 0 for no
-        cap); `Explore.SystemsPerExplorer` 0 buys none. The systems left (`ExploreAtlas.SystemsLeft`, new) are those the plan
-        knows, hasn't explored and reaches from home through usable gates: one behind a gate under construction, or one
-        refused within the hour, counts once a ship can jump there.
-      - **The purchase** (D98, D102, `BuyAsync`): the explore plan is a buying plan now, at the cheapest shipyard the gates
-        reach that sells SHIP_EXPLORER, within the credit reserve (`IShipPurchaseService`). The first at the new
-        `PurchaseTier.Explorer` (7), after the gate's loads and before the probes; every further one at the new
-        `PurchaseTier.MoreExplorers` (10), after the drones and cargo ships that take turns and before the far probes (11),
-        and only while one of our ships is at the shipyard or a probe of ours is in its system, which answers the
-        purchase's call (D30): a need nothing could meet would hold back the far probes for good. The state says where the
-        next purchase stands (`ExplorerPurchaseStatus`).
-      - **The fetch** (D98, D30, `FetchAsync`): when the purchase waits only for a ship at the shipyard
-        (`CommandShipFetchesIt`), the command ship flies there once its current step ends (`FetchingExplorer`), through the
-        gates: a `MoveToWaypointGoal` now flies across systems (`MoveToWaypointGoalExecutor`, `GoalJumps`, D101). There it
-        waits while the credits are saved up, and the purchase is made. It goes only while a way there through usable
-        gates is known (the jumps refused lately left out), and explores on meanwhile: a flight that found no way would end
-        at once, on every pass.
-      - **Who explores, and where first** (D103): the explorers, or the command ship while there are none. Once there is one,
-        the command ship finishes its step, jumps home and is released (`HomeAsync`, `ExploreAtlas.HomeFrom`, D60). Each
-        exploring ship takes a system no other has taken (`Taken`), within the trade reach of home (`Trade.MaxHaulDistance`,
-        5) before any beyond it, the nearest to it first in each (`ExploreAtlas.Next`). The state lists each explorer with
-        what it does (`ExploringShip`).
-      - **B73** (`DecideAsync`): a free command ship away from home, trading there since 6.29, is no longer taken home
-        with nothing left to explore: only a ship that explored is brought home (D60).
-      - **In between, trade** (D102, `DecideExplorerAsync`): an explorer with no system left is released where it is
-        (`nothing_to_explore`, journalled once as `PlanCompleted`) and trades from there through the trading plan, across the
-        systems in reach (D96). `FleetRoles.IsExplorer` (new): trading is an explorer's only role
-        (`FleetRoles.PotentialRoles`), and it is never a siphon drone, a builder or a cargo ship of `Trade.ShipPurchases`
-        (`IsSiphoner`, `CanConstruct`, `IsCargoShip`), though it carries a gas siphon; with the role board off it trades
-        across systems as a cargo ship does. The plan takes it back once its trip ends and a system turns up.
-      - **Charting** (D99, `Exploring/Charting.cs`, `ChartAsync` in `Goals/Executors/ExploreSystemGoalExecutor.cs`): the
-        scouting stops include every uncharted waypoint (trait `UNCHARTED`) of a type that can hold a market or shipyard,
-        every type but ASTEROID and GAS_GIANT, an uncharted gate first, then the nearest. At such a stop the ship charts it
-        (`POST my/ships/{ship}/chart`; `ChartActionResult` now holds the waypoint and the agent's credits), the cache keeps
-        the waypoint the chart shows, and a market or shipyard on it is stored as at any stop. The reward, the credits after
-        the chart less those cached before it, is booked as `ChartReward` (`WaypointChartedEvent`, `LedgerEntryHandler`) and
-        journalled (`Charted`). A chart that fails fetches the waypoint instead, and the ship moves on.
-      - **Visibility**: `spacetraders_explore_systems_left` and `spacetraders_explore_explorers_wanted` (new), from the
-        plan's state; a chart's reward in `spacetraders_credits_earned_total{source="ChartReward"}` and the ships' ledger
-        metric; the purchase order's positions moved (probes 8, the turns 9, the far probes 11); the fleet table says
-        "flying to X1-GT9-AE7B" for the command ship on its way to the shipyard.
-      - gembernodes: the systems dashboard shows the systems left, the explorers wanted and bought, the chart rewards and
-        the `Charted` lines; the purchase order table sorts its positions as numbers (10 and 11 sorted before 2), and its
-        description lists the new tiers.
+      - **The note** (`Exploring/Warps.cs`): a warp's fuel and seconds as above; the drive and its range from the ship's
+        cached modules (`Warps.Range`); BURN where the fuel pays for it, CRUISE otherwise, never a drift (D104).
+      - **One planner for every way** (D101, `Exploring/SystemWays.cs` on `Exploring/WayChart.cs`): the fastest way from a
+        ship to every system it can get to, Dijkstra over the systems and where the ship is in each, by the seconds: jumps
+        through the usable gates (the flight to the gate, and the cooldown a jump waits out after the one before it), and,
+        for a ship with a warp drive, warps from wherever it is, within the drive's range. Fuel-safe (D100): a warp lands
+        where the ship can refuel (a market, or a FUEL_STATION, whose type shows even where it is uncharted), or, into a
+        system with nowhere to refuel, keeps the fuel to warp back and goes no further. A ship fills its tank where it
+        leaves a market, or flies to its system's nearest market first. A system the API refused a warp into gets none for
+        an hour (`WarpRefusals`). The positions come from `cached_systems`; the waypoints from the cache.
+      - **Every executor flies through it** (D101, `GoalJumps.TowardsAsync`): a ship with a warp drive takes the first step of
+        the fastest way, a warp (`IGoalWarps`) or a jump, so it warps only where that is faster or the only way; a ship
+        without one jumps as before.
+      - **The warp** (`Goals/Executors/GoalWarps.cs`, `IWarpSubCommand`, `WarpGoal` and `WarpGoalExecutor`): it fills its tank
+        first where a full tank warps where this one can't, or in BURN (in orbit it docks, docked it refuels and orbits); then
+        the flight mode, the warp, the nav and fuel cached and the arrival scheduled for the goal (B17). A BURN warp the API
+        refuses for its fuel goes in CRUISE; any other refusal (`WarpRefusedException`) blocks the goal, and the plan
+        chooses again.
+      - **The measurement** (D100, "then measure"): every warp is journalled (`Warped`) with the fuel and the seconds it took
+        against those the note reckons, and a warp that differs logs a warning, for the note to take the API's numbers.
+      - **The explorer warps** (`ExploreAtlas.NextByWays`, `DecideExplorerAsync` in `Exploring/ExplorePlanService.cs`): the
+        systems within the trade reach of home through the gates first (D103), then the nearest by the seconds its way
+        takes, by jumps or warps (D106). Before a warp goes to a system only a warp reaches, the plan fetches its waypoints
+        (`LookForWarpsAsync`, `ExploreAtlas.WarpLooks`: one system a pass, after the gates' looks), and the explorer waits for
+        that. It lands at the market nearest the system's gate, and explores and charts there as anywhere (D99).
+      - **Scanning** (D105, `ScanAsync`; `POST my/ships/{ship}/scan/systems`): with nothing left within its ways, an
+        explorer with a sensor array scans from where it is, once a system, after its cooldown, and the plan keeps it
+        meanwhile. Every system found is cached with its position; those within its warps (800) join the plan's systems.
+        Journalled `SystemsScanned`.
+      - **And back**: with nothing left in a system the gates don't reach from home, the explorer warps to the nearest one
+        they do (`ExploreStepKind.Rejoin`, status `Returning`), and is released there to trade (D102).
+      - **D107**: a system only a warp reaches doesn't count towards the explorers wanted.
+      - A bought ship is cached with its mounts, modules and engine at once, as startup sync caches them
+        (`PurchaseShipActionResult`, `ShipPurchaseService`): a second explorer warps, scans and has its speed before the next
+        restart.
+      - Visibility: the fleet table says "warping to X1-ZZ69"; gembernodes: the systems dashboard's exploring journal shows
+        the `Warped` and `SystemsScanned` lines.
     - Readings in the build (yours to confirm or change):
-      - **The command ship finishes what it is doing first**: a system it has just jumped into is scouted before it flies to
-        the shipyard, and once on its way it stays with the purchase while the credits are saved up for it; if something
-        earlier in the order comes first meanwhile, it explores on until the explorer may be bought again.
-      - **The chart's reward is measured from the credits**: another ship's trade that lands between the chart and the
-        credits read before it would count in the reward.
-      - **An explorer counts towards the credit reserve as a trader** (D51): with the role board on, trading is its only role,
-        so its 40 units count while it explores too, as the command ship's do.
-    - Expect, once deployed: 17 systems left, so 2 explorers wanted. The first explorer's need at position 7, and, while
-      nothing earlier waits, the command ship turning back to X1-GT9-AE7B from the chain, about 12 jumps (some 60,000 in
-      antimatter, an hour or two of cooldowns); the probes abroad wait for that purchase (D98). Then `ShipPurchased` for the
-      explorer, the command ship home and released, and the explorer jumping towards the systems within the trade reach
-      first (X1-GY77, X1-BC61, X1-VY81, X1-QA35, X1-QR21). The second once a probe of ours is in X1-GT9, after the drones
-      and cargo ships that take turns. No chart until a system with uncharted waypoints is reached: every waypoint of the
-      16 systems explored so far was charted by other agents.
-    - Noticed (yours to call): D97's SCARCE rule is for probes, so an explorer is bought at any supply.
-    - Tests: `ExplorersTests` (new: one explorer for every 10 systems left, rounded up, at most the cap, and none at 0; the
-      first before the probes, fetched by the command ship, which explores on while no way to the shipyard is known; bought there, the command ship home and released, the explorer
-      on its way; short of credits the command ship explores on, but once on its way it waits at the shipyard; a further
-      one only while a probe of ours is in the shipyard's system; each explorer its own system; a command ship that trades abroad isn't taken home (B73, which failed before); an explorer with nothing
-      left trades and is taken back after its trip; the trade reach first; the stops chart the gate first, and no asteroid
-      or gas giant), `ExploreAtlasTests` (the systems left; a taken system left to its ship; the way home; the trade reach
-      first), `ExplorerRolesTests` (new: an explorer only trades, bought or synced, which failed for a bought one as a cargo
-      ship; a siphon drone still siphons), `ExploreSystemGoalExecutorTests` (a chart, its reward and the market it shows;
-      a failed chart fetches the waypoint; no chart for a charted stop or an asteroid), `FetchFlightTests` (new: a move to
-      another system through the gates, no way, a refused jump), `PurchaseOrderTests` (the two tiers),
-      `LedgerEntryHandlerTests` (`ChartReward`), `DefaultSettingsSeedTests` (the two settings), `PrometheusMetricsTests`
-      (the two gauges, the probes at 8, the command ship's flight to the shipyard on the fleet table).
-    - To understand this, start with `EnsureBootstrappedAsync`, `BuyAsync` and `DecideExplorerAsync` in
-      `Exploring/ExplorePlanService.cs`, then `Next` and `SystemsLeft` in `Exploring/ExploreAtlas.cs`, `Exploring/Charting.cs`
-      with `ChartAsync` in `Goals/Executors/ExploreSystemGoalExecutor.cs`, and `FleetRoles.IsExplorer`.
-    - Done when: the explorers wanted are bought and explore, each its own system, and trade when none is left; the command
-      ship works at home; and the uncharted markets and shipyards are charted as they are found, with their rewards in the
-      ledger.
-  - **6.31 Warping** (D100, D101), in this order:
-    - Research: exactly how a warp's fuel and time follow from distance and flight mode, and what the drive's range
-      (2,000) limits. The spec says only that a warp uses fuel; the docs' pages render in a browser, so read them in one.
-      It ends as a note in this slice, with its sources.
-    - Measure: one warp by the explorer, its fuel and time held against the note.
-    - Warps in the fastest-way planner (D101): for a ship with a warp drive (only the explorer has one), a warp is one more
-      way between systems, weighed against the jumps by distance and fuel, and the only way into a system the gates don't
-      reach or whose gate is unbuilt. Fuel-safe: a warp only where the ship can refuel, or has the fuel to warp back. The
-      systems' positions come from the API, cached.
-    - The explorer warps to the systems the gates don't reach, within range, the nearest first, and charts what it finds
-      (D99).
+      - **The drive's range is a cap**: the API names no error for a warp beyond it; with CRUISE/BURN only (D104) the tank
+        (800) limits the explorer first anyway.
+      - **Every market refuels**: a warp may land at any market, or at a FUEL_STATION, as a place to refuel.
+      - **"Nearest" is by the seconds** for an explorer with a warp drive, within the trade reach too (D103 counted jumps).
+      - **The scan's reach**: the systems within the explorer's warps (800) join the plan; the others are only cached with
+        their position, and join when a scan from nearer finds them.
+      - **The trading plan's estimates count jumps**, for every ship: the explorer's trades warp where that is faster, so a
+        trip can be quicker than its estimate.
+      - **Measured, not held back**: the first warp measures the note, without a stop for your check: it lands where the
+        ship can refuel, so a wrong note costs time, not a ship, and says so in a warning.
+    - Expect, once deployed: the restart caches the explorer's modules and engine (startup sync). The plan fetches the five
+      systems behind gates under construction, one a pass. The explorer explores what is left within the trade reach first
+      (X1-QA35, X1-QR21, X1-VY81, X1-BC61, X1-GY77), then the nearest by the seconds, which should soon be a warp: X1-ZZ69
+      from X1-GT9 (531 in CRUISE, 753 seconds), X1-JU15 from X1-AD37, X1-YG40 from X1-TA92, X1-JX83 from X1-AA31. Its first
+      `Warped` line is the measurement: 531 fuel and 753 seconds for X1-ZZ69 from X1-GT9. X1-XJ90 stays out of reach (955,
+      against an 800-unit tank). No chart reward is likely in those five: others charted them.
+    - Noticed (yours to call): a scan finds systems only within its sensor's range, which isn't documented; the first
+      `SystemsScanned` line will show how far it reaches. A `RepeatingError` for 429s was raised at 13:32Z and cleared at
+      13:43Z, after 6.30's deploy (the bug session's).
+    - Tests: `WarpsTests` (new: the fuel and seconds of the note, the range from the cached modules, BURN, CRUISE and never a
+      drift), `SystemWaysTests` (new: a system behind an unbuilt gate by a jump and a warp; none beyond the tank; a jump where
+      it is faster, a warp where it is; into a system with nowhere to refuel only with the fuel to warp back, and no further;
+      a refused system; a ship without a drive; a warp from the nearest market; the landing), `WarpExplorersTests` (new: the
+      waypoints fetched before the warp, once even where there are none; D107; D106 both ways; the scan, once, and a warp to what it found; a scan that finds
+      nothing in reach; a scan after the cooldown; back where the gates reach and released; a refused warp for an hour),
+      `WarpGoalExecutorTests` (new: the warp and its journal line; a mismatch warns; dock, refuel, a flight to a market first;
+      a tank the refuel didn't fill asks for no warp; BURN refused goes in CRUISE; a refusal blocks; the fuel to warp back;
+      the destination's system), `WarpFlightTests` (new: a move to another system warps where the way does, jumps where it
+      does, and a ship without a drive jumps), `WarpRequestTests` (new: the request, a refusal and the rate limiter's 429,
+      the scan, a bought ship's modules), `ShipPurchaseServiceTests` (a bought ship's mounts, modules and engine),
+      `PrometheusMetricsTests` (the fleet table's "warping to").
+    - To understand this, start with `Exploring/Warps.cs` and `Exploring/SystemWays.cs`, then `NextByWays` and `WarpLooks` in
+      `Exploring/ExploreAtlas.cs` and `DecideExplorerAsync` and `ScanAsync` in `Exploring/ExplorePlanService.cs`, then
+      `GoalWarps.WarpAsync`.
     - Done when: the explorer warps to such systems and back without being stranded, the planner picks a warp only where
       it is the faster way or the only one, and the explorer charts what it finds.
   - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of

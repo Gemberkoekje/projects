@@ -81,6 +81,36 @@ public sealed class ShipPurchaseServiceTests
     }
 
     [Fact]
+    public async Task TheBoughtShip_IsCachedWithItsMountsModulesAndEngine_AsStartupSyncCachesThem()
+    {
+        // Slice 6.31: an explorer bought since the last restart has its warp drive, its sensor array and its speed at once.
+        const string modules = """[{"symbol":"MODULE_WARP_DRIVE_I","range":2000}]""";
+        const string engine = """{"symbol":"ENGINE_ION_DRIVE_II","speed":36}""";
+        _port.PurchaseShipAsync("SHIP_MINING_DRONE", Shipyard, Arg.Any<CancellationToken>())
+            .Returns(new PurchaseShipActionResult(
+                new AgentModel("AGENT", null, "X1-AB-HQ", 88_000, "COSMIC", 2),
+                "AGENT-2",
+                new NavModel("DOCKED", "X1-AB", Shipyard, "CRUISE", null, null),
+                new FuelModel(80, 80),
+                new CargoModel(0, 15, []),
+                12_000)
+            {
+                MountSymbols = ["MOUNT_SENSOR_ARRAY_II"],
+                ModulesJson = modules,
+                EngineJson = engine,
+            });
+
+        await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        await _ships.Received(1).UpsertAsync(
+            Arg.Is<ShipModel>(ship => ship.Symbol == "AGENT-2"
+                && ship.ModulesJson == modules
+                && ship.EngineJson == engine
+                && ship.MountSymbols!.SequenceEqual(new[] { "MOUNT_SENSOR_ARRAY_II" })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task WithoutAShipOfOursAtTheShipyard_ItCallsForOne_InsteadOfAskingTheApi()
     {
         // D30: the API sells a ship only where one of ours is. Without one there the purchase could only

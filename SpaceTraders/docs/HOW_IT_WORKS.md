@@ -331,12 +331,12 @@ it and the other ships can do and what each role would earn: see
 
 Markets are not scouted again. Other systems are the explore plan's (below).
 
-### Explore (`ExplorePlanService`, slices 6.11 and 6.30)
+### Explore (`ExplorePlanService`, slices 6.11, 6.30 and 6.31)
 
 Asked on 2026-10-04: "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through
 that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the
-home system, recursively." On by default (`Automation.Plan.Explore.Enabled`, D69); your decisions are D59–D63, and for the
-explorers and charting (slice 6.30) D98, D99, D102 and D103.
+home system, recursively." On by default (`Automation.Plan.Explore.Enabled`, D69); your decisions are D59–D63, for the
+explorers and charting (slice 6.30) D98, D99, D102 and D103, and for warping (slice 6.31) D100, D101 and D104–D107.
 
 - **What it knows** (`ExplorePlanState`, `plan_states` row `Explore`): every system it has seen, with its gate's waypoint,
   whether the gate is built (`Active`), still `UnderConstruction`, `None` or `Unknown`, the gates it connects to (asked
@@ -347,7 +347,10 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103.
   that failed after 5 minutes. A system an exploring ship has just jumped into has its system and all its waypoints
   fetched at once (`cached_systems`, `cached_waypoints`), as startup sync stores them. The state also lists each explorer
   with what the plan does with it, the systems left to explore, the explorers wanted, and where the next one's purchase
-  stands (`Purchase`).
+  stands (`Purchase`). With an explorer that has a warp drive (slice 6.31), once nothing else is to be looked at, it fetches
+  the same way the system and waypoints of one system a pass that only a warp reaches (`ExploreAtlas.WarpLooks`: behind a
+  gate under construction, or found by a scan), the nearest to the explored systems and the explorers first; the systems a
+  scan found within its warps join its systems, and it records the systems scanned from (`ScannedAt`).
 - **Who explores:** the explorers (`SHIP_EXPLORER`, cached as `EXPLORER` after startup sync; `FleetRoles.IsExplorer`), or
   the command ship (cached type `COMMAND`) while there is none. The plan takes a ship when it is free (its trip has ended,
   D61: no goal, no assignment, not in transit) and a system is left for it, with an `Explore` assignment, so no other plan
@@ -373,6 +376,24 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103.
   explorer with nothing left is released where it is and trades from there (D102): trading is its only role
   (`FleetRoles.PotentialRoles`), never a siphon drone's or a builder's, though it carries a gas siphon. The plan takes it
   back once its trip ends and a system turns up.
+- **An explorer with a warp drive** (slice 6.31, `ExploreAtlas.NextByWays`; its cached modules list one, `Warps.HasDrive`)
+  goes the fastest way, through the gates or by warps (`SystemWays`, D101), and so also to the systems the gates don't
+  reach. The systems within the trade reach of home through the gates come first (D103); after them the nearest by the
+  seconds its way takes, by jumps or warps (D106). It waits a pass while the waypoints of a system only a warp reaches,
+  within a warp of an explored system, are still to fetch: until then nobody knows where it could refuel there. With nothing
+  left within its ways it scans first (below); then, in a system the gates don't reach from home, it goes back to the
+  nearest one they do (`Rejoin`, status `Returning`), and is released there. Systems only a warp reaches don't count among
+  the systems left (D107).
+- **The ways** (`SystemWays` on a `WayChart`: the gates, `cached_systems`' positions and the cached waypoints): Dijkstra over
+  the systems, and where the ship is in each, by the seconds as the API reckons them. A jump takes no time, after a flight to
+  the gate and the cooldown of the jump before it (17 seconds plus 0.311 a unit of the systems' distance). A warp
+  (`Warps`, the research note of 2026-10-06) goes from anywhere in the system, within the drive's range (2,000 for Warp
+  Drive I), and burns a flight's fuel on the systems' distance: the distance in CRUISE, twice it in BURN; it takes
+  round(round(distance) × 50 / speed + 15) seconds in CRUISE, 25 instead of 50 in BURN. BURN where the fuel pays for it,
+  CRUISE otherwise, never a drift (D104). Fuel-safe (D100): a warp lands at a market (every market seen sells FUEL) or a
+  fuel station, the one nearest the system's gate, or, into a system with nowhere to refuel, keeps the fuel to warp back
+  and goes no further. The tank fills where the ship leaves a market; short of fuel elsewhere, it flies to its system's
+  nearest market first. A system the API refused a warp into gets none for an hour (`WarpRefusals`).
 - **A jump** (`JumpGoal`): fly to the system's gate, fill the tank when docked at a gate that sells fuel, orbit, and jump
   (`POST my/ships/{ship}/jump` with the destination gate's `waypointSymbol`), once the cooldown is over. Each jump buys one
   ANTIMATTER at the gate's market, booked as `AntimatterPurchase`. The plan gives a jump only while the credits after the
@@ -382,6 +403,19 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103.
   leaves that gate alone for an hour and chooses again. The jump itself is every flight's between systems (`GoalJumps`,
   slice 6.28): the probes jump the same way, and a refused jump is recorded for every way (`JumpRefusals`), so no ship is
   sent through that gate for the hour either.
+- **A warp** (`WarpGoal`, slice 6.31; `GoalWarps`, which every flight between systems of a ship with a warp drive shares):
+  docked at a market it refuels and orbits, in orbit at one it docks first where a full tank would warp where this one
+  can't, or in BURN; short of fuel elsewhere it flies to its system's nearest market. Then it sets the flight mode, warps
+  (`IWarpSubCommand`: `POST my/ships/{ship}/warp` with the destination's `waypointSymbol`), caches the nav and the fuel, and
+  schedules the arrival for the goal, which ends in the destination's system. It is journalled (`Warped`) with the fuel and
+  the seconds it took against those `Warps` reckons, and a warning when they differ (D100, "then measure"). A BURN warp the
+  API refuses for its fuel goes in CRUISE; any other refusal (`WarpRefusedException`) blocks the goal with `warp_refused`,
+  the plan chooses again, and no warp goes to that system for an hour.
+- **Scanning** (slice 6.31, D105: "Scan when none left"): with nothing left within its ways, an explorer with a warp drive
+  and a sensor array scans from where it is (`POST my/ships/{ship}/scan/systems`), once a system, after its cooldown, and
+  the plan keeps it meanwhile. Every system found is cached with its position (`cached_systems`); those within its warps
+  (the tank or the drive's range, the less) join the plan's systems (journal `SystemsScanned`). A scan that fails is tried
+  again after 5 minutes.
 - **Scouting a system** (`ExploreSystemGoal`): its markets and shipyards with nothing cached yet, and its uncharted
   waypoints of a type that can hold a market or shipyard, every type but ASTEROID and GAS_GIANT (`Charting`, D99); an
   uncharted gate first, then the nearest from where the ship is, each visited once, "as it initially does for the home
@@ -399,8 +433,8 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103.
   the trading plan's traders cross systems (slice 6.29, D96), an explorer between explorations among them: see
   [Trading](#trading-tradingautomationservice-slice-65).
 - **What it costs:** API reads while it learns (one a pass, a few at each new system: about 85 waypoints are five pages),
-  a chart at each stop that needs one, the jumps' antimatter, the explorers (about 700,000 each), and the exploring ships'
-  time. The cache grows by a system's waypoints, markets and shipyards for each system explored; an agent reset clears it.
+  a chart at each stop that needs one, the jumps' antimatter, a warp's fuel, a scan a system, the explorers (about 700,000
+  each), and the exploring ships' time. The cache grows by a system's waypoints, markets and shipyards for each system explored; an agent reset clears it.
 - **Metrics:** `spacetraders_explore_systems_left` and `spacetraders_explore_explorers_wanted`, as the last pass counted
   them; a chart's reward counts in `spacetraders_credits_earned_total{source="ChartReward"}`.
 
@@ -1429,10 +1463,10 @@ scout and probe plans don't read the roles.
 
 - **Storage:** each ship has at most one active goal, stored in `cached_ships` (`GoalId`,
   `GoalKind`, `GoalPayloadJson`, `GoalStatus`).
-- **Kinds:** 19 kinds are defined, but only thirteen are ever created: `ScoutWaypoint`,
+- **Kinds:** 20 kinds are defined, but only fourteen are ever created: `ScoutWaypoint`,
   `DeployProbe`, `MineAndSell`, `SiphonAndSell`, `GatherAndSell`, `TradeBetweenMarkets`,
-  `SurveyWaypoint`, `MoveToWaypoint` (the survey ship's move, D54), the explore plan's `Jump` and `ExploreSystem`
-  (slice 6.11), `SupplyConstruction` (a construction trip, slice 6.6), and the mining plan's `MineForShuttle` (a drone
+  `SurveyWaypoint`, `MoveToWaypoint` (the survey ship's move, D54), the explore plan's `Jump`, `ExploreSystem`
+  (slice 6.11) and `Warp` (an explorer's warp, slice 6.31), `SupplyConstruction` (a construction trip, slice 6.6), and the mining plan's `MineForShuttle` (a drone
   parked at a far asteroid) and `CollectOre` (a shuttle's round of collecting there; slice 6.18, D83). The older
   `SiphonResource`, like `MineResource`, is never created.
 - **Status:** `Assigned`, or `Blocked` once the circuit breaker stops the goal (see below).
@@ -1543,6 +1577,7 @@ they count.
 | `TradeBetweenMarkets` | [cmd] navigate towards the buy market (`GoalFlight`: in BURN where the fuel allows it, otherwise CRUISE, D84; a ship left in DRIFT is switched out of it, slice 6.10c), by way of refuelling stops when it is beyond one tank (each stop's arrival refreshes that market), and dock. **Docked at the buy market:** with nothing bought yet, work the trip out again with the prices the arrival has just fetched (the flight there is spent, so only the fuel still ahead counts); when not even a unit earns the minimum, the trip no longer earns it a unit after fuel (`not_lucrative`), or the credits, its own and those no other trip holds back (D57), don't pay for a unit (`not_possible`), clear the goal (`TradeDropped`) and the plan chooses again from there. Otherwise buy in batches (D79): each [API] purchase takes the units of the next batch of the trade volume whose sale, as last seen at the sell market and each batch sold a step cheaper (`PriceSteps`), still earns `Trade.MinProfitPerUnit` over the price quoted now (`TradeRoutePlanner.UnitsWorthBuying`), up to the free hold and what the credits pay for with the fuel ahead kept back; it publishes `CargoPurchasedEvent`, logs `CargoBought`, fetches the market again (D25) and stores the goal with what the batch cost, holding back only what is left to buy; a restart goes on from what is aboard. The first batch whose units wouldn't earn the minimum ends the buying; then record the purchase in the goal and end the saving for that route, if any. Then navigate towards the sell market and dock. **Docked at the sell market:** when selling there no longer earns `Trade.MinProfitPerUnit` over what the cargo cost and another market pays more after fuel, move the sale there, once per trip (`TradeRerouted`); otherwise sell in batches of the market's trade volume (D79): [API] sell one, publishing `ShipCargoSoldEvent` and logging `CargoSold`, fetch the market again and store what it fetched, and go on while the quote still earns the minimum. When it no longer does, the rest goes where it fetches more after fuel, on the same once-per-trip terms (`TradeRerouted`), or with nowhere better is sold there all the same; a sale that never earned it sells anyway. Then clear the goal and complete. A market that doesn't buy the good, once the sale has moved: clear the goal (`TradeDropped`); the plan then sells the cargo where it can. **A market in another system** (slice 6.29, D96): a step through the gates (`GoalJumps`, as the `Jump` row's): [cmd] navigate to its system's gate (`GoalFlight`), and there the jump once the cooldown and the credit floor allow it; after it the next step goes on from the next gate, and in the market's system it flies there. At the buy market the trip is weighed on the map of the systems in reach when it sells in another system: the haul's fuel, its antimatter and the credit floor are kept back from the batches (`TradeRoutePlanner.KeptBackFor`, D63). A trip with nothing aboard that can't jump on (no way known any more, a refused jump, or a jump that would leave less than the floor) is dropped (`TradeDropped`, `no_way`, `jump_refused` or `not_possible`). One with its cargo aboard keeps it and waits, stepped each tick: for the way, which comes back an hour after a refusal (`JumpRefusals`), or at the gate for the credits; past `Health.Ship.MaxMinutesWithoutChange` that shows as `ShipStuck`. A sale moves only within its system. |
 | `MoveToWaypoint` | One flight to a waypoint (D54). At the target (its arrival docked it): clear the goal and complete. Elsewhere: [cmd] navigate towards it (`GoalFlight`); out of the ship's CRUISE reach (**Drifting**), that is the fastest way, which cruises as far as it can and drifts the rest (D84), logging `DriftStarted` on the leg that drifts. The survey plan moves a ship that can only survey this way. |
 | `Jump` | One jump (slice 6.11). Not at the system's gate: [cmd] navigate towards it (`GoalFlight`). At the gate: wait for the cooldown; when the credits after the antimatter (its price at the gate's market as last seen; fetched once if never seen) fall below `FleetExpansion.MinCreditReserve`, clear the goal (the plan holds the jump); docked, refuel when the gate sells fuel and the tank isn't full, then orbit; [API] jump to the destination gate, store the nav and the cooldown, store the credits, publish `ShipJumpedEvent`, log `Jumped`, clear the goal and complete. In the destination's system already: clear the goal and complete. A refused jump (`JumpRefusedException`): block the goal with `jump_refused` and log `ShipBlocked` at Warning; the plan chooses again. The jump is `GoalJumps`' (slice 6.28), which every flight between systems shares; a refused jump is also recorded in `JumpRefusals`, so no way goes through that gate for an hour. |
+| `Warp` | One warp of an explorer (slice 6.31, D100, D101). In transit: wait for the arrival. In the destination's system: clear the goal and complete. Otherwise `GoalWarps`: docked at a market, [cmd] refuel when the tank isn't full, then orbit; in orbit at a market where a full tank would warp where this one can't, or in BURN, [cmd] dock first; short of the fuel where it can't refuel, [cmd] navigate to its system's nearest market (`GoalFlight`). Then set the flight mode (BURN where the fuel pays for it, CRUISE otherwise, D104) and [cmd] warp (`IWarpSubCommand`: [API] warp, store the nav and the fuel, publish `ShipInTransitEvent`, schedule the arrival for the goal), and log `Warped` with the fuel and seconds against those reckoned, a warning where they differ. A BURN warp refused for its fuel warps in CRUISE. A refused warp (`WarpRefusedException`): block the goal with `warp_refused`, log `ShipBlocked` at Warning, and record it in `WarpRefusals`, so no warp goes there for an hour. No fuel-safe warp (the tank short, or where the system lies unknown): clear the goal; the plan chooses again. A flight between systems of a ship with a warp drive (`GoalJumps`, the `DeployProbe`, `MoveToWaypoint` and `TradeBetweenMarkets` rows) takes the same step where its fastest way warps. |
 | `ExploreSystem` | Scouting one system (slice 6.11). At the next stop: fetch its market (`MarketRefresher`) and its shipyard unless they were stored since the goal began (the arrival stores them; a jump doesn't), mark it visited, and record the visit in the goal; after the last stop clear the goal and complete. A fetch that fails is logged and the ship moves on. Before a flight, wait for the cooldown (a jump's); then [cmd] navigate towards the stop (`GoalFlight`). |
 | `SurveyWaypoint` | One survey (slice 6.4). [cmd] navigate towards the asteroid (`GoalFlight`). Docked there: orbit. On cooldown: wait. In orbit: [API] survey, store the cooldown and the surveys (`SurveyKeeper`: `cached_surveys`, `Surveyed` per survey, `spacetraders_surveys_taken_total`), clear the goal and complete. A failed survey clears the goal too (the plan gives it again; a failure that repeats shows as `RepeatingError`). |
 | `SupplyConstruction` | One construction trip (slice 6.6). [cmd] navigate towards the buy market (`GoalFlight`: through refuelling stops, in BURN where that strands nothing) and dock. **Docked at the market**, with the prices the arrival has just fetched: the units are the trip's, at most the free hold and what the site still needs less what the other construction trips carry; the trip is dropped (`ConstructionDropped`) when that is nothing (`not_needed`), the market no longer sells the material (`not_sold_here`), its supply is SCARCE or LIMITED (`low_supply`, D66), or the first batch would dip into the credit reserve (`over_budget`, D64; what the trip holds back is its own to spend); otherwise buy them in batches of the market's trade volume (D81): for each, [API] buy it at the price quoted then, publish `CargoPurchasedEvent` (`ForConstruction`: the ledger's `ConstructionBuy`), log `CargoBought`, fetch the market again (D25), and store the goal with what the batch cost, holding back only what is left to buy; a restart goes on from what is aboard. Before each batch it checks the market as the last refresh fetched it: when the supply has fallen to SCARCE or LIMITED, or the batch would dip into the reserve, it buys no more and takes what it has to the site (logged at Information). Then it records the purchase in the goal: the units it bought, what they cost. Then navigate towards the site and dock. **Docked at the site:** with none of the material aboard, clear the goal and complete; else supply as much as the site still needs, as cached (when that says none, it fetches the site once more), [API] supply, store the site and the hold the API answers with, publish `ConstructionSuppliedEvent`, log `ConstructionSupplied`, clear the goal and complete. A supply the API refuses (4800, 4801: `not_needed`; 4802: `wrong_location`) logs `ConstructionDropped` at Warning, fetches the site again and clears the goal, with the cargo aboard; the plan doesn't offer that ship the material again for 10 minutes. Every end books the trip (`TripBook`, `construction`): a loss, as supplying pays nothing. |
@@ -1571,6 +1606,9 @@ they count.
     refuelling stops when it is beyond one tank, and the fastest way where no chain of fuel markets reaches
     (D84), so the fallback is left for a ship whose fuel has run short of its plan. It leaves the ship in
     DRIFT, and the ship's next flight asks for its leg's mode, which switches it out of DRIFT (B47).
+- **`WarpSubCommand`** (slice 6.31): warps a ship in orbit to a waypoint of another system ([API] warp), stores the nav and
+  the fuel it answers with, publishes `ShipInTransitEvent` and schedules the arrival for the goal, as a navigation does; the
+  arrival goes on as below. A refusal is the API's `WarpRefusedException`, left to `GoalWarps`.
 - **On arrival** (`NavigateToWaypointArrivedCommand`) it refreshes the market through `MarketRefresher`
   (publishing `MarketDataRefreshedEvent`; an answer without prices isn't stored, B62) and the shipyard
   (an answer without the ships for sale leaves the cached ones, B64), docks, and publishes

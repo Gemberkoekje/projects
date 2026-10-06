@@ -139,7 +139,7 @@ public sealed class FetchFlightTests
         => new MoveToWaypointGoalExecutor(
                 _goals,
                 _tradeContexts,
-                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, new JumpRefusals(), _tradeContexts, _dock, _orbit, _refuel, _bus, _log.For<GoalJumps>()),
+                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, new JumpRefusals(), _tradeContexts, _dock, _orbit, _refuel, _bus, Substitute.For<IGoalWarps>(), _log.For<GoalJumps>()),
                 _dock,
                 _bus,
                 _log.For<MoveToWaypointGoalExecutor>())

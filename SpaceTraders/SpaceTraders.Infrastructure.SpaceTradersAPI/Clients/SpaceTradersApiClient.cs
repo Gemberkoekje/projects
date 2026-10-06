@@ -243,6 +243,13 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    public Task<ScanSystemsResult> ScanSystemsAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, ScanSystemsResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/scan/systems",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
     public Task<JumpResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
         => PostWrappedAsync<object, JumpResult>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/jump",

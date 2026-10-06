@@ -103,6 +103,8 @@ public sealed class ShipPurchaseService(
 
         await agents.SetAgentAsync(bus, result.Agent, cancellationToken);
 
+        // With what startup sync caches of a ship (slice 6.31): its mounts, modules and engine, so a ship bought since the last
+        // restart has its warp drive, its sensor array and its speed at once.
         var newShip = new ShipModel(
             result.ShipSymbol,
             result.ShipNav.SystemSymbol,
@@ -116,7 +118,12 @@ public sealed class ShipPurchaseService(
             result.ShipCargo.Units,
             result.ShipCargo.Capacity,
             ShipType: shipType,
-            CargoInventory: result.ShipCargo.Inventory);
+            MountSymbols: result.MountSymbols,
+            CargoInventory: result.ShipCargo.Inventory,
+            ModulesJson: result.ModulesJson,
+            FrameJson: result.FrameJson,
+            ReactorJson: result.ReactorJson,
+            EngineJson: result.EngineJson);
 
         await ships.UpsertAsync(newShip, cancellationToken);
 

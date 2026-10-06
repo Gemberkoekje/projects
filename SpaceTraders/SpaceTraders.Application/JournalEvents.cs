@@ -202,6 +202,21 @@ public static class JournalEvents
     public const string Charted = nameof(Charted);
 
     /// <summary>
+    /// An explorer warped to another system (PLAN.md slice 6.31, D100: <c>ShipSymbol</c>, <c>WaypointSymbol</c> it left,
+    /// <c>Destination</c> it lands at, <c>FlightMode</c>, <c>Distance</c> between the systems, the <c>Fuel</c> and the
+    /// <c>Seconds</c> it took, and the <c>ReckonedFuel</c> and <c>ReckonedSeconds</c> the research note gives for it). A warp that
+    /// differs from the note logs a warning too.
+    /// </summary>
+    public const string Warped = nameof(Warped);
+
+    /// <summary>
+    /// An explorer scanned for the systems around it, with nothing else left within its warps (PLAN.md slice 6.31, D105:
+    /// <c>ShipSymbol</c>, <c>SystemSymbol</c> it scanned from, <c>Systems</c> found, <c>Within</c> its warps of <c>MaxWarp</c>,
+    /// and <c>Added</c> to the explore plan's systems).
+    /// </summary>
+    public const string SystemsScanned = nameof(SystemsScanned);
+
+    /// <summary>
     /// The cached shipyards or markets list a ship type or good no snapshot of the run held yet, and a snapshot was saved
     /// (slice 2.15: <c>Discovered</c>, the types and goods with where they are listed, and <c>SnapshotId</c>).
     /// </summary>

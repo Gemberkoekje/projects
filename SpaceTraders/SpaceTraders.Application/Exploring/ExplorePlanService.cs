@@ -57,6 +57,20 @@ public interface IExplorePlanService
 ///   <item>In each system it explores, the ship charts every uncharted waypoint that can hold a market or shipyard, the gate
 ///   first (<see cref="Charting"/>, D99).</item>
 /// </list>
+/// Slice 6.31 (D100, D101, D104–D107) lets an explorer warp:
+/// <list type="bullet">
+///   <item>An explorer with a warp drive goes the fastest way, through the gates or by warps (<see cref="SystemWays"/>), and so
+///   also to the systems the gates don't reach: behind a gate under construction, or with no gate the plan knows. A warp is
+///   fuel-safe: it lands where the ship can refuel, or keeps the fuel to warp back (D100); BURN or CRUISE, never a drift (D104).</item>
+///   <item>The systems within the trade reach of home through the gates come first, then the nearest by the seconds its way
+///   takes, whether by jumps or warps (D106, <see cref="ExploreAtlas.NextByWays"/>).</item>
+///   <item>Before a warp goes to a system only a warp reaches, its waypoints are fetched (one system a pass, after the gates'
+///   looks), so the ship lands where it can refuel.</item>
+///   <item>With nothing left within its ways, an explorer with a sensor array scans from where it is, once a system, and the
+///   systems within its warps join the plan's (D105); with nothing left after that, one in a system the gates don't reach goes
+///   back to one they do, and is released there to trade (D102).</item>
+///   <item>A system only a warp reaches doesn't count towards the explorers wanted (D107).</item>
+/// </list>
 /// What it knows of the gates comes from the API: home's gate, then the connections of each system it explores, and the
 /// gates those lead to. A pass asks for one of those at most, as the reads give way to the moves (D19); a gate still under
 /// construction is looked at again hourly. A system an exploring ship has just jumped into has its waypoints fetched at once.
@@ -76,6 +90,7 @@ public sealed class ExplorePlanService(
     IShipPurchaseService shipPurchases,
     IPurchaseOrder purchaseOrder,
     JumpRefusals refusals,
+    WarpRefusals warpRefusals,
     ILogger<ExplorePlanService> logger) : IExplorePlanService
 {
     /// <summary>The type of an exploring ship's assignment.</summary>
@@ -95,6 +110,7 @@ public sealed class ExplorePlanService(
     private const string WaitingForCredits = "waiting_for_credits";
     private const string NoWayHome = "no_way_home";
     private const string NothingToExplore = "nothing_to_explore";
+    private const string Scanning = "scanning";
     private const int WaypointPageSize = 20;
 
     private static readonly JsonSerializerOptions CompareOptions = new();
@@ -142,7 +158,7 @@ public sealed class ExplorePlanService(
                 };
 
         var explorers = fleet.Where(FleetRoles.IsExplorer).OrderBy(explorer => explorer.Symbol, StringComparer.Ordinal).ToList();
-        state = await LearnAsync(state, [ship, .. explorers], now, cancellationToken);
+        state = await LearnAsync(state, [ship, .. explorers], [.. explorers.Where(Warps.HasDrive)], now, cancellationToken);
         state = await CountAsync(state, now, cancellationToken);
         state = state with { Purchase = await BuyAsync(state, fleet, explorers.Count, now, cancellationToken) };
         var reach = await ReachAsync(cancellationToken);
@@ -163,9 +179,16 @@ public sealed class ExplorePlanService(
 
     /// <summary>
     /// Learns what the next decision needs: the waypoints of a system an exploring ship has just jumped into, at once; each
-    /// known system's gate from the cached waypoints; then one look at the API, the most needed first (<see cref="NextLook"/>).
+    /// known system's gate from the cached waypoints; then one look at the API, the most needed first (<see cref="NextLook"/>);
+    /// with none of those, for the ships with a warp drive, the waypoints of a system only a warp reaches (slice 6.31,
+    /// <see cref="LookForWarpsAsync"/>).
     /// </summary>
-    private async Task<ExplorePlanState> LearnAsync(ExplorePlanState state, IReadOnlyList<ShipModel> exploring, DateTimeOffset now, CancellationToken ct)
+    private async Task<ExplorePlanState> LearnAsync(
+        ExplorePlanState state,
+        IReadOnlyList<ShipModel> exploring,
+        IReadOnlyList<ShipModel> warping,
+        DateTimeOffset now,
+        CancellationToken ct)
     {
         foreach (var ship in exploring.Where(ship => ship.LocalStatus != ShipLocalStatus.InTransit && ship.SystemSymbol is { Length: > 0 }))
         {
@@ -185,8 +208,34 @@ public sealed class ExplorePlanService(
         {
             (Look.Gate, var system) => await LookAtGateAsync(state, system, now, ct),
             (Look.Connections, var system) => await LookAtConnectionsAsync(state, system, now, ct),
-            _ => state,
+            _ => await LookForWarpsAsync(state, warping, now, ct),
         };
+    }
+
+    /// <summary>
+    /// With nothing else to look at, the waypoints of a system only a warp reaches, the nearest to the explored systems and the
+    /// ships with a warp drive first (slice 6.31, <see cref="ExploreAtlas.WarpLooks"/>), fetched as those of a system an
+    /// exploring ship has just jumped into: a warp lands where the ship can refuel, so where that is must be known first. One
+    /// system a pass.
+    /// </summary>
+    private async Task<ExplorePlanState> LookForWarpsAsync(ExplorePlanState state, IReadOnlyList<ShipModel> warping, DateTimeOffset now, CancellationToken ct)
+    {
+        if (warping.Count == 0)
+        {
+            return state;
+        }
+
+        var positions = (await systems.GetAllAsync(ct))
+            .GroupBy(system => system.Symbol, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => (group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase);
+        var fetched = (await waypoints.GetVisitedSystemSymbolsAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var looks = ExploreAtlas.WarpLooks(
+            state,
+            positions,
+            fetched,
+            [.. warping.Select(ship => (ship.SystemSymbol ?? string.Empty, WayShip.Of(ship, now).MaxWarp))],
+            now);
+        return looks.Count == 0 ? state : await FetchSystemAsync(state, looks[0], now, ct);
     }
 
     /// <summary>Fetches a system and all its waypoints, and caches them; the gate among them is as the API says now.</summary>
@@ -220,6 +269,7 @@ public sealed class ExplorePlanService(
         return Update(state, systemSymbol, known => known with
         {
             WaypointsCheckedAt = now,
+            WaypointsFetchedAt = now,
             GateWaypointSymbol = gate?.Symbol ?? string.Empty,
             Gate = gate is null ? GateState.None : gate.IsUnderConstruction ? GateState.UnderConstruction : GateState.Active,
             GateCheckedAt = now,
@@ -751,7 +801,9 @@ public sealed class ExplorePlanService(
     /// Chooses an explorer's next step (slice 6.30): scout the system it is in, if not explored yet; else a jump towards the
     /// nearest system not explored yet that no other exploring ship has taken; with none left, it is released where it is, and
     /// trades from there until one turns up (D102: "they can trade at the location they are at until a new unexplored location
-    /// comes up").
+    /// comes up"). Slice 6.31: an explorer with a warp drive takes the first step of the fastest way, a jump or a warp
+    /// (<see cref="ExploreAtlas.NextByWays"/>); with nothing left it scans from where it is (D105, <see cref="ScanAsync"/>),
+    /// and, in a system the gates don't reach from home, goes back to one they do before it is released.
     /// </summary>
     private async Task<ExplorePlanState> DecideExplorerAsync(
         ExplorePlanState state,
@@ -779,11 +831,13 @@ public sealed class ExplorePlanService(
             }
         }
 
-        var step = ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), reach);
+        var step = Warps.HasDrive(ship)
+            ? ExploreAtlas.NextByWays(state, await ChartAsync(state, now, ct), WayShip.Of(ship, now), now, Taken(state, ship.Symbol), reach)
+            : ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), reach);
         switch (step.Kind)
         {
             case ExploreStepKind.Explore:
-                return Put(state, await JumpAsync(ship, assignment, step, entry.Reason, ct)
+                return Put(state, await GoAsync(ship, assignment, step, entry.Reason, ct)
                     ? entry with { Status = ExploreStatus.Exploring, TargetSystemSymbol = step.TargetSystemSymbol, Reason = string.Empty }
                     : entry with { Reason = WaitingForCredits, TargetSystemSymbol = step.TargetSystemSymbol });
 
@@ -791,6 +845,33 @@ public sealed class ExplorePlanService(
                 return Put(state, entry);
 
             default:
+                // Slice 6.31 (D105): nothing left within its ways, it scans from here first, once; the next passes fetch what it
+                // found within its warps and choose again. The plan keeps the ship meanwhile, or a trade would take it away.
+                (var scanning, state) = await ScanAsync(state, ship, now, ct);
+                if (scanning)
+                {
+                    if (assignment is null)
+                    {
+                        await TakeAsync(ship, assignment, here, now, ct);
+                        logger.LogInformation(
+                            "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: scans for the systems around {SystemSymbol}, with nothing left within its ways.",
+                            JournalEvents.PlanStarted,
+                            AutomationPlan.Explore,
+                            ship.Symbol,
+                            here);
+                    }
+
+                    return Put(state, entry with { Status = ExploreStatus.Exploring, TargetSystemSymbol = here, Reason = Scanning });
+                }
+
+                if (step.Kind == ExploreStepKind.Rejoin)
+                {
+                    // Where the gates don't reach from home, no trader goes either: it goes back to the nearest system they do.
+                    return Put(state, await GoAsync(ship, assignment, step, entry.Reason, ct)
+                        ? entry with { Status = ExploreStatus.Returning, TargetSystemSymbol = step.TargetSystemSymbol, Reason = NothingToExplore }
+                        : entry with { Reason = WaitingForCredits, TargetSystemSymbol = step.TargetSystemSymbol });
+                }
+
                 if (assignment is not null)
                 {
                     await assignments.UpsertAsync(assignment with { CompletedAt = now }, ct);
@@ -848,6 +929,108 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>
+    /// Gives the ship the first step of <paramref name="step"/>: a jump (<see cref="JumpAsync"/>), or, for an explorer with a
+    /// warp drive (slice 6.31), a warp (<see cref="WarpGoal"/>), which buys no antimatter; a free ship is taken for it.
+    /// </summary>
+    /// <returns>True when the step was given.</returns>
+    private async Task<bool> GoAsync(ShipModel ship, ShipAssignmentDto? assignment, ExploreStep step, string reason, CancellationToken ct)
+    {
+        if (step.WarpWaypointSymbol.Length == 0)
+        {
+            return await JumpAsync(ship, assignment, step, reason, ct);
+        }
+
+        if (assignment is null)
+        {
+            await TakeAsync(ship, assignment, ship.SystemSymbol ?? string.Empty, TimeProvider.System.GetUtcNow(), ct);
+            logger.LogInformation(
+                "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: {Purpose} {SystemSymbol}, warping to {Destination} first; {Jumps} jumps and {Warps} warps, about {Minutes} minutes.",
+                JournalEvents.PlanStarted,
+                AutomationPlan.Explore,
+                ship.Symbol,
+                step.Kind == ExploreStepKind.Rejoin ? "goes back to" : "explores",
+                step.TargetSystemSymbol,
+                step.WarpWaypointSymbol,
+                step.Jumps,
+                step.Warps,
+                Math.Round(step.Seconds / 60));
+        }
+
+        await goals.SetActiveGoalAsync(ship.Symbol, new WarpGoal { DestinationWaypointSymbol = step.WarpWaypointSymbol }, ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Scans for the systems around an explorer (slice 6.31, D105, asked on 2026-10-06: "Once none is left in its warp reach,
+    /// the explorer scans from where it is, caches what it finds, and warps to those systems, nearest first"): once from each
+    /// system, by an explorer with a warp drive and a sensor array, after its cooldown. Every system found is cached with its
+    /// position; those within its warps (<see cref="WayShip.MaxWarp"/>) join the plan's systems, and their waypoints are fetched,
+    /// one a pass, before a warp goes there (<see cref="LookForWarpsAsync"/>). A scan that fails is tried again after a few
+    /// minutes.
+    /// </summary>
+    /// <returns>Whether it scanned or waits for its cooldown to; and the state.</returns>
+    private async Task<(bool Scanning, ExplorePlanState State)> ScanAsync(ExplorePlanState state, ShipModel ship, DateTimeOffset now, CancellationToken ct)
+    {
+        var here = ship.SystemSymbol ?? string.Empty;
+        if (!Warps.HasDrive(ship)
+            || !ship.HasSensorArray
+            || Find(state, here) is not { } known
+            || known.ScannedAt is not null
+            || (known.ScanTriedAt is { } tried && now - tried < ExploreAtlas.RetryAfter))
+        {
+            return (false, state);
+        }
+
+        if (ship.CooldownExpiresAt is { } cooldown && cooldown > now)
+        {
+            return (true, state);
+        }
+
+        ScanSystemsActionResult scan;
+        try
+        {
+            scan = await port.ScanSystemsAsync(ship.Symbol, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Explore plan: ship {ShipSymbol} couldn't scan for the systems around {SystemSymbol}; trying again in a few minutes.", ship.Symbol, here);
+            return (false, Update(state, here, system => system with { ScanTriedAt = now }));
+        }
+
+        await ships.UpdateCooldownAsync(ship.Symbol, scan.CooldownExpiresAt ?? now.AddSeconds(scan.CooldownSeconds), ct);
+        foreach (var found in scan.Systems)
+        {
+            await systems.UpsertAsync(new SystemCacheModel(found.Symbol, found.SectorSymbol, found.Type, found.X, found.Y, now), ct);
+        }
+
+        var maxWarp = WayShip.Of(ship, now).MaxWarp;
+        var within = scan.Systems
+            .Where(found => !found.Symbol.Equals(here, StringComparison.OrdinalIgnoreCase) && found.Distance <= maxWarp)
+            .Select(found => found.Symbol)
+            .ToList();
+        var added = within.Count(system => Find(state, system) is null);
+        foreach (var system in within)
+        {
+            state = Ensure(state, system);
+        }
+
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} scanned from {SystemSymbol}: {Systems} systems, {Within} of them within its warps of {MaxWarp}, {Added} new to the plan.",
+            JournalEvents.SystemsScanned,
+            ship.Symbol,
+            here,
+            scan.Systems.Count,
+            within.Count,
+            maxWarp,
+            added);
+        return (true, Update(state, here, system => system with { ScannedAt = now, ScanTriedAt = now }));
+    }
+
+    /// <summary>The chart the ways of a ship with a warp drive are planned on (slice 6.31), with the jumps and warps refused lately.</summary>
+    private Task<WayChart> ChartAsync(ExplorePlanState state, DateTimeOffset now, CancellationToken ct)
+        => WayChart.ReadAsync(refusals.Apply(state), systems, waypoints, warpRefusals, now, ct);
+
+    /// <summary>
     /// Gives the ship the jump of <paramref name="step"/>, once the credits after the antimatter leave the floor every ship
     /// purchase keeps (D63); a free ship is taken for it. Until then the plan says why, once.
     /// </summary>
@@ -884,7 +1067,12 @@ public sealed class ExplorePlanService(
                 JournalEvents.PlanStarted,
                 AutomationPlan.Explore,
                 ship.Symbol,
-                step.Kind == ExploreStepKind.Explore ? "explores" : "flies home to",
+                step.Kind switch
+                {
+                    ExploreStepKind.Explore => "explores",
+                    ExploreStepKind.Rejoin => "goes back to",
+                    _ => "flies home to",
+                },
                 step.TargetSystemSymbol,
                 step.Jumps);
         }
@@ -974,12 +1162,14 @@ public sealed class ExplorePlanService(
     /// <summary>
     /// The gate of a jump the API refused, from the ship's goal that it blocked: an exploring jump (<see cref="JumpGoal"/>), or
     /// the command ship's flight to the explorers' shipyard (<see cref="MoveToWaypointGoal"/>, whose ways leave that gate alone
-    /// already). Null for any other goal.
+    /// already); or an explorer's warp the API refused (<see cref="WarpGoal"/>, slice 6.31), whose system the ways leave alone
+    /// already. Null for any other goal.
     /// </summary>
     private static string? RefusedGate(ShipGoal? goal) => goal switch
     {
         JumpGoal { Status: GoalStatus.Blocked, StatusReason: JumpGoalExecutor.RefusedReason } jump => jump.DestinationGateWaypointSymbol,
         MoveToWaypointGoal { Status: GoalStatus.Blocked, StatusReason: GoalJumps.RefusedReason } => string.Empty,
+        WarpGoal { Status: GoalStatus.Blocked, StatusReason: WarpGoalExecutor.RefusedReason } => string.Empty,
         _ => null,
     };
 

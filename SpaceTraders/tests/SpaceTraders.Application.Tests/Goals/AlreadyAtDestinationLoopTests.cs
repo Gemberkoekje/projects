@@ -91,6 +91,7 @@ public sealed class AlreadyAtDestinationLoopTests
             _orbit,
             Substitute.For<IRefuelSubCommand>(),
             _bus,
+            Substitute.For<IGoalWarps>(),
             NullLogger<GoalJumps>.Instance);
         var executor = new DeployProbeGoalExecutor(_goals, jumps, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
 

@@ -238,6 +238,7 @@ public sealed class DeployProbeGoalExecutorTests
             _orbit,
             Substitute.For<IRefuelSubCommand>(),
             _bus,
+            Substitute.For<IGoalWarps>(),
             _log.For<GoalJumps>());
 
     private Task<GoalExecutionResult> StepAsync(ShipModel probe, string target = "X1-AB-MKT")

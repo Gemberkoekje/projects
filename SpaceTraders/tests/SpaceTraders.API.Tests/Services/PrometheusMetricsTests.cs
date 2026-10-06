@@ -354,6 +354,24 @@ public sealed class PrometheusMetricsServiceTests
                 GoalStatus = (int)fetch.Status,
             });
 
+            // Slice 6.31 (D100): an explorer warping to a system the gates don't reach.
+            var warp = new WarpGoal { DestinationWaypointSymbol = "X1-ZZ69-I53" };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-16",
+                ShipType = "SHIP_EXPLORER",
+                Status = "IN_TRANSIT",
+                SystemSymbol = "X1-ZZ69",
+                WaypointSymbol = "X1-ZZ69-I53",
+                DestWaypointSymbol = "X1-ZZ69-I53",
+                ArrivesAt = now.AddMinutes(12),
+                GoalId = warp.GoalId,
+                GoalKind = warp.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(warp),
+                GoalStatus = (int)warp.Status,
+            });
+
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -389,6 +407,7 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-13", "→ X1-AB-B7", "drifting to X1-AB-B7"),
             ("AGENT-14", "→ X1-AB-I55", "flying to X1-KR90"),
             ("AGENT-15", "→ X1-AB-I55", "flying to X1-GT9-AE7B"),
+            ("AGENT-16", "→ X1-ZZ69-I53", "warping to X1-ZZ69"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);
