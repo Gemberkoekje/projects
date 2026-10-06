@@ -248,6 +248,39 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task TheFirstExplorer_ComesAfterTheGatesLoads_AndBeforeTheProbes()
+    {
+        // Slice 6.30, D98: "Start with one before probes", after the jump gate's loads (D64).
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse("the credits are saved up for the explorer");
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeTrue("the gate's loads come first");
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"))).Should().BeFalse("the gate's load waits to be bought");
+
+        _needs.Report(AutomationPlan.Construction, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AFurtherExplorer_WaitsForTheDronesAndCargoShipsThatTakeTurns_AndTheFarProbesForIt()
+    {
+        // D102: "First before probes, rest last", before the far probes.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.MoreExplorers, "SHIP_EXPLORER"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue("a probe within the trade reach comes before it");
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.MoreExplorers, "SHIP_EXPLORER"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeFalse("the far probes come last");
+    }
+
+    [Fact]
     public async Task ATurnPasses_WhenTheOtherKindHasNothingToBuy()
     {
         // A cargo ship's turn, but no new cargo ship would have a lucrative route: a drone may go.

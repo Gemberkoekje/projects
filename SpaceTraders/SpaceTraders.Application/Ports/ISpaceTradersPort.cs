@@ -83,6 +83,10 @@ public interface ISpaceTradersPort
     /// </summary>
     Task<JumpActionResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Charts the waypoint the ship is at (PLAN.md slice 6.30, D99): its traits become visible to everyone, and the agent gets a
+    /// one-off reward by their rarity.
+    /// </summary>
     Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>The gates a jump gate connects to, by their waypoints.</summary>

@@ -359,6 +359,10 @@ public sealed class PrometheusMetricsService(
                     => $"flying to {WaypointSymbols.SystemOf(abroad.TargetWaypointSymbol)}",
                 DeployProbeGoal => "scouting",
                 PatrolMarketGoal => "watching its market",
+                // Slice 6.30 (D98): a move to a waypoint of another system, the command ship's to the shipyard that sells explorers.
+                MoveToWaypointGoal far when at is { Length: > 0 }
+                    && !WaypointSymbols.SystemOf(far.TargetWaypointSymbol).Equals(WaypointSymbols.SystemOf(at), StringComparison.OrdinalIgnoreCase)
+                    => $"flying to {far.TargetWaypointSymbol}",
                 MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",
                 MoveToWaypointGoal => "moving",
                 JumpGoal jump => $"jumping to {WaypointSymbols.SystemOf(jump.DestinationGateWaypointSymbol)}",

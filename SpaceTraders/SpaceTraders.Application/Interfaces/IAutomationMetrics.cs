@@ -208,6 +208,15 @@ public interface IAutomationMetrics
     void Systems(IReadOnlyCollection<SpaceTraders.Application.Exploring.SystemSample> systems);
 
     /// <summary>
+    /// Records the explore plan's count (slice 6.30, D102): the systems it knows, hasn't explored and reaches from home through
+    /// built gates (<c>spacetraders_explore_systems_left</c>), and the explorers it wants for them
+    /// (<c>spacetraders_explore_explorers_wanted</c>), as its last pass counted them.
+    /// </summary>
+    /// <param name="systemsLeft">The systems left to explore.</param>
+    /// <param name="explorersWanted">The explorers wanted.</param>
+    void Exploring(int systemsLeft, int explorersWanted);
+
+    /// <summary>
     /// Records the agent's settings, one series per setting, always 1
     /// (<c>spacetraders_setting_info{setting,current,next_run,description}</c>): its value now, the value the next run
     /// starts with (D69) and what it does, for the dashboard's settings table (slice 2.9). A setting whose values or

@@ -7,6 +7,7 @@ using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
@@ -35,6 +36,8 @@ public sealed class ExplorePlanServiceTests
     private readonly string _database = Guid.NewGuid().ToString();
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
+    private readonly IPurchaseOrder _order = Substitute.For<IPurchaseOrder>();
     private readonly LogRecorder _log = new();
 
     public ExplorePlanServiceTests()
@@ -306,6 +309,9 @@ public sealed class ExplorePlanServiceTests
                 new PlanRepository(db),
                 _settings,
                 _port,
+                _purchases,
+                _order,
+                new JumpRefusals(),
                 _log.For<ExplorePlanService>())
             .EnsureBootstrappedAsync(CancellationToken.None);
     }

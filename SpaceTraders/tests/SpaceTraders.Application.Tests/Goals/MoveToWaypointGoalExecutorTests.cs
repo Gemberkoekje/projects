@@ -2,10 +2,12 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
@@ -102,7 +104,25 @@ public sealed class MoveToWaypointGoalExecutorTests
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>());
     }
 
+    /// <summary>The jumps of a flight to another system, which these flights, all within X1-DC53, never take.</summary>
+    private GoalJumps Jumps()
+        => new(
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipRepository>(),
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IMarketRepository>(),
+            Substitute.For<IMarketRefresher>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IGateNetwork>(),
+            new JumpRefusals(),
+            _tradeContexts,
+            _dock,
+            Substitute.For<IOrbitSubCommand>(),
+            Substitute.For<IRefuelSubCommand>(),
+            _bus,
+            _log.For<GoalJumps>());
+
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, MoveToWaypointGoal goal)
-        => new MoveToWaypointGoalExecutor(_goals, _tradeContexts, _dock, _bus, _log.For<MoveToWaypointGoalExecutor>())
+        => new MoveToWaypointGoalExecutor(_goals, _tradeContexts, Jumps(), _dock, _bus, _log.For<MoveToWaypointGoalExecutor>())
             .ExecuteStepAsync(ship, goal, new ShipGoalContext(), CancellationToken.None);
 }

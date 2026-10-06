@@ -1,8 +1,8 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
@@ -10,6 +10,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -32,11 +33,13 @@ public sealed class ExploreSystemGoalExecutorTests
     private readonly IWaypointRepository _waypoints = Substitute.For<IWaypointRepository>();
     private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly IMarketRefresher _refresher = Substitute.For<IMarketRefresher>();
     private readonly IWaypointVisitService _visits = Substitute.For<IWaypointVisitService>();
     private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly IDockSubCommand _dock = Substitute.For<IDockSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly LogRecorder _log = new();
 
     private readonly ExploreSystemGoal _goal = new()
     {
@@ -129,6 +132,73 @@ public sealed class ExploreSystemGoalExecutorTests
         await _goals.Received(1).SetActiveGoalAsync(Ship, Arg.Is<ExploreSystemGoal>(goal => goal.Visited == 1), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task AtAnUnchartedStop_ItChartsIt_BooksTheReward_AndStoresTheMarketTheChartShows()
+    {
+        // Slice 6.30 (D99): an uncharted waypoint hides its traits, a marketplace among them. The chart shows them and pays a
+        // one-off reward by their rarity, which the API gives only as the agent's credits after it.
+        var (uncharted, charted) = NewPlanet();
+        _waypoints.FindAsync(uncharted.Symbol, Arg.Any<CancellationToken>()).Returns(uncharted, charted);
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", "account", "X1-DC53-A1", 1_000_000, "COSMIC", 21));
+        _port.CreateChartAsync(Ship, Arg.Any<CancellationToken>()).Returns(new ChartActionResult(
+            new WaypointDataModel(uncharted.Symbol, System, "PLANET", 50, 50, HasMarket: true, HasShipyard: false, TraitsJson: """[{"symbol":"MARKETPLACE"}]""", ChartJson: """{"submittedBy":"SPECTER"}"""),
+            1_003_105));
+
+        var result = await StepAsync(At(uncharted.Symbol, "IN_ORBIT"), _goal with { Stops = [uncharted.Symbol, Far] });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _waypoints.Received(1).UpsertRangeAsync(
+            Arg.Is<IReadOnlyList<WaypointCacheModel>>(rows => rows.Count == 1 && rows[0].Symbol == uncharted.Symbol && rows[0].HasMarket && rows[0].ChartJson != null),
+            Arg.Any<CancellationToken>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<WaypointChartedEvent>(chart => chart.ShipSymbol == Ship && chart.WaypointSymbol == uncharted.Symbol && chart.Reward == 3_105),
+            Arg.Any<DeliveryOptions?>());
+        await _agents.Received(1).UpsertAsync(Arg.Is<AgentModel>(agent => agent.Credits == 1_003_105), Arg.Any<CancellationToken>());
+        await _refresher.Received(1).RefreshAsync(System, uncharted.Symbol, Arg.Any<CancellationToken>());
+        var line = _log.Journal.Should().ContainSingle().Subject;
+        line.EventKind.Should().Be(JournalEvents.Charted);
+        line.Message.Should().Contain(uncharted.Symbol).And.Contain("3105");
+    }
+
+    [Fact]
+    public async Task AChartThatFails_FetchesTheWaypointInstead_AndTheShipMovesOn()
+    {
+        // Another agent may have charted it meanwhile: what anyone can see of it now is kept.
+        var (uncharted, charted) = NewPlanet();
+        _waypoints.FindAsync(uncharted.Symbol, Arg.Any<CancellationToken>()).Returns(uncharted, charted);
+        _port.CreateChartAsync(Ship, Arg.Any<CancellationToken>()).Returns<ChartActionResult>(_ => throw new InvalidOperationException("4230 already charted"));
+        _port.GetWaypointAsync(System, uncharted.Symbol, Arg.Any<CancellationToken>())
+            .Returns(new WaypointDataModel(uncharted.Symbol, System, "PLANET", 50, 50, HasMarket: true, HasShipyard: false, TraitsJson: """[{"symbol":"MARKETPLACE"}]"""));
+
+        var result = await StepAsync(At(uncharted.Symbol, "IN_ORBIT"), _goal with { Stops = [uncharted.Symbol, Far] });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _waypoints.Received(1).UpsertRangeAsync(Arg.Is<IReadOnlyList<WaypointCacheModel>>(rows => rows[0].HasMarket), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().PublishAsync(Arg.Any<WaypointChartedEvent>(), Arg.Any<DeliveryOptions?>());
+        await _goals.Received(1).SetActiveGoalAsync(Ship, Arg.Is<ExploreSystemGoal>(goal => goal.Visited == 1), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AChartedStop_OrAnUnchartedAsteroid_IsNotCharted()
+    {
+        // D99: asteroids and gas giants hold no market or shipyard; the plan gives none as a stop, and a stop is charted
+        // only when it can hold one.
+        var rock = new WaypointCacheModel("X1-KR90-ROCK", System, "ASTEROID", 10, 10, HasMarket: false, HasShipyard: false, DateTimeOffset.UtcNow, """[{"symbol":"UNCHARTED"}]""");
+        _waypoints.FindAsync(rock.Symbol, Arg.Any<CancellationToken>()).Returns(rock);
+
+        await StepAsync(At(Gate, "IN_ORBIT"), _goal);
+        await StepAsync(At(rock.Symbol, "IN_ORBIT"), _goal with { Stops = [rock.Symbol, Far] });
+
+        await _port.DidNotReceive().CreateChartAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>A planet nobody has charted, and as the chart shows it: with a marketplace.</summary>
+    private static (WaypointCacheModel Uncharted, WaypointCacheModel Charted) NewPlanet()
+    {
+        var uncharted = new WaypointCacheModel("X1-KR90-NEW", System, "PLANET", 50, 50, HasMarket: false, HasShipyard: false, DateTimeOffset.UtcNow, """[{"symbol":"UNCHARTED"}]""");
+        return (uncharted, uncharted with { HasMarket = true, TraitsJson = """[{"symbol":"MARKETPLACE"}]""" });
+    }
+
     private static ShipModel At(string waypoint, string status)
         => new(Ship, System, waypoint, status, "CRUISE", 400, 400, CargoCapacity: 40, ShipType: "COMMAND");
 
@@ -139,11 +209,12 @@ public sealed class ExploreSystemGoalExecutorTests
                 _waypoints,
                 _markets,
                 _shipyards,
+                _agents,
                 _refresher,
                 _visits,
                 _tradeContexts,
                 _dock,
                 _bus,
-                NullLogger<ExploreSystemGoalExecutor>.Instance)
+                _log.For<ExploreSystemGoalExecutor>())
             .ExecuteStepAsync(ship, goal, new ShipGoalContext(), CancellationToken.None);
 }

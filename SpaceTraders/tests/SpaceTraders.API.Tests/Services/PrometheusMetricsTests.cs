@@ -337,6 +337,23 @@ public sealed class PrometheusMetricsServiceTests
                 GoalStatus = (int)abroad.Status,
             });
 
+            // Slice 6.30 (D98): the command ship on its way to the shipyard that sells explorers, in another system.
+            var fetch = new MoveToWaypointGoal { TargetWaypointSymbol = "X1-GT9-AE7B" };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-15",
+                ShipType = "COMMAND",
+                Status = "IN_TRANSIT",
+                WaypointSymbol = "X1-AB-I55",
+                DestWaypointSymbol = "X1-AB-I55",
+                ArrivesAt = now.AddMinutes(3),
+                GoalId = fetch.GoalId,
+                GoalKind = fetch.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(fetch),
+                GoalStatus = (int)fetch.Status,
+            });
+
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -371,6 +388,7 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-12", "→ X1-AB-F48", "drifting to X1-AB-F48 to siphon for LIQUID_NITROGEN"),
             ("AGENT-13", "→ X1-AB-B7", "drifting to X1-AB-B7"),
             ("AGENT-14", "→ X1-AB-I55", "flying to X1-KR90"),
+            ("AGENT-15", "→ X1-AB-I55", "flying to X1-GT9-AE7B"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);
@@ -651,8 +669,9 @@ public sealed class PrometheusMetricsServiceTests
             NullLogger<PrometheusMetricsService>.Instance);
         await service.SampleAsync(CancellationToken.None);
 
-        // Slice 6.6 (D64) put the jump gate's materials at 6, after the cargo ships: the probes moved to 7.
-        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 7, "SHIP_PROBE", "X1-AB-A2", 77_117));
+        // Slice 6.6 (D64) put the jump gate's materials at 6, after the cargo ships: the probes moved to 7. Slice 6.30 (D98)
+        // put the first explorer at 7: the probes moved to 8.
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 8, "SHIP_PROBE", "X1-AB-A2", 77_117));
     }
 
     /// <summary>
@@ -874,6 +893,8 @@ public sealed class PrometheusAutomationMetricsTests
         { "spacetraders_credit_reserve", metrics => metrics.ReservedCredits(100_000), "spacetraders_credit_reserve{reset_date=\"2026-09-27\"} 100000\n" },
         { "spacetraders_db_size_bytes", metrics => metrics.DatabaseSize(15_742_655), "spacetraders_db_size_bytes{reset_date=\"2026-09-27\"} 15742655\n" },
         { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds{reset_date=\"2026-09-27\"} 1791118800\n" },
+        { "spacetraders_explore_systems_left", metrics => metrics.Exploring(16, 2), "spacetraders_explore_systems_left{reset_date=\"2026-09-27\"} 16\n" },
+        { "spacetraders_explore_explorers_wanted", metrics => metrics.Exploring(16, 2), "spacetraders_explore_explorers_wanted{reset_date=\"2026-09-27\"} 2\n" },
     };
 
     /// <summary>

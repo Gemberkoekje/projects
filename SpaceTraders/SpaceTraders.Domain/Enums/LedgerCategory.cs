@@ -15,4 +15,7 @@ public enum LedgerCategory
     Other,
     AntimatterPurchase,
     ConstructionBuy,
+
+    /// <summary>The one-off reward for charting a waypoint (PLAN.md slice 6.30, D99).</summary>
+    ChartReward,
 }

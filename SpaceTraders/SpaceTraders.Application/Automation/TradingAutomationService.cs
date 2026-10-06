@@ -299,13 +299,14 @@ public sealed class TradingAutomationService(
 
     /// <summary>
     /// Whether a trader takes routes across systems (slice 6.29, D96): one whose role is trading, the trade role on the board (with
-    /// the board off, a cargo ship), and not a shuttle kept for a collection point (D83, D86). A drone, which gathers first (D58),
-    /// a builder (D65), or the survey ship in its spare time (D34) trades in its own system between its trips, as its own work is
-    /// there, and every other plan works at home (D60): a trip abroad would leave that work undone.
+    /// the board off, a cargo ship, or an explorer the explore plan has no system for, D102), and not a shuttle kept for a
+    /// collection point (D83, D86). A drone, which gathers first (D58), a builder (D65), or the survey ship in its spare time (D34)
+    /// trades in its own system between its trips, as its own work is there, and every other plan works at home (D60): a trip
+    /// abroad would leave that work undone.
     /// </summary>
     private static bool CrossesSystems(FleetRoleBoard board, ShipModel ship, IReadOnlySet<string> collectionShuttles)
         => !collectionShuttles.Contains(ship.Symbol)
-            && (board.RolesOn ? board.RoleOf(ship) == FleetRole.Trade : FleetRoles.IsCargoShip(ship));
+            && (board.RolesOn ? board.RoleOf(ship) == FleetRole.Trade : FleetRoles.IsCargoShip(ship) || FleetRoles.IsExplorer(ship));
 
     /// <summary>
     /// Jettisons what a free ship holds that nothing will sell or use (D42), when no good aboard pays for its sale:

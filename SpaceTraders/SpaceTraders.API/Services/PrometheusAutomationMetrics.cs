@@ -73,6 +73,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _roleCreditsPerHour;
     private readonly RunGauge _purchaseNeed;
     private readonly RunGauge _creditReserve;
+    private readonly RunGauge _exploreSystemsLeft;
+    private readonly RunGauge _exploreExplorersWanted;
 
     private readonly Lock _lock = new();
     private readonly SampledGauge _systemInfo;
@@ -458,6 +460,12 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "position",
             "ship_type",
             "shipyard");
+        _exploreSystemsLeft = UntilSet(
+            "spacetraders_explore_systems_left",
+            "The systems the explore plan knows, hasn't explored and reaches from home through built gates (slice 6.30, D102).");
+        _exploreExplorersWanted = UntilSet(
+            "spacetraders_explore_explorers_wanted",
+            "The explorers the explore plan wants (D102): one for every Explore.SystemsPerExplorer systems left to explore, or part of that, at most Explore.MaxExplorers.");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -576,6 +584,13 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void ReservedCredits(long credits) => _creditReserve.Set(credits);
+
+    /// <inheritdoc />
+    public void Exploring(int systemsLeft, int explorersWanted)
+    {
+        _exploreSystemsLeft.Set(systemsLeft);
+        _exploreExplorersWanted.Set(explorersWanted);
+    }
 
     /// <inheritdoc />
     public void Fleet(IReadOnlyCollection<ShipMetricsSample> ships, DateTimeOffset now)

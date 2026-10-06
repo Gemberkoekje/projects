@@ -997,17 +997,26 @@ public sealed record JumpActionResult
     }
 }
 
+/// <summary>
+/// What charting a waypoint gave (PLAN.md slice 6.30, D99): the waypoint with its traits shown, and the agent's credits after
+/// the chart, which include its one-off reward. The API gives the reward on its own nowhere.
+/// </summary>
 public sealed record ChartActionResult
 {
-    public required string WaypointSymbol { get; init; }
+    /// <summary>The waypoint charted, as anyone can see it now: its traits, a marketplace or shipyard among them.</summary>
+    public required WaypointDataModel Waypoint { get; init; }
 
-    public required string WaypointType { get; init; }
+    /// <summary>The agent's credits after the chart; null when the answer didn't hold them.</summary>
+    public long? AgentCredits { get; init; }
 
+    /// <summary>Creates the result.</summary>
+    /// <param name="Waypoint">The waypoint charted.</param>
+    /// <param name="AgentCredits">The agent's credits after the chart.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ChartActionResult(string WaypointSymbol, string WaypointType)
+    public ChartActionResult(WaypointDataModel Waypoint, long? AgentCredits = null)
     {
-        this.WaypointSymbol = WaypointSymbol;
-        this.WaypointType = WaypointType;
+        this.Waypoint = Waypoint;
+        this.AgentCredits = AgentCredits;
     }
 }
 

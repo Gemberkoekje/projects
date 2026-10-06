@@ -95,6 +95,62 @@ public sealed class ExploreAtlasTests
     }
 
     [Fact]
+    public void TheSystemsLeft_AreThoseNotExploredThatBuiltGatesReach()
+    {
+        // Slice 6.30 (D102): "Reachable, round up". In the network X1-G is left, and X1-F, whose gate is unbuilt, isn't yet.
+        ExploreAtlas.SystemsLeft(Network(), Now).Should().Be(1);
+        ExploreAtlas.SystemsLeft(State(null), Now).Should().Be(2);
+        ExploreAtlas.SystemsLeft(State(Now.AddMinutes(-10)), Now).Should().Be(1, "X1-B's gate refused a jump within the hour");
+    }
+
+    [Fact]
+    public void ASystemAnotherShipHasTaken_IsLeftToIt()
+    {
+        // Slice 6.30: each exploring ship takes the nearest system no other exploring ship has taken.
+        ExploreAtlas.Next(State(null), "X1-A", Now, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "x1-b" })
+            .Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-C" });
+        ExploreAtlas.Next(State(null), "X1-A", Now, new HashSet<string> { "X1-B", "X1-C" }).Kind.Should().Be(ExploreStepKind.Home, "both are taken");
+    }
+
+    [Fact]
+    public void ASystemWithinTheTradeReach_ComesFirst_ThoughOneBeyondItIsNearerTheShip()
+    {
+        // D103, asked on 2026-10-06: "first the systems within 5 jumps are explored before going further". That day the command
+        // ship, always taking the system nearest to it, had explored a chain 16 jumps deep while X1-QA35 and X1-QR21, one jump
+        // from home, waited. Here X1-H hangs off home, X1-G off X1-E: from X1-D, X1-G is 2 jumps and X1-H 3, but from home
+        // X1-G is 3 jumps and X1-H 1.
+        var network = Network();
+        var state = network with
+        {
+            Systems =
+            [
+                .. network.Systems.Select(system => system.SystemSymbol == "X1-A" ? system with { Connections = [.. system.Connections!, "X1-H-G"] } : system),
+                Known("X1-H", []) with { ExploredAt = null },
+            ],
+        };
+
+        ExploreAtlas.Next(state, "X1-D", Now, reach: 2).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-H", Jumps = 3 });
+        ExploreAtlas.Next(state, "X1-D", Now, reach: 3).TargetSystemSymbol.Should().Be("X1-G", "both are within the reach: the nearer to the ship first");
+        ExploreAtlas.Next(state, "X1-D", Now).TargetSystemSymbol.Should().Be("X1-G", "without a reach, the nearest");
+        ExploreAtlas.Next(state, "X1-D", Now, new HashSet<string> { "X1-H" }, reach: 2).TargetSystemSymbol.Should().Be("X1-G", "X1-H is taken");
+    }
+
+    [Fact]
+    public void TheWayHome_WhateverIsLeftToExplore()
+    {
+        // Slice 6.30 (D98): once an explorer explores, the command ship comes home, though X1-G is still to explore.
+        ExploreAtlas.HomeFrom(Network(), "X1-D", Now).Should().BeEquivalentTo(new
+        {
+            Kind = ExploreStepKind.ReturnHome,
+            GateWaypointSymbol = "X1-D-G",
+            DestinationGateWaypointSymbol = "X1-B-G",
+            TargetSystemSymbol = "X1-A",
+            Jumps = 2,
+        });
+        ExploreAtlas.HomeFrom(Network(), "X1-A", Now).Kind.Should().Be(ExploreStepKind.Home);
+    }
+
+    [Fact]
     public void AGateThatRefusedAJumpLately_IsNoWay_ForAnHour()
     {
         // Every ship's refused jumps are recorded (JumpRefusals): a probe isn't sent through a gate that has just refused one.

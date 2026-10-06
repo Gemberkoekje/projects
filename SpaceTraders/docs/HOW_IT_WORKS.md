@@ -331,11 +331,12 @@ it and the other ships can do and what each role would earn: see
 
 Markets are not scouted again. Other systems are the explore plan's (below).
 
-### Explore (`ExplorePlanService`, slice 6.11)
+### Explore (`ExplorePlanService`, slices 6.11 and 6.30)
 
 Asked on 2026-10-04: "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through
 that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the
-home system, recursively." Off by default (`Automation.Plan.Explore.Enabled`); your decisions are D59–D63.
+home system, recursively." On by default (`Automation.Plan.Explore.Enabled`, D69); your decisions are D59–D63, and for the
+explorers and charting (slice 6.30) D98, D99, D102 and D103.
 
 - **What it knows** (`ExplorePlanState`, `plan_states` row `Explore`): every system it has seen, with its gate's waypoint,
   whether the gate is built (`Active`), still `UnderConstruction`, `None` or `Unknown`, the gates it connects to (asked
@@ -343,38 +344,65 @@ home system, recursively." Off by default (`Automation.Plan.Explore.Enabled`); y
   counts as explored (the scout plan's). It learns one thing a pass (D19): home's gate (fresh from the API: the cache
   keeps what startup sync saw when the agent started), then each explored system's connections, then each connected
   gate (`GET …/waypoints/{gate}`); a gate under construction, or a jump the API refused, is looked at again hourly, a look
-  that failed after 5 minutes. A system the command ship has just jumped into has its system and all its waypoints
-  fetched at once (`cached_systems`, `cached_waypoints`), as startup sync stores them.
-- **The command ship** (cached type `COMMAND`): the plan takes it when it is free (its trip has ended, D61: no goal, no
-  assignment, not in transit) and a system is left to explore, with an `Explore` assignment, so no other plan takes it.
-  It bootstraps before the role board and every plan after it. While the scout plan or the contract has the ship, it
-  waits.
-- **Where it goes** (`ExploreAtlas`): the nearest system not explored yet by jumps through built gates (a jump needs the
-  gates at both ends built), then by symbol; no limit (D59). While a look that could change the choice is still to come,
-  it waits a pass. With nothing left it jumps home (D60), and at home its assignment ends: the other plans give it work
-  again. Away with no built way home, it waits (`no_way_home`, journaled once, Warning).
+  that failed after 5 minutes. A system an exploring ship has just jumped into has its system and all its waypoints
+  fetched at once (`cached_systems`, `cached_waypoints`), as startup sync stores them. The state also lists each explorer
+  with what the plan does with it, the systems left to explore, the explorers wanted, and where the next one's purchase
+  stands (`Purchase`).
+- **Who explores:** the explorers (`SHIP_EXPLORER`, cached as `EXPLORER` after startup sync; `FleetRoles.IsExplorer`), or
+  the command ship (cached type `COMMAND`) while there is none. The plan takes a ship when it is free (its trip has ended,
+  D61: no goal, no assignment, not in transit) and a system is left for it, with an `Explore` assignment, so no other plan
+  takes it. It bootstraps before the role board and every plan after it. While the scout plan or the contract has the
+  command ship, it waits. Once there is an explorer, the command ship finishes its step, jumps home and is released there
+  (D60, D98).
+- **How many explorers** (D102): one for every `Explore.SystemsPerExplorer` (10) systems left, or part of that, at most
+  `Explore.MaxExplorers` (5; 0 for no cap); `Explore.SystemsPerExplorer` 0 buys none. The systems left are those it knows,
+  hasn't explored and reaches from home through built gates (`ExploreAtlas.SystemsLeft`): one behind a gate under
+  construction counts once the gate is built. They are bought at the cheapest shipyard the gates reach that sells one
+  (X1-GT9-AE7B in the reset of 2026-10-04): the first at `PurchaseTier.Explorer`, before the probes, the rest at
+  `PurchaseTier.MoreExplorers`, after the drones and cargo ships that take turns (see
+  [the order ships are bought in](#the-order-ships-are-bought-in-purchaseorder-slice-610b)). The API sells a ship only where
+  one of ours is (D30): the command ship fetches the first (`FetchingExplorer`: a `MoveToWaypointGoal` to the shipyard,
+  through the gates), sent once nothing comes before it and the credits allow it, and waits there while the credits are
+  saved up; a further one counts in the order only while one of our ships is at the shipyard or a probe of ours is in its
+  system, which answers the purchase's call, so no explorer turns back for one.
+- **Where it goes** (`ExploreAtlas`): a system not explored yet that no other exploring ship has taken, within the trade
+  reach of home (`Trade.MaxHaulDistance`, 5) before any beyond it (D103), the nearest by jumps through built gates in each
+  (a jump needs the gates at both ends built), then by symbol; no limit (D59). While a look that could change the choice
+  is still to come, it waits a pass. With nothing left the command ship jumps home (D60), and at home its assignment ends:
+  the other plans give it work again; away with no built way home, it waits (`no_way_home`, journaled once, Warning). An
+  explorer with nothing left is released where it is and trades from there (D102): trading is its only role
+  (`FleetRoles.PotentialRoles`), never a siphon drone's or a builder's, though it carries a gas siphon. The plan takes it
+  back once its trip ends and a system turns up.
 - **A jump** (`JumpGoal`): fly to the system's gate, fill the tank when docked at a gate that sells fuel, orbit, and jump
   (`POST my/ships/{ship}/jump` with the destination gate's `waypointSymbol`), once the cooldown is over. Each jump buys one
   ANTIMATTER at the gate's market, booked as `AntimatterPurchase`. The plan gives a jump only while the credits after the
   antimatter (its last price at that gate) stay at or above `FleetExpansion.MinCreditReserve` (60,000, D63); until then it
-  holds the jump (`waiting_for_credits`, journaled once): a free command ship keeps its other work, an exploring one waits
-  where it is. A jump the API refuses (a client error, `JumpRefusedException`) blocks the goal with `jump_refused`; the
-  plan then leaves that gate alone for an hour and chooses again. The jump itself is every flight's between systems
-  (`GoalJumps`, slice 6.28): the probes jump the same way, and a refused jump is recorded for every way (`JumpRefusals`),
-  so no ship is sent through that gate for the hour either.
-- **Scouting a system** (`ExploreSystemGoal`): its markets and shipyards with nothing cached yet, nearest first from the
-  gate, each visited once, "as it initially does for the home system"; the arrival stores the market and the
-  shipyard, and a stop it didn't store (the gate it jumped to) is fetched there. It charts nothing (D62): uncharted
-  waypoints keep their traits hidden. A system with neither is explored as soon as the ship is there. When the goal ends
-  the system is explored (`SystemExplored`), whatever a fetch that failed missed, so the ship doesn't go back for it.
+  holds the jump (`waiting_for_credits`, journaled once): a free ship keeps its other work, an exploring one waits where it
+  is. A jump the API refuses (a client error, `JumpRefusedException`) blocks the goal with `jump_refused`; the plan then
+  leaves that gate alone for an hour and chooses again. The jump itself is every flight's between systems (`GoalJumps`,
+  slice 6.28): the probes jump the same way, and a refused jump is recorded for every way (`JumpRefusals`), so no ship is
+  sent through that gate for the hour either.
+- **Scouting a system** (`ExploreSystemGoal`): its markets and shipyards with nothing cached yet, and its uncharted
+  waypoints of a type that can hold a market or shipyard, every type but ASTEROID and GAS_GIANT (`Charting`, D99); an
+  uncharted gate first, then the nearest from where the ship is, each visited once, "as it initially does for the home
+  system". At an uncharted stop the ship charts it first (`POST my/ships/{ship}/chart`): the chart shows its traits, which
+  the cache keeps, and pays a one-off reward by their rarity, which the API gives only as the credits after it; the reward
+  booked is those less the credits cached before (`WaypointChartedEvent`, ledger `ChartReward`, journal `Charted`). A chart
+  that fails (another agent charted it meanwhile) fetches the waypoint instead. Then the arrival stores the market and the
+  shipyard, and a stop it didn't store (the gate it jumped to, a market a chart showed) is fetched there. A system with
+  none of those is explored as soon as the ship is there. When the goal ends the system is explored (`SystemExplored`),
+  whatever a fetch that failed missed, so the ship doesn't go back for it.
 - **Business stays home** (D60, `BusinessSystems`): the plans do business in the headquarters' system alone (slice 6.28;
   it used to be every system where a ship that doesn't explore is, which a probe abroad would have made a place to buy
   drones in). The mining, siphon and trading plans buy ships only there, the contract plan looks for its drone's shipyard
-  only there, and the mining, siphon and survey plans plan no work in a system because the explorer is in it. Only the
-  trading plan's traders cross systems (slice 6.29, D96): see [Trading](#trading-tradingautomationservice-slice-65).
+  only there, and the mining, siphon and survey plans plan no work in a system because an exploring ship is in it. Only
+  the trading plan's traders cross systems (slice 6.29, D96), an explorer between explorations among them: see
+  [Trading](#trading-tradingautomationservice-slice-65).
 - **What it costs:** API reads while it learns (one a pass, a few at each new system: about 85 waypoints are five pages),
-  the jumps' antimatter, and the command ship's time. The cache grows by a system's waypoints, markets and shipyards for
-  each system explored; an agent reset clears it.
+  a chart at each stop that needs one, the jumps' antimatter, the explorers (about 700,000 each), and the exploring ships'
+  time. The cache grows by a system's waypoints, markets and shipyards for each system explored; an agent reset clears it.
+- **Metrics:** `spacetraders_explore_systems_left` and `spacetraders_explore_explorers_wanted`, as the last pass counted
+  them; a chart's reward counts in `spacetraders_credits_earned_total{source="ChartReward"}`.
 
 ### Role board (`RolePlanService`, slice 6.9)
 
@@ -1320,9 +1348,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
      built, otherwise extra miners can be built."): the load comes before them unless it waits for its markets
      (`PurchaseNeed.WaitsForMarkets`: SCARCE or LIMITED, D66, or another buyer there, D80), whatever the credits; they
      never hold the load back;
-  7. `Probes`: a probe for every market (D29) of home and of the explored systems within the trade reach (slice 6.28,
+  7. `Explorer`: the first explorer (slice 6.30, D98: "Start with one before probes"), while the explore plan wants one
+     (D102); the command ship fetches it;
+  8. `Probes`: a probe for every market (D29) of home and of the explored systems within the trade reach (slice 6.28,
      D97);
-  8. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
+  9. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
      in turn: the kind not bought last, so after the list's last cargo ship a drone, then a cargo ship, and
      so on (the ledger's `ShipPurchase` rows, which carry the type, and this process's purchases, which the
      ledger gets a moment later). Any drone counts, the contract's and a scarce mineral's too; a cargo ship is
@@ -1330,8 +1360,10 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
      count. A turn passes when the other kind has nothing to buy: no drone's first trip would serve a market
      short of its mineral, or a miner is free; no new cargo ship would have a lucrative route, or a trader has
      no trip. A turn that passed isn't made up later;
-  9. `FarProbes`: a probe for every market of the other explored systems (slice 6.28, D97: "all explored markets when
-     money allows", "After drones/cargo").
+  10. `MoreExplorers`: every further explorer the explore plan wants (slice 6.30, D102: "First before probes, rest last"),
+      while one of our ships is at its shipyard or a probe of ours is in its system to answer the purchase's call;
+  11. `FarProbes`: a probe for every market of the other explored systems (slice 6.28, D97: "all explored markets when
+      money allows", "After drones/cargo").
 - **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
   pass what it would buy now, or nothing, and asks before it buys (`IPurchaseOrder.ReportAsync`). A plan
   may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,
@@ -1345,7 +1377,7 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it
   waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the
-  plans in their order (contract, probe, survey, mining, siphon, construction, trading), so after a purchase the
+  plans in their order (explore, contract, probe, survey, mining, siphon, construction, trading), so after a purchase the
   next one in line may come in the same tick.
 - **Visibility:** `spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}`, one series
   per plan that needs something, worth the ship's price: the lowest `position` is what the credits are
@@ -1421,7 +1453,7 @@ scout and probe plans don't read the roles.
     sold or dropped, `MineAndSellGoalExecutor`, `SiphonAndSellGoalExecutor` and
     `GatherAndSellGoalExecutor` when the trip is sold or can't go on, and
     `SurveyWaypointGoalExecutor` after each survey (slice 6.4; B16's survey part, fixed: survey goals
-    were never cleared), `MoveToWaypointGoalExecutor` at the move's target (D54), `JumpGoalExecutor` after the jump (or
+    were never cleared), `MoveToWaypointGoalExecutor` at the move's target (D54; a target in another system is reached through the gates, slice 6.30), `JumpGoalExecutor` after the jump (or
     when the credits no longer pay for it), `ExploreSystemGoalExecutor` after the last stop, and
     `SupplyConstructionGoalExecutor` when the trip has supplied its site or is dropped (slice 6.6);
   - the scout plan, when its last stop is done.
@@ -1657,7 +1689,8 @@ DRONE are both EXCAVATORs, they should get different names." Your decision is D7
 | `MarketDataRefreshedEvent` | Arrival at a market; the market watch; a refresh after a trade (D25) | `MarketPriceSampleHandler` → `market_price_samples`, one row per good (B19, fixed) |
 | `ShipNavigationCompletedEvent` | Arrival, after docking (`NavigateToWaypointArrivedCommand`) | `ShipNavigationCompletedHandler` → one goal step |
 | `ShipRefueledEvent` | Refuel | `LedgerEntryHandler` → `ledger_entries` (FuelPurchase) |
-| `ShipJumpedEvent` | `GoalJumps`, for every jump: the command ship's exploring (slice 6.11), the probes' flights to other systems (slice 6.28) and the traders' trips across systems (slice 6.29) | `LedgerEntryHandler` → `ledger_entries` (AntimatterPurchase, one unit of ANTIMATTER at the gate it left) |
+| `ShipJumpedEvent` | `GoalJumps`, for every jump: the exploring ships (slices 6.11, 6.30), the probes' flights to other systems (slice 6.28) and the traders' trips across systems (slice 6.29) | `LedgerEntryHandler` → `ledger_entries` (AntimatterPurchase, one unit of ANTIMATTER at the gate it left) |
+| `WaypointChartedEvent` | `ExploreSystemGoalExecutor`, for every chart (slice 6.30, D99) | `LedgerEntryHandler` → `ledger_entries` (ChartReward, the credits after the chart less those before it; none for a chart that paid nothing) |
 | `ShipCargoSoldEvent` | Mining, siphon, spare-time and trade executors; carries the market it was sold to (`WaypointSymbol`) | `LedgerEntryHandler` (TradeSell, with that market and the unit price since B57, and `spacetraders_goods_sold_units_total`); `activity_logs` row |
 | `CargoPurchasedEvent` | Trade and construction executors | `LedgerEntryHandler` (TradeBuy, or ConstructionBuy for a construction trip's materials, slice 6.6; and `spacetraders_goods_bought_units_total`) |
 | `ConstructionSuppliedEvent` | Construction executor, per supply (slice 6.6) | `activity_logs` row |
@@ -1840,7 +1873,7 @@ other app (D8):
 
 ### What each setting does
 
-The seed holds 54 settings: the 40 that change what the bot does (8 of them the health rules'
+The seed holds 60 settings: the 46 that change what the bot does (8 of them the health rules'
 thresholds), 2 that are read without changing it, and 12 status flags. Settings that nothing read, or only code that never runs, were
 removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the list.
 
@@ -1865,6 +1898,8 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Trade.FuelReserveCredits` (5000) | Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24) |
 | `Trade.MaxHaulDistance` (5) | The trade reach, in jumps (D96): a trade route buys within that many jumps of the trader's system and sells within that many of the buy market's, through built gates (slice 6.29); the probes of the explored systems within it of home are bought at the probe tier, those of the systems beyond it after the drones and cargo ships that take turns (slice 6.28, D97); 0 or less means 5. The market views' queries over the never-written `trade_opportunities` read it too |
 | `Trade.MaxPriceAgeMinutes` (30) | How old, in minutes, a market's prices may be for a trade route to buy or sell there, at home too (slice 6.29, D96); 0 or less means 30. Older prices still say where fuel is sold |
+| `Explore.SystemsPerExplorer` (10) | The explore plan wants one explorer for every this many systems it knows, hasn't explored and reaches through built gates, or part of that (slice 6.30, D102); 0 buys none |
+| `Explore.MaxExplorers` (5) | The most explorers the explore plan buys (D102); 0 for no cap |
 | `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`) | The cargo ships the trading plan buys, in order: the Nth while the fleet has fewer than N cargo ships (D21); empty buys none |
 | `Market.RefreshMinutes` (5) | Minutes between refreshes of a market where one of our ships is (the market watch); 0 switches it off. Also how old a market's prices may get before a roaming probe flies there (slice 6.3); at 0 that is 5 |
 | `ActivityLog.RetentionDays` (30) | Activity log retention |
@@ -2090,7 +2125,8 @@ The seven pages in `src/Future` are not routed.
   | `ConstructionDropped` | Construction executor, when a trip is given up (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol` where the ship is, `SiteWaypoint`, `Reason` (`not_needed`, `not_sold_here`, `low_supply`, `over_budget`, at the market before it bought anything: D81); at Warning, when the API refused the supply, `WaypointSymbol` (the site), `Units` kept aboard and `Reason` (`not_needed`, `wrong_location`) |
   | `ProbeCalled` | Probe plan, when it sends a probe to a shipyard where a purchase waits for one of our ships (D30) | `ShipSymbol`, `WaypointSymbol`, `ShipType` the purchase is for |
   | `Jumped` | `GoalJumps`, per jump of any ship (slices 6.11, 6.28, 6.29) | `ShipSymbol`, `WaypointSymbol`: the gate it left, `Destination`: the gate it jumped to, `SystemSymbol` it is in now, `Cost` of the antimatter, `CooldownSeconds` the jump started (slice 6.29) |
-  | `SystemExplored` | Explore plan, when the command ship has scouted a system, or is in one with no market or shipyard (slice 6.11) | `ShipSymbol`, `SystemSymbol`, `Markets`, `Shipyards` |
+  | `SystemExplored` | Explore plan, when an exploring ship, the command ship or an explorer, has scouted a system, or is in one with nothing to scout (slices 6.11, 6.30) | `ShipSymbol`, `SystemSymbol`, `Markets`, `Shipyards` |
+  | `Charted` | `ExploreSystemGoalExecutor`, when an exploring ship has charted a waypoint (slice 6.30, D99) | `ShipSymbol`, `WaypointSymbol`, `WaypointType`, `Reward` in credits, `HasMarket`, `HasShipyard` |
   | `Discovered` | `GameStateSnapshots`, when the cache lists a ship type or good no snapshot of the run held, and a snapshot was saved (slice 2.15) | `Discovered`: each new ship type and good with where it is listed; `SnapshotId` |
   | `PlanStarted`, `PlanCompleted` | Scout, contract, probe and explore plans; the construction plan when it first sees the home gate need materials, and when it is complete (slice 6.6) | `Plan`, and the plan's ship, contract or system; the explore plan's start also `Purpose` (`explores`, `flies home to`), the `SystemSymbol` it goes to and its `Jumps`, its completion the systems `Explored`; for construction the site (`WaypointSymbol`) and, at the start, its `Materials` |
   | `PlanBlocked` | Contract plan (`unsupported_deliverable`, `no_ship_or_budget`, `no_asteroid`), probe plan (`waiting_for_credits`), explore plan (`waiting_for_credits`, with the jump's `WaypointSymbol`, `Destination`, `SystemSymbol`, `Price`, `Floor` and `Credits`; `no_way_home` at Warning) | `Plan`, `Reason` |
@@ -2150,8 +2186,9 @@ The seven pages in `src/Future` are not routed.
   | Metric | Labels | What it counts or shows | Updated |
   |---|---|---|---|
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
+  | `spacetraders_explore_systems_left`, `spacetraders_explore_explorers_wanted` | | The systems the explore plan knows, hasn't explored and reaches from home through built gates, and the explorers it wants for them: one for every `Explore.SystemsPerExplorer`, at most `Explore.MaxExplorers` (slice 6.30, D102), as its last pass counted them | Every 10 s, from the explore plan's state |
   | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry; the dearest full hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D64) | Every 10 s |
-  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `Construction`, `Probes`, `Alternating`, `FarProbes`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5; slice 6.6 put `Construction` at 6, so probes moved to 7, the turns to 8; slice 6.28 added `FarProbes` at 9). Construction's series is the gate's next load: the material as `ship_type`, its market as `shipyard`, worth the load with its fuel. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
+  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `Construction`, `Explorer`, `Probes`, `Alternating`, `MoreExplorers`, `FarProbes`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5; slice 6.6 put `Construction` at 6, so probes moved to 7, the turns to 8; slice 6.28 added `FarProbes` at 9; slice 6.30 put `Explorer` at 7 and `MoreExplorers` at 10, so probes moved to 8, the turns to 9 and the far probes to 11). Construction's series is the gate's next load: the material as `ship_type`, its market as `shipyard`, worth the load with its fuel. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
   | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c; `drifting to X1-AB-B7` for the survey ship's move, D54; `buying FAB_MATS at X1-AB-F49 for X1-AB-I55` and `supplying FAB_MATS to X1-AB-I55` for a construction trip, slice 6.6), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |

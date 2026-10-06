@@ -104,6 +104,12 @@ public sealed class PrometheusMarketMetricsService(
                 .Select(system => system with { Probes = probes.GetValueOrDefault(system.System) }),
         ]);
 
+        // Slice 6.30 (D102): the systems left to explore and the explorers wanted for them, as the explore plan counted them.
+        if (explore is not null)
+        {
+            metrics.Exploring(explore.SystemsLeft, explore.ExplorersWanted);
+        }
+
         if (!_hasSupplyChain)
         {
             var chains = await supplyChain.GetAsync(scope.ServiceProvider.GetRequiredService<ISpaceTradersPort>(), now, cancellationToken);
