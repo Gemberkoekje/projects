@@ -144,4 +144,10 @@ public enum ProbePurchaseStatus
 
     /// <summary>Every shipyard a probe could be bought at has SHIP_PROBE at SCARCE supply: none is bought there (D97).</summary>
     ShipyardsScarce = 7,
+
+    /// <summary>
+    /// Where the next probe costs least can't sell one until a probe of ours, on its way there now, arrives (D30, D97, B72):
+    /// it is bought there once that probe is.
+    /// </summary>
+    WaitingForAProbeToArrive = 8,
 }

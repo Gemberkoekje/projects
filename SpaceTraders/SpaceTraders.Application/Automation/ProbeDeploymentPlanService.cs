@@ -401,35 +401,23 @@ public sealed class ProbeDeploymentPlanService(
         }
 
         var scarce = false;
+        ProbeSource? waiting = null;
         foreach (var system in shortOf)
         {
-            // A purchase needs one of our ships at the shipyard (D30): at home there always is one to call, abroad only once a
-            // probe of ours is in that system.
-            var candidates = new List<(ProbeOffer Offer, long Antimatter)>();
-            foreach (var offer in offers.Where(offer => offer.System.Equals(pass.Home, StringComparison.OrdinalIgnoreCase)
-                || pass.Systems.Any(served => served.Symbol.Equals(offer.System, StringComparison.OrdinalIgnoreCase) && served.Present > 0)))
+            var source = Source(pass, offers, system, ref scarce);
+            if (source is { Waits: false })
             {
-                if (CanJump(pass, offer.System, system.Symbol, out var antimatter))
-                {
-                    scarce |= offer.Scarce;
-                    if (!offer.Scarce)
-                    {
-                        candidates.Add((offer, antimatter));
-                    }
-                }
+                // A probe for another system, whose shipyard sells this one's for least, is still bought for this one's sake.
+                var tier = system.InTradeReach || source.For.InTradeReach ? PurchaseTier.Probes : PurchaseTier.FarProbes;
+                return await BuyAsync(pass, source.For, source.Offer, source.Antimatter, tier, cancellationToken);
             }
 
-            if (candidates.Count == 0)
-            {
-                continue;
-            }
+            waiting ??= source;
+        }
 
-            var (best, jumpCost) = candidates
-                .OrderBy(candidate => candidate.Offer.Price + candidate.Antimatter)
-                .ThenBy(candidate => candidate.Offer.Price)
-                .ThenBy(candidate => candidate.Offer.Shipyard, StringComparer.Ordinal)
-                .First();
-            return await BuyAsync(pass, system, best, jumpCost, cancellationToken);
+        if (waiting is not null)
+        {
+            return new ProbePurchase(ProbePurchaseStatus.WaitingForAProbeToArrive, waiting.For.Symbol, waiting.Offer.Shipyard, waiting.Offer.Price, waiting.Antimatter);
         }
 
         return new ProbePurchase(
@@ -440,9 +428,114 @@ public sealed class ProbeDeploymentPlanService(
             0);
     }
 
-    private async Task<ProbePurchase> BuyAsync(Pass pass, ServedSystem system, ProbeOffer offer, long antimatter, CancellationToken cancellationToken)
+    /// <summary>
+    /// Where the next probe for a system short of one is bought (D97: "the shipyard where it costs least, the antimatter to its
+    /// system counted"), or why the plan waits (B72). A shipyard sells only where one of our ships is (D30): at home, and abroad
+    /// once a probe of ours is in its system. Going by the cheapest shipyard, the antimatter of the jumps from there counted:
+    /// <list type="bullet">
+    ///   <item>one that can sell now sells it;</item>
+    ///   <item>one in a system a probe of ours is on its way to waits for that probe, and the probes for it are bought there
+    ///   once it is: the plan used to buy them where it could, one a pass, at home;</item>
+    ///   <item>one in a system with no probe there or on its way waits for that system's first probe, which is bought now, at
+    ///   the cheapest shipyard that can sell it (or waited for, as above), and flies there.</item>
+    /// </list>
+    /// A system's own shipyard counts for it only once a probe of ours is there or on its way.
+    /// </summary>
+    /// <returns>The purchase, or the wait; null when no shipyard can serve the system.</returns>
+    private static ProbeSource? Source(Pass pass, IReadOnlyList<ProbeOffer> offers, ServedSystem system, ref bool scarce)
     {
-        var tier = system.InTradeReach ? PurchaseTier.Probes : PurchaseTier.FarProbes;
+        foreach (var (offer, antimatter) in Options(pass, offers, system, ownToo: system.Probes.Count > 0, ref scarce))
+        {
+            var seller = Served(pass, offer.System)!;
+            if (CanSell(pass, seller))
+            {
+                return new ProbeSource(system, offer, antimatter, Waits: false);
+            }
+
+            if (IsComing(seller))
+            {
+                return new ProbeSource(system, offer, antimatter, Waits: true);
+            }
+
+            if (seller.Markets.Count > 0 && FirstProbe(pass, offers, seller, ref scarce) is { } first)
+            {
+                return first;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The first probe for a system with no probe of ours there or on its way (B72): from the cheapest shipyard elsewhere that
+    /// can sell it now, or the wait for one that can once a probe on its way there arrives.
+    /// </summary>
+    private static ProbeSource? FirstProbe(Pass pass, IReadOnlyList<ProbeOffer> offers, ServedSystem system, ref bool scarce)
+    {
+        foreach (var (offer, antimatter) in Options(pass, offers, system, ownToo: false, ref scarce))
+        {
+            var seller = Served(pass, offer.System)!;
+            if (CanSell(pass, seller))
+            {
+                return new ProbeSource(system, offer, antimatter, Waits: false);
+            }
+
+            if (IsComing(seller))
+            {
+                return new ProbeSource(system, offer, antimatter, Waits: true);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The shipyards a probe for <paramref name="system"/> can come from, the cheapest first with the antimatter of the jumps
+    /// counted (D97): those in a system a probe can get to (home's, or one the gates reach), from where a probe can get to
+    /// <paramref name="system"/>, not at SCARCE supply (noted in <paramref name="scarce"/>); the system's own only with
+    /// <paramref name="ownToo"/>.
+    /// </summary>
+    private static List<(ProbeOffer Offer, long Antimatter)> Options(Pass pass, IReadOnlyList<ProbeOffer> offers, ServedSystem system, bool ownToo, ref bool scarce)
+    {
+        var options = new List<(ProbeOffer Offer, long Antimatter)>();
+        foreach (var offer in offers)
+        {
+            var seller = Served(pass, offer.System);
+            if (seller is null
+                || !(seller.Reached || seller.Present > 0)
+                || (!ownToo && seller == system)
+                || !CanJump(pass, offer.System, system.Symbol, out var antimatter))
+            {
+                continue;
+            }
+
+            if (offer.Scarce)
+            {
+                scarce = true;
+                continue;
+            }
+
+            options.Add((offer, antimatter));
+        }
+
+        return [.. options
+            .OrderBy(option => option.Offer.Price + option.Antimatter)
+            .ThenBy(option => option.Offer.Price)
+            .ThenBy(option => option.Offer.Shipyard, StringComparer.Ordinal)];
+    }
+
+    private static ServedSystem? Served(Pass pass, string systemSymbol)
+        => pass.Systems.FirstOrDefault(served => served.Symbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether a shipyard in the system can sell a probe now (D30): at home there always is a probe to call, abroad once one of ours is there.</summary>
+    private static bool CanSell(Pass pass, ServedSystem seller)
+        => seller.Symbol.Equals(pass.Home, StringComparison.OrdinalIgnoreCase) || seller.Present > 0;
+
+    /// <summary>Whether a probe of ours is on its way to the system, none being there yet.</summary>
+    private static bool IsComing(ServedSystem system) => system.Present == 0 && system.Probes.Count > 0;
+
+    private async Task<ProbePurchase> BuyAsync(Pass pass, ServedSystem system, ProbeOffer offer, long antimatter, PurchaseTier tier, CancellationToken cancellationToken)
+    {
         if (!await purchaseOrder.ReportAsync(
             AutomationPlan.ProbeDeployment,
             new PurchaseNeed(tier, ProbeShipType, offer.Shipyard, offer.Price),
@@ -604,6 +697,9 @@ public sealed class ProbeDeploymentPlanService(
 
     /// <summary>A shipyard's offer of a probe, as cached.</summary>
     private sealed record ProbeOffer(string Shipyard, string System, long Price, bool Scarce);
+
+    /// <summary>Where a probe for <see cref="For"/> is bought now, or, with <see cref="Waits"/>, will be once a probe arrives (B72).</summary>
+    private sealed record ProbeSource(ServedSystem For, ProbeOffer Offer, long Antimatter, bool Waits);
 
     /// <summary>What the pass did about the next probe, and where it would be bought.</summary>
     private sealed record ProbePurchase(ProbePurchaseStatus Status, string System, string Shipyard, long Price, long Antimatter);

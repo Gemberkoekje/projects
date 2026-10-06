@@ -392,6 +392,55 @@ public sealed class ProbeDeploymentPlanServiceTests
         _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90K1);
     }
 
+    [Fact]
+    public async Task WhileAProbeIsOnItsWay_TheSystemsOtherProbesWaitToBeBoughtWhereItArrives()
+    {
+        // B72: X1-KR90's first probe, SPECTER-7, is still at home on its way there. Its K2 sells probes for 24,000, home's A2
+        // for 81,645 and a jump; until SPECTER-7 arrives K2 can't sell (D30), and the plan bought X1-KR90's other probes at
+        // A2, one a pass, then X1-MT49's, which K2 would sell for 28,000 with the jump. It waits for SPECTER-7 instead.
+        var leaving = Probe("SPECTER-7", A2) with { Status = "IN_TRANSIT", DestWaypointSymbol = I55, ArrivesAt = _now.AddMinutes(2) };
+        _activeGoals["SPECTER-7"] = new DeployProbeGoal { TargetWaypointSymbol = Kr90K1 };
+        Abroad(leaving);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(PurchaseNeed.None);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.WaitingForAProbeToArrive);
+        _state.NextProbeSystem.Should().Be(Kr90);
+        _state.NextProbeShipyard.Should().Be(Kr90K2);
+        _state.NextProbePrice.Should().Be(24_000);
+    }
+
+    [Fact]
+    public async Task ASystemsFirstProbe_GoesWhereItsProbesCostLeast_ThoughThatIsAnotherSystem()
+    {
+        // B72: X1-MT49's shipyard M1 sells probes for 10,000, the cheapest for X1-KR90 too, whose own K2 can't sell before a
+        // probe of ours is there (D30). So the first probe goes to X1-MT49, bought at home, the only shipyard that can sell
+        // one now, and X1-KR90's are bought at M1 once it is there.
+        Abroad();
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard(Kr90K2, ("SHIP_PROBE", 24_000)) with { SystemSymbol = Kr90 },
+            Shipyard("X1-MT49-M1", ("SHIP_PROBE", 10_000)) with { SystemSymbol = Mt49 },
+        ]);
+        _purchases.TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>()).Returns(new ShipPurchaseResult
+        {
+            IsSuccess = true,
+            EstimatedCost = 81_645,
+            ActualCost = 81_645,
+            PurchasedShip = Probe("SPECTER-7", A2),
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
+        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().StartWith(Mt49);
+        _state!.NextProbeSystem.Should().Be(Mt49);
+        _state.NextProbeAntimatter.Should().Be(9_000);
+    }
+
     /// <summary>
     /// Slice 6.28: home X1-DC53 has three markets, A2 (a shipyard), H52 and its gate I55, each with a probe; its gate connects
     /// to X1-KR90's, explored (its gate G, K1, and K2, a shipyard that sells probes for 24,000), and that to X1-MT49's (its gate
