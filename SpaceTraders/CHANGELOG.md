@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-06, B70)
+- A ship whose arrival was never handled gets it again (`LostArrivals`): a goal step for a ship still stored in transit more than 5 minutes past its arrival time schedules its arrival again, for its active goal, at most once every 5 minutes, and logs a warning. Only the arrival's dock takes a ship out of transit in the cache, and an arrival whose dock failed four times was dropped: SPECTER-5's, at 00:42:53Z on 2026-10-06 in a 35-second outage of the game's API, left it waiting for hours, until a restart.
+
+### Docs – Changed (2026-10-06, B70)
+- `PLAN.md`: B70. `docs/HOW_IT_WORKS.md`: the arrival's dock, and a lost arrival.
+
 ### Code – Fixed (2026-10-06, B71)
 - The mining, siphon and construction plans read every ship's goal before the ships (`FleetGoals`). A trip that ends in its arrival handler empties the hold first and ends its goal after; read the other way round, a pass could see the goal ended beside the ship as it was before, free with cargo it no longer held. The builder SPECTER-D, which had just supplied the gate's last 80 ADVANCED_CIRCUITRY, was passed over to the trading plan and spent 18 minutes on an ELECTRONICS trade while its next FAB_MATS load waited; a drone would have been sent to sell what it had just sold.
 

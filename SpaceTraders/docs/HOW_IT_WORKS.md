@@ -1512,6 +1512,17 @@ they count.
    the row and publishes `ShipArrivedEvent`. It is not leader-gated.
 3. `ShipArrivedEventHandler` continues only if the event's goal id matches the ship's active goal
    (B17). It then sends `NavigateToWaypointArrivedCommand`.
+4. `NavigateToWaypointArrivedHandler` fetches the market and the shipyard there and docks the ship:
+   the dock is what takes the ship out of transit in the cache. It then publishes
+   `ShipNavigationCompletedEvent`, whose handler runs the goal's next step.
+
+**A lost arrival** (B70): Wolverine drops a message after its last retry, and the timer was deleted
+when it fired, so an arrival whose dock fails for good (as in a network outage of the game's API) is
+gone, and the cache keeps the ship in transit. Every goal step would wait for it. So a goal step for a
+ship stored in transit more than 5 minutes past its arrival time (`LostArrivals.Margin`) schedules
+its arrival again, for its active goal, at most once every 5 minutes per ship, and logs a warning
+("its arrival is scheduled again"); the arrival then runs from step 2. A restart did the same
+through the startup sync, which stores every ship as the API has it.
 
 Cooldown timers are never scheduled, and `ShipCooldownExpiredEvent` has no handler. Goals that
 wait for a cooldown simply run again on a later tick.

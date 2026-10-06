@@ -131,6 +131,7 @@ public sealed class AlreadyAtDestinationLoopTests
             new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
+            new LostArrivals(Substitute.For<IShipEventScheduler>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         var navigateHandler = new NavigateToWaypointHandler(
