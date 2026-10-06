@@ -103,6 +103,12 @@ public sealed record RoleSettings
     /// </summary>
     public IReadOnlySet<string> ConstructionSystems { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The systems the plans do business in (<c>BusinessSystems</c>, D60): the headquarters'. A ship outside them can only trade
+    /// (slice 6.29, D96). Empty, any system, until the role board reads the agent.
+    /// </summary>
+    public IReadOnlySet<string> BusinessSystems { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Reads the settings.</summary>
     /// <param name="settings">The settings.</param>
     /// <param name="cancellationToken">Stops the reads.</param>
@@ -139,21 +145,32 @@ public sealed record RoleSettings
     /// <summary>
     /// The roles a ship could take whose plan is on (D38): surveying with the survey plan; mining with the mining plan,
     /// or while the contract wants ore (D40); siphoning with the siphon plan; trading with the trading plan; constructing
-    /// with the construction plan, while the jump gate of the ship's system needs materials (slice 6.6).
+    /// with the construction plan, while the jump gate of the ship's system needs materials (slice 6.6). A ship abroad, or on a
+    /// trade trip that takes it abroad, can only trade (PLAN.md slice 6.29, D96): every other plan works at home (D60).
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="contractWantsOre">Whether the contract plan's contract still wants ore.</param>
+    /// <param name="abroad">
+    /// Whether the ship is going outside the systems the plans do business in (<see cref="BusinessSystems"/>); a ship outside
+    /// them counts as abroad anyway.
+    /// </param>
     /// <returns>Its roles, in the order survey, mine, siphon, trade, construct.</returns>
-    public IReadOnlyList<FleetRole> Available(ShipModel ship, bool contractWantsOre)
-        => [.. FleetRoles.PotentialRoles(ship).Where(role => role switch
+    public IReadOnlyList<FleetRole> Available(ShipModel ship, bool contractWantsOre, bool abroad = false)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+
+        var away = abroad || (BusinessSystems.Count > 0 && !BusinessSystems.Contains(ship.SystemSymbol ?? string.Empty));
+        return [.. FleetRoles.PotentialRoles(ship).Where(role => role switch
         {
+            FleetRole.Trade => Switches.Contains(AutomationPlan.Trading),
+            _ when away => false,
             FleetRole.Survey => Switches.Contains(AutomationPlan.Survey),
             FleetRole.Mine => Switches.Contains(AutomationPlan.Mining) || contractWantsOre,
             FleetRole.Siphon => Switches.Contains(AutomationPlan.Siphon),
-            FleetRole.Trade => Switches.Contains(AutomationPlan.Trading),
             FleetRole.Construct => Switches.Contains(AutomationPlan.Construction) && ConstructionSystems.Contains(ship.SystemSymbol ?? string.Empty),
             _ => false,
         })];
+    }
 
     /// <summary>A percentage setting: 0 or more; missing or unreadable means the default.</summary>
     private static async Task<int> PercentAsync(ISettingsRepository settings, string key, int defaultValue, CancellationToken cancellationToken)

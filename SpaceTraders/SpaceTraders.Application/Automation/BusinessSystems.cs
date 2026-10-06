@@ -8,7 +8,8 @@ namespace SpaceTraders.Application.Automation;
 /// The systems the plans do business in (asked on 2026-10-04, while the command ship explores: "For now: come home. Long
 /// term: plans should just work across systems … But let's start simple"): the headquarters' system alone, as D60 meant
 /// (PLAN.md slice 6.28). What a ship finds elsewhere is information, for the systems dashboard: no plan buys a ship, or plans
-/// work, in a system because the explorer, a probe that watches its markets, or later a trader is in it.
+/// work, in a system because the explorer, a probe that watches its markets, or a trader is in it. Only the trading plan's
+/// traders cross systems (slice 6.29, D96), and the role board gives a ship abroad the trade role alone.
 /// </summary>
 public static class BusinessSystems
 {

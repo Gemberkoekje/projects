@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Queries;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Infrastructure.Persistence;
@@ -384,6 +385,9 @@ public static class StatusEndpoints
         route.TradeSymbol,
         route.BuyWaypointSymbol,
         route.SellWaypointSymbol,
+        BuySystemSymbol = WaypointSymbols.SystemOf(route.BuyWaypointSymbol),
+        SellSystemSymbol = WaypointSymbols.SystemOf(route.SellWaypointSymbol),
+        route.Jumps,
         route.Units,
         route.ExpectedProfit,
         ProfitPerUnit = route.Units > 0 ? route.ExpectedProfit / route.Units : 0,

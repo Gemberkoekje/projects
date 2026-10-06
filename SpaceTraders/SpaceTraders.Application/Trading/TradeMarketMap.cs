@@ -1,11 +1,14 @@
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Trading;
 
 /// <summary>
-/// What a trade decision reads about one system (PLAN.md slice 6.5): where each waypoint is, what
-/// each market buys and sells at the prices last seen there, and the game's production chains.
+/// What a trade decision reads about one system (PLAN.md slice 6.5), or, for the trading plan, about the systems within its
+/// reach (slice 6.29, D96): where each waypoint is, what each market buys and sells at the prices last seen there, the game's
+/// production chains, and the ways between the systems through their jump gates (<see cref="Gates"/>). Distances are measured
+/// within a system only: a waypoint of another system is reached by its gates.
 /// </summary>
 /// <remarks>Immutable once built, so it can be shared between the decisions of one pass.</remarks>
 public sealed class TradeMarketMap
@@ -16,7 +19,10 @@ public sealed class TradeMarketMap
     private const string ExchangeType = "EXCHANGE";
     private const string AbundantSupply = "ABUNDANT";
 
+    private static readonly IReadOnlySet<string> NoMarkets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     private readonly Dictionary<string, (int X, int Y)> _positions;
+    private readonly Dictionary<string, string> _systems;
     private readonly Dictionary<string, Dictionary<string, TradeGoodSnapshot>> _goods;
     private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _madeFrom;
     private readonly HashSet<string> _madeInto;
@@ -24,9 +30,9 @@ public sealed class TradeMarketMap
     private readonly IReadOnlySet<string> _constructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _goingIntoConstruction = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Builds the map of one system.</summary>
-    /// <param name="waypoints">The system's waypoints, with their coordinates.</param>
-    /// <param name="markets">The system's markets, with the goods and prices last seen there.</param>
+    /// <summary>Builds the map of one system, or of several (slice 6.29).</summary>
+    /// <param name="waypoints">The systems' waypoints, with their coordinates.</param>
+    /// <param name="markets">The systems' markets, with the goods and prices last seen there.</param>
     /// <param name="madeFrom">The production chains: for each good, the goods it is made from.</param>
     public TradeMarketMap(
         IEnumerable<WaypointCacheModel> waypoints,
@@ -39,6 +45,9 @@ public sealed class TradeMarketMap
 
         Waypoints = [.. waypoints.GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase).Select(group => group.First())];
         _positions = Waypoints.ToDictionary(waypoint => waypoint.Symbol, waypoint => (waypoint.X, waypoint.Y), StringComparer.OrdinalIgnoreCase);
+        _systems = Waypoints
+            .Where(waypoint => !string.IsNullOrWhiteSpace(waypoint.SystemSymbol))
+            .ToDictionary(waypoint => waypoint.Symbol, waypoint => waypoint.SystemSymbol, StringComparer.OrdinalIgnoreCase);
         _goods = markets
             .GroupBy(market => market.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -57,11 +66,46 @@ public sealed class TradeMarketMap
         _averageFuelPrice = fuelPrices.Count == 0 ? 0 : (long)Math.Ceiling(fuelPrices.Average());
     }
 
-    /// <summary>The system's waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
+    /// <summary>A copy that shares everything with <paramref name="other"/> (<see cref="WithoutJumps"/>).</summary>
+    private TradeMarketMap(TradeMarketMap other)
+    {
+        Waypoints = other.Waypoints;
+        _positions = other._positions;
+        _systems = other._systems;
+        _goods = other._goods;
+        _madeFrom = other._madeFrom;
+        _madeInto = other._madeInto;
+        _averageFuelPrice = other._averageFuelPrice;
+        _constructionMaterials = other._constructionMaterials;
+        _goingIntoConstruction = other._goingIntoConstruction;
+        ConstructionSystemSymbol = other.ConstructionSystemSymbol;
+        StaleMarkets = other.StaleMarkets;
+    }
+
+    /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
     public IReadOnlyList<WaypointCacheModel> Waypoints { get; }
+
+    /// <summary>
+    /// The flights planned on this map, by start, end, fuel aboard and tank (slice 6.29): a pass weighs the same haul for every
+    /// good two markets trade, and every trader, so each is planned once (<see cref="TradeRoutePlanner.TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).
+    /// </summary>
+    internal System.Collections.Concurrent.ConcurrentDictionary<string, (bool Found, TradeFlight Flight)> Flights { get; }
+        = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The waypoints that have a market with known prices.</summary>
     public IReadOnlyCollection<string> MarketWaypoints => _goods.Keys;
+
+    /// <summary>
+    /// The ways between the map's systems through their jump gates (slice 6.29, D96): <see cref="TradeGates.None"/> unless set,
+    /// and then a waypoint of another system is out of reach.
+    /// </summary>
+    public TradeGates Gates { get; init; } = TradeGates.None;
+
+    /// <summary>
+    /// The markets whose prices are too old to choose a trade route by (D96: <c>Trade.MaxPriceAgeMinutes</c>, at home too): their
+    /// prices still say where fuel is sold, but no route buys or sells there. None unless set.
+    /// </summary>
+    public IReadOnlySet<string> StaleMarkets { get; init; } = NoMarkets;
 
     /// <summary>
     /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the
@@ -76,6 +120,40 @@ public sealed class TradeMarketMap
             _goingIntoConstruction = GoodsGoingInto(value, _madeFrom);
         }
     }
+
+    /// <summary>
+    /// The system whose jump gate needs <see cref="ConstructionMaterials"/> (D68: the headquarters'): only its markets feed the
+    /// gate (D89). Empty for any market, as a map of that one system has it.
+    /// </summary>
+    public string ConstructionSystemSymbol { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The same map without the ways between its systems (slice 6.29, D96): what a ship whose work is in its own system trades
+    /// by, a drone between its trips, say; and where a trip moves its sale to.
+    /// </summary>
+    /// <returns>The map, every waypoint of another system out of reach.</returns>
+    public TradeMarketMap WithoutJumps()
+        => ReferenceEquals(Gates, TradeGates.None) ? this : new TradeMarketMap(this);
+
+    /// <summary>The system a waypoint is in: as its cached waypoint says, else as its symbol does.</summary>
+    /// <param name="waypointSymbol">The waypoint.</param>
+    /// <returns>The system.</returns>
+    public string SystemOf(string waypointSymbol)
+    {
+        ArgumentNullException.ThrowIfNull(waypointSymbol);
+        return _systems.TryGetValue(waypointSymbol, out var system) ? system : WaypointSymbols.SystemOf(waypointSymbol);
+    }
+
+    /// <summary>Whether two waypoints are in the same system.</summary>
+    /// <param name="a">One waypoint.</param>
+    /// <param name="b">The other.</param>
+    /// <returns>True for the same system.</returns>
+    public bool SameSystem(string a, string b) => SystemOf(a).Equals(SystemOf(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether a market's prices are recent enough to choose a trade route by (<see cref="StaleMarkets"/>, D96).</summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <returns>True unless its prices are too old.</returns>
+    public bool IsFresh(string waypointSymbol) => !StaleMarkets.Contains(waypointSymbol);
 
     /// <summary>The goods a market lists, with their last known prices; empty for an unknown market.</summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
@@ -100,14 +178,14 @@ public sealed class TradeMarketMap
         return false;
     }
 
-    /// <summary>The straight-line distance between two waypoints, as the game measures it.</summary>
+    /// <summary>The straight-line distance between two waypoints of one system, as the game measures it.</summary>
     /// <param name="from">One waypoint.</param>
     /// <param name="to">The other waypoint.</param>
     /// <param name="distance">The distance.</param>
-    /// <returns>Whether both waypoints are on the map.</returns>
+    /// <returns>Whether both waypoints are on the map, in the same system: between systems a ship jumps (slice 6.29).</returns>
     public bool TryGetDistance(string from, string to, out double distance)
     {
-        if (_positions.TryGetValue(from, out var a) && _positions.TryGetValue(to, out var b))
+        if (_positions.TryGetValue(from, out var a) && _positions.TryGetValue(to, out var b) && SameSystem(from, to))
         {
             var dx = (double)b.X - a.X;
             var dy = (double)b.Y - a.Y;
@@ -201,6 +279,7 @@ public sealed class TradeMarketMap
     public string ConstructionMaterialMadeFrom(string waypointSymbol, string tradeSymbol)
     {
         if (ConstructionMaterials.Count == 0
+            || (ConstructionSystemSymbol.Length > 0 && !SystemOf(waypointSymbol).Equals(ConstructionSystemSymbol, StringComparison.OrdinalIgnoreCase))
             || !TryGetGood(waypointSymbol, tradeSymbol, out var input)
             || !input.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
             || input.Supply.Equals(AbundantSupply, StringComparison.OrdinalIgnoreCase))

@@ -2,12 +2,15 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Tests.Trading;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Goals;
@@ -36,6 +39,11 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly FullHoldSavings _savings = new();
+    private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
+    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
+    private readonly IOrbitSubCommand _orbit = Substitute.For<IOrbitSubCommand>();
+    private readonly IRefuelSubCommand _refuel = Substitute.For<IRefuelSubCommand>();
     private readonly LogRecorder _log = new();
 
     public TradeBetweenMarketsGoalExecutorTests()
@@ -674,6 +682,129 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         });
     }
 
+    [Fact]
+    public async Task ToABuyMarketAbroad_ItFliesToItsSystemsGateFirst()
+    {
+        // Slice 6.29 (D101): PLASTICS bought in X1-CD and sold in X1-EF. From K85 the way is the gate, 82 away, and a jump.
+        AcrossSystems();
+
+        var result = await StepAsync(CommandShip(K85), Plastics());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == TradeAcrossFixture.AbGate),
+            Arg.Any<CancellationToken>());
+        await _port.DidNotReceiveWithAnyArgs().JumpShipAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task AtTheGate_ItJumpsTowardsTheBuyMarketAbroad()
+    {
+        AcrossSystems();
+
+        var result = await StepAsync(CommandShip(TradeAcrossFixture.AbGate, "IN_ORBIT"), Plastics());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(1).JumpShipAsync("SHIP-1", TradeAcrossFixture.CdGate, Arg.Any<CancellationToken>());
+        await _bus.Received(1).PublishAsync(Arg.Is<ShipJumpedEvent>(jumped => jumped.Cost == TradeAcrossFixture.Antimatter), Arg.Any<DeliveryOptions?>());
+        _log.Journal.Should().ContainSingle(entry => entry.EventKind == "Jumped").Which.Properties["CooldownSeconds"].Should().Be(328);
+        await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task WithNoWayLeft_ATripWithNothingAboard_IsDropped()
+    {
+        // The gates the way went through are no longer usable: the trading plan chooses again.
+        AcrossSystems();
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns((ExplorePlanState?)null);
+
+        var result = await StepAsync(CommandShip(K85), Plastics());
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["Reason"], "no_way"));
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await _trips.Received(1).BookAsync("SHIP-1", Arg.Any<TradeBetweenMarketsGoal>(), "no_way", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task WithNoWayLeft_ATripWithItsCargoAboard_KeepsItAndWaits()
+    {
+        // 40 EQUIPMENT bought at K85 for X1-CD: selling them at home, or overboard (D42), would give away what they are worth
+        // there; the gates give a refused way back after an hour.
+        AcrossSystems();
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns((ExplorePlanState?)null);
+
+        var result = await StepAsync(Loaded(K85), Trip(bought: true, sellAt: TradeAcrossFixture.CdMarket));
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Reason.Should().Contain("waits");
+        _log.Journal.Should().NotContain(e => e.EventKind == "TradeDropped" || e.EventKind == "TradeRerouted");
+        await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<NavigateToWaypointCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AtTheGate_WithTooFewCreditsToJump_ATripWithItsCargoWaitsForThem()
+    {
+        // D63: the antimatter, 5,000, would leave less than the floor of 60,000 of the 62,000 credits.
+        AcrossSystems(credits: 62_000);
+
+        var result = await StepAsync(Loaded(TradeAcrossFixture.AbGate, status: "IN_ORBIT"), Trip(bought: true, sellAt: TradeAcrossFixture.CdMarket));
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.DidNotReceiveWithAnyArgs().JumpShipAsync(default!, default!, default);
+        await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task AtTheBuyMarket_ATripThatSellsAbroad_KeepsBackItsAntimatterAndTheFloor()
+    {
+        // Of 150,000 the batches may spend what is left after the haul's fuel (170), its jump's antimatter (5,000) and the
+        // floor every jump leaves (60,000): 26 at 3,254. The ship can then always jump on with its cargo (D63).
+        AcrossSystems(credits: 150_000);
+        BuyReturns(units: 26, total: 26 * 3_254);
+
+        var result = await StepAsync(CommandShip(K85), Trip(sellAt: TradeAcrossFixture.CdMarket) with { Units = 26 });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 26, Arg.Any<CancellationToken>());
+        await _tradeContexts.Received().ReadReachAsync(SystemSymbol, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>PLASTICS bought in X1-CD and sold in X1-EF (slice 6.29).</summary>
+    private static TradeBetweenMarketsGoal Plastics() => new()
+    {
+        TradeSymbol = "PLASTICS",
+        BuyWaypointSymbol = TradeAcrossFixture.CdMarket,
+        SellWaypointSymbol = TradeAcrossFixture.EfMarket,
+        Units = 40,
+        ExpectedProfit = 29_000,
+        Jumps = 2,
+    };
+
+    /// <summary>
+    /// The three systems of <see cref="TradeAcrossFixture"/>, as the trade contexts and the gates read them; the floor 60,000, and
+    /// a jump to X1-CD's gate costing 5,000 and leaving a cooldown of 328 seconds.
+    /// </summary>
+    private void AcrossSystems(long credits = Credits)
+    {
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(TradeAcrossFixture.AcrossMap(), credits));
+        _tradeContexts.ReadReachAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(TradeAcrossFixture.AcrossMap(), credits));
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, A1, credits, "COSMIC", 3));
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns(TradeAcrossFixture.Network());
+        _settings.GetAsync<long>(CreditReserve.FloorSetting, Arg.Any<CancellationToken>()).Returns(TradeAcrossFixture.Floor);
+        _markets.FindSnapshotByWaypointAsync(TradeAcrossFixture.AbGate, Arg.Any<CancellationToken>()).Returns(Market(
+            TradeAcrossFixture.AbGate,
+            Good("ANTIMATTER", "EXCHANGE", (int)TradeAcrossFixture.Antimatter, 4_800, 10),
+            Good("FUEL", "EXCHANGE", 90, 80, 180)));
+        _port.JumpShipAsync("SHIP-1", TradeAcrossFixture.CdGate, Arg.Any<CancellationToken>()).Returns(new JumpActionResult(
+            new NavModel("IN_ORBIT", TradeAcrossFixture.Cd, TradeAcrossFixture.CdGate, "CRUISE", TradeAcrossFixture.CdGate, DateTimeOffset.UtcNow),
+            328,
+            DateTimeOffset.UtcNow.AddSeconds(328),
+            TradeAcrossFixture.Antimatter,
+            credits - TradeAcrossFixture.Antimatter));
+    }
+
     /// <summary>The trade trips of the fleet, by ship, as the goal store reads them (D57).</summary>
     private void TripsHoldBack(params (string Ship, TradeBetweenMarketsGoal Trip)[] trips)
     {
@@ -704,6 +835,7 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
                 _bus,
                 _trips,
                 _savings,
+                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, new JumpRefusals(), _tradeContexts, _dock, _orbit, _refuel, _bus, _log.For<GoalJumps>()),
                 _log.For<TradeBetweenMarketsGoalExecutor>())
             .ExecuteStepAsync(ship, trip, new ShipGoalContext(), CancellationToken.None);
 }

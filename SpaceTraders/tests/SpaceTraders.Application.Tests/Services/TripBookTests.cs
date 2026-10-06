@@ -127,6 +127,26 @@ public sealed class TripBookTests
     };
 
     /// <summary>The ship's fuel purchases in the ledger, as the trip book asks for them: from the trip's start on.</summary>
+    [Fact]
+    public async Task ATripThroughTheGates_IsBookedAfterItsAntimatter()
+    {
+        // Slice 6.29: "each trip's profit after antimatter in the ledger". Two jumps at 5,024 and 5,500.
+        var startedAt = TimeProvider.System.GetUtcNow().AddMinutes(-20);
+        FuelBought("SPECTER-2", startedAt, 270);
+        _ledger.GetRangeAsync(startedAt, Arg.Any<DateTimeOffset?>(), "SPECTER-2", LedgerCategory.AntimatterPurchase, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([
+                new LedgerEntryDto(1, startedAt.AddMinutes(4), "SPECTER-2", null, nameof(LedgerCategory.AntimatterPurchase), -5_024, "ANTIMATTER", 5_024, 1, "X1-AB-G"),
+                new LedgerEntryDto(2, startedAt.AddMinutes(12), "SPECTER-2", null, nameof(LedgerCategory.AntimatterPurchase), -5_500, "ANTIMATTER", 5_500, 1, "X1-CD-G"),
+            ]);
+
+        await Book().BookAsync("SPECTER-2", Trade(startedAt) with { Earned = 240_000, Spent = 130_160 }, TripBook.Sold, CancellationToken.None);
+
+        var line = _log.Journal.Should().ContainSingle().Subject;
+        line.Message.Should().Be("TripEnded: ship SPECTER-2 made 99046 credits on its trade trip in 20 minutes: sold for 240000, bought for 130160, fuel 270, antimatter 10524 (sold).");
+        line.Properties["AntimatterCost"].Should().Be(10_524L);
+        _metrics.Received(1).TripProfit("trade", 99_046);
+    }
+
     private void FuelBought(string shipSymbol, DateTimeOffset since, params long[] costs)
         => _ledger.GetRangeAsync(since, Arg.Any<DateTimeOffset?>(), shipSymbol, LedgerCategory.FuelPurchase, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(costs

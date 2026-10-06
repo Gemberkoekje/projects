@@ -1,4 +1,6 @@
+using System.Globalization;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -11,7 +13,9 @@ namespace SpaceTraders.Application.Trading;
 /// <list type="bullet">
 ///   <item>a trip's profit is what the sell market pays minus what the buy market charges, per unit,
 ///   times the units, minus the fuel for the trip: from where the ship is to the buy market, and on to
-///   the sell market;</item>
+///   the sell market; on a map of the systems within the trading plan's reach (slice 6.29, D96), a market of another system
+///   is reached through the gates, within <c>Trade.MaxHaulDistance</c> jumps, and the antimatter of the jumps is a cost
+///   too;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
 ///   <item>among lucrative trips, first those that feed a market making a material the jump gate still needs (D89), last those
 ///   to a market that exchanges the good (D91), and otherwise the one that earns most an hour over the whole trip from where
@@ -331,15 +335,19 @@ public static class TradeRoutePlanner
     /// otherwise through markets that sell fuel, refuelling at each, every hop within a full tank. The
     /// fewest stops win, then the cheapest fuel: a stop costs a dock, a refuel, an orbit and a market
     /// refresh, more than the few credits another way could save. The cost is the fuel bought on
-    /// arrival at each stop, the destination included.
+    /// arrival at each stop, the destination included. To a waypoint of another system (slice 6.29, D101): to the gate, the
+    /// jumps of the fewest-jump way the map's gates know (<see cref="TradeMarketMap.Gates"/>), and on from the last gate; the
+    /// jumps burn no fuel, and cost their antimatter.
     /// </summary>
-    /// <param name="map">The system.</param>
+    /// <param name="map">The system, or the systems within the trading plan's reach.</param>
     /// <param name="from">Where the flight starts.</param>
     /// <param name="to">Where it ends.</param>
     /// <param name="fuelAtStart">The fuel aboard on leaving <paramref name="from"/>.</param>
     /// <param name="fuelCapacity">What the tank holds, as filled at each stop.</param>
-    /// <param name="flight">The stops, the destination last, and the fuel they cost.</param>
-    /// <returns>False when a position is unknown, or no chain of fuel markets reaches the destination.</returns>
+    /// <param name="flight">The stops, the destination last, the fuel they cost, and the jumps with their antimatter.</param>
+    /// <returns>
+    /// False when a position is unknown, no chain of fuel markets reaches the destination, or no way through the gates does.
+    /// </returns>
     public static bool TryPlanFlight(
         TradeMarketMap map,
         string from,
@@ -349,7 +357,84 @@ public static class TradeRoutePlanner
         out TradeFlight flight)
     {
         ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
 
+        var planned = map.Flights.GetOrAdd(
+            string.Create(CultureInfo.InvariantCulture, $"{from}>{to}|{fuelAtStart}|{fuelCapacity}"),
+            _ => map.SameSystem(from, to)
+                ? (TryPlanFlightWithin(map, from, to, fuelAtStart, fuelCapacity, out var within), within)
+                : (TryPlanFlightBetween(map, from, to, fuelAtStart, fuelCapacity, out var between), between));
+        flight = planned.Flight;
+        return planned.Found;
+    }
+
+    /// <summary>
+    /// How a ship flies from where it is to a waypoint (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>):
+    /// a ship docked where fuel is sold fills its tank before it leaves.
+    /// </summary>
+    /// <param name="map">The ship's system.</param>
+    /// <param name="ship">The ship, where it is now.</param>
+    /// <param name="destination">Where it is going.</param>
+    /// <param name="flight">The stops, the destination last, and the fuel they cost.</param>
+    /// <returns>False when a position is unknown, or no chain of fuel markets reaches the destination.</returns>
+    public static bool TryPlanFlight(TradeMarketMap map, ShipModel ship, string destination, out TradeFlight flight)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        return TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, destination, FuelAtDeparture(map, ship), ship.FuelCapacity, out flight);
+    }
+
+    /// <summary>
+    /// A flight to another system (slice 6.29, D101): the flight to the gate of the system the ship is in, the jumps, and the
+    /// flight from the last gate. A ship jumps from orbit, so it fills no tank at a gate it jumps from; where the gate it jumps to
+    /// sells fuel, it fills its tank there before it flies on (<c>GoalFlight</c> docks for it when a full tank flies the leg
+    /// differently).
+    /// </summary>
+    private static bool TryPlanFlightBetween(
+        TradeMarketMap map,
+        string from,
+        string to,
+        int fuelAtStart,
+        int fuelCapacity,
+        out TradeFlight flight)
+    {
+        flight = new TradeFlight([], 0, fuelAtStart);
+        if (!map.Gates.TryFindWay(map.SystemOf(from), map.SystemOf(to), out var jumps)
+            || jumps.Count == 0
+            || !TryPlanFlightWithin(map, from, jumps[0].GateWaypointSymbol, fuelAtStart, fuelCapacity, out var toGate))
+        {
+            return false;
+        }
+
+        var lastGate = jumps[^1].DestinationGateWaypointSymbol;
+        var fuelAtLastGate = map.SellsFuel(lastGate) ? fuelCapacity : toGate.FuelLeft;
+        if (!TryPlanFlightWithin(map, lastGate, to, fuelAtLastGate, fuelCapacity, out var fromGate))
+        {
+            return false;
+        }
+
+        flight = new TradeFlight(
+            [.. toGate.Stops, .. jumps.Select(jump => jump.DestinationGateWaypointSymbol), .. fromGate.Stops],
+            toGate.FuelCost + fromGate.FuelCost,
+            fromGate.FuelLeft)
+        {
+            Jumps = jumps,
+            AntimatterCost = jumps.Sum(jump => map.Gates.AntimatterAt(jump.GateWaypointSymbol)),
+        };
+        return true;
+    }
+
+    /// <summary>A flight within one system (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).</summary>
+    private static bool TryPlanFlightWithin(
+        TradeMarketMap map,
+        string from,
+        string to,
+        int fuelAtStart,
+        int fuelCapacity,
+        out TradeFlight flight)
+    {
         flight = new TradeFlight([], 0, fuelAtStart);
         if (from.Equals(to, StringComparison.OrdinalIgnoreCase))
         {
@@ -368,11 +453,11 @@ public static class TradeRoutePlanner
             return true;
         }
 
-        // Dijkstra over the markets that sell fuel: fewest stops first, then the cheapest fuel.
+        // Dijkstra over the system's markets that sell fuel: fewest stops first, then the cheapest fuel.
         List<string> stations =
         [
             .. map.MarketWaypoints
-                .Where(market => map.SellsFuel(market) && !market.Equals(from, StringComparison.OrdinalIgnoreCase))
+                .Where(market => map.SellsFuel(market) && !market.Equals(from, StringComparison.OrdinalIgnoreCase) && map.SameSystem(market, to))
                 .Append(to)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.Ordinal),
@@ -433,23 +518,6 @@ public static class TradeRoutePlanner
         stops.Reverse();
         flight = new TradeFlight(stops, best[to].Cost, fuelCapacity - best[to].LastLeg);
         return true;
-    }
-
-    /// <summary>
-    /// How a ship flies from where it is to a waypoint (<see cref="TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>):
-    /// a ship docked where fuel is sold fills its tank before it leaves.
-    /// </summary>
-    /// <param name="map">The ship's system.</param>
-    /// <param name="ship">The ship, where it is now.</param>
-    /// <param name="destination">Where it is going.</param>
-    /// <param name="flight">The stops, the destination last, and the fuel they cost.</param>
-    /// <returns>False when a position is unknown, or no chain of fuel markets reaches the destination.</returns>
-    public static bool TryPlanFlight(TradeMarketMap map, ShipModel ship, string destination, out TradeFlight flight)
-    {
-        ArgumentNullException.ThrowIfNull(map);
-        ArgumentNullException.ThrowIfNull(ship);
-
-        return TryPlanFlight(map, ship.WaypointSymbol ?? string.Empty, destination, FuelAtDeparture(map, ship), ship.FuelCapacity, out flight);
     }
 
     /// <summary>
@@ -721,7 +789,9 @@ public static class TradeRoutePlanner
     /// Runs Rank's checks on every route with a price gap that no other trader holds, of a good no other trip is on its way to
     /// buy at that market (D80): the lucrative routes go to <paramref name="routes"/>, and with <paramref name="judgements"/>
     /// every route goes there too, with the first check it fails (Judge). A delivery that feeds a material the jump gate still
-    /// needs counts at no gap too: its goods only have to sell for what they cost (D90).
+    /// needs counts at no gap too: its goods only have to sell for what they cost (D90). Only markets whose prices are recent
+    /// count (<see cref="TradeMarketMap.IsFresh"/>, D96); in another system a market counts within the gates' reach, the buy
+    /// market's from where the ship is, the sell market's from the buy market (<see cref="TradeGates.MaxJumps"/>).
     /// </summary>
     private static void CheckRoutes(
         TradeMarketMap map,
@@ -741,7 +811,7 @@ public static class TradeRoutePlanner
         var here = ship.WaypointSymbol ?? string.Empty;
         var fuelAtStart = FuelAtDeparture(map, ship);
         var speed = FleetRoles.EngineSpeed(ship, TripTime.DefaultEngineSpeed);
-        foreach (var buy in map.MarketWaypoints)
+        foreach (var buy in map.MarketWaypoints.Where(map.IsFresh))
         {
             var goods = map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0).ToList();
             if (goods.Count == 0)
@@ -760,6 +830,7 @@ public static class TradeRoutePlanner
                 foreach (var sell in map.MarketWaypoints)
                 {
                     if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
+                        || !map.IsFresh(sell)
                         || !map.TryGetGood(sell, good.Symbol, out var atSell)
                         || atSell.SellPrice < good.PurchasePrice
                         || (atSell.SellPrice == good.PurchasePrice && map.ConstructionMaterialMadeFrom(sell, good.Symbol).Length == 0)
@@ -795,7 +866,10 @@ public static class TradeRoutePlanner
     /// Works out a route from its buy market on, the flight there being <paramref name="approach"/>: as many units as each earn
     /// <paramref name="minProfitPerUnit"/>, each batch bought a step dearer and each sold a step cheaper than the one before
     /// (D79, <see cref="PriceSteps"/>), up to the free hold and what the credits pay for once the trip's fuel is kept back; and
-    /// the whole trip's time, at the engine's <paramref name="speed"/> (D95, <see cref="TripTime.TradeSeconds"/>).
+    /// the whole trip's time, at the engine's <paramref name="speed"/> (D95, <see cref="TripTime.TradeSeconds"/>). A trip through
+    /// the gates (slice 6.29) counts its antimatter as it counts its fuel, and keeps back the credit floor every jump must leave
+    /// as well (D63), so that it can always jump on with its cargo; its jumps' cooldowns count in its time where they hold the
+    /// ship.
     /// </summary>
     /// <param name="failed">
     /// When it can't be flown or traded, the first check it fails: a market, a price or a trade volume unknown, or no room in
@@ -850,15 +924,18 @@ public static class TradeRoutePlanner
         }
 
         var fuelCost = approach.FuelCost + haul.FuelCost;
-        route = route with { FuelCost = fuelCost };
+        var antimatter = approach.AntimatterCost + haul.AntimatterCost;
+        var jumps = approach.Jumps.Count + haul.Jumps.Count;
+        route = route with { FuelCost = fuelCost, AntimatterCost = antimatter, Jumps = jumps };
         var free = ship.CargoCapacity - ship.CargoCurrent;
         if (free <= 0)
         {
             return false;
         }
 
-        // D79: unit by unit, while the next earns the minimum and the credits left after the trip's fuel pay for it.
-        var budget = Math.Max(0, credits - fuelCost);
+        // D79: unit by unit, while the next earns the minimum and the credits left after the trip's fuel pay for it; through the
+        // gates, after its antimatter and the floor every jump leaves too (D63).
+        var budget = Math.Max(0, credits - fuelCost - antimatter - (jumps > 0 ? map.Gates.CreditFloor : 0));
         var units = 0;
         var cost = 0.0;
         var revenue = 0.0;
@@ -897,16 +974,43 @@ public static class TradeRoutePlanner
             atBuy.PurchasePrice,
             atSell.SellPrice,
             fuelCost,
-            (long)Math.Floor(revenue + Sliver) - cargoCost - fuelCost,
+            (long)Math.Floor(revenue + Sliver) - cargoCost - fuelCost - antimatter,
             map.PricierGoodMadeFrom(sellWaypointSymbol, tradeSymbol))
         {
             CargoCost = cargoCost,
+            AntimatterCost = antimatter,
+            Jumps = jumps,
             FeedsProduction = !map.IsEndProduct(tradeSymbol) && !toExchange,
             ConstructionMaterial = material,
             ToExchange = toExchange,
-            Seconds = TripTime.TradeSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, buyWaypointSymbol, haul.Stops, speed),
+            Seconds = TripTime.TradeSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, buyWaypointSymbol, haul.Stops, speed, CooldownLeft(map, ship)),
         };
         return true;
+    }
+
+    /// <summary>
+    /// The seconds left of the ship's cooldown when the map's gates were judged (slice 6.29): a jump waits for it, a flight
+    /// doesn't. 0 for a map without gates.
+    /// </summary>
+    private static double CooldownLeft(TradeMarketMap map, ShipModel ship)
+        => ship.CooldownExpiresAt is { } expires && !ReferenceEquals(map.Gates, TradeGates.None)
+            ? Math.Max(0, (expires - map.Gates.Now).TotalSeconds)
+            : 0;
+
+    /// <summary>
+    /// What a trip keeps back for the way still ahead of it (slice 6.29): the fuel and the antimatter of <paramref name="flight"/>,
+    /// and when the flight jumps, the credit floor every jump must leave (D63). The trade executor buys its batches with the
+    /// credits above it, so a ship with cargo can always jump on.
+    /// </summary>
+    /// <param name="map">The map the flight was planned on.</param>
+    /// <param name="flight">The way still ahead.</param>
+    /// <returns>The credits kept back.</returns>
+    public static long KeptBackFor(TradeMarketMap map, TradeFlight flight)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(flight);
+
+        return flight.FuelCost + flight.AntimatterCost + (flight.Jumps.Count > 0 ? map.Gates.CreditFloor : 0);
     }
 
     /// <summary>
@@ -955,7 +1059,7 @@ public static class TradeRoutePlanner
                 continue;
             }
 
-            var candidate = new TradeSale(market, good.SellPrice, flight.FuelCost, ((long)good.SellPrice * units) - flight.FuelCost);
+            var candidate = new TradeSale(market, good.SellPrice, flight.FuelCost, ((long)good.SellPrice * units) - flight.FuelCost - flight.AntimatterCost);
             var tier = supplyFirst && candidate.NetRevenue > 0 ? SaleTier(map, market, tradeSymbol) : UnpaidSaleTier;
             var isHere = market.Equals(here, StringComparison.OrdinalIgnoreCase);
             if (!found
@@ -1083,6 +1187,12 @@ public sealed record TradeFlight
 
     /// <summary>The fuel aboard on arrival at the destination.</summary>
     public required int FuelLeft { get; init; }
+
+    /// <summary>The jumps of a flight to another system, in order (slice 6.29); none within a system.</summary>
+    public IReadOnlyList<GateJump> Jumps { get; init; } = [];
+
+    /// <summary>What the jumps cost: one ANTIMATTER at the market of each gate it jumps from (D63).</summary>
+    public long AntimatterCost { get; init; }
 }
 
 /// <summary>One trip of a trade route, as the planner works it out.</summary>
@@ -1143,8 +1253,14 @@ public sealed record TradeRoute
     /// <summary>The fuel for the trip: to the buy market, then on to the sell market.</summary>
     public required long FuelCost { get; init; }
 
-    /// <summary>What the trip earns after fuel.</summary>
+    /// <summary>What the trip earns after fuel, and after the antimatter of its jumps (slice 6.29).</summary>
     public required long Profit { get; init; }
+
+    /// <summary>The jumps the trip takes through the gates, to the buy market and on to the sell market (slice 6.29); 0 within a system.</summary>
+    public int Jumps { get; init; }
+
+    /// <summary>What its jumps cost: one ANTIMATTER at each gate it jumps from (D63). 0 unless set.</summary>
+    public long AntimatterCost { get; init; }
 
     /// <summary>The pricier good the sell market makes from the good, or empty.</summary>
     public required string FeedsTradeSymbol { get; init; }
@@ -1207,7 +1323,7 @@ public sealed record TradeRoute
     /// <param name="minProfitPerUnit">The minimum profit per unit; 0 or less means any profit.</param>
     /// <returns>True when the trip is worth taking.</returns>
     public bool IsWorthIt(int minProfitPerUnit)
-        => FeedsConstruction ? Units > 0 && Profit + FuelCost >= 0 : IsLucrative(minProfitPerUnit);
+        => FeedsConstruction ? Units > 0 && Profit + FuelCost + AntimatterCost >= 0 : IsLucrative(minProfitPerUnit);
 }
 
 /// <summary>Where cargo is sold, and what it fetches there.</summary>

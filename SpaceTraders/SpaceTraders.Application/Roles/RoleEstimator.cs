@@ -25,6 +25,7 @@ public sealed record RoleContext
         this.FuelReserveCredits = FuelReserveCredits;
         this.Chains = Chains;
         this.Rates = Rates;
+        TradeMap = Mining.Map;
     }
 
     /// <summary>The system's map, its usable surveys, the credits and the time.</summary>
@@ -56,6 +57,12 @@ public sealed record RoleContext
 
     /// <summary>The system's map.</summary>
     public TradeMarketMap Map => Mining.Map;
+
+    /// <summary>
+    /// The map a ship's trade estimates come from (PLAN.md slice 6.29, D96): the systems within the trade reach, as the trading
+    /// plan ranks a trader's routes by. The system's own map unless set.
+    /// </summary>
+    public TradeMarketMap TradeMap { get; init; }
 }
 
 /// <summary>
@@ -211,7 +218,8 @@ public static class RoleEstimator
 
     private static List<RoleOption> TradeOptions(RoleContext context, ShipModel ship)
     {
-        var map = context.Map;
+        // Slice 6.29: the routes the trading plan would give the ship as a trader, across the systems in reach.
+        var map = context.TradeMap;
         var credits = Math.Max(0, context.Mining.Credits - context.FuelReserveCredits);
 
         // B67: the routes the other ships' trips hold, and the goods they are on their way to buy at a market (D80), aren't this

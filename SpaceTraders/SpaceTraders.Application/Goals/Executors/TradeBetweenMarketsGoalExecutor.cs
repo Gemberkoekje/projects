@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
@@ -39,6 +40,16 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// fuel allows it (<see cref="GoalFlight"/>, D84), which costs more fuel than it counts, an extra cost accepted on
 /// 2026-10-05 ("I accept the extra fuel costs this brings"). A ship left in DRIFT is switched out of it before it flies
 /// (slice 6.10c).
+/// <para>
+/// A market in another system (PLAN.md slice 6.29, D96) is reached through the gates, as every flight between systems goes
+/// (<see cref="GoalJumps"/>, D101): to the gate, the jump once the cooldown and the credit floor allow it, and on from the
+/// gate the ship jumped to, refuelling at the markets there. At the buy market the trip is weighed with the haul still ahead
+/// of it, its antimatter and the credit floor every jump leaves (D63) kept back, so a ship with cargo can always jump on. A trip
+/// with nothing aboard that can't jump on (no way through the gates is known any more, the API refused the jump, or it would
+/// leave less than the floor) is dropped, and the trading plan chooses again. One with its cargo aboard keeps it and waits: for
+/// the way, which the gates give back an hour after a refusal, or at the gate for the credits. A trip moves its sale only
+/// within the system it sells in.
+/// </para>
 /// </summary>
 public sealed class TradeBetweenMarketsGoalExecutor(
     IShipRepository ships,
@@ -51,11 +62,13 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     IMessageBus bus,
     ITripBook trips,
     FullHoldSavings savings,
+    GoalJumps jumps,
     ILogger<TradeBetweenMarketsGoalExecutor> logger) : IShipGoalExecutor
 {
     private const string NotLucrative = "not_lucrative";
     private const string NotPossible = "not_possible";
     private const string NotBoughtHere = "not_bought_here";
+    private const string NoWay = "no_way";
     private const string CruiseMode = "CRUISE";
 
     /// <inheritdoc />
@@ -84,7 +97,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     {
         if (!IsAt(ship, trade.BuyWaypointSymbol))
         {
-            return await FlyTowardsAsync(ship, trade.BuyWaypointSymbol, ct);
+            return await FlyTowardsAsync(ship, trade, trade.BuyWaypointSymbol, ct);
         }
 
         if (ship.LocalStatus == ShipLocalStatus.InOrbit)
@@ -94,7 +107,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         }
 
         var system = ship.SystemSymbol ?? string.Empty;
-        var context = await tradeContexts.ReadAsync(system, ct);
+        var context = await HaulContextAsync(system, trade, ct);
 
         // D57: what the other trips hold back on their way to buy is theirs, construction trips' too (D64); what this one holds
         // back is its own to spend.
@@ -133,10 +146,11 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             }
         }
 
-        // D79: a batch at a time, each at the price quoted then, with the fuel still ahead kept back, while the next units
-        // still earn the minimum against what their sale is expected to fetch at the sell market, as last seen.
-        var fuelAhead = TradeRoutePlanner.TryPlanFlight(context.Map, ship, trade.SellWaypointSymbol, out var haul) ? haul.FuelCost : 0;
-        var spendable = Math.Max(0, credits - fuelAhead);
+        // D79: a batch at a time, each at the price quoted then, with the fuel still ahead kept back (through the gates, its
+        // antimatter and the credit floor too, D63), while the next units still earn the minimum against what their sale is
+        // expected to fetch at the sell market, as last seen.
+        var keptBack = TradeRoutePlanner.TryPlanFlight(context.Map, ship, trade.SellWaypointSymbol, out var haul) ? TradeRoutePlanner.KeptBackFor(context.Map, haul) : 0;
+        var spendable = Math.Max(0, credits - keptBack);
         var free = ship.CargoCapacity - ship.CargoCurrent;
         var map = context.Map;
         var current = trade;
@@ -164,7 +178,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
                 ReservedCredits = Math.Max(0, current.ReservedCredits - cost),
             };
             await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
-            map = (await tradeContexts.ReadAsync(system, ct)).Map;
+            map = (await HaulContextAsync(system, trade, ct)).Map;
         }
 
         if (bought == 0)
@@ -234,7 +248,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
 
         if (!IsAt(ship, trade.SellWaypointSymbol))
         {
-            return await FlyTowardsAsync(ship, trade.SellWaypointSymbol, ct);
+            return await FlyTowardsAsync(ship, trade, trade.SellWaypointSymbol, ct);
         }
 
         if (ship.LocalStatus == ShipLocalStatus.InOrbit)
@@ -385,13 +399,58 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     /// <summary>
     /// Flies towards a market: straight there when one tank will do, otherwise to the first market on the way where it can
     /// refuel, in BURN where the fuel allows (<see cref="GoalFlight"/>, D84). Each arrival refreshes that market's prices and
-    /// steps the goal again.
+    /// steps the goal again. To a market in another system, a step through the gates (<see cref="AbroadAsync"/>).
     /// </summary>
-    private async Task<GoalExecutionResult> FlyTowardsAsync(ShipModel ship, string destination, CancellationToken ct)
+    private async Task<GoalExecutionResult> FlyTowardsAsync(ShipModel ship, TradeBetweenMarketsGoal trade, string destination, CancellationToken ct)
     {
+        if (!string.Equals(ship.SystemSymbol, WaypointSymbols.SystemOf(destination), StringComparison.OrdinalIgnoreCase))
+        {
+            return await AbroadAsync(ship, trade, destination, ct);
+        }
+
         var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
         return await GoalFlight.TowardsAsync(context.Map, ship, destination, dock, bus, ct);
     }
+
+    /// <summary>
+    /// A step towards a market in another system (slice 6.29): a leg to the gate, or the jump from it (<see cref="GoalJumps"/>,
+    /// D101). When the ship can't jump on, a trip with nothing aboard is dropped, and the trading plan chooses again. One with
+    /// its cargo aboard keeps it and waits, where selling it in the system it is in, or jettisoning it (D42), would give its
+    /// value away: for the way, which the gates give back an hour after a refusal (<see cref="JumpRefusals"/>), or at the gate
+    /// for the credits, which the sales bring back. A wait longer than <c>Health.Ship.MaxMinutesWithoutChange</c> shows as
+    /// <c>ShipStuck</c>.
+    /// </summary>
+    private async Task<GoalExecutionResult> AbroadAsync(ShipModel ship, TradeBetweenMarketsGoal trade, string destination, CancellationToken ct)
+    {
+        var step = await jumps.TowardsAsync(ship, destination, ct);
+        var reason = step.Outcome switch
+        {
+            JumpStepOutcome.NoWay => NoWay,
+            JumpStepOutcome.Refused => GoalJumps.RefusedReason,
+            JumpStepOutcome.ShortOfCredits => NotPossible,
+            _ => string.Empty,
+        };
+        if (reason.Length == 0)
+        {
+            return step.Result;
+        }
+
+        if (Aboard(ship, trade.TradeSymbol) == 0)
+        {
+            return await DropAsync(ship, trade, reason, ct);
+        }
+
+        return GoalExecutionResult.Progressing($"{step.Result.Reason} The {trade.TradeSymbol} aboard waits to go on to {destination}.");
+    }
+
+    /// <summary>
+    /// What the trip is weighed with at its buy market: the system's map, or, for a sell market in another system (slice 6.29),
+    /// the map of the systems within the trade reach, so that the haul through the gates counts.
+    /// </summary>
+    private Task<TradeContext> HaulContextAsync(string system, TradeBetweenMarketsGoal trade, CancellationToken ct)
+        => string.Equals(system, WaypointSymbols.SystemOf(trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase)
+            ? tradeContexts.ReadAsync(system, ct)
+            : tradeContexts.ReadReachAsync(system, ct);
 
     /// <summary>
     /// Gives up a trip no longer worth it at the buy market (D14, D79): its units no longer earn the minimum a unit after fuel,

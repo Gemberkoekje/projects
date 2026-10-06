@@ -543,6 +543,34 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     }
 
     [Fact]
+    public async Task TradingRoutes_GiveTheSystemsAndTheJumpsOfARouteAcrossSystems()
+    {
+        // Slice 6.29 (D96): "the routes table gives the systems and jumps".
+        _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())
+            .Returns(new TradingAutomationPlanState
+            {
+                PlanId = Guid.NewGuid(),
+                CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Opportunities =
+                [
+                    TradingRoute("EQUIPMENT", "X1-FJ91-K94", "X1-HN44-A1", MarketAutomationOpportunityStatus.Assigned, 40, 104_670, string.Empty) with { AssignedShipSymbol = "SHIP-1", Jumps = 1 },
+                    TradingRoute("FOOD", "X1-FJ91-K94", "X1-FJ91-A1", MarketAutomationOpportunityStatus.Pending, 40, 9_620, string.Empty),
+                ],
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/trading-routes");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var routes = json.RootElement.GetProperty("routes");
+        (routes[0].GetProperty("buySystemSymbol").GetString(), routes[0].GetProperty("sellSystemSymbol").GetString(), routes[0].GetProperty("jumps").GetInt32())
+            .Should().Be(("X1-FJ91", "X1-HN44", 1));
+        (routes[1].GetProperty("buySystemSymbol").GetString(), routes[1].GetProperty("sellSystemSymbol").GetString(), routes[1].GetProperty("jumps").GetInt32())
+            .Should().Be(("X1-FJ91", "X1-FJ91", 0));
+    }
+
+    [Fact]
     public async Task TradingRoutes_BeforeTheTradingPlansFirstPass_AreNone()
     {
         _factory.PlanRepository.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, Arg.Any<CancellationToken>())

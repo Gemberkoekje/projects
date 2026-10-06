@@ -40,6 +40,10 @@ public interface ITradingAutomationService
 ///   first, to the trader it is best for. A route carries as many units as each earn <c>Trade.MinProfitPerUnit</c>, in batches
 ///   of each market's trade volume (D79). The credits are those no trip on its way to buy holds back, and a
 ///   trip holds back what its cargo costs from the moment it starts until it buys (D57, <see cref="TripReservations"/>);</item>
+///   <item>across systems (slice 6.29, D96): a ship whose role is trading takes routes across the systems within the trade
+///   reach of the system it is in (<see cref="ITradeContextReader.ReadReachAsync"/>), through the gates; every other trader,
+///   whose own work is in its system (a drone, a builder, a shuttle kept for a collection point), takes routes there. A trader
+///   stays where its last sale leaves it, and cargo it holds is sold, or jettisoned, in its system;</item>
 ///   <item>with the spare-time plan on, a ship that gathers in its spare time (the command ship, when the survey
 ///   plan has nothing for it) trades only for a route that waits for it once its hold is sold, after the other
 ///   traders (D34): then it sells its hold first, and a spare-time trip that fills its hold is interrupted for it.
@@ -187,26 +191,34 @@ public sealed class TradingAutomationService(
         var judged = new Dictionary<string, JudgedSystem>(StringComparer.OrdinalIgnoreCase);
         var idle = 0;
 
+        // D96, D83, D86: the shuttles kept for a collection point collect at home once a drone is parked there.
+        var collectionShuttles = await CollectionShuttlesAsync(cancellationToken);
+
         // A construction trip on its way to buy holds back its cargo as a trade trip does (slice 6.6, D64), and its material at its
         // buy market against other trips (D80).
         var constructionTrips = await goals.GetActiveConstructionGoalsAsync(cancellationToken);
         var constructionHolds = TripReservations.HeldBack(constructionTrips);
         foreach (var system in free.GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
-            var context = await tradeContexts.ReadAsync(system.Key, cancellationToken);
+            // Slice 6.29 (D96): the systems within the trade reach. A ship whose role is trading takes routes across them; one
+            // whose own work is in its system trades there, and sells what it holds there.
+            var context = await tradeContexts.ReadReachAsync(system.Key, cancellationToken);
+            var inSystem = context.Map.WithoutJumps();
+            TradeMarketMap MapOf(ShipModel ship) => CrossesSystems(board, ship, collectionShuttles) ? context.Map : inSystem;
+
             var traders = new List<ShipModel>();
             foreach (var ship in system.Where(ship => !gatherers.Contains(ship.Symbol)))
             {
-                if (TradeRoutePlanner.TryFindBestCargoSale(context.Map, ship, mustSell: false, out var cargo, out var sale))
+                if (TradeRoutePlanner.TryFindBestCargoSale(inSystem, ship, mustSell: false, out var cargo, out var sale))
                 {
-                    var goal = await SellHeldCargoAsync(context.Map, ship, cargo, sale, cancellationToken);
+                    var goal = await SellHeldCargoAsync(inSystem, ship, cargo, sale, cancellationToken);
                     held.Add(new HeldRoute(ship.Symbol, goal));
                     heldKeys.Add(held[^1].Key);
                 }
                 else
                 {
                     // Cargo that doesn't pay for its sale would only take room from the route (D42).
-                    traders.Add(await JettisonDeadCargoAsync(context.Map, ship, board, earmarked, materials, cancellationToken));
+                    traders.Add(await JettisonDeadCargoAsync(inSystem, ship, board, earmarked, materials, cancellationToken));
                 }
             }
 
@@ -218,13 +230,13 @@ public sealed class TradingAutomationService(
                 judged[system.Key] = new JudgedSystem(context.Map, judgements);
             }
 
-            var credits = await AssignRoutesAsync(context, traders, held, heldKeys, pending, judgements, constructionTrips, constructionHolds, cancellationToken);
+            var credits = await AssignRoutesAsync(context, MapOf, traders, held, heldKeys, pending, judgements, constructionTrips, constructionHolds, cancellationToken);
             idle += traders.Count;
 
-            // After the other traders: a ship that gathers in its spare time takes a route that is left for it.
+            // After the other traders: a ship that gathers in its spare time takes a route that is left for it, in its system.
             foreach (var ship in system.Where(ship => gatherers.Contains(ship.Symbol)))
             {
-                credits = await TradeInsteadOfGatheringAsync(context, credits, ship, onTrip.Contains(ship.Symbol), held, heldKeys, HeldBuysOf(held, constructionTrips), cancellationToken);
+                credits = await TradeInsteadOfGatheringAsync(context with { Map = inSystem }, credits, ship, onTrip.Contains(ship.Symbol), held, heldKeys, HeldBuysOf(held, constructionTrips), cancellationToken);
             }
         }
 
@@ -275,6 +287,25 @@ public sealed class TradingAutomationService(
                 .Select(material => material.TradeSymbol)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The shuttles the mining plan keeps for its collection points (slice 6.18, D83): each trades until one of its point's drones
+    /// is parked there (D86), and then collects, at home.
+    /// </summary>
+    private async Task<IReadOnlySet<string>> CollectionShuttlesAsync(CancellationToken cancellationToken)
+        => ((await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken))?.CollectionPoints ?? [])
+            .SelectMany(point => point.ShuttleSymbols)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether a trader takes routes across systems (slice 6.29, D96): one whose role is trading, the trade role on the board (with
+    /// the board off, a cargo ship), and not a shuttle kept for a collection point (D83, D86). A drone, which gathers first (D58),
+    /// a builder (D65), or the survey ship in its spare time (D34) trades in its own system between its trips, as its own work is
+    /// there, and every other plan works at home (D60): a trip abroad would leave that work undone.
+    /// </summary>
+    private static bool CrossesSystems(FleetRoleBoard board, ShipModel ship, IReadOnlySet<string> collectionShuttles)
+        => !collectionShuttles.Contains(ship.Symbol)
+            && (board.RolesOn ? board.RoleOf(ship) == FleetRole.Trade : FleetRoles.IsCargoShip(ship));
 
     /// <summary>
     /// Jettisons what a free ship holds that nothing will sell or use (D42), when no good aboard pays for its sale:
@@ -357,7 +388,9 @@ public sealed class TradingAutomationService(
         }
 
         var (shipyard, forSale) = offer[0];
-        var context = await tradeContexts.ReadAsync(shipyard.SystemSymbol, cancellationToken);
+
+        // Slice 6.29 (D96): a cargo ship trades across the systems in reach, so the routes that wait for one count there too.
+        var context = await tradeContexts.ReadReachAsync(shipyard.SystemSymbol, cancellationToken);
         var newShip = new ShipModel(
             "NEW-" + shipType,
             shipyard.SystemSymbol,
@@ -509,12 +542,15 @@ public sealed class TradingAutomationService(
     /// <summary>
     /// Gives the free traders of one system their routes, best route first: each round, the trader whose
     /// best route ranks highest gets it, and that route is no longer open to the others. A route's rate counts its trip from
-    /// where each trader is (D95), so of two traders the nearer one gets a route both could fly.
+    /// where each trader is (D95), so of two traders the nearer one gets a route both could fly. Each trader's routes are those
+    /// of its own map (<paramref name="mapOf"/>): the systems in reach, or its own system (slice 6.29).
     /// </summary>
+    /// <param name="mapOf">The map a trader's routes come from.</param>
     /// <param name="judgements">Gets how each trader's routes with a price gap fared (D76).</param>
     /// <returns>The credits left for cargo once the routes' purchases are counted.</returns>
     private async Task<long> AssignRoutesAsync(
         TradeContext context,
+        Func<ShipModel, TradeMarketMap> mapOf,
         List<ShipModel> traders,
         List<HeldRoute> held,
         HashSet<string> heldKeys,
@@ -534,8 +570,8 @@ public sealed class TradingAutomationService(
         var heldBuys = HeldBuysOf(held, constructionTrips);
         foreach (var trader in traders)
         {
-            NoteSaving(context, trader, credits, heldKeys, heldBuys);
-            var judged = TradeRoutePlanner.Judge(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
+            NoteSaving(mapOf(trader), context.MinProfitPerUnit, trader, credits, heldKeys, heldBuys);
+            var judged = TradeRoutePlanner.Judge(mapOf(trader), trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
             judgements.AddRange(judged);
             foreach (var route in judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route))
             {
@@ -554,7 +590,7 @@ public sealed class TradingAutomationService(
             var bestRoute = new TradeRoute(string.Empty, string.Empty, string.Empty, 0, 0, 0, 0, 0, string.Empty);
             foreach (var trader in traders)
             {
-                var routes = TradeRoutePlanner.Rank(context.Map, trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
+                var routes = TradeRoutePlanner.Rank(mapOf(trader), trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
                 if (routes.Count > 0 && (!found || TradeRoutePlanner.CompareBestFirst(routes[0], bestRoute) < 0))
                 {
                     bestShip = trader;
@@ -594,18 +630,20 @@ public sealed class TradingAutomationService(
     /// Meanwhile it takes the best trip it can pay for: fewer units, or another route. A trader whose best route is one it can
     /// pay for saves up for nothing more, unless that is the route it saved up for: then the saving lasts until it buys.
     /// </summary>
-    private void NoteSaving(TradeContext context, ShipModel trader, long credits, IReadOnlySet<string> heldKeys, HeldBuys heldBuys)
+    private void NoteSaving(TradeMarketMap map, int minProfitPerUnit, ShipModel trader, long credits, IReadOnlySet<string> heldKeys, HeldBuys heldBuys)
     {
-        var routes = TradeRoutePlanner.Rank(context.Map, trader, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys);
+        var routes = TradeRoutePlanner.Rank(map, trader, AnyCredits, minProfitPerUnit, heldKeys, heldBuys);
         if (routes.Count == 0)
         {
             savings.Clear(trader.Symbol);
             return;
         }
 
+        // Slice 6.29: a trip through the gates pays its antimatter too, and keeps the credit floor besides (D63), which ship
+        // purchases keep anyway.
         var best = routes[0];
-        var cost = ((long)best.Units * best.BuyPrice) + best.FuelCost;
-        if (cost > credits)
+        var cost = ((long)best.Units * best.BuyPrice) + best.FuelCost + best.AntimatterCost;
+        if (cost + (best.Jumps > 0 ? map.Gates.CreditFloor : 0) > credits)
         {
             if (savings.SaveFor(trader.Symbol, best.Key, cost))
             {
@@ -660,6 +698,7 @@ public sealed class TradingAutomationService(
             Units = route.Units,
             ExpectedProfit = route.Profit,
             ExpectedSeconds = WholeSeconds(route.Seconds),
+            Jumps = route.Jumps,
             FeedsTradeSymbol = route.FeedsTradeSymbol,
             ReservedCredits = route.CargoCost,
         };
@@ -679,7 +718,27 @@ public sealed class TradingAutomationService(
         // D95: the journal gives the rate the route was ranked by, and the trip's time it was worked out over.
         var creditsPerHour = (long)Math.Round(route.CreditsPerHour);
         var tripMinutes = TripTime.Minutes(route.Seconds);
-        if (route.FeedsConstruction)
+        if (route.Jumps > 0)
+        {
+            // Slice 6.29 (D96): a route through the gates names its jumps, and what their antimatter costs.
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), {Jumps} jumps through the gates; about {ExpectedProfit} credits after {FuelCost} for fuel and {AntimatterCost} for antimatter, the way to the buy market included: {CreditsPerHour} an hour over about {TripMinutes} minutes.",
+                JournalEvents.TradeStarted,
+                ship.Symbol,
+                route.Units,
+                route.TradeSymbol,
+                route.BuyWaypointSymbol,
+                route.BuyPrice,
+                route.SellWaypointSymbol,
+                route.SellPrice,
+                route.Jumps,
+                route.Profit,
+                route.FuelCost,
+                route.AntimatterCost,
+                creditsPerHour,
+                tripMinutes);
+        }
+        else if (route.FeedsConstruction)
         {
             // D89: a route that feeds the jump gate's materials comes before every other; the journal says so.
             logger.LogInformation(
@@ -766,6 +825,7 @@ public sealed class TradingAutomationService(
                     Units = route.Goal.Units,
                     ExpectedProfit = route.Goal.ExpectedProfit,
                     ExpectedSeconds = route.Goal.ExpectedSeconds,
+                    Jumps = route.Goal.Jumps,
                     FeedsTradeSymbol = route.Goal.FeedsTradeSymbol,
                     FirstObservedAt = firstSeen.GetValueOrDefault(route.Key, now),
                     LastObservedAt = now,
@@ -783,6 +843,7 @@ public sealed class TradingAutomationService(
                     Units = route.Best.Units,
                     ExpectedProfit = route.Best.Profit,
                     ExpectedSeconds = WholeSeconds(route.Best.Seconds),
+                    Jumps = route.Best.Jumps,
                     FeedsTradeSymbol = route.Best.FeedsTradeSymbol,
                     CandidateShipSymbols = route.CandidateShipSymbols,
                     FirstObservedAt = firstSeen.GetValueOrDefault(route.Best.Key, now),
@@ -792,7 +853,8 @@ public sealed class TradingAutomationService(
 
         // D76, B66: a good that a trader's route carries is traded; every other good with a price gap says why not, one whose
         // route waits for a free trader included: the waiting routes go once no trader is free, and its reason stays. A system
-        // without a free trader at this pass keeps what the plan found there before.
+        // without a free trader at this pass keeps what the plan found there before. Routes reach across systems (slice 6.29),
+        // so a good counts as traded, or waiting, wherever its route buys it.
         var traded = GoodsOf(opportunities.Where(route => route.Status == MarketAutomationOpportunityStatus.Assigned));
         var waiting = GoodsOf(opportunities.Where(route => route.Status == MarketAutomationOpportunityStatus.Pending));
         List<TradingAutomationGoodNotTradedState> notTraded =
@@ -800,7 +862,7 @@ public sealed class TradingAutomationService(
             .. (existing?.NotTraded ?? [])
                 .Where(good => !judged.ContainsKey(good.SystemSymbol))
                 .Concat(judged.SelectMany(system => NotTradedIn(system.Key, system.Value, waiting, now)))
-                .Where(good => !traded.Contains(GoodKey(good.SystemSymbol, good.TradeSymbol)))
+                .Where(good => !traded.Contains(good.TradeSymbol))
                 .OrderBy(good => good.SystemSymbol, StringComparer.Ordinal),
         ];
 
@@ -834,7 +896,7 @@ public sealed class TradingAutomationService(
         DateTimeOffset now)
         => TradeRouteJudgement.FurthestPerGood(system.Judgements).Select(judgement =>
         {
-            var waits = judgement.Check == TradeRouteCheck.Lucrative && waiting.Contains(GoodKey(systemSymbol, judgement.Route.TradeSymbol));
+            var waits = judgement.Check == TradeRouteCheck.Lucrative && waiting.Contains(judgement.Route.TradeSymbol);
             return new TradingAutomationGoodNotTradedState
             {
                 SystemSymbol = systemSymbol,
@@ -852,10 +914,10 @@ public sealed class TradingAutomationService(
             };
         });
 
-    /// <summary>The goods the routes carry, by system (<see cref="GoodKey"/>).</summary>
+    /// <summary>The goods the routes carry.</summary>
     private static HashSet<string> GoodsOf(IEnumerable<TradingAutomationOpportunityState> routes)
         => routes
-            .Select(route => GoodKey(WaypointSymbols.SystemOf(route.BuyWaypointSymbol), route.TradeSymbol))
+            .Select(route => route.TradeSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The check a good's route failed, as the state names it (D76).</summary>
@@ -868,8 +930,6 @@ public sealed class TradingAutomationService(
         TradeRouteCheck.NotLucrative => "not_lucrative",
         _ => "below_the_listed_routes",
     };
-
-    private static string GoodKey(string systemSymbol, string tradeSymbol) => $"{systemSymbol}|{tradeSymbol}";
 
     /// <summary>Whether two lists of routes say the same, apart from when they were seen.</summary>
     private static bool SameRoutes(

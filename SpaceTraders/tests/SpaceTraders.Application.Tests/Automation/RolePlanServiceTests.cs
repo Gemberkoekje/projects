@@ -31,6 +31,8 @@ public sealed class RolePlanServiceTests
     private readonly RoleBoardMemory _memory = new();
     private readonly TradeEarnings _tradeEarnings = new();
     private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
+    private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private RolePlanState? _state;
@@ -39,6 +41,9 @@ public sealed class RolePlanServiceTests
     {
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(_ => Context());
+
+        // Slice 6.29: the trade estimates come from the systems in reach; here, the one system.
+        _tradeContexts.ReadReachAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(_ => new TradeContext(Context().Map, Context().Credits, 200));
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
         _plans.GetAsync<RolePlanState>(PlanTypes.Roles, Arg.Any<CancellationToken>()).Returns(_ => _state);
@@ -291,6 +296,20 @@ public sealed class RolePlanServiceTests
         _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Should().Match<RoleShipState>(ship => ship.Role == FleetRole.Collect && ship.Reason == RolePlanner.Collection);
     }
 
+    [Fact]
+    public async Task AShipOnATradeTripThatEndsAbroad_KeepsTheTradeRole()
+    {
+        // Slice 6.29 (D96): the command ship, the only ship that can survey, would survey (D38); but its trip sells in X1-CD,
+        // where only trading has work for it, and a new role takes effect where the trip ends. Back home it is weighed again.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, H52, 1_000_000, "COBALT", 3));
+        _activeGoals["SHIP-1"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = H52, SellWaypointSymbol = "X1-CD-M" };
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _state!.Ships.Single(ship => ship.ShipSymbol == "SHIP-1").Role.Should().Be(FleetRole.Trade);
+    }
+
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
     private void HeldBy(string ship, string market, string ore)
@@ -317,6 +336,8 @@ public sealed class RolePlanServiceTests
                 _memory,
                 _tradeEarnings,
                 _constructionSites,
+                _agents,
+                _tradeContexts,
                 _log.For<RolePlanService>())
             .EnsureBootstrappedAsync();
 }

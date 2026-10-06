@@ -15,8 +15,9 @@ public interface ITripBook
 {
     /// <summary>
     /// Books a trip that ended: what its sales brought in (<see cref="TripGoal.Earned"/>), less what its cargo cost
-    /// (<see cref="TripGoal.Spent"/>) and the fuel its ship bought since the trip started, as the ledger has it. Counts the
-    /// trip and what it made or lost, by activity, and journals it (<c>TripEnded</c>).
+    /// (<see cref="TripGoal.Spent"/>), the fuel its ship bought since the trip started, and the antimatter of the jumps it made
+    /// meanwhile (slice 6.29), as the ledger has them. Counts the trip and what it made or lost, by activity, and journals it
+    /// (<c>TripEnded</c>).
     /// </summary>
     /// <param name="shipSymbol">The ship.</param>
     /// <param name="trip">The trip as it ended, with everything it sold and bought.</param>
@@ -140,9 +141,18 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
             category: LedgerCategory.FuelPurchase,
             cancellationToken: cancellationToken);
 
+        // Slice 6.29: a trip through the gates pays one ANTIMATTER a jump.
+        var antimatterPurchases = await ledger.GetRangeAsync(
+            from: startedAt,
+            to: now,
+            shipSymbol: shipSymbol,
+            category: LedgerCategory.AntimatterPurchase,
+            cancellationToken: cancellationToken);
+
         // A purchase is a negative amount in the ledger.
         var fuel = -fuelPurchases.Sum(entry => entry.Amount);
-        var profit = earned - spent - fuel;
+        var antimatter = -antimatterPurchases.Sum(entry => entry.Amount);
+        var profit = earned - spent - fuel - antimatter;
 
         metrics.TripEnded(activity);
         metrics.TripProfit(activity, profit);
@@ -152,6 +162,24 @@ public sealed class TripBook(ILedgerRepository ledger, IAutomationMetrics metric
         {
             tradeEarnings.Ended(startedAt, now, profit);
         }
+
+        if (antimatter != 0)
+        {
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} made {Profit} credits on its {Activity} trip in {Minutes} minutes: sold for {Earned}, bought for {Spent}, fuel {FuelCost}, antimatter {AntimatterCost} ({Reason}).",
+                JournalEvents.TripEnded,
+                shipSymbol,
+                profit,
+                activity,
+                (int)(now - startedAt).TotalMinutes,
+                earned,
+                spent,
+                fuel,
+                antimatter,
+                reason);
+            return;
+        }
+
         logger.LogInformation(
             "{EventKind:l}: ship {ShipSymbol} made {Profit} credits on its {Activity} trip in {Minutes} minutes: sold for {Earned}, bought for {Spent}, fuel {FuelCost} ({Reason}).",
             JournalEvents.TripEnded,
