@@ -79,7 +79,10 @@ public sealed class ConstructionPlanService(
     {
         var now = TimeProvider.System.GetUtcNow();
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
-        var fleet = await ships.GetAllAsync(cancellationToken);
+
+        // B71: the goals before the ships, so a trip that ends meanwhile leaves no builder free with the load it supplied.
+        var read = await FleetGoals.ReadAsync(ships, goals, cancellationToken);
+        var fleet = read.Fleet;
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
@@ -89,7 +92,7 @@ public sealed class ConstructionPlanService(
         var trips = new List<SupplyConstructionGoal>();
         foreach (var ship in fleet)
         {
-            var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            var goal = read.GoalOf(ship.Symbol);
             if (goal is SupplyConstructionGoal trip)
             {
                 trips.Add(trip);

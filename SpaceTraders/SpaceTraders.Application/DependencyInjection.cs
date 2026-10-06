@@ -149,6 +149,9 @@ public static class DependencyInjection
         services.AddSingleton<IGoalStepCircuitBreaker, GoalStepCircuitBreaker>();
         services.AddSingleton<IShipGoalStepGuard, ShipGoalStepGuard>();
 
+        // B70: an arrival that was never handled is scheduled again from the ship's next goal step.
+        services.AddSingleton<LostArrivals>();
+
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);

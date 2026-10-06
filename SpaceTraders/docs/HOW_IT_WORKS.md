@@ -981,7 +981,12 @@ buy.
   mining, siphon and construction plans each note the ships they work with and the free ones they gave no
   work. An arrival's goal step runs outside the tick, so a trip can end after its plan's pass and before
   the trading plan's; that ship wasn't passed over and waits for its own plan's next pass, a tick later,
-  instead of trading. A plan that is switched off has no say.
+  instead of trading. A plan that is switched off has no say. A trip can also end during a pass: the
+  arrival empties the hold first and ends the goal after, so the mining, siphon and construction plans
+  read every ship's goal first and the ships after (`FleetGoals`, B71). A goal read as ended then comes
+  with the ship as its trip left it, and one read as running keeps its ship busy for that pass. Read the
+  other way round, a builder whose supply landed between the two reads looked free with the load it had
+  just supplied and was passed over to trading, and a drone was sent to sell what it had just sold.
 - **A ship that gathers in its spare time** (the command ship, with the survey and spare-time plans on,
   slice 6.8) trades when it has nothing to survey (D34), but only for a route that waits for it once
   its hold is sold, and after the other traders have chosen. The route is judged from where selling its
@@ -1511,6 +1516,17 @@ they count.
    the row and publishes `ShipArrivedEvent`. It is not leader-gated.
 3. `ShipArrivedEventHandler` continues only if the event's goal id matches the ship's active goal
    (B17). It then sends `NavigateToWaypointArrivedCommand`.
+4. `NavigateToWaypointArrivedHandler` fetches the market and the shipyard there and docks the ship:
+   the dock is what takes the ship out of transit in the cache. It then publishes
+   `ShipNavigationCompletedEvent`, whose handler runs the goal's next step.
+
+**A lost arrival** (B70): Wolverine drops a message after its last retry, and the timer was deleted
+when it fired, so an arrival whose dock fails for good (as in a network outage of the game's API) is
+gone, and the cache keeps the ship in transit. Every goal step would wait for it. So a goal step for a
+ship stored in transit more than 5 minutes past its arrival time (`LostArrivals.Margin`) schedules
+its arrival again, for its active goal, at most once every 5 minutes per ship, and logs a warning
+("its arrival is scheduled again"); the arrival then runs from step 2. A restart did the same
+through the startup sync, which stores every ship as the API has it.
 
 Cooldown timers are never scheduled, and `ShipCooldownExpiredEvent` has no handler. Goals that
 wait for a cooldown simply run again on a later tick.

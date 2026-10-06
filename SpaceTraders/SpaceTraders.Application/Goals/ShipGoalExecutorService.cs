@@ -18,6 +18,7 @@ public sealed class ShipGoalExecutorService(
     IShipGoalStepGuard stepGuard,
     IAutomationMetrics metrics,
     ITripBook trips,
+    LostArrivals lostArrivals,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
     private const string MaxGoalStepsPerMinuteSetting = "Automation.CircuitBreaker.MaxGoalStepsPerMinute";
@@ -102,6 +103,16 @@ public sealed class ShipGoalExecutorService(
                 activeGoal.Kind,
                 shipSymbol);
             return null;
+        }
+
+        // B70: an arrival whose handling failed for good leaves the ship stored in transit, and every step would wait for it.
+        if (await lostArrivals.RescheduleIfLostAsync(ship, activeGoal.GoalId, TimeProvider.System.GetUtcNow(), ct))
+        {
+            logger.LogWarning(
+                "ShipGoalExecutorService: ship {ShipSymbol} is still stored in transit to {Destination}, due at {ArrivesAt}; its arrival is scheduled again.",
+                shipSymbol,
+                ship.WaypointSymbol,
+                ship.ArrivesAt);
         }
 
         var maxStepsPerMinute = await GetMaxGoalStepsPerMinuteAsync(ct);
