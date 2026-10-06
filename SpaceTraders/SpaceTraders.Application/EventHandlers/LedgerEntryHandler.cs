@@ -76,6 +76,27 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger, IAutomationMetr
         notifier.Notify("ship", @event.ShipSymbol);
     }
 
+    /// <summary>Books a chart's reward (PLAN.md slice 6.30, D99) in a category of its own; a chart that paid nothing books nothing.</summary>
+    /// <param name="event">The chart.</param>
+    /// <param name="cancellationToken">Stops the write.</param>
+    /// <returns>A task that completes when the reward is booked.</returns>
+    public async Task Handle(WaypointChartedEvent @event, CancellationToken cancellationToken)
+    {
+        if (@event.Reward <= 0)
+        {
+            return;
+        }
+
+        await ledger.AppendAsync(
+            @event.ShipSymbol,
+            LedgerCategory.ChartReward,
+            @event.Reward,
+            waypointSymbol: @event.WaypointSymbol,
+            cancellationToken: cancellationToken);
+        CountCredits(LedgerCategory.ChartReward, @event.Reward);
+        notifier.Notify("ship", @event.ShipSymbol);
+    }
+
     public async Task Handle(ShipRepairedEvent @event, CancellationToken cancellationToken)
     {
         await ledger.AppendAsync(

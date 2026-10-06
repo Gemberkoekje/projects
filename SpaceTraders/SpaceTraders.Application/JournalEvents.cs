@@ -189,10 +189,17 @@ public static class JournalEvents
     public const string Jumped = nameof(Jumped);
 
     /// <summary>
-    /// The command ship explored a system (asked on 2026-10-04: <c>ShipSymbol</c>, <c>SystemSymbol</c>, <c>Markets</c> and
-    /// <c>Shipyards</c> it visited there, each once, as the scout plan does at home).
+    /// An exploring ship, the command ship or an explorer, explored a system (asked on 2026-10-04: <c>ShipSymbol</c>,
+    /// <c>SystemSymbol</c>, <c>Markets</c> and <c>Shipyards</c> it visited there, each once, as the scout plan does at home).
     /// </summary>
     public const string SystemExplored = nameof(SystemExplored);
+
+    /// <summary>
+    /// An exploring ship charted a waypoint (PLAN.md slice 6.30, D99: <c>ShipSymbol</c>, <c>WaypointSymbol</c>,
+    /// <c>WaypointType</c>, <c>Reward</c> in credits, and whether the chart showed a market, <c>HasMarket</c>, or a shipyard,
+    /// <c>HasShipyard</c>).
+    /// </summary>
+    public const string Charted = nameof(Charted);
 
     /// <summary>
     /// The cached shipyards or markets list a ship type or good no snapshot of the run held yet, and a snapshot was saved

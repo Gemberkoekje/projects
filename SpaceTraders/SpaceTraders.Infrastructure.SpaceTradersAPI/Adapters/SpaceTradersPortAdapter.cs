@@ -367,7 +367,7 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
     public async Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default)
     {
         var result = await client.CreateChartAsync(shipSymbol, cancellationToken);
-        return new ChartActionResult(result.Waypoint.Symbol, result.Waypoint.Type);
+        return new ChartActionResult(MapWaypoint(result.Waypoint), result.Agent?.Credits);
     }
 
     public async Task<JumpGateConnectionModel> GetJumpGateConnectionsAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)

@@ -425,6 +425,34 @@ public sealed record ShipJumpedEvent
     }
 }
 
+/// <summary>
+/// A ship charted the waypoint it is at (PLAN.md slice 6.30, D99): the API pays a one-off reward by the rarity of the
+/// waypoint's traits, <see cref="Reward"/>.
+/// </summary>
+public sealed record WaypointChartedEvent
+{
+    /// <summary>The ship.</summary>
+    public required string ShipSymbol { get; init; }
+
+    /// <summary>The waypoint it charted.</summary>
+    public required string WaypointSymbol { get; init; }
+
+    /// <summary>The credits the chart brought in: the credits after it less those before it; 0 when none showed.</summary>
+    public required long Reward { get; init; }
+
+    /// <summary>Creates the event.</summary>
+    /// <param name="ShipSymbol">The ship.</param>
+    /// <param name="WaypointSymbol">The waypoint it charted.</param>
+    /// <param name="Reward">The credits the chart brought in.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public WaypointChartedEvent(string ShipSymbol, string WaypointSymbol, long Reward)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.WaypointSymbol = WaypointSymbol;
+        this.Reward = Reward;
+    }
+}
+
 public sealed record ShipRepairedEvent
 {
     public required string ShipSymbol { get; init; }

@@ -67,6 +67,11 @@ public sealed class DefaultSettingsSeedTests
         "Trade.MaxHaulDistance",
         "Trade.MaxPriceAgeMinutes",
 
+        // The explorers (slice 6.30, D102): ExplorePlanService wants one for every Explore.SystemsPerExplorer systems left to
+        // explore, at most Explore.MaxExplorers.
+        "Explore.SystemsPerExplorer",
+        "Explore.MaxExplorers",
+
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",
 

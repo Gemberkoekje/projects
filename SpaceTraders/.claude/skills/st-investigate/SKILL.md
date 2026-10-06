@@ -142,7 +142,7 @@ create it, never to paste the password. mcp-k8s (read-only) works for pod status
 {namespace="spacetraders"} | json | EventKind != ""
 
 # Exploring (slice 6.11): jumps, systems explored, the explore plan's start, waits and end, refused jumps
-{namespace="spacetraders"} | json | EventKind=~"Jumped|SystemExplored" or Plan="Explore" or Reason="jump_refused"
+{namespace="spacetraders"} | json | EventKind=~"Jumped|SystemExplored|Charted" or Plan="Explore" or Reason="jump_refused"
 
 # Log volume per hour (a loop shows up here)
 sum(count_over_time({namespace="spacetraders"}[1h]))                               (with --step 1h)

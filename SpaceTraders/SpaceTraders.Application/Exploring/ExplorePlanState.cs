@@ -1,19 +1,33 @@
+using SpaceTraders.Application.Services;
+
 namespace SpaceTraders.Application.Exploring;
 
-/// <summary>What the explore plan is doing with the command ship.</summary>
+/// <summary>What the explore plan is doing with a ship that explores: the command ship, or an explorer.</summary>
 public enum ExploreStatus
 {
-    /// <summary>The command ship has other work; the plan takes it when its trip ends and there is a system to explore.</summary>
+    /// <summary>
+    /// The ship has other work; the plan takes it when its trip ends and there is a system to explore. An explorer with no
+    /// system left trades meanwhile (slice 6.30, D102).
+    /// </summary>
     Waiting = 0,
 
-    /// <summary>The command ship is on its way to a system not explored yet, or scouting one.</summary>
+    /// <summary>The ship is on its way to a system not explored yet, or scouting one.</summary>
     Exploring = 1,
 
-    /// <summary>Nothing reachable is left to explore: the command ship is on its way home.</summary>
+    /// <summary>The command ship is on its way home: nothing reachable is left to explore, or an explorer explores now.</summary>
     Returning = 2,
 
-    /// <summary>Every system the active gates reach is explored, and the command ship is home with its other work.</summary>
+    /// <summary>
+    /// The command ship is home with its other work: every system the active gates reach is explored, or an explorer
+    /// explores them (slice 6.30, D98).
+    /// </summary>
     Done = 3,
+
+    /// <summary>
+    /// The command ship is on its way to the shipyard that sells the first explorer, or waits there until it is bought (slice
+    /// 6.30, D98).
+    /// </summary>
+    FetchingExplorer = 4,
 }
 
 /// <summary>What the plan knows about a system's jump gate.</summary>
@@ -32,13 +46,39 @@ public enum GateState
     None = 3,
 }
 
+/// <summary>Where the next explorer's purchase stands (PLAN.md slice 6.30, D98, D102).</summary>
+public enum ExplorerPurchaseStatus
+{
+    /// <summary>No explorer is wanted beyond those there are.</summary>
+    None = 0,
+
+    /// <summary>One was bought this pass.</summary>
+    Bought = 1,
+
+    /// <summary>Something earlier in the order ships are bought in comes first (D43).</summary>
+    WaitingForAnotherPurchase = 2,
+
+    /// <summary>It would leave less than the credit reserve; the credits are saved up for it.</summary>
+    WaitingForCredits = 3,
+
+    /// <summary>The first explorer: the command ship flies to the shipyard to buy it there (D30, D98).</summary>
+    CommandShipFetchesIt = 4,
+
+    /// <summary>A further explorer: none of our ships is in the shipyard's system yet, or one is on its way to the shipyard (D30, D102).</summary>
+    WaitingForAShipThere = 5,
+
+    /// <summary>No shipyard the gates reach is known to sell one.</summary>
+    NoShipyardSellsOne = 6,
+}
+
 /// <summary>
-/// The explore plan (asked on 2026-10-04): the systems it knows, what it knows of their gates, and which it has explored.
-/// One row in <c>plan_states</c>.
+/// The explore plan (asked on 2026-10-04): the systems it knows, what it knows of their gates, and which it has explored; what
+/// it does with the command ship, and since slice 6.30 with each explorer, and how many explorers it wants. One row in
+/// <c>plan_states</c>.
 /// </summary>
 public sealed record ExplorePlanState
 {
-    /// <summary>The command ship, which explores.</summary>
+    /// <summary>The command ship, which explores while there is no explorer.</summary>
     public required string ShipSymbol { get; init; }
 
     /// <summary>The headquarters' system, where the command ship comes home to.</summary>
@@ -50,14 +90,64 @@ public sealed record ExplorePlanState
     /// <summary>The system the command ship is exploring or on its way to; empty when none.</summary>
     public string TargetSystemSymbol { get; init; } = string.Empty;
 
-    /// <summary>Why the plan waits, in a word for the journal (<c>waiting_for_credits</c>, <c>no_way_home</c>); empty when it doesn't.</summary>
+    /// <summary>Why the plan waits with the command ship, in a word for the journal (<c>waiting_for_credits</c>, <c>no_way_home</c>); empty when it doesn't.</summary>
     public string Reason { get; init; } = string.Empty;
 
     /// <summary>The systems it knows: home, and every system a known gate connects to.</summary>
     public IReadOnlyList<KnownSystem> Systems { get; init; } = [];
 
+    /// <summary>The explorers (slice 6.30, D98), and what the plan does with each.</summary>
+    public IReadOnlyList<ExploringShip> Explorers { get; init; } = [];
+
+    /// <summary>
+    /// The systems the plan knows, hasn't explored and reaches from home through built gates (slice 6.30, D102), as the last
+    /// pass counted them.
+    /// </summary>
+    public int SystemsLeft { get; init; }
+
+    /// <summary>
+    /// The explorers it wants (D102): one for every <c>Explore.SystemsPerExplorer</c> systems left, or part of that, at most
+    /// <c>Explore.MaxExplorers</c>.
+    /// </summary>
+    public int ExplorersWanted { get; init; }
+
+    /// <summary>Where the next explorer's purchase stands, as the last pass left it.</summary>
+    public ExplorerPurchaseState Purchase { get; init; } = new();
+
     /// <summary>When the state last changed.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>An explorer, as the explore plan sees it (PLAN.md slice 6.30).</summary>
+public sealed record ExploringShip
+{
+    /// <summary>The explorer.</summary>
+    public required string ShipSymbol { get; init; }
+
+    /// <summary>What the plan does with it: <see cref="ExploreStatus.Exploring"/>, or <see cref="ExploreStatus.Waiting"/> while it trades (D102).</summary>
+    public required ExploreStatus Status { get; init; }
+
+    /// <summary>The system it explores or is on its way to; empty when none.</summary>
+    public string TargetSystemSymbol { get; init; } = string.Empty;
+
+    /// <summary>Why the plan waits with it, in a word (<c>waiting_for_credits</c>, <c>nothing_to_explore</c>); empty when it doesn't.</summary>
+    public string Reason { get; init; } = string.Empty;
+}
+
+/// <summary>The next explorer's purchase, as a pass of the explore plan left it (PLAN.md slice 6.30).</summary>
+public sealed record ExplorerPurchaseState
+{
+    /// <summary>Where it stands.</summary>
+    public ExplorerPurchaseStatus Status { get; init; }
+
+    /// <summary>Its place in the order ships are bought in: <see cref="PurchaseTier.Explorer"/> for the first, <see cref="PurchaseTier.MoreExplorers"/> after it.</summary>
+    public PurchaseTier Tier { get; init; }
+
+    /// <summary>The shipyard it would be bought at; empty when none.</summary>
+    public string ShipyardWaypointSymbol { get; init; } = string.Empty;
+
+    /// <summary>What the shipyard asks, as cached; 0 when unknown.</summary>
+    public long Price { get; init; }
 }
 
 /// <summary>A system the explore plan knows: home, or one a known gate connects to.</summary>
@@ -85,17 +175,18 @@ public sealed record KnownSystem
     public DateTimeOffset? JumpRefusedAt { get; init; }
 
     /// <summary>
-    /// When its waypoints were last asked for, once the command ship was there and none were cached, whatever the answer;
+    /// When its waypoints were last asked for, once an exploring ship was there and none were cached, whatever the answer;
     /// null when they never were.
     /// </summary>
     public DateTimeOffset? WaypointsCheckedAt { get; init; }
 
     /// <summary>
-    /// When the command ship was given its markets and shipyards to scout; null before. Once that goal has ended the system
-    /// counts as explored, even where a market or shipyard couldn't be fetched, so the ship doesn't go back for it forever.
+    /// When an exploring ship was given its markets and shipyards to scout, and its uncharted waypoints to chart; null before.
+    /// Once that goal has ended the system counts as explored, even where a market or shipyard couldn't be fetched, so the ship
+    /// doesn't go back for it forever.
     /// </summary>
     public DateTimeOffset? ScoutingSince { get; init; }
 
-    /// <summary>When the command ship had visited each of its markets and shipyards; null while it hasn't.</summary>
+    /// <summary>When an exploring ship had visited each of its markets and shipyards; null while none has.</summary>
     public DateTimeOffset? ExploredAt { get; init; }
 }

@@ -20,10 +20,12 @@ namespace SpaceTraders.Application.Services;
 ///   the probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
 ///   (slice 6.25, D92), which waits while a load can be bought: "If the gate can be built, it should be built, otherwise
 ///   extra miners can be built.";</item>
+///   <item>the first explorer (slice 6.30, D98), while the explore plan wants one, which the command ship fetches;</item>
 ///   <item>a probe for every market (D29): home's, then those of the explored systems within the trade reach (slice 6.28,
 ///   D97);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy;</item>
+///   <item>every further explorer the explore plan wants (slice 6.30, D102: one for every 10 systems left to explore);</item>
 ///   <item>last, a probe for every market of the other explored systems (slice 6.28, D97).</item>
 /// </list>
 /// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
@@ -58,6 +60,7 @@ public sealed class PurchaseOrder(
         [AutomationPlan.Siphon] = PurchaseTier.Coverage,
         [AutomationPlan.Trading] = PurchaseTier.CargoShips,
         [AutomationPlan.Construction] = PurchaseTier.Construction,
+        [AutomationPlan.Explore] = PurchaseTier.Explorer,
         [AutomationPlan.ProbeDeployment] = PurchaseTier.Probes,
     };
 
@@ -390,19 +393,31 @@ public enum PurchaseTier
     Construction = 6,
 
     /// <summary>
+    /// The first explorer (slice 6.30, D98: "Start with one before probes"), while the explore plan wants one (D102); the
+    /// command ship fetches it.
+    /// </summary>
+    Explorer = 7,
+
+    /// <summary>
     /// A probe, until every market has one (D29): home's, then those of the explored systems within the trade reach,
     /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97).
     /// </summary>
-    Probes = 7,
+    Probes = 8,
 
     /// <summary>A drone by the miners' rule (D28, D32), or one more cargo ship of the list's last type, in turn.</summary>
-    Alternating = 8,
+    Alternating = 9,
+
+    /// <summary>
+    /// Every further explorer the explore plan wants (slice 6.30, D102: "First before probes, rest last"), after the drones and
+    /// cargo ships that take turns, once one of our ships is in the shipyard's system.
+    /// </summary>
+    MoreExplorers = 10,
 
     /// <summary>
     /// A probe for a market of an explored system beyond the trade reach (slice 6.28, D97): "all explored markets when money
-    /// allows", last, after the drones and cargo ships that take turns.
+    /// allows", last, after the drones and cargo ships that take turns and the further explorers.
     /// </summary>
-    FarProbes = 9,
+    FarProbes = 11,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

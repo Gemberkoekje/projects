@@ -60,8 +60,9 @@ public sealed record GateJump
 
 /// <summary>
 /// Where the explore plan goes next (asked on 2026-10-04), from what it knows of the gates: the nearest system not explored
-/// yet, by jumps through active gates, and home once none is left. A jump needs both gates built, and the plan leaves a
-/// gate the API refused a jump to alone for an hour (<see cref="RecheckAfter"/>).
+/// yet, by jumps through active gates, those within the trade reach of home first (slice 6.30, D103), and home once none is
+/// left. A jump needs both gates built, and the plan leaves a gate the API refused a jump to alone for an hour
+/// (<see cref="RecheckAfter"/>).
 /// </summary>
 public static class ExploreAtlas
 {
@@ -83,12 +84,20 @@ public static class ExploreAtlas
             && (system.JumpRefusedAt is null || now - system.JumpRefusedAt.Value >= RecheckAfter);
     }
 
-    /// <summary>The command ship's next step from <paramref name="hereSystem"/>, which the plan has explored already.</summary>
+    /// <summary>
+    /// An exploring ship's next step from <paramref name="hereSystem"/>, which the plan has explored already: the nearest system
+    /// not explored yet that no other exploring ship has taken (slice 6.30), else home. Asked on 2026-10-06: "first the systems
+    /// within 5 jumps are explored before going further", with "Reach first, then nearest" and "The trade reach" (D103): a
+    /// system within <paramref name="reach"/> jumps of home comes before every one beyond it, the nearest to the ship first in
+    /// each.
+    /// </summary>
     /// <param name="state">What the plan knows.</param>
     /// <param name="hereSystem">The system the ship is in.</param>
     /// <param name="now">The time to judge by.</param>
+    /// <param name="taken">The systems the other exploring ships explore or are on their way to; none when null.</param>
+    /// <param name="reach">The jumps from home within which a system comes first (<c>Trade.MaxHaulDistance</c>); 0 for none.</param>
     /// <returns>The step.</returns>
-    public static ExploreStep Next(ExplorePlanState state, string hereSystem, DateTimeOffset now)
+    public static ExploreStep Next(ExplorePlanState state, string hereSystem, DateTimeOffset now, IReadOnlySet<string>? taken = null, int reach = 0)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(hereSystem);
@@ -105,20 +114,78 @@ public static class ExploreAtlas
             return new ExploreStep { Kind = ExploreStepKind.Wait };
         }
 
-        var target = order.FirstOrDefault(system => system.ExploredAt is null);
+        var open = order.Where(system => system.ExploredAt is null && taken?.Contains(system.SystemSymbol) != true).ToList();
+        var fromHome = reach > 0 && open.Count > 0 ? Reachable(state, state.HomeSystemSymbol, now) : new Dictionary<string, int>();
+        var target = open.FirstOrDefault(system => fromHome.TryGetValue(system.SystemSymbol, out var jumps) && jumps <= reach)
+            ?? open.FirstOrDefault();
         if (target is not null)
         {
             return Towards(atlas, parents, hereSystem, target.SystemSymbol, ExploreStepKind.Explore);
         }
 
+        return Home(atlas, parents, state.HomeSystemSymbol, hereSystem);
+    }
+
+    /// <summary>
+    /// The command ship's way home from <paramref name="hereSystem"/> (slice 6.30, D98): once an explorer explores, it comes
+    /// home, whatever is left to explore.
+    /// </summary>
+    /// <param name="state">What the plan knows.</param>
+    /// <param name="hereSystem">The system the ship is in.</param>
+    /// <param name="now">The time to judge the gates by.</param>
+    /// <returns><see cref="ExploreStepKind.Home"/>, a jump towards home, or why there is none.</returns>
+    public static ExploreStep HomeFrom(ExplorePlanState state, string hereSystem, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(hereSystem);
+
+        var atlas = new Atlas(state, now);
         if (hereSystem.Equals(state.HomeSystemSymbol, StringComparison.OrdinalIgnoreCase))
         {
             return new ExploreStep { Kind = ExploreStepKind.Home, TargetSystemSymbol = state.HomeSystemSymbol };
         }
 
-        return parents.ContainsKey(state.HomeSystemSymbol)
-            ? Towards(atlas, parents, hereSystem, state.HomeSystemSymbol, ExploreStepKind.ReturnHome)
-            : new ExploreStep { Kind = ExploreStepKind.NoWayHome, TargetSystemSymbol = state.HomeSystemSymbol };
+        if (!atlas.BySystem.ContainsKey(hereSystem))
+        {
+            return new ExploreStep { Kind = ExploreStepKind.Wait };
+        }
+
+        var (parents, _) = atlas.Search(hereSystem);
+        return Home(atlas, parents, state.HomeSystemSymbol, hereSystem);
+    }
+
+    /// <summary>
+    /// How many systems are left to explore (slice 6.30, D102): those the plan knows, hasn't explored and reaches from home
+    /// through usable gates (<see cref="IsUsable"/>). A system whose gate is under construction, or was refused within the
+    /// hour, doesn't count until a ship can jump there.
+    /// </summary>
+    /// <param name="state">What the plan knows.</param>
+    /// <param name="now">The time to judge the gates by.</param>
+    /// <returns>The systems left.</returns>
+    public static int SystemsLeft(ExplorePlanState state, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        var atlas = new Atlas(state, now);
+        if (!atlas.BySystem.ContainsKey(state.HomeSystemSymbol))
+        {
+            return 0;
+        }
+
+        var (_, order) = atlas.Search(state.HomeSystemSymbol);
+        return order.Count(system => system.ExploredAt is null);
+    }
+
+    private static ExploreStep Home(Atlas atlas, IReadOnlyDictionary<string, string> parents, string home, string hereSystem)
+    {
+        if (hereSystem.Equals(home, StringComparison.OrdinalIgnoreCase))
+        {
+            return new ExploreStep { Kind = ExploreStepKind.Home, TargetSystemSymbol = home };
+        }
+
+        return parents.ContainsKey(home)
+            ? Towards(atlas, parents, hereSystem, home, ExploreStepKind.ReturnHome)
+            : new ExploreStep { Kind = ExploreStepKind.NoWayHome, TargetSystemSymbol = home };
     }
 
     /// <summary>

@@ -55,6 +55,23 @@ public sealed class LedgerEntryHandlerTests
     }
 
     [Fact]
+    public async Task AChartsReward_IsALedgerRowOfItsOwn_AndCreditsEarned_AndAChartThatPaidNothingBooksNothing()
+    {
+        // Slice 6.30 (D99): charting a waypoint pays a one-off reward by the rarity of its traits.
+        await _handler.Handle(new WaypointChartedEvent("SPECTER-50", "X1-QT24-A1", 3_105), CancellationToken.None);
+        await _handler.Handle(new WaypointChartedEvent("SPECTER-50", "X1-QT24-B2", 0), CancellationToken.None);
+
+        await _ledger.Received(1).AppendAsync(
+            "SPECTER-50",
+            LedgerCategory.ChartReward,
+            3_105,
+            waypointSymbol: "X1-QT24-A1",
+            cancellationToken: Arg.Any<CancellationToken>());
+        await _ledger.ReceivedWithAnyArgs(1).AppendAsync(default!, default, default);
+        _metrics.Received(1).CreditsEarned("ChartReward", 3_105);
+    }
+
+    [Fact]
     public async Task ASale_IsALedgerRow_WithItsMarketAndUnitPrice_AndCreditsEarned()
     {
         // B57, found on 2026-10-03: all 1,336 sale rows since the first, on 2026-10-02 at 13:20Z, had no market and no unit

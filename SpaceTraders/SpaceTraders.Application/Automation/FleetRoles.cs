@@ -18,11 +18,31 @@ namespace SpaceTraders.Application.Automation;
 ///   <item>a ship that can siphon, and can neither mine nor survey, siphons (slice 6.7): the siphon plan's
 ///   trips. Only a siphoner the siphon plan has no work for may trade. The command ship siphons only in its
 ///   spare time;</item>
+///   <item>an explorer explores (slice 6.30), and trades when the explore plan has no system for it (D102), though it
+///   carries a gas siphon;</item>
 ///   <item>any other ship with a hold and a tank trades.</item>
 /// </list>
 /// </summary>
 public static class FleetRoles
 {
+    /// <summary>The ship the explore plan buys (PLAN.md slice 6.30, D98).</summary>
+    public const string ExplorerShipType = "SHIP_EXPLORER";
+
+    /// <summary>
+    /// Whether the ship is an explorer (PLAN.md slice 6.30, D98): the type it is cached with, <c>SHIP_EXPLORER</c> when bought
+    /// and its registration role <c>EXPLORER</c> after startup sync, or an explorer's frame. The explore plan flies it; in
+    /// between it only trades (D102).
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for an explorer.</returns>
+    public static bool IsExplorer(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.ShipType.Equals(ExplorerShipType, StringComparison.OrdinalIgnoreCase)
+            || ship.ShipType.Equals("EXPLORER", StringComparison.OrdinalIgnoreCase)
+            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_EXPLORER\"", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// Whether the ship is a surveyor, which surveys before anything else (D20); with the spare-time plan on, it trades
     /// or gathers when it has nothing to survey (slice 6.8, D34).
@@ -59,7 +79,8 @@ public static class FleetRoles
         return ship.HasGasSiphonEquipment
             && ship.IsTradingCapable
             && !ship.HasMiningEquipment
-            && !ship.HasSurveyEquipment;
+            && !ship.HasSurveyEquipment
+            && !IsExplorer(ship);
     }
 
     /// <summary>
@@ -104,7 +125,8 @@ public static class FleetRoles
     /// <summary>
     /// Whether the ship is a cargo ship, as the trading plan buys them (D21): a hold and a tank, and nothing
     /// to mine, siphon or survey with. Judged by what it carries rather than its cached type, which startup
-    /// sync replaces with the registration role (B25).
+    /// sync replaces with the registration role (B25). An explorer is none (slice 6.30): until startup sync records
+    /// its gas siphon, a bought one shows only its hold and tank.
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>True for a shuttle or hauler.</returns>
@@ -114,7 +136,8 @@ public static class FleetRoles
         return ship.IsTradingCapable
             && !ship.HasMiningEquipment
             && !ship.HasGasSiphonEquipment
-            && !ship.HasSurveyEquipment;
+            && !ship.HasSurveyEquipment
+            && !IsExplorer(ship);
     }
 
     /// <summary>
@@ -144,7 +167,8 @@ public static class FleetRoles
     /// The roles a ship could take, by what it carries (slice 6.9, D38), whichever plans are on: survey with a
     /// surveyor; mine with a mining laser, a hold and a tank; siphon with a gas siphon, a hold and a tank; trade with
     /// a hold and a tank; construct with a hold and a tank, unless it is a drone (slice 6.6, D65). A probe has none: the
-    /// probe plan flies it.
+    /// probe plan flies it. An explorer trades and nothing else (slice 6.30, D102): asked on 2026-10-06, "Explorers can trade
+    /// with 40 cargo space, so they can trade at the location they are at until a new unexplored location comes up."
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>Its potential roles, in the order survey, mine, siphon, trade, construct.</returns>
@@ -156,6 +180,11 @@ public static class FleetRoles
         if (IsProbe(ship))
         {
             return roles;
+        }
+
+        if (IsExplorer(ship))
+        {
+            return ship.IsTradingCapable ? [FleetRole.Trade] : roles;
         }
 
         if (CanSurvey(ship))
@@ -188,15 +217,15 @@ public static class FleetRoles
 
     /// <summary>
     /// Whether the ship can build the jump gate (slice 6.6, D65): a hold and a tank, to buy the materials and carry them
-    /// there, and no drone, which gathers first (D58). The command ship and the cargo ships can; probes, drones and survey
-    /// ships can't.
+    /// there, and no drone, which gathers first (D58). The command ship and the cargo ships can; probes, drones, survey
+    /// ships and explorers (D102) can't.
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>True for a ship that can take the construction role.</returns>
     public static bool CanConstruct(ShipModel ship)
     {
         ArgumentNullException.ThrowIfNull(ship);
-        return ship.IsTradingCapable && !IsProbe(ship) && !IsMiningDrone(ship) && !IsSiphoner(ship);
+        return ship.IsTradingCapable && !IsProbe(ship) && !IsMiningDrone(ship) && !IsSiphoner(ship) && !IsExplorer(ship);
     }
 
     /// <summary>

@@ -141,6 +141,10 @@ public sealed class ChartResult
 
     [JsonPropertyName("waypoint")]
     required public Systems.Waypoint Waypoint { get; init; }
+
+    /// <summary>The agent after the chart, its credits with the chart's reward (the API's spec since 2025-04).</summary>
+    [JsonPropertyName("agent")]
+    public Agents.Agent? Agent { get; init; }
 }
 
 public sealed class ChartData
