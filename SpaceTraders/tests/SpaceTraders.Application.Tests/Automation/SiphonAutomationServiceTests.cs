@@ -231,6 +231,32 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task ATripThatEndsWhileThePassReadsTheGoals_LeavesNoSaleOfGasItHasSold()
+    {
+        // B71: a trip's last sale lands in its arrival handler, outside the tick: the hold is emptied first, and the trip ends
+        // after. Read the other way round, a pass saw the drone free with the gas it had just sold, and sent it to sell it again.
+        var trip = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = C38, SellWaypointSymbol = E47, Selling = true };
+        _activeGoals["SHIP-5"] = trip;
+        ShipModel[] fleet = [SiphonDrone(waypoint: E47, cargo: [new CargoItemModel("LIQUID_NITROGEN", 6)])];
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(_ => fleet);
+        _goals.GetActiveGoalAsync("SHIP-5", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (ReferenceEquals(_activeGoals["SHIP-5"], trip))
+            {
+                fleet = [SiphonDrone(waypoint: E47)];
+                _activeGoals["SHIP-5"] = trip with { Status = GoalStatus.Completed };
+            }
+
+            return _activeGoals["SHIP-5"];
+        });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-5"].Should().BeOfType<SiphonAndSellGoal>().Which.Selling.Should().BeFalse("it holds nothing to sell");
+        _log.Journal.Should().NotContain(entry => Equals(entry.Properties["Reason"], "held_cargo"));
+    }
+
+    [Fact]
     public async Task ASiphonDrone_SharesAPairWhoseMarketMakesSomethingFromItsGas_BeforeSiphoningForOneThatOnlyPaysForIt()
     {
         // D91: SHIP-6 siphons HYDROCARBON for G50, which makes FUEL from it; E47 and C39, SCARCE, only pay for it.

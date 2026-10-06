@@ -349,6 +349,32 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task ATripThatEndsWhileThePassReadsTheGoals_LeavesNoSaleOfOreItHasSold()
+    {
+        // B71: a trip's last sale lands in its arrival handler, outside the tick: the hold is emptied first, and the trip ends
+        // after. Read the other way round, a pass saw the drone free with the ore it had just sold, and sent it to sell it again.
+        var trip = new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51, Selling = true };
+        _activeGoals["SHIP-3"] = trip;
+        ShipModel[] fleet = [Drone(cargo: [new CargoItemModel("COPPER_ORE", 9)])];
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(_ => fleet);
+        _goals.GetActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (ReferenceEquals(_activeGoals["SHIP-3"], trip))
+            {
+                fleet = [Drone()];
+                _activeGoals["SHIP-3"] = trip with { Status = GoalStatus.Completed };
+            }
+
+            return _activeGoals["SHIP-3"];
+        });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Which.Selling.Should().BeFalse("it holds nothing to sell");
+        _log.Journal.Should().NotContain(entry => Equals(entry.Properties["Reason"], "held_cargo"));
+    }
+
+    [Fact]
     public async Task AMinerWithAFullHold_SellsWhatItHolds_EvenWhenTheSaleDoesntPayForItsFuel()
     {
         // D71: a trip keeps the other ores a market buys within one tank, so its hold can fill with them. Only F49 buys this
