@@ -51,6 +51,7 @@ public sealed class ExplorersTests
     public ExplorersTests()
     {
         _settings.GetAsync<long>(CreditReserve.FloorSetting, Arg.Any<CancellationToken>()).Returns(60_000L);
+        ProbePlanOn(true);
         Settings(perExplorer: 10, cap: 5);
         OrderLets(PurchaseTier.Explorer);
         PurchaseFails(ShipPurchaseFailure.NoShipAtShipyard);
@@ -189,26 +190,132 @@ public sealed class ExplorersTests
     }
 
     [Fact]
-    public async Task AFurtherExplorer_IsBoughtLast_OnlyWhileAProbeOfOursIsInTheShipyardsSystem()
+    public async Task AFurtherExplorer_StaysLast_AndTheCommandShipFetchesIt_WhenNoProbeIsThere()
     {
-        // D102: "First before probes, rest last", bought once a probe of ours is in X1-GT9 to answer the purchase's call
-        // (D30), so no explorer turns back for one. Until then the far probes aren't held back by a need nothing can meet.
+        // D108: "Can we set up the command ship to go to that location if there isn't a probe there", the location being "where
+        // an explorer ship is supposed to be bought if it's in the purchase order and enough credits are available", with
+        // "Keep D102's order". It counts in the order though none of our ships is in X1-GT9 (D102 waited for one there): the
+        // command ship can meet it.
         await SeedAsync();
-        await AddShipAsync(Explorer, Home, HomeGate, "SHIP_EXPLORER");
+        await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
         OrderLets(PurchaseTier.MoreExplorers);
 
         await PassAsync();
 
-        (await StateAsync()).Purchase.Should().BeEquivalentTo(new { Status = ExplorerPurchaseStatus.WaitingForAShipThere, Tier = PurchaseTier.MoreExplorers, ShipyardWaypointSymbol = Shipyard });
-        await _order.DidNotReceive().ReportAsync(AutomationPlan.Explore, Arg.Is<PurchaseNeed>(need => need.Tier != PurchaseTier.None), Arg.Any<CancellationToken>());
+        await _order.Received().ReportAsync(
+            AutomationPlan.Explore,
+            Arg.Is<PurchaseNeed>(need => need.Tier == PurchaseTier.MoreExplorers && need.ShipyardWaypointSymbol == Shipyard),
+            Arg.Any<CancellationToken>());
+        (await GoalAsync(CommandShip)).Should().BeOfType<MoveToWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(Shipyard);
+        (await AssignmentAsync(CommandShip)).Should().BeEquivalentTo(new { AssignmentType = ExplorePlanService.AssignmentType, CompletedAt = (DateTimeOffset?)null });
+        var state = await StateAsync();
+        state.Status.Should().Be(ExploreStatus.FetchingExplorer);
+        state.Purchase.Should().BeEquivalentTo(new { Status = ExplorerPurchaseStatus.CommandShipFetchesIt, Tier = PurchaseTier.MoreExplorers, ShipyardWaypointSymbol = Shipyard });
+        _log.Journal.Should().ContainSingle(line => line.EventKind == JournalEvents.PlanStarted && line.Message.Contains(CommandShip, StringComparison.Ordinal))
+            .Which.Message.Should().Contain(Shipyard);
 
-        await AddShipAsync("SPECTER-60", Gt9, "X1-GT9-B1", "SHIP_PROBE");
+        // At the shipyard the explorer is bought, and the command ship comes home to work (D60).
+        await MoveAsync(CommandShip, Gt9, Shipyard);
+        PurchaseSucceeds();
         await PassAsync();
 
-        await _order.Received().ReportAsync(AutomationPlan.Explore, Arg.Is<PurchaseNeed>(need => need.Tier == PurchaseTier.MoreExplorers && need.ShipyardWaypointSymbol == Shipyard), Arg.Any<CancellationToken>());
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.Bought);
+        (await GoalAsync(CommandShip)).Should().BeEquivalentTo(new { GateWaypointSymbol = Gt9Gate, DestinationGateWaypointSymbol = HomeGate });
+        (await StateAsync()).Status.Should().Be(ExploreStatus.Returning);
+    }
+
+    [Fact]
+    public async Task TheFirstExplorer_IsLeftToAProbeInTheShipyardsSystem_AndTheCommandShipExploresOn()
+    {
+        // D108: "if there isn't a probe there". The purchase calls for a ship (D30), and the probe plan sends the probe in
+        // X1-GT9 to the shipyard: the command ship would fly four times as far for nothing.
+        await SeedAsync();
+        await AddShipAsync("SPECTER-60", Gt9, "X1-GT9-B1", "SHIP_PROBE");
+
+        await PassAsync();
+
         await _purchases.Received().TryPurchaseAsync("SHIP_EXPLORER", Shipyard, Arg.Any<CancellationToken>());
         (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.WaitingForAShipThere, "the call brings the probe there");
-        (await GoalAsync(CommandShip)).Should().BeNull("the command ship fetches only the first");
+        (await GoalAsync(CommandShip)).Should().BeEquivalentTo(new { GateWaypointSymbol = HomeGate, DestinationGateWaypointSymbol = "X1-S01-G" });
+        (await StateAsync()).Status.Should().Be(ExploreStatus.Exploring);
+    }
+
+    [Theory]
+    [InlineData("X1-GT9-B1", true)]
+    [InlineData("X1-S01-M", false)]
+    public async Task AProbeOnItsWayToTheShipyardsSystem_AnswersTheCall_ButOneThatOnlyPassesThroughDoesnt(string flightTo, bool answers)
+    {
+        // A probe counts for the system its flight goes to, as the probe plan counts it (B15): one jumping in from home answers
+        // the call once there; one at X1-GT9's gate on its way to X1-S01 doesn't.
+        await SeedAsync();
+        await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
+        OrderLets(PurchaseTier.MoreExplorers);
+        var (system, waypoint) = answers ? (Home, "X1-FJ91-A1") : (Gt9, Gt9Gate);
+        await AddShipAsync("SPECTER-60", system, waypoint, "SHIP_PROBE");
+        await SetGoalAsync("SPECTER-60", new DeployProbeGoal { TargetWaypointSymbol = flightTo });
+
+        await PassAsync();
+
+        (await StateAsync()).Purchase.Status.Should().Be(answers ? ExplorerPurchaseStatus.WaitingForAShipThere : ExplorerPurchaseStatus.CommandShipFetchesIt);
+        if (answers)
+        {
+            (await GoalAsync(CommandShip)).Should().BeNull("an explorer explores, and the probe brings the purchase its ship");
+        }
+        else
+        {
+            (await GoalAsync(CommandShip)).Should().BeOfType<MoveToWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(Shipyard);
+        }
+    }
+
+    [Fact]
+    public async Task WithTheProbePlanOff_NoProbeAnswersTheCall_SoTheCommandShipFetchesTheExplorer()
+    {
+        // The probe plan answers the calls (D30); switched off, its probes stay where they are.
+        await SeedAsync();
+        await AddShipAsync("SPECTER-60", Gt9, "X1-GT9-B1", "SHIP_PROBE");
+        ProbePlanOn(false);
+
+        await PassAsync();
+
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.CommandShipFetchesIt);
+        (await GoalAsync(CommandShip)).Should().BeOfType<MoveToWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(Shipyard);
+    }
+
+    [Fact]
+    public async Task OnceOnItsWay_TheCommandShipStaysWithTheExplorer_WhileTheOrderHoldsItBack()
+    {
+        // Read with D108, as D98 waits for the credits: a drone's or a cargo ship's turn came while it flew there. It waits at
+        // the shipyard, where the purchase needs it, rather than flying home and back.
+        await SeedAsync();
+        await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
+        OrderLets(PurchaseTier.MoreExplorers);
+        await PassAsync();
+
+        await MoveAsync(CommandShip, Gt9, Shipyard);
+        OrderLets(PurchaseTier.None);
+        await PassesAsync(2);
+
+        (await GoalAsync(CommandShip)).Should().BeNull();
+        (await AssignmentAsync(CommandShip))!.CompletedAt.Should().BeNull();
+        var state = await StateAsync();
+        state.Status.Should().Be(ExploreStatus.FetchingExplorer);
+        state.Purchase.Status.Should().Be(ExplorerPurchaseStatus.WaitingForAnotherPurchase);
+    }
+
+    [Fact]
+    public async Task UntilTheOrderLetsAFurtherExplorerThrough_TheCommandShipKeepsItsWork()
+    {
+        // D108: "if it's in the purchase order and enough credits are available". At 15:55Z on 2026-10-06 the probes within
+        // the trade reach and the drones and cargo ships that take turns came first (D102).
+        await SeedAsync();
+        await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
+
+        await PassAsync();
+
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.WaitingForAnotherPurchase);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!);
+        (await GoalAsync(CommandShip)).Should().BeNull();
+        (await AssignmentAsync(CommandShip)).Should().BeNull();
     }
 
     [Theory]
@@ -336,6 +443,10 @@ public sealed class ExplorersTests
         _settings.GetAsync<int>(ExplorePlanService.SystemsPerExplorerSetting, Arg.Any<CancellationToken>()).Returns(perExplorer);
         _settings.GetAsync<int>(ExplorePlanService.MaxExplorersSetting, Arg.Any<CancellationToken>()).Returns(cap);
     }
+
+    /// <summary>Switches the probe plan, which answers a purchase's call for a ship (D30), on or off.</summary>
+    private void ProbePlanOn(bool on)
+        => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.ProbeDeployment), Arg.Any<CancellationToken>()).Returns(on);
 
     /// <summary>The order ships are bought in lets the explore plan buy a need at <paramref name="tier"/>, and no other.</summary>
     private void OrderLets(PurchaseTier tier)

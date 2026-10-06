@@ -8,6 +8,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Application.Tests.Services;
@@ -19,7 +20,9 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// Slice 6.3 (D29, D30): a probe for every market of the headquarters' system, bought while the credits stay
 /// at the reserve; until then the probes roam between nearby markets, the one whose prices are oldest first,
 /// and a shipyard where a purchase waits for one of our ships gets the nearest probe. On X1-DC53 as it was
-/// on 2026-10-02, with the starting probe SPECTER-2 parked at H52 since the start.
+/// on 2026-10-02, with the starting probe SPECTER-2 parked at H52 since the start. Its waypoints A2 and H52 are cached here
+/// without their shipyard trait, so the probes roam as they did before slice 6.32, which parks a probe at each shipyard
+/// (D110); the tests of slice 6.32 give them their trait.
 /// </summary>
 public sealed class ProbeDeploymentPlanServiceTests
 {
@@ -37,6 +40,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private const string Kr90K2 = "X1-KR90-K2";
     private const string Mt49 = "X1-MT49";
     private const string Mt49Gate = "X1-MT49-G";
+    private const string Mt49M1 = "X1-MT49-M1";
 
     private readonly IProbeDeploymentPlanRepository _plans = Substitute.For<IProbeDeploymentPlanRepository>();
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
@@ -58,15 +62,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     public ProbeDeploymentPlanServiceTests()
     {
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, A1, 151_214, "COBALT", 3));
-        _waypoints.GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(
-        [
-            Waypoint(A1, "PLANET", 21, 16),
-            Waypoint(A2, "MOON", 21, 16, shipyard: true),
-            Waypoint(H51, "PLANET", -18, 40),
-            Waypoint(H52, "MOON", -18, 40, shipyard: true),
-            Waypoint(XB5C, "ENGINEERED_ASTEROID", -15, 21),
-            Waypoint(J58, "ASTEROID_BASE", 435, -572),
-        ]);
+        _waypoints.GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(DefaultWaypoints());
         LastSeen((A1, 60), (A2, 2), (H51, 30), (H52, 1), (XB5C, 1), (J58, 90));
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
         [
@@ -267,7 +263,8 @@ public sealed class ProbeDeploymentPlanServiceTests
     {
         // Slice 6.28 (D97): before it, the plan counted home's markets only, bought nothing more and left X1-KR90 unwatched.
         // No probe of ours is in X1-KR90 yet, so its shipyard can't sell one (D30): the probe is bought at home, with the
-        // jump's antimatter (5,000 at home's gate) counted, and flies to X1-KR90's gate, the market it sees first.
+        // jump's antimatter (5,000 at home's gate) counted, and flies to X1-KR90's shipyard K2, the market it sees first since
+        // slice 6.32 (D109; before, the gate, where it came in).
         Abroad();
         _purchases.TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>()).Returns(new ShipPurchaseResult
         {
@@ -280,7 +277,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
-        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90Gate);
+        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90K2);
         _activeGoals.Should().ContainSingle("home's probes stay at their markets");
         _state!.Purchase.Should().Be(ProbePurchaseStatus.Bought);
         _state.NextProbeSystem.Should().Be(Kr90);
@@ -289,7 +286,90 @@ public sealed class ProbeDeploymentPlanServiceTests
             (SystemSymbol, 0, true, 3),
             (Kr90, 1, true, 1),
             (Mt49, 2, true, 0));
-        _log.Entries.Should().Contain(entry => entry.Message == "Probe plan: probe SPECTER-7, bought in X1-DC53, flies to X1-KR90-G in X1-KR90, 1 jumps from home, which has 0 probes for 3 markets.");
+        _log.Entries.Should().Contain(entry => entry.Message == "Probe plan: probe SPECTER-7, bought in X1-DC53, flies to X1-KR90-K2 in X1-KR90, 1 jumps from home, which has 0 probes for 3 markets.");
+    }
+
+    [Fact]
+    public async Task AProbeParksAtItsSystemsShipyard_AndTheOthersRoam()
+    {
+        // Slice 6.32, D110: "Stays parked". Before, SPECTER-2 left the shipyard H52 for the staler markets; now SPECTER-5,
+        // at A2, roams to A1, an hour old.
+        _waypoints.GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(
+            [.. DefaultWaypoints().Select(waypoint => waypoint.Symbol == H52 ? waypoint with { HasShipyard = true } : waypoint)]);
+        Fleet(StartingProbe(), Probe("SPECTER-5", A2));
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SPECTER-2");
+        _activeGoals["SPECTER-5"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(A1);
+        _state!.Systems.Single().Markets.Single(market => market.WaypointSymbol == H52)
+            .Should().BeEquivalentTo(new { Shipyard = ShipyardKind.Shipyard, ProbeSymbol = "SPECTER-2" });
+    }
+
+    [Fact]
+    public async Task AShipyardThatSellsExplorers_GetsTheNextProbe_BeforeTheMarketsOfANearerSystem()
+    {
+        // Slice 6.32, D109: "with shipyards with explorer ships being even higher priority than that". X1-MT49's M1 sells
+        // SHIP_EXPLORER, 2 jumps from home; X1-KR90, 1 jump, has three markets without a probe and came first before. Only home
+        // sells probes here: the probe is bought there, with both jumps' antimatter, and flies to M1.
+        Abroad();
+        ShipyardAtM1(explorer: true);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard(Kr90K2, ("SHIP_MINING_DRONE", 48_000)) with { SystemSymbol = Kr90 },
+            Shipyard(Mt49M1, ("SHIP_EXPLORER", 702_315)) with { SystemSymbol = Mt49 },
+        ]);
+        _purchases.TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>()).Returns(new ShipPurchaseResult
+        {
+            IsSuccess = true,
+            EstimatedCost = 81_645,
+            ActualCost = 81_645,
+            PurchasedShip = Probe("SPECTER-7", A2),
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
+        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Mt49M1);
+        _state!.NextProbeSystem.Should().Be(Mt49);
+        _state.NextProbeFor.Should().Be(ShipyardKind.Explorer);
+        _state.NextProbeAntimatter.Should().Be(9_000);
+        _state.Systems.Single(system => system.SystemSymbol == Mt49).Markets.Single(market => market.WaypointSymbol == Mt49M1)
+            .Shipyard.Should().Be(ShipyardKind.Explorer);
+    }
+
+    [Fact]
+    public async Task AShipyardGetsItsProbe_BeforeTheMarketsOfANearerSystem()
+    {
+        // Slice 6.32, D109: "Across systems". X1-KR90's shipyard K2 has its probe, SPECTER-7, and two markets without one; X1-MT49,
+        // a jump further, has a shipyard, M1, without one. K2 sells probes now that SPECTER-7 is there.
+        Abroad(Probe("SPECTER-7", Kr90K2) with { SystemSymbol = Kr90 });
+        ShipyardAtM1(explorer: false);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", Kr90K2, 24_000));
+        _state!.NextProbeSystem.Should().Be(Mt49);
+        _state.NextProbeFor.Should().Be(ShipyardKind.Shipyard);
+        _activeGoals.Should().NotContainKey("SPECTER-7", "it stays parked at K2 (D110)");
+    }
+
+    [Theory]
+    [InlineData(true, PurchaseTier.Probes)]
+    [InlineData(false, PurchaseTier.FarProbes)]
+    public async Task AShipyardBeyondTheTradeReach_GetsItsProbeWithTheProbesInReach_OnlyIfItSellsExplorers(bool explorer, PurchaseTier tier)
+    {
+        // Slice 6.32, D111: "Probe tier". With Trade.MaxHaulDistance 1, X1-MT49, 2 jumps away, is beyond the trade reach; the
+        // explore plan buys explorers at any shipyard the gates reach. X1-KR90 has its three probes, and K2 sells probes.
+        Abroad(Probe("SPECTER-7", Kr90Gate) with { SystemSymbol = Kr90 }, Probe("SPECTER-8", Kr90K1) with { SystemSymbol = Kr90 }, Probe("SPECTER-9", Kr90K2) with { SystemSymbol = Kr90 });
+        ShipyardAtM1(explorer);
+        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(1);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(tier, "SHIP_PROBE", Kr90K2, 24_000));
+        _state!.NextProbeSystem.Should().Be(Mt49);
     }
 
     [Fact]
@@ -463,7 +543,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         _waypoints.GetBySystemAsync(Mt49, Arg.Any<CancellationToken>()).Returns(
         [
             WaypointIn(Mt49, Mt49Gate, "JUMP_GATE", 0, 0),
-            WaypointIn(Mt49, "X1-MT49-M1", "PLANET", 20, 20),
+            WaypointIn(Mt49, Mt49M1, "PLANET", 20, 20),
         ]);
         LastSeen((A2, 1), (H52, 1), (I55, 1));
         _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>()).Returns(
@@ -479,6 +559,36 @@ public sealed class ProbeDeploymentPlanServiceTests
         _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns(Network(mt49Connected: true));
         Fleet([StartingProbe(), Probe("SPECTER-5", A2), Probe("SPECTER-6", I55), .. more]);
     }
+
+    /// <summary>
+    /// Slice 6.32: X1-MT49's M1 is a shipyard, with <paramref name="explorer"/> one that sells SHIP_EXPLORER (else light
+    /// shuttles); home's A2 and X1-KR90's K2 sell probes, as in <see cref="Abroad"/>.
+    /// </summary>
+    private void ShipyardAtM1(bool explorer)
+    {
+        _waypoints.GetBySystemAsync(Mt49, Arg.Any<CancellationToken>()).Returns(
+        [
+            WaypointIn(Mt49, Mt49Gate, "JUMP_GATE", 0, 0),
+            WaypointIn(Mt49, Mt49M1, "PLANET", 20, 20, shipyard: true),
+        ]);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard(Kr90K2, ("SHIP_PROBE", 24_000)) with { SystemSymbol = Kr90 },
+            Shipyard(Mt49M1, explorer ? ("SHIP_EXPLORER", 702_315) : ("SHIP_LIGHT_SHUTTLE", 117_273)) with { SystemSymbol = Mt49 },
+        ]);
+    }
+
+    /// <summary>X1-DC53's markets as the tests before slice 6.32 knew them: A2 and H52 without their shipyard trait.</summary>
+    private static List<WaypointCacheModel> DefaultWaypoints() =>
+    [
+        Waypoint(A1, "PLANET", 21, 16),
+        Waypoint(A2, "MOON", 21, 16),
+        Waypoint(H51, "PLANET", -18, 40),
+        Waypoint(H52, "MOON", -18, 40),
+        Waypoint(XB5C, "ENGINEERED_ASTEROID", -15, 21),
+        Waypoint(J58, "ASTEROID_BASE", 435, -572),
+    ];
 
     private ExplorePlanState Network(bool mt49Connected) => new()
     {

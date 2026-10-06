@@ -6,6 +6,7 @@ using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
@@ -48,9 +49,9 @@ public interface IExplorePlanService
 ///   most <c>Explore.MaxExplorers</c> (5; 0 for no cap): the systems it knows, hasn't explored and reaches from home through
 ///   built gates (<see cref="ExploreAtlas.SystemsLeft"/>).</item>
 ///   <item>It buys them at the cheapest shipyard the gates reach that sells one, within the credit reserve: the first at
-///   <see cref="PurchaseTier.Explorer"/>, before the probes, which the command ship fetches (D30), every further one at
-///   <see cref="PurchaseTier.MoreExplorers"/>, after the drones and cargo ships that take turns, once one of our ships is in
-///   the shipyard's system, where a probe answers its call.</item>
+///   <see cref="PurchaseTier.Explorer"/>, before the probes, every further one at <see cref="PurchaseTier.MoreExplorers"/>,
+///   after the drones and cargo ships that take turns. A probe of ours in the shipyard's system, or on its way there, answers
+///   the purchase's call for a ship (D30); with none, the command ship fetches the explorer (slice 6.32, D108).</item>
 ///   <item>The explorers explore, each the nearest system no other exploring ship has taken; once there is one, the command
 ///   ship finishes its step, comes home and is released (D60). An explorer with no system left to take is released where it
 ///   is, and trades from there (D102) until one turns up.</item>
@@ -449,11 +450,11 @@ public sealed class ExplorePlanService(
     /// Buys the next explorer while fewer are there than wanted (slice 6.30, D98, D102), at the cheapest shipyard the gates
     /// reach that sells one, when nothing comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>):
     /// the first at <see cref="PurchaseTier.Explorer"/>, before the probes; every further one at
-    /// <see cref="PurchaseTier.MoreExplorers"/>, after the drones and cargo ships that take turns, and only while one of our
-    /// ships can be at the shipyard: one is there, or a probe is in its system to answer the purchase's call (D30). A need that
-    /// nothing could meet would hold back the far probes for good. <see cref="IShipPurchaseService"/> keeps the credit reserve,
-    /// and calls for a ship when none of ours is at the shipyard; for the first explorer the command ship answers it
-    /// (<see cref="ExplorerPurchaseStatus.CommandShipFetchesIt"/>).
+    /// <see cref="PurchaseTier.MoreExplorers"/>, after the drones and cargo ships that take turns. <see cref="IShipPurchaseService"/>
+    /// keeps the credit reserve, and calls for a ship when none of ours is at the shipyard (D30). Slice 6.32 (D108): a probe of
+    /// ours in the shipyard's system, or on its way there, answers the call (<see cref="ExplorerPurchaseStatus.WaitingForAShipThere"/>);
+    /// with none, the command ship does, for every explorer (<see cref="ExplorerPurchaseStatus.CommandShipFetchesIt"/>), so a
+    /// further one counts in the order even while none of our ships is in the shipyard's system.
     /// </summary>
     private async Task<ExplorerPurchaseState> BuyAsync(ExplorePlanState state, IReadOnlyList<ShipModel> fleet, int owned, DateTimeOffset now, CancellationToken ct)
     {
@@ -482,11 +483,6 @@ public sealed class ExplorePlanService(
         }
 
         var purchase = new ExplorerPurchaseState { Tier = tier, ShipyardWaypointSymbol = offer.Shipyard, Price = offer.Price };
-        if (tier == PurchaseTier.MoreExplorers && !fleet.Any(ship => CanAnswer(ship, offer.Shipyard, offer.System)))
-        {
-            return purchase with { Status = ExplorerPurchaseStatus.WaitingForAShipThere };
-        }
-
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Explore, new PurchaseNeed(tier, FleetRoles.ExplorerShipType, offer.Shipyard, offer.Price), ct))
         {
             return purchase with { Status = ExplorerPurchaseStatus.WaitingForAnotherPurchase };
@@ -521,9 +517,9 @@ public sealed class ExplorePlanService(
             {
                 { IsSuccess: true } => ExplorerPurchaseStatus.Bought,
                 { Failure: ShipPurchaseFailure.OverBudget } => ExplorerPurchaseStatus.WaitingForCredits,
-                { Failure: ShipPurchaseFailure.NoShipAtShipyard } => tier == PurchaseTier.Explorer
-                    ? ExplorerPurchaseStatus.CommandShipFetchesIt
-                    : ExplorerPurchaseStatus.WaitingForAShipThere,
+                { Failure: ShipPurchaseFailure.NoShipAtShipyard } => await ProbeAnswersAsync(fleet, offer.System, ct)
+                    ? ExplorerPurchaseStatus.WaitingForAShipThere
+                    : ExplorerPurchaseStatus.CommandShipFetchesIt,
                 { Failure: ShipPurchaseFailure.PriceUnknown } => ExplorerPurchaseStatus.NoShipyardSellsOne,
                 _ => ExplorerPurchaseStatus.None,
             },
@@ -532,12 +528,29 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>
-    /// Whether a ship lets a further explorer be bought (D30, D102): it is at the shipyard, or it is a probe in the shipyard's
-    /// system, which answers the purchase's call.
+    /// Whether a probe of ours answers the call of a purchase at a shipyard in <paramref name="system"/> (D30, slice 6.32, D108:
+    /// "if there isn't a probe there"): one that counts for that system, there or on its way there, as the probe plan counts
+    /// it (<see cref="ProbePlanner.Whereabouts"/>), while the probe plan, which answers the calls, is on. A probe that only
+    /// passes through, on its way to another system, doesn't.
     /// </summary>
-    private static bool CanAnswer(ShipModel ship, string shipyard, string system)
-        => (ship.LocalStatus != ShipLocalStatus.InTransit && string.Equals(ship.WaypointSymbol, shipyard, StringComparison.OrdinalIgnoreCase))
-            || (FleetRoles.IsProbe(ship) && string.Equals(ship.SystemSymbol, system, StringComparison.OrdinalIgnoreCase));
+    private async Task<bool> ProbeAnswersAsync(IReadOnlyList<ShipModel> fleet, string system, CancellationToken ct)
+    {
+        if (!await settings.IsPlanEnabledAsync(AutomationPlan.ProbeDeployment, ct))
+        {
+            return false;
+        }
+
+        foreach (var probe in fleet.Where(FleetRoles.IsProbe))
+        {
+            var (_, counts) = ProbePlanner.Whereabouts(probe, await goals.GetActiveGoalAsync(probe.Symbol, ct));
+            if (counts.Equals(system, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>The command ship's next step, when it is exploring, fetching an explorer, or free (its trip has ended).</summary>
     private async Task<ExplorePlanState> StepAsync(ExplorePlanState state, ShipModel ship, bool explorersExplore, int reach, DateTimeOffset now, CancellationToken ct)
@@ -584,10 +597,10 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>
-    /// Chooses the command ship's next step: scout the system it is in, if not explored yet; once an explorer explores, home
-    /// (slice 6.30, D98); while the first explorer waits for it at the shipyard, that shipyard; else a jump towards the nearest
-    /// system not explored yet, or towards home; at home with nothing left, it is released to the other plans. A free ship is
-    /// taken (an <see cref="AssignmentType"/> assignment) only for a step it has to take.
+    /// Chooses the command ship's next step: scout the system it is in, if not explored yet; while an explorer waits for it at
+    /// the shipyard, that shipyard (slice 6.30, D98; every explorer since slice 6.32, D108); once an explorer explores, home;
+    /// else a jump towards the nearest system not explored yet, or towards home; at home with nothing left, it is released to
+    /// the other plans. A free ship is taken (an <see cref="AssignmentType"/> assignment) only for a step it has to take.
     /// </summary>
     private async Task<ExplorePlanState> DecideAsync(
         ExplorePlanState state,
@@ -616,18 +629,17 @@ public sealed class ExplorePlanService(
             }
         }
 
-        if (explorersExplore)
-        {
-            return await HomeAsync(state, ship, assignment, now, ct);
-        }
-
-        // The first explorer (D98): the command ship fetches it, and once on its way stays with it while the credits are saved.
-        // Only while a way there is known: a flight that found none would end at once, on every pass.
-        if ((state.Purchase.Status == ExplorerPurchaseStatus.CommandShipFetchesIt
-                || (state.Status == ExploreStatus.FetchingExplorer && state.Purchase.Status == ExplorerPurchaseStatus.WaitingForCredits))
+        // An explorer that no probe of ours can fetch (D98, D108): the command ship fetches it, before it comes home for the
+        // explorers that explore. Only while a way there is known: a flight that found none would end at once, on every pass.
+        if (Fetches(state)
             && ExploreAtlas.TryFindJumps(refusals.Apply(state), here, WaypointSymbols.SystemOf(state.Purchase.ShipyardWaypointSymbol), now, out _))
         {
             return await FetchAsync(state, ship, assignment, now, ct);
+        }
+
+        if (explorersExplore)
+        {
+            return await HomeAsync(state, ship, assignment, now, ct);
         }
 
         var step = ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), reach);
@@ -710,9 +722,23 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>
-    /// The command ship fetches the first explorer (slice 6.30, D98, D30): it flies to the shipyard, through the gates, and
-    /// waits there until the purchase is made (<see cref="BuyAsync"/>). It is sent only while the credits allow the purchase;
-    /// while they are saved up for it, it waits where it is.
+    /// Whether the command ship fetches the next explorer (D98, slice 6.32, D108): the purchase calls for a ship that no probe of
+    /// ours answers; or the command ship is on its way already, and the purchase still waits, for the credits, for the order
+    /// ships are bought in, or for a probe that came into the shipyard's system meanwhile. Once on its way it stays with the
+    /// purchase rather than flying home and back.
+    /// </summary>
+    private static bool Fetches(ExplorePlanState state)
+        => state.Purchase.Status == ExplorerPurchaseStatus.CommandShipFetchesIt
+            || (state.Status == ExploreStatus.FetchingExplorer
+                && state.Purchase.Status is ExplorerPurchaseStatus.WaitingForCredits
+                    or ExplorerPurchaseStatus.WaitingForAnotherPurchase
+                    or ExplorerPurchaseStatus.WaitingForAShipThere);
+
+    /// <summary>
+    /// The command ship fetches an explorer (slice 6.30, D98, D30; every explorer since slice 6.32, D108): it flies to the
+    /// shipyard, through the gates, and waits there until the purchase is made (<see cref="BuyAsync"/>). It is sent only while
+    /// the order ships are bought in and the credits allow the purchase; while they hold it back once it is on its way, it
+    /// waits where it is.
     /// </summary>
     private async Task<ExplorePlanState> FetchAsync(ExplorePlanState state, ShipModel ship, ShipAssignmentDto? assignment, DateTimeOffset now, CancellationToken ct)
     {
@@ -725,7 +751,7 @@ public sealed class ExplorePlanService(
             if (state.Status != ExploreStatus.FetchingExplorer)
             {
                 logger.LogInformation(
-                    "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: flies to {WaypointSymbol} to buy the first explorer there, for about {Price}.",
+                    "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: flies to {WaypointSymbol} to buy an explorer there, for about {Price}; no probe of ours is there to answer the purchase's call.",
                     JournalEvents.PlanStarted,
                     AutomationPlan.Explore,
                     ship.Symbol,

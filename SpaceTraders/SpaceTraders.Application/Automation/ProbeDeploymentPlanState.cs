@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using SpaceTraders.Application.Probes;
 
 namespace SpaceTraders.Application.Automation;
 
@@ -26,8 +27,16 @@ public sealed record ProbeDeploymentPlanState
     /// <summary>Whether a probe was bought in the pass, or why not.</summary>
     public ProbePurchaseStatus Purchase { get; init; }
 
-    /// <summary>The system the next probe is for: the first with fewer probes than markets; empty when none has.</summary>
+    /// <summary>
+    /// The system the next probe is for: the first short of one, its shipyards first (slice 6.32, D109); empty when none is.
+    /// </summary>
     public string NextProbeSystem { get; init; } = string.Empty;
+
+    /// <summary>
+    /// What the next probe is for (slice 6.32, D109): a shipyard that sells SHIP_EXPLORER, another shipyard, or a market
+    /// (<see cref="ShipyardKind.None"/>).
+    /// </summary>
+    public ShipyardKind NextProbeFor { get; init; }
 
     /// <summary>
     /// Where the next probe would be bought: the shipyard where it costs least, the antimatter to its system counted (D97); with
@@ -79,6 +88,9 @@ public sealed record ProbeMarketState
 {
     /// <summary>The market's waypoint.</summary>
     public required string WaypointSymbol { get; init; }
+
+    /// <summary>Whether it is a shipyard, and one that sells SHIP_EXPLORER, where a probe parks first (slice 6.32, D109, D110).</summary>
+    public ShipyardKind Shipyard { get; init; }
 
     /// <summary>The probe at the market, or on its way there; empty when there is none.</summary>
     public string ProbeSymbol { get; init; } = string.Empty;
