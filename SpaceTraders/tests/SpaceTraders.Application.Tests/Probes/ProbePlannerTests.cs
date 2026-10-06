@@ -1,6 +1,9 @@
 using FluentAssertions;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Probes;
 
@@ -255,9 +258,114 @@ public sealed class ProbePlannerTests
         ProbePlanner.Entry(snapshot, "X1-DC53-UNKNOWN", 9).Should().Be(A1, "without the gate's position the oldest prices win");
     }
 
+    [Fact]
+    public void WithFewerProbesThanMarkets_AProbeAtAShipyard_StaysParked_AndTheOthersRoam()
+    {
+        // Slice 6.32, D110: "Stays parked", so a purchase at A2 needs no probe called (D30). Before, PROBE-1 left A2 for the
+        // staler H51, as PROBE-2 leaves A1.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", A2), Probe("PROBE-2", A1)],
+            Shipyard(A2, minutesAgo: 1),
+            Market(A1, minutesAgo: 1),
+            Market(H51, minutesAgo: 60)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-2", H51, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
+    public void AShipyardWithoutAProbe_GetsTheNearestFreeProbe_BeforeADueMarket()
+    {
+        // D109, D110: shipyards first. A2 was seen a minute ago and isn't due; H51 is an hour old.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H52)],
+            Shipyard(A2, minutesAgo: 1),
+            Market(H51, minutesAgo: 60),
+            Market(XB5C, minutesAgo: 60)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-1", A2, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
+    public void AShipyardThatSellsExplorers_GetsAProbe_BeforeEveryOtherShipyard_HoweverFar()
+    {
+        // D109: "with shipyards with explorer ships being even higher priority than that". J58, the far corner, goes first,
+        // to the probe nearest it (PROBE-2 at A1, 719 away; PROBE-1 at H52 is 761); then H51, next door to PROBE-1. XB5C,
+        // an hour old, waits.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H52), Probe("PROBE-2", A1)],
+            Shipyard(H51, minutesAgo: 60),
+            Shipyard(J58, minutesAgo: 1, explorer: true),
+            Market(A1, minutesAgo: 1),
+            Market(XB5C, minutesAgo: 60)));
+
+        moves.Should().BeEquivalentTo([
+            new ProbeMove("PROBE-2", J58, ForPurchase: false, ShipType: string.Empty),
+            new ProbeMove("PROBE-1", H51, ForPurchase: false, ShipType: string.Empty),
+        ]);
+    }
+
+    [Fact]
+    public void AProbeParkedAtAShipyard_GivesWayToAShipyardThatSellsExplorers()
+    {
+        // D109: a purchase at H51 drew the one probe there (D30), and it stayed parked once the purchase was made. J58, which
+        // sells explorers, comes first: it moves on.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H51)],
+            Shipyard(H51, minutesAgo: 1),
+            Shipyard(J58, minutesAgo: 1, explorer: true),
+            Market(A1, minutesAgo: 60)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-1", J58, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
+    public void WithAProbeForEveryMarket_ASpareTakesAShipyardFirst()
+    {
+        // B69's settling, shipyards first (D109): H51's prices are an hour older than H52's, but H52 is a shipyard.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", A1), Probe("PROBE-2", A1), Probe("PROBE-3", A1)],
+            Market(A1, minutesAgo: 1),
+            Shipyard(H52, minutesAgo: 1),
+            Market(H51, minutesAgo: 60)));
+
+        moves.Should().BeEquivalentTo([
+            new ProbeMove("PROBE-2", H52, ForPurchase: false, ShipType: string.Empty),
+            new ProbeMove("PROBE-3", H51, ForPurchase: false, ShipType: string.Empty),
+        ]);
+    }
+
+    [Fact]
+    public void AProbeComingIn_TakesAShipyardThatSellsExplorers_ThenAnotherShipyard_ThenTheMarketARoamingProbeWouldTake()
+    {
+        // D109: from the gate at H52, the shipyard J58 sells explorers; A2 is the nearest other shipyard, before XB5C's.
+        var snapshot = Snapshot([], Market(H51, minutesAgo: 600), Shipyard(XB5C, minutesAgo: 1), Shipyard(A2, minutesAgo: 1), Shipyard(J58, minutesAgo: 1, explorer: true));
+
+        ProbePlanner.Entry(snapshot, H52, 9).Should().Be(J58);
+        ProbePlanner.Entry(snapshot with { Probes = [Probe("PROBE-1", J58, free: false)] }, H52, 9).Should().Be(XB5C, "it is nearer the gate than A2");
+        ProbePlanner.Entry(snapshot with { Probes = [Probe("PROBE-1", J58, free: false), Probe("PROBE-2", XB5C), Probe("PROBE-3", A2)] }, H52, 9)
+            .Should().Be(H51);
+    }
+
+    [Fact]
+    public void AProbe_CountsWhereItsFlightGoes_ElseWhereItLands_ElseWhereItIs()
+    {
+        // B15, slice 6.28: a probe that only passes through X1-GT9 on its way to X1-BC61 counts for X1-BC61.
+        var atGate = new ShipModel("PROBE-1", "X1-GT9", "X1-GT9-E10Z", "IN_ORBIT", "CRUISE", 0, 0);
+        var flying = atGate with { Status = "IN_TRANSIT", DestWaypointSymbol = "X1-GT9-AE7B", ArrivesAt = Now.AddMinutes(5) };
+
+        ProbePlanner.Whereabouts(atGate, new DeployProbeGoal { TargetWaypointSymbol = "X1-BC61-EE6B" }).Should().Be(("X1-BC61-EE6B", "X1-BC61"));
+        ProbePlanner.Whereabouts(atGate, null).Should().Be(("X1-GT9-E10Z", "X1-GT9"));
+        ProbePlanner.Whereabouts(atGate, new DeployProbeGoal { TargetWaypointSymbol = "X1-BC61-EE6B", Status = GoalStatus.Completed })
+            .Should().Be(("X1-GT9-E10Z", "X1-GT9"), "a flight that ended holds nothing");
+        ProbePlanner.Whereabouts(flying, null).Should().Be(("X1-GT9-AE7B", "X1-GT9"));
+    }
+
     private static ProbeShip Probe(string symbol, string waypointSymbol, bool free = true) => new(symbol, waypointSymbol, free, 9);
 
     private static ProbeMarket Market(string waypointSymbol, int minutesAgo) => new(waypointSymbol, Now.AddMinutes(-minutesAgo));
+
+    private static ProbeMarket Shipyard(string waypointSymbol, int minutesAgo, bool explorer = false)
+        => Market(waypointSymbol, minutesAgo) with { Shipyard = explorer ? ShipyardKind.Explorer : ShipyardKind.Shipyard };
 
     private static ShipyardCall Call(string waypointSymbol, string shipType) => new(waypointSymbol, shipType, Now.AddSeconds(-10), Now.AddSeconds(-5));
 

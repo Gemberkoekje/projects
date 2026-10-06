@@ -300,10 +300,10 @@ it and the other ships can do and what each role would earn: see
 | Plan | Purpose | Ships it uses | Statuses | Buys |
 |---|---|---|---|---|
 | Scout | Visit every marketplace in the starting system once | The one ship with fuel | Active → Completed | Nothing |
-| Explore | Jump through active gates to every system not explored yet, scout each one's markets and shipyards once, and come home (slice 6.11, D59–D63) | The command ship, once its trip ends | What it knows of each system and gate; the command ship Waiting, Exploring, Returning or Done | Nothing; each jump buys one ANTIMATTER |
+| Explore | Jump through active gates to every system not explored yet, scout each one's markets and shipyards once, and come home (slice 6.11, D59–D63) | The command ship, once its trip ends | What it knows of each system and gate; the command ship Waiting, Exploring, Returning or Done | `SHIP_EXPLORER` (slice 6.30, D98, D102), which the command ship fetches unless a probe of ours answers the purchase's call (slice 6.32, D108); each jump buys one ANTIMATTER |
 | Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral and area, the rest by an assignment (slice 6.9, D38–D42, D48, D53) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral and area must be worth their role |
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_MINING_DRONE`, first in the order (D43) |
-| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
+| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30); a probe parks at each shipyard first, those that sell explorers first of all (slice 6.32, D109, D110) | Probes | Markets with their probe, the next probe's price, open calls | `SHIP_PROBE`, while there are fewer probes than markets, after the cargo ships of the list (D43) |
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones, with the role board on (D47); then one more for each further area with mining drones, after the drones per scarce mineral (D55) |
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77); a drone bought for the jump gate's smelters mines only its ore for them while the gate needs a material made from it (D92) | Free miners | Low-supply openings (Pending/Assigned), the gate's miners | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53); while the gate needs materials, one per ore its smelters have below HIGH every `Mining.GateMinerIntervalMinutes` (D92); then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
@@ -331,12 +331,13 @@ it and the other ships can do and what each role would earn: see
 
 Markets are not scouted again. Other systems are the explore plan's (below).
 
-### Explore (`ExplorePlanService`, slices 6.11, 6.30 and 6.31)
+### Explore (`ExplorePlanService`, slices 6.11, 6.30, 6.31 and 6.32)
 
 Asked on 2026-10-04: "if an active jump gate goes to a system that isn't explored yet, the COMMAND ship should go through
 that jump gate. If there are markets or shipyard there, the COMMAND ship should scout them, as it initially does for the
 home system, recursively." On by default (`Automation.Plan.Explore.Enabled`, D69); your decisions are D59–D63, for the
-explorers and charting (slice 6.30) D98, D99, D102 and D103, and for warping (slice 6.31) D100, D101 and D104–D107.
+explorers and charting (slice 6.30) D98, D99, D102 and D103, for warping (slice 6.31) D100, D101 and D104–D107, and for
+who fetches an explorer (slice 6.32) D108.
 
 - **What it knows** (`ExplorePlanState`, `plan_states` row `Explore`): every system it has seen, with its gate's waypoint,
   whether the gate is built (`Active`), still `UnderConstruction`, `None` or `Unknown`, the gates it connects to (asked
@@ -356,7 +357,7 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103, and for warping (sl
   D61: no goal, no assignment, not in transit) and a system is left for it, with an `Explore` assignment, so no other plan
   takes it. It bootstraps before the role board and every plan after it. While the scout plan or the contract has the
   command ship, it waits. Once there is an explorer, the command ship finishes its step, jumps home and is released there
-  (D60, D98).
+  (D60, D98), unless it fetches the next explorer (below).
 - **How many explorers** (D102): one for every `Explore.SystemsPerExplorer` (10) systems left, or part of that, at most
   `Explore.MaxExplorers` (5; 0 for no cap); `Explore.SystemsPerExplorer` 0 buys none. The systems left are those it knows,
   hasn't explored and reaches from home through built gates (`ExploreAtlas.SystemsLeft`): one behind a gate under
@@ -364,10 +365,15 @@ explorers and charting (slice 6.30) D98, D99, D102 and D103, and for warping (sl
   (X1-GT9-AE7B in the reset of 2026-10-04): the first at `PurchaseTier.Explorer`, before the probes, the rest at
   `PurchaseTier.MoreExplorers`, after the drones and cargo ships that take turns (see
   [the order ships are bought in](#the-order-ships-are-bought-in-purchaseorder-slice-610b)). The API sells a ship only where
-  one of ours is (D30): the command ship fetches the first (`FetchingExplorer`: a `MoveToWaypointGoal` to the shipyard,
-  through the gates), sent once nothing comes before it and the credits allow it, and waits there while the credits are
-  saved up; a further one counts in the order only while one of our ships is at the shipyard or a probe of ours is in its
-  system, which answers the purchase's call, so no explorer turns back for one.
+  one of ours is (D30). A probe of ours in the shipyard's system, or on its way there (as the probe plan counts it,
+  `ProbePlanner.Whereabouts`: one that only passes through counts for where it goes), answers the purchase's call while the
+  probe plan is on (`WaitingForAShipThere`); with none, the command ship fetches the explorer, the first and every further
+  one (slice 6.32, D108; `CommandShipFetchesIt`, then `FetchingExplorer`: a `MoveToWaypointGoal` to the shipyard, through
+  the gates). It is sent once nothing comes before the explorer in the order and the credits allow it, and taken once its
+  trip ends (D61); once on its way it stays with the purchase, waiting at the shipyard while the credits are saved up or the
+  order holds the explorer back; once it is bought, it comes home and is released (D60). Since the probes park at the
+  shipyards that sell explorers first (see the probe plan), one is usually there by a further explorer's turn. A further
+  explorer counts in the order even while none of our ships is in the shipyard's system: the command ship can meet it.
 - **Where it goes** (`ExploreAtlas`): a system not explored yet that no other exploring ship has taken, within the trade
   reach of home (`Trade.MaxHaulDistance`, 5) before any beyond it (D103), the nearest by jumps through built gates in each
   (a jump needs the gates at both ends built), then by symbol; no limit (D59). While a look that could change the choice
@@ -626,11 +632,15 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   it through the mining plan. Every unit delivered isn't enough: until the fulfil call has gone out,
   the assignment stays open with 0 units left, so the ship goes back to make it.
 
-### Probe deployment (`ProbeDeploymentPlanService`, slices 6.3 and 6.28)
+### Probe deployment (`ProbeDeploymentPlanService`, slices 6.3, 6.28 and 6.32)
 
 The goal is a probe at every market, where the market watch keeps the prices fresh (D29): the HQ system's first, then
 those of each explored system the built gates reach, the nearest first (slice 6.28, D97: "Trade reach as a priority, all
-explored markets when money allows"). Each pass:
+explored markets when money allows"). Since slice 6.32 the shipyards come first (D109–D111, asked on 2026-10-06: "have
+probes deployed to shipyards with priority, with shipyards with explorer ships being even higher priority than that"): a
+probe parked at a shipyard lets a purchase there happen at once (D30). A shipyard is a market whose waypoint has the
+SHIPYARD trait (every shipyard cached so far is one); one that sells `SHIP_EXPLORER`, as cached, comes before the others.
+Each pass:
 - **Probes** are the ships with a probe frame, or cached as `SHIP_PROBE` (bought) or `SATELLITE`
   (startup sync stores a ship's *registration role* as its type), so the starting probe is one (B25).
   No other plan uses them. A probe counts for the system it is in, or, with a flight to make, for the system it flies to,
@@ -639,9 +649,14 @@ explored markets when money allows"). Each pass:
   home (`ExploreAtlas.Reachable`, through `IGateNetwork`: the explore plan's gates, with the jumps refused lately), the
   nearest first by jumps; then any other system a probe of ours is in, where it keeps working but none is bought. Home and
   the systems within `Trade.MaxHaulDistance` jumps of it (5, the trade reach, D96) are in the trade reach.
+- **Which system is next** (`Wants`, slice 6.32, D109: "Across systems"): each system short of a probe, there or on its
+  way, once, in this order: fewer probes than shipyards that sell `SHIP_EXPLORER`, wherever the gates reach it, at the
+  probe tier (D111); within the trade reach, at the probe tier, fewer probes than shipyards, then fewer than markets; beyond
+  it, at the far-probe tier, the same. Each step goes home first, then the nearest. A system's probes park at its shipyards
+  before they roam (below), so the counts say which still lack one.
 - **Spares** (B69, slice 6.28): a system with more probes than markets lends the free ones it would settle at no market of
   its own (`ProbePlanner.Surplus`) to the first system short of one that they can get to, before a probe is bought for it.
-- **Buying** (D29, D97): for the first system with fewer probes than markets, a `SHIP_PROBE` at the shipyard where it
+- **Buying** (D29, D97): for the first system short of one, a `SHIP_PROBE` at the shipyard where it
   costs least with the antimatter of the jumps from there counted, at most one a pass, through `ShipPurchaseService`: the
   purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30), so a shipyard sells at
   home, and abroad once a probe of ours is in its system. Going by the cheapest, the antimatter counted (B72): one that
@@ -652,34 +667,39 @@ explored markets when money allows"). Each pass:
   alone, and the purchase refuses one the shipyard, fetched again just before, lists at SCARCE (`Scarce`). A probe bought
   for another system flies there at once. The contract's drone, a surveyor, a drone per scarce mineral and area, a
   surveyor per area, the cargo ships of `Trade.ShipPurchases` and the gate's loads come first (D43): a probe for the trade
-  reach is a `Probes` need; one for a system beyond it a `FarProbes` need, after the drones and cargo ships that take
-  turns too (D97). While one of them waits, the probe waits (`Purchase` `WaitingForAnotherPurchase`), and the probes fly
-  on.
-- **Flights abroad**: a probe sent to another system flies to the market there it should see first, as a roaming probe
-  would choose from the system's gate (`ProbePlanner.Entry`). The plan sends none where no way through built gates is
+  reach, or for a shipyard that sells explorers anywhere (D111), is a `Probes` need; one for a system beyond it a
+  `FarProbes` need, after the drones and cargo ships that take turns too (D97). While one of them waits, the probe waits
+  (`Purchase` `WaitingForAnotherPurchase`), and the probes fly on.
+- **Flights abroad**: a probe sent to another system flies to the market there it should see first (`ProbePlanner.Entry`):
+  a shipyard without a probe, one that sells `SHIP_EXPLORER` before the others, the nearest the system's gate (D109); else
+  the market a roaming probe would choose from the gate. The plan sends none where no way through built gates is
   known, or where the jumps' antimatter, as last seen at each gate, would leave less than the credit floor (D63).
 - **Flights in a system** (`ProbePlanner`, no I/O), for the free probes of each system:
   1. a shipyard where a purchase waits for one of our ships (`ShipyardCalls`, D30) gets the nearest
      free probe (`ProbeCalled`), which stays there while the call is open;
-  2. while there are fewer probes than markets, every other free probe gets a market that is due, its
+  2. a probe parks at each shipyard (slice 6.32, D110: "Stays parked"), those that sell `SHIP_EXPLORER` first, the nearest
+     pair of free probe and shipyard first; a probe at a shipyard, the first there by symbol, stays, and one parked at a
+     shipyard that sells no explorer gives way to one that does;
+  3. while there are fewer probes than markets, every other free probe gets a market that is due, its
      prices older than `Market.RefreshMinutes` (5), with no probe at it or on its way. Each pair of free
      probe and due market is scored by the market's age minus twice the flight there in CRUISE (15 s
      plus the distance times 25 over the engine's speed, 9 for a probe), and the best pair goes first.
      A market never seen is the oldest, and so is a market the cache holds without prices (B62);
-  3. once there is a probe for every market (B69), each market keeps one probe and only the spares
+  4. once there is a probe for every market (B69), each market keeps one probe and only the spares
      fly: every free probe at a waypoint that is no market, and at a market every one but the first by
      symbol (all of them while another probe flies there). They go to the markets with no probe at
-     them or on their way, due or not, scored the same way. A market our other ships keep fresh is
-     never due, so step 2 would leave it without a probe, and a probe next door would leave its own
+     them or on their way, due or not, the shipyards first as in step 2, then scored the same way. A market our other ships
+     keep fresh is never due, so step 3 would leave it without a probe, and a probe next door would leave its own
      market for a due one.
   With a probe at every market, the probes stay where they are.
 - **The flight** is a `DeployProbeGoal`: one per flight, ended at the arrival, which fetches the
   market and shipyard there. The plan then chooses again. A flight to another system jumps through the gates on the way
   (`GoalJumps`, D101; see the executor).
 - **State** (`plan_states`, written only when it changes): per system (`Systems`), its jumps from home, whether it is in
-  the trade reach, its probes, and every market with the probe at it or on its way, whether another ship of ours is at
-  it, and for a market nobody watches when it is due; the next probe's system, shipyard, price and antimatter, and why it
-  isn't bought (`Purchase`, `ShipyardsScarce` and `WaitingForAProbeToArrive` among the reasons); the open calls.
+  the trade reach, its probes, and every market with whether it is a shipyard (`Shipyard`: `None`, `Shipyard`, `Explorer`),
+  the probe at it or on its way, whether another ship of ours is at it, and for a market nobody watches when it is due; the
+  next probe's system, what it is for (`NextProbeFor`), its shipyard, price and antimatter, and why it isn't bought
+  (`Purchase`, `ShipyardsScarce` and `WaitingForAProbeToArrive` among the reasons); the open calls.
 - **Journal:** `PlanStarted` once, `PlanBlocked` (`waiting_for_credits`) when it starts waiting for
   credits, `ProbeCalled`; the purchase logs `ShipPurchased`, a probe sent to another system an Information line, and each
   jump `Jumped`.
@@ -1383,9 +1403,10 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
      (`PurchaseNeed.WaitsForMarkets`: SCARCE or LIMITED, D66, or another buyer there, D80), whatever the credits; they
      never hold the load back;
   7. `Explorer`: the first explorer (slice 6.30, D98: "Start with one before probes"), while the explore plan wants one
-     (D102); the command ship fetches it;
+     (D102); the command ship fetches it unless a probe of ours answers the purchase's call (slice 6.32, D108);
   8. `Probes`: a probe for every market (D29) of home and of the explored systems within the trade reach (slice 6.28,
-     D97);
+     D97), the shipyards first, those that sell `SHIP_EXPLORER` first of all, wherever the gates reach them (slice 6.32,
+     D109, D111);
   9. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship of the list's last type,
      in turn: the kind not bought last, so after the list's last cargo ship a drone, then a cargo ship, and
      so on (the ledger's `ShipPurchase` rows, which carry the type, and this process's purchases, which the
@@ -1394,10 +1415,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
      count. A turn passes when the other kind has nothing to buy: no drone's first trip would serve a market
      short of its mineral, or a miner is free; no new cargo ship would have a lucrative route, or a trader has
      no trip. A turn that passed isn't made up later;
-  10. `MoreExplorers`: every further explorer the explore plan wants (slice 6.30, D102: "First before probes, rest last"),
-      while one of our ships is at its shipyard or a probe of ours is in its system to answer the purchase's call;
+  10. `MoreExplorers`: every further explorer the explore plan wants (slice 6.30, D102: "First before probes, rest last");
+      a probe of ours in its shipyard's system answers the purchase's call, else the command ship fetches it (slice 6.32,
+      D108);
   11. `FarProbes`: a probe for every market of the other explored systems (slice 6.28, D97: "all explored markets when
-      money allows", "After drones/cargo").
+      money allows", "After drones/cargo"), the shipyards first (slice 6.32, D109).
 - **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
   pass what it would buy now, or nothing, and asks before it buys (`IPurchaseOrder.ReportAsync`). A plan
   may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,

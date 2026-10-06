@@ -27,8 +27,8 @@ public enum ExploreStatus
     Done = 3,
 
     /// <summary>
-    /// The command ship is on its way to the shipyard that sells the first explorer, or waits there until it is bought (slice
-    /// 6.30, D98).
+    /// The command ship is on its way to the shipyard that sells the next explorer, or waits there until it is bought (slice
+    /// 6.30, D98; every explorer since slice 6.32, D108).
     /// </summary>
     FetchingExplorer = 4,
 }
@@ -64,10 +64,16 @@ public enum ExplorerPurchaseStatus
     /// <summary>It would leave less than the credit reserve; the credits are saved up for it.</summary>
     WaitingForCredits = 3,
 
-    /// <summary>The first explorer: the command ship flies to the shipyard to buy it there (D30, D98).</summary>
+    /// <summary>
+    /// None of our ships is at the shipyard, and no probe of ours can answer the purchase's call: the command ship flies there
+    /// to buy it (D30, D98; every explorer since slice 6.32, D108).
+    /// </summary>
     CommandShipFetchesIt = 4,
 
-    /// <summary>A further explorer: none of our ships is in the shipyard's system yet, or one is on its way to the shipyard (D30, D102).</summary>
+    /// <summary>
+    /// None of our ships is at the shipyard yet: a probe of ours in its system, or on its way there, answers the purchase's
+    /// call (D30, slice 6.32, D108).
+    /// </summary>
     WaitingForAShipThere = 5,
 
     /// <summary>No shipyard the gates reach is known to sell one.</summary>
