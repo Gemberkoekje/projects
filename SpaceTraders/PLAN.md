@@ -30,7 +30,7 @@
   6.28 checked after the deploy: no anomalies; X1-NF46's first probe bought at home (SPECTER-43, 29,885, 10:56Z) and in
   X1-NF46 by 11:21Z after two jumps, and meanwhile the probe plan waited for it (`WaitingForAProbeToArrive`) before buying
   X1-HN44's at X1-NF46's shipyard, as B72's fix meant.
-- **In review:** slice 6.29 (trade across systems, D96), on branch `claude/spacetraders-trade-across-systems`.
+- **In review:** slice 6.29 (trade across systems, D96): projects#194, its dashboard column gembernodes#85.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.28, listed under [Phases](#phases).
 - **Still open:**
   - Slices 6.30–6.31, across systems (D94–D101): planned under [Phases](#phases), built in that order, one PR each, with a
@@ -254,7 +254,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.26 Every ship builds the gate (D93)
 - 6.27 Profit per hour (D95), the first of the slices across systems below
 - 6.28 Probes at the markets abroad (D97, D101; B72)
-- 6.29 Trade across systems (D96), in review
+- 6.29 Trade across systems (D96), in review (projects#194)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101). 6.27 and 6.28 are done, 6.29 is in review; 6.30 and 6.31
 are next, in that order:
@@ -288,7 +288,7 @@ are next, in that order:
     dashboard as gembernodes#83, deployed by gembernodes#84 (image `edb83c8`, live since 2026-10-06 10:55Z). Its details are
     in `docs/archive/PLAN_HISTORY.md`.
   - **6.29 Trade across systems** (D95, D96): the trading plan's routes reach the systems around. Built on branch
-    `claude/spacetraders-trade-across-systems`, in review.
+    `claude/spacetraders-trade-across-systems`, in review as projects#194, its dashboard column as gembernodes#85.
     - Found (read-only, 2026-10-06 between 10:55Z and 11:45Z, image `edb83c8`):
       - Prices at most 30 minutes old abroad: X1-NF46 4 of its 16 markets, X1-HN44 1 of 8, X1-FH63 1, and X1-HU81's 20,
         where the command ship was exploring; home all 28. The probes abroad (6.28) had just begun: SPECTER-43, the first,
