@@ -43,4 +43,7 @@ public enum ShipPurchaseFailure
 
     /// <summary>None of our ships is at the shipyard, which the API requires; a ship is called there (D30).</summary>
     NoShipAtShipyard = 4,
+
+    /// <summary>A probe whose supply at the shipyard is SCARCE, as fetched just before the purchase: none is bought (D97).</summary>
+    Scarce = 5,
 }

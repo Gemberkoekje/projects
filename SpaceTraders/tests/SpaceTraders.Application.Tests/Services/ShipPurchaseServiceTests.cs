@@ -160,6 +160,33 @@ public sealed class ShipPurchaseServiceTests
     }
 
     [Fact]
+    public async Task AProbeTheShipyardHasAtScarce_WhenFetchedAgain_IsNotBought()
+    {
+        // D97 (slice 6.28): no probe is bought where SHIP_PROBE is SCARCE. The cache said MODERATE, which the probe plan goes
+        // by; the shipyard, fetched again with our ship there, says SCARCE: the last purchase brought it down.
+        var fresh = new ShipyardDataModel(Shipyard, "X1-AB", "[]", "[{\"type\":\"SHIP_PROBE\",\"purchasePrice\":31000,\"supply\":\"SCARCE\"}]");
+        _port.GetShipyardAsync("X1-AB", Shipyard, Arg.Any<CancellationToken>()).Returns(fresh);
+        _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(Selling("SHIP_PROBE", 29_885, "MODERATE"), Selling("SHIP_PROBE", 31_000, "SCARCE"));
+
+        var result = await Service().TryPurchaseAsync("SHIP_PROBE", Shipyard);
+
+        result.Failure.Should().Be(ShipPurchaseFailure.Scarce);
+        result.EstimatedCost.Should().Be(31_000);
+        await _port.DidNotReceiveWithAnyArgs().PurchaseShipAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ADroneAtScarce_IsBoughtAsBefore()
+    {
+        // D97 is about probes; the other plans' purchases go by their own rules.
+        _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(Selling("SHIP_MINING_DRONE", 12_000, "SCARCE"));
+
+        var result = await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AShipyardThatCantBeFetched_SellsAtItsCachedPrice()
     {
         _port.GetShipyardAsync("X1-AB", Shipyard, Arg.Any<CancellationToken>())
@@ -187,6 +214,14 @@ public sealed class ShipPurchaseServiceTests
         SystemSymbol = "X1-AB",
         ShipTypes = ["SHIP_MINING_DRONE"],
         Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = price }],
+    };
+
+    private static ShipyardWaypointDto Selling(string shipType, long price, string supply) => new()
+    {
+        WaypointSymbol = Shipyard,
+        SystemSymbol = "X1-AB",
+        ShipTypes = [shipType],
+        Ships = [new ShipyardShipDto { Type = shipType, PurchasePrice = price, Supply = supply }],
     };
 
     private void ShipsAt(string waypointSymbol)

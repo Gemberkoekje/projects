@@ -20,9 +20,11 @@ namespace SpaceTraders.Application.Services;
 ///   the probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
 ///   (slice 6.25, D92), which waits while a load can be bought: "If the gate can be built, it should be built, otherwise
 ///   extra miners can be built.";</item>
-///   <item>a probe for every market (D29);</item>
+///   <item>a probe for every market (D29): home's, then those of the explored systems within the trade reach (slice 6.28,
+///   D97);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
-///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy.</item>
+///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy;</item>
+///   <item>last, a probe for every market of the other explored systems (slice 6.28, D97).</item>
 /// </list>
 /// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
 /// the ship): a need that never can be would stop everything after it. Until each plan that is on, and could need
@@ -387,11 +389,20 @@ public enum PurchaseTier
     /// </summary>
     Construction = 6,
 
-    /// <summary>A probe, until every market has one (D29).</summary>
+    /// <summary>
+    /// A probe, until every market has one (D29): home's, then those of the explored systems within the trade reach,
+    /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97).
+    /// </summary>
     Probes = 7,
 
     /// <summary>A drone by the miners' rule (D28, D32), or one more cargo ship of the list's last type, in turn.</summary>
     Alternating = 8,
+
+    /// <summary>
+    /// A probe for a market of an explored system beyond the trade reach (slice 6.28, D97): "all explored markets when money
+    /// allows", last, after the drones and cargo ships that take turns.
+    /// </summary>
+    FarProbes = 9,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

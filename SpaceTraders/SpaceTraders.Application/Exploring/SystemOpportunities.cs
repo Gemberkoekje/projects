@@ -267,6 +267,9 @@ public sealed record SystemSample
     /// <summary>Its waypoints nobody has charted, whose traits are hidden.</summary>
     public int Uncharted { get; init; }
 
+    /// <summary>Our probes in it (PLAN.md slice 6.28), which keep its markets' prices fresh; set by the caller, who has the fleet.</summary>
+    public int Probes { get; init; }
+
     /// <summary>Its cached waypoints, counted by type.</summary>
     public IReadOnlyDictionary<string, int> WaypointTypes { get; init; } = new Dictionary<string, int>();
 

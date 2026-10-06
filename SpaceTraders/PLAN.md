@@ -23,20 +23,18 @@
 
 ## Where things stand (2026-10-06)
 
-- **Running:** projects main `f2068e5` (projects#185), deployed by gembernodes#80, live since 2026-10-05 21:31Z. The agent
-  is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its
-  jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z; the explore plan saw it at 04:12Z and has taken the command
-  ship out since (6.11).
-- **Merged, not yet deployed:** projects#186 (B69: the spare probes settle at the markets without one), #187 (B71: the
-  gathering plans read the goals before the ships), #188 (B70: a lost arrival is scheduled again), #189 (slice 6.26, D93:
-  every ship that can build builds the jump gate) and #190 (slice 6.27, D95: trade routes ranked by credits an hour; its
-  routes table is in gembernodes already, `cff057f`). One gembernodes PR that bumps both images to main `b7b85b7` deploys
-  them all, merged once the projects CI run has pushed the images. Until then SPECTER-5 stays stuck at C45 (B70).
+- **Running:** projects main `6a0bcf2` (projects#186–#191: B69, B70, B71, slices 6.26 and 6.27, the plan cleanup), deployed
+  by gembernodes#82, live since 2026-10-06 09:05Z. The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system
+  X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z; the
+  explore plan saw it at 04:12Z and has taken the command ship out since (6.11): by 09:14Z it had explored nine systems,
+  out to X1-DR50, nine jumps away, and was on its way to X1-FC19.
+- **In review:** slice 6.28 (D97, D101: probes at the markets abroad, through the gates), on branch
+  `claude/spacetraders-probes-abroad` in projects and gembernodes.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.27, listed under [Phases](#phases).
 - **Still open:**
   - Slices 6.28–6.31, across systems (D94–D101): planned under [Phases](#phases), built in that order, one PR each, with a
-    stop after each for your check. They do nothing until the next reset's home gate is built (D68); the next reset is on
-    2026-10-11 at 13:00Z.
+    stop after each for your check; 6.28 is built. In this reset the home gate is built, so each works as soon as it is
+    deployed; after the next reset, on 2026-10-11 at 13:00Z, they wait for the new home system's gate (D68).
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
     last check, a full reset period on the cluster, is the same one.
@@ -255,10 +253,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.26 Every ship builds the gate (D93)
 - 6.27 Profit per hour (D95), the first of the slices across systems below
 
-The slices across systems, as planned on 2026-10-06 (D94–D101). 6.27 is built; 6.28–6.31 are next, in that order:
+The slices across systems, as planned on 2026-10-06 (D94–D101). 6.27 is done; 6.28 is built, in review; 6.29–6.31 are
+next, in that order:
 
-- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D101; 6.27 built; numbered after projects#189's slice 6.26 and
-  D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
+- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D101; 6.27 done, 6.28 built; numbered after projects#189's
+  slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
   system so other systems actually get considered and used. I want a "profit per time unit" so the system can choose
   between a short route that pays less or a long route that pays more. 3. I'd like the new ship type, EXPLORER, to be bought
   to help with exploring. 4. I'd like probes to be at each new market." And: "Ask questions, and first make/update the plan
@@ -278,84 +277,105 @@ The slices across systems, as planned on 2026-10-06 (D94–D101). 6.27 is built;
       watch fetches one market a tick, so at most about 60 markets every 5 minutes.
     - A gate jump needs no jump drive: SPECTER-1 has none (a cargo hold, crew quarters, mineral and gas processors) and
       jumped seven times. Probes and cargo ships should jump as well; a probe's first jump confirms it.
-    - The next reset is on 2026-10-11 at 13:00Z. The next home system's gate has to be built first (D68), so 6.28–6.31 do
-      nothing until then; 6.27 works from the start.
-  - **6.27 Profit per hour** (D95; built on branch `claude/spacetraders-profit-per-hour`): the trading plan ranks routes by
-    what they earn an hour.
+    - The next reset is on 2026-10-11 at 13:00Z. After it the new home system's gate has to be built first (D68) before
+      6.28–6.31 do anything; 6.27 works from the start. In this reset the gate is built, so each works once deployed.
+  - **6.27 Profit per hour** (D95): done, merged as projects#190, its routes table as gembernodes#81, deployed by
+    gembernodes#82 (image `6a0bcf2`, live since 2026-10-06 09:05Z); its details are in `docs/archive/PLAN_HISTORY.md`.
+  - **6.28 Probes at the markets abroad** (D97, D101, with D96's reach; built on branch `claude/spacetraders-probes-abroad`):
+    every market within the trade reach gets a probe, then every other explored market as the credits allow.
+    - Found (read-only, 2026-10-06 about 09:20Z, image `6a0bcf2`):
+      - Home had 28 probes for its 28 markets, and the probe plan reported `EveryMarketHasOne`: it counted home's markets
+        only. The explored systems had 124 markets more, none watched: within 5 jumps X1-HN44 8, X1-NF46 16, X1-AD37 4,
+        X1-GT9 16 and X1-TA92 16 (60); beyond, X1-AA31 26, X1-PX46 6, X1-JQ80 10, X1-DR50 3 and X1-FC19 19 (64, more as
+        exploring goes on).
+      - Shipyards selling SHIP_PROBE, none SCARCE: home's A2 and C46 29,885; X1-HN44 25,737; X1-NF46 26,830 and 33,794;
+        X1-TA92 23,443 and 25,307; X1-AA31 21,385 and 31,012; X1-JQ80 24,736. Antimatter about 5,000 a jump.
+      - Credits 2,332,178, the credit reserve 406,959.
+      - `BusinessSystems` counted every system where a ship that doesn't explore is: a probe abroad would have made its
+        system one where the mining, siphon, trading and contract plans buy ships.
+      - Nothing in the API's spec says a cooldown holds a navigation up, and the drones fly off to sell while their
+        extraction cooldown runs; only a jump waits for one.
     - Done:
-      - `Trading/TripTime.cs` (new): the timing the trading plan and the role board share, so they agree. A flight in CRUISE,
-        leg by leg through its refuelling stops, as the API reckons it (15 seconds plus the distance times 25 over the
-        engine's speed, 9 for an engine not cached), and 10 seconds at each landing (dock, trade or refuel, the market's
-        refresh), a ship already at its buy market stopping there too. The batches aren't timed: the ledger can't tell them
-        apart (a trade's rows share their second), and a flight takes minutes.
-      - `TradeRoute.Seconds` (the whole trip from where the ship is: the flight to the buy market and the haul) and
-        `TradeRoute.CreditsPerHour`, worked out with the route (`TradeRoutePlanner.TryEvaluate`, `Rank`, `Judge`).
-      - `TradeRoutePlanner.RankingProfit` became `RankingRate`: the rate, an end product's at half (D85). `Rank` and
-        `CompareBestFirst` keep their order around it: the routes that feed the gate's materials first (D89, D90), the routes
-        to an exchange last (D91), then the rate, then a good something is made from, then the key. The trading plan hands
-        out its routes trader by trader, the best first, so of two traders the nearer one now gets a route both could fly.
-      - The role board's trade options take the route's own seconds (`RoleEstimator.TradeOptions`); its `FlightSeconds`,
-        `StopSeconds` and `DefaultEngineSpeed` are `TripTime`'s.
-      - The trip keeps its time (`TradeBetweenMarketsGoal.ExpectedSeconds`, whole seconds), and so do the trading plan's
-        state (`TradingAutomationOpportunityState.ExpectedSeconds`) and `GET /status/trading-routes`, which gives
-        `expectedMinutes` and `creditsPerHour` for each route. `TradeStarted` gives `CreditsPerHour` and `TripMinutes`
-        ("… an hour over about … minutes"), and a lucrative good's "Goods not traded" reason its rate and minutes ("…; 60,130
-        an hour, the trip taking about 9 minutes (D95).").
-    - gembernodes (branch `claude/spacetraders-profit-per-hour` there too): the routes table under the market tree gets
-      **minutes** and **per hour**, "—" for a route without a time, and its description the plan's order as it is now (it
-      still said full holds and the most profit after fuel). It goes in with the image bump, once this is merged.
-    - Unchanged: D14's 5 a unit, which sizes a trip (D79); one buyer at a time (D80); the credits a trip holds (D57); a
-      cargo ship beyond the list still waits for a route worth `Trade.ShipPurchaseMinRouteProfit` in credits (D88); the
-      role board's cap on trade estimates (D87).
-    - Noticed (not changed): a leg the executor burns (D84) takes half the time counted, so a short trip whose legs burn
-      ends sooner than its rate assumed. The role board's times were already counted this way.
-    - Watch after the deploy: shorter trips make more calls an hour; `ApiThrottled` should stay quiet (1.12 requests a
-      second of 2 on 2026-10-06).
-    - Done when: the trading plan's list orders the lucrative routes by credits an hour within D89 and D91, and a short
-      route that earns more an hour goes before a long one that earns more a trip.
-    - Tests: `TradeRoutePlannerTests` (a route's time, at the stand-in speed and at 36; a short route that earns more an hour
-      before a long one that earns more a trip, and without the chains EQUIPMENT for A1 before MEDICINE, both failing
-      before the change; the time of the flight to the buy market; the rate within D89's and D91's order; an end product's
-      rate at half), `TradeRouteJudgementTests` (the reason's rate), `TradingAutomationServiceTests` (the trip's and the
-      state's time, the journal's rate and minutes; the D15 trip's scenario made the best per hour too: D41 pays 3,700),
-      `ApiIntegrationTests` (`expectedMinutes`, `creditsPerHour`). App 1,261, Domain 75, API 216 (4 skipped), Infrastructure
-      87, Integration 1.
-    - Warnings left in the files touched: QW0028 and QW0029 ("use a strongly typed identifier") on the plan states' and
-      goals' `Guid` ids (`MarketAutomationPlanState.cs`, `ShipGoal.cs`), from before; typed ids would reach every plan and
-      goal.
-    - To understand this, start with `Trading/TripTime.cs`, then `RankingRate` and `TryEvaluateFrom` in
-      `Trading/TradeRoutePlanner.cs`, and `TradeOptions` in `Roles/RoleEstimator.cs`.
-  - **6.28 Probes at the markets abroad** (D97, with D96's reach): every market within the trade reach gets a probe, then
-    every other explored market as the credits allow.
-    - To do:
-      - The fastest-way planner learns jumps (D101), for every executor: D84's planner (`TradeRoutePlanner.TryPlanNextLeg`,
-        `TryPlanMixedFlight`), which already picks CRUISE, BURN or DRIFT for each leg, gets jump legs between gates (the
-        gates the explore plan knows): to a waypoint in another system, the flight to the system's gate, then the jumps on
-        the way, one ANTIMATTER each at the gate's price, only while the credits after it stay at the floor (D63), each
-        cooldown waited out. `JumpGoalExecutor`'s steps move into the flight helper (`GoalFlight`). A probe has no tank, so
-        its own flights cost nothing.
-      - The probe plan in every system: home first, as now, then each explored system within `Trade.MaxHaulDistance`
-        jumps of home, the nearest first, at `PurchaseTier.Probes`; the other explored systems in a new last tier after
-        `PurchaseTier.Alternating`. A spare probe (B69) goes to a system short of one before a probe is bought for it.
-      - Where a probe is bought: the shipyard where it costs least, the antimatter to its system counted, whose SHIP_PROBE
-        supply isn't SCARCE (D97, at home too). A purchase abroad needs one of our ships there (D30): in a system with a
-        shipyard that sells probes, the first probe to arrive lets the plan buy the rest there.
-      - `BusinessSystems` becomes the headquarters' system alone, as D60 meant ("(home)"): a probe abroad, or a trader in
-        6.29, lets no other plan work or buy in its system.
-      - Visibility: the probe plan's state per system; a `Jumped` line for each probe's jump; probes and price age per
-        system on the systems dashboard (gembernodes).
-    - Expect: about 60 probes for the five explored systems within 5 jumps (X1-HN44 8, X1-NF46 16, X1-AD37 4, X1-GT9 16,
-      X1-TA92 16), more as exploring goes on: around 1.7M credits at 21,385 to 33,794 a probe and about 5,000 a jump, as
-      the credit reserve allows. With about 90 markets watched, the market watch fetches each every 7 or 8 minutes rather
-      than 5, inside D96's 30.
+      - **The jump, every flight's** (D101, `Goals/Executors/GoalJumps.cs`, new): the jump goal's steps moved out of
+        `JumpGoalExecutor` into a helper every flight between systems uses. The way is the fewest jumps through the built
+        gates the explore plan knows (`ExploreAtlas.TryFindJumps`, new, read through `IGateNetwork`); in each system a leg
+        to its gate as every flight flies (`GoalFlight`, D84); at the gate the cooldown waited out, the credit floor kept
+        (D63), the tank filled where the gate sells fuel, orbit, jump, booked (`ShipJumpedEvent`) and journalled
+        (`Jumped`). A jump the API refuses is recorded (`JumpRefusals`, new, in memory), and no way goes through that gate
+        for an hour. `JumpGoalExecutor` keeps its goal's handling. `DeployProbeGoalExecutor` flies a probe to a market of
+        another system this way: no way known any more, or a jump short of the floor, ends the goal for the plan to choose
+        again; a refused jump blocks it (`jump_refused`). A probe has no tank, so its flights cost only the antimatter.
+      - **The probe plan in every system** (`ProbeDeploymentPlanService`): home first, then each explored system the
+        built gates reach from home, the nearest first (`ExploreAtlas.Reachable`, new), then any other system a probe is
+        in. A probe counts for the system it is in or flies to, holding its market there (B15). Each system's free probes
+        fly as before (`ProbePlanner`); a probe sent to another system flies to the market a roaming probe would pick from
+        that system's gate (`ProbePlanner.Entry`, new).
+      - **Spares first** (B69): a system with more probes than markets lends those it would settle at no market of its own
+        (`ProbePlanner.Surplus`, new) to the first system short of one they can get to, before a probe is bought for it.
+      - **Where a probe is bought** (D97): for the first system short of one, at the shipyard where it costs least with
+        the antimatter of the jumps from there counted, as last seen at each gate, never at SCARCE supply. A shipyard
+        counts at home, and abroad once a probe of ours is in its system (D30): a system's first probe is bought
+        elsewhere, the rest where it arrived. A probe bought for another system flies there at once. The purchase refuses
+        a probe the shipyard, fetched again just before, lists at SCARCE (`ShipPurchaseFailure.Scarce`, new): the cache is
+        a purchase behind.
+      - **The order** (D97): the probes of home and the trade reach (`Trade.MaxHaulDistance` jumps of home, 5) at
+        `PurchaseTier.Probes`; the other systems' at `PurchaseTier.FarProbes` (new, 9), after the drones and cargo ships
+        that take turns.
+      - **Business stays home** (D60): `BusinessSystems.Of` is the headquarters' system alone; the mining, siphon and
+        trading plans read the agent for it.
+      - **Visibility:** the plan's state per system (`ProbeDeploymentPlanState.Systems`: jumps, trade reach, probes,
+        markets; the next probe's system, shipyard, price and antimatter; `ShipyardsScarce`); an Information line for each
+        probe sent to another system and `Jumped` for each jump; the fleet view's "flying to X1-…" for a probe on its way
+        abroad; `spacetraders_system_probes` (new) for the systems dashboard. `ShipLeftIdle` counts a system's due markets
+        as work for that system's probes. The descriptions of `Trade.MaxHaulDistance` and the probe plan's switch, for the
+        next agent.
+      - gembernodes (branch `claude/spacetraders-probes-abroad` there too): the systems dashboard's table gets **probes**
+        and **oldest prices** (the age of the oldest market prices in each system, from
+        `spacetraders_market_observed_timestamp_seconds`), a stat of the probes abroad, and the main dashboard's purchase
+        order description `FarProbes`.
+    - Choices made in the build (yours to change): a probe bought for another system flies straight there, whatever the
+      system it was bought in lacks; `Trade.MaxHaulDistance` 0 or less means 5, as the market views read it; a system no
+      way reaches now, or whose jumps the credits don't allow, gets no probe until that changes; a probe stays where it is
+      when its way closes, and its system keeps it working.
+    - How D101 came out: the ways between systems are found on their own, the fewest jumps through built gates, and D84's
+      planner flies the legs within each system. A jump burns no fuel, so there is nothing for D84's fuel search to weigh
+      between gates; 6.31's warps, which do, are where the two searches meet. The executors whose goals leave the system
+      jump through `GoalJumps`: the probes' and the explore plan's so far; 6.29's trade executor is next.
+    - Expect, once deployed (the gate is built in this reset): a probe a pass at most, as the order and the reserve allow.
+      X1-HN44's first probe is bought at home (29,885 and a jump) and flies there; its other seven at X1-HN44's shipyard
+      (25,737); X1-NF46's first at X1-HN44's, and so on outwards: about 60 probes and 1.6M credits for the trade reach, then
+      the 64 beyond it after the drones and cargo ships. Each jump journals `Jumped`; X1-AD37 and X1-GT9 have no shipyard
+      that sells probes, so theirs come from the nearest that does. The market watch fetches one market a tick, so with
+      about 90 markets watched each is fetched every 7 or 8 minutes rather than 5, inside D96's 30.
+    - Unchanged: the probes' flights within a system (B69's settling included); the explore plan's own jumps and its
+      `JumpRefusedAt`; what a jump costs (one ANTIMATTER at the gate's market).
+    - Noticed (not changed): a jump's cooldown isn't counted in a probe's choice of shipyard, only the antimatter (D97's
+      words); routes with more jumps wait out more cooldowns.
+    - Tests: `ExploreAtlasTests` (the fewest jumps through built gates, reach only through explored systems, a refused
+      gate left alone for an hour), `ProbePlannerTests` (the spares, the market a probe coming in takes),
+      `ProbeDeploymentPlanServiceTests` (a probe bought at home for the nearest system abroad and sent there, the rest
+      bought where the first arrived, a system beyond the reach last, none at SCARCE at home either, a spare sent before a
+      purchase, none sent where the jump would break the floor, a probe on its way abroad counted there),
+      `DeployProbeGoalExecutorTests` (to the gate first, the jump and on, the cooldown between jumps, no way, short of the
+      floor, a refused jump), `JumpGoalExecutorTests` (the refusal recorded for every way), `ShipPurchaseServiceTests` (a
+      probe at SCARCE when fetched again isn't bought; a drone is), `PurchaseOrderTests` (`FarProbes` after the turns),
+      `MiningAutomationServiceTests`, `TradingAutomationServiceTests` and `ContractPlanServiceTests` (no purchase where only
+      a probe is; these three and the executor's first failed before the change), `ShipRuleTests` (a probe abroad is no
+      probe for a due market at home), `PrometheusMetricsTests` and `MetricsEndpointTests` (the fleet view's "flying to",
+      `spacetraders_system_probes`). App 1,298, Domain 75, API 216 (4 skipped), Infrastructure 87, Integration 1.
+    - Warnings left in the files touched: QW0028 on `ProbeDeploymentPlanState.PlanId` ("use a strongly typed
+      identifier"), from before, as on every plan state.
     - Done when: every market within the trade reach has a probe, or one on its way, as far as the credits allow; no probe
       is bought where SHIP_PROBE is SCARCE; no other plan buys or works abroad.
+    - To understand this, start with `Goals/Executors/GoalJumps.cs` and `TryFindJumps` in `Exploring/ExploreAtlas.cs`,
+      then `ServeAsync`, `LendSpares` and `BuyProbeAsync` in `Automation/ProbeDeploymentPlanService.cs`.
   - **6.29 Trade across systems** (D95, D96): the trading plan's routes reach the systems around.
     - To do:
       - A map of the systems in reach: their waypoints and markets (prices at most `Trade.MaxPriceAgeMinutes` old, new,
         30, home's too), the gates between them, and the ANTIMATTER price at each gate's market.
-      - Routes across systems, through the planner of 6.28 (D101): in-system legs as today (D84), and jumps between gates,
-        their antimatter a cost and their cooldown in the time where it holds the ship. The rate (D95) does the choosing:
+      - Routes across systems, through 6.28's ways (D101, `GoalJumps`, `ExploreAtlas.TryFindJumps`): in-system legs as
+        today (D84), and jumps between gates, their antimatter a cost and their cooldown in the time where it holds the
+        ship. The rate (D95) does the choosing:
         a far route goes first only when it earns more an hour.
       - The trade executor flies with 6.28's legs: to a buy market abroad, its batches (D79), on to the sell market,
         refuelling abroad at the markets there.

@@ -73,6 +73,7 @@ public sealed class TradingAutomationService(
     IConstructionSites constructionSites,
     PassedOverShips passedOver,
     TradeShipDemand demand,
+    IAgentRepository agents,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -247,7 +248,7 @@ public sealed class TradingAutomationService(
         }
 
         // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        await BuyCargoShipAsync(fleet, board, BusinessSystems.Of(fleet, BusinessSystems.Explorers(active)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
+        await BuyCargoShipAsync(fleet, board, BusinessSystems.Of(await agents.GetAsync(cancellationToken)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
 
         await SaveStateAsync(held, pending, judged, cancellationToken);
     }

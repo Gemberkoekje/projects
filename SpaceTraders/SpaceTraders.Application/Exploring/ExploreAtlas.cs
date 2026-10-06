@@ -38,6 +38,26 @@ public sealed record ExploreStep
     public int Jumps { get; init; }
 }
 
+/// <summary>One jump of a way between systems (PLAN.md slice 6.28, D101): from a system's gate to a gate it connects to.</summary>
+public sealed record GateJump
+{
+    /// <summary>Creates a jump.</summary>
+    /// <param name="GateWaypointSymbol">The gate the ship jumps from, in the system it is in.</param>
+    /// <param name="DestinationGateWaypointSymbol">The gate it jumps to, in the next system.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public GateJump(string GateWaypointSymbol, string DestinationGateWaypointSymbol)
+    {
+        this.GateWaypointSymbol = GateWaypointSymbol;
+        this.DestinationGateWaypointSymbol = DestinationGateWaypointSymbol;
+    }
+
+    /// <summary>The gate the ship jumps from, in the system it is in.</summary>
+    public required string GateWaypointSymbol { get; init; }
+
+    /// <summary>The gate it jumps to, in the next system.</summary>
+    public required string DestinationGateWaypointSymbol { get; init; }
+}
+
 /// <summary>
 /// Where the explore plan goes next (asked on 2026-10-04), from what it knows of the gates: the nearest system not explored
 /// yet, by jumps through active gates, and home once none is left. A jump needs both gates built, and the plan leaves a
@@ -139,6 +159,84 @@ public static class ExploreAtlas
         }
 
         return jumps;
+    }
+
+    /// <summary>
+    /// The systems a ship can get to from <paramref name="fromSystem"/> by jumps (PLAN.md slice 6.28, D101), with the fewest
+    /// jumps to each: through usable gates only (<see cref="IsUsable"/>: built at both ends, and not refused within the hour),
+    /// and on through explored systems only, whose connections are known. <paramref name="fromSystem"/> itself is at 0; a
+    /// system the plan doesn't know reaches nothing.
+    /// </summary>
+    /// <param name="state">What the plan knows, with the refusals of the other ships' jumps (<see cref="JumpRefusals"/>).</param>
+    /// <param name="fromSystem">The system to start from.</param>
+    /// <param name="now">The time to judge the gates by.</param>
+    /// <returns>The jumps, by system.</returns>
+    public static IReadOnlyDictionary<string, int> Reachable(ExplorePlanState state, string fromSystem, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(fromSystem);
+
+        var jumps = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [fromSystem] = 0 };
+        var atlas = new Atlas(state, now);
+        if (!atlas.BySystem.ContainsKey(fromSystem))
+        {
+            return jumps;
+        }
+
+        // Breadth first, so a system's predecessor is counted before it.
+        var (parents, order) = atlas.Search(fromSystem);
+        foreach (var system in order.Where(system => !system.SystemSymbol.Equals(fromSystem, StringComparison.OrdinalIgnoreCase)))
+        {
+            jumps[system.SystemSymbol] = jumps[parents[system.SystemSymbol]] + 1;
+        }
+
+        return jumps;
+    }
+
+    /// <summary>
+    /// The way from one system to another by jumps (PLAN.md slice 6.28, D101): the fewest, through the gates
+    /// <see cref="Reachable"/> goes through, the nearest first and by symbol within a distance, as the explore plan goes. Each
+    /// jump is from the gate of the system the ship is in to a gate that gate connects to.
+    /// </summary>
+    /// <param name="state">What the plan knows, with the refusals of the other ships' jumps (<see cref="JumpRefusals"/>).</param>
+    /// <param name="fromSystem">The system the ship is in.</param>
+    /// <param name="toSystem">The system it is going to.</param>
+    /// <param name="now">The time to judge the gates by.</param>
+    /// <param name="jumps">The jumps, in order; none when the ship is in that system already.</param>
+    /// <returns>False when no way through usable gates is known.</returns>
+    public static bool TryFindJumps(ExplorePlanState state, string fromSystem, string toSystem, DateTimeOffset now, out IReadOnlyList<GateJump> jumps)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(fromSystem);
+        ArgumentNullException.ThrowIfNull(toSystem);
+
+        jumps = [];
+        if (fromSystem.Equals(toSystem, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var atlas = new Atlas(state, now);
+        if (!atlas.BySystem.ContainsKey(fromSystem))
+        {
+            return false;
+        }
+
+        var (parents, _) = atlas.Search(fromSystem);
+        if (!parents.ContainsKey(toSystem))
+        {
+            return false;
+        }
+
+        var way = new List<GateJump>();
+        for (var system = atlas.BySystem[toSystem].SystemSymbol; !system.Equals(fromSystem, StringComparison.OrdinalIgnoreCase); system = parents[system])
+        {
+            way.Add(new GateJump(atlas.BySystem[parents[system]].GateWaypointSymbol, atlas.BySystem[system].GateWaypointSymbol));
+        }
+
+        way.Reverse();
+        jumps = way;
+        return true;
     }
 
     private static ExploreStep Towards(

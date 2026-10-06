@@ -65,14 +65,11 @@ public sealed class PrometheusMarketMetricsService(
         var explore = await scope.ServiceProvider.GetRequiredService<IPlanRepository>().GetAsync<ExplorePlanState>(PlanTypes.Explore, cancellationToken);
         var headquarters = (await scope.ServiceProvider.GetRequiredService<IAgentRepository>().GetAsync(cancellationToken))?.HeadquartersSymbol;
         var home = explore?.HomeSystemSymbol ?? (headquarters is { Length: > 0 } ? WaypointSymbols.SystemOf(headquarters) : string.Empty);
-        var business = BusinessSystems.Of(
-                await scope.ServiceProvider.GetRequiredService<IShipRepository>().GetAllAsync(cancellationToken),
-                BusinessSystems.Explorers(await scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>().GetAllActiveAsync(cancellationToken)))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Business stays home (D60, slice 6.28): a system abroad keeps its markets' refresh times, not each good's price series,
+        // also while probes watch its markets.
         var summaryOnly = (explore?.Systems ?? [])
-            .Where(system => system.ExploredAt is not null
-                && !system.SystemSymbol.Equals(home, StringComparison.OrdinalIgnoreCase)
-                && !business.Contains(system.SystemSymbol))
+            .Where(system => system.ExploredAt is not null && !system.SystemSymbol.Equals(home, StringComparison.OrdinalIgnoreCase))
             .Select(system => system.SystemSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -96,7 +93,16 @@ public sealed class PrometheusMarketMetricsService(
                 [.. shipyard.Ships.Select(ForSale)])),
         ]);
 
-        metrics.Systems(SystemOpportunities.Summarise(explore, home, waypoints, [.. priced.Values], now));
+        // Slice 6.28: how many of our probes are in each system, for the systems dashboard.
+        var probes = (await scope.ServiceProvider.GetRequiredService<IShipRepository>().GetAllAsync(cancellationToken))
+            .Where(FleetRoles.IsProbe)
+            .GroupBy(ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+        metrics.Systems(
+        [
+            .. SystemOpportunities.Summarise(explore, home, waypoints, [.. priced.Values], now)
+                .Select(system => system with { Probes = probes.GetValueOrDefault(system.System) }),
+        ]);
 
         if (!_hasSupplyChain)
         {

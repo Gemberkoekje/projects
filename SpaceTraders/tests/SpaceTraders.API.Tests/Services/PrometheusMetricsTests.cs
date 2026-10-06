@@ -320,6 +320,23 @@ public sealed class PrometheusMetricsServiceTests
                 });
             }
 
+            // Slice 6.28: a probe on its way to a market of another system, flying to its own system's gate first.
+            var abroad = new DeployProbeGoal { TargetWaypointSymbol = "X1-KR90-K1" };
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-14",
+                ShipType = "SHIP_PROBE",
+                Status = "IN_TRANSIT",
+                WaypointSymbol = "X1-AB-I55",
+                DestWaypointSymbol = "X1-AB-I55",
+                ArrivesAt = now.AddMinutes(3),
+                GoalId = abroad.GoalId,
+                GoalKind = abroad.Kind.ToString(),
+                GoalPayloadJson = JsonSerializer.Serialize<ShipGoal>(abroad),
+                GoalStatus = (int)abroad.Status,
+            });
+
             db.ShipAssignments.Add(ContractAssignment("AGENT-3"));
             db.ShipAssignments.Add(ContractAssignment("AGENT-5"));
             await db.SaveChangesAsync();
@@ -353,6 +370,7 @@ public sealed class PrometheusMetricsServiceTests
             ("AGENT-11", "→ X1-AB-B7", "drifting to X1-AB-B7 to mine GOLD_ORE"),
             ("AGENT-12", "→ X1-AB-F48", "drifting to X1-AB-F48 to siphon for LIQUID_NITROGEN"),
             ("AGENT-13", "→ X1-AB-B7", "drifting to X1-AB-B7"),
+            ("AGENT-14", "→ X1-AB-I55", "flying to X1-KR90"),
         });
         var drone = ships.Single(s => s.Ship == "AGENT-3");
         drone.CargoCapacity.Should().Be(15);
@@ -1175,6 +1193,7 @@ public sealed class PrometheusAutomationMetricsTests
             Markets = 7,
             Shipyards = 1,
             Uncharted = 0,
+            Probes = 3,
             WaypointTypes = new Dictionary<string, int> { ["ASTEROID"] = 11, ["JUMP_GATE"] = 1 },
             GatheringSites = new Dictionary<string, int> { ["IRON_ORE"] = 4 },
             RawGoods = [new SpaceTraders.Application.Exploring.RawGoodSample { Good = "IRON_ORE", Price = 61, Market = "X1-KR90-A1", Supply = "SCARCE" }],
@@ -1193,6 +1212,8 @@ public sealed class PrometheusAutomationMetricsTests
         text.Should().Contain("spacetraders_system_connection_info{reset_date=\"2026-09-27\",system=\"X1-KR90\",to=\"X1-VR15\"} 1\n");
         text.Should().Contain("spacetraders_system_facilities{reset_date=\"2026-09-27\",system=\"X1-KR90\",kind=\"market\"} 7\n");
         text.Should().Contain("spacetraders_system_facilities{reset_date=\"2026-09-27\",system=\"X1-KR90\",kind=\"shipyard\"} 1\n");
+        text.Should().Contain("spacetraders_system_probes{reset_date=\"2026-09-27\",system=\"X1-KR90\"} 3\n");
+        text.Should().NotContain("spacetraders_system_probes{reset_date=\"2026-09-27\",system=\"X1-HZ59\"}");
         text.Should().Contain("spacetraders_system_waypoints{reset_date=\"2026-09-27\",system=\"X1-KR90\",type=\"ASTEROID\"} 11\n");
         text.Should().Contain("spacetraders_system_gathering_sites{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\"} 4\n");
         text.Should().Contain("spacetraders_system_raw_good_price{reset_date=\"2026-09-27\",system=\"X1-KR90\",good=\"IRON_ORE\",market=\"X1-KR90-A1\"} 61\n");

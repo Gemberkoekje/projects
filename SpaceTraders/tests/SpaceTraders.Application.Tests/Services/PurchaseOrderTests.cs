@@ -232,6 +232,22 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task AProbeBeyondTheTradeReach_WaitsForTheDronesAndCargoShipsThatTakeTurns()
+    {
+        // Slice 6.28 (D97): "Trade reach as a priority, all explored markets when money allows", the others "After
+        // drones/cargo". A probe for home or a system within the reach still comes before them.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ATurnPasses_WhenTheOtherKindHasNothingToBuy()
     {
         // A cargo ship's turn, but no new cargo ship would have a lucrative route: a drone may go.

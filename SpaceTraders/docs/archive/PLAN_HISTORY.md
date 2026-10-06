@@ -190,6 +190,8 @@
   across systems, an explorer that charts, and warping, planned as slices 6.27–6.31 and built in that order, one PR each,
   with a stop after each for your check. Slice 6.27 (profit per hour) is built on branch
   `claude/spacetraders-profit-per-hour`.
+- B69, B71, B70, slices 6.26 and 6.27 and the plan cleanup are merged (projects#186–#191, main `6a0bcf2`) and deployed by
+  gembernodes#82 (image `6a0bcf2`, live since 2026-10-06 09:05Z); 6.27's routes table went in as gembernodes#81.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -3292,6 +3294,53 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.27 Profit per hour** (built on branch `claude/spacetraders-profit-per-hour`, asked on 2026-10-06, D95; merged as
+  projects#190, its routes table as gembernodes#81, deployed by gembernodes#82, image `6a0bcf2`, live since 2026-10-06
+  09:05Z): the trading plan ranks routes by what they earn an hour.
+  - Done:
+    - `Trading/TripTime.cs` (new): the timing the trading plan and the role board share, so they agree. A flight in CRUISE,
+      leg by leg through its refuelling stops, as the API reckons it (15 seconds plus the distance times 25 over the
+      engine's speed, 9 for an engine not cached), and 10 seconds at each landing (dock, trade or refuel, the market's
+      refresh), a ship already at its buy market stopping there too. The batches aren't timed: the ledger can't tell them
+      apart (a trade's rows share their second), and a flight takes minutes.
+    - `TradeRoute.Seconds` (the whole trip from where the ship is: the flight to the buy market and the haul) and
+      `TradeRoute.CreditsPerHour`, worked out with the route (`TradeRoutePlanner.TryEvaluate`, `Rank`, `Judge`).
+    - `TradeRoutePlanner.RankingProfit` became `RankingRate`: the rate, an end product's at half (D85). `Rank` and
+      `CompareBestFirst` keep their order around it: the routes that feed the gate's materials first (D89, D90), the routes
+      to an exchange last (D91), then the rate, then a good something is made from, then the key. The trading plan hands
+      out its routes trader by trader, the best first, so of two traders the nearer one now gets a route both could fly.
+    - The role board's trade options take the route's own seconds (`RoleEstimator.TradeOptions`); its `FlightSeconds`,
+      `StopSeconds` and `DefaultEngineSpeed` are `TripTime`'s.
+    - The trip keeps its time (`TradeBetweenMarketsGoal.ExpectedSeconds`, whole seconds), and so do the trading plan's
+      state (`TradingAutomationOpportunityState.ExpectedSeconds`) and `GET /status/trading-routes`, which gives
+      `expectedMinutes` and `creditsPerHour` for each route. `TradeStarted` gives `CreditsPerHour` and `TripMinutes`
+      ("… an hour over about … minutes"), and a lucrative good's "Goods not traded" reason its rate and minutes ("…; 60,130
+      an hour, the trip taking about 9 minutes (D95).").
+  - gembernodes (branch `claude/spacetraders-profit-per-hour` there too): the routes table under the market tree gets
+    **minutes** and **per hour**, "—" for a route without a time, and its description the plan's order as it is now (it
+    still said full holds and the most profit after fuel). It goes in with the image bump, once this is merged.
+  - Unchanged: D14's 5 a unit, which sizes a trip (D79); one buyer at a time (D80); the credits a trip holds (D57); a
+    cargo ship beyond the list still waits for a route worth `Trade.ShipPurchaseMinRouteProfit` in credits (D88); the
+    role board's cap on trade estimates (D87).
+  - Noticed (not changed): a leg the executor burns (D84) takes half the time counted, so a short trip whose legs burn
+    ends sooner than its rate assumed. The role board's times were already counted this way.
+  - Watch after the deploy: shorter trips make more calls an hour; `ApiThrottled` should stay quiet (1.12 requests a
+    second of 2 on 2026-10-06).
+  - Done when: the trading plan's list orders the lucrative routes by credits an hour within D89 and D91, and a short
+    route that earns more an hour goes before a long one that earns more a trip.
+  - Tests: `TradeRoutePlannerTests` (a route's time, at the stand-in speed and at 36; a short route that earns more an hour
+    before a long one that earns more a trip, and without the chains EQUIPMENT for A1 before MEDICINE, both failing
+    before the change; the time of the flight to the buy market; the rate within D89's and D91's order; an end product's
+    rate at half), `TradeRouteJudgementTests` (the reason's rate), `TradingAutomationServiceTests` (the trip's and the
+    state's time, the journal's rate and minutes; the D15 trip's scenario made the best per hour too: D41 pays 3,700),
+    `ApiIntegrationTests` (`expectedMinutes`, `creditsPerHour`). App 1,261, Domain 75, API 216 (4 skipped), Infrastructure
+    87, Integration 1.
+  - Warnings left in the files touched: QW0028 and QW0029 ("use a strongly typed identifier") on the plan states' and
+    goals' `Guid` ids (`MarketAutomationPlanState.cs`, `ShipGoal.cs`), from before; typed ids would reach every plan and
+    goal.
+  - To understand this, start with `Trading/TripTime.cs`, then `RankingRate` and `TryEvaluateFrom` in
+    `Trading/TradeRoutePlanner.cs`, and `TradeOptions` in `Roles/RoleEstimator.cs`.
 
 - **6.26 Every ship builds the gate** (built on branch `claude/spacetraders-every-ship-builds`, asked on 2026-10-06, D93).
   Asked: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for

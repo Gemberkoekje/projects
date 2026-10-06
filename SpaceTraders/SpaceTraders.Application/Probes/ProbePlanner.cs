@@ -91,6 +91,70 @@ public static class ProbePlanner
     }
 
     /// <summary>
+    /// The free probes a system can spare for another (PLAN.md slice 6.28): with more probes than markets, as many as it has
+    /// too many, of those it would settle at no market of its own (B69): at a waypoint that is no market, or at a market that
+    /// has another probe, by symbol. A probe at a shipyard that calls stays: the purchase needs it there.
+    /// </summary>
+    /// <param name="snapshot">The system, its markets and probes, the open calls, and the time.</param>
+    /// <returns>The probes the system can spare; none while it has a market for each.</returns>
+    public static IReadOnlyList<ProbeShip> Surplus(ProbeSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var markets = snapshot.Markets
+            .Where(market => snapshot.Positions.ContainsKey(market.WaypointSymbol))
+            .ToList();
+        var surplus = snapshot.Probes.Count - markets.Count;
+        if (surplus <= 0)
+        {
+            return [];
+        }
+
+        var held = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var probe in snapshot.Probes)
+        {
+            Hold(held, probe.WaypointSymbol);
+        }
+
+        var calledAt = snapshot.Calls.Select(call => call.WaypointSymbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var free = snapshot.Probes
+            .Where(probe => probe.IsFree
+                && snapshot.Positions.ContainsKey(probe.WaypointSymbol)
+                && !calledAt.Contains(probe.WaypointSymbol))
+            .OrderBy(probe => probe.Symbol, StringComparer.Ordinal)
+            .ToList();
+        return [.. Spares(markets, held, free).OrderBy(probe => probe.Symbol, StringComparer.Ordinal).Take(surplus)];
+    }
+
+    /// <summary>
+    /// The market a probe that comes into the system from another flies to first (PLAN.md slice 6.28): of those no probe is at
+    /// or on its way to, the one a roaming probe would pick from the system's jump gate, where it comes in: the oldest prices
+    /// first, less <see cref="FlightWeight"/> times the flight there. Never-seen prices count as the oldest.
+    /// </summary>
+    /// <param name="snapshot">The system, its markets and probes, and the time.</param>
+    /// <param name="gateWaypointSymbol">The system's jump gate; without its position, the oldest prices win.</param>
+    /// <param name="speed">The probe's engine speed.</param>
+    /// <returns>The market; empty when each has a probe at it or on its way.</returns>
+    public static string Entry(ProbeSnapshot snapshot, string gateWaypointSymbol, int speed)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(gateWaypointSymbol);
+
+        var held = snapshot.Probes.Select(probe => probe.WaypointSymbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hasGate = snapshot.Positions.TryGetValue(gateWaypointSymbol, out var gate);
+        return snapshot.Markets
+            .Where(market => !held.Contains(market.WaypointSymbol) && snapshot.Positions.ContainsKey(market.WaypointSymbol))
+            .Select(market => (
+                market.WaypointSymbol,
+                Score: (snapshot.Now - market.LastSeenAt).TotalSeconds
+                    - (hasGate ? FlightWeight * FlightSeconds(gate, snapshot.Positions[market.WaypointSymbol], speed) : 0)))
+            .OrderByDescending(market => market.Score)
+            .ThenBy(market => market.WaypointSymbol, StringComparer.Ordinal)
+            .Select(market => market.WaypointSymbol)
+            .FirstOrDefault() ?? string.Empty;
+    }
+
+    /// <summary>
     /// Seconds a flight in CRUISE takes, as the API reckons it: 15, plus the distance (rounded, at least 1)
     /// times 25 over the engine's speed.
     /// </summary>
