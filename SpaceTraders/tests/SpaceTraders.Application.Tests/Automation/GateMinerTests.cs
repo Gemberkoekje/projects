@@ -36,6 +36,7 @@ public sealed class GateMinerTests
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -43,6 +44,8 @@ public sealed class GateMinerTests
 
     public GateMinerTests()
     {
+        // Business stays home (D60, slice 6.28): the headquarters are in the test's system.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
@@ -359,6 +362,7 @@ public sealed class GateMinerTests
                 _roleAdvisor,
                 _order,
                 _passedOver,
+                _agents,
                 _log.For<MiningAutomationService>())
             .EnsureBootstrappedAsync();
 }

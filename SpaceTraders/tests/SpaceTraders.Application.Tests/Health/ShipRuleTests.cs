@@ -236,7 +236,22 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(11));
 
         violations.Should().ContainSingle().Which.Should().Match<HealthViolation>(violation =>
-            violation.Subject == "SHIP-2" && violation.Details.Contains("1 markets that no probe or ship watches are due", StringComparison.Ordinal));
+            violation.Subject == "SHIP-2" && violation.Details.Contains("1 markets of X1-AB that no probe or ship watches are due", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AProbeInAnotherSystem_IsNoProbeForADueMarketHere()
+    {
+        // Slice 6.28: the plan flies the probes of each system between that system's markets; one that watches a market abroad
+        // is no probe for a due market at home, which the plan gives to home's own probes, a spare or a new one.
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", ProbeSymbol = "SHIP-2" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", DueAt = Start.AddMinutes(-20) }));
+        _fleet.Have(FleetFixture.StartingProbe("SHIP-3", "X1-CD-A1", Start) with { SystemSymbol = "X1-CD" });
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
     }
 
     [Fact]
@@ -648,7 +663,7 @@ public sealed class ShipLeftIdleRuleTests
         PlanId = Guid.NewGuid(),
         SystemSymbol = "X1-AB",
         Probes = 1,
-        Markets = markets,
+        Systems = [new ProbeSystemState { SystemSymbol = "X1-AB", Reached = true, InTradeReach = true, Probes = 1, Markets = markets }],
         CreatedAt = Start,
         UpdatedAt = Start,
     };

@@ -6,9 +6,9 @@ namespace SpaceTraders.Application.Automation;
 
 /// <summary>
 /// The systems the plans do business in (asked on 2026-10-04, while the command ship explores: "For now: come home. Long
-/// term: plans should just work across systems … But let's start simple"): the systems where a ship of ours is, not counting
-/// a ship that explores. What it finds there is information, for the systems dashboard: no plan buys a ship, or plans work,
-/// in a system because the explorer is in it.
+/// term: plans should just work across systems … But let's start simple"): the headquarters' system alone, as D60 meant
+/// (PLAN.md slice 6.28). What a ship finds elsewhere is information, for the systems dashboard: no plan buys a ship, or plans
+/// work, in a system because the explorer, a probe that watches its markets, or later a trader is in it.
 /// </summary>
 public static class BusinessSystems
 {
@@ -25,20 +25,9 @@ public static class BusinessSystems
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>The systems where a ship of ours is that doesn't explore, in symbol order.</summary>
-    /// <param name="fleet">The fleet.</param>
-    /// <param name="explorers">The ships that explore (<see cref="Explorers"/>).</param>
-    /// <returns>The systems, by symbol.</returns>
-    public static IReadOnlyList<string> Of(IEnumerable<ShipModel> fleet, IReadOnlySet<string> explorers)
-    {
-        ArgumentNullException.ThrowIfNull(fleet);
-        ArgumentNullException.ThrowIfNull(explorers);
-        return [.. fleet
-            .Where(ship => !explorers.Contains(ship.Symbol))
-            .Select(ship => ship.SystemSymbol)
-            .OfType<string>()
-            .Where(system => system.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.Ordinal)];
-    }
+    /// <summary>The systems the plans do business in: the headquarters' system (D60, slice 6.28).</summary>
+    /// <param name="agent">The agent, as cached; null before startup sync caches it.</param>
+    /// <returns>The headquarters' system; none while the agent or its headquarters isn't known.</returns>
+    public static IReadOnlyList<string> Of(AgentModel? agent)
+        => agent?.HeadquartersSymbol is { Length: > 0 } headquarters ? [WaypointSymbols.SystemOf(headquarters)] : [];
 }

@@ -73,6 +73,12 @@ public static class DependencyInjection
 
         // Exploring (asked on 2026-10-04): the command ship jumps through active gates to every system not explored yet.
         services.AddScoped<IExplorePlanService, ExplorePlanService>();
+
+        // The ways between systems (slice 6.28, D101): the gates the explore plan knows, the jumps refused lately, and the
+        // jump every flight to another system makes.
+        services.AddScoped<IGateNetwork, GateNetwork>();
+        services.AddSingleton<JumpRefusals>();
+        services.AddScoped<GoalJumps>();
         services.AddScoped<IContractPlanService, ContractPlanService>();
         services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
         services.AddScoped<IMiningAutomationService, MiningAutomationService>();

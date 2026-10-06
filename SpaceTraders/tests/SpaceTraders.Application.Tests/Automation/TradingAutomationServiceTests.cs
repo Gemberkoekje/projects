@@ -41,12 +41,15 @@ public sealed class TradingAutomationServiceTests
     private readonly PassedOverShips _passedOver = new();
     private readonly TradeShipDemand _demand = new();
     private readonly IConstructionSites _constructionSites = Substitute.For<IConstructionSites>();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private TradingAutomationPlanState? _state;
 
     public TradingAutomationServiceTests()
     {
+        // Business stays home (D60, slice 6.28): the headquarters are in the test's system.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map()));
         _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ConstructionSiteModel>());
@@ -799,6 +802,34 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhereOnlyAProbeWatchesTheMarkets_NoCargoShipIsBought()
+    {
+        // Slice 6.28 (D60): business stays home. A probe now watches the markets of systems abroad; X1-KR90 sells shuttles,
+        // and a shuttle there would have a lucrative route. Before the change a probe there made X1-KR90 a system the plans
+        // did business in.
+        const string Kr90 = "X1-KR90";
+        SurveyPlanOn();
+        Fleet(new ShipModel("SHIP-9", Kr90, A1, "DOCKED", "CRUISE", 0, 0, ShipType: "SHIP_PROBE"));
+        CreditsAre(300_000);
+        _tradeContexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = A1,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_LIGHT_SHUTTLE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 117_273, FuelCapacity = 300, CargoCapacity = 40 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
     public async Task AfterTheShuttle_TheNextCargoShipsAreLightHaulers_AndThenOneMoreOfTheLastType_InTurnWithTheDrones()
     {
         // D21's list, then D43: "alternate drones and cargo ships", one more cargo ship of the list's last type at a time.
@@ -1050,6 +1081,7 @@ public sealed class TradingAutomationServiceTests
                 _constructionSites,
                 _passedOver,
                 _demand,
+                _agents,
                 _log.For<TradingAutomationService>())
             .EnsureBootstrappedAsync();
 }

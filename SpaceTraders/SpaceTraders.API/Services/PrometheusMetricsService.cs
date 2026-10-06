@@ -352,6 +352,11 @@ public sealed class PrometheusMetricsService(
                 TradeBetweenMarketsGoal trade => $"trading {trade.TradeSymbol}",
                 SurveyWaypointGoal survey => $"surveying for {survey.TargetDepositSymbol}",
                 DeployProbeGoal { ForPurchase: true } => "called to a shipyard",
+
+                // Slice 6.28: a probe on its way to a market of another system, through the gates.
+                DeployProbeGoal abroad when at is { Length: > 0 }
+                    && !WaypointSymbols.SystemOf(abroad.TargetWaypointSymbol).Equals(WaypointSymbols.SystemOf(at), StringComparison.OrdinalIgnoreCase)
+                    => $"flying to {WaypointSymbols.SystemOf(abroad.TargetWaypointSymbol)}",
                 DeployProbeGoal => "scouting",
                 PatrolMarketGoal => "watching its market",
                 MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",

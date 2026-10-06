@@ -37,6 +37,7 @@ public sealed class SiphonAutomationServiceTests
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -44,6 +45,8 @@ public sealed class SiphonAutomationServiceTests
 
     public SiphonAutomationServiceTests()
     {
+        // Business stays home (D60, slice 6.28): the headquarters are in the test's system.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context());
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -376,7 +379,10 @@ public sealed class SiphonAutomationServiceTests
 
         _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
-        _state?.Opportunities.Should().BeEmpty();
+
+        // Slice 6.28: the openings listed are home's, what a drone would be bought for there; X1-KR90's aren't looked at.
+        await _contexts.DidNotReceive().ReadAsync(Kr90, Arg.Any<CancellationToken>());
+        _state?.Opportunities.Should().NotContain(opportunity => opportunity.CandidateShipSymbols.Contains("SHIP-1"));
     }
 
     [Theory]
@@ -601,6 +607,7 @@ public sealed class SiphonAutomationServiceTests
                 _roleAdvisor,
                 _order,
                 _passedOver,
+                _agents,
                 _log.For<SiphonAutomationService>())
             .EnsureBootstrappedAsync();
 }

@@ -61,6 +61,7 @@ public sealed class SiphonAutomationService(
     IRoleAdvisor roles,
     IPurchaseOrder purchaseOrder,
     PassedOverShips passedOver,
+    IAgentRepository agents,
     ILogger<SiphonAutomationService> logger) : ISiphonAutomationService
 {
     /// <summary>The setting that holds the most siphon drones to keep (D32).</summary>
@@ -87,9 +88,9 @@ public sealed class SiphonAutomationService(
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        var explorers = BusinessSystems.Explorers(active);
-        var systems = BusinessSystems.Of(fleet, explorers);
+        // Business stays home (D60, slice 6.28): its openings and drones are there only. The command ship, while it explores,
+        // has an open assignment, so it is no free siphoner (asked on 2026-10-04).
+        var systems = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
 
         var heldKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var heldBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

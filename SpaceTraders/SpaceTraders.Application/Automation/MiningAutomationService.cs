@@ -79,6 +79,7 @@ public sealed class MiningAutomationService(
     IRoleAdvisor roles,
     IPurchaseOrder purchaseOrder,
     PassedOverShips passedOver,
+    IAgentRepository agents,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     /// <summary>
@@ -116,9 +117,10 @@ public sealed class MiningAutomationService(
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
+        // Business stays home (D60, slice 6.28): drones are bought there only; the command ship works for no plan while it
+        // explores (asked on 2026-10-04).
         var explorers = BusinessSystems.Explorers(active);
-        var systems = BusinessSystems.Of(fleet, explorers);
+        var systems = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
 
         // D83: the shuttles designated for each collection point, by point, as the last pass left them.
         var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);

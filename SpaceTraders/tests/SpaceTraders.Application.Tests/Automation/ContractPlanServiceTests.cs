@@ -243,7 +243,7 @@ public sealed class ContractPlanServiceTests
     }
 
     [Fact]
-    public async Task TheContractsDrone_IsLookedForWhereOurShipsWork_NotWhereTheCommandShipExplores()
+    public async Task TheContractsDrone_IsLookedForAtHome_NotWhereTheCommandShipExplores_OrAProbeWatches()
     {
         var plans = Substitute.For<IContractMineralPlanRepository>();
         var contracts = Substitute.For<IContractRepository>();
@@ -270,12 +270,14 @@ public sealed class ContractPlanServiceTests
                 }))
         ]);
 
-        // Asked on 2026-10-04: business stays where our ships work. The shipyard seen last that sells drones can be one the
-        // command ship has just explored, in X1-KR90: the drone isn't bought there.
+        // Asked on 2026-10-04: business stays home. The shipyard seen last that sells drones can be one the command ship has
+        // just explored, in X1-KR90, or one where a probe watches the markets, in X1-CD (slice 6.28, which found the probe made
+        // X1-CD a system the plans did business in): the drone isn't bought there.
         ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
         [
             new ShipModel("SHIP-1", "X1-KR90", "X1-KR90-YARD", "DOCKED", "CRUISE", 400, 400, CargoCapacity: 40, ShipType: "COMMAND"),
             new ShipModel("SHIP-2", "X1-AB", "X1-AB-MKT", "DOCKED", "CRUISE", 0, 0, ShipType: "SATELLITE"),
+            new ShipModel("SHIP-3", "X1-CD", "X1-CD-YARD", "DOCKED", "CRUISE", 0, 0, ShipType: "SHIP_PROBE"),
         ]);
         assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
             [new ShipAssignmentDto("SHIP-1", "Explore", "X1-KR90-YARD", null, null, null, 0, DateTimeOffset.UtcNow, null)]);
@@ -283,10 +285,10 @@ public sealed class ContractPlanServiceTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel(
             Symbol: "AGENT",
             AccountId: null,
-            HeadquartersSymbol: null,
+            HeadquartersSymbol: "X1-AB-A1",
             Credits: 1,
             StartingFaction: "COSMIC",
-            ShipCount: 1));
+            ShipCount: 3));
 
         shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
         shipyards.FindByWaypointAsync("X1-AB-SHIPYARD", Arg.Any<CancellationToken>()).Returns(new ShipyardWaypointDto
@@ -314,7 +316,7 @@ public sealed class ContractPlanServiceTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             shipPurchases,
-            Substitute.For<IAgentRepository>(),
+            agents,
             Substitute.For<IMessageBus>(),
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),

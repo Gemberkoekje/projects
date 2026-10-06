@@ -142,17 +142,21 @@ public sealed class ShipLeftIdleRule(
             }
         }
 
-        // The plan gives every free probe a due market that nothing watches (D29), so a probe can only be left
-        // idle while one waits when the plan has stopped. A probe that stays at a shipyard for a purchase
-        // (D30) waits seconds: a call lasts two minutes after the last attempt.
-        if (context.IsOn(AutomationPlan.ProbeDeployment)
-            && await probePlans.GetAsync(cancellationToken) is { } probes
-            && probes.Markets.Count(market => market.IsUnwatched && market.DueAt <= context.Now) is > 0 and var unwatched)
+        // The plan gives every free probe a due market of its system that nothing watches (D29, per system since slice 6.28),
+        // so a probe can only be left idle while one waits when the plan has stopped. A probe that stays at a shipyard for a
+        // purchase (D30) waits seconds: a call lasts two minutes after the last attempt.
+        if (context.IsOn(AutomationPlan.ProbeDeployment) && await probePlans.GetAsync(cancellationToken) is { } probes)
         {
-            waiting.Add(new WaitingWork(
-                AutomationPlan.ProbeDeployment,
-                string.Create(CultureInfo.InvariantCulture, $"{unwatched} markets that no probe or ship watches are due"),
-                ship => FleetRoles.IsProbe(ship.Ship)));
+            foreach (var system in probes.Systems)
+            {
+                if (system.Markets.Count(market => market.IsUnwatched && market.DueAt <= context.Now) is > 0 and var unwatched)
+                {
+                    waiting.Add(new WaitingWork(
+                        AutomationPlan.ProbeDeployment,
+                        string.Create(CultureInfo.InvariantCulture, $"{unwatched} markets of {system.SystemSymbol} that no probe or ship watches are due"),
+                        ship => FleetRoles.IsProbe(ship.Ship) && string.Equals(ship.Ship.SystemSymbol, system.SystemSymbol, StringComparison.OrdinalIgnoreCase)));
+                }
+            }
         }
 
         if (context.IsOn(AutomationPlan.Mining)

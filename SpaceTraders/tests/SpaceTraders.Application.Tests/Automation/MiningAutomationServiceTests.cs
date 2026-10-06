@@ -39,6 +39,7 @@ public sealed class MiningAutomationServiceTests
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly IRoleAdvisor _roleAdvisor = Substitute.For<IRoleAdvisor>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly PassedOverShips _passedOver = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
@@ -46,6 +47,8 @@ public sealed class MiningAutomationServiceTests
 
     public MiningAutomationServiceTests()
     {
+        // Business stays home (D60, slice 6.28): the headquarters are in the test's system.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context());
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -518,6 +521,33 @@ public sealed class MiningAutomationServiceTests
         _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
         _state?.Opportunities.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task WhereOnlyAProbeWatchesTheMarkets_NoDroneIsBought()
+    {
+        // Slice 6.28 (D60): business stays home. A probe now watches the markets of systems abroad; X1-KR90 sells drones, and
+        // its ores are short. Before the change a probe there made X1-KR90 a system the plans did business in.
+        const string Kr90 = "X1-KR90";
+        const string Yard = "X1-KR90-YARD";
+        Fleet(new ShipModel("SHIP-9", Kr90, Yard, "DOCKED", "CRUISE", 0, 0, ShipType: "SHIP_PROBE"));
+        _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = Yard,
+                SystemSymbol = Kr90,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        await _contexts.DidNotReceive().ReadAsync(Kr90, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -1012,6 +1042,7 @@ public sealed class MiningAutomationServiceTests
                 _roleAdvisor,
                 _order,
                 _passedOver,
+                _agents,
                 _log.For<MiningAutomationService>())
             .EnsureBootstrappedAsync();
 }

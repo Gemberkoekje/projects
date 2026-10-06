@@ -77,7 +77,22 @@ public sealed class AlreadyAtDestinationLoopTests
     [Fact]
     public async Task ProbeInOrbitAtTarget_TakesOneStep()
     {
-        var executor = new DeployProbeGoalExecutor(_goals, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
+        var jumps = new GoalJumps(
+            Substitute.For<ISpaceTradersPort>(),
+            _ships,
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IMarketRepository>(),
+            Substitute.For<IMarketRefresher>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<SpaceTraders.Application.Exploring.IGateNetwork>(),
+            new SpaceTraders.Application.Exploring.JumpRefusals(),
+            Substitute.For<ITradeContextReader>(),
+            _dock,
+            _orbit,
+            Substitute.For<IRefuelSubCommand>(),
+            _bus,
+            NullLogger<GoalJumps>.Instance);
+        var executor = new DeployProbeGoalExecutor(_goals, jumps, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
 
         await RunOneStepAsync(
             executor,

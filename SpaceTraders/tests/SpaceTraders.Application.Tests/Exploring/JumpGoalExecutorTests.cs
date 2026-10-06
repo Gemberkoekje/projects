@@ -3,6 +3,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
@@ -44,6 +45,8 @@ public sealed class JumpGoalExecutorTests
     private readonly IOrbitSubCommand _orbit = Substitute.For<IOrbitSubCommand>();
     private readonly IRefuelSubCommand _refuel = Substitute.For<IRefuelSubCommand>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
+    private readonly JumpRefusals _refusals = new();
     private readonly LogRecorder _log = new();
 
     public JumpGoalExecutorTests()
@@ -151,6 +154,22 @@ public sealed class JumpGoalExecutorTests
         await _goals.Received(1).BlockGoalAsync(Ship, Jump.GoalId, JumpGoalExecutor.RefusedReason, Arg.Any<CancellationToken>());
         await _ships.DidNotReceive().UpdateNavAsync(Arg.Any<string>(), Arg.Any<NavModel>(), Arg.Any<FuelModel?>(), Arg.Any<CancellationToken>());
         _log.Journal.Should().ContainSingle().Which.EventKind.Should().Be(JournalEvents.ShipBlocked);
+
+        // Slice 6.28: every way between systems leaves that gate alone for an hour, the probes' too.
+        var network = _refusals.Apply(new ExplorePlanState
+        {
+            ShipSymbol = Ship,
+            HomeSystemSymbol = Home,
+            Status = ExploreStatus.Exploring,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Systems =
+            [
+                new KnownSystem { SystemSymbol = Home, GateWaypointSymbol = HomeGate, Gate = GateState.Active, Connections = [Kr90Gate], ExploredAt = DateTimeOffset.UtcNow },
+                new KnownSystem { SystemSymbol = "X1-KR90", GateWaypointSymbol = Kr90Gate, Gate = GateState.Active, ExploredAt = DateTimeOffset.UtcNow },
+            ],
+        });
+        ExploreAtlas.TryFindJumps(network, Home, "X1-KR90", DateTimeOffset.UtcNow, out _).Should().BeFalse();
+        ExploreAtlas.TryFindJumps(network, Home, "X1-KR90", DateTimeOffset.UtcNow.AddMinutes(61), out _).Should().BeTrue();
     }
 
     [Fact]
@@ -171,18 +190,10 @@ public sealed class JumpGoalExecutorTests
 
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, JumpGoal? goal = null)
         => new JumpGoalExecutor(
-                _port,
-                _ships,
                 _goals,
-                _agents,
-                _markets,
-                _refresher,
-                _settings,
                 _tradeContexts,
+                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, _refusals, _tradeContexts, _dock, _orbit, _refuel, _bus, _log.For<GoalJumps>()),
                 _dock,
-                _orbit,
-                _refuel,
-                _bus,
-                _log.For<JumpGoalExecutor>())
+                _bus)
             .ExecuteStepAsync(ship, goal ?? Jump, new ShipGoalContext(), CancellationToken.None);
 }

@@ -3,9 +3,13 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Exploring;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Domain.Goals;
 
@@ -26,6 +30,13 @@ public sealed class ProbeDeploymentPlanServiceTests
     private const string H52 = "X1-DC53-H52";
     private const string XB5C = "X1-DC53-XB5C";
     private const string J58 = "X1-DC53-J58";
+    private const string I55 = "X1-DC53-I55";
+    private const string Kr90 = "X1-KR90";
+    private const string Kr90Gate = "X1-KR90-G";
+    private const string Kr90K1 = "X1-KR90-K1";
+    private const string Kr90K2 = "X1-KR90-K2";
+    private const string Mt49 = "X1-MT49";
+    private const string Mt49Gate = "X1-MT49-G";
 
     private readonly IProbeDeploymentPlanRepository _plans = Substitute.For<IProbeDeploymentPlanRepository>();
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
@@ -38,6 +49,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private readonly ShipyardCalls _calls = new();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private readonly DateTimeOffset _now = TimeProvider.System.GetUtcNow();
@@ -150,7 +162,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         _activeGoals.Should().BeEmpty();
         _state!.Purchase.Should().Be(ProbePurchaseStatus.EveryMarketHasOne);
         _order.Of(AutomationPlan.ProbeDeployment).Should().Be(PurchaseNeed.None, "nothing after the probes waits for them");
-        _state.Markets.Select(market => market.ProbeSymbol).Should().Equal("SPECTER-5", "SPECTER-2");
+        _state.Systems.Should().ContainSingle().Which.Markets.Select(market => market.ProbeSymbol).Should().Equal("SPECTER-5", "SPECTER-2");
     }
 
     [Fact]
@@ -237,18 +249,204 @@ public sealed class ProbeDeploymentPlanServiceTests
 
         await _plans.Received(1).UpsertAsync(Arg.Any<ProbeDeploymentPlanState>(), Arg.Any<CancellationToken>());
         _state!.Probes.Should().Be(1);
-        _state.Markets.Select(market => (market.WaypointSymbol, market.ProbeSymbol, market.WatchedByShip)).Should().Equal(
+        _state.Systems.Should().ContainSingle().Which.Markets.Select(market => (market.WaypointSymbol, market.ProbeSymbol, market.WatchedByShip)).Should().Equal(
             (A1, "SPECTER-2", false),
             (A2, string.Empty, false),
             (H51, string.Empty, false),
             (H52, string.Empty, false),
             (J58, string.Empty, false),
             (XB5C, string.Empty, true));
-        _state.Markets.Single(market => market.WaypointSymbol == H51).DueAt.Should().BeCloseTo(_now.AddMinutes(-25), TimeSpan.FromSeconds(1));
-        _state.Markets.Single(market => market.WaypointSymbol == A1).DueAt.Should().Be(default, "a watched market's time changes with every refresh");
+        _state.Systems[0].Markets.Single(market => market.WaypointSymbol == H51).DueAt.Should().BeCloseTo(_now.AddMinutes(-25), TimeSpan.FromSeconds(1));
+        _state.Systems[0].Markets.Single(market => market.WaypointSymbol == A1).DueAt.Should().Be(default, "a watched market's time changes with every refresh");
         _log.Journal.Should().ContainSingle(entry => entry.EventKind == "PlanStarted")
             .Which.Message.Should().Be("PlanStarted: ProbeDeployment plan for system X1-DC53: 1 probes for 6 markets.");
     }
+
+    [Fact]
+    public async Task WithAProbeAtEveryHomeMarket_ItBuysOneForTheNearestSystemAbroad_AndSendsItThere()
+    {
+        // Slice 6.28 (D97): before it, the plan counted home's markets only, bought nothing more and left X1-KR90 unwatched.
+        // No probe of ours is in X1-KR90 yet, so its shipyard can't sell one (D30): the probe is bought at home, with the
+        // jump's antimatter (5,000 at home's gate) counted, and flies to X1-KR90's gate, the market it sees first.
+        Abroad();
+        _purchases.TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>()).Returns(new ShipPurchaseResult
+        {
+            IsSuccess = true,
+            EstimatedCost = 81_645,
+            ActualCost = 81_645,
+            PurchasedShip = Probe("SPECTER-7", A2),
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
+        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90Gate);
+        _activeGoals.Should().ContainSingle("home's probes stay at their markets");
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.Bought);
+        _state.NextProbeSystem.Should().Be(Kr90);
+        _state.NextProbeAntimatter.Should().Be(5_000);
+        _state.Systems.Select(system => (system.SystemSymbol, system.Jumps, system.InTradeReach, system.Probes)).Should().Equal(
+            (SystemSymbol, 0, true, 3),
+            (Kr90, 1, true, 1),
+            (Mt49, 2, true, 0));
+        _log.Entries.Should().Contain(entry => entry.Message == "Probe plan: probe SPECTER-7, bought in X1-DC53, flies to X1-KR90-G in X1-KR90, 1 jumps from home, which has 0 probes for 3 markets.");
+    }
+
+    [Fact]
+    public async Task OnceAProbeIsInASystem_TheRestAreBoughtThere_WhereTheyCostLeast()
+    {
+        // D97: X1-KR90's K2 sells probes for 24,000, home's A2 for 81,645 and a jump; SPECTER-7, in X1-KR90 now, answers the
+        // call there (D30).
+        Abroad(Probe("SPECTER-7", Kr90Gate) with { SystemSymbol = Kr90 });
+        _purchases.TryPurchaseAsync("SHIP_PROBE", Kr90K2, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            _calls.Call(Kr90K2, "SHIP_PROBE", TimeProvider.System.GetUtcNow());
+            return new ShipPurchaseResult { Failure = ShipPurchaseFailure.NoShipAtShipyard, EstimatedCost = 24_000 };
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", Kr90K2, 24_000));
+        _activeGoals["SPECTER-7"].Should().BeEquivalentTo(new { TargetWaypointSymbol = Kr90K2, ForPurchase = true });
+        _state!.NextProbeAntimatter.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ASystemBeyondTheTradeReach_GetsItsProbesLast_AfterTheDronesAndCargoShips()
+    {
+        // D97: with Trade.MaxHaulDistance 1, X1-MT49, 2 jumps away, is beyond the trade reach. X1-KR90 has its three.
+        Abroad(Probe("SPECTER-7", Kr90Gate) with { SystemSymbol = Kr90 }, Probe("SPECTER-8", Kr90K1) with { SystemSymbol = Kr90 }, Probe("SPECTER-9", Kr90K2) with { SystemSymbol = Kr90 });
+        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(1);
+
+        await RunAsync();
+
+        // K2 for 24,000 and X1-KR90's jump (4,000) beats home's A2 for 81,645 and two jumps.
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.FarProbes, "SHIP_PROBE", Kr90K2, 24_000));
+        _state!.NextProbeSystem.Should().Be(Mt49);
+        _state.NextProbeAntimatter.Should().Be(4_000);
+        _state.Systems.Single(system => system.SystemSymbol == Mt49).InTradeReach.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task NoProbeIsBoughtWhereProbesAreScarce_AtHomeToo()
+    {
+        // D97: "It should also check whether the probes are in SCARCE supply and not buy them if they are." Home has a market
+        // without a probe, and only A2 sells them, at SCARCE.
+        Abroad();
+        Fleet(StartingProbe(), Probe("SPECTER-5", A2));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([Shipyard(A2, ("SHIP_PROBE", 81_645)) with
+        {
+            Ships = [new ShipyardShipDto { Type = "SHIP_PROBE", PurchasePrice = 81_645, Supply = "SCARCE" }],
+        }]);
+
+        await RunAsync();
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(PurchaseNeed.None);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.ShipyardsScarce);
+    }
+
+    [Fact]
+    public async Task ASpareProbe_GoesToASystemShortOfOne_BeforeAProbeIsBoughtForIt()
+    {
+        // B69, slice 6.28: home has four probes for three markets, SPECTER-8 a second at A2; X1-KR90 two for three, and no
+        // way to X1-MT49.
+        Abroad(Probe("SPECTER-8", A2), Probe("SPECTER-10", Kr90K1) with { SystemSymbol = Kr90 }, Probe("SPECTER-11", Kr90K2) with { SystemSymbol = Kr90 });
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns(Network(mt49Connected: false));
+
+        await RunAsync();
+
+        _activeGoals["SPECTER-8"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90Gate);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.EveryMarketHasOne);
+        _state.Systems.Select(system => system.Probes).Should().Equal(3, 3);
+    }
+
+    [Fact]
+    public async Task NoProbeIsSentAbroad_WhereTheJumpWouldLeaveLessThanTheCreditFloor()
+    {
+        // D63: 64,000 less the jump's 5,000 is under the floor of 60,000: the spare stays, and no probe is bought for X1-KR90.
+        Abroad(Probe("SPECTER-8", A2));
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, A1, 64_000, "COBALT", 3));
+        _settings.GetAsync<long>(CreditReserve.FloorSetting, Arg.Any<CancellationToken>()).Returns(60_000L);
+
+        await RunAsync();
+
+        _activeGoals.Should().NotContainKey("SPECTER-8");
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.NoShipyardSellsProbes);
+    }
+
+    [Fact]
+    public async Task AProbeOnItsWayAbroad_CountsForThatSystem_AndHoldsItsMarketThere()
+    {
+        // B15 across systems: SPECTER-7 is still at home, in flight to home's gate, on its way to X1-KR90's K1.
+        var leaving = Probe("SPECTER-7", A2) with { Status = "IN_TRANSIT", DestWaypointSymbol = I55, ArrivesAt = _now.AddMinutes(2) };
+        _activeGoals["SPECTER-7"] = new DeployProbeGoal { TargetWaypointSymbol = Kr90K1 };
+        Abroad(leaving);
+
+        await RunAsync();
+
+        _state!.Systems.Select(system => system.Probes).Should().Equal(3, 1, 0);
+        _state.Systems[1].Markets.Single(market => market.WaypointSymbol == Kr90K1).ProbeSymbol.Should().Be("SPECTER-7");
+        _activeGoals["SPECTER-7"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(Kr90K1);
+    }
+
+    /// <summary>
+    /// Slice 6.28: home X1-DC53 has three markets, A2 (a shipyard), H52 and its gate I55, each with a probe; its gate connects
+    /// to X1-KR90's, explored (its gate G, K1, and K2, a shipyard that sells probes for 24,000), and that to X1-MT49's (its gate
+    /// and M1). Jumps cost 5,000 from home's gate and 4,000 from X1-KR90's. No market abroad was ever seen.
+    /// </summary>
+    private void Abroad(params ShipModel[] more)
+    {
+        _waypoints.GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(
+        [
+            Waypoint(A2, "MOON", 21, 16, shipyard: true),
+            Waypoint(H52, "MOON", -18, 40, shipyard: true),
+            Waypoint(I55, "JUMP_GATE", 272, -358),
+        ]);
+        _waypoints.GetBySystemAsync(Kr90, Arg.Any<CancellationToken>()).Returns(
+        [
+            WaypointIn(Kr90, Kr90Gate, "JUMP_GATE", 0, 0),
+            WaypointIn(Kr90, Kr90K1, "PLANET", 30, 0),
+            WaypointIn(Kr90, Kr90K2, "MOON", 100, 0, shipyard: true),
+        ]);
+        _waypoints.GetBySystemAsync(Mt49, Arg.Any<CancellationToken>()).Returns(
+        [
+            WaypointIn(Mt49, Mt49Gate, "JUMP_GATE", 0, 0),
+            WaypointIn(Mt49, "X1-MT49-M1", "PLANET", 20, 20),
+        ]);
+        LastSeen((A2, 1), (H52, 1), (I55, 1));
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketSnapshot(I55, SystemSymbol, [new TradeGoodSnapshot("ANTIMATTER", "EXCHANGE", 5_000, 4_800, 10, "MODERATE")], [], [], ["ANTIMATTER"]),
+            new MarketSnapshot(Kr90Gate, Kr90, [new TradeGoodSnapshot("ANTIMATTER", "EXCHANGE", 4_000, 3_800, 10, "MODERATE")], [], [], ["ANTIMATTER"]),
+        ]);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard(Kr90K2, ("SHIP_PROBE", 24_000)) with { SystemSymbol = Kr90 },
+        ]);
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns(Network(mt49Connected: true));
+        Fleet([StartingProbe(), Probe("SPECTER-5", A2), Probe("SPECTER-6", I55), .. more]);
+    }
+
+    private ExplorePlanState Network(bool mt49Connected) => new()
+    {
+        ShipSymbol = "SPECTER-1",
+        HomeSystemSymbol = SystemSymbol,
+        Status = ExploreStatus.Exploring,
+        UpdatedAt = _now,
+        Systems =
+        [
+            new KnownSystem { SystemSymbol = SystemSymbol, GateWaypointSymbol = I55, Gate = GateState.Active, Connections = [Kr90Gate], ExploredAt = _now },
+            new KnownSystem { SystemSymbol = Kr90, GateWaypointSymbol = Kr90Gate, Gate = GateState.Active, Connections = mt49Connected ? [I55, Mt49Gate] : [I55], ExploredAt = _now },
+            new KnownSystem { SystemSymbol = Mt49, GateWaypointSymbol = Mt49Gate, Gate = GateState.Active, Connections = [Kr90Gate], ExploredAt = _now },
+        ],
+    };
+
+    private static WaypointCacheModel WaypointIn(string system, string symbol, string type, int x, int y, bool shipyard = false)
+        => new(symbol, system, type, x, y, HasMarket: true, HasShipyard: shipyard, DateTimeOffset.UnixEpoch);
 
     private static WaypointCacheModel Waypoint(string symbol, string type, int x, int y, bool shipyard = false)
         => new(symbol, SystemSymbol, type, x, y, HasMarket: true, HasShipyard: shipyard, DateTimeOffset.UnixEpoch);
@@ -296,6 +494,7 @@ public sealed class ProbeDeploymentPlanServiceTests
                 _calls,
                 _settings,
                 _order,
+                _gates,
                 _log.For<ProbeDeploymentPlanService>())
             .EnsureBootstrappedAsync();
 }

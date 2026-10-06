@@ -59,6 +59,88 @@ public sealed class ExploreAtlasTests
         ExploreAtlas.Next(state, "X1-A", Now).TargetSystemSymbol.Should().Be("X1-B", "X1-C's gate isn't built");
     }
 
+    [Fact]
+    public void TheWayToASystem_IsTheFewestJumps_ThroughBuiltGates()
+    {
+        // Slice 6.28 (D101): X1-A to X1-D goes by X1-B (2 jumps), not by X1-C and X1-E (3); X1-F's gate is unbuilt.
+        var state = Network();
+
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-D", Now, out var jumps).Should().BeTrue();
+        jumps.Should().Equal(new GateJump("X1-A-G", "X1-B-G"), new GateJump("X1-B-G", "X1-D-G"));
+        ExploreAtlas.TryFindJumps(state, "X1-D", "X1-A", Now, out var back).Should().BeTrue();
+        back.Should().Equal(new GateJump("X1-D-G", "X1-B-G"), new GateJump("X1-B-G", "X1-A-G"));
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-A", Now, out var none).Should().BeTrue();
+        none.Should().BeEmpty();
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-F", Now, out _).Should().BeFalse("X1-F's gate isn't built");
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-Z", Now, out _).Should().BeFalse("nothing is known of X1-Z");
+    }
+
+    [Fact]
+    public void Reachable_CountsTheJumps_OnlyThroughBuiltGates_AndOnlyOnThroughExploredSystems()
+    {
+        // X1-G hangs off X1-E, which isn't explored here: its connections aren't known, so nothing beyond it is reached.
+        var state = Network() with
+        {
+            Systems = [.. Network().Systems.Select(system => system.SystemSymbol == "X1-E" ? system with { ExploredAt = null } : system)],
+        };
+
+        ExploreAtlas.Reachable(state, "X1-A", Now).Should().BeEquivalentTo(new Dictionary<string, int>
+        {
+            ["X1-A"] = 0,
+            ["X1-B"] = 1,
+            ["X1-C"] = 1,
+            ["X1-D"] = 2,
+            ["X1-E"] = 2,
+        });
+    }
+
+    [Fact]
+    public void AGateThatRefusedAJumpLately_IsNoWay_ForAnHour()
+    {
+        // Every ship's refused jumps are recorded (JumpRefusals): a probe isn't sent through a gate that has just refused one.
+        var refusals = new JumpRefusals();
+        refusals.Record("X1-B-G", Now.AddMinutes(-10));
+        var state = refusals.Apply(Network());
+
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-D", Now, out var jumps).Should().BeTrue();
+        jumps.Should().HaveCount(3, "it goes round by X1-C and X1-E");
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-B", Now, out _).Should().BeFalse();
+        ExploreAtlas.TryFindJumps(state, "X1-A", "X1-B", Now.AddMinutes(51), out _).Should().BeTrue();
+    }
+
+    /// <summary>
+    /// Home X1-A connects to X1-B and X1-C; X1-B to X1-D; X1-C to X1-E; X1-E to X1-D and X1-G, and to X1-F, whose gate is
+    /// under construction. All explored but X1-F and X1-G.
+    /// </summary>
+    private static ExplorePlanState Network() => new()
+    {
+        ShipSymbol = "SHIP-1",
+        HomeSystemSymbol = "X1-A",
+        Status = ExploreStatus.Exploring,
+        UpdatedAt = Now,
+        Systems =
+        [
+            Known("X1-A", ["X1-B-G", "X1-C-G"]),
+            Known("X1-B", ["X1-A-G", "X1-D-G"]),
+            Known("X1-C", ["X1-A-G", "X1-E-G"]),
+            Known("X1-D", ["X1-B-G", "X1-E-G"]),
+            Known("X1-E", ["X1-C-G", "X1-D-G", "X1-F-G", "X1-G-G"]),
+            Known("X1-F", []) with { Gate = GateState.UnderConstruction, ExploredAt = null },
+            Known("X1-G", []) with { ExploredAt = null },
+        ],
+    };
+
+    private static KnownSystem Known(string symbol, IReadOnlyList<string> connections) => new()
+    {
+        SystemSymbol = symbol,
+        GateWaypointSymbol = $"{symbol}-G",
+        Gate = GateState.Active,
+        GateCheckedAt = Now,
+        Connections = connections,
+        ConnectionsCheckedAt = Now,
+        ExploredAt = Now,
+    };
+
     /// <summary>Home X1-A, explored, connects to X1-B and X1-C, both built and not explored; the jump to X1-B was refused at <paramref name="refusedAt"/>.</summary>
     private static ExplorePlanState State(DateTimeOffset? refusedAt) => new()
     {

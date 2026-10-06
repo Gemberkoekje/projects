@@ -35,6 +35,9 @@ public sealed class ShipPurchaseService(
     IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
+    private const string ProbeShipType = "SHIP_PROBE";
+    private const string ScarceSupply = "SCARCE";
+
     public async Task<ShipPurchaseResult> TryPurchaseAsync(
         string shipType,
         string shipyardWaypoint,
@@ -72,7 +75,18 @@ public sealed class ShipPurchaseService(
                 estimatedCost);
         }
 
-        var quotedCost = await QuoteAsync(cached, shipType, estimatedCost, cancellationToken);
+        var quote = await QuoteAsync(cached, shipType, cancellationToken);
+        var quotedCost = quote?.PurchasePrice is > 0 and var quotedPrice ? quotedPrice : estimatedCost;
+
+        // D97 (slice 6.28, asked on 2026-10-06): "It should also check whether the probes are in SCARCE supply and not buy them
+        // if they are", read as every probe purchase. The probe plan leaves a shipyard whose cached supply is SCARCE alone; this
+        // is the supply as the shipyard gives it now, which the last purchase there may have brought down.
+        if (shipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase)
+            && (quote?.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))
+        {
+            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceSupply} at {shipyardWaypoint} (D97).", quotedCost);
+        }
+
         if (quotedCost != estimatedCost)
         {
             estimatedCost = quotedCost;
@@ -162,22 +176,21 @@ public sealed class ShipPurchaseService(
             && string.Equals(ship.WaypointSymbol, waypointSymbol, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// The price the shipyard asks now, fetched while our ship is there, and stored for the other plans;
-    /// the cached price when the fetch fails or lists no price.
+    /// The ship as the shipyard lists it now, its price and supply, fetched while our ship is there, and stored for the other
+    /// plans; as cached when the fetch fails or lists no ships.
     /// </summary>
-    private async Task<long> QuoteAsync(ShipyardWaypointDto cached, string shipType, long cachedCost, CancellationToken cancellationToken)
+    private async Task<ShipyardShipDto?> QuoteAsync(ShipyardWaypointDto cached, string shipType, CancellationToken cancellationToken)
     {
         try
         {
             var fresh = await port.GetShipyardAsync(cached.SystemSymbol, cached.WaypointSymbol, cancellationToken);
             if (fresh is null || string.IsNullOrWhiteSpace(fresh.ShipsDetailJson))
             {
-                return cachedCost;
+                return ShipOf(cached, shipType);
             }
 
             await shipyards.UpsertAsync(fresh, cancellationToken);
-            var quoted = ResolveShipPurchasePrice(await shipyards.FindByWaypointAsync(cached.WaypointSymbol, cancellationToken), shipType);
-            return quoted > 0 ? quoted : cachedCost;
+            return ShipOf(await shipyards.FindByWaypointAsync(cached.WaypointSymbol, cancellationToken), shipType) ?? ShipOf(cached, shipType);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -185,8 +198,11 @@ public sealed class ShipPurchaseService(
                 ex,
                 "Ship purchase: couldn't fetch the shipyard at {WaypointSymbol} again; buying at its cached price {Cost}.",
                 cached.WaypointSymbol,
-                cachedCost);
-            return cachedCost;
+                ResolveShipPurchasePrice(cached, shipType));
+            return ShipOf(cached, shipType);
         }
     }
+
+    private static ShipyardShipDto? ShipOf(ShipyardWaypointDto? shipyard, string shipType)
+        => shipyard?.Ships.FirstOrDefault(ship => shipType.Equals(ship.Type, StringComparison.OrdinalIgnoreCase));
 }

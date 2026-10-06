@@ -1,21 +1,24 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
 
-/// <summary>The probe plan (PLAN.md slice 6.3).</summary>
+/// <summary>The probe plan (PLAN.md slices 6.3 and 6.28).</summary>
 public interface IProbeDeploymentPlanService
 {
     /// <summary>
-    /// One pass of the plan: buys a probe while the system has more markets than probes and the credits
-    /// allow, sends the nearest free probe to each shipyard that calls for a ship, and every other free probe
-    /// to the market that needs one most.
+    /// One pass of the plan: sends a spare probe to a system short of one, buys a probe while a system it serves has more
+    /// markets than probes and the credits allow, sends the nearest free probe to each shipyard that calls for a ship, and
+    /// every other free probe to the market of its system that needs one most.
     /// </summary>
     /// <param name="cancellationToken">Stops the pass.</param>
     /// <returns>A task that completes when the pass is done.</returns>
@@ -23,20 +26,30 @@ public interface IProbeDeploymentPlanService
 }
 
 /// <summary>
-/// The probe plan (PLAN.md slice 6.3, D29, D30), in the headquarters' system. Long term every market has a
-/// probe of its own, which the market watch uses to keep its prices fresh. Each pass:
+/// The probe plan (PLAN.md slice 6.3, D29, D30; slice 6.28, D97). Long term every market has a probe of its own, which the
+/// market watch uses to keep its prices fresh: those of the headquarters' system first, then those of each explored system
+/// the built gates reach, the nearest first (asked on 2026-10-06: "Trade reach as a priority, all explored markets when money
+/// allows - I have minimum required credit reserves for a reason. It should also check whether the probes are in SCARCE
+/// supply and not buy them if they are."). Each pass:
 /// <list type="number">
-///   <item>while there are fewer probes than markets, it buys a SHIP_PROBE at the shipyard that sells it for
-///   the least, as long as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29), and nothing
-///   comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>, D43): the contract's drone, a
-///   surveyor, a drone for each scarce mineral and the cargo ships of <c>Trade.ShipPurchases</c> go first;</item>
-///   <item>it flies the free probes (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
-///   waits for one of our ships (<see cref="ShipyardCalls"/>, D30), the others between nearby markets, the
-///   one whose prices are oldest first, until there is a probe for every market; then each market keeps one, and
-///   the spares settle at the markets without one (B69).</item>
+///   <item>a system with more probes than markets lends its spares to the first system short of one (B69, slice 6.28), before
+///   a probe is bought for it;</item>
+///   <item>while a system has more markets than probes, it buys a SHIP_PROBE for the first such system, at the shipyard where
+///   it costs least with the antimatter of the jumps to that system counted, never where SHIP_PROBE is SCARCE (D97), as long
+///   as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29), and nothing comes before it in the
+///   order ships are bought in (<see cref="IPurchaseOrder"/>, D43): home's and those of the systems within
+///   <c>Trade.MaxHaulDistance</c> jumps of home at the probe tier, the others' last (<see cref="PurchaseTier.FarProbes"/>).
+///   A purchase needs one of our ships at the shipyard (D30), so a shipyard abroad counts once a probe of ours is in its
+///   system: the first probe to arrive lets the plan buy the rest there. One bought for another system flies there at once;</item>
+///   <item>it flies the free probes of each system (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
+///   waits for one of our ships (<see cref="ShipyardCalls"/>, D30), the others between nearby markets, the one whose prices
+///   are oldest first, until there is a probe for every market; then each market keeps one, and the spares settle at the
+///   markets without one (B69).</item>
 /// </list>
-/// A probe is any probe in the system, the starting one included (B25); a probe in flight, or with a flight
-/// to make, keeps its market, so no target is bought or flown to twice (B15).
+/// A probe is any probe, the starting one included (B25); a probe in flight, or with a flight to make, counts for the system
+/// it goes to and keeps its market there, so no target is bought or flown to twice (B15). A flight to another system jumps
+/// through the gates on the way (<see cref="Goals.Executors.GoalJumps"/>, D101), each jump's antimatter paid only while the
+/// credits after it stay at the floor (D63): the plan sends no probe abroad where they wouldn't.
 /// </summary>
 public sealed class ProbeDeploymentPlanService(
     IProbeDeploymentPlanRepository plans,
@@ -50,6 +63,7 @@ public sealed class ProbeDeploymentPlanService(
     ShipyardCalls calls,
     ISettingsRepository settings,
     IPurchaseOrder purchaseOrder,
+    IGateNetwork gates,
     ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
 {
     /// <summary>The ship the plan buys (D29).</summary>
@@ -57,6 +71,9 @@ public sealed class ProbeDeploymentPlanService(
 
     /// <summary>How old a market's prices may get when <c>Market.RefreshMinutes</c> gives no interval.</summary>
     internal const int DefaultDueMinutes = 5;
+
+    private const string ScarceSupply = "SCARCE";
+    private const string AntimatterSymbol = "ANTIMATTER";
 
     private static readonly JsonSerializerOptions CompareOptions = new();
 
@@ -73,150 +90,377 @@ public sealed class ProbeDeploymentPlanService(
             return;
         }
 
-        var systemSymbol = SystemOf(agent.HeadquartersSymbol);
-        var systemWaypoints = await waypoints.GetBySystemAsync(systemSymbol, cancellationToken);
-        var marketSymbols = systemWaypoints
-            .Where(waypoint => waypoint.HasMarket)
-            .Select(waypoint => waypoint.Symbol)
-            .Order(StringComparer.Ordinal)
-            .ToList();
-        if (marketSymbols.Count == 0)
+        var home = WaypointSymbols.SystemOf(agent.HeadquartersSymbol);
+        var now = TimeProvider.System.GetUtcNow();
+        var minutes = await settings.GetAsync<int>(MarketWatchService.RefreshMinutesSetting, cancellationToken);
+        var fleet = await ships.GetAllAsync(cancellationToken);
+        var pass = new Pass
         {
-            logger.LogDebug("Probe plan: no markets cached in system {System}.", systemSymbol);
+            Home = home,
+            Now = now,
+            DueAfter = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultDueMinutes),
+            Network = await gates.ReadAsync(cancellationToken),
+            Credits = agent.Credits,
+            Floor = Math.Max(0, await settings.GetAsync<long>(CreditReserve.FloorSetting, cancellationToken)),
+
+            // A market without prices counts as never seen, so a probe goes there first (B62).
+            LastSeen = (await markets.GetAllFreshnessAsync(cancellationToken))
+                .Where(freshness => freshness.HasPrices)
+                .GroupBy(freshness => freshness.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Max(freshness => freshness.LastObservedAt), StringComparer.OrdinalIgnoreCase),
+            Calls = calls.Open(now),
+        };
+
+        var probes = new List<FleetProbe>();
+        foreach (var probe in fleet.Where(FleetRoles.IsProbe))
+        {
+            probes.Add(await ProbeAsync(probe, cancellationToken));
+        }
+
+        await ServeAsync(pass, probes, await ReachAsync(cancellationToken), cancellationToken);
+        if (pass.Systems.Count == 0 || pass.Systems[0].Markets.Count == 0)
+        {
+            logger.LogDebug("Probe plan: no markets cached in system {System}.", home);
             return;
         }
 
         var existing = await plans.GetAsync(cancellationToken);
-        var fleet = await ships.GetAllAsync(cancellationToken);
-        var (purchase, shipyard, price) = await BuyProbeAsync(systemSymbol, ProbesIn(fleet, systemSymbol).Count, marketSymbols.Count, cancellationToken);
-        if (purchase == ProbePurchaseStatus.Bought)
+        var probeSymbols = probes.Select(probe => probe.View.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        pass.ShipsAt = WaypointsWithShips(fleet);
+        pass.OthersAt = WaypointsWithShips(fleet.Where(ship => !probeSymbols.Contains(ship.Symbol)));
+        if (pass.Network is not null && pass.Systems.Count > 1)
         {
-            fleet = await ships.GetAllAsync(cancellationToken);
+            pass.Antimatter = (await markets.GetAllSnapshotsAsync(cancellationToken))
+                .Select(market => (market.WaypointSymbol, Good: market.TradeGoods.FirstOrDefault(good => good.Symbol.Equals(AntimatterSymbol, StringComparison.OrdinalIgnoreCase))))
+                .Where(market => market.Good is not null)
+                .GroupBy(market => market.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => (long)group.First().Good!.PurchasePrice, StringComparer.OrdinalIgnoreCase);
         }
 
-        var now = TimeProvider.System.GetUtcNow();
-        var minutes = await settings.GetAsync<int>(MarketWatchService.RefreshMinutesSetting, cancellationToken);
-        var dueAfter = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultDueMinutes);
-        // A market without prices counts as never seen, so a probe goes there first (B62).
-        var lastSeen = (await markets.GetAllFreshnessAsync(cancellationToken))
-            .Where(freshness => freshness.HasPrices)
-            .GroupBy(freshness => freshness.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.Max(freshness => freshness.LastObservedAt), StringComparer.OrdinalIgnoreCase);
-        var probes = new List<ProbeShip>();
-        foreach (var probe in ProbesIn(fleet, systemSymbol))
+        LendSpares(pass);
+        var purchase = await BuyProbeAsync(pass, cancellationToken);
+
+        // A purchase where none of our ships is calls for one (D30): the probes answer it in this pass.
+        pass.Calls = calls.Open(now);
+        foreach (var (shipSymbol, market) in pass.Sends)
         {
-            probes.Add(await ProbeShipAsync(probe, cancellationToken));
+            await goals.SetActiveGoalAsync(shipSymbol, new DeployProbeGoal { TargetWaypointSymbol = market }, cancellationToken);
         }
 
-        var snapshot = new ProbeSnapshot
+        var moves = new List<(ServedSystem System, ProbeMove Move)>();
+        foreach (var system in pass.Systems)
         {
-            Positions = systemWaypoints
-                .GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => new WaypointPosition(group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase),
-            Markets = [.. marketSymbols.Select(symbol => new ProbeMarket(symbol, lastSeen.GetValueOrDefault(symbol, DateTimeOffset.MinValue)))],
-            Probes = probes,
-            ShipsAt = fleet
-                .Where(ship => ship.LocalStatus != ShipLocalStatus.InTransit && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
-                .Select(ship => ship.WaypointSymbol!)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase),
-            Calls = calls.Open(now),
-            Now = now,
-            DueAfter = dueAfter,
-        };
-
-        var moves = ProbePlanner.Plan(snapshot);
-        foreach (var move in moves)
-        {
-            await SendAsync(move, cancellationToken);
+            foreach (var move in ProbePlanner.Plan(Snapshot(pass, system)))
+            {
+                await SendAsync(move, cancellationToken);
+                moves.Add((system, move));
+            }
         }
 
-        var state = State(existing, systemSymbol, snapshot, fleet, moves, purchase, shipyard, price);
+        var state = State(existing, pass, moves, purchase);
         if (existing is null)
         {
             logger.LogInformation(
                 "{EventKind:l}: {Plan} plan for system {System}: {Probes} probes for {Markets} markets.",
                 JournalEvents.PlanStarted,
                 AutomationPlan.ProbeDeployment,
-                systemSymbol,
+                home,
                 state.Probes,
-                state.Markets.Count);
+                state.Systems.Sum(system => system.Markets.Count));
         }
 
-        if (purchase == ProbePurchaseStatus.WaitingForCredits && existing?.Purchase != ProbePurchaseStatus.WaitingForCredits)
+        if (purchase.Status == ProbePurchaseStatus.WaitingForCredits && existing?.Purchase != ProbePurchaseStatus.WaitingForCredits)
         {
             logger.LogInformation(
                 "{EventKind:l}: {Plan} plan waits ({Reason}): a probe costs {Price} at {WaypointSymbol}, and the purchase must leave the credit reserve.",
                 JournalEvents.PlanBlocked,
                 AutomationPlan.ProbeDeployment,
                 "waiting_for_credits",
-                price,
-                shipyard);
+                purchase.Price,
+                purchase.Shipyard);
         }
 
         await SaveStateAsync(existing, state, cancellationToken);
     }
 
-    private static List<ShipModel> ProbesIn(IReadOnlyList<ShipModel> fleet, string systemSymbol)
-        => [.. fleet.Where(ship => FleetRoles.IsProbe(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase))];
-
-    private static string SystemOf(string waypointSymbol)
-    {
-        var lastDash = waypointSymbol.LastIndexOf('-');
-        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
-    }
-
     /// <summary>The engine's speed from the cached engine; a probe bought since the last restart has none yet.</summary>
     private static int EngineSpeed(ShipModel ship) => FleetRoles.EngineSpeed(ship, ProbePlanner.DefaultProbeSpeed);
 
+    /// <summary>The waypoints where one of our ships is, probe or not, and not in flight.</summary>
+    private static HashSet<string> WaypointsWithShips(IEnumerable<ShipModel> fleet)
+        => fleet
+            .Where(ship => ship.LocalStatus != ShipLocalStatus.InTransit && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+            .Select(ship => ship.WaypointSymbol!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
-    /// Buys the next probe (D29) while the system has more markets than probes, at the shipyard that sells it
-    /// for the least, when nothing comes before it in the order ships are bought in (D43).
-    /// <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when none of ours is at the
-    /// shipyard (D30).
+    /// How many jumps from home the trade reach goes (D96): <c>Trade.MaxHaulDistance</c>, 5 when it gives none. The probes of
+    /// the explored systems within it come at the probe tier, the others' last (D97).
     /// </summary>
-    private async Task<(ProbePurchaseStatus Status, string Shipyard, long Price)> BuyProbeAsync(
-        string systemSymbol,
-        int probes,
-        int marketCount,
-        CancellationToken cancellationToken)
+    private async Task<int> ReachAsync(CancellationToken cancellationToken)
+        => await settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, cancellationToken) is var jumps and > 0
+            ? jumps
+            : TradeContextReader.DefaultMaxHaulDistance;
+
+    /// <summary>
+    /// The probe as the plan sees it: free, or holding the market it flies to, or will fly to once its goal's next step runs,
+    /// in this system or another (slice 6.28); in flight without a goal, where it lands.
+    /// </summary>
+    private async Task<FleetProbe> ProbeAsync(ShipModel probe, CancellationToken cancellationToken)
     {
-        var offer = (await shipyards.GetAllAsync(cancellationToken))
-            .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(candidate => candidate.Ships
+        var goal = await goals.GetActiveGoalAsync(probe.Symbol, cancellationToken);
+        var flight = goal is DeployProbeGoal { Status: not GoalStatus.Completed and not GoalStatus.Blocked } deploy
+            ? deploy.TargetWaypointSymbol
+            : string.Empty;
+        var waypoint = probe.LocalStatus == ShipLocalStatus.InTransit
+            ? FirstOf(flight, probe.DestWaypointSymbol, probe.WaypointSymbol)
+            : FirstOf(flight, probe.WaypointSymbol);
+        var system = waypoint.Length > 0 ? WaypointSymbols.SystemOf(waypoint) : probe.SystemSymbol ?? string.Empty;
+        return new FleetProbe(
+            new ProbeShip(probe.Symbol, waypoint, FleetRoles.IsFree(probe, goal, hasOpenAssignment: false), EngineSpeed(probe)),
+            system,
+            probe.SystemSymbol ?? string.Empty);
+    }
+
+    private static string FirstOf(params string?[] symbols)
+        => symbols.FirstOrDefault(symbol => !string.IsNullOrWhiteSpace(symbol)) ?? string.Empty;
+
+    /// <summary>
+    /// The systems the probes serve (slice 6.28, D97), in the order they get probes: home; then each explored system the built
+    /// gates reach from home, the nearest first, those within the trade reach at the probe tier; then any other system a probe
+    /// of ours is in or on its way to, where it keeps working but none is bought. A system whose waypoints aren't cached is left
+    /// out.
+    /// </summary>
+    private async Task ServeAsync(Pass pass, IReadOnlyList<FleetProbe> probes, int reach, CancellationToken cancellationToken)
+    {
+        var jumps = pass.Network is null
+            ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [pass.Home] = 0 }
+            : ExploreAtlas.Reachable(pass.Network, pass.Home, pass.Now);
+        var explored = (pass.Network?.Systems ?? [])
+            .Where(system => system.ExploredAt is not null)
+            .ToDictionary(system => system.SystemSymbol, StringComparer.OrdinalIgnoreCase);
+        var served = new List<(string Symbol, bool Reached, int Jumps)> { (pass.Home, true, 0) };
+        served.AddRange(jumps
+            .Where(system => !system.Key.Equals(pass.Home, StringComparison.OrdinalIgnoreCase) && explored.ContainsKey(system.Key))
+            .OrderBy(system => system.Value)
+            .ThenBy(system => system.Key, StringComparer.Ordinal)
+            .Select(system => (system.Key, true, system.Value)));
+        served.AddRange(probes
+            .Select(probe => probe.System)
+            .Where(system => system.Length > 0 && !served.Any(known => known.Symbol.Equals(system, StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal)
+            .Select(system => (system, false, 0)));
+
+        foreach (var (symbol, reached, away) in served)
+        {
+            var systemWaypoints = await waypoints.GetBySystemAsync(symbol, cancellationToken);
+            if (systemWaypoints.Count == 0 && pass.Systems.Count > 0)
+            {
+                continue;
+            }
+
+            pass.Systems.Add(new ServedSystem
+            {
+                Symbol = symbol,
+                Reached = reached,
+                Jumps = away,
+                InTradeReach = reached && away <= reach,
+                Gate = explored.TryGetValue(symbol, out var known) && known.GateWaypointSymbol.Length > 0
+                    ? known.GateWaypointSymbol
+                    : systemWaypoints.FirstOrDefault(waypoint => waypoint.Type.Equals("JUMP_GATE", StringComparison.OrdinalIgnoreCase))?.Symbol ?? string.Empty,
+                Positions = systemWaypoints
+                    .GroupBy(waypoint => waypoint.Symbol, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => new WaypointPosition(group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase),
+                Markets =
+                [
+                    .. systemWaypoints
+                        .Where(waypoint => waypoint.HasMarket)
+                        .Select(waypoint => waypoint.Symbol)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Order(StringComparer.Ordinal)
+                        .Select(market => new ProbeMarket(market, pass.LastSeen.GetValueOrDefault(market, DateTimeOffset.MinValue))),
+                ],
+                Probes = [.. probes.Where(probe => probe.System.Equals(symbol, StringComparison.OrdinalIgnoreCase)).Select(probe => probe.View)],
+                Present = probes.Count(probe => probe.System.Equals(symbol, StringComparison.OrdinalIgnoreCase) && probe.In.Equals(symbol, StringComparison.OrdinalIgnoreCase)),
+            });
+        }
+    }
+
+    private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system) => new()
+    {
+        Positions = system.Positions,
+        Markets = system.Markets,
+        Probes = system.Probes,
+        ShipsAt = pass.ShipsAt,
+        Calls = pass.Calls,
+        Now = pass.Now,
+        DueAfter = pass.DueAfter,
+    };
+
+    /// <summary>Whether a system the plan buys probes for has fewer probes, there or on their way, than markets.</summary>
+    private static bool IsShort(ServedSystem system) => system.Reached && system.Probes.Count < system.Markets.Count;
+
+    /// <summary>
+    /// B69, slice 6.28: a system with more probes than markets lends the spares its own markets don't need
+    /// (<see cref="ProbePlanner.Surplus"/>) to the first system short of one that they can get to, before the plan buys one
+    /// for it.
+    /// </summary>
+    private void LendSpares(Pass pass)
+    {
+        foreach (var lender in pass.Systems.Where(system => system.Probes.Count > system.Markets.Count).ToList())
+        {
+            foreach (var spare in ProbePlanner.Surplus(Snapshot(pass, lender)))
+            {
+                var borrower = pass.Systems.FirstOrDefault(system => system != lender && IsShort(system) && CanJump(pass, lender.Symbol, system.Symbol, out _));
+                if (borrower is null)
+                {
+                    break;
+                }
+
+                Send(pass, lender, borrower, spare, "a spare");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a probe can get from one system to another: a way through built gates is known (D101), and its antimatter,
+    /// as last seen at each gate, leaves the credit floor (D63).
+    /// </summary>
+    private static bool CanJump(Pass pass, string from, string to, out long antimatter)
+    {
+        antimatter = 0;
+        if (from.Equals(to, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (pass.Network is null || !ExploreAtlas.TryFindJumps(pass.Network, from, to, pass.Now, out var jumps))
+        {
+            return false;
+        }
+
+        antimatter = jumps.Sum(jump => pass.AntimatterAt(jump.GateWaypointSymbol));
+        return pass.Credits - antimatter >= pass.Floor;
+    }
+
+    /// <summary>
+    /// Gives a probe its flight to another system (<see cref="Pass.Sends"/>): to the market of that system it should see first,
+    /// from the system's gate (<see cref="ProbePlanner.Entry"/>). It holds that market from now on, and counts for that system.
+    /// A system short of probes always has a market without one; should none be left, the probe stays.
+    /// </summary>
+    private void Send(Pass pass, ServedSystem from, ServedSystem to, ProbeShip probe, string what)
+    {
+        var market = ProbePlanner.Entry(Snapshot(pass, to), to.Gate, probe.Speed);
+        if (market.Length == 0)
+        {
+            return;
+        }
+
+        pass.Sends.Add((probe.Symbol, market));
+        from.Probes.RemoveAll(view => view.Symbol.Equals(probe.Symbol, StringComparison.OrdinalIgnoreCase));
+        to.Probes.Add(new ProbeShip(probe.Symbol, market, IsFree: false, probe.Speed));
+        logger.LogInformation(
+            "Probe plan: probe {ShipSymbol}, {What} in {From}, flies to {WaypointSymbol} in {SystemSymbol}, {Jumps} jumps from home, which has {Probes} probes for {Markets} markets.",
+            probe.Symbol,
+            what,
+            from.Symbol,
+            market,
+            to.Symbol,
+            to.Jumps,
+            to.Probes.Count - 1,
+            to.Markets.Count);
+    }
+
+    /// <summary>
+    /// Buys the next probe (D29, D97) for the first system short of one, at the shipyard where it costs least with the
+    /// antimatter of the jumps there counted, when nothing comes before it in the order ships are bought in (D43).
+    /// <see cref="IShipPurchaseService"/> keeps the credit reserve, refuses a probe at SCARCE supply when it fetches the
+    /// shipyard again, and calls for a ship when none of ours is at the shipyard (D30). A probe bought for another system
+    /// flies there at once.
+    /// </summary>
+    private async Task<ProbePurchase> BuyProbeAsync(Pass pass, CancellationToken cancellationToken)
+    {
+        var offers = (await shipyards.GetAllAsync(cancellationToken))
+            .SelectMany(shipyard => shipyard.Ships
                 .Where(ship => ship.Type.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
-                .Select(ship => (Shipyard: candidate.WaypointSymbol, Price: ship.PurchasePrice)))
-            .OrderBy(candidate => candidate.Price)
-            .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
+                .Select(ship => new ProbeOffer(
+                    shipyard.WaypointSymbol,
+                    shipyard.SystemSymbol.Length > 0 ? shipyard.SystemSymbol : WaypointSymbols.SystemOf(shipyard.WaypointSymbol),
+                    ship.PurchasePrice,
+                    (ship.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))))
+            .OrderBy(offer => offer.Price)
+            .ThenBy(offer => offer.Shipyard, StringComparer.Ordinal)
             .ToList();
-        var (shipyard, price) = offer.Count > 0 ? offer[0] : (string.Empty, 0L);
-        if (probes >= marketCount)
+
+        var homeOffer = offers.FirstOrDefault(offer => offer.System.Equals(pass.Home, StringComparison.OrdinalIgnoreCase));
+        var shortOf = pass.Systems.Where(IsShort).ToList();
+        if (shortOf.Count == 0)
         {
-            return (ProbePurchaseStatus.EveryMarketHasOne, shipyard, price);
+            return new ProbePurchase(ProbePurchaseStatus.EveryMarketHasOne, string.Empty, homeOffer?.Shipyard ?? string.Empty, homeOffer?.Price ?? 0, 0);
         }
 
-        if (offer.Count == 0)
+        var scarce = false;
+        foreach (var system in shortOf)
         {
-            return (ProbePurchaseStatus.NoShipyardSellsProbes, shipyard, price);
+            // A purchase needs one of our ships at the shipyard (D30): at home there always is one to call, abroad only once a
+            // probe of ours is in that system.
+            var candidates = new List<(ProbeOffer Offer, long Antimatter)>();
+            foreach (var offer in offers.Where(offer => offer.System.Equals(pass.Home, StringComparison.OrdinalIgnoreCase)
+                || pass.Systems.Any(served => served.Symbol.Equals(offer.System, StringComparison.OrdinalIgnoreCase) && served.Present > 0)))
+            {
+                if (CanJump(pass, offer.System, system.Symbol, out var antimatter))
+                {
+                    scarce |= offer.Scarce;
+                    if (!offer.Scarce)
+                    {
+                        candidates.Add((offer, antimatter));
+                    }
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                continue;
+            }
+
+            var (best, jumpCost) = candidates
+                .OrderBy(candidate => candidate.Offer.Price + candidate.Antimatter)
+                .ThenBy(candidate => candidate.Offer.Price)
+                .ThenBy(candidate => candidate.Offer.Shipyard, StringComparer.Ordinal)
+                .First();
+            return await BuyAsync(pass, system, best, jumpCost, cancellationToken);
         }
 
+        return new ProbePurchase(
+            scarce ? ProbePurchaseStatus.ShipyardsScarce : ProbePurchaseStatus.NoShipyardSellsProbes,
+            shortOf[0].Symbol,
+            homeOffer?.Shipyard ?? string.Empty,
+            homeOffer?.Price ?? 0,
+            0);
+    }
+
+    private async Task<ProbePurchase> BuyAsync(Pass pass, ServedSystem system, ProbeOffer offer, long antimatter, CancellationToken cancellationToken)
+    {
+        var tier = system.InTradeReach ? PurchaseTier.Probes : PurchaseTier.FarProbes;
         if (!await purchaseOrder.ReportAsync(
             AutomationPlan.ProbeDeployment,
-            new PurchaseNeed(PurchaseTier.Probes, ProbeShipType, shipyard, price),
+            new PurchaseNeed(tier, ProbeShipType, offer.Shipyard, offer.Price),
             cancellationToken))
         {
-            return (ProbePurchaseStatus.WaitingForAnotherPurchase, shipyard, price);
+            return new ProbePurchase(ProbePurchaseStatus.WaitingForAnotherPurchase, system.Symbol, offer.Shipyard, offer.Price, antimatter);
         }
 
         ShipPurchaseResult result;
         try
         {
-            result = await shipPurchases.TryPurchaseAsync(ProbeShipType, shipyard, cancellationToken);
+            result = await shipPurchases.TryPurchaseAsync(ProbeShipType, offer.Shipyard, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // The probes fly on: a purchase that keeps failing shows as RepeatingError.
-            logger.LogWarning(ex, "Probe plan: buying a {ShipType} at {WaypointSymbol} failed.", ProbeShipType, shipyard);
-            return (ProbePurchaseStatus.None, shipyard, price);
+            logger.LogWarning(ex, "Probe plan: buying a {ShipType} at {WaypointSymbol} failed.", ProbeShipType, offer.Shipyard);
+            return new ProbePurchase(ProbePurchaseStatus.None, system.Symbol, offer.Shipyard, offer.Price, antimatter);
         }
 
         var status = result switch
@@ -225,29 +469,28 @@ public sealed class ProbeDeploymentPlanService(
             { Failure: ShipPurchaseFailure.OverBudget } => ProbePurchaseStatus.WaitingForCredits,
             { Failure: ShipPurchaseFailure.NoShipAtShipyard } => ProbePurchaseStatus.WaitingForAShipAtTheShipyard,
             { Failure: ShipPurchaseFailure.PriceUnknown } => ProbePurchaseStatus.NoShipyardSellsProbes,
+            { Failure: ShipPurchaseFailure.Scarce } => ProbePurchaseStatus.ShipyardsScarce,
             _ => ProbePurchaseStatus.None,
         };
-        return (status, shipyard, result.EstimatedCost > 0 ? result.EstimatedCost : price);
-    }
+        var price = result.EstimatedCost > 0 ? result.EstimatedCost : offer.Price;
+        if (result is { IsSuccess: true, PurchasedShip: { } bought })
+        {
+            var probe = new ProbeShip(bought.Symbol, offer.Shipyard, IsFree: true, EngineSpeed(bought));
+            if (offer.System.Equals(system.Symbol, StringComparison.OrdinalIgnoreCase))
+            {
+                system.Probes.Add(probe);
+            }
+            else
+            {
+                // Bought for another system: it flies there at once, so the system it was bought in doesn't keep it.
+                var at = pass.Systems.FirstOrDefault(served => served.Symbol.Equals(offer.System, StringComparison.OrdinalIgnoreCase)) ?? system;
+                at.Probes.Add(probe);
+                Send(pass, at, system, probe, "bought");
+            }
+        }
 
-    /// <summary>
-    /// The probe as the plan sees it: free, or holding the market it flies to, or will fly to once its goal's
-    /// next step runs.
-    /// </summary>
-    private async Task<ProbeShip> ProbeShipAsync(ShipModel probe, CancellationToken cancellationToken)
-    {
-        var goal = await goals.GetActiveGoalAsync(probe.Symbol, cancellationToken);
-        var flight = goal is DeployProbeGoal { Status: not GoalStatus.Completed and not GoalStatus.Blocked } deploy
-            ? deploy.TargetWaypointSymbol
-            : string.Empty;
-        var waypoint = probe.LocalStatus == ShipLocalStatus.InTransit
-            ? FirstOf(probe.DestWaypointSymbol, flight, probe.WaypointSymbol)
-            : FirstOf(flight, probe.WaypointSymbol);
-        return new ProbeShip(probe.Symbol, waypoint, FleetRoles.IsFree(probe, goal, hasOpenAssignment: false), EngineSpeed(probe));
+        return new ProbePurchase(status, system.Symbol, offer.Shipyard, price, antimatter);
     }
-
-    private static string FirstOf(params string?[] symbols)
-        => symbols.FirstOrDefault(symbol => !string.IsNullOrWhiteSpace(symbol)) ?? string.Empty;
 
     private async Task SendAsync(ProbeMove move, CancellationToken cancellationToken)
     {
@@ -274,27 +517,16 @@ public sealed class ProbeDeploymentPlanService(
 
     private static ProbeDeploymentPlanState State(
         ProbeDeploymentPlanState? existing,
-        string systemSymbol,
-        ProbeSnapshot snapshot,
-        IReadOnlyList<ShipModel> fleet,
-        IReadOnlyList<ProbeMove> moves,
-        ProbePurchaseStatus purchase,
-        string shipyard,
-        long price)
+        Pass pass,
+        IReadOnlyList<(ServedSystem System, ProbeMove Move)> moves,
+        ProbePurchase purchase)
     {
         // Where each probe is, or flies to, once this pass's flights are given.
-        var holds = snapshot.Probes
-            .Select(probe => (
+        var holds = pass.Systems
+            .SelectMany(system => system.Probes.Select(probe => (
                 probe.Symbol,
-                Waypoint: moves.FirstOrDefault(move => string.Equals(move.ShipSymbol, probe.Symbol, StringComparison.Ordinal))?.WaypointSymbol ?? probe.WaypointSymbol))
+                Waypoint: moves.FirstOrDefault(move => string.Equals(move.Move.ShipSymbol, probe.Symbol, StringComparison.Ordinal)).Move?.WaypointSymbol ?? probe.WaypointSymbol)))
             .ToList();
-        var probeSymbols = snapshot.Probes.Select(probe => probe.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var shipsAt = fleet
-            .Where(ship => !probeSymbols.Contains(ship.Symbol)
-                && ship.LocalStatus != ShipLocalStatus.InTransit
-                && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
-            .Select(ship => ship.WaypointSymbol!)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         string ProbeAt(string waypointSymbol) => holds
             .Where(hold => hold.Waypoint.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase))
             .Select(hold => hold.Symbol)
@@ -304,30 +536,43 @@ public sealed class ProbeDeploymentPlanService(
         return new ProbeDeploymentPlanState
         {
             PlanId = existing?.PlanId ?? Guid.NewGuid(),
-            SystemSymbol = systemSymbol,
-            Probes = snapshot.Probes.Count,
-            Markets =
+            SystemSymbol = pass.Home,
+            Probes = holds.Count,
+            Systems =
             [
-                .. snapshot.Markets.Select(market =>
+                .. pass.Systems.Select(system => new ProbeSystemState
                 {
-                    var view = new ProbeMarketState
-                    {
-                        WaypointSymbol = market.WaypointSymbol,
-                        ProbeSymbol = ProbeAt(market.WaypointSymbol),
-                        WatchedByShip = shipsAt.Contains(market.WaypointSymbol),
-                    };
-                    return view.IsUnwatched
-                        ? view with { DueAt = market.LastSeenAt == DateTimeOffset.MinValue ? DateTimeOffset.MinValue : market.LastSeenAt + snapshot.DueAfter }
-                        : view;
+                    SystemSymbol = system.Symbol,
+                    Reached = system.Reached,
+                    Jumps = system.Jumps,
+                    InTradeReach = system.InTradeReach,
+                    Probes = system.Probes.Count,
+                    Markets =
+                    [
+                        .. system.Markets.Select(market =>
+                        {
+                            var view = new ProbeMarketState
+                            {
+                                WaypointSymbol = market.WaypointSymbol,
+                                ProbeSymbol = ProbeAt(market.WaypointSymbol),
+                                WatchedByShip = pass.OthersAt.Contains(market.WaypointSymbol),
+                            };
+                            return view.IsUnwatched
+                                ? view with { DueAt = market.LastSeenAt == DateTimeOffset.MinValue ? DateTimeOffset.MinValue : market.LastSeenAt + pass.DueAfter }
+                                : view;
+                        }),
+                    ],
                 }),
             ],
-            Purchase = purchase,
-            NextProbeShipyard = shipyard,
-            NextProbePrice = price,
+            Purchase = purchase.Status,
+            NextProbeSystem = purchase.System,
+            NextProbeShipyard = purchase.Shipyard,
+            NextProbePrice = purchase.Price,
+            NextProbeAntimatter = purchase.Antimatter,
             Calls =
             [
-                .. snapshot.Calls
-                    .Where(call => snapshot.Positions.ContainsKey(call.WaypointSymbol))
+                .. pass.Calls
+                    .Where(call => pass.Systems.Any(system => system.Positions.ContainsKey(call.WaypointSymbol)))
                     .Select(call => new ProbeCallState
                     {
                         WaypointSymbol = call.WaypointSymbol,
@@ -335,8 +580,8 @@ public sealed class ProbeDeploymentPlanService(
                         ProbeSymbol = ProbeAt(call.WaypointSymbol),
                     }),
             ],
-            CreatedAt = existing?.CreatedAt ?? snapshot.Now,
-            UpdatedAt = snapshot.Now,
+            CreatedAt = existing?.CreatedAt ?? pass.Now,
+            UpdatedAt = pass.Now,
         };
     }
 
@@ -353,4 +598,77 @@ public sealed class ProbeDeploymentPlanService(
 
     private static string Comparable(ProbeDeploymentPlanState state)
         => JsonSerializer.Serialize(state with { PlanId = Guid.Empty, CreatedAt = default, UpdatedAt = default }, CompareOptions);
+
+    /// <summary>A probe of the fleet: the plan's view of it, the system it counts for, and the system it is in.</summary>
+    private sealed record FleetProbe(ProbeShip View, string System, string In);
+
+    /// <summary>A shipyard's offer of a probe, as cached.</summary>
+    private sealed record ProbeOffer(string Shipyard, string System, long Price, bool Scarce);
+
+    /// <summary>What the pass did about the next probe, and where it would be bought.</summary>
+    private sealed record ProbePurchase(ProbePurchaseStatus Status, string System, string Shipyard, long Price, long Antimatter);
+
+    /// <summary>A system the probes serve, as one pass sees it.</summary>
+    private sealed class ServedSystem
+    {
+        public required string Symbol { get; init; }
+
+        /// <summary>Whether a way from home through built gates is known now; home is.</summary>
+        public required bool Reached { get; init; }
+
+        public required int Jumps { get; init; }
+
+        public required bool InTradeReach { get; init; }
+
+        /// <summary>Its jump gate, where a probe from another system comes in; empty when none is known.</summary>
+        public required string Gate { get; init; }
+
+        public required IReadOnlyDictionary<string, WaypointPosition> Positions { get; init; }
+
+        public required IReadOnlyList<ProbeMarket> Markets { get; init; }
+
+        /// <summary>The probes in the system, or on their way there, as this pass leaves them.</summary>
+        public required List<ProbeShip> Probes { get; init; }
+
+        /// <summary>How many of them are in the system already, which a purchase at a shipyard there needs (D30).</summary>
+        public required int Present { get; init; }
+    }
+
+    /// <summary>What one pass reads and decides, across the systems.</summary>
+    private sealed class Pass
+    {
+        public required string Home { get; init; }
+
+        public required DateTimeOffset Now { get; init; }
+
+        public required TimeSpan DueAfter { get; init; }
+
+        public required ExplorePlanState? Network { get; init; }
+
+        public required long Credits { get; init; }
+
+        public required long Floor { get; init; }
+
+        public required IReadOnlyDictionary<string, DateTimeOffset> LastSeen { get; init; }
+
+        /// <summary>The shipyards where a purchase waits for one of our ships (D30), read again after this pass's purchase.</summary>
+        public required IReadOnlyList<ShipyardCall> Calls { get; set; }
+
+        public List<ServedSystem> Systems { get; } = [];
+
+        /// <summary>The waypoints where one of our ships is, probe or not, and not in flight.</summary>
+        public IReadOnlySet<string> ShipsAt { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The waypoints where one of our ships that is no probe is, and not in flight: the market watch keeps those fresh.</summary>
+        public IReadOnlySet<string> OthersAt { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>What a unit of ANTIMATTER costs at each market that sells it, as last seen; read only when a probe could jump.</summary>
+        public IReadOnlyDictionary<string, long> Antimatter { get; set; } = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The flights to other systems this pass gives, by probe: the market each flies to.</summary>
+        public List<(string ShipSymbol, string WaypointSymbol)> Sends { get; } = [];
+
+        /// <summary>What a jump from <paramref name="gate"/> costs: one ANTIMATTER at its market, as last seen; 0 while unknown.</summary>
+        public long AntimatterAt(string gate) => Antimatter.GetValueOrDefault(gate);
+    }
 }

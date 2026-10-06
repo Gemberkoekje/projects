@@ -222,6 +222,39 @@ public sealed class ProbePlannerTests
             .Should().BeEmpty();
     }
 
+    [Fact]
+    public void ASystemWithMoreProbesThanMarkets_SparesTheOnesItWouldSettleNowhere()
+    {
+        // Slice 6.28 (B69): two markets, four probes. PROBE-1 keeps A1 and PROBE-2 H51; PROBE-3, a second probe at A1, and
+        // PROBE-4, at XB5C (no market here), are spares. With PROBE-5 on its way to H51, which can't be lent in flight,
+        // PROBE-2 is a spare too: PROBE-5 takes H51.
+        var snapshot = Snapshot(
+            [Probe("PROBE-1", A1), Probe("PROBE-2", H51), Probe("PROBE-3", A1), Probe("PROBE-4", XB5C)],
+            Market(A1, minutesAgo: 1),
+            Market(H51, minutesAgo: 1));
+
+        ProbePlanner.Surplus(snapshot).Select(probe => probe.Symbol).Should().Equal("PROBE-3", "PROBE-4");
+        ProbePlanner.Surplus(snapshot with { Probes = [.. snapshot.Probes, Probe("PROBE-5", H51, free: false)] })
+            .Select(probe => probe.Symbol).Should().Equal("PROBE-2", "PROBE-3", "PROBE-4");
+        ProbePlanner.Surplus(snapshot with { Probes = [.. snapshot.Probes.Take(3)] })
+            .Select(probe => probe.Symbol).Should().Equal(["PROBE-3"], "as many as it has too many");
+        ProbePlanner.Surplus(snapshot with { Probes = [.. snapshot.Probes.Take(2)] }).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AProbeComingIn_TakesTheMarketARoamingProbeWouldTake_FromTheGate()
+    {
+        // Slice 6.28: from the gate at H52 (next door to H51), H51 seen half an hour ago beats A1 seen 31 minutes ago less
+        // twice its 143 s; a market never seen goes first; one with a probe at it or on its way is taken.
+        var snapshot = Snapshot([], Market(H51, minutesAgo: 30), Market(A1, minutesAgo: 31));
+
+        ProbePlanner.Entry(snapshot, H52, 9).Should().Be(H51);
+        ProbePlanner.Entry(snapshot with { Markets = [.. snapshot.Markets, new ProbeMarket(J58, DateTimeOffset.MinValue)] }, H52, 9).Should().Be(J58);
+        ProbePlanner.Entry(snapshot with { Probes = [Probe("PROBE-1", H51, free: false)] }, H52, 9).Should().Be(A1);
+        ProbePlanner.Entry(snapshot with { Probes = [Probe("PROBE-1", H51, free: false), Probe("PROBE-2", A1)] }, H52, 9).Should().BeEmpty();
+        ProbePlanner.Entry(snapshot, "X1-DC53-UNKNOWN", 9).Should().Be(A1, "without the gate's position the oldest prices win");
+    }
+
     private static ProbeShip Probe(string symbol, string waypointSymbol, bool free = true) => new(symbol, waypointSymbol, free, 9);
 
     private static ProbeMarket Market(string waypointSymbol, int minutesAgo) => new(waypointSymbol, Now.AddMinutes(-minutesAgo));

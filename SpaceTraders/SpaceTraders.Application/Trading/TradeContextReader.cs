@@ -73,6 +73,15 @@ public sealed class TradeContextReader(
     /// <summary>The setting that holds the credits cargo must leave, so fuel can always be bought (D24).</summary>
     public const string FuelReserveCreditsSetting = "Trade.FuelReserveCredits";
 
+    /// <summary>
+    /// The setting that holds how many jumps from home the trade reach goes (D96): the probes of the explored systems within it
+    /// come before the drones and cargo ships that take turns, the others' last (slice 6.28, D97).
+    /// </summary>
+    public const string MaxHaulDistanceSetting = "Trade.MaxHaulDistance";
+
+    /// <summary>The trade reach when <see cref="MaxHaulDistanceSetting"/> gives none, as it is seeded.</summary>
+    public const int DefaultMaxHaulDistance = 5;
+
     /// <inheritdoc />
     public async Task<TradeContext> ReadAsync(string systemSymbol, CancellationToken cancellationToken)
     {

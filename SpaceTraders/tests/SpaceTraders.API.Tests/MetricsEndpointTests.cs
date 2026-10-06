@@ -61,6 +61,7 @@ public sealed class MetricsEndpointTests
         "spacetraders_system_explored_timestamp_seconds",
         "spacetraders_system_connection_info",
         "spacetraders_system_facilities",
+        "spacetraders_system_probes",
         "spacetraders_system_waypoints",
         "spacetraders_system_gathering_sites",
         "spacetraders_system_raw_good_price",

@@ -80,6 +80,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly SampledGauge _systemExplored;
     private readonly SampledGauge _systemConnection;
     private readonly SampledGauge _systemFacilities;
+    private readonly SampledGauge _systemProbes;
     private readonly SampledGauge _systemWaypoints;
     private readonly SampledGauge _systemGatheringSites;
     private readonly SampledGauge _systemRawGoodPrice;
@@ -326,6 +327,10 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "A system's cached waypoints with a market, a shipyard, or still uncharted.",
             "system",
             "kind"));
+        _systemProbes = new SampledGauge(Labelled(
+            "spacetraders_system_probes",
+            "Our probes in a system (slice 6.28), which keep its markets' prices fresh; no series for a system without one.",
+            "system"));
         _systemWaypoints = new SampledGauge(Labelled(
             "spacetraders_system_waypoints",
             "A system's cached waypoints, by type.",
@@ -823,7 +828,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         {
             SampledGauge[] all =
             [
-                _systemInfo, _systemJumps, _systemExplored, _systemConnection, _systemFacilities, _systemWaypoints,
+                _systemInfo, _systemJumps, _systemExplored, _systemConnection, _systemFacilities, _systemProbes, _systemWaypoints,
                 _systemGatheringSites, _systemRawGoodPrice, _systemRawGoodSupply, _systemTradeMargin, _systemTradeVolume,
             ];
             foreach (var gauge in all)
@@ -852,6 +857,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
                 _systemFacilities.Set(system.Markets, system.System, "market");
                 _systemFacilities.Set(system.Shipyards, system.System, "shipyard");
                 _systemFacilities.Set(system.Uncharted, system.System, "uncharted");
+                if (system.Probes > 0)
+                {
+                    _systemProbes.Set(system.Probes, system.System);
+                }
+
                 foreach (var (type, count) in system.WaypointTypes)
                 {
                     _systemWaypoints.Set(count, system.System, type);
