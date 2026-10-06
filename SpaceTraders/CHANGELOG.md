@@ -13,6 +13,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Docs – Changed (2026-10-06, B71)
 - `PLAN.md`: B71. `docs/HOW_IT_WORKS.md`: the gathering plans read the goals before the ships.
 
+### Code – Fixed (2026-10-06, B69)
+- Once there is a probe for every market, each market keeps one probe and only the spares fly: a free probe at a waypoint that is no market, or at a market that has another, goes to a market without a probe, due or not (`ProbePlanner`). Free probes used to fly only to due markets, scored by age minus twice the flight, so a market our other ships keep fresh never got its probe, and a probe next door left its own market for a due one: the eight probes bought at X1-FJ91-C46 sat there for a day while seven markets had none, and the probes in the A, D and H clusters hopped between neighbours 65 to 109 times an hour. With fewer probes than markets they still roam (D29).
+
+### Docs – Changed (2026-10-06, B69)
+- `PLAN.md`: B69; slice 6.25 merged and deployed, and the jump gate complete. `docs/HOW_IT_WORKS.md`: the probes' flights once there is a probe for every market.
+
 ### Code – Added (2026-10-05, slice 6.25)
 - The jump gate's miners (D92), as asked on 2026-10-05: "extra miners to be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the smelters have at least HIGH saturation". While the gate needs materials, a smelter is a market that imports an ore and exports a metal, made from ores alone, that goes into a material the gate still needs (`MiningPlanner.GateSmelters`; `TradeMarketMap.GoesIntoConstruction`): IRON_ORE into IRON for FAB_MATS, COPPER_ORE into COPPER for ADVANCED_CIRCUITRY. For each ore with a smelter below HIGH that a new drone can serve, the mining plan buys one mining drone every `Mining.GateMinerIntervalMinutes` (new, 30), the lowest supply first, within `Mining.MaxDrones` and the credit reserve. It stands at the gate's place in the order ships are bought in, after a load the markets sell now: the construction plan says when its load waits for SCARCE or LIMITED markets, or another buyer there (`PurchaseNeed.WaitsForMarkets`), and only then may the miners be bought. Each such drone mines only its ore, for its smelter with the lowest supply (reason `gate`), and parks at no collection point, until the gate needs nothing made from its ore; the mining plan's state lists them (`GateMiners`). Among the drones for scarce minerals (D48) a gate miner counts for its own ore only.
 
