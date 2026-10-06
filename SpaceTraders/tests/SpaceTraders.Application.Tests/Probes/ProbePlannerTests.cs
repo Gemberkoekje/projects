@@ -121,14 +121,74 @@ public sealed class ProbePlannerTests
     }
 
     [Fact]
+    public void WithAProbeForEveryMarket_TheSpares_SettleAtTheMarketsWithoutOne_DueOrNot()
+    {
+        // B69: four probes for four markets, three of them at A1, where they were bought. Our other ships keep A2 and H52
+        // fresh, so neither is ever due, and the spares stayed at the shipyard: seven at X1-FJ91-C46 for a day.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", A1), Probe("PROBE-2", H51), Probe("PROBE-3", A1), Probe("PROBE-4", A1)],
+            Market(A1, minutesAgo: 1),
+            Market(A2, minutesAgo: 1),
+            Market(H51, minutesAgo: 1),
+            Market(H52, minutesAgo: 2)));
+
+        moves.Should().BeEquivalentTo([
+            new ProbeMove("PROBE-3", A2, ForPurchase: false, ShipType: string.Empty),
+            new ProbeMove("PROBE-4", H52, ForPurchase: false, ShipType: string.Empty),
+        ]);
+    }
+
+    [Fact]
+    public void WithAProbeForEveryMarket_AProbeKeepsItsMarket_AndASpareTakesTheOneWithout()
+    {
+        // B69: PROBE-1, next door, left H51 for H52 as soon as H52 was due, and H51 was due five minutes later. In
+        // X1-FJ91's clusters the probes hopped between neighbours some 75 times an hour, and the spares, further away,
+        // never won a market.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H51), Probe("PROBE-2", A1), Probe("PROBE-3", A1)],
+            Market(H51, minutesAgo: 1),
+            Market(H52, minutesAgo: 10),
+            Market(A1, minutesAgo: 1)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-3", H52, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
+    public void WithAProbeForEveryMarket_AProbeBackFromACall_TakesTheMarketWithoutOne()
+    {
+        // D30: once the purchase is made, the probe at the shipyard, which is no market, flies on.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H52), Probe("PROBE-2", A1)],
+            Market(H51, minutesAgo: 1),
+            Market(A1, minutesAgo: 1)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-1", H51, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
+    public void WithFewerProbesThanMarkets_AProbeStillLeavesItsMarket_ForADueOne()
+    {
+        // D29: until there is a probe for every market, the probes drift between nearby markets.
+        var moves = ProbePlanner.Plan(Snapshot(
+            [Probe("PROBE-1", H51), Probe("PROBE-2", A1)],
+            Market(H51, minutesAgo: 1),
+            Market(H52, minutesAgo: 10),
+            Market(A1, minutesAgo: 1)));
+
+        moves.Should().ContainSingle().Which.Should().Be(new ProbeMove("PROBE-1", H52, ForPurchase: false, ShipType: string.Empty));
+    }
+
+    [Fact]
     public void AShipyardThatCalls_GetsTheNearestFreeProbe_BeforeAnyMarket()
     {
-        // D30: the mining plan can afford a drone at H52, where none of our ships is.
+        // D30: the mining plan can afford a drone at H52, where none of our ships is. XB5C, seen a minute ago, makes it fewer
+        // probes than markets, so the other probe roams.
         var moves = ProbePlanner.Plan(Snapshot(
             [Probe("PROBE-1", A1), Probe("PROBE-2", J58)],
             [Call(H52, "SHIP_MINING_DRONE")],
             Market(J58, minutesAgo: 1),
-            Market(A2, minutesAgo: 600)));
+            Market(A2, minutesAgo: 600),
+            Market(XB5C, minutesAgo: 1)));
 
         moves.Should().BeEquivalentTo([
             new ProbeMove("PROBE-1", H52, ForPurchase: true, ShipType: "SHIP_MINING_DRONE"),

@@ -573,12 +573,18 @@ The goal is a probe at every market of the HQ system, where the market watch kee
 - **Flights** (`ProbePlanner`, no I/O):
   1. a shipyard where a purchase waits for one of our ships (`ShipyardCalls`, D30) gets the nearest
      free probe (`ProbeCalled`), which stays there while the call is open;
-  2. every other free probe gets a market that is due, its prices older than `Market.RefreshMinutes`
-     (5), with no probe at it or on its way. Each pair of free probe and due market is scored by the
-     market's age minus twice the flight there in CRUISE (15 s plus the distance times 25 over the
-     engine's speed, 9 for a probe), and the best pair goes first. A market never seen is the oldest,
-     and so is a market the cache holds without prices (B62).
-  With a probe at every market, none is due without one, and the probes stay where they are.
+  2. while there are fewer probes than markets, every other free probe gets a market that is due, its
+     prices older than `Market.RefreshMinutes` (5), with no probe at it or on its way. Each pair of free
+     probe and due market is scored by the market's age minus twice the flight there in CRUISE (15 s
+     plus the distance times 25 over the engine's speed, 9 for a probe), and the best pair goes first.
+     A market never seen is the oldest, and so is a market the cache holds without prices (B62);
+  3. once there is a probe for every market (B69), each market keeps one probe and only the spares
+     fly: every free probe at a waypoint that is no market, and at a market every one but the first by
+     symbol (all of them while another probe flies there). They go to the markets with no probe at
+     them or on their way, due or not, scored the same way. A market our other ships keep fresh is
+     never due, so step 2 would leave it without a probe, and a probe next door would leave its own
+     market for a due one.
+  With a probe at every market, the probes stay where they are.
 - **The flight** is a `DeployProbeGoal`: one per flight, ended at the arrival, which fetches the
   market and shipyard there. The plan then chooses again.
 - **State** (`plan_states`, written only when it changes): every market with the probe at it or on
