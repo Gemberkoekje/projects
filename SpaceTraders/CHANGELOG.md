@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-06, B71)
+- The mining, siphon and construction plans read every ship's goal before the ships (`FleetGoals`). A trip that ends in its arrival handler empties the hold first and ends its goal after; read the other way round, a pass could see the goal ended beside the ship as it was before, free with cargo it no longer held. The builder SPECTER-D, which had just supplied the gate's last 80 ADVANCED_CIRCUITRY, was passed over to the trading plan and spent 18 minutes on an ELECTRONICS trade while its next FAB_MATS load waited; a drone would have been sent to sell what it had just sold.
+
+### Docs – Changed (2026-10-06, B71)
+- `PLAN.md`: B71. `docs/HOW_IT_WORKS.md`: the gathering plans read the goals before the ships.
+
 ### Code – Fixed (2026-10-06, B69)
 - Once there is a probe for every market, each market keeps one probe and only the spares fly: a free probe at a waypoint that is no market, or at a market that has another, goes to a market without a probe, due or not (`ProbePlanner`). Free probes used to fly only to due markets, scored by age minus twice the flight, so a market our other ships keep fresh never got its probe, and a probe next door left its own market for a due one: the eight probes bought at X1-FJ91-C46 sat there for a day while seven markets had none, and the probes in the A, D and H clusters hopped between neighbours 65 to 109 times an hour. With fewer probes than markets they still roam (D29).
 
