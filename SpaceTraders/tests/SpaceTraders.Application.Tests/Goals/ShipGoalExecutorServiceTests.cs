@@ -22,6 +22,8 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
     private readonly ITripBook _trips = Substitute.For<ITripBook>();
     private readonly ShipGoalStepGuard _stepGuard = new();
+    private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
+    private readonly LostArrivals _lostArrivals;
     private readonly LogRecorder _log = new();
 
     private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
@@ -31,6 +33,7 @@ public sealed class ShipGoalExecutorServiceTests
     {
         // Automation and every plan switched on, unless a test says otherwise.
         _settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        _lostArrivals = new LostArrivals(_scheduler);
     }
 
     private ShipGoalExecutorService CreateService() =>
@@ -44,7 +47,46 @@ public sealed class ShipGoalExecutorServiceTests
             _stepGuard,
             _metrics,
             _trips,
+            _lostArrivals,
             _log.For<ShipGoalExecutorService>());
+
+    [Fact]
+    public async Task ExecuteAsync_AShipStoredInTransitLongPastItsArrival_HasItsArrivalScheduledAgain_OnceAMargin()
+    {
+        // B70, seen on 2026-10-06: SPECTER-5's arrival at gas giant C45, due at 00:42:53Z, fell in a 35-second outage of the
+        // game's API. The dock failed four times and the arrival was dropped; the cache kept the ship in transit, nothing
+        // scheduled its arrival again, and every step of its SiphonAndSell goal waited for it, for hours, until a restart.
+        var siphon = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-045", SellWaypointSymbol = "X1-AB-051" };
+        var lost = new ShipModel("SHIP-1", "X1-AB", "X1-AB-045", "IN_TRANSIT", "CRUISE", 37, 80, ArrivesAt: DateTimeOffset.UtcNow.AddMinutes(-10));
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(lost);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(siphon);
+        _executor.CanExecute(siphon).Returns(true);
+        _executor.ExecuteStepAsync(lost, siphon, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.WaitingForArrival("In transit to X1-AB-045."));
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _scheduler.Received(1).ScheduleArrivalAsync("SHIP-1", siphon.GoalId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        _log.Entries.Should().ContainSingle(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning && entry.Message.Contains("scheduled again"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AShipWhoseArrivalIsJustDue_IsLeftToItsArrival()
+    {
+        // An arrival is handled within seconds of its time: the scheduler fires it, and the dock takes the ship out of transit.
+        var siphon = new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-045", SellWaypointSymbol = "X1-AB-051" };
+        var landing = new ShipModel("SHIP-1", "X1-AB", "X1-AB-045", "IN_TRANSIT", "CRUISE", 37, 80, ArrivesAt: DateTimeOffset.UtcNow.AddSeconds(-20));
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(landing);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(siphon);
+        _executor.CanExecute(siphon).Returns(true);
+        _executor.ExecuteStepAsync(landing, siphon, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.WaitingForArrival("In transit to X1-AB-045."));
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _scheduler.DidNotReceiveWithAnyArgs().ScheduleArrivalAsync(default!, default, default, default);
+    }
 
     [Fact]
     public async Task ExecuteAsync_WhenTheBreakerTrips_JournalsTheShipAsBlocked()
@@ -184,6 +226,7 @@ public sealed class ShipGoalExecutorServiceTests
             _stepGuard,
             Substitute.For<IAutomationMetrics>(),
             _trips,
+            _lostArrivals,
             log.For<ShipGoalExecutorService>());
 
         for (var tick = 0; tick < 12; tick++)

@@ -224,21 +224,22 @@ public static class ConstructionPlanner
     }
 
     /// <summary>
-    /// The ships that build when the role board is off (D65's rule): of the ships that can (<see cref="FleetRoles.CanConstruct"/>),
-    /// the largest holds, then the one that can do least else, then by symbol.
+    /// The ships that build when the role board is off (D65's rule, D93): every ship that can (<see cref="FleetRoles.CanConstruct"/>),
+    /// the largest holds first, then the one that can do least else, then by symbol; only the first <paramref name="count"/>
+    /// when it is above 0.
     /// </summary>
     /// <param name="candidates">The ships that may build: the caller leaves out those that survey.</param>
-    /// <param name="count">How many build (<c>Construction.Ships</c>).</param>
+    /// <param name="count">The most that build (<c>Construction.Ships</c>); 0 for all of them.</param>
     /// <returns>The builders.</returns>
     public static IReadOnlyList<ShipModel> PickBuilders(IEnumerable<ShipModel> candidates, int count)
     {
         ArgumentNullException.ThrowIfNull(candidates);
-        return [.. candidates
+        var largestFirst = candidates
             .Where(FleetRoles.CanConstruct)
             .OrderByDescending(ship => ship.CargoCapacity)
             .ThenBy(ship => FleetRoles.PotentialRoles(ship).Count)
-            .ThenBy(ship => ship.Symbol, StringComparer.Ordinal)
-            .Take(Math.Max(0, count))];
+            .ThenBy(ship => ship.Symbol, StringComparer.Ordinal);
+        return [.. count > 0 ? largestFirst.Take(count) : largestFirst];
     }
 
     /// <summary>

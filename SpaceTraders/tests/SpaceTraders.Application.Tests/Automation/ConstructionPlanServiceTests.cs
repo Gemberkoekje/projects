@@ -11,6 +11,7 @@ using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Tests.Services;
 using SpaceTraders.Application.Trading;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Construction.ConstructionFixture;
 
@@ -246,6 +247,58 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
+    public async Task ATripThatEndsWhileThePassReadsTheGoals_LeavesTheBuilderItsNextLoad_NotATrade()
+    {
+        // B71, seen on 2026-10-06: SPECTER-D supplied the last 80 ADVANCED_CIRCUITRY at 01:19:25.6Z, in its arrival handler,
+        // while tick 1424's construction pass read the fleet's goals. The pass had read the ship before the supply, the 80
+        // aboard, and its goal after it, done: a free builder holding other cargo, which a pass leaves to the trading plan
+        // (B63). 0.7 s later the trading plan, reading the ship empty by then, sent it on an 18-minute ELECTRONICS trade while
+        // a FAB_MATS load waited.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        _sites.NeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Site(fabMats: 1_287, circuitry: 400)]);
+        var trip = new SupplyConstructionGoal { TradeSymbol = "ADVANCED_CIRCUITRY", ConstructionSiteWaypointSymbol = Gate, BuyWaypointSymbol = D42, Units = 80, CargoBought = true };
+        _activeGoals["SHIP-6"] = trip;
+        ShipModel[] fleet = [Hauler(waypoint: Gate, cargo: [new CargoItemModel("ADVANCED_CIRCUITRY", 80)])];
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(_ => fleet);
+        _goals.GetActiveGoalAsync("SHIP-6", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            // The arrival handler supplies as the pass reads the goal: the hold is emptied first, then the trip ends
+            // (SupplyConstructionGoalExecutor).
+            if (ReferenceEquals(_activeGoals["SHIP-6"], trip))
+            {
+                fleet = [Hauler(waypoint: Gate)];
+                _activeGoals["SHIP-6"] = trip with { Status = GoalStatus.Completed };
+            }
+
+            return _activeGoals["SHIP-6"];
+        });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Which.TradeSymbol.Should().Be("FAB_MATS");
+        _passedOver.MayTrade("SHIP-6", [AutomationPlan.Construction]).Should().BeFalse("its plan had a load for it (B63)");
+    }
+
+    [Fact]
+    public async Task ThreeFreeBuilders_AndTheLast40FabMats_OneTakesThem_TheOthersMayTrade()
+    {
+        // D93, asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there
+        // aren't 3 ships gunning for the final 40 FAB MATS." A load takes only what no other trip carries or goes to buy, those
+        // the same pass starts included (MaterialNeed.OnTheWay): the first builder takes the 40, and the others have no load.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct), ("SHIP-7", FleetRole.Construct), ("SHIP-8", FleetRole.Construct));
+        _sites.NeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Site(fabMats: 1_560, circuitry: 400)]);
+        Fleet(Hauler(), Shuttle(), Hauler("SHIP-8"));
+
+        await RunAsync();
+
+        var trip = _activeGoals.Values.Should().ContainSingle().Which.Should().BeOfType<SupplyConstructionGoal>().Subject;
+        (trip.TradeSymbol, trip.Units).Should().Be(("FAB_MATS", 40));
+        var others = new[] { "SHIP-6", "SHIP-7", "SHIP-8" }.Where(ship => !_activeGoals.ContainsKey(ship)).ToList();
+        others.Should().HaveCount(2).And.OnlyContain(ship => _passedOver.MayTrade(ship, new[] { AutomationPlan.Construction }), "the pass had no load for them (B63)");
+        _state!.Sites.Single().Materials.Single(material => material.TradeSymbol == "FAB_MATS").OnTheWay.Should().Be(40);
+    }
+
+    [Fact]
     public async Task ABuilderThatHoldsOtherCargo_IsLeftToTheTradingPlan()
     {
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
@@ -258,10 +311,23 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
-    public async Task WithTheRoleBoardOff_ItPicksTheLargestHoldItself()
+    public async Task WithTheRoleBoardOff_ItPicksTheBuildersItself()
     {
-        // The survey plan is on: the command ship surveys (D20). Of the shuttle and the hauler, the hauler builds.
+        // The survey plan is on: the command ship surveys (D20). Without a limit (D93), the shuttle and the hauler both build.
         _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        Fleet(CommandShip(), Shuttle(), Hauler());
+
+        await RunAsync();
+
+        _activeGoals.Keys.Should().BeEquivalentTo("SHIP-6", "SHIP-7");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOff_AndOneBuilder_ItPicksTheLargestHold()
+    {
+        // D65, with Construction.Ships at 1: of the shuttle and the hauler, the hauler builds.
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        _settings.GetAsync<int>(RoleSettings.ConstructionShipsSetting, Arg.Any<CancellationToken>()).Returns(1);
         Fleet(CommandShip(), Shuttle(), Hauler());
 
         await RunAsync();

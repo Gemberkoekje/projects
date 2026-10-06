@@ -14,7 +14,10 @@ namespace SpaceTraders.Application.Probes;
 ///   probe and due market is scored by the market's age minus <see cref="FlightWeight"/> times the flight
 ///   there, and the best pair goes first, so a market goes to the probe nearest it.</item>
 /// </list>
-/// With a probe at every market nothing is due that isn't held, so the probes stay where they are.
+/// Once there is a probe for every market (B69), each market keeps one probe, and only the spares fly: those at a
+/// waypoint that is no market, or at a market that has another, go to the markets without a probe, due or not, scored
+/// the same way. A market our other ships keep fresh is never due, so roaming would never fill it, and a probe next
+/// door would leave its own market for a due one. With a probe at every market, the probes stay where they are.
 /// </summary>
 public static class ProbePlanner
 {
@@ -70,31 +73,20 @@ public static class ProbePlanner
             Fly(held, free, nearest, call.WaypointSymbol);
         }
 
-        var due = snapshot.Markets
-            .Where(market => snapshot.Positions.ContainsKey(market.WaypointSymbol)
-                && snapshot.Now - market.LastSeenAt >= snapshot.DueAfter)
+        var markets = snapshot.Markets
+            .Where(market => snapshot.Positions.ContainsKey(market.WaypointSymbol))
             .ToList();
-        while (free.Count > 0)
+        if (snapshot.Probes.Count >= markets.Count)
         {
-            var pairs = free
-                .SelectMany(probe => due
-                    .Where(market => !held.ContainsKey(market.WaypointSymbol))
-                    .Select(market => (Probe: probe, Market: market, Score: Score(snapshot, probe, market))))
-                .ToList();
-            if (pairs.Count == 0)
-            {
-                break;
-            }
-
-            var (probe, market, _) = pairs
-                .OrderByDescending(pair => pair.Score)
-                .ThenBy(pair => pair.Market.WaypointSymbol, StringComparer.Ordinal)
-                .ThenBy(pair => pair.Probe.Symbol, StringComparer.Ordinal)
-                .First();
-            moves.Add(new ProbeMove(probe.Symbol, market.WaypointSymbol, ForPurchase: false, ShipType: string.Empty));
-            Fly(held, free, probe, market.WaypointSymbol);
+            // B69: a probe for every market; each keeps its own, and the spares fill the markets without one.
+            SendToMarkets(snapshot, Spares(markets, held, free), markets, held, free, moves);
+            return moves;
         }
 
+        var due = markets
+            .Where(market => snapshot.Now - market.LastSeenAt >= snapshot.DueAfter)
+            .ToList();
+        SendToMarkets(snapshot, free, due, held, free, moves);
         return moves;
     }
 
@@ -117,6 +109,55 @@ public static class ProbePlanner
 
     private static double Score(ProbeSnapshot snapshot, ProbeShip probe, ProbeMarket market)
         => (snapshot.Now - market.LastSeenAt).TotalSeconds - (FlightWeight * FlightSeconds(snapshot, probe, market.WaypointSymbol));
+
+    /// <summary>
+    /// Sends the probes to the markets no probe is at or flying to, the best pair of probe and market first, until either
+    /// runs out.
+    /// </summary>
+    private static void SendToMarkets(
+        ProbeSnapshot snapshot,
+        List<ProbeShip> probes,
+        IReadOnlyList<ProbeMarket> markets,
+        Dictionary<string, int> held,
+        List<ProbeShip> free,
+        List<ProbeMove> moves)
+    {
+        while (probes.Count > 0)
+        {
+            var pairs = probes
+                .SelectMany(probe => markets
+                    .Where(market => !held.ContainsKey(market.WaypointSymbol))
+                    .Select(market => (Probe: probe, Market: market, Score: Score(snapshot, probe, market))))
+                .ToList();
+            if (pairs.Count == 0)
+            {
+                return;
+            }
+
+            var (probe, market, _) = pairs
+                .OrderByDescending(pair => pair.Score)
+                .ThenBy(pair => pair.Market.WaypointSymbol, StringComparer.Ordinal)
+                .ThenBy(pair => pair.Probe.Symbol, StringComparer.Ordinal)
+                .First();
+            moves.Add(new ProbeMove(probe.Symbol, market.WaypointSymbol, ForPurchase: false, ShipType: string.Empty));
+            probes.Remove(probe);
+            Fly(held, free, probe, market.WaypointSymbol);
+        }
+    }
+
+    /// <summary>
+    /// The free probes their waypoint can spare (B69): all at a waypoint that is no market; at a market, all but the first
+    /// by symbol, or all while another probe flies there.
+    /// </summary>
+    private static List<ProbeShip> Spares(IReadOnlyList<ProbeMarket> markets, Dictionary<string, int> held, List<ProbeShip> free)
+    {
+        var marketSymbols = markets.Select(market => market.WaypointSymbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. free
+            .GroupBy(probe => probe.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(group => marketSymbols.Contains(group.Key) && held.GetValueOrDefault(group.Key) == group.Count()
+                ? group.Skip(1)
+                : group)];
+    }
 
     private static void Fly(Dictionary<string, int> held, List<ProbeShip> free, ProbeShip probe, string destination)
     {

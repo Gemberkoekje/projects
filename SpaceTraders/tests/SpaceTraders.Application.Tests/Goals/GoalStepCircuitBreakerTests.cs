@@ -154,6 +154,7 @@ public sealed class GoalStepCircuitBreakerTests
             new NoStepGuard(),
             _metrics,
             Substitute.For<ITripBook>(),
+            new LostArrivals(Substitute.For<IShipEventScheduler>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
     /// <summary>

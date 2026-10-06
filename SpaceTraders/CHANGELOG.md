@@ -13,6 +13,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Docs – Changed (2026-10-06, slices 6.27–6.31)
 - `PLAN.md`: slices 6.27–6.31 planned, across systems, with decisions D94–D101, as asked on 2026-10-06 ("CHART unchartered systems and waypoints", trade with "a "profit per time unit"" that considers other systems, an EXPLORER, and "probes to be at each new market"): profit per hour, probes at the markets abroad, trade across systems, the explorer and charting, warping, in that order, one PR each; slice 6.27 built. Where things stand: slice 6.25 merged and deployed, the home gate finished and the systems explored since. `docs/HOW_IT_WORKS.md`: ranking by the rate, the trip's time, `TradeStarted`'s new fields.
 
+### Code – Changed (2026-10-06, slice 6.26)
+- Every ship that can build builds the jump gate (D93), as asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for the final 40 FAB MATS." `Construction.Ships` is now an optional cap, 0 (the new default) for no limit; with a cap, the largest holds build, as before (D65). The underway count was there already: a load takes only what no other trip carries or goes to buy (`MaterialNeed.OnTheWay`), and one trip buys a material at a market at a time (D80), so of three builders and the last 40 FAB_MATS one takes them and the others trade.
+
+### Docs – Changed (2026-10-06, slice 6.26)
+- `PLAN.md`: slice 6.26 and decision D93. `docs/HOW_IT_WORKS.md`: who builds the gate, and the setting.
+
+### Code – Fixed (2026-10-06, B70)
+- A ship whose arrival was never handled gets it again (`LostArrivals`): a goal step for a ship still stored in transit more than 5 minutes past its arrival time schedules its arrival again, for its active goal, at most once every 5 minutes, and logs a warning. Only the arrival's dock takes a ship out of transit in the cache, and an arrival whose dock failed four times was dropped: SPECTER-5's, at 00:42:53Z on 2026-10-06 in a 35-second outage of the game's API, left it waiting for hours, until a restart.
+
+### Docs – Changed (2026-10-06, B70)
+- `PLAN.md`: B70. `docs/HOW_IT_WORKS.md`: the arrival's dock, and a lost arrival.
+
+### Code – Fixed (2026-10-06, B71)
+- The mining, siphon and construction plans read every ship's goal before the ships (`FleetGoals`). A trip that ends in its arrival handler empties the hold first and ends its goal after; read the other way round, a pass could see the goal ended beside the ship as it was before, free with cargo it no longer held. The builder SPECTER-D, which had just supplied the gate's last 80 ADVANCED_CIRCUITRY, was passed over to the trading plan and spent 18 minutes on an ELECTRONICS trade while its next FAB_MATS load waited; a drone would have been sent to sell what it had just sold.
+
+### Docs – Changed (2026-10-06, B71)
+- `PLAN.md`: B71. `docs/HOW_IT_WORKS.md`: the gathering plans read the goals before the ships.
+
+### Code – Fixed (2026-10-06, B69)
+- Once there is a probe for every market, each market keeps one probe and only the spares fly: a free probe at a waypoint that is no market, or at a market that has another, goes to a market without a probe, due or not (`ProbePlanner`). Free probes used to fly only to due markets, scored by age minus twice the flight, so a market our other ships keep fresh never got its probe, and a probe next door left its own market for a due one: the eight probes bought at X1-FJ91-C46 sat there for a day while seven markets had none, and the probes in the A, D and H clusters hopped between neighbours 65 to 109 times an hour. With fewer probes than markets they still roam (D29).
+
+### Docs – Changed (2026-10-06, B69)
+- `PLAN.md`: B69; slice 6.25 merged and deployed, and the jump gate complete. `docs/HOW_IT_WORKS.md`: the probes' flights once there is a probe for every market.
+
 ### Code – Added (2026-10-05, slice 6.25)
 - The jump gate's miners (D92), as asked on 2026-10-05: "extra miners to be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the smelters have at least HIGH saturation". While the gate needs materials, a smelter is a market that imports an ore and exports a metal, made from ores alone, that goes into a material the gate still needs (`MiningPlanner.GateSmelters`; `TradeMarketMap.GoesIntoConstruction`): IRON_ORE into IRON for FAB_MATS, COPPER_ORE into COPPER for ADVANCED_CIRCUITRY. For each ore with a smelter below HIGH that a new drone can serve, the mining plan buys one mining drone every `Mining.GateMinerIntervalMinutes` (new, 30), the lowest supply first, within `Mining.MaxDrones` and the credit reserve. It stands at the gate's place in the order ships are bought in, after a load the markets sell now: the construction plan says when its load waits for SCARCE or LIMITED markets, or another buyer there (`PurchaseNeed.WaitsForMarkets`), and only then may the miners be bought. Each such drone mines only its ore, for its smelter with the lowest supply (reason `gate`), and parks at no collection point, until the gate needs nothing made from its ore; the mining plan's state lists them (`GateMiners`). Among the drones for scarce minerals (D48) a gate miner counts for its own ore only.
 
