@@ -77,7 +77,10 @@ public sealed class SiphonAutomationService(
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
-        var fleet = await ships.GetAllAsync(cancellationToken);
+
+        // B71: the goals before the ships, so a trip that ends meanwhile leaves no siphoner free with the gas it sold.
+        var read = await FleetGoals.ReadAsync(ships, goals, cancellationToken);
+        var fleet = read.Fleet;
         var active = await assignments.GetAllActiveAsync(cancellationToken);
         var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -99,7 +102,7 @@ public sealed class SiphonAutomationService(
         var free = new List<ShipModel>();
         foreach (var ship in fleet)
         {
-            var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            var goal = read.GoalOf(ship.Symbol);
             if (goal is SiphonAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
             {
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);

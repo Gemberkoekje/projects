@@ -106,7 +106,10 @@ public sealed class MiningAutomationService(
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
-        var fleet = await ships.GetAllAsync(cancellationToken);
+
+        // B71: the goals before the ships, so a trip that ends meanwhile leaves no miner free with the ore it sold.
+        var read = await FleetGoals.ReadAsync(ships, goals, cancellationToken);
+        var fleet = read.Fleet;
         var active = await assignments.GetAllActiveAsync(cancellationToken);
         var withAssignment = active
             .Where(assignment => !assignment.CompletedAt.HasValue)
@@ -150,7 +153,7 @@ public sealed class MiningAutomationService(
         var freeCollectors = new List<ShipModel>();
         foreach (var ship in fleet)
         {
-            var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            var goal = read.GoalOf(ship.Symbol);
             if (goal is MineAndSellGoal trip && trip.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
             {
                 var key = MiningPlanner.OpportunityKey(trip.SellWaypointSymbol, trip.TradeSymbol);

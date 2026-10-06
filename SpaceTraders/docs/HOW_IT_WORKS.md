@@ -971,7 +971,12 @@ buy.
   mining, siphon and construction plans each note the ships they work with and the free ones they gave no
   work. An arrival's goal step runs outside the tick, so a trip can end after its plan's pass and before
   the trading plan's; that ship wasn't passed over and waits for its own plan's next pass, a tick later,
-  instead of trading. A plan that is switched off has no say.
+  instead of trading. A plan that is switched off has no say. A trip can also end during a pass: the
+  arrival empties the hold first and ends the goal after, so the mining, siphon and construction plans
+  read every ship's goal first and the ships after (`FleetGoals`, B71). A goal read as ended then comes
+  with the ship as its trip left it, and one read as running keeps its ship busy for that pass. Read the
+  other way round, a builder whose supply landed between the two reads looked free with the load it had
+  just supplied and was passed over to trading, and a drone was sent to sell what it had just sold.
 - **A ship that gathers in its spare time** (the command ship, with the survey and spare-time plans on,
   slice 6.8) trades when it has nothing to survey (D34), but only for a route that waits for it once
   its hold is sold, and after the other traders have chosen. The route is judged from where selling its
