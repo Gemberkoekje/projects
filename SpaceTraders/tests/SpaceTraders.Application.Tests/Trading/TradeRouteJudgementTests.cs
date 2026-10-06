@@ -87,13 +87,15 @@ public sealed class TradeRouteJudgementTests
     }
 
     [Fact]
-    public void Why_ALucrativeRoute_GivesItsProfit()
+    public void Why_ALucrativeRoute_GivesItsProfit_AndWhatItEarnsAnHour()
     {
+        // Slice 6.27 (D95): the rate the route ranks by, over the trip from K85: 185 to D41 at the stand-in speed of 9, and two
+        // stops, about 9 minutes.
         var map = Map();
         var equipment = TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld)
             .Single(judgement => judgement.Route.Key == TradeRoutePlanner.RouteKey("EQUIPMENT", K85, D41));
 
-        equipment.Why(map).Should().Be("SHIP-1: lucrative, 40 units for 9,168 after fuel, 229 a unit.");
+        equipment.Why(map).Should().Be("SHIP-1: lucrative, 40 units for 9,168 after fuel, 229 a unit; 60,130 an hour, the trip taking about 9 minutes (D95).");
     }
 
     [Fact]

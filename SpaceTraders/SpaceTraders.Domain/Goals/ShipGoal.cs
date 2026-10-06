@@ -385,6 +385,12 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
     public long ExpectedProfit { get; init; }
 
     /// <summary>
+    /// How long the trip was expected to take, in seconds, from where the ship was when it was chosen: what its rate was worked
+    /// out over (PLAN.md slice 6.27, D95). 0 for cargo the ship already held, and for a trip stored before slice 6.27.
+    /// </summary>
+    public int ExpectedSeconds { get; init; }
+
+    /// <summary>
     /// The pricier good the sell market makes from <see cref="TradeSymbol"/>, or empty when the trip
     /// feeds no production there.
     /// </summary>

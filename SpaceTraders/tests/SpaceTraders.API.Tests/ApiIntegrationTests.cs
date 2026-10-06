@@ -505,7 +505,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
                 [
                     TradingRoute("EQUIPMENT", "X1-AB-K85", "X1-AB-D41", MarketAutomationOpportunityStatus.Assigned, 40, 9_168, "SHIP_PARTS") with { AssignedShipSymbol = "SHIP-1" },
                     TradingRoute("FABRICS", "X1-AB-C3", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 40, 2_800, "CLOTHING") with { CandidateShipSymbols = ["SHIP-2"] },
-                    TradingRoute("CLOTHING", "X1-AB-D41", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 15, 4_095, string.Empty) with { CandidateShipSymbols = ["SHIP-2", "SHIP-3"] },
+                    TradingRoute("CLOTHING", "X1-AB-D41", "X1-AB-A1", MarketAutomationOpportunityStatus.Pending, 15, 4_095, string.Empty) with { CandidateShipSymbols = ["SHIP-2", "SHIP-3"], ExpectedSeconds = 548 },
                 ],
             });
 
@@ -528,6 +528,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         routes[1].GetProperty("buyWaypointSymbol").GetString().Should().Be("X1-AB-C3");
         routes[1].GetProperty("sellWaypointSymbol").GetString().Should().Be("X1-AB-A1");
         routes[1].GetProperty("candidateShips").GetString().Should().Be("SHIP-2");
+        routes[1].GetProperty("creditsPerHour").GetInt64().Should().Be(0, "a route stored without a time has no rate");
 
         routes[2].GetProperty("position").GetInt32().Should().Be(2);
         routes[2].GetProperty("units").GetInt32().Should().Be(15);
@@ -535,6 +536,10 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         routes[2].GetProperty("profitPerUnit").GetInt64().Should().Be(273);
         routes[2].GetProperty("feedsTradeSymbol").GetString().Should().BeEmpty();
         routes[2].GetProperty("candidateShips").GetString().Should().Be("SHIP-2, SHIP-3");
+
+        // Slice 6.27 (D95): the trip's time and what it earns an hour, the rate the plan ranks by.
+        routes[2].GetProperty("expectedMinutes").GetDouble().Should().Be(9.1);
+        routes[2].GetProperty("creditsPerHour").GetInt64().Should().Be(26_901);
     }
 
     [Fact]

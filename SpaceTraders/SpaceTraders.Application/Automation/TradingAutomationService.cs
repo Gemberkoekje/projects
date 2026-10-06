@@ -507,7 +507,8 @@ public sealed class TradingAutomationService(
 
     /// <summary>
     /// Gives the free traders of one system their routes, best route first: each round, the trader whose
-    /// best route ranks highest gets it, and that route is no longer open to the others.
+    /// best route ranks highest gets it, and that route is no longer open to the others. A route's rate counts its trip from
+    /// where each trader is (D95), so of two traders the nearer one gets a route both could fly.
     /// </summary>
     /// <param name="judgements">Gets how each trader's routes with a price gap fared (D76).</param>
     /// <returns>The credits left for cargo once the routes' purchases are counted.</returns>
@@ -657,9 +658,13 @@ public sealed class TradingAutomationService(
             SellWaypointSymbol = route.SellWaypointSymbol,
             Units = route.Units,
             ExpectedProfit = route.Profit,
+            ExpectedSeconds = WholeSeconds(route.Seconds),
             FeedsTradeSymbol = route.FeedsTradeSymbol,
             ReservedCredits = route.CargoCost,
         };
+
+    /// <summary>A trip's time as the goal and the state keep it (D95): whole seconds, so a fraction never rewrites the state.</summary>
+    private static int WholeSeconds(double seconds) => (int)Math.Round(seconds, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// What the trade and construction trips on their way to buy hold at their buy markets (D80): the trips of earlier passes,
@@ -670,11 +675,14 @@ public sealed class TradingAutomationService(
 
     private void LogRoute(ShipModel ship, TradeRoute route)
     {
+        // D95: the journal gives the rate the route was ranked by, and the trip's time it was worked out over.
+        var creditsPerHour = (long)Math.Round(route.CreditsPerHour);
+        var tripMinutes = TripTime.Minutes(route.Seconds);
         if (route.FeedsConstruction)
         {
             // D89: a route that feeds the jump gate's materials comes before every other; the journal says so.
             logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes the jump gate's {ConstructionMaterial} from it (D89); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes the jump gate's {ConstructionMaterial} from it (D89); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included: {CreditsPerHour} an hour over about {TripMinutes} minutes.",
                 JournalEvents.TradeStarted,
                 ship.Symbol,
                 route.Units,
@@ -685,12 +693,14 @@ public sealed class TradingAutomationService(
                 route.SellPrice,
                 route.ConstructionMaterial,
                 route.Profit,
-                route.FuelCost);
+                route.FuelCost,
+                creditsPerHour,
+                tripMinutes);
         }
         else if (route.FeedsTradeSymbol.Length > 0)
         {
             logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes {FeedsTradeSymbol} from it; about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes {FeedsTradeSymbol} from it; about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included: {CreditsPerHour} an hour over about {TripMinutes} minutes.",
                 JournalEvents.TradeStarted,
                 ship.Symbol,
                 route.Units,
@@ -701,12 +711,14 @@ public sealed class TradingAutomationService(
                 route.SellPrice,
                 route.FeedsTradeSymbol,
                 route.Profit,
-                route.FuelCost);
+                route.FuelCost,
+                creditsPerHour,
+                tripMinutes);
         }
         else
         {
             logger.LogInformation(
-                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included.",
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included: {CreditsPerHour} an hour over about {TripMinutes} minutes.",
                 JournalEvents.TradeStarted,
                 ship.Symbol,
                 route.Units,
@@ -716,7 +728,9 @@ public sealed class TradingAutomationService(
                 route.SellWaypointSymbol,
                 route.SellPrice,
                 route.Profit,
-                route.FuelCost);
+                route.FuelCost,
+                creditsPerHour,
+                tripMinutes);
         }
     }
 
@@ -750,6 +764,7 @@ public sealed class TradingAutomationService(
                     AssignedShipSymbol = route.ShipSymbol,
                     Units = route.Goal.Units,
                     ExpectedProfit = route.Goal.ExpectedProfit,
+                    ExpectedSeconds = route.Goal.ExpectedSeconds,
                     FeedsTradeSymbol = route.Goal.FeedsTradeSymbol,
                     FirstObservedAt = firstSeen.GetValueOrDefault(route.Key, now),
                     LastObservedAt = now,
@@ -766,6 +781,7 @@ public sealed class TradingAutomationService(
                     Status = MarketAutomationOpportunityStatus.Pending,
                     Units = route.Best.Units,
                     ExpectedProfit = route.Best.Profit,
+                    ExpectedSeconds = WholeSeconds(route.Best.Seconds),
                     FeedsTradeSymbol = route.Best.FeedsTradeSymbol,
                     CandidateShipSymbols = route.CandidateShipSymbols,
                     FirstObservedAt = firstSeen.GetValueOrDefault(route.Best.Key, now),
