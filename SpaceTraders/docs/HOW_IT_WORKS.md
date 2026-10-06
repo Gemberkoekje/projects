@@ -577,9 +577,12 @@ explored markets when money allows"). Each pass:
   its own (`ProbePlanner.Surplus`) to the first system short of one that they can get to, before a probe is bought for it.
 - **Buying** (D29, D97): for the first system with fewer probes than markets, a `SHIP_PROBE` at the shipyard where it
   costs least with the antimatter of the jumps from there counted, at most one a pass, through `ShipPurchaseService`: the
-  purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30), so a shipyard counts at
-  home, and abroad once a probe of ours is in its system: a system's first probe is bought elsewhere, the rest where it
-  arrived. No probe is bought where SHIP_PROBE is SCARCE: the plan leaves a shipyard whose cached supply is SCARCE
+  purchase must leave the credit reserve (D51), and needs one of our ships at the shipyard (D30), so a shipyard sells at
+  home, and abroad once a probe of ours is in its system. Going by the cheapest, the antimatter counted (B72): one that
+  can sell now sells; one in a system a probe of ours is on its way to waits for it (`WaitingForAProbeToArrive`), and the
+  probes are bought there once it is; one in a system with no probe there or coming waits for that system's first probe,
+  bought now at the cheapest shipyard that can sell it. A system's own shipyard counts for it once a probe is there or on
+  its way. No probe is bought where SHIP_PROBE is SCARCE: the plan leaves a shipyard whose cached supply is SCARCE
   alone, and the purchase refuses one the shipyard, fetched again just before, lists at SCARCE (`Scarce`). A probe bought
   for another system flies there at once. The contract's drone, a surveyor, a drone per scarce mineral and area, a
   surveyor per area, the cargo ships of `Trade.ShipPurchases` and the gate's loads come first (D43): a probe for the trade
@@ -610,7 +613,7 @@ explored markets when money allows"). Each pass:
 - **State** (`plan_states`, written only when it changes): per system (`Systems`), its jumps from home, whether it is in
   the trade reach, its probes, and every market with the probe at it or on its way, whether another ship of ours is at
   it, and for a market nobody watches when it is due; the next probe's system, shipyard, price and antimatter, and why it
-  isn't bought (`Purchase`, `ShipyardsScarce` among the reasons); the open calls.
+  isn't bought (`Purchase`, `ShipyardsScarce` and `WaitingForAProbeToArrive` among the reasons); the open calls.
 - **Journal:** `PlanStarted` once, `PlanBlocked` (`waiting_for_credits`) when it starts waiting for
   credits, `ProbeCalled`; the purchase logs `ShipPurchased`, a probe sent to another system an Information line, and each
   jump `Jumped`.
