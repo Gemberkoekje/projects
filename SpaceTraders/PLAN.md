@@ -28,7 +28,7 @@
   13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at
   2026-10-06 03:17Z. Since the deploy the explore plan wants 2 explorers for the 19 systems left; at 13:25Z the command
   ship set off from X1-QT24 to X1-GT9-AE7B to buy the first, and at 14:23Z it was at X1-PX46.
-- **In review:** slice 6.31 (warping, D100, D101, D104–D107), built on branch `claude/spacetraders-warp`. In this reset
+- **In review:** slice 6.31 (warping, D100, D101, D104–D107): projects#196, its dashboard gembernodes#87. In this reset
   the home gate is built, so it works as soon as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices
   across systems wait for the new home system's gate (D68).
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.30, listed under [Phases](#phases).
@@ -259,7 +259,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.28 Probes at the markets abroad (D97, D101; B72)
 - 6.29 Trade across systems (D96)
 - 6.30 The explorers, and charting (D98, D99, D102, D103; B73)
-- 6.31 Warping (D100, D101, D104–D107), in review
+- 6.31 Warping (D100, D101, D104–D107), in review (projects#196)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's). 6.27–6.30
 are done; 6.31 is in review:
@@ -297,7 +297,8 @@ are done; 6.31 is in review:
   - **6.30 The explorers, and charting** (D98, D99, D102, D103): done, merged as projects#195 with B73's fix, its systems
     dashboard and the deploy as gembernodes#86 (image `8c37dd7e`, live since 2026-10-06 13:19Z). Its details are in
     `docs/archive/PLAN_HISTORY.md`.
-  - **6.31 Warping** (D100, D101, D104–D107). Built on branch `claude/spacetraders-warp`, in review.
+  - **6.31 Warping** (D100, D101, D104–D107). Built on branch `claude/spacetraders-warp`, in review as projects#196, its
+    dashboard as gembernodes#87.
     - Research (2026-10-06, D100: "Research how the warp works exactly"). The sources: the API's docs, "Ship Navigation",
       read in a browser (a warp "behaves very similar to normal waypoint travel in that it takes time and consumes normal
       fuel"); the OpenAPI spec 2.3.0 in `SpaceTradersAPI/api-docs` (`POST my/ships/{ship}/warp` to a waypoint of another
