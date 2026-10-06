@@ -31,7 +31,7 @@
 - **Merged, not yet deployed:** projects#192 (slice 6.28, D97, D101: probes at the markets abroad, through the gates; main
   `806e9f1`, 2026-10-06 10:25Z), with its dashboard in gembernodes#83. Its deploy, gembernodes#84 (a draft), waits for
   B72's fix, and then bumps the images to that commit instead.
-- **In review:** B72 (below), on branch `claude/spacetraders-b72-probe-source`.
+- **In review:** B72 (below): projects#193, on branch `claude/spacetraders-b72-probe-source`.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.28, listed under [Phases](#phases).
 - **Still open:**
   - Slices 6.29–6.31, across systems (D94–D101): planned under [Phases](#phases), built in that order, one PR each, with a
