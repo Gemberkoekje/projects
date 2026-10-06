@@ -367,6 +367,14 @@ next, in that order:
       identifier"), from before, as on every plan state.
     - Done when: every market within the trade reach has a probe, or one on its way, as far as the credits allow; no probe
       is bought where SHIP_PROBE is SCARCE; no other plan buys or works abroad.
+    - Files, in `SpaceTraders.Application` unless named: new `Goals/Executors/GoalJumps.cs`, `Exploring/GateNetwork.cs`,
+      `Exploring/JumpRefusals.cs`; changed `Automation/ProbeDeploymentPlanService.cs`, `ProbeDeploymentPlanState.cs`,
+      `BusinessSystems.cs`, `MiningAutomationService.cs`, `SiphonAutomationService.cs`, `TradingAutomationService.cs`,
+      `ContractPlanService.cs`; `Exploring/ExploreAtlas.cs`, `SystemOpportunities.cs`; `Goals/Executors/JumpGoalExecutor.cs`,
+      `DeployProbeGoalExecutor.cs`; `Probes/ProbePlanner.cs`; `Services/PurchaseOrder.cs`, `ShipPurchaseService.cs`,
+      `IShipPurchaseService.cs`; `Trading/TradeContextReader.cs`; `Health/ShipLeftIdleRule.cs`; `DependencyInjection.cs`;
+      API `PrometheusMetricsService.cs`, `PrometheusMarketMetricsService.cs`, `PrometheusAutomationMetrics.cs`; Persistence
+      `DefaultSettingsSeed.cs`; docs `HOW_IT_WORKS.md`, `GLOSSARY.md`.
     - To understand this, start with `Goals/Executors/GoalJumps.cs` and `TryFindJumps` in `Exploring/ExploreAtlas.cs`,
       then `ServeAsync`, `LendSpares` and `BuyProbeAsync` in `Automation/ProbeDeploymentPlanService.cs`.
   - **6.29 Trade across systems** (D95, D96): the trading plan's routes reach the systems around.
