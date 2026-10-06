@@ -312,6 +312,7 @@ public sealed class ExplorePlanServiceTests
                 _purchases,
                 _order,
                 new JumpRefusals(),
+                new WarpRefusals(),
                 _log.For<ExplorePlanService>())
             .EnsureBootstrappedAsync(CancellationToken.None);
     }

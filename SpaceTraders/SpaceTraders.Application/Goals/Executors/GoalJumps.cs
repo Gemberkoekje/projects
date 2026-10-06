@@ -35,6 +35,9 @@ public enum JumpStepOutcome
 
     /// <summary>No way through built gates is known to the destination's system.</summary>
     NoWay = 6,
+
+    /// <summary>The ship warped towards the destination's system (PLAN.md slice 6.31, <see cref="GoalWarps"/>).</summary>
+    Warped = 7,
 }
 
 /// <summary>One step of a flight between systems: what it did, and the outcome the executor's step returns.</summary>
@@ -72,6 +75,10 @@ public sealed record JumpStep
 /// The jump is booked as the antimatter's purchase (<see cref="ShipJumpedEvent"/>) and journalled (<c>Jumped</c>). What a
 /// step that can't go on does to the goal is the executor's to say.
 /// </summary>
+/// <remarks>
+/// Slice 6.31 (D101): a ship with a warp drive goes the fastest way, through the gates or by warps (<see cref="IGoalWarps"/>),
+/// so a warp is taken where it is the faster way or the only one; a ship without one goes through the gates as before.
+/// </remarks>
 public sealed class GoalJumps(
     ISpaceTradersPort port,
     IShipRepository ships,
@@ -86,6 +93,7 @@ public sealed class GoalJumps(
     IOrbitSubCommand orbit,
     IRefuelSubCommand refuel,
     IMessageBus bus,
+    IGoalWarps warps,
     ILogger<GoalJumps> logger)
 {
     /// <summary>The <see cref="Domain.Goals.ShipGoal.StatusReason"/> of a goal whose jump the API refused.</summary>
@@ -105,6 +113,23 @@ public sealed class GoalJumps(
     {
         var here = ship.SystemSymbol ?? string.Empty;
         var system = WaypointSymbols.SystemOf(destination);
+        if (Warps.HasDrive(ship) && (await warps.FindAsync(ship, destination, ct)).Steps is [var first, ..])
+        {
+            // Slice 6.31 (D101): the fastest way's first step, a warp or a jump.
+            if (first.Kind == WayStepKind.Warp)
+            {
+                return await warps.WarpAsync(ship, first.ToWaypointSymbol, ct);
+            }
+
+            if (!string.Equals(ship.WaypointSymbol, first.FromWaypointSymbol, StringComparison.OrdinalIgnoreCase))
+            {
+                var map = (await tradeContexts.ReadAsync(here, ct)).Map;
+                return new JumpStep(JumpStepOutcome.Flying, await GoalFlight.TowardsAsync(map, ship, first.FromWaypointSymbol, dock, bus, ct));
+            }
+
+            return await JumpAsync(ship, first.FromWaypointSymbol, first.ToWaypointSymbol, ct);
+        }
+
         var network = await gates.ReadAsync(ct);
         if (network is null
             || !ExploreAtlas.TryFindJumps(network, here, system, TimeProvider.System.GetUtcNow(), out var jumps)

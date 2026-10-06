@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IDockSubCommand, DockSubCommand>();
         services.AddScoped<IRefuelSubCommand, RefuelSubCommand>();
         services.AddScoped<IFlightModeSubCommand, FlightModeSubCommand>();
+        services.AddScoped<IWarpSubCommand, WarpSubCommand>();
 
         // Phase 15a/15b: observability read-model (FleetStatusQueryService is the concrete implementation from Phase 15b).
         // Phase 16c: wrap with a short-lived in-memory cache so dashboard polling does not overload the database.
@@ -78,6 +79,9 @@ public static class DependencyInjection
         // jump every flight to another system makes.
         services.AddScoped<IGateNetwork, GateNetwork>();
         services.AddSingleton<JumpRefusals>();
+        services.AddSingleton<WarpRefusals>();
+        services.AddScoped<GoalWarps>();
+        services.AddScoped<IGoalWarps>(sp => sp.GetRequiredService<GoalWarps>());
         services.AddScoped<GoalJumps>();
         services.AddScoped<IContractPlanService, ContractPlanService>();
         services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
@@ -149,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, JumpGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, WarpGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, ExploreSystemGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, SupplyConstructionGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();

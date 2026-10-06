@@ -119,6 +119,38 @@ public sealed class WarpResult
     required public ShipFuel Fuel { get; init; }
 }
 
+/// <summary>The answer to a scan for the systems around a ship (PLAN.md slice 6.31): the systems found, and the cooldown it started.</summary>
+public sealed class ScanSystemsResult
+{
+    [JsonPropertyName("cooldown")]
+    required public Cooldown Cooldown { get; init; }
+
+    [JsonPropertyName("systems")]
+    public IReadOnlyList<ScannedSystem>? Systems { get; init; }
+}
+
+/// <summary>A system a scan found: where it lies, and its distance from the ship.</summary>
+public sealed class ScannedSystem
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+
+    [JsonPropertyName("sectorSymbol")]
+    public string? SectorSymbol { get; init; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; init; }
+
+    [JsonPropertyName("x")]
+    public int X { get; init; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; init; }
+
+    [JsonPropertyName("distance")]
+    public int Distance { get; init; }
+}
+
 public sealed class JumpResult
 {
     [JsonPropertyName("nav")]

@@ -120,6 +120,7 @@ public sealed class MoveToWaypointGoalExecutorTests
             Substitute.For<IOrbitSubCommand>(),
             Substitute.For<IRefuelSubCommand>(),
             _bus,
+            Substitute.For<IGoalWarps>(),
             _log.For<GoalJumps>());
 
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, MoveToWaypointGoal goal)

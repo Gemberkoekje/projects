@@ -192,7 +192,7 @@ public sealed class JumpGoalExecutorTests
         => new JumpGoalExecutor(
                 _goals,
                 _tradeContexts,
-                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, _refusals, _tradeContexts, _dock, _orbit, _refuel, _bus, _log.For<GoalJumps>()),
+                new GoalJumps(_port, _ships, _agents, _markets, _refresher, _settings, _gates, _refusals, _tradeContexts, _dock, _orbit, _refuel, _bus, Substitute.For<IGoalWarps>(), _log.For<GoalJumps>()),
                 _dock,
                 _bus)
             .ExecuteStepAsync(ship, goal ?? Jump, new ShipGoalContext(), CancellationToken.None);

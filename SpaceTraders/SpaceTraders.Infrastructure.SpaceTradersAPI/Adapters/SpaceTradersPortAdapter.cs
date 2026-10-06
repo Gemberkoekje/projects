@@ -127,13 +127,22 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
                 purchasedShip.Cargo.Inventory?.Select(MapCargoItem).ToList())
             : MapFleetCargo(result.Ship.Cargo);
 
+        // Slice 6.31: what startup sync caches of a ship, so a ship bought since the last restart has its warp drive and speed.
+        var details = MapShip(purchasedShip);
         return new PurchaseShipActionResult(
             MapAgent(result.Agent),
             result.Ship.Symbol,
             MapNav(result.Ship.Nav!),
             MapFuel(result.Ship.Fuel!),
             cargo,
-            result.Transaction.Price);
+            result.Transaction.Price)
+        {
+            MountSymbols = details.MountSymbols,
+            ModulesJson = details.ModulesJson,
+            FrameJson = details.FrameJson,
+            ReactorJson = details.ReactorJson,
+            EngineJson = details.EngineJson,
+        };
     }
 
     public async Task<ContractActionResult> AcceptContractAsync(string contractId, CancellationToken cancellationToken = default)
@@ -339,8 +348,33 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     public async Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
-        var result = await client.WarpShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        WarpResult result;
+        try
+        {
+            result = await client.WarpShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        }
+        catch (SpaceTradersApiException exception) when (IsRefusal(exception))
+        {
+            // Slice 6.31: a client error is the game's answer to this warp, and would be the same on every step.
+            throw new WarpRefusedException(waypointSymbol, exception.ErrorCode ?? 0, exception.Message, exception);
+        }
+
         return new WarpActionResult(MapNav(result.Nav), MapFuel(result.Fuel));
+    }
+
+    public async Task<ScanSystemsActionResult> ScanSystemsAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.ScanSystemsAsync(shipSymbol, cancellationToken);
+        return new ScanSystemsActionResult(
+            [.. (result.Systems ?? []).Select(system => new ScannedSystemModel(
+                system.Symbol,
+                system.SectorSymbol ?? string.Empty,
+                system.Type ?? string.Empty,
+                system.X,
+                system.Y,
+                system.Distance))],
+            result.Cooldown.TotalSeconds,
+            result.Cooldown.Expiration);
     }
 
     public async Task<JumpActionResult> JumpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)

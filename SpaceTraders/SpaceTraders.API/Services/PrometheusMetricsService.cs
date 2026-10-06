@@ -366,6 +366,9 @@ public sealed class PrometheusMetricsService(
                 MoveToWaypointGoal { Drifting: true } move => $"drifting to {move.TargetWaypointSymbol}",
                 MoveToWaypointGoal => "moving",
                 JumpGoal jump => $"jumping to {WaypointSymbols.SystemOf(jump.DestinationGateWaypointSymbol)}",
+
+                // Slice 6.31 (D100): an explorer's warp to another system.
+                WarpGoal warp => $"warping to {WaypointSymbols.SystemOf(warp.DestinationWaypointSymbol)}",
                 ExploreSystemGoal explore => $"exploring {explore.SystemSymbol}",
                 IdleGoal => "idle",
                 _ => goal.Kind.ToString(),

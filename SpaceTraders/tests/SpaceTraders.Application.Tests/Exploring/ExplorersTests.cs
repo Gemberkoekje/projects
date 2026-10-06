@@ -467,6 +467,7 @@ public sealed class ExplorersTests
                 _purchases,
                 _order,
                 _refusals,
+                new WarpRefusals(),
                 _log.For<ExplorePlanService>())
             .EnsureBootstrappedAsync(CancellationToken.None);
     }

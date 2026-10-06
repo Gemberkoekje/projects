@@ -100,6 +100,12 @@ public interface ISpaceTradersApiClient
 
     Task<WarpResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>Scans for the systems around a ship with a sensor array (PLAN.md slice 6.31): <c>POST my/ships/{ship}/scan/systems</c>.</summary>
+    /// <param name="shipSymbol">The ship.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>The systems found, and the cooldown the scan started.</returns>
+    Task<ScanSystemsResult> ScanSystemsAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
     /// <summary>Jumps a ship in orbit at a jump gate to a gate it connects to, buying one ANTIMATTER at the gate's market.</summary>
     /// <param name="shipSymbol">The ship.</param>
     /// <param name="waypointSymbol">The destination: a jump gate the ship's gate connects to.</param>

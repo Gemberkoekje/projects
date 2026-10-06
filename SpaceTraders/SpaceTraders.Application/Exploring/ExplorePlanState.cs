@@ -14,7 +14,10 @@ public enum ExploreStatus
     /// <summary>The ship is on its way to a system not explored yet, or scouting one.</summary>
     Exploring = 1,
 
-    /// <summary>The command ship is on its way home: nothing reachable is left to explore, or an explorer explores now.</summary>
+    /// <summary>
+    /// The command ship is on its way home: nothing reachable is left to explore, or an explorer explores now. An explorer with
+    /// nothing left, in a system the gates don't reach from home, is on its way back to one they do (PLAN.md slice 6.31).
+    /// </summary>
     Returning = 2,
 
     /// <summary>
@@ -124,7 +127,10 @@ public sealed record ExploringShip
     /// <summary>The explorer.</summary>
     public required string ShipSymbol { get; init; }
 
-    /// <summary>What the plan does with it: <see cref="ExploreStatus.Exploring"/>, or <see cref="ExploreStatus.Waiting"/> while it trades (D102).</summary>
+    /// <summary>
+    /// What the plan does with it: <see cref="ExploreStatus.Exploring"/>, <see cref="ExploreStatus.Waiting"/> while it trades
+    /// (D102), or <see cref="ExploreStatus.Returning"/> on its way back to a system the gates reach (slice 6.31).
+    /// </summary>
     public required ExploreStatus Status { get; init; }
 
     /// <summary>The system it explores or is on its way to; empty when none.</summary>
@@ -181,6 +187,12 @@ public sealed record KnownSystem
     public DateTimeOffset? WaypointsCheckedAt { get; init; }
 
     /// <summary>
+    /// When its system and waypoints were last fetched without an error (PLAN.md slice 6.31): a system only a warp reaches is
+    /// fetched once, even when it has no waypoint to cache; null while that never happened.
+    /// </summary>
+    public DateTimeOffset? WaypointsFetchedAt { get; init; }
+
+    /// <summary>
     /// When an exploring ship was given its markets and shipyards to scout, and its uncharted waypoints to chart; null before.
     /// Once that goal has ended the system counts as explored, even where a market or shipyard couldn't be fetched, so the ship
     /// doesn't go back for it forever.
@@ -189,4 +201,13 @@ public sealed record KnownSystem
 
     /// <summary>When an exploring ship had visited each of its markets and shipyards; null while none has.</summary>
     public DateTimeOffset? ExploredAt { get; init; }
+
+    /// <summary>
+    /// When an explorer scanned for the systems around it from here (PLAN.md slice 6.31, D105), with nothing else left within its
+    /// warps; null while none did. A system is scanned from once.
+    /// </summary>
+    public DateTimeOffset? ScannedAt { get; init; }
+
+    /// <summary>When a scan from here was last tried, whatever the answer: one that failed is tried again after a few minutes.</summary>
+    public DateTimeOffset? ScanTriedAt { get; init; }
 }
