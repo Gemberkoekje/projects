@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-06, slice 6.26)
+- Every ship that can build builds the jump gate (D93), as asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for the final 40 FAB MATS." `Construction.Ships` is now an optional cap, 0 (the new default) for no limit; with a cap, the largest holds build, as before (D65). The underway count was there already: a load takes only what no other trip carries or goes to buy (`MaterialNeed.OnTheWay`), and one trip buys a material at a market at a time (D80), so of three builders and the last 40 FAB_MATS one takes them and the others trade.
+
+### Docs – Changed (2026-10-06, slice 6.26)
+- `PLAN.md`: slice 6.26 and decision D93. `docs/HOW_IT_WORKS.md`: who builds the gate, and the setting.
+
 ### Code – Added (2026-10-05, slice 6.25)
 - The jump gate's miners (D92), as asked on 2026-10-05: "extra miners to be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the smelters have at least HIGH saturation". While the gate needs materials, a smelter is a market that imports an ore and exports a metal, made from ores alone, that goes into a material the gate still needs (`MiningPlanner.GateSmelters`; `TradeMarketMap.GoesIntoConstruction`): IRON_ORE into IRON for FAB_MATS, COPPER_ORE into COPPER for ADVANCED_CIRCUITRY. For each ore with a smelter below HIGH that a new drone can serve, the mining plan buys one mining drone every `Mining.GateMinerIntervalMinutes` (new, 30), the lowest supply first, within `Mining.MaxDrones` and the credit reserve. It stands at the gate's place in the order ships are bought in, after a load the markets sell now: the construction plan says when its load waits for SCARCE or LIMITED markets, or another buyer there (`PurchaseNeed.WaitsForMarkets`), and only then may the miners be bought. Each such drone mines only its ore, for its smelter with the lowest supply (reason `gate`), and parks at no collection point, until the gate needs nothing made from its ore; the mining plan's state lists them (`GateMiners`). Among the drones for scarce minerals (D48) a gate miner counts for its own ore only.
 

@@ -246,6 +246,25 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
+    public async Task ThreeFreeBuilders_AndTheLast40FabMats_OneTakesThem_TheOthersMayTrade()
+    {
+        // D93, asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there
+        // aren't 3 ships gunning for the final 40 FAB MATS." A load takes only what no other trip carries or goes to buy, those
+        // the same pass starts included (MaterialNeed.OnTheWay): the first builder takes the 40, and the others have no load.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct), ("SHIP-7", FleetRole.Construct), ("SHIP-8", FleetRole.Construct));
+        _sites.NeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns([Site(fabMats: 1_560, circuitry: 400)]);
+        Fleet(Hauler(), Shuttle(), Hauler("SHIP-8"));
+
+        await RunAsync();
+
+        var trip = _activeGoals.Values.Should().ContainSingle().Which.Should().BeOfType<SupplyConstructionGoal>().Subject;
+        (trip.TradeSymbol, trip.Units).Should().Be(("FAB_MATS", 40));
+        var others = new[] { "SHIP-6", "SHIP-7", "SHIP-8" }.Where(ship => !_activeGoals.ContainsKey(ship)).ToList();
+        others.Should().HaveCount(2).And.OnlyContain(ship => _passedOver.MayTrade(ship, new[] { AutomationPlan.Construction }), "the pass had no load for them (B63)");
+        _state!.Sites.Single().Materials.Single(material => material.TradeSymbol == "FAB_MATS").OnTheWay.Should().Be(40);
+    }
+
+    [Fact]
     public async Task ABuilderThatHoldsOtherCargo_IsLeftToTheTradingPlan()
     {
         RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
@@ -258,10 +277,23 @@ public sealed class ConstructionPlanServiceTests
     }
 
     [Fact]
-    public async Task WithTheRoleBoardOff_ItPicksTheLargestHoldItself()
+    public async Task WithTheRoleBoardOff_ItPicksTheBuildersItself()
     {
-        // The survey plan is on: the command ship surveys (D20). Of the shuttle and the hauler, the hauler builds.
+        // The survey plan is on: the command ship surveys (D20). Without a limit (D93), the shuttle and the hauler both build.
         _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        Fleet(CommandShip(), Shuttle(), Hauler());
+
+        await RunAsync();
+
+        _activeGoals.Keys.Should().BeEquivalentTo("SHIP-6", "SHIP-7");
+    }
+
+    [Fact]
+    public async Task WithTheRoleBoardOff_AndOneBuilder_ItPicksTheLargestHold()
+    {
+        // D65, with Construction.Ships at 1: of the shuttle and the hauler, the hauler builds.
+        _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Survey), Arg.Any<CancellationToken>()).Returns(true);
+        _settings.GetAsync<int>(RoleSettings.ConstructionShipsSetting, Arg.Any<CancellationToken>()).Returns(1);
         Fleet(CommandShip(), Shuttle(), Hauler());
 
         await RunAsync();

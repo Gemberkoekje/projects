@@ -181,6 +181,9 @@ public sealed class ConstructionPlannerTests
         // Of two 40-unit holds, the shuttle, which can do least else, before the command ship.
         ConstructionPlanner.PickBuilders([CommandShip(), Drone(), Shuttle()], 1).Select(ship => ship.Symbol).Should().Equal("SHIP-7");
         ConstructionPlanner.PickBuilders([Drone(), probe], 1).Should().BeEmpty();
+
+        // D93: without a limit, every ship that can build, the largest holds first.
+        ConstructionPlanner.PickBuilders([CommandShip(), probe, Drone(), Shuttle(), Hauler()], 0).Select(ship => ship.Symbol).Should().Equal("SHIP-6", "SHIP-7", "SHIP-1");
     }
 
     [Fact]
