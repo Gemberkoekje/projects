@@ -308,7 +308,7 @@ it and the other ships can do and what each role would earn: see
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77); a drone bought for the jump gate's smelters mines only its ore for them while the gate needs a material made from it (D92) | Free miners | Low-supply openings (Pending/Assigned), the gate's miners | `SHIP_MINING_DRONE`: one per scarce ore and area (D48, D53); while the gate needs materials, one per ore its smelters have below HIGH every `Mining.GateMinerIntervalMinutes` (D92); then in turn with the cargo ships (D43); up to `Mining.MaxDrones` |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
 | Construction | Build the home system's jump gate: buy its materials a full hold at a time and supply them (slice 6.6, D64–D68) | The ships with the construction role: every ship that isn't a drone or the surveyor, or the largest holds up to `Construction.Ships` (D65, D93); any free ship that holds what the gate needs | The gate's materials (required, fulfilled, on their way), the builders, why no load was bought | No ship: the gate's next load of materials, after the cargo ships in the order (D64), above the credit reserve |
-| Trading | Carry goods between markets for the most profit after fuel | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
+| Trading | Carry goods between markets for the most an hour after fuel (D95) | Ships with a cargo hold and a fuel tank that the plans above leave free | Held and open routes (Assigned/Pending) | Cargo ships, `Trade.ShipPurchases` (D21), then one more of the list's last type in turn with the drones (D43) |
 | SpareTime | Keep the command ship busy when it has nothing to survey or trade: mine or siphon whatever sells at the nearest place it can, and sell it (slice 6.8, D34–D37) | Surveyors with a mining laser or a gas siphon, a hold and a tank (the command ship), while the survey plan is on | Each such ship and what it does (Gathering, Selling, Busy, Waiting) | Nothing |
 
 ### Scout (`ScoutAllMarketplacesPlanService`)
@@ -1036,20 +1036,32 @@ buy.
     costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. H60
     sold IRON for 105 to 157 within an hour on 2026-10-05, while D52 paid 151 to 155 and F58 150. "Goods not traded" shows
     such a route as "feeds the jump gate's …, … units for … after fuel (D89, D90)".
-- **Ranking** (D15, D82, D85): among the lucrative trips (after those that feed the jump gate, D89, and before those to a
+- **Ranking** (D15, D82, D85, D95): among the lucrative trips (after those that feed the jump gate, D89, and before those to a
   market that exchanges the good, which come last and never count as feeding production, D91, `TradeRoute.ToExchange`),
-  the most profitable first, an end product's counted at half its profit (`TradeRoutePlanner.RankingProfit`): one goes first only when it
-  earns more than twice as much. An
-  end product is a good nothing is made from by the game's production chains (`TradeMarketMap.IsEndProduct`; ships
-  count as made from SHIP_PARTS and SHIP_PLATING), wherever it is sold. Asked on 2026-10-05: "Why is iron
-  prioritized over ship parts, although the profit would be a lot higher?" D15 had put a trip first only when its
-  sell market makes a pricier good from the cargo, by its exports, so SHIP_PARTS, which sell only at shipyards'
-  markets, never came first. D82 then put every end product after every other trip, until no trader took FOOD at
-  about 75,000 a load while trips of 302 to 3,864 went first; D85, "Half weight", replaced that. The end products
-  traded in X1-FJ91 are ANTIMATTER, ASSAULT_RIFLES, CLOTHING, DRUGS, FAB_MATS, FIREARMS, FOOD, FUEL, ICE_WATER,
-  JEWELRY, MEDICINE, RELIC_TECH and SUPERGRAINS. Without the production chains every good is one, and the trips go by
-  profit alone. A trip's `FeedsTradeSymbol` still names the pricier good its sell market makes
-  from the cargo, if any, for the journal and the routes view.
+  the one that earns most an hour first, an end product's rate counted at half (`TradeRoutePlanner.RankingRate`): one goes
+  first only when it earns more than twice as much an hour.
+  - **Per hour** (slice 6.27, D95, asked on 2026-10-06: "I want a "profit per time unit" so the system can choose between a
+    short route that pays less or a long route that pays more"; chosen: "Whole trip, keep order. This should work in
+    addition to Gate feeding first, Exchanges last and Products at half, not in spite of it."): a trip's rate is its
+    profit after fuel over the whole trip from where the ship is (`TradeRoute.Seconds`, `TradeRoute.CreditsPerHour`): the
+    flight to the buy market and the haul, each in CRUISE through its refuelling stops as the API reckons it (15 seconds
+    plus the distance times 25 over the engine's speed, 9 for an engine not cached), and 10 seconds at each landing, a ship
+    already at the buy market stopping there too (`TripTime`). The role board times its trade estimates the same way (D38),
+    so a role's rate and a route's rank agree. A burnt leg (D84) is faster than counted. Of two traders the nearer one gets
+    a route both could fly: the plan hands out the routes trader by trader, the best rate first. The goal keeps the trip's
+    time (`TradeBetweenMarketsGoal.ExpectedSeconds`), `TradeStarted` gives the rate and the minutes ("… an hour over about
+    … minutes"), and so do the "Goods not traded" reasons and `/status/trading-routes` (`expectedMinutes`, `creditsPerHour`).
+    D14's minimum a unit, which sizes a trip (D79), stays as it was.
+  - **End products** (D82, D85): an end product is a good nothing is made from by the game's production chains
+    (`TradeMarketMap.IsEndProduct`; ships count as made from SHIP_PARTS and SHIP_PLATING), wherever it is sold. Asked on
+    2026-10-05: "Why is iron prioritized over ship parts, although the profit would be a lot higher?" D15 had put a trip
+    first only when its sell market makes a pricier good from the cargo, by its exports, so SHIP_PARTS, which sell only at
+    shipyards' markets, never came first. D82 then put every end product after every other trip, until no trader took
+    FOOD at about 75,000 a load while trips of 302 to 3,864 went first; D85, "Half weight", replaced that. The end
+    products traded in X1-FJ91 are ANTIMATTER, ASSAULT_RIFLES, CLOTHING, DRUGS, FAB_MATS, FIREARMS, FOOD, FUEL, ICE_WATER,
+    JEWELRY, MEDICINE, RELIC_TECH and SUPERGRAINS. Without the production chains every good is one, and the trips go by
+    their rate alone. A trip's `FeedsTradeSymbol` still names the pricier good its sell market makes from the cargo, if
+    any, for the journal and the routes view.
 - **Saving up for a trip** (D56, `FullHoldSavings`): "Full hold or nothing, when this occurs the credit
   floor should be temporarily expanded so any ship purchases wait for the full hold to be bought before new ships
   are bought." When a free trader's best route, credits aside, carries more units than the credits for cargo pay for
@@ -1987,7 +1999,7 @@ The seven pages in `src/Future` are not routed.
   | `ContractDelivered`, `ContractFulfilled` | `FulfillContractDeliveryCommand` | `ContractId`, `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`; `Payment` |
   | `ShipPurchased` | `ShipPurchaseService` | `ShipSymbol`, `ShipType`, `WaypointSymbol`, `Cost`, `ShipName` (slice 2.14) |
   | `CargoBought`, `CargoSold` | Trade, mining, siphon and spare-time executors; `CargoBought` also the construction executor (slice 6.6) | `ShipSymbol`, `TradeSymbol`, `Units`, `WaypointSymbol`, `Cost` or `Revenue` |
-  | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it |
+  | `TradeStarted` | Trading plan | `ShipSymbol`, `TradeSymbol`, `Units`, `BuyWaypoint`, `SellWaypoint`, `SellPrice`, `FuelCost` (the whole trip, the flight to the buy market included), `ExpectedProfit`; `BuyPrice` for a purchase; `FeedsTradeSymbol` when the sell market makes a pricier good from it; for a purchase, `CreditsPerHour` and `TripMinutes`, the rate it was ranked by and the trip's time (D95) |
   | `TradeRerouted` | Trade executor, at the sell market | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellPrice`, `SellWaypoint`, `NewSellPrice`, `FuelCost`, `Reason` |
   | `TradeDropped` | Trade executor | `ShipSymbol`, `TradeSymbol`, `WaypointSymbol`, `SellWaypoint`, `Reason`: `not_lucrative` (with `Units`, `BuyPrice`, `SellPrice`, `ExpectedProfit`, `MinProfitPerUnit`; when not even a unit earns the minimum, `BuyPrice`, `SellPrice`, `Margin` and `MinProfitPerUnit`), `not_possible` or `not_bought_here` (also when a market stops buying part way through a sale) |
   | `Surveyed` | `SurveyKeeper`, one per survey a ship takes (slice 6.4) | `ShipSymbol`, `WaypointSymbol`, `TradeSymbol` surveyed for, `Signature`, `Size`, `Deposits` (`COPPER_ORE x2, IRON_ORE`), `Expiration` |

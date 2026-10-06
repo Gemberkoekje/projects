@@ -136,7 +136,7 @@ public sealed record TradeRouteJudgement
                 $"{ship}: feeds the jump gate's {Route.ConstructionMaterial}, {Route.Units:N0} units for {Route.Profit:N0} after fuel (D89, D90)."),
             _ => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{ship}: lucrative, {Route.Units:N0} units for {Route.Profit:N0} after fuel, {Route.Profit / Route.Units:N0} a unit."),
+                $"{ship}: lucrative, {Route.Units:N0} units for {Route.Profit:N0} after fuel, {Route.Profit / Route.Units:N0} a unit; {Route.CreditsPerHour:N0} an hour, the trip taking about {TripTime.Minutes(Route.Seconds):N0} minutes (D95)."),
         };
     }
 

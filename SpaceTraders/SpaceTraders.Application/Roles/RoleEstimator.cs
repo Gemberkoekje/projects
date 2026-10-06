@@ -115,7 +115,8 @@ public sealed record RoleOption
 /// </list>
 /// each with what the production chains add (D39), at most what the trip earns on a unit (D49): a gathered unit's
 /// price there, a traded unit's margin. A trip's time is its flights in CRUISE, as the API reckons them
-/// (15 seconds plus the distance times 25 over the engine's speed), <see cref="StopSeconds"/> at each landing, and for
+/// (15 seconds plus the distance times 25 over the engine's speed), <see cref="StopSeconds"/> at each landing: the trading
+/// plan's own timing (<see cref="TripTime"/>, D95), a trade trip's being the route's <see cref="TradeRoute.Seconds"/>; and for
 /// mining and siphoning the cooldowns to fill the hold, half a tick after each. A mining or siphon trip to a market out
 /// of the ship's CRUISE reach drifts there first (slice 6.10c, D45): ten times as long as in CRUISE, and the 1 fuel it
 /// burns is bought back there. Surveying has no estimate: it comes first (D38). Nor has building the jump gate, which
@@ -124,10 +125,10 @@ public sealed record RoleOption
 public static class RoleEstimator
 {
     /// <summary>The engine speed of a ship whose engine isn't cached yet: the Impulse Drive I of the drones and probes.</summary>
-    public const int DefaultEngineSpeed = 9;
+    public const int DefaultEngineSpeed = TripTime.DefaultEngineSpeed;
 
     /// <summary>Seconds at each landing: docking, a trade or a refuel, the market's refresh, orbiting again.</summary>
-    public const double StopSeconds = 10;
+    public const double StopSeconds = TripTime.StopSeconds;
 
     /// <summary>Seconds between ticks; a cooldown that ends waits half of one, on average, for the next step.</summary>
     public const double TickSeconds = 5;
@@ -165,31 +166,17 @@ public static class RoleEstimator
             .Take(Math.Max(0, limit))];
     }
 
-    /// <summary>The seconds a flight takes in CRUISE, leg by leg through its stops, as the API reckons them.</summary>
+    /// <summary>
+    /// The seconds a flight takes in CRUISE, leg by leg through its stops, as the API reckons them: the trading plan's timing
+    /// (<see cref="TripTime.CruiseSeconds"/>, D95), so a role's rate and a route's rank agree.
+    /// </summary>
     /// <param name="map">The system.</param>
     /// <param name="from">Where the flight starts.</param>
     /// <param name="stops">Where it lands, in order, the destination last.</param>
     /// <param name="speed">The engine's speed.</param>
     /// <returns>The seconds in flight; 0 to stay put.</returns>
     public static double FlightSeconds(TradeMarketMap map, string from, IReadOnlyList<string> stops, int speed)
-    {
-        ArgumentNullException.ThrowIfNull(map);
-        ArgumentNullException.ThrowIfNull(stops);
-
-        var seconds = 0.0;
-        var at = from;
-        foreach (var stop in stops)
-        {
-            if (map.TryGetDistance(at, stop, out var distance))
-            {
-                seconds += 15 + (Math.Max(1, Math.Round(distance)) * 25 / Math.Max(1, speed));
-            }
-
-            at = stop;
-        }
-
-        return seconds;
-    }
+        => TripTime.CruiseSeconds(map, from, stops, speed);
 
     /// <summary>
     /// The seconds a flight takes in DRIFT (slice 6.10c, D45), as the API reckons it: 15 seconds plus the distance times 250
@@ -225,7 +212,6 @@ public static class RoleEstimator
     private static List<RoleOption> TradeOptions(RoleContext context, ShipModel ship)
     {
         var map = context.Map;
-        var speed = FleetRoles.EngineSpeed(ship, DefaultEngineSpeed);
         var credits = Math.Max(0, context.Mining.Credits - context.FuelReserveCredits);
 
         // B67: the routes the other ships' trips hold, and the goods they are on their way to buy at a market (D80), aren't this
@@ -243,21 +229,9 @@ public static class RoleEstimator
         var options = new List<RoleOption>();
         foreach (var route in TradeRoutePlanner.Rank(map, ship, credits, context.MinProfitPerUnit, heldKeys, heldBuys))
         {
-            if (!TradeRoutePlanner.TryPlanFlight(map, ship, route.BuyWaypointSymbol, out var approach)
-                || !TradeRoutePlanner.TryPlanFlight(
-                    map,
-                    route.BuyWaypointSymbol,
-                    route.SellWaypointSymbol,
-                    map.SellsFuel(route.BuyWaypointSymbol) ? ship.FuelCapacity : approach.FuelLeft,
-                    ship.FuelCapacity,
-                    out var haul))
-            {
-                continue;
-            }
+            // D95: the trip's time as the trading plan ranks it, from where the ship is.
+            var seconds = route.Seconds;
 
-            var seconds = FlightSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, speed)
-                + FlightSeconds(map, route.BuyWaypointSymbol, haul.Stops, speed)
-                + (StopSeconds * (Math.Max(1, approach.Stops.Count) + haul.Stops.Count));
             // The chains add at most the route's own margin a unit (D49).
             var chain = route.Units * context.Chains.PerUnitAtMost(route.SellWaypointSymbol, route.TradeSymbol, route.SellPrice - route.BuyPrice);
             var earns = route.Profit + (long)Math.Round(chain);

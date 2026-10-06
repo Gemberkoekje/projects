@@ -10,8 +10,9 @@ namespace SpaceTraders.Application.Tests.Trading;
 
 /// <summary>
 /// Slice 6.5: a trip's profit is what the sell market pays minus what the buy market charges, times
-/// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes
-/// of end products, which nothing is made from, rank at half their profit (D15, D82, D85); two traders never share a route. D79: a trip carries as many
+/// the units, minus the fuel; it is lucrative from <c>Trade.MinProfitPerUnit</c> per unit (D14); routes rank by what they earn
+/// an hour over the whole trip from where the ship is (slice 6.27, D95), those of end products, which nothing is made from, at
+/// half (D15, D82, D85); two traders never share a route. D79: a trip carries as many
 /// units as each earn the minimum, in batches of each market's trade volume, each batch bought a step dearer and each sold a
 /// step cheaper; D80: one buyer of a good at a market at a time.
 /// </summary>
@@ -34,6 +35,54 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void ARoutesTime_IsTheFlightToTheBuyMarket_TheHaul_AndAStopAtEachLanding()
+    {
+        // Slice 6.27 (D95): the whole trip from where the ship is, as the API reckons CRUISE (15 seconds plus the distance times
+        // 25 over the engine's speed): K85 to D41 (185), then D41 to A1 (95), and a stop at each market. The command ship's
+        // engine isn't cached here, so the drones' speed of 9 stands in; with a speed of 36 each flight takes a quarter.
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip(), "MEDICINE", D41, A1, 250_000, 200, out var slow).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(Map(), CommandShip() with { EngineJson = """{"speed":36}""" }, "MEDICINE", D41, A1, 250_000, 200, out var fast)
+            .Should().BeTrue();
+
+        slow.Seconds.Should().BeApproximately(15 + (185 * 25 / 9.0) + 15 + (95 * 25 / 9.0) + (2 * TripTime.StopSeconds), 0.001);
+        fast.Seconds.Should().BeApproximately(15 + (185 * 25 / 36.0) + 15 + (95 * 25 / 36.0) + (2 * TripTime.StopSeconds), 0.001);
+        slow.CreditsPerHour.Should().BeApproximately(slow.Profit * 3_600.0 / slow.Seconds, 0.001);
+        fast.CreditsPerHour.Should().BeGreaterThan(slow.CreditsPerHour, "the same profit in less time");
+    }
+
+    [Fact]
+    public void Rank_PutsAShortRouteThatEarnsMoreAnHour_BeforeALongOneThatEarnsMoreATrip()
+    {
+        // Slice 6.27, asked on 2026-10-06: "I want a "profit per time unit" so the system can choose between a short route that
+        // pays less or a long route that pays more." From P, PLASTICS sell 40 away at S for 100 a unit over P's price, and
+        // ELECTRONICS 360 away at L for 200: the long trip earns about twice as much, in seven times the time. Before D95 the
+        // long route went first.
+        var map = new TradeMarketMap(
+            [Place("X1-AB-P", 0), Place("X1-AB-S", 40), Place("X1-AB-L", 360)],
+            [
+                Market("X1-AB-P", Good("PLASTICS", "EXPORT", 200, 100, 40), Good("ELECTRONICS", "EXPORT", 1_000, 500, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+                Market("X1-AB-S", Good("PLASTICS", "IMPORT", 600, 300, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+                Market("X1-AB-L", Good("ELECTRONICS", "IMPORT", 2_400, 1_200, 40), Good("FUEL", "EXCHANGE", 100, 90, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["EQUIPMENT"] = ["ALUMINUM", "PLASTICS"],
+                ["SHIP_PARTS"] = ["ELECTRONICS", "EQUIPMENT"],
+            });
+
+        var routes = TradeRoutePlanner.Rank(map, CommandShip("X1-AB-P"), 250_000, 5, NoneHeld);
+
+        routes.Select(route => route.TradeSymbol).Should().Equal("PLASTICS", "ELECTRONICS");
+        (routes[0].Profit, routes[1].Profit).Should().Be(((100 * 40) - 100, (200 * 40) - 400));
+        routes[0].Seconds.Should().BeApproximately(15 + (40 * 25 / 9.0) + (2 * TripTime.StopSeconds), 0.001);
+        routes[1].Seconds.Should().BeApproximately(15 + (360 * 25 / 9.0) + (2 * TripTime.StopSeconds), 0.001);
+        routes[0].CreditsPerHour.Should().BeGreaterThan(3 * routes[1].CreditsPerHour);
+        TradeRoutePlanner.CompareBestFirst(routes[0], routes[1]).Should().BeNegative();
+
+        static WaypointCacheModel Place(string symbol, int x) => new(symbol, SystemSymbol, "PLANET", x, 0, true, false, DateTimeOffset.UnixEpoch);
+    }
+
+    [Fact]
     public void Profit_CountsTheFuelToGetToTheBuyMarketToBeginWith()
     {
         // Your note of 2026-10-02. P and Q sell the same good at the same price, each 100 from R,
@@ -52,6 +101,7 @@ public sealed class TradeRoutePlannerTests
         routes.Select(route => route.BuyWaypointSymbol).Should().Equal("X1-AB-P", "X1-AB-Q");
         routes[0].Profit.Should().Be((300 * 40) - 100);
         routes[1].Profit.Should().Be((300 * 40) - 100 - 200, "the flight to Q is part of the trip");
+        (routes[1].Seconds - routes[0].Seconds).Should().BeApproximately(15 + (200 * 25 / 9.0), 0.001, "and its time too (D95)");
 
         static WaypointCacheModel Place(string symbol, int x) => new(symbol, SystemSymbol, "PLANET", x, 0, true, false, DateTimeOffset.UnixEpoch);
     }
@@ -60,8 +110,8 @@ public sealed class TradeRoutePlannerTests
     public void Rank_PutsTheRoutesOfAGoodSomethingIsMadeFromFirst_ThoughAnEndProductEarnsMore()
     {
         // D15, D82, D85: SHIP_PARTS are made from EQUIPMENT, so both its routes come before MEDICINE's, which nothing is made
-        // from, wherever they sell it: MEDICINE earns more, but less than twice as much, and counts at half. D41 makes
-        // SHIP_PARTS (7,721) from it; A1 makes nothing from it, and pays more.
+        // from, wherever they sell it: MEDICINE earns more than EQUIPMENT for D41, a trip and an hour (D95), but less than twice
+        // as much, and counts at half. D41 makes SHIP_PARTS (7,721) from it; A1 makes nothing from it, and pays more.
         var routes = TradeRoutePlanner.Rank(Map(), CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => (route.TradeSymbol, route.BuyWaypointSymbol, route.SellWaypointSymbol)).Should().Equal(
@@ -73,7 +123,8 @@ public sealed class TradeRoutePlannerTests
         routes[0].Profit.Should().Be((245 * 40) - (2 * 90));
         routes[1].Profit.Should().Be((233 * 40) - (2 * 76));
         routes[2].Profit.Should().BeGreaterThan(routes[0].Profit);
-        (routes[2].Profit / 2.0).Should().BeLessThan(routes[1].Profit);
+        routes[2].CreditsPerHour.Should().BeGreaterThan(routes[1].CreditsPerHour);
+        (routes[2].CreditsPerHour / 2.0).Should().BeLessThan(routes[1].CreditsPerHour);
     }
 
     [Fact]
@@ -99,10 +150,10 @@ public sealed class TradeRoutePlannerTests
         var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 5, NoneHeld);
 
         routes.Select(route => (route.TradeSymbol, route.FeedsProduction)).Should().Equal(("FOOD", false), ("IRON", true));
-        (routes[0].Profit / 2.0).Should().BeGreaterThan(routes[1].Profit);
+        (routes[0].CreditsPerHour / 2.0).Should().BeGreaterThan(routes[1].CreditsPerHour);
         TradeRoutePlanner.CompareBestFirst(routes[0], routes[1]).Should().BeNegative();
-        TradeRoutePlanner.RankingProfit(routes[0]).Should().Be(routes[0].Profit / 2.0);
-        TradeRoutePlanner.RankingProfit(routes[1]).Should().Be(routes[1].Profit);
+        TradeRoutePlanner.RankingRate(routes[0]).Should().Be(routes[0].CreditsPerHour / 2.0);
+        TradeRoutePlanner.RankingRate(routes[1]).Should().Be(routes[1].CreditsPerHour);
     }
 
     [Fact]
@@ -134,6 +185,7 @@ public sealed class TradeRoutePlannerTests
 
         needed.Select(route => (route.TradeSymbol, route.ConstructionMaterial)).Should().Equal(("IRON", "FAB_MATS"), ("SHIP_PARTS", string.Empty));
         needed[1].Profit.Should().BeGreaterThan(10 * needed[0].Profit);
+        needed[1].CreditsPerHour.Should().BeGreaterThan(10 * needed[0].CreditsPerHour, "D95 ranks within D89's order, not in spite of it");
         TradeRoutePlanner.CompareBestFirst(needed[0], needed[1]).Should().BeNegative();
         done.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON");
         done.Should().OnlyContain(route => !route.FeedsConstruction);
@@ -195,6 +247,7 @@ public sealed class TradeRoutePlannerTests
 
         routes.Select(route => (route.SellWaypointSymbol, route.ToExchange, route.FeedsProduction)).Should().Equal((D41, false, true), (A1, true, false));
         routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
+        routes[1].CreditsPerHour.Should().BeGreaterThan(routes[0].CreditsPerHour, "A1 is nearer too: D95 ranks within D91's order");
         TradeRoutePlanner.CompareBestFirst(routes[0], routes[1]).Should().BeNegative();
     }
 
@@ -277,16 +330,21 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void Rank_WithoutTheProductionChains_GoesByProfitAlone()
+    public void Rank_WithoutTheProductionChains_GoesByTheRateAlone()
     {
+        // Slice 6.27 (D95): every good counts as an end product, all at half, so the rate alone orders them. MEDICINE earns the
+        // most a trip (15,198), but flies 185 to D41 first: about 14 minutes, 66,096 an hour. EQUIPMENT for A1 earns 9,620 in
+        // about 5 minutes, 106,926 an hour. Before D95 MEDICINE went first.
         var map = new TradeMarketMap(Waypoints, [K85Market(), D41Market(), A1Market()], new Dictionary<string, IReadOnlyList<string>>());
 
         var routes = TradeRoutePlanner.Rank(map, CommandShip(), 250_000, 200, NoneHeld);
 
         routes.Select(route => route.TradeSymbol + " " + route.SellWaypointSymbol).Should().Equal(
-            "MEDICINE " + A1,
             "EQUIPMENT " + A1,
+            "MEDICINE " + A1,
             "EQUIPMENT " + D41);
+        routes[1].Profit.Should().BeGreaterThan(routes[0].Profit);
+        routes.Select(route => Math.Round(route.CreditsPerHour)).Should().Equal(106_926, 66_096, 60_130);
     }
 
     [Fact]

@@ -201,6 +201,12 @@ public sealed record TradingAutomationOpportunityState
     /// <summary>What a trip earns after fuel, as estimated: for a pending route, for its best candidate.</summary>
     public long ExpectedProfit { get; init; }
 
+    /// <summary>
+    /// How long a trip takes, in seconds, as estimated from where the ship is (D95): for a held route, when its trader set off;
+    /// for a pending one, for its best candidate. 0 for cargo a trader already held, and for a route stored before slice 6.27.
+    /// </summary>
+    public int ExpectedSeconds { get; init; }
+
     /// <summary>The pricier good the sell market makes from the good, or empty (D15).</summary>
     public string FeedsTradeSymbol { get; init; } = string.Empty;
 

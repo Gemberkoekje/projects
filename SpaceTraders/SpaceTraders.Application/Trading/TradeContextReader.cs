@@ -56,7 +56,7 @@ public interface ITradeContextReader
 /// <remarks>
 /// Only the production chains may cost an API call, once per process (<see cref="ISupplyChainCache"/>);
 /// everything else comes from the database. Without the chains no route counts as feeding production,
-/// and routes are ranked by profit alone.
+/// and routes are ranked by what they earn an hour alone (D95).
 /// </remarks>
 public sealed class TradeContextReader(
     IMarketRepository markets,

@@ -6,6 +6,7 @@ using SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using Wolverine;
@@ -115,8 +116,9 @@ public static class StatusEndpoints
         });
 
         // Slice 2.17 (D75): the trading plan's routes as it stored them at its last pass. The routes traders hold come first;
-        // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: the most profit
-        // after fuel, an end product's counted at half, D85), numbered from 1.
+        // then the lucrative routes no trader holds, in the order the plan gives them out (TradeRoutePlanner.Rank: the routes that
+        // feed the jump gate first, those to an exchange last, otherwise the most an hour over the whole trip, an end product's
+        // counted at half; D85, D89, D91, D95), numbered from 1, each with its trip's minutes and credits an hour (slice 6.27).
         // Only a pass with a free trader lists any, and at most 20 (TradingAutomationService.MaxPendingRoutes). Slice 2.18
         // (D76): and for each good with a price gap that no trader carries, why not: the check its route failed for the free
         // trader that got furthest with it, or that it waits for a free trader (B66), as the plan's last pass with a free
@@ -385,6 +387,8 @@ public static class StatusEndpoints
         route.Units,
         route.ExpectedProfit,
         ProfitPerUnit = route.Units > 0 ? route.ExpectedProfit / route.Units : 0,
+        ExpectedMinutes = Math.Round(route.ExpectedSeconds / 60.0, 1),
+        CreditsPerHour = (long)Math.Round(TripTime.PerHour(route.ExpectedProfit, route.ExpectedSeconds)),
         route.FeedsTradeSymbol,
         ShipSymbol = route.AssignedShipSymbol,
         CandidateShips = string.Join(", ", route.CandidateShipSymbols),

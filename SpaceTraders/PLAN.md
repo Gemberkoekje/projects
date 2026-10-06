@@ -184,8 +184,11 @@
   asked on 2026-10-05, with your decision D91) is merged and deployed (projects#184, gembernodes#79, image `78d238f`).
 - Slice 6.25 (the jump gate's miners: a mining drone per ore every half hour for the smelters that make the gate's metals,
   dedicated to its ore, until each smelter has its ore at HIGH; D91's phase 2, asked on 2026-10-05, with your decision D92)
-  is merged and deployed (projects#185, gembernodes#80, image `f2068e5`, live since 2026-10-05 21:31Z). The jump gate
-  X1-FJ91-I64 was complete at 2026-10-06 03:17Z.
+  is merged and deployed (projects#185, gembernodes#80, image `f2068e5`, live since 2026-10-05 21:31Z).
+- The home gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z, when its last FAB_MATS were supplied. The explore
+  plan (6.11) saw it built at 04:12Z, on its hourly look, and took the command ship out at once: by 07:23Z SPECTER-1
+  had jumped seven times (5,024 to 5,560 antimatter a jump), explored X1-HN44, X1-NF46, X1-AD37, X1-GT9, X1-TA92 and
+  X1-AA31, and was scouting X1-PX46.
 - B69 (with a probe for every market, seven spare probes sat at the shipyard where they were bought while the others
   hopped between neighbouring markets) is built on branch `claude/spacetraders-idle-probes`.
 - B70 (an arrival whose dock failed for good, in a network outage, left SPECTER-5 stored in transit for hours, every
@@ -196,6 +199,10 @@
 - Slice 6.26 (every ship that can build builds the jump gate, `Construction.Ships` 0 for no limit, the underway count
   keeping them off each other's units; asked on 2026-10-06, with your decision D93) is built on branch
   `claude/spacetraders-every-ship-builds`.
+- Across systems (asked on 2026-10-06, with your decisions D94–D101): profit per hour, probes at the markets abroad, trade
+  across systems, an explorer that charts, and warping, planned as slices 6.27–6.31 and built in that order, one PR each,
+  with a stop after each for your check. Slice 6.27 (profit per hour) is built on branch
+  `claude/spacetraders-profit-per-hour`.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -383,6 +390,14 @@ get the next D-number.
 | D84 | Slice 6.19 (asked on 2026-10-05): "The excavators are now drifting for 2 hours. Did they start drifting from the location they were built, or did they first go to the closest location they can reach with their fuel and then start drifting? More generally, can we optimize the routing for a location where a combination of cruising and drifting is faster than just drifting?" They drifted straight from where they were (D52 to B7, 368, about 2 h 52 min). Then: "While adding that, can you also add burning to the options? I'd like a ship to burn if they can reach the destination with double fuel consumption, but cruise if they cannot. I accept the extra fuel costs this brings, I think it is worth it." And: "A ship can technically land anywhere with 1 fuel and then drift to a fuel station, so it can cruise to an asteroid with 2 fuel left, drift to the correct asteroid with 1 fuel left, then drift back to a fuel station with 0 fuel and refuel." | **The fastest mix of CRUISE and DRIFT; BURN where the fuel allows it** (2026-10-05): a way out of CRUISE reach is the fastest mix of CRUISE legs, refuelling at markets that sell fuel, and DRIFT legs; a drone for a collection point (D83) flies straight to its asteroid. A leg burns when the tank holds twice its CRUISE fuel and burning strands nothing (into a market that sells fuel; elsewhere, only when what is left still takes the ship on as cruising would), and cruises otherwise; the extra fuel is accepted. No leg lands a ship with an empty tank where no fuel is sold. |
 | D92 | Slice 6.25 (asked on 2026-10-05: "For spacetraders, I'd like, as part of the jump gate build phase, extra miners to be bought for the ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until each of the smelters have at least HIGH saturation."), D91's phase 2. While the gate needs materials its loads hold back every drone after them (D64), and the drones before them are bought only for a SCARCE or LIMITED ore (D48): H60's IRON_ORE at MODERATE got none. Asked which ores count (the smelters', or the factories' QUARTZ_SAND and SILICON_CRYSTALS too), one drone in all or one per ore every half hour, where they stand among the purchases and against `Mining.MaxDrones`, and how long a drone stays dedicated. | **The gate's miners** ("Smelters only (Recommended)", "One per ore", "Same tier as gate loads, capped. If the gate can be built, it should be built, otherwise extra miners can be built.", "Until the gate is done (Recommended)", 2026-10-05): while the gate needs materials, a smelter is a market that imports an ore and exports a metal, a good made from ores alone, that goes into a material the gate still needs, through the production chains (IRON_ORE into IRON for FAB_MATS; COPPER_ORE into COPPER for ADVANCED_CIRCUITRY). For each ore with a smelter below HIGH that a new drone can serve, one mining drone every `Mining.GateMinerIntervalMinutes` (30), the lowest supply first; at the gate's place in the order ships are bought in, after a load the markets sell now (one that waits for SCARCE or LIMITED markets, or for another buyer there, lets them go), within `Mining.MaxDrones` and the credit reserve. Each mines only its ore, for its smelter with the lowest supply, sharing a pair with other miners, and parks at no collection point, until the gate needs nothing made from its ore; while every smelter of it has the ore ABUNDANT, or none is in its reach, it follows the usual rules. It counts among D48's drones for its own ore only. Amends D28, D43, D48, D64 and D83. |
 | D93 | Slice 6.26 (asked on 2026-10-06, the home gate finished with one builder: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for the final 40 FAB MATS."). From 21:05Z on 10-05 the one builder (D65, `Construction.Ships` 1) flew its 80-unit loads back to back, 23 to 30 minutes each, while the FAB_MATS markets had more: the builder set the gate's pace. | **No limit** (2026-10-06): while the gate needs materials every ship that can build has the construction role (the role board; with it off the construction plan picks them alike), the drones and the surveyor decided first as before. `Construction.Ships` stays as an optional cap, 0 (the new default) for none. The underway count already existed: a load takes only what no other trip carries or goes to buy (`MaterialNeed.OnTheWay`, the trips the same pass starts included), and one trip buys a material at a market at a time (D80), so of three builders and the last 40 FAB_MATS one takes them. A builder with no load trades (D65). Amends D65. |
+| D94 | Slices 6.27–6.31 (asked on 2026-10-06): "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade system so other systems actually get considered and used. I want a "profit per time unit" so the system can choose between a short route that pays less or a long route that pays more. 3. I'd like the new ship type, EXPLORER, to be bought to help with exploring. 4. I'd like probes to be at each new market." and "Ask questions, and first make/update the plan so you don't overcommit yourself." In which order? None of the 514 waypoints cached in the seven systems explored is uncharted, and the price gaps the command ship saw abroad were far wider than at home (EQUIPMENT in X1-HN44, one jump away, 1,414 a unit; home's best, SHIP_PARTS, 210). | **Money first** ("Money first (Recommended)", 2026-10-06): profit per hour at home (6.27), probes at the markets abroad (6.28), trade across systems (6.29), the explorer and charting (6.30), warping (6.31); one PR each, with a stop after each for your check. |
+| D95 | Slice 6.27: how does "profit per time unit" rank trade routes? They rank by profit per trip (D85), within one system. Offered: the whole trip from where the ship is, or the haul from the buy market to the sell market alone; within today's order, or instead of it. | **The whole trip's profit per hour, within today's order** ("Whole trip, keep order. This should work in addition to Gate feeding first, Exchanges last and Products at half, not in spite of it.", 2026-10-06): a route counts for its profit over the whole trip's time from where the ship is: the flight to the buy market, the haul, the stops, and in 6.29 the jumps, whose antimatter is a cost. The rate takes profit's place in the order: routes that feed the jump gate's materials first (D89, D90), routes to a market that exchanges the good last (D91), an end product's rate counted at half (D85). D14's minimum per unit stays. Amends D85. |
+| D96 | Slice 6.29: how far may a trade route reach across systems, and on which prices? The trading plan works in one system; D60 kept every plan at home. | **`Trade.MaxHaulDistance` jumps, fresh prices only** ("Trade.MaxHaulDistance jumps (Recommended)", 2026-10-06): a route buys and sells anywhere within the setting's jumps (seeded at 5; only a market view read it before) through built gates, antimatter and cooldowns counted in its rate (D95). Read as: the buy market within that many jumps of the ship's system, the sell market within that many of the buy market's. Only a market whose prices are at most `Trade.MaxPriceAgeMinutes` (new, 30) old counts, at home too. A trader stays where its last sale leaves it and takes its next route from there; mining, siphoning, surveys, contracts, construction and the other plans' purchases stay home (D60, D68). Amends D60 for trading. |
+| D97 | Slice 6.28: which markets abroad get a probe, where in the order ships are bought in (D43), and what else limits a purchase? D29 gives a probe to every market of the headquarters' system. The five explored systems within 5 jumps have 60 markets, all seven 92; a probe costs 21,385 to 33,794 there, 29,885 at home. Asked first where the markets beyond the trade reach stand: before the drones and cargo ships that take turns, or after them. | **The trade reach first, then every explored market as the credits allow, never where probes are SCARCE** ("Trade reach as a priority, all explored markets when money allows - I have minimum required credit reserves for a reason. It should also check whether the probes are in SCARCE supply and not buy them if they are.", then "After drones/cargo (Recommended)", 2026-10-06): home's markets, then those of the explored systems within the trade reach (D96, counted from home), the nearest system first, keep the probe tier; every other explored market gets its probe in a new last tier, after the drones and cargo ships that take turns, above the credit reserve as every purchase. No probe is bought at a shipyard whose SHIP_PROBE supply is SCARCE (read as every probe purchase, home's too). Amends D29 and D43. |
+| D98 | Slice 6.30: how many explorers, where in the order, and who fetches one? Only X1-GT9-AE7B, 4 jumps from home, sells SHIP_EXPLORER, for 702,315: an 800-unit tank, a 40-unit hold, a warp drive of range 2,000, a sensor array and a gas siphon. A purchase needs one of our ships at the shipyard (D30). | **One, configurable, before the probes** ("Start with one before probes, but make it configurable so I can add more later.", 2026-10-06): `Explore.Explorers` (new, 1) explorers, bought in a new tier after the jump gate's loads and before the probes. The command ship, out exploring, goes to the shipyard and buys one, then comes home to work (D60); the explorers explore through the gates from then on (D59). Amends D43 and D59. |
+| D99 | Slice 6.30: what does the explorer chart? D62 charted nothing ("charting might be interesting later"). Charting pays a one-off reward by the rarity of the waypoint's traits (the API's spec), and an uncharted waypoint hides its traits, a marketplace or shipyard among them. Of the 514 waypoints cached in seven systems, none of the 369 asteroids and 7 gas giants holds a market or shipyard. | **Every uncharted market or shipyard, no asteroids** ("Every uncharted market or shipyard, I'm not sure if every single asteroid needs to be charted but I don't want my explorer to waste time on that.", 2026-10-06). Read as: the exploring ship charts each uncharted waypoint of a type that holds markets or shipyards (every type but ASTEROID and GAS_GIANT), the jump gate first, as an uncharted gate hides its connections, then the nearest first, and scouts a market or shipyard it reveals; the reward goes in the ledger. The sensor array's waypoint scan, which shows an uncharted waypoint's traits, can narrow this to the waypoints with a marketplace or shipyard if charting by type wastes time. Replaces D62. |
+| D100 | Slice 6.31: should the explorer warp to the systems the gates don't reach? Five gates seen on 2026-10-06 are under construction, X1-XJ90's, next to home, among them. How a warp costs fuel and time isn't documented: the spec says only that it uses fuel, the drive lists a range of 2,000, and X1-HN44, the nearest system, is 840 from home against an 800-unit tank. | **Research how warping works, then measure, then fuel-safe** ("Research how the warp works exactly, then measure, then fuel-safe.", 2026-10-06): first find out exactly how a warp's fuel and time follow from distance and flight mode, and what the range limits; then one warp checks it; then the explorer warps only where it can refuel or warp back, and charts what it finds (D99). |
+| D101 | Slices 6.28 and 6.31 (suggested on 2026-10-06, while this plan was written): "We have a planner that decides whether to cruise, burn or drift to get to a location fastest. I'd suggest expanding that for jumps: Whether to jump or use a warp drive if the ship has one, based on distance and fuel." | **One planner for every way** (2026-10-06): D84's fastest-way planner, which picks CRUISE, BURN or DRIFT for each leg, also plans the ways between systems: jumps through built gates (6.28; each costs one ANTIMATTER and a cooldown) and, for a ship with a warp drive, warps (6.31, once D100's research and measurement give their fuel and time), choosing by distance and fuel; a warp is also the way into a system the gates don't reach. Every executor flies through it. Read as D84's "fastest", with the antimatter counted in a trade route's rate (D95). Amends D84. |
 
 ## Phases
 
@@ -3406,6 +3421,151 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D101; 6.27 built; numbered after projects#189's slice 6.26 and
+  D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
+  system so other systems actually get considered and used. I want a "profit per time unit" so the system can choose
+  between a short route that pays less or a long route that pays more. 3. I'd like the new ship type, EXPLORER, to be bought
+  to help with exploring. 4. I'd like probes to be at each new market." And: "Ask questions, and first make/update the plan
+  so you don't overcommit yourself." Built in the order below (D94), one PR each (with a gembernodes PR where a dashboard
+  changes), with a stop after each for your check.
+  - **What the bot's data said** (2026-10-06, about 07:30Z, image `f2068e5`):
+    - The home gate X1-FJ91-I64 was finished at about 04:12Z. By 07:23Z the command ship had jumped seven times (5,024 to
+      5,560 antimatter a jump), explored X1-HN44, X1-NF46, X1-AD37, X1-GT9, X1-TA92 and X1-AA31, and was scouting X1-PX46.
+      It goes to the nearest system from where it is, so X1-QA35 and X1-QR21, one jump from home, are still to explore.
+      Five gates it saw are under construction: X1-XJ90 (one jump from home), X1-JU15, X1-JX83, X1-YG40 and X1-ZZ69. Its
+      jump from X1-AA31 to X1-PX46, about 1,890 apart, left a cooldown of 596 seconds.
+    - All 514 waypoints cached in those systems are charted, by other agents: nothing in reach needs charting.
+    - Home's trade has thinned: the four routes running expected 1,881 to 4,254 a trip. The widest gaps the command ship
+      saw abroad, on its one visit: EQUIPMENT 1,414 a unit in X1-HN44 (trade volume 20); FIREARMS 761, DRUGS 740 and
+      ASSAULT_RIFLES 670 in X1-AA31; SHIP_PLATING 433 in X1-TA92. Home's widest: SHIP_PARTS 210, MEDICINE 180.
+    - Credits 2,004,964, the credit reserve 535,553. The bot made 1.12 API requests a second (the limit is 2). The market
+      watch fetches one market a tick, so at most about 60 markets every 5 minutes.
+    - A gate jump needs no jump drive: SPECTER-1 has none (a cargo hold, crew quarters, mineral and gas processors) and
+      jumped seven times. Probes and cargo ships should jump as well; a probe's first jump confirms it.
+    - The next reset is on 2026-10-11 at 13:00Z. The next home system's gate has to be built first (D68), so 6.28–6.31 do
+      nothing until then; 6.27 works from the start.
+  - **6.27 Profit per hour** (D95; built on branch `claude/spacetraders-profit-per-hour`): the trading plan ranks routes by
+    what they earn an hour.
+    - Done:
+      - `Trading/TripTime.cs` (new): the timing the trading plan and the role board share, so they agree. A flight in CRUISE,
+        leg by leg through its refuelling stops, as the API reckons it (15 seconds plus the distance times 25 over the
+        engine's speed, 9 for an engine not cached), and 10 seconds at each landing (dock, trade or refuel, the market's
+        refresh), a ship already at its buy market stopping there too. The batches aren't timed: the ledger can't tell them
+        apart (a trade's rows share their second), and a flight takes minutes.
+      - `TradeRoute.Seconds` (the whole trip from where the ship is: the flight to the buy market and the haul) and
+        `TradeRoute.CreditsPerHour`, worked out with the route (`TradeRoutePlanner.TryEvaluate`, `Rank`, `Judge`).
+      - `TradeRoutePlanner.RankingProfit` became `RankingRate`: the rate, an end product's at half (D85). `Rank` and
+        `CompareBestFirst` keep their order around it: the routes that feed the gate's materials first (D89, D90), the routes
+        to an exchange last (D91), then the rate, then a good something is made from, then the key. The trading plan hands
+        out its routes trader by trader, the best first, so of two traders the nearer one now gets a route both could fly.
+      - The role board's trade options take the route's own seconds (`RoleEstimator.TradeOptions`); its `FlightSeconds`,
+        `StopSeconds` and `DefaultEngineSpeed` are `TripTime`'s.
+      - The trip keeps its time (`TradeBetweenMarketsGoal.ExpectedSeconds`, whole seconds), and so do the trading plan's
+        state (`TradingAutomationOpportunityState.ExpectedSeconds`) and `GET /status/trading-routes`, which gives
+        `expectedMinutes` and `creditsPerHour` for each route. `TradeStarted` gives `CreditsPerHour` and `TripMinutes`
+        ("… an hour over about … minutes"), and a lucrative good's "Goods not traded" reason its rate and minutes ("…; 60,130
+        an hour, the trip taking about 9 minutes (D95).").
+    - gembernodes (branch `claude/spacetraders-profit-per-hour` there too): the routes table under the market tree gets
+      **minutes** and **per hour**, "—" for a route without a time, and its description the plan's order as it is now (it
+      still said full holds and the most profit after fuel). It goes in with the image bump, once this is merged.
+    - Unchanged: D14's 5 a unit, which sizes a trip (D79); one buyer at a time (D80); the credits a trip holds (D57); a
+      cargo ship beyond the list still waits for a route worth `Trade.ShipPurchaseMinRouteProfit` in credits (D88); the
+      role board's cap on trade estimates (D87).
+    - Noticed (not changed): a leg the executor burns (D84) takes half the time counted, so a short trip whose legs burn
+      ends sooner than its rate assumed. The role board's times were already counted this way.
+    - Watch after the deploy: shorter trips make more calls an hour; `ApiThrottled` should stay quiet (1.12 requests a
+      second of 2 on 2026-10-06).
+    - Done when: the trading plan's list orders the lucrative routes by credits an hour within D89 and D91, and a short
+      route that earns more an hour goes before a long one that earns more a trip.
+    - Tests: `TradeRoutePlannerTests` (a route's time, at the stand-in speed and at 36; a short route that earns more an hour
+      before a long one that earns more a trip, and without the chains EQUIPMENT for A1 before MEDICINE, both failing
+      before the change; the time of the flight to the buy market; the rate within D89's and D91's order; an end product's
+      rate at half), `TradeRouteJudgementTests` (the reason's rate), `TradingAutomationServiceTests` (the trip's and the
+      state's time, the journal's rate and minutes; the D15 trip's scenario made the best per hour too: D41 pays 3,700),
+      `ApiIntegrationTests` (`expectedMinutes`, `creditsPerHour`). App 1,261, Domain 75, API 216 (4 skipped), Infrastructure
+      87, Integration 1.
+    - Warnings left in the files touched: QW0028 and QW0029 ("use a strongly typed identifier") on the plan states' and
+      goals' `Guid` ids (`MarketAutomationPlanState.cs`, `ShipGoal.cs`), from before; typed ids would reach every plan and
+      goal.
+    - To understand this, start with `Trading/TripTime.cs`, then `RankingRate` and `TryEvaluateFrom` in
+      `Trading/TradeRoutePlanner.cs`, and `TradeOptions` in `Roles/RoleEstimator.cs`.
+  - **6.28 Probes at the markets abroad** (D97, with D96's reach): every market within the trade reach gets a probe, then
+    every other explored market as the credits allow.
+    - To do:
+      - The fastest-way planner learns jumps (D101), for every executor: D84's planner (`TradeRoutePlanner.TryPlanNextLeg`,
+        `TryPlanMixedFlight`), which already picks CRUISE, BURN or DRIFT for each leg, gets jump legs between gates (the
+        gates the explore plan knows): to a waypoint in another system, the flight to the system's gate, then the jumps on
+        the way, one ANTIMATTER each at the gate's price, only while the credits after it stay at the floor (D63), each
+        cooldown waited out. `JumpGoalExecutor`'s steps move into the flight helper (`GoalFlight`). A probe has no tank, so
+        its own flights cost nothing.
+      - The probe plan in every system: home first, as now, then each explored system within `Trade.MaxHaulDistance`
+        jumps of home, the nearest first, at `PurchaseTier.Probes`; the other explored systems in a new last tier after
+        `PurchaseTier.Alternating`. A spare probe (B69) goes to a system short of one before a probe is bought for it.
+      - Where a probe is bought: the shipyard where it costs least, the antimatter to its system counted, whose SHIP_PROBE
+        supply isn't SCARCE (D97, at home too). A purchase abroad needs one of our ships there (D30): in a system with a
+        shipyard that sells probes, the first probe to arrive lets the plan buy the rest there.
+      - `BusinessSystems` becomes the headquarters' system alone, as D60 meant ("(home)"): a probe abroad, or a trader in
+        6.29, lets no other plan work or buy in its system.
+      - Visibility: the probe plan's state per system; a `Jumped` line for each probe's jump; probes and price age per
+        system on the systems dashboard (gembernodes).
+    - Expect: about 60 probes for the five explored systems within 5 jumps (X1-HN44 8, X1-NF46 16, X1-AD37 4, X1-GT9 16,
+      X1-TA92 16), more as exploring goes on: around 1.7M credits at 21,385 to 33,794 a probe and about 5,000 a jump, as
+      the credit reserve allows. With about 90 markets watched, the market watch fetches each every 7 or 8 minutes rather
+      than 5, inside D96's 30.
+    - Done when: every market within the trade reach has a probe, or one on its way, as far as the credits allow; no probe
+      is bought where SHIP_PROBE is SCARCE; no other plan buys or works abroad.
+  - **6.29 Trade across systems** (D95, D96): the trading plan's routes reach the systems around.
+    - To do:
+      - A map of the systems in reach: their waypoints and markets (prices at most `Trade.MaxPriceAgeMinutes` old, new,
+        30, home's too), the gates between them, and the ANTIMATTER price at each gate's market.
+      - Routes across systems, through the planner of 6.28 (D101): in-system legs as today (D84), and jumps between gates,
+        their antimatter a cost and their cooldown in the time where it holds the ship. The rate (D95) does the choosing:
+        a far route goes first only when it earns more an hour.
+      - The trade executor flies with 6.28's legs: to a buy market abroad, its batches (D79), on to the sell market,
+        refuelling abroad at the markets there.
+      - A trader stays where its last sale leaves it, and its next route is ranked from there. The role board values a
+        ship abroad for trading only.
+      - Visibility: the routes table gives the systems and jumps; a trip's booked profit (D46) is after its antimatter;
+        a `Jumped` line for each trader's jump.
+    - Unchanged: one buyer at a time (D80), across systems too; cargo ships are bought at home, D88's waiting routes now
+      including routes abroad.
+    - Done when: traders take routes abroad whenever those earn more an hour, and finish them: no ship stranded, no jump
+      refused, each trip's profit after antimatter in the ledger.
+  - **6.30 The explorer, and charting** (D98, D99).
+    - To do:
+      - `Explore.Explorers` (new, 1) SHIP_EXPLORERs, at a new `PurchaseTier.Explorer` after the gate's loads and before
+        the probes, at the cheapest shipyard that sells one (X1-GT9-AE7B today). The command ship, while it explores, flies
+        there and buys it (D30).
+      - The explore plan's ships: the explorers, or the command ship while there are none; once an explorer is bought the
+        command ship jumps home and is released (D60). Each explorer takes the nearest system that isn't explored and that
+        no other explorer has taken.
+      - Charting (D99): in each system it explores, the exploring ship charts every uncharted waypoint that isn't an
+        ASTEROID or a GAS_GIANT, the gate first, then the nearest, and scouts a market or shipyard it reveals. The reward
+        is booked, in a ledger category of its own, with a `Charted` journal line. If charting by type wastes time, the
+        waypoint scan (both ships carry a sensor array) shows which uncharted waypoints have a marketplace or shipyard.
+      - With nothing left to explore an explorer comes home, as the command ship does (D60), until a new gate is built or
+        6.31 gives it a system to warp to.
+      - Visibility: the explorers on the fleet table; charted waypoints and their rewards on the systems dashboard
+        (gembernodes).
+    - Noticed (yours to call): D97's SCARCE rule is for probes, so an explorer is bought at any supply.
+    - Done when: one explorer is bought and exploring, the command ship works at home, and the uncharted markets and
+      shipyards are charted as they are found, with their rewards in the ledger.
+  - **6.31 Warping** (D100, D101), in this order:
+    - Research: exactly how a warp's fuel and time follow from distance and flight mode, and what the drive's range
+      (2,000) limits. The spec says only that a warp uses fuel; the docs' pages render in a browser, so read them in one.
+      It ends as a note in this slice, with its sources.
+    - Measure: one warp by the explorer, its fuel and time held against the note.
+    - Warps in the fastest-way planner (D101): for a ship with a warp drive (only the explorer has one), a warp is one more
+      way between systems, weighed against the jumps by distance and fuel, and the only way into a system the gates don't
+      reach or whose gate is unbuilt. Fuel-safe: a warp only where the ship can refuel, or has the fuel to warp back. The
+      systems' positions come from the API, cached.
+    - The explorer warps to the systems the gates don't reach, within range, the nearest first, and charts what it finds
+      (D99).
+    - Done when: the explorer warps to such systems and back without being stranded, the planner picks a warp only where
+      it is the faster way or the only one, and the explorer charts what it finds.
+  - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
+    other systems (D68).
 
 - **6.26 Every ship builds the gate** (built on branch `claude/spacetraders-every-ship-builds`, asked on 2026-10-06, D93).
   Asked: "Let's remove the one gate ship limit, but have a "underway" counter of items so there aren't 3 ships gunning for
