@@ -82,6 +82,37 @@ public sealed class RolePlannerConstructionTests
     }
 
     [Fact]
+    public void WithoutALimit_EveryShipThatCanBuild_BuildsTheGate()
+    {
+        // D93, asked on 2026-10-06: "Let's remove the one gate ship limit, but have a "underway" counter of items so there
+        // aren't 3 ships gunning for the final 40 FAB MATS." The survey ship and the drone are decided first, as before; the
+        // command ship and both cargo ships build, and trade whenever the construction plan has no load for them.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(SurveyShip(), [FleetRole.Survey]),
+                Candidate(CommandShip(), CommandRoles, Trade("trade|A", 20_000)),
+                Candidate(Hauler(), CargoRoles, Trade("trade|B", 30_000)),
+                Candidate(Shuttle(), CargoRoles, Trade("trade|C", 10_000)),
+                Candidate(Drone(), DroneRoles, Trade("trade|D", 9_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2,
+            coverage: [],
+            builders: 0);
+
+        decisions.Where(decision => decision.Role == FleetRole.Construct).Select(decision => decision.ShipSymbol).Should().Equal("SHIP-1", "SHIP-6", "SHIP-7");
+        Role(decisions, "SHIP-3").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
+        Role(decisions, "SHIP-5").Should().Be((FleetRole.Survey, RolePlanner.OnlyRole));
+    }
+
+    [Fact]
+    public void WithoutASetting_ThereIsNoLimit()
+    {
+        RolePlanner.Decide([Candidate(Hauler(), CargoRoles), Candidate(Shuttle(), CargoRoles)], contractWantsOre: false, headStart: 0.2, coverage: [])
+            .Should().OnlyContain(decision => decision.Role == FleetRole.Construct);
+    }
+
+    [Fact]
     public void TheShipThatSurveys_AndTheContractsMiners_DontBuild()
     {
         // The command ship is the only ship that can survey, and a drone can mine: it surveys (D38). The contract takes the

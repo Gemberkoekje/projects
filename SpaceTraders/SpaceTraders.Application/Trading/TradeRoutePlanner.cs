@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -12,8 +13,10 @@ namespace SpaceTraders.Application.Trading;
 ///   times the units, minus the fuel for the trip: from where the ship is to the buy market, and on to
 ///   the sell market;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
-///   <item>among lucrative trips, first those that feed a market making a material the jump gate still needs (D89), then the
-///   most profitable, an end product's (a good nothing is made from) counted at half its profit (D15, D82, D85).</item>
+///   <item>among lucrative trips, first those that feed a market making a material the jump gate still needs (D89), last those
+///   to a market that exchanges the good (D91), and otherwise the one that earns most an hour over the whole trip from where
+///   the ship is (D95, <see cref="TripTime"/>), an end product's (a good nothing is made from) counted at half (D15, D82,
+///   D85).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -79,9 +82,9 @@ public static class TradeRoutePlanner
 
     /// <summary>
     /// The lucrative routes for a ship, best first: those that feed the jump gate's materials (D89,
-    /// <see cref="TradeRoute.ConstructionMaterial"/>), then by profit, an end product's counted at half
-    /// (<see cref="RankingProfit"/>, D82, D85). Routes in <paramref name="heldRouteKeys"/> belong to other traders and are left
-    /// out: two traders never share a route.
+    /// <see cref="TradeRoute.ConstructionMaterial"/>), those to a market that exchanges the good last (D91), and otherwise by
+    /// what they earn an hour, an end product's counted at half (<see cref="RankingRate"/>, D82, D85, D95). Routes in
+    /// <paramref name="heldRouteKeys"/> belong to other traders and are left out: two traders never share a route.
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
@@ -121,7 +124,7 @@ public static class TradeRoutePlanner
         return [.. routes
             .OrderByDescending(route => route.FeedsConstruction)
             .ThenBy(route => route.ToExchange)
-            .ThenByDescending(RankingProfit)
+            .ThenByDescending(RankingRate)
             .ThenByDescending(route => route.FeedsProduction)
             .ThenBy(route => route.Key, StringComparer.Ordinal)];
     }
@@ -171,24 +174,26 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// What a route counts for when routes are ranked (D82, D85): its profit, or half of it for an end product, a good
-    /// nothing is made from (<see cref="TradeRoute.FeedsProduction"/>). So an end product goes first only when it earns more
-    /// than twice as much. Asked on 2026-10-05, when no trader took FOOD at about 75,000 a load while trips of 302 to 3,864
-    /// went first, D82 having put every end product after every other route: "Half weight".
+    /// What a route counts for when routes are ranked (D82, D85, D95): what it earns an hour over the whole trip
+    /// (<see cref="TradeRoute.CreditsPerHour"/>), or half of that for an end product, a good nothing is made from
+    /// (<see cref="TradeRoute.FeedsProduction"/>). So a short route that earns less a trip goes before a long one that earns
+    /// more, when it earns more an hour (asked on 2026-10-06: "I want a "profit per time unit" so the system can choose between
+    /// a short route that pays less or a long route that pays more"), and an end product goes first only when it earns more
+    /// than twice as much an hour (D85: "Half weight").
     /// </summary>
     /// <param name="route">The route.</param>
-    /// <returns>The profit the route ranks by.</returns>
-    public static double RankingProfit(TradeRoute route)
+    /// <returns>The credits an hour the route ranks by.</returns>
+    public static double RankingRate(TradeRoute route)
     {
         ArgumentNullException.ThrowIfNull(route);
 
-        return route.FeedsProduction ? route.Profit : route.Profit / 2.0;
+        return route.FeedsProduction ? route.CreditsPerHour : route.CreditsPerHour / 2.0;
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15, D82, D85, D89, D91): one that feeds the jump gate's materials first, one that sells
-    /// to a market that exchanges the good last, then by <see cref="RankingProfit"/>, a good something is made from first on
-    /// a tie, then by key.
+    /// Orders two routes as Rank does (D15, D82, D85, D89, D91, D95): one that feeds the jump gate's materials first, one that
+    /// sells to a market that exchanges the good last, then by <see cref="RankingRate"/>, a good something is made from first
+    /// on a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -210,10 +215,10 @@ public static class TradeRoutePlanner
             return exchange;
         }
 
-        var profit = RankingProfit(y).CompareTo(RankingProfit(x));
-        if (profit != 0)
+        var rate = RankingRate(y).CompareTo(RankingRate(x));
+        if (rate != 0)
         {
-            return profit;
+            return rate;
         }
 
         var feeds = y.FeedsProduction.CompareTo(x.FeedsProduction);
@@ -283,7 +288,8 @@ public static class TradeRoutePlanner
             return false;
         }
 
-        if (!TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, minProfitPerUnit, approach, out route, out failed))
+        var speed = FleetRoles.EngineSpeed(ship, TripTime.DefaultEngineSpeed);
+        if (!TryEvaluateFrom(map, ship, tradeSymbol, buyWaypointSymbol, sellWaypointSymbol, credits, minProfitPerUnit, approach, speed, out route, out failed))
         {
             return false;
         }
@@ -734,6 +740,7 @@ public static class TradeRoutePlanner
 
         var here = ship.WaypointSymbol ?? string.Empty;
         var fuelAtStart = FuelAtDeparture(map, ship);
+        var speed = FleetRoles.EngineSpeed(ship, TripTime.DefaultEngineSpeed);
         foreach (var buy in map.MarketWaypoints)
         {
             var goods = map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0).ToList();
@@ -769,7 +776,7 @@ public static class TradeRoutePlanner
                         route = new TradeRoute(good.Symbol, buy, sell, 0, good.PurchasePrice, atSell.SellPrice, 0, 0, string.Empty);
                         check = TradeRouteCheck.BuyMarketOutOfReach;
                     }
-                    else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, minProfitPerUnit, approach, out route, out check))
+                    else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, minProfitPerUnit, approach, speed, out route, out check))
                     {
                         check = route.IsWorthIt(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
                         if (check == TradeRouteCheck.Lucrative)
@@ -787,7 +794,8 @@ public static class TradeRoutePlanner
     /// <summary>
     /// Works out a route from its buy market on, the flight there being <paramref name="approach"/>: as many units as each earn
     /// <paramref name="minProfitPerUnit"/>, each batch bought a step dearer and each sold a step cheaper than the one before
-    /// (D79, <see cref="PriceSteps"/>), up to the free hold and what the credits pay for once the trip's fuel is kept back.
+    /// (D79, <see cref="PriceSteps"/>), up to the free hold and what the credits pay for once the trip's fuel is kept back; and
+    /// the whole trip's time, at the engine's <paramref name="speed"/> (D95, <see cref="TripTime.TradeSeconds"/>).
     /// </summary>
     /// <param name="failed">
     /// When it can't be flown or traded, the first check it fails: a market, a price or a trade volume unknown, or no room in
@@ -808,6 +816,7 @@ public static class TradeRoutePlanner
         long credits,
         int minProfitPerUnit,
         TradeFlight approach,
+        int speed,
         out TradeRoute route,
         out TradeRouteCheck failed)
     {
@@ -895,6 +904,7 @@ public static class TradeRoutePlanner
             FeedsProduction = !map.IsEndProduct(tradeSymbol) && !toExchange,
             ConstructionMaterial = material,
             ToExchange = toExchange,
+            Seconds = TripTime.TradeSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, buyWaypointSymbol, haul.Stops, speed),
         };
         return true;
     }
@@ -1149,8 +1159,17 @@ public sealed record TradeRoute
     public string Key => TradeRoutePlanner.RouteKey(TradeSymbol, BuyWaypointSymbol, SellWaypointSymbol);
 
     /// <summary>
+    /// How long the trip takes from where the ship was when it was worked out (D95, <see cref="TripTime.TradeSeconds"/>): the
+    /// flight to the buy market, the haul and a stop at each landing. 0 unless set.
+    /// </summary>
+    public double Seconds { get; init; }
+
+    /// <summary>What the trip earns an hour (D95): its profit over <see cref="Seconds"/>; 0 without a time.</summary>
+    public double CreditsPerHour => TripTime.PerHour(Profit, Seconds);
+
+    /// <summary>
     /// Whether something is made from the good (D15, D82): an end product, which nothing is made from
-    /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its profit, wherever it is sold (D85); a sale to a market
+    /// (<see cref="TradeMarketMap.IsEndProduct"/>), ranks at half its rate, wherever it is sold (D85, D95); a sale to a market
     /// that exchanges the good never feeds production (D91, <see cref="ToExchange"/>). False unless set.
     /// </summary>
     public bool FeedsProduction { get; init; }

@@ -104,17 +104,24 @@ public sealed class TradingAutomationServiceTests
         trip.FeedsTradeSymbol.Should().BeEmpty("A1 makes nothing from EQUIPMENT");
         trip.CargoBought.Should().BeFalse();
 
+        // Slice 6.27 (D95): the trip's time from K85, 104 to A1 at the stand-in speed of 9 and two stops, and its rate.
+        trip.ExpectedSeconds.Should().Be(324);
+        _state!.Opportunities.Should().ContainSingle(o => o.Status == MarketAutomationOpportunityStatus.Assigned).Which.ExpectedSeconds.Should().Be(324);
+
         var started = _log.Journal.Should().ContainSingle().Subject;
         started.EventKind.Should().Be("TradeStarted");
         started.Properties["ShipSymbol"].Should().Be("SHIP-1");
         started.Properties.Should().NotContainKey("FeedsTradeSymbol");
+        started.Properties["CreditsPerHour"].Should().Be(106_926L);
+        started.Properties["TripMinutes"].Should().Be(5.0);
     }
 
     [Fact]
     public async Task ATripToAMarketThatMakesAPricierGoodFromItsCargo_SaysWhichInItsGoalAndTheJournal()
     {
-        // D15: D41 makes SHIP_PARTS (7,721) from EQUIPMENT; paying 3,520 for it there, it is the best route.
-        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(K85Market(), D41Market(equipmentPrice: 3_520), A1Market())));
+        // D15: D41 makes SHIP_PARTS (7,721) from EQUIPMENT; paying 3,700 for it there, it is the best route, an hour too (D95):
+        // 17,688 in about 9 minutes, against A1's 9,620 in about 5.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map(K85Market(), D41Market(equipmentPrice: 3_700), A1Market())));
         Fleet(CommandShip());
 
         await RunAsync();
@@ -565,7 +572,7 @@ public sealed class TradingAutomationServiceTests
 
         var medicine = _state!.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "MEDICINE").Subject;
         (medicine.Reason, medicine.ShipSymbol, medicine.BuyWaypointSymbol, medicine.SellWaypointSymbol).Should().Be(("waiting", "SHIP-1", D41, A1));
-        medicine.Why.Should().Be("SHIP-1: lucrative, 40 units for 15,198 after fuel, 379 a unit. It waits for a free trader: the free traders took routes that rank higher.");
+        medicine.Why.Should().Be("SHIP-1: lucrative, 40 units for 15,198 after fuel, 379 a unit; 66,096 an hour, the trip taking about 14 minutes (D95). It waits for a free trader: the free traders took routes that rank higher.");
 
         Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
         await RunAsync();
@@ -605,7 +612,7 @@ public sealed class TradingAutomationServiceTests
         _state!.Opportunities.Select(route => route.TradeSymbol).Should().NotContain("G01").And.HaveCount(1 + TradingAutomationService.MaxPendingRoutes);
         var g01 = _state.NotTraded.Should().ContainSingle(good => good.TradeSymbol == "G01").Subject;
         g01.Reason.Should().Be("below_the_listed_routes");
-        g01.Why.Should().Be("SHIP-1: lucrative, 40 units for 40,248 after fuel, 1,006 a unit. The 20 waiting routes listed rank higher.");
+        g01.Why.Should().Be("SHIP-1: lucrative, 40 units for 40,248 after fuel, 1,006 a unit; 263,975 an hour, the trip taking about 9 minutes (D95). The 20 waiting routes listed rank higher.");
     }
 
     [Fact]

@@ -229,7 +229,7 @@ what it saw. Where to start:
    `dotnet test SpaceTraders.slnx --filter "Category!=Integration"`.
 7. **Update the docs:**
    - `docs/HOW_IT_WORKS.md`, if behaviour changed;
-   - `PLAN.md`: add the B-number; once the fix is merged and deployed, its row moves to
+   - `PLAN.md`: add the B-number; once the fix is merged, its row moves to
      `docs/archive/PLAN_HISTORY.md`;
    - `CHANGELOG.md`.
 8. **Open a PR**, one per bug, with:

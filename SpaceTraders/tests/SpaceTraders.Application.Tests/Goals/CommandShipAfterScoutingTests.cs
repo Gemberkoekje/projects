@@ -104,6 +104,7 @@ public sealed class CommandShipAfterScoutingTests
             new ShipGoalStepGuard(),
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
+            new LostArrivals(Substitute.For<IShipEventScheduler>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         for (var tick = 0; tick < TicksPerMinute; tick++)

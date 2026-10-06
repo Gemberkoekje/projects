@@ -34,10 +34,12 @@ public interface IConstructionPlanService
 /// <list type="bullet">
 ///   <item>a free ship that holds a material the gate still needs takes it there first, whatever its role: it would
 ///   otherwise be sold, or jettisoned where no market buys it;</item>
-///   <item>a free builder with an empty hold takes a load (<see cref="ConstructionPlanner"/>): the ship with the
-///   construction role, the largest hold that isn't a drone or the surveyor (D65); with the role board off, the plan picks
-///   it by the same rule. A load is a full hold, or what the gate still needs, at a market whose supply isn't SCARCE or
-///   LIMITED (D66), bought in batches of its trade volume (D81);</item>
+///   <item>a free builder with an empty hold takes a load (<see cref="ConstructionPlanner"/>): a ship with the construction
+///   role, which every ship that can build has while the gate needs materials, or the largest holds, as many as
+///   <c>Construction.Ships</c> when that is above 0 (D65, D93); with the role board off, the plan picks them by the same rule.
+///   A load is a full hold, or what the gate still needs once what every other trip carries or goes to buy is counted, at a
+///   market whose supply isn't SCARCE or LIMITED (D66) and where no other trip is on its way to buy it (D80), bought in
+///   batches of its trade volume (D81);</item>
 ///   <item>supplying pays nothing, so a load is judged as a ship purchase (D64): it keeps the credit reserve
 ///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships in the order ships are bought in
 ///   (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so probes and further ships wait until the
@@ -77,7 +79,10 @@ public sealed class ConstructionPlanService(
     {
         var now = TimeProvider.System.GetUtcNow();
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
-        var fleet = await ships.GetAllAsync(cancellationToken);
+
+        // B71: the goals before the ships, so a trip that ends meanwhile leaves no builder free with the load it supplied.
+        var read = await FleetGoals.ReadAsync(ships, goals, cancellationToken);
+        var fleet = read.Fleet;
         var withAssignment = (await assignments.GetAllActiveAsync(cancellationToken))
             .Where(assignment => !assignment.CompletedAt.HasValue)
             .Select(assignment => assignment.ShipSymbol)
@@ -87,7 +92,7 @@ public sealed class ConstructionPlanService(
         var trips = new List<SupplyConstructionGoal>();
         foreach (var ship in fleet)
         {
-            var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            var goal = read.GoalOf(ship.Symbol);
             if (goal is SupplyConstructionGoal trip)
             {
                 trips.Add(trip);
@@ -130,8 +135,8 @@ public sealed class ConstructionPlanService(
     }
 
     /// <summary>
-    /// The ships that build (D65): with the role board on, those with the construction role; with it off, the largest holds
-    /// of each system that don't survey (D20), as many as <c>Construction.Ships</c>.
+    /// The ships that build (D65, D93): with the role board on, those with the construction role; with it off, those of each
+    /// system that can and don't survey (D20), the largest holds, as many as <c>Construction.Ships</c> when that is above 0.
     /// </summary>
     private async Task<IReadOnlyList<ShipModel>> BuildersAsync(FleetRoleBoard board, IReadOnlyList<ShipModel> fleet, CancellationToken cancellationToken)
     {
