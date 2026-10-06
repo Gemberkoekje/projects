@@ -30,9 +30,9 @@
   at X1-GT9-AE7B at 14:44Z and explores the systems within the trade reach first (X1-GY77 at 15:54Z); the explore plan
   wants a second for the 20 systems left, which waits for the probes within the trade reach and the drones and cargo
   ships that take turns (D102).
-- **In review:** slice 6.32 (shipyards first, D108–D111). In this reset the home gate is built, so it works as soon as it
-  is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices across systems wait for the new home system's gate
-  (D68).
+- **In review:** slice 6.32 (shipyards first, D108–D111): projects#197. In this reset the home gate is built, so it works
+  as soon as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices across systems wait for the new home
+  system's gate (D68).
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.31, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
@@ -267,7 +267,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.30 The explorers, and charting (D98, D99, D102, D103; B73)
 - 6.31 Warping (D100, D101, D104–D107)
 - 6.32 Shipyards first: the command ship fetches every explorer no probe can, and the probes park at the shipyards
-  (D108–D111), in review
+  (D108–D111), in review (projects#197)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done; 6.32, asked the same day after them, is in review:
@@ -314,7 +314,7 @@ done; 6.32, asked the same day after them, is in review:
   that location if there isn't a probe there, and also have probes deployed to shipyards with priority, with shipyards with
   explorer ships being even higher priority than that?", the location being "The location where an explorer ship is
   supposed to be bought if it's in the purchase order and enough credits are available". Built on branch
-  `claude/spacetraders-shipyard-probes`, in review.
+  `claude/spacetraders-shipyard-probes`, in review as projects#197.
   - Found (read-only, 2026-10-06 between 15:45Z and 16:10Z, image `60f3922a`):
     - The command ship bought the first explorer, SPECTER-5C, at X1-GT9-AE7B at 14:44Z, after setting off at 13:25Z, and
       was home at 15:05Z. The explore plan wanted 2 explorers for the 20 systems left.
