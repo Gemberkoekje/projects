@@ -194,14 +194,17 @@ public sealed class GoalJumps(
         }
 
         await bus.PublishAsync(new ShipJumpedEvent(ship.Symbol, gate, destinationGate, result.Cost));
+
+        // Slice 6.29: the cooldown too, against which the trade planner's estimate of it can be checked (TradeGates).
         logger.LogInformation(
-            "{EventKind:l}: ship {ShipSymbol} jumped from {WaypointSymbol} to {Destination} in {SystemSymbol}; the antimatter cost {Cost}.",
+            "{EventKind:l}: ship {ShipSymbol} jumped from {WaypointSymbol} to {Destination} in {SystemSymbol}; the antimatter cost {Cost}, the cooldown is {CooldownSeconds} seconds.",
             JournalEvents.Jumped,
             ship.Symbol,
             gate,
             destinationGate,
             result.Nav.SystemSymbol,
-            result.Cost);
+            result.Cost,
+            result.CooldownSeconds);
         return new JumpStep(JumpStepOutcome.Jumped, GoalExecutionResult.Progressing($"Jumped to {destinationGate}."));
     }
 

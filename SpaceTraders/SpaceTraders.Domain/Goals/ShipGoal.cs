@@ -391,6 +391,12 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
     public int ExpectedSeconds { get; init; }
 
     /// <summary>
+    /// The jumps through the gates the trip was expected to take, to the buy market and on to the sell market (PLAN.md slice
+    /// 6.29, D96): its markets lie in other systems. 0 within a system.
+    /// </summary>
+    public int Jumps { get; init; }
+
+    /// <summary>
     /// The pricier good the sell market makes from <see cref="TradeSymbol"/>, or empty when the trip
     /// feeds no production there.
     /// </summary>

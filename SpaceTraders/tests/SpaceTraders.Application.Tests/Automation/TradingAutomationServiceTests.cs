@@ -10,6 +10,7 @@ using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Tests.Services;
+using SpaceTraders.Application.Tests.Trading;
 using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -52,6 +53,10 @@ public sealed class TradingAutomationServiceTests
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipAssignmentDto>());
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(Map()));
+
+        // Slice 6.29: the trading plan reads the systems within its reach; the tests of one system give it what ReadAsync gives.
+        _tradeContexts.ReadReachAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => _tradeContexts.ReadAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
         _constructionSites.CachedNeedingMaterialsAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ConstructionSiteModel>());
         _goals.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => _activeGoals.GetValueOrDefault(call.Arg<string>()));
@@ -1003,6 +1008,84 @@ public sealed class TradingAutomationServiceTests
 
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
+
+    [Fact]
+    public async Task AShipWhoseRoleIsTrading_TakesARouteAbroad_WhenItEarnsMoreAnHour()
+    {
+        // Slice 6.29 (D96): X1-CD, a jump away, pays 6,000 for EQUIPMENT, A1 3,499. The shuttle has the trade role: its trip
+        // buys at K85 and jumps there, the jump and its antimatter in the journal and the state.
+        RolesAre(("SHIP-2", FleetRole.Trade));
+        Fleet(Shuttle("SHIP-2"));
+        ReachIs(TradeAcrossFixture.AcrossMap());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-2"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol, trip.Jumps).Should().Be(("EQUIPMENT", K85, TradeAcrossFixture.CdMarket, 1));
+        var started = _log.Journal.Should().ContainSingle(entry => entry.EventKind == JournalEvents.TradeStarted).Subject;
+        started.Properties["Jumps"].Should().Be(1);
+        started.Properties["AntimatterCost"].Should().Be(TradeAcrossFixture.Antimatter);
+        _state!.Opportunities.Single(route => route.Status == MarketAutomationOpportunityStatus.Assigned).Jumps.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AShipWhoseOwnWorkIsAtHome_TradesInItsOwnSystem_ThoughARouteAbroadEarnsMore()
+    {
+        // D96 with D58: a ship with the mining role trades between its trips, when the mining plan passed it over; a trip
+        // abroad would leave its mining undone, and the mining plan works at home (D60).
+        MiningPlanOn();
+        RolesAre(("SHIP-1", FleetRole.Mine));
+        Fleet(CommandShip());
+        _passedOver.Record(AutomationPlan.Mining, own: ["SHIP-1"], passedOver: ["SHIP-1"]);
+        ReachIs(TradeAcrossFixture.AcrossMap());
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.SellWaypointSymbol, trip.Jumps).Should().Be((A1, 0));
+    }
+
+    [Fact]
+    public async Task AShuttleKeptForACollectionPoint_TradesInItsOwnSystem()
+    {
+        // D83, D86: the shuttle trades until a drone is parked at its point, and then collects there, at home.
+        RolesAre(("SHIP-2", FleetRole.Trade));
+        Fleet(Shuttle("SHIP-2"));
+        ReachIs(TradeAcrossFixture.AcrossMap());
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities = [],
+            CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = Asteroid, SellWaypointSymbol = A1, ShuttleSymbols = ["SHIP-2"] }],
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-2"].Should().BeOfType<TradeBetweenMarketsGoal>().Which.Jumps.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ATraderAbroad_TakesItsNextRouteFromWhereItIs()
+    {
+        // D96: "traders stay where they sell". The shuttle sold in X1-CD; its next route is ranked from there, across the
+        // systems in reach of X1-CD.
+        RolesAre(("SHIP-2", FleetRole.Trade));
+        var abroad = Shuttle("SHIP-2") with { SystemSymbol = TradeAcrossFixture.Cd, WaypointSymbol = TradeAcrossFixture.CdMarket };
+        Fleet(abroad);
+        _tradeContexts.ReadReachAsync(TradeAcrossFixture.Cd, Arg.Any<CancellationToken>()).Returns(Context(TradeAcrossFixture.AcrossMap(), 1_000_000));
+
+        await RunAsync();
+
+        var best = TradeRoutePlanner.Rank(TradeAcrossFixture.AcrossMap(), abroad, 1_000_000, 200, new HashSet<string>())[0];
+        var trip = _activeGoals["SHIP-2"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
+        (trip.TradeSymbol, trip.BuyWaypointSymbol, trip.SellWaypointSymbol, trip.Jumps).Should().Be((best.TradeSymbol, best.BuyWaypointSymbol, best.SellWaypointSymbol, best.Jumps));
+        trip.Jumps.Should().BeGreaterThan(0);
+    }
+
+    private void ReachIs(TradeMarketMap map, long credits = 1_000_000)
+        => _tradeContexts.ReadReachAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, credits));
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 

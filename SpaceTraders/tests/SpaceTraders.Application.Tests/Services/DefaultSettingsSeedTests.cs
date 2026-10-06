@@ -62,6 +62,11 @@ public sealed class DefaultSettingsSeedTests
         "Trade.ShipPurchaseMinRouteProfit",
         "Trade.ShipPurchaseWaitMinutes",
 
+        // Trading across systems (slice 6.29, D96): TradeContextReader's reach, in jumps, and the oldest prices a route counts.
+        // The reach also places the probes abroad (ProbeDeploymentPlanService, slice 6.28).
+        "Trade.MaxHaulDistance",
+        "Trade.MaxPriceAgeMinutes",
+
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",
 
@@ -79,7 +84,6 @@ public sealed class DefaultSettingsSeedTests
         // and the market views (MarketsEndpoints, QueryHandlers).
         "FleetExpansion.PreferredShipType",
         "Automation.MiningShipPercentage",
-        "Trade.MaxHaulDistance",
     ];
 
     [Fact]

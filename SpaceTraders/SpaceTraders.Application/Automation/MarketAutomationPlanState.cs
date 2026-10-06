@@ -207,6 +207,9 @@ public sealed record TradingAutomationOpportunityState
     /// </summary>
     public int ExpectedSeconds { get; init; }
 
+    /// <summary>The jumps through the gates a trip takes, to the buy market and on to the sell market (slice 6.29, D96); 0 within a system.</summary>
+    public int Jumps { get; init; }
+
     /// <summary>The pricier good the sell market makes from the good, or empty (D15).</summary>
     public string FeedsTradeSymbol { get; init; } = string.Empty;
 

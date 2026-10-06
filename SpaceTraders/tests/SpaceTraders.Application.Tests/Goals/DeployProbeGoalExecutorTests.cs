@@ -160,7 +160,7 @@ public sealed class DeployProbeGoalExecutorTests
         await _bus.Received(1).PublishAsync(Arg.Is<ShipJumpedEvent>(jumped => jumped.Cost == 5_024 && jumped.ToWaypointSymbol == CdGate), Arg.Any<DeliveryOptions?>());
         await _goals.DidNotReceiveWithAnyArgs().ClearActiveGoalAsync(default!, default);
         _log.Journal.Should().ContainSingle().Which.Message.Should().Be(
-            "Jumped: ship PROBE-1 jumped from X1-AB-G to X1-CD-G in X1-CD; the antimatter cost 5024.");
+            "Jumped: ship PROBE-1 jumped from X1-AB-G to X1-CD-G in X1-CD; the antimatter cost 5024, the cooldown is 420 seconds.");
 
         // In the market's system, it flies on to the market.
         (await StepAsync(Probe(CdGate, "IN_ORBIT") with { SystemSymbol = "X1-CD" }, CdMarket)).Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);

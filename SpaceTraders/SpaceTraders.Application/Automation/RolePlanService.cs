@@ -50,6 +50,8 @@ public sealed class RolePlanService(
     RoleBoardMemory memory,
     TradeEarnings tradeEarnings,
     IConstructionSites constructionSites,
+    IAgentRepository agents,
+    ITradeContextReader tradeContexts,
     ILogger<RolePlanService> logger) : IRolePlanService
 {
     /// <summary>How long a ship with more than one role may have no work before the board weighs the roles again.</summary>
@@ -69,6 +71,12 @@ public sealed class RolePlanService(
         {
             roleSettings = roleSettings with { ConstructionSystems = await ConstructionSystemsAsync(cancellationToken) };
         }
+
+        // Slice 6.29 (D96): a ship abroad, or on a trade trip that takes it there, only trades; the other plans work at home.
+        roleSettings = roleSettings with
+        {
+            BusinessSystems = BusinessSystems.Of(await agents.GetAsync(cancellationToken)).ToHashSet(StringComparer.OrdinalIgnoreCase),
+        };
 
         var contractWantsOre = roleSettings.Switches.Contains(AutomationPlan.Contract)
             && await contractPlans.GetAsync(cancellationToken) is { Status: ContractMineralPlanStatus.Active } contract
@@ -97,10 +105,14 @@ public sealed class RolePlanService(
             {
                 trips[ship.Symbol] = goal;
             }
+        }
 
-            var free = FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol));
+        var abroad = Abroad(trips, roleSettings.BusinessSystems);
+        foreach (var ship in fleet)
+        {
+            var free = FleetRoles.IsFree(ship, trips.GetValueOrDefault(ship.Symbol), withAssignment.Contains(ship.Symbol));
             var freeFor = memory.FreeFor(ship.Symbol, free, now);
-            if (!surveying.Contains(ship.Symbol) && roleSettings.Available(ship, contractWantsOre).Count > 1 && freeFor > idle)
+            if (!surveying.Contains(ship.Symbol) && roleSettings.Available(ship, contractWantsOre, abroad.Contains(ship.Symbol)).Count > 1 && freeFor > idle)
             {
                 idle = freeFor;
             }
@@ -117,7 +129,7 @@ public sealed class RolePlanService(
             SeedRates(state);
         }
 
-        var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, trips, now, cancellationToken);
+        var candidates = await CandidatesAsync(fleet, roleSettings, contractWantsOre, state, trips, abroad, now, cancellationToken);
         var coverage = await CoverageAsync(fleet, trips, cancellationToken);
         var decisions = RolePlanner.Decide(candidates, contractWantsOre, roleSettings.HeadStart, coverage, collectors, roleSettings.ConstructionShips);
         await SaveAsync(state, candidates, decisions, conditions, now, cancellationToken);
@@ -152,6 +164,19 @@ public sealed class RolePlanService(
             .SelectMany(point => point.ShuttleSymbols)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// The ships on a trade trip that ends outside the systems the plans do business in (slice 6.29, D96): it sells abroad, where
+    /// only trading has work for them, and a new role takes effect where the trip ends. A ship abroad already counts as abroad
+    /// anyway (<see cref="RoleSettings.Available"/>).
+    /// </summary>
+    private static HashSet<string> Abroad(IReadOnlyDictionary<string, ShipGoal> trips, IReadOnlySet<string> businessSystems)
+        => trips
+            .Where(trip => businessSystems.Count > 0
+                && trip.Value is TradeBetweenMarketsGoal trade
+                && !businessSystems.Contains(WaypointSymbols.SystemOf(trade.SellWaypointSymbol)))
+            .Select(trip => trip.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The systems whose jump gate still needs materials, as the construction cache has it (slice 6.6): the home system, or
@@ -197,13 +222,17 @@ public sealed class RolePlanService(
         return idle >= NoWorkAfter && now - last.Value >= NoWorkAfter ? "a ship without work" : null;
     }
 
-    /// <summary>Every ship but the probes, with the roles it could take and its best trips in each, system by system.</summary>
+    /// <summary>
+    /// Every ship but the probes, with the roles it could take and its best trips in each, system by system. A ship's trade
+    /// trips are those the trading plan would give it as a trader, across the systems within the trade reach (slice 6.29).
+    /// </summary>
     private async Task<IReadOnlyList<RoleCandidate>> CandidatesAsync(
         IReadOnlyList<ShipModel> fleet,
         RoleSettings roleSettings,
         bool contractWantsOre,
         RolePlanState? state,
         IReadOnlyDictionary<string, ShipGoal> trips,
+        IReadOnlySet<string> abroad,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -219,7 +248,7 @@ public sealed class RolePlanService(
             RoleContext? context = null;
             foreach (var ship in system.OrderBy(ship => ship.Symbol, StringComparer.Ordinal))
             {
-                var roles = roleSettings.Available(ship, contractWantsOre);
+                var roles = roleSettings.Available(ship, contractWantsOre, abroad.Contains(ship.Symbol));
                 var options = new List<RoleOption>();
                 if (roles.Any(role => role is not FleetRole.Survey and not FleetRole.Construct) && system.Key.Length > 0)
                 {
@@ -236,12 +265,15 @@ public sealed class RolePlanService(
                         {
                             Trips = trips,
                             TradeCreditsPerHourAtMost = tradeEarnings.PerHour(now),
+                            TradeMap = (await tradeContexts.ReadReachAsync(system.Key, cancellationToken)).Map,
                         };
                     }
 
+                    // Slice 6.29 (D96, D58): a drone trades in its own system between its trips; any other ship as a trader would.
+                    var estimates = FleetRoles.IsMiningDrone(ship) || FleetRoles.IsSiphoner(ship) ? context with { TradeMap = context.Map } : context;
                     foreach (var role in roles.Where(role => role is not FleetRole.Survey and not FleetRole.Construct))
                     {
-                        options.AddRange(RoleEstimator.Options(context, ship, role, RolePlanner.MaxOptionsPerRole));
+                        options.AddRange(RoleEstimator.Options(estimates, ship, role, RolePlanner.MaxOptionsPerRole));
                     }
                 }
 
