@@ -6,16 +6,16 @@ An automation bot and dashboard for [SpaceTraders](https://spacetraders.io/), a 
 trading game played entirely through an HTTP API. The bot registers an agent, keeps a PostgreSQL
 cache of the game state, and runs its ships automatically. A React dashboard shows what it is doing.
 
-> **Status (2026-10-02):** running on the cluster again. It was taken off in May 2026 after it
-> filled the shared PostgreSQL database. `PLAN.md` describes the way back: phase 1
-> (safe to run) is done, including a four-hour soak test; so is phase 2 (visibility: metrics, the
-> ledger, the journal, and a Grafana dashboard and alerts in gembernodes); and so is phase 3 (health
-> rules: the bot checks itself every minute and reports anomalies). Phase 4 (back on the cluster)
-> was merged in gembernodes (PR #11), and its first-run watch (slice 4.3) is under way. In phase 5
-> Claude investigates the running bot read-only with the `st-investigate` skill
-> (`tools/investigate/`). Phase 6 makes money one loop at a time: trading (slice 6.5) is built.
-> Every plan is on by default, and the settings you choose carry over to the next agent after a
-> server reset (D69). Known issues are listed there under B-numbers and decisions under D-numbers.
+> **Status (2026-10-06):** running on the cluster since 2026-10-02. It was taken off in May 2026
+> after it filled the shared PostgreSQL database; `PLAN.md` describes the way back. Phases 1–5 are
+> done: safe to run (with a four-hour soak test), visibility (metrics, the ledger, the journal, and
+> Grafana dashboards and alerts in gembernodes), health rules (the bot checks itself every minute and
+> reports anomalies), back on the cluster, and Claude investigating the running bot read-only with
+> the `st-investigate` skill (`tools/investigate/`). Phase 6 makes money one loop at a time:
+> contracts, probes, surveying, mining, siphoning, trading, roles, the home jump gate (complete on
+> 2026-10-06) and exploring beyond it. Every plan is on by default, and the settings you choose
+> carry over to the next agent after a server reset (D69). `PLAN.md` lists the open issues under
+> B-numbers and the decisions under D-numbers; finished work is in `docs/archive/PLAN_HISTORY.md`.
 
 ---
 

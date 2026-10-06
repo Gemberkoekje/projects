@@ -9,8 +9,9 @@ Contributions are welcome. Please keep changes small, focused, and aligned with 
 ## Where things stand
 
 - `docs/HOW_IT_WORKS.md` describes what the code does today.
-- `PLAN.md` holds the plan, the known issues (B-numbers) and the decisions already taken
-  (D-numbers). Work happens in its slices, one PR per slice.
+- `PLAN.md` holds the plan, the open issues (B-numbers) and the decisions already taken
+  (D-numbers). Work happens in its slices, one PR per slice; once a slice or a fix is merged, its
+  details move to `docs/archive/PLAN_HISTORY.md`.
 - `CLAUDE.md` defines what Claude works on in this project: things that don't work the way they
   are intended to, not strategy or settings.
 - `docs/archive/` holds earlier plans. They don't describe the current code.

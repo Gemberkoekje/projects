@@ -212,8 +212,9 @@ what it saw. Where to start:
 
 1. **Pin down the symptom.** What happens, to which ship or contract, since when, and how often.
    Save the queries and their results; they go into the PR.
-2. **Check whether it's known.** `PLAN.md` "Known issues" may have a B-number already, fixed or
-   not, and `git log` the commit that fixed it. A fix only counts once the image that runs has it:
+2. **Check whether it's known.** `PLAN.md` "Known issues" lists the open bugs and
+   `docs/archive/PLAN_HISTORY.md` the fixed ones, each under its B-number; `git log` has the commit
+   that fixed it. A fix only counts once the image that runs has it:
    compare `check`'s image with the fix's commit, and look for the symptom after that deploy.
 3. **Find the intended behaviour** and where it's written down: a health rule, a test, a code
    comment, `docs/HOW_IT_WORKS.md`, or a decision in `PLAN.md`.
@@ -228,7 +229,8 @@ what it saw. Where to start:
    `dotnet test SpaceTraders.slnx --filter "Category!=Integration"`.
 7. **Update the docs:**
    - `docs/HOW_IT_WORKS.md`, if behaviour changed;
-   - `PLAN.md`: add or close the B-number;
+   - `PLAN.md`: add the B-number; once the fix is merged, its row moves to
+     `docs/archive/PLAN_HISTORY.md`;
    - `CHANGELOG.md`.
 8. **Open a PR**, one per bug, with:
    - the symptom;

@@ -14,7 +14,8 @@ Claude fixes things that don't work the way they are intended to. It does not tu
 - Touching a file that has build warnings? Consider fixing them in the same change.
   Mention any you leave, and why.
 
-The current plan, known issues and open decisions are in `PLAN.md`.
+The current plan, the open issues and the decisions are in `PLAN.md`; finished slices and fixed bugs
+are in `docs/archive/PLAN_HISTORY.md`.
 
 ## graphify
 
