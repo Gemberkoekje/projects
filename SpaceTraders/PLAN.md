@@ -29,8 +29,8 @@
   out since (6.11): at 12:12Z it jumped on from X1-JV87 to X1-QT24. 6.29 checked after the deploy: no anomalies, and by
   12:14Z three traders had taken routes abroad, among them SPECTER-E's 80 LAB_INSTRUMENTS from X1-NF46 to home, 4 jumps,
   about 55,309 after 21,404 for antimatter.
-- **In review:** slice 6.30 (the explorers and charting, D98, D99, D102, D103), built on branch
-  `claude/spacetraders-explorer-charting`.
+- **In review:** slice 6.30 (the explorers and charting, D98, D99, D102, D103) with B73's fix: projects#195, its dashboard
+  gembernodes#86.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.29, listed under [Phases](#phases).
 - **Still open:**
   - Slice 6.31, warping (D100, D101): planned under [Phases](#phases), after 6.30, with a stop for your check. In this reset
@@ -258,7 +258,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.27 Profit per hour (D95), the first of the slices across systems below
 - 6.28 Probes at the markets abroad (D97, D101; B72)
 - 6.29 Trade across systems (D96)
-- 6.30 The explorers, and charting (D98, D99, D102, D103), in review
+- 6.30 The explorers, and charting (D98, D99, D102, D103), in review (projects#195)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101, and D102 and D103 with 6.30's go). 6.27–6.29 are done, 6.30 is in
 review; 6.31 is next:
@@ -293,7 +293,8 @@ review; 6.31 is next:
     in `docs/archive/PLAN_HISTORY.md`.
   - **6.29 Trade across systems** (D95, D96): done, merged as projects#194, its routes table's jumps column and the deploy
     as gembernodes#85 (image `7555d61`, live since 2026-10-06 12:01Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
-  - **6.30 The explorers, and charting** (D98, D99, D102, D103). Built on branch `claude/spacetraders-explorer-charting`.
+  - **6.30 The explorers, and charting** (D98, D99, D102, D103). Built on branch `claude/spacetraders-explorer-charting`, in
+    review as projects#195 with B73's fix, its dashboard as gembernodes#86.
     - Found (read-only, 2026-10-06 about 12:05Z, image `7555d61`):
       - The explore plan knew 35 systems and had explored 14; of the 21 left, 16 lay behind built gates and 5 behind gates
         under construction (X1-XJ90, X1-JU15, X1-ZZ69, X1-YG40, X1-JX83). By D102 that is 2 explorers.
