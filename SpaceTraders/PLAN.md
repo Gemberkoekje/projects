@@ -30,9 +30,9 @@
   (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. The first explorer, SPECTER-5C, was bought
   at X1-GT9-AE7B at 14:44Z that day and explores the systems within the trade reach first (X1-GY77 at 15:54Z). Nothing was
   read from the bot since 6.32's deploy.
-- **In review:** slice 6.34 (a cargo ship every half hour, before the probes; D116), built on branch `ccr-caa38096-yjumz1`
-  in projects. Its dashboard's description of the order waits on gembernodes' branch of the same name for the deploy PR,
-  which follows the merge with the new image. It works as soon as it is deployed; after the next reset, on 2026-10-11 at
+- **In review:** slice 6.34 (a cargo ship every half hour, before the probes; D116): projects#199. Its dashboard's
+  description of the order waits on gembernodes' branch `ccr-caa38096-yjumz1` for the deploy PR, which follows the merge
+  with the new image. It works as soon as it is deployed; after the next reset, on 2026-10-11 at
   13:00Z, it waits behind the new home gate's loads (D64), as the probes do.
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.33, listed under [Phases](#phases).
 - **Still open:**
@@ -276,7 +276,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
   (D108–D111)
 - 6.33 The largest hold, every explorer before the probes, exploring in rings, and trade trips first at the rate limit
   (D112–D115)
-- 6.34 A cargo ship every half hour, before the probes (D116), in review
+- 6.34 A cargo ship every half hour, before the probes (D116), in review (projects#199)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done, and so are 6.32, asked the same day after them (D108–D111), and 6.33, asked on 2026-10-07 (D112–D115; the details of
@@ -322,8 +322,8 @@ both are in `docs/archive/PLAN_HISTORY.md`); 6.34, asked the same day, is in rev
 
 - **6.34 A cargo ship every half hour, before the probes** (D116). Asked on 2026-10-07: "I would like to switch priorities
   between new trade ships and probes. So once every half hour, money permitting, a trade ship is bought, independent on
-  whether probes still need to be bought." Built on branch `ccr-caa38096-yjumz1` in projects; the dashboard's description
-  of the order is on the same branch in gembernodes, for the deploy PR.
+  whether probes still need to be bought." Built on branch `ccr-caa38096-yjumz1` in projects, in review as projects#199;
+  the dashboard's description of the order is on the same branch in gembernodes, for the deploy PR.
   - Found (in the code; nothing was read from the bot, which this session can't reach):
     - The order's positions (`PurchaseTier`): 7 every explorer, 8 the probes of home and the trade reach, 9 the drones and
       cargo ships that take turns, 10 the far probes. Beyond `Trade.ShipPurchases` the trading plan said what it needed
