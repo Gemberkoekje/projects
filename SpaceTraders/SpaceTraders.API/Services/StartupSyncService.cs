@@ -59,7 +59,7 @@ public sealed class StartupSyncService(
             });
         }
 
-        var ships = await GetAllShipsAsync(apiClient, cancellationToken);
+        var (ships, fetchedAt) = await GetAllShipsAsync(apiClient, cancellationToken);
         foreach (var ship in ships)
         {
             var existingShip = await dbContext.Ships.FindAsync([dbContext.AgentId, ship.Symbol], cancellationToken);
@@ -83,18 +83,27 @@ public sealed class StartupSyncService(
             }
 
             // Game state only. The goal columns belong to the bot, and a restart must not clear them.
-            cachedShip.SystemSymbol = ship.Nav?.SystemSymbol;
-            cachedShip.WaypointSymbol = ship.Nav?.WaypointSymbol;
-            cachedShip.DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol;
-            cachedShip.Status = ship.Nav?.Status;
-            cachedShip.LocalStatus = ShipLocalStatusMapper.FromApiStatus(ship.Nav?.Status);
-            cachedShip.FlightMode = ship.Nav?.FlightMode;
             cachedShip.ShipType = shipType;
             cachedShip.MountsJson = mountsJson;
             cachedShip.ModulesJson = modulesJson;
             cachedShip.FrameJson = frameJson;
             cachedShip.ReactorJson = reactorJson;
             cachedShip.EngineJson = engineJson;
+
+            // B77: the ship event scheduler starts first in the chain, so an arrival due during the restart is handled while
+            // the pages are fetched. A ship it has moved since its page was fetched (a jump, a flight, a sale) has newer game
+            // state in its row than in the page: the row keeps where the ship is, its cooldown, fuel and cargo.
+            if (existingShip is not null && existingShip.LastSyncedAt >= fetchedAt[ship.Symbol])
+            {
+                continue;
+            }
+
+            cachedShip.SystemSymbol = ship.Nav?.SystemSymbol;
+            cachedShip.WaypointSymbol = ship.Nav?.WaypointSymbol;
+            cachedShip.DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol;
+            cachedShip.Status = ship.Nav?.Status;
+            cachedShip.LocalStatus = ShipLocalStatusMapper.FromApiStatus(ship.Nav?.Status);
+            cachedShip.FlightMode = ship.Nav?.FlightMode;
             cachedShip.CooldownExpiresAt = cooldownExpiresAt;
             cachedShip.FuelCurrent = ship.Fuel?.Current ?? 0;
             cachedShip.FuelCapacity = ship.Fuel?.Capacity ?? 0;
@@ -152,15 +161,18 @@ public sealed class StartupSyncService(
     /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static async Task<List<SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet.Ship>> GetAllShipsAsync(
+    /// <summary>Every ship, page by page, and when the page each came in was asked for (B77).</summary>
+    private static async Task<(List<SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet.Ship> Ships, Dictionary<string, DateTimeOffset> FetchedAt)> GetAllShipsAsync(
         ISpaceTradersApiClient apiClient,
         CancellationToken cancellationToken)
     {
         var page = 1;
         var allShips = new List<SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet.Ship>();
+        var fetchedAt = new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase);
 
         while (true)
         {
+            var askedAt = TimeProvider.System.GetUtcNow();
             var response = await apiClient.GetMyShipsAsync(page, ShipPageSize, cancellationToken);
             if (response.Data.Count == 0)
             {
@@ -168,6 +180,10 @@ public sealed class StartupSyncService(
             }
 
             allShips.AddRange(response.Data);
+            foreach (var ship in response.Data)
+            {
+                fetchedAt[ship.Symbol] = askedAt;
+            }
 
             if (allShips.Count >= response.Meta.Total)
             {
@@ -177,7 +193,7 @@ public sealed class StartupSyncService(
             page++;
         }
 
-        return allShips;
+        return (allShips, fetchedAt);
     }
 
     private static async Task EnsureSystemsForShipsAreCachedAsync(

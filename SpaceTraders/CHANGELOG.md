@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-07, B77)
+- Startup sync no longer puts a ship back where it was before an arrival moved it (B77). The ship event scheduler starts first in the startup chain, so an arrival due during a restart is handled while startup sync fetches the ships' pages; the sync saved every ship as its page had it, and a ship that had jumped, flown on or sold meanwhile was stored as before. At the 05:27Z deploy on 2026-10-07 SPECTER-121 was put back at the gate it had jumped from, its next jump was refused and the explore plan left X1-FA16's gate alone for an hour; at the 11:04Z deploy SPECTER-35 was stored in transit for 10 minutes after it had arrived. Now a ship whose row was written after its page was asked for (`LastSyncedAt`) keeps where it is, its cooldown, fuel and cargo; its type, mounts and modules still come from the page.
+
+### Docs – Changed (2026-10-07, B77)
+- `PLAN.md`: B77. `docs/HOW_IT_WORKS.md`: startup sync and the arrivals handled while it runs.
+
 ### Code – Fixed (2026-10-07, B74)
 - `ShipLeftIdle` no longer flags a probe parked at a shipyard (B74). Since slice 6.32 (D110, "Stays parked") a system with fewer probes than markets parks a probe at each shipyard, so a purchase there needs no probe called, and the plan gives it no due market; the rule still took every idle probe in a system with a due market for one the plan could send. On 2026-10-07 at 13:30Z all 52 open `ShipLeftIdle` anomalies were parked probes. The rule now leaves out the probe each shipyard market has in the probe plan's state.
 

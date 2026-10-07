@@ -163,7 +163,10 @@ checks it. The lease is not released on shutdown.
   contracts with their terms, so a restart doesn't blank the deliverables the contract plan works
   from (B31, fixed).
 - **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It
-  leaves their goal columns alone, so ships keep their goals across a restart.
+  leaves their goal columns alone, so ships keep their goals across a restart. The ship event
+  scheduler starts first in the chain, so an arrival due during the restart is handled while the
+  ships' pages are fetched: a ship whose row was written after its page was asked for (`LastSyncedAt`)
+  keeps where it is, its cooldown, fuel and cargo, which are newer than the page (B77).
 - It has no error handling.
 
 **Snapshots** (`GameStateSnapshots`, slice 2.15): a `startup_snapshots` row holds the game state as
