@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-07, B75)
+- A docked explorer goes into orbit before it scans for systems (B75). The API scans only from orbit, and an explorer with nothing left within its ways comes back to the plan docked, after a trade (D102): since 2026-10-06 22:55Z every scan failed with `400 Ship is not currently in orbit`, 38 in a day, and no scan ever found a system (D105). `ExplorePlanService` now takes `IOrbitSubCommand`; a failed orbit counts as a failed scan, tried again after 5 minutes.
+
+### Docs – Changed (2026-10-07, B75)
+- `PLAN.md`: B75. `docs/HOW_IT_WORKS.md`: the scan's orbit.
+
 ### Code – Changed (2026-10-07, slice 6.34)
 - A cargo ship every half hour, before the probes (D116), as asked on 2026-10-07: "I would like to switch priorities between new trade ships and probes. So once every half hour, money permitting, a trade ship is bought, independent on whether probes still need to be bought.", and chosen: "Keep D88's check", "Save up, probes wait", "Keep the turns too". `PurchaseTier.TimedCargoShip` (new, 8) stands after every explorer and before the probes, which move from 8 to 9; the drones and cargo ships that take turns move from 9 to 10 and the far probes from 10 to 11. Beyond `Trade.ShipPurchases`, once a route has waited for a new cargo ship (D88), the trading plan says it needs the largest hold (D112) at `TimedCargoShip` when `Trade.ShipPurchaseIntervalMinutes` (new, 30; 0 or less for 30) have passed since it last bought a cargo ship, of the list or beyond it, or none is on record; till then at `Alternating`, in turn with the drones as before (`BeyondTheListTierAsync`). The credits are saved up for it as for anything in the order, so the probes wait until it is bought.
 - The trading plan's state keeps when it last bought a cargo ship (`TradingAutomationPlanState.LastShipBoughtAt`, new), so a restart doesn't start the half hour again; it reads its state once a pass, before its purchase, and writes it when that changes too.
