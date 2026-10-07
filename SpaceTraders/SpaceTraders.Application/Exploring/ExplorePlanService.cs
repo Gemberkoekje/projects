@@ -876,6 +876,20 @@ public sealed class ExplorePlanService(
                     : entry with { Reason = WaitingForCredits, TargetSystemSymbol = step.TargetSystemSymbol });
 
             case ExploreStepKind.Wait:
+                // B76: something that could change the choice isn't known yet, a gate an exploration has just shown, or a system's
+                // waypoints for a warp; the plan looks, a pass at a time. A free explorer is kept meanwhile, or the role board gives
+                // it the trade role and the trading plan a trip, though systems are left to explore (D102).
+                if (assignment is null)
+                {
+                    await TakeAsync(ship, assignment, here, now, ct);
+                    logger.LogInformation(
+                        "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: waits in {SystemSymbol} until the plan has looked at the gates and systems it has just learned of, then explores.",
+                        JournalEvents.PlanStarted,
+                        AutomationPlan.Explore,
+                        ship.Symbol,
+                        here);
+                }
+
                 return Put(state, entry);
 
             default:
