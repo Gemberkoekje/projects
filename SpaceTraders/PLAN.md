@@ -29,10 +29,11 @@
   of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was
   complete at 2026-10-06 03:17Z. Read from the bot at 2026-10-07 13:30Z: 57.0M credits, the credit reserve 9.4M, 5
   explorers exploring, 464 probes, `Trade.MaxHaulDistance` 9999 (since about 04:35Z).
-- **Merged, not yet deployed:** B74–B77 (below; projects#200–#203, main `05a78d74`, 2026-10-07 14:25Z).
-- **In review:** slice 6.35, a separate ring width (D117), on branch `claude/spacetraders-explore-ring-width`.
-- **Next:** slice 6.36, a purchase that waits for one of our ships lets the ones behind it through (D118).
-- **Done:** phases 0–5, and phase 6's slices 6.1–6.34, listed under [Phases](#phases).
+- **Merged, not yet deployed:** B74–B77 (below; projects#200–#203, main `05a78d74`, 2026-10-07 14:25Z), and slice 6.35,
+  a separate ring width (D117; projects#204, main `0fd5a829`, 14:37Z).
+- **In review:** slice 6.36, a purchase that waits for one of our ships lets the ones behind it through (D118), on branch
+  `claude/spacetraders-waiting-purchase-lets-others-through`.
+- **Done:** phases 0–5, and phase 6's slices 6.1–6.35, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
@@ -281,12 +282,12 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.33 The largest hold, every explorer before the probes, exploring in rings, and trade trips first at the rate limit
   (D112–D115)
 - 6.34 A cargo ship every half hour, before the probes (D116)
-- 6.35 A separate ring width (D117), in review
-- 6.36 A purchase that waits for a ship lets the ones behind it through (D118), planned
+- 6.35 A separate ring width (D117)
+- 6.36 A purchase that waits for a ship lets the ones behind it through (D118), in review
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done, and so are 6.32, asked the same day after them (D108–D111), and 6.33 and 6.34, asked on 2026-10-07 (D112–D116); the
-details of the three are in `docs/archive/PLAN_HISTORY.md`. 6.35 and 6.36, asked the same day, are in review and next:
+details of the three are in `docs/archive/PLAN_HISTORY.md`. So is 6.35, asked the same day (its details are there too); 6.36, asked with it, is in review:
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
@@ -326,27 +327,34 @@ details of the three are in `docs/archive/PLAN_HISTORY.md`. 6.35 and 6.36, asked
   - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
     other systems (D68).
 
-- **6.35 A separate ring width** (D117). Asked on 2026-10-07: "Make a separate ring width setting defaulting to 5,
-  please." Built on branch `claude/spacetraders-explore-ring-width`; the systems dashboard's description of the rings
-  follows in the deploy PR.
-  - Found: the explore plan read the rings' width from the trade reach (`ReachAsync`, D114). With `Trade.MaxHaulDistance`
-    at 9999 since about 04:35Z there was one ring, and each explorer took the system nearest itself: at 13:30Z X1-PY67, 4
-    jumps from home, and X1-YT71 at 5 were still unexplored, and X1-KT12 and X1-SH53, 6 jumps out but one from X1-BC24 where
-    two explorers were bought, too (B76 sent those explorers trading first).
-  - Done: `Explore.RingWidth` (new, 5; 0 or less means 5), read by `RingWidthAsync` in `Exploring/ExplorePlanService.cs`
-    in place of the trade reach; `ExploreAtlas.Next`, `NextByWays` and `Ring` take it as `ringWidth`. The trade reach keeps
-    its other uses (D96, D97, D112).
-  - Expect, once deployed: the explorers take the systems 1 to 5 jumps from home first (X1-PY67, X1-YT71, and the systems
-    behind the gates under construction that count 4 or 5, X1-B53 and X1-PZ19, by warp), then 6 to 10, and so on.
-  - Tests: `ExplorersTests` (rings 1 wide with a trade reach of 9999, 5 wide with a reach of 1, unset means 5),
-    `WarpExplorersTests` (the rings read from the new setting), `ExploreAtlasTests` (the renamed argument),
-    `DefaultSettingsSeedTests` (the new setting).
-  - To understand this, start with `RingWidthAsync` in `Exploring/ExplorePlanService.cs`, then `Ring` in
-    `Exploring/ExploreAtlas.cs`.
-
-- **6.36 A purchase that waits for a ship lets the ones behind it through** (D118), planned: built after 6.35, its own PR.
-  Asked on 2026-10-07: "Yes please, as long as the total doesn't dip below the total needed for the freighter."
-  - The plan: the order ships are bought in (`PurchaseOrder`) passes over an earlier need whose purchase waits for one of
-    our ships at its shipyard (an open call, `ShipyardCalls`, D30), as long as the later purchase leaves the waiting
-    needs' prices and the credit reserve; the purchase itself keeps them too, as the credits move between the order's
-    answer and the purchase.
+- **6.36 A purchase that waits for a ship lets the ones behind it through** (D118). Asked on 2026-10-07, after the day's
+  investigation: "Do you want a purchase that is only waiting for a ship to arrive to let the ones behind it go first?" -
+  "Yes please, as long as the total doesn't dip below the total needed for the freighter." Built on branch
+  `claude/spacetraders-waiting-purchase-lets-others-through`, in review.
+  - Found: the bulk freighter at X1-HB56-C18D (`TimedCargoShip`, 8) waited from 13:17Z to 13:51Z for probe SPECTER-216 to
+    reach the shipyard, as a ship is sold only where one of ours is (D30), with 57M credits against its 2.9M and the 9.4M
+    credit reserve; the probes behind it waited too (D116). Earlier that day the probes had waited 19 minutes behind an
+    explorer the command ship was fetching (D108).
+  - Done:
+    - **The order** (`PurchaseOrder`): a need whose purchase waits for one of our ships at its shipyard
+      (`WaitingForAShip`: the call its purchase made is open, `ShipyardCalls`, D30) no longer holds the needs after it
+      back, as long as their purchase leaves the waiting needs' prices and the credit reserve (`IBudgetPolicy`, with the
+      later need's price and theirs). Anything else before it, or credits short of that, still holds it back, as before.
+    - **The purchase** (`ShipPurchaseService`) keeps the same: the order records what it let a need through with
+      (`PurchaseNeeds.Hold`, `ReportedNeed.Held`), and the purchase adds it to its budget check, with the shipyard's price
+      as it asks it now (`PurchaseNeeds.HeldFor`).
+  - Readings in the build (yours to confirm or change):
+    - **Any plan's purchase** that waits for a ship counts, the explorer the command ship fetches (D108) too.
+    - **Several waiting**: a purchase behind them keeps all their prices, and the reserve once.
+    - **"The total needed"** is the dashboard's "credits needed": the waiting purchase's price as cached, and the credit
+      reserve. When it is bought, it is at the price the shipyard asks then, as every purchase is.
+    - **A purchase that waits for credits** still holds the rest back (D116, "Save up, probes wait").
+    - **A construction load** let through so keeps them when its trip starts; its batches are priced as they go (D81).
+  - Expect, once deployed: while a purchase on the dashboard's purchase order waits for a ship (a `ProbeCalled` line,
+    a probe flying to its shipyard), the purchases after it go on, each leaving its "credits needed".
+  - Tests: `PurchaseOrderTests` (a probe goes before the freighter once its purchase waits for a ship, not before; it
+    waits while it would dip below the freighter's total; with two waiting it leaves both, and the freighter goes before
+    a waiting explorer keeping the explorer's), `ShipPurchaseServiceTests` (the purchase keeps the waiting price beyond
+    the reserve).
+  - To understand this, start with `DecideAsync` and `WaitingForAShip` in `Services/PurchaseOrder.cs`, then `HeldFor`
+    there and its use in `Services/ShipPurchaseService.cs`.

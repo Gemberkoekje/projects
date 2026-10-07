@@ -223,6 +223,9 @@
 - Slice 6.34 (a cargo ship every half hour, before the probes; with your decision D116) is merged (projects#199, main
   `07cf58f3`, 2026-10-07 10:49Z) and deployed by gembernodes#91, with the dashboard's description of the slice (merged
   11:02Z, pod up 11:04Z).
+- B74–B77, found on 2026-10-07 while looking at the anomalies, the purchase order and a trading explorer, are merged
+  (projects#200–#203, main `05a78d74`, 14:25Z), and slice 6.35 (a separate ring width; with your decision D117) too
+  (projects#204, main `0fd5a829`, 14:37Z); none deployed yet.
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -3327,6 +3330,24 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.35 A separate ring width** (built on branch `claude/spacetraders-explore-ring-width`, asked on 2026-10-07, D117;
+  merged as projects#204, main `0fd5a829`; the systems dashboard's description of the rings follows in the deploy PR).
+  Asked: "Make a separate ring width setting defaulting to 5, please."
+  - Found: the explore plan read the rings' width from the trade reach (`ReachAsync`, D114). With `Trade.MaxHaulDistance`
+    at 9999 since about 04:35Z there was one ring, and each explorer took the system nearest itself: at 13:30Z X1-PY67, 4
+    jumps from home, and X1-YT71 at 5 were still unexplored, and X1-KT12 and X1-SH53, 6 jumps out but one from X1-BC24 where
+    two explorers were bought, too (B76 sent those explorers trading first).
+  - Done: `Explore.RingWidth` (new, 5; 0 or less means 5), read by `RingWidthAsync` in `Exploring/ExplorePlanService.cs`
+    in place of the trade reach; `ExploreAtlas.Next`, `NextByWays` and `Ring` take it as `ringWidth`. The trade reach keeps
+    its other uses (D96, D97, D112).
+  - Expect, once deployed: the explorers take the systems 1 to 5 jumps from home first (X1-PY67, X1-YT71, and the systems
+    behind the gates under construction that count 4 or 5, X1-B53 and X1-PZ19, by warp), then 6 to 10, and so on.
+  - Tests: `ExplorersTests` (rings 1 wide with a trade reach of 9999, 5 wide with a reach of 1, unset means 5),
+    `WarpExplorersTests` (the rings read from the new setting), `ExploreAtlasTests` (the renamed argument),
+    `DefaultSettingsSeedTests` (the new setting).
+  - To understand this, start with `RingWidthAsync` in `Exploring/ExplorePlanService.cs`, then `Ring` in
+    `Exploring/ExploreAtlas.cs`.
 
 - **6.34 A cargo ship every half hour, before the probes** (built on branch `ccr-caa38096-yjumz1` in projects and
   gembernodes, asked on 2026-10-07, D116; merged as projects#199, main `07cf58f3`, its dashboard's description and the
