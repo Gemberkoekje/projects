@@ -135,6 +135,13 @@ public sealed record TradingAutomationPlanState
     /// </summary>
     public IReadOnlyList<TradingAutomationGoodNotTradedState> NotTraded { get; init; } = [];
 
+    /// <summary>
+    /// When the plan last bought a cargo ship, of the list or beyond it (slice 6.34, D116): the next beyond the list goes before
+    /// the probes once <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since. Null before its first, and in a state stored
+    /// before slice 6.34.
+    /// </summary>
+    public DateTimeOffset? LastShipBoughtAt { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public required DateTimeOffset UpdatedAt { get; init; }

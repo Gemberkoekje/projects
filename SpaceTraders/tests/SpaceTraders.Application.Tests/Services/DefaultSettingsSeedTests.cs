@@ -54,13 +54,15 @@ public sealed class DefaultSettingsSeedTests
         "Alerts.WebhookUrl",
 
         // Trading (slice 6.5): TradeContextReader (the trading plan and the trade executor), and
-        // MarketWatchService; slice 6.4: TradeContextReader (D24) and TradingAutomationService (D21, D88).
+        // MarketWatchService; slice 6.4: TradeContextReader (D24) and TradingAutomationService (D21, D88, and the cargo ship
+        // on the clock, D116).
         "Trade.MinProfitPerUnit",
         "Market.RefreshMinutes",
         "Trade.FuelReserveCredits",
         "Trade.ShipPurchases",
         "Trade.ShipPurchaseMinRouteProfit",
         "Trade.ShipPurchaseWaitMinutes",
+        "Trade.ShipPurchaseIntervalMinutes",
 
         // Trading across systems (slice 6.29, D96): TradeContextReader's reach, in jumps, and the oldest prices a route counts.
         // The reach also places the probes abroad (ProbeDeploymentPlanService, slice 6.28).
