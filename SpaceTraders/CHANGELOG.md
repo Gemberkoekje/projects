@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-07, B75)
+- A docked explorer goes into orbit before it scans for systems (B75). The API scans only from orbit, and an explorer with nothing left within its ways comes back to the plan docked, after a trade (D102): since 2026-10-06 22:55Z every scan failed with `400 Ship is not currently in orbit`, 38 in a day, and no scan ever found a system (D105). `ExplorePlanService` now takes `IOrbitSubCommand`; a failed orbit counts as a failed scan, tried again after 5 minutes.
+
+### Docs – Changed (2026-10-07, B75)
+- `PLAN.md`: B75, and B74 merged. `docs/HOW_IT_WORKS.md`: the scan's orbit.
+
 ### Code – Fixed (2026-10-07, B74)
 - `ShipLeftIdle` no longer flags a probe parked at a shipyard (B74). Since slice 6.32 (D110, "Stays parked") a system with fewer probes than markets parks a probe at each shipyard, so a purchase there needs no probe called, and the plan gives it no due market; the rule still took every idle probe in a system with a due market for one the plan could send. On 2026-10-07 at 13:30Z all 52 open `ShipLeftIdle` anomalies were parked probes. The rule now leaves out the probe each shipyard market has in the probe plan's state.
 

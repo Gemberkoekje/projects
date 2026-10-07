@@ -427,7 +427,8 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   the plan chooses again, and no warp goes to that system for an hour.
 - **Scanning** (slice 6.31, D105: "Scan when none left"): with nothing left within its ways, an explorer with a warp drive
   and a sensor array scans from where it is (`POST my/ships/{ship}/scan/systems`), once a system, after its cooldown, and
-  the plan keeps it meanwhile. Every system found is cached with its position (`cached_systems`); those within its warps
+  the plan keeps it meanwhile. The API scans only from orbit: a docked explorer, as a trade leaves it (D102), goes into orbit
+  first (`IOrbitSubCommand`, B75). Every system found is cached with its position (`cached_systems`); those within its warps
   (the tank or the drive's range, the less) join the plan's systems (journal `SystemsScanned`). A scan that fails is tried
   again after 5 minutes.
 - **Scouting a system** (`ExploreSystemGoal`): its markets and shipyards with nothing cached yet, and its uncharted
