@@ -382,7 +382,9 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   6 to 10, then 11 to 15, and so on (slice 6.33, D114: "I'd like exploring done in concentric circles based on trade
   distance"; D103 put the first ring first and took the rest as one), the nearest by jumps through built gates in each
   (a jump needs the gates at both ends built), then by symbol; no limit (D59). The jumps are those the systems dashboard
-  shows (`ExploreAtlas.JumpsFromHome`). While a look that could change the choice is still to come, it waits a pass.
+  shows (`ExploreAtlas.JumpsFromHome`). While a look that could change the choice is still to come, it waits a pass; a
+  free explorer, such as one just bought or back from a trade, is taken meanwhile (journal `PlanStarted`, "waits in …"),
+  so the trading plan doesn't send it off while systems are left (B76).
   With nothing left the command ship jumps home (D60), and at home its assignment ends: the other plans give it work
   again; away with no built way home, it waits (`no_way_home`, journaled once, Warning). An explorer with nothing left
   is released where it is and trades from there (D102): trading is its only role (`FleetRoles.PotentialRoles`), never a

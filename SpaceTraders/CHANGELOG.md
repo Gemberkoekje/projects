@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-07, B76)
+- The explore plan keeps a free explorer while it waits to choose its system (B76). While a look that could change the choice is still to come (the gates an exploration has just shown, a system's waypoints for a warp), the plan waits a pass; an explorer of its own waited with its assignment open, but a free one, just bought or back from a trade, was left free, and the trading plan sent it off, though systems were left (D102: it trades only with none left). On 2026-10-07 each of the three explorers bought went trading within half a minute, for 15 to 44 minutes. Now the plan takes it (journal `PlanStarted`, "waits in …").
+
+### Docs – Changed (2026-10-07, B76)
+- `PLAN.md`: B76. `docs/HOW_IT_WORKS.md`: the explore plan's wait.
+
 ### Code – Fixed (2026-10-07, B75)
 - A docked explorer goes into orbit before it scans for systems (B75). The API scans only from orbit, and an explorer with nothing left within its ways comes back to the plan docked, after a trade (D102): since 2026-10-06 22:55Z every scan failed with `400 Ship is not currently in orbit`, 38 in a day, and no scan ever found a system (D105). `ExplorePlanService` now takes `IOrbitSubCommand`; a failed orbit counts as a failed scan, tried again after 5 minutes.
 
