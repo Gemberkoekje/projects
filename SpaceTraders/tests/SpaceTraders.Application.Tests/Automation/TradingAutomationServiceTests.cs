@@ -645,9 +645,11 @@ public sealed class TradingAutomationServiceTests
     [Fact]
     public async Task TheState_IsWrittenOnlyWhenItChanges()
     {
-        // The tick runs every 5 seconds; while nothing happens the plan writes nothing.
+        // The tick runs every 5 seconds; while nothing happens the plan writes nothing. Nothing is bought either: the state keeps
+        // when the plan last bought a cargo ship (D116), and the fleet here wouldn't grow by the shuttle a purchase stands for.
         _activeGoals["SHIP-1"] = new TradeBetweenMarketsGoal { TradeSymbol = "EQUIPMENT", BuyWaypointSymbol = K85, SellWaypointSymbol = D41, Units = 20 };
         Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) });
+        _order.Allows = false;
 
         await RunAsync();
         await RunAsync();
@@ -854,12 +856,14 @@ public sealed class TradingAutomationServiceTests
 
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER", A1, 354_210));
         await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        _state!.LastShipBoughtAt.Should().NotBeNull("the list's ship starts the clock too (D116)");
 
         _purchases.ClearReceivedCalls();
         Fleet(CommandShip(), shuttle, hauler, hauler with { Symbol = "SHIP-7" });
 
         await RunAsync();
 
+        // D116: the list's last ship was bought within the half hour, so the next takes its turn after the probes.
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
         await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
@@ -870,6 +874,7 @@ public sealed class TradingAutomationServiceTests
         // D88, asked on 2026-10-05: "can you add a limitation on buying more trade ships unless a trade ship actually adds value?"
         // The list is bought and every trader is on a trip. A light hauler from A1 would have EQUIPMENT worth more than 10,000:
         // the first pass only notes that it waits; once it has waited 30 minutes, the traders can't keep up, and one is bought.
+        // No purchase of the plan is on record, so the clock lets it go before the probes (D116), but not before D88 does.
         SurveyPlanOn();
         _settings.GetAsync<long>(TradingAutomationService.ShipPurchaseMinRouteProfitSetting, Arg.Any<CancellationToken>()).Returns(10_000L);
         _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
@@ -885,7 +890,7 @@ public sealed class TradingAutomationServiceTests
         _demand.Backdate(TimeSpan.FromMinutes(30));
         await RunAsync();
 
-        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
         await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
 
@@ -904,7 +909,7 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, 1_800_000));
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, 1_800_000));
         await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, Arg.Any<CancellationToken>());
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
@@ -920,7 +925,7 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
         await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
 
@@ -936,7 +941,7 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
     }
 
     [Fact]
@@ -951,13 +956,95 @@ public sealed class TradingAutomationServiceTests
 
         await RunAsync();
 
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
+    }
+
+    [Fact]
+    public async Task BeyondTheList_ACargoShipGoesBeforeTheProbes_OnceHalfAnHourHasPassedSinceThePlanLastBoughtOne()
+    {
+        // Slice 6.34 (D116), asked on 2026-10-07: "I would like to switch priorities between new trade ships and probes. So once
+        // every half hour, money permitting, a trade ship is bought, independent on whether probes still need to be bought." The
+        // plan bought its last cargo ship 31 minutes ago: the next takes its place on the clock, before the probes, and the state
+        // keeps when it was bought, which the next one counts from.
+        BeyondTheListWithTheGates();
+        Shipyards(HomeShipyard());
+        LastBought(TimeSpan.FromMinutes(31));
+        var before = DateTimeOffset.UtcNow;
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
+        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        _state!.LastShipBoughtAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public async Task BeyondTheList_WithinHalfAnHourOfThePlansLastPurchase_ACargoShipTakesItsTurnWithTheDrones()
+    {
+        // D116, "Keep the turns too": till the half hour has passed, the next cargo ship takes turns with the drones after the
+        // probes, as before (D43).
+        BeyondTheListWithTheGates();
+        Shipyards(HomeShipyard());
+        LastBought(TimeSpan.FromMinutes(29));
+
+        await RunAsync();
+
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
+    }
+
+    [Theory]
+    [InlineData(60, 59, PurchaseTier.Alternating)]
+    [InlineData(60, 60, PurchaseTier.TimedCargoShip)]
+    [InlineData(0, 29, PurchaseTier.Alternating)]
+    [InlineData(0, 30, PurchaseTier.TimedCargoShip)]
+    public async Task TheClock_IsTradeShipPurchaseIntervalMinutes_HalfAnHourWhenUnset(int intervalMinutes, int minutesAgo, PurchaseTier tier)
+    {
+        BeyondTheListWithTheGates();
+        Shipyards(HomeShipyard());
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseIntervalMinutesSetting, Arg.Any<CancellationToken>()).Returns(intervalMinutes);
+        LastBought(TimeSpan.FromMinutes(minutesAgo));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Tier.Should().Be(tier);
+    }
+
+    [Fact]
+    public async Task APurchaseThatFails_DoesNotStartTheClock()
+    {
+        // D116: the half hour counts from a ship bought, so the next pass saves up for the same one again.
+        BeyondTheListWithTheGates();
+        Shipyards(HomeShipyard());
+        _purchases.TryPurchaseUnlessScarceAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = false, Failure = ShipPurchaseFailure.OverBudget, FailureReason = "Over budget." });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Tier.Should().Be(PurchaseTier.TimedCargoShip);
+        _state!.LastShipBoughtAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WhenThePlanLastBoughtACargoShip_StaysInItsState_AsItsRoutesChange()
+    {
+        // D116: the clock counts from the plan's last purchase, which its state keeps over a restart; a pass that writes new
+        // routes keeps it too.
+        LastBought(TimeSpan.FromMinutes(10));
+        var boughtAt = _state!.LastShipBoughtAt;
+        _order.Allows = false;
+        Fleet(CommandShip());
+
+        await RunAsync();
+
+        _state.Opportunities.Should().NotBeEmpty();
+        _state.LastShipBoughtAt.Should().Be(boughtAt);
     }
 
     [Fact]
     public async Task BeyondTheList_NoCargoShipIsBought_WhileNoRouteIsWorthTheMinimum()
     {
-        // D88: a market that is stable has only small gaps left; however long they wait, they add no ship.
+        // D88: a market that is stable has only small gaps left; however long they wait, they add no ship. No purchase of the
+        // plan is on record, so the clock would let one go before the probes (D116, "Keep D88's check"): D88 still holds it.
         _settings.GetAsync<long>(TradingAutomationService.ShipPurchaseMinRouteProfitSetting, Arg.Any<CancellationToken>()).Returns(10_000_000L);
         _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
         _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(MapWhereEquipmentFillsAHauler(), 1_000_000));
@@ -1167,7 +1254,8 @@ public sealed class TradingAutomationServiceTests
     /// <summary>
     /// For D112: the list is bought and every trader is on a trip; the gates of <see cref="TradeAcrossFixture"/> lead from home to
     /// X1-CD and on to X1-EF, a probe of ours is parked in one of them (X1-CD's market unless given) while the probe plan is on,
-    /// and the markets there are as the fixture has them, with a million credits.
+    /// and the markets there are as the fixture has them, with a million credits. No purchase of the plan is on record, so the
+    /// next cargo ship goes before the probes (D116) unless the test says when the last was bought (<see cref="LastBought"/>).
     /// </summary>
     private void BeyondTheListWithTheGates(string probeSystem = TradeAcrossFixture.Cd, string probeWaypoint = TradeAcrossFixture.CdMarket)
     {
@@ -1190,6 +1278,16 @@ public sealed class TradingAutomationServiceTests
     }
 
     private void Shipyards(params ShipyardWaypointDto[] shipyards) => _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(shipyards);
+
+    /// <summary>The plan's state as an earlier pass left it, with its last cargo ship bought that long ago (D116).</summary>
+    private void LastBought(TimeSpan ago) => _state = new TradingAutomationPlanState
+    {
+        PlanId = Guid.NewGuid(),
+        Opportunities = [],
+        LastShipBoughtAt = DateTimeOffset.UtcNow - ago,
+        CreatedAt = DateTimeOffset.UtcNow.AddHours(-2),
+        UpdatedAt = DateTimeOffset.UtcNow - ago,
+    };
 
     /// <summary>The fixture's shipyard at A1, home: the shuttle (40) and the hauler (80), and any other ships given.</summary>
     private static ShipyardWaypointDto HomeShipyard(params ShipyardShipDto[] more) => new()

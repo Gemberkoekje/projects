@@ -22,6 +22,9 @@ namespace SpaceTraders.Application.Services;
 ///   extra miners can be built.";</item>
 ///   <item>every explorer the explore plan wants (slice 6.30, D98, D102: one for every 10 systems left to explore), the first
 ///   and every further one before the probes (slice 6.33, D113); the command ship fetches one no probe of ours can (D108);</item>
+///   <item>one more cargo ship with the largest hold, once <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the trading
+///   plan last bought one (slice 6.34, D116): "once every half hour, money permitting, a trade ship is bought, independent on
+///   whether probes still need to be bought";</item>
 ///   <item>a probe for every market (D29): home's, then those of the explored systems within the trade reach (slice 6.28,
 ///   D97);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships with the largest hold (D112), in turn: a drone, a cargo
@@ -411,23 +414,33 @@ public enum PurchaseTier
     Explorer = 7,
 
     /// <summary>
-    /// A probe, until every market has one (D29): home's, then those of the explored systems within the trade reach,
-    /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97).
+    /// One more cargo ship, the largest hold (D112), once <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the trading
+    /// plan last bought one (slice 6.34, D116). Asked on 2026-10-07: "I would like to switch priorities between new trade ships
+    /// and probes. So once every half hour, money permitting, a trade ship is bought, independent on whether probes still need
+    /// to be bought." Only while D88's route has waited for it; till the half hour has passed, the next takes its turn with the
+    /// drones (<see cref="Alternating"/>).
     /// </summary>
-    Probes = 8,
+    TimedCargoShip = 8,
+
+    /// <summary>
+    /// A probe, until every market has one (D29): home's, then those of the explored systems within the trade reach,
+    /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97). 8 until slice 6.34 (D116) put the cargo ship on the
+    /// clock before it.
+    /// </summary>
+    Probes = 9,
 
     /// <summary>
     /// A drone by the miners' rule (D28, D32), or one more cargo ship, in turn: the ship with the largest hold a shipyard within
     /// the trade reach lists, not SCARCE there (slice 6.33, D112).
     /// </summary>
-    Alternating = 9,
+    Alternating = 10,
 
     /// <summary>
     /// A probe for a market of an explored system beyond the trade reach (slice 6.28, D97): "all explored markets when money
     /// allows", last, after the drones and cargo ships that take turns. 11 until slice 6.33 (D113) moved the further explorers,
-    /// which stood at 10, to <see cref="Explorer"/>.
+    /// which stood at 10, to <see cref="Explorer"/>, and 11 again since slice 6.34 (D116) put the cargo ship on the clock at 8.
     /// </summary>
-    FarProbes = 10,
+    FarProbes = 11,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

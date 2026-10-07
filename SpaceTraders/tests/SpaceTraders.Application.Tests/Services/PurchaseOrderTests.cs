@@ -279,11 +279,48 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
-    public void EachTiersNumber_IsItsPositionInTheOrder_TheExplorersBeforeTheProbes()
+    public async Task ACargoShipOnTheClock_ComesAfterTheExplorers_AndBeforeTheProbes_AndTheTurns()
+    {
+        // Slice 6.34 (D116), asked on 2026-10-07: "I would like to switch priorities between new trade ships and probes. So once
+        // every half hour, money permitting, a trade ship is bought, independent on whether probes still need to be bought."
+        // The trading plan says so once Trade.ShipPurchaseIntervalMinutes have passed since it last bought one: the credits are
+        // saved up for it, and the probes, the drones and cargo ships that take turns and the far probes wait. Every explorer
+        // stays before it (D113).
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse("the credits are saved up for the cargo ship");
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("waits for the Trading plan's SHIP_HEAVY_FREIGHTER (TimedCargoShip)", StringComparison.Ordinal));
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"))).Should().BeTrue("every explorer comes first");
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER"))).Should().BeFalse("the explorer waits to be bought");
+
+        _needs.Report(AutomationPlan.Explore, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ACargoShipOnTheClock_DoesNotWaitForTheDronesTurn_WhichComesAfterTheProbes()
+    {
+        // D116, "Keep the turns too": after a cargo ship it is the drones' turn (D43), but the turns come after the probes, and
+        // the cargo ship on the clock before them. Between, the trading plan's cargo ship takes its turn as before.
+        LedgerHolds(("SHIP-3", ShipType.ShipMiningDrone), ("SHIP-4", ShipType.ShipHeavyFreighter));
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_HEAVY_FREIGHTER"))).Should().BeFalse("between, the drones' turn comes first");
+    }
+
+    [Fact]
+    public void EachTiersNumber_IsItsPositionInTheOrder_TheCargoShipOnTheClockBeforeTheProbes()
     {
         // The SpaceTraders dashboard shows the number as the position (spacetraders_purchase_need_credits{position}), and you
         // name the tiers by it: "Explorers (order 10) ... in front of probes (order 8)". Since slice 6.33 (D113) every explorer
-        // is 7, the probes stay 8 and the drones and cargo ships 9, and the far probes, 11 before, are 10.
+        // is 7. Slice 6.34 (D116) put the cargo ship on the clock at 8, before the probes, which moved to 9, the drones and cargo
+        // ships that take turns to 10 and the far probes to 11.
         Enum.GetValues<PurchaseTier>().Should().Equal(
             PurchaseTier.None,
             PurchaseTier.Contract,
@@ -293,10 +330,11 @@ public sealed class PurchaseOrderTests
             PurchaseTier.CargoShips,
             PurchaseTier.Construction,
             PurchaseTier.Explorer,
+            PurchaseTier.TimedCargoShip,
             PurchaseTier.Probes,
             PurchaseTier.Alternating,
             PurchaseTier.FarProbes);
-        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 11));
+        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 12));
     }
 
     [Fact]

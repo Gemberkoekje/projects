@@ -23,18 +23,18 @@
 
 ## Where things stand (2026-10-07)
 
-- **Running:** projects main `4b4cbcad` (projects#197: slice 6.32, shipyards first), deployed by gembernodes#89 with the
-  dashboards' descriptions of the slice (merged 2026-10-06 17:54Z); gembernodes#88 raised the API's CPU and memory limits
-  (restart at 15:37Z that day). The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets),
-  with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. The first explorer,
-  SPECTER-5C, was bought at X1-GT9-AE7B at 14:44Z that day and explores the systems within the trade reach first (X1-GY77
-  at 15:54Z). Nothing was read from the bot since 6.32's deploy.
-- **In review:** slice 6.33 (the largest hold, every explorer before the probes, exploring in rings, trade trips first at
-  the rate limit; D112–D115): projects#198. Its dashboard's descriptions wait on gembernodes' branch `ccr-1ca8b8f2-r8kgby`
-  for the deploy PR, which follows the merge with the new image. In this reset the home gate is built, so it works as soon
-  as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices across systems wait for the new home
-  system's gate (D68).
-- **Done:** phases 0–5, and phase 6's slices 6.1–6.32, listed under [Phases](#phases).
+- **Running:** projects main `27050f8b` (projects#198: slice 6.33, the largest hold, every explorer before the probes,
+  exploring in rings, trade trips first at the rate limit), deployed by gembernodes#90 with the dashboard's descriptions of
+  the slice (merged 2026-10-07 05:24Z); gembernodes#88 raised the API's CPU and memory limits (restart at 2026-10-06
+  15:37Z). The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on
+  (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. The first explorer, SPECTER-5C, was bought
+  at X1-GT9-AE7B at 14:44Z that day and explores the systems within the trade reach first (X1-GY77 at 15:54Z). Nothing was
+  read from the bot since 6.32's deploy.
+- **In review:** slice 6.34 (a cargo ship every half hour, before the probes; D116): projects#199. Its dashboard's
+  description of the order waits on gembernodes' branch `ccr-caa38096-yjumz1` for the deploy PR, which follows the merge
+  with the new image. It works as soon as it is deployed; after the next reset, on 2026-10-11 at
+  13:00Z, it waits behind the new home gate's loads (D64), as the probes do.
+- **Done:** phases 0–5, and phase 6's slices 6.1–6.33, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
@@ -115,7 +115,7 @@ get the next D-number.
 | D40 | Slice 6.9 (asked on 2026-10-02): should contract work stay first for every ship that can mine (D23), or compete on profit? | **Contract first:** "Every ship that can mine, except the survey-role holder, joins the contract while units remain, as now. Roles are compared for the rest of the reset, so a contract can't stall because drones found trading more profitable." D23 kept. |
 | D41 | Slice 6.9 (asked on 2026-10-02): how often does a ship reconsider its role? | **Every 10 minutes, with a head start:** "The whole fleet is re-evaluated every 10 minutes, and at once for a ship whose role has no work for it. A ship's current role gets a 20% head start in the comparison, so close calls don't flip back and forth. Both numbers become settings." (`Roles.ReconsiderMinutes`, `Roles.HeadStartPercent`) A new role takes effect when the ship's trip ends. |
 | D42 | Slice 6.9 (asked on 2026-10-02, during the work): what happens to cargo nothing will sell? Surveyors carried theirs for good (6.4's Noticed), and traders kept what didn't pay for its fuel. | **Sell it, or jettison it:** "if a ship's cargo hold isn't empty and the goods aren't going to be sold or earmarked for another reason, the ship should either go to a waypoint to sell it or, if that's not profitable, jettison it." The contract's ore on a ship that mines for the contract is earmarked; so is a spare-time hold, which the next trip fills on (D37), unless no market it can reach buys it. |
-| D43 | Slice 6.10 (asked on 2026-10-03): "I feel there are too many siphoning drones and not enough other ship types." Each plan buys on its own: drones (~50k) are affordable at ~150k credits, so a light shuttle (114k, needs 214k with the reserve) or a probe (77k, 177k) never was. In what order are ships bought? | **A fixed order** (slice 6.10b): first a designated surveyor (D47); then "at least 1 drone per mineral that is scarce or limited" (D48); "then save up for cargo ships": while a ship in `Trade.ShipPurchases` is still to buy, no probes and no other drones are bought; then probes until every market has one (D29); then "alternate drones and cargo ships": a drone by today's rules (D28, D32), then one more cargo ship of the list's last type, and so on, while minerals stay at or below LIMITED. The contract's drone stays first (D23, D40). **Amended by D112:** the cargo ship is the largest hold within the trade reach that isn't SCARCE. |
+| D43 | Slice 6.10 (asked on 2026-10-03): "I feel there are too many siphoning drones and not enough other ship types." Each plan buys on its own: drones (~50k) are affordable at ~150k credits, so a light shuttle (114k, needs 214k with the reserve) or a probe (77k, 177k) never was. In what order are ships bought? | **A fixed order** (slice 6.10b): first a designated surveyor (D47); then "at least 1 drone per mineral that is scarce or limited" (D48); "then save up for cargo ships": while a ship in `Trade.ShipPurchases` is still to buy, no probes and no other drones are bought; then probes until every market has one (D29); then "alternate drones and cargo ships": a drone by today's rules (D28, D32), then one more cargo ship of the list's last type, and so on, while minerals stay at or below LIMITED. The contract's drone stays first (D23, D40). **Amended by D112:** the cargo ship is the largest hold within the trade reach that isn't SCARCE. **Amended by D116:** beyond the list a cargo ship goes before the probes once every half hour. |
 | D44 | Slice 6.10 (asked on 2026-10-03): "I feel like there should be more profitable trades." In a day, 102 of 176 trades were taken because they feed production (D15), at a median 538 credits against 3,386 for the others; with `Trade.MinProfitPerUnit` at 5 almost any feeding route wins. Change D15? | **Keep D15:** "I feel like there aren't many trades to begin with. I'm not too worried about trades that don't have a lot of profit, as they should feed into trades that are more profitable, and make ships more affordable (by making more of them so the availability becomes better)." Only the command ship trades; more trades come from cargo ships (D43) and from the command ship once a surveyor takes over (D47). |
 | D45 | Slice 6.10 (asked on 2026-10-03): "I'd like a way to add mining/siphoning drones for the minerals outside of fuel range, e.g. by having a drone drift to the marketplace that buys the mineral first, then refueling and resuming normal behavior." Which drones drift where? | **New and free drones, near first** (slice 6.10c): a target out of a drone's CRUISE reach counts when its asteroid is within a CRUISE round trip of the market that buys the ore; it ranks after every reachable target of the same supply level (D28). The drone drifts there once (1 fuel, about ten times slower), refuels, switches back to CRUISE and mines from that market. |
 | D46 | Slice 6.10 (asked on 2026-10-03): "I'd like to see the actual trade profits, so the actual sell − buy − fuel … offset in the same graph by other profit sources such as mining profits (− fuel) and contract profits (preferably − fuel)." Book profit per transaction or per trip? | **Per trip, at its end** (slice 6.10a): a trade, mining, siphon or spare-time trip books its sales − purchases − fuel when it ends, with a journal line; contracts book their payments, and the fuel their ships bought on contract work. No dips from a purchase and its sale landing in different hours. |
@@ -188,6 +188,7 @@ get the next D-number.
 | D113 | Slice 6.33 (asked on 2026-10-07): "I'd like Explorers (order 10) to go in front of probes (order 8)". Order 10 was the further explorers (D102: "First before probes, rest last"), after the drones and cargo ships that take turns; the first stood at 7, after the jump gate's loads. | **Every explorer before the probes** (2026-10-07): every explorer the explore plan wants stands where the first does, 7; the probes keep 8 and the drones and cargo ships 9, and the far probes, 11, become 10. A further explorer can now come before a probe parks at its shipyard (D111), so the command ship fetches it more often (D108). Amends D102. |
 | D114 | Slice 6.33 (asked on 2026-10-07): "I'd like exploring done in concentric circles based on trade distance. So first the first 5 systems as is currently the case, then 6-10, then 11-15 etc." D103 explored the systems within the trade reach of home first, then the rest as one, the nearest first (by the seconds for an explorer that warps, D106). Asked where the systems only a warp reaches stand. | **Rings of the trade reach, a warp-only system in the ring of its gate** ("Ring of their gate (Recommended)", 2026-10-07): rings around home as wide as `Trade.MaxHaulDistance` (1–5 jumps, 6–10, 11–15, and so on), each explored before the next, the nearest to the ship first within a ring. The jumps are those the systems dashboard shows: a system behind a gate under construction counts one more than the system whose gate leads there, and joins that ring; one found by a scan, with no gate known, comes after every ring. Amends D103 and D106. |
 | D115 | Slice 6.33 (asked on 2026-10-07, during the work): "I'd like trade ships to be prioritized in rate limiting. So if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to wait for a miner or a surveyor." D19 put writes before reads, every write alike. | **A trade trip's requests first** (2026-10-07): what a trade trip sends goes before every other request while they wait for the rate limit: another write gives way while one waits and leaves the last 5 of the burst to them, and a read gives way to them as to any write. Read as: a trade ship is a ship on a trade trip, whatever its type; the refreshes of the markets it trades at count with its writes, as they decide its next batch; a write that has given way for 10 seconds stops giving way, as a read does (D19), so the miners can't starve. Amends D19. |
+| D116 | Slice 6.34 (asked on 2026-10-07): "I would like to switch priorities between new trade ships and probes. So once every half hour, money permitting, a trade ship is bought, independent on whether probes still need to be bought." The probes within the trade reach stood at 8, before the drones and cargo ships that take turns (9), so beyond `Trade.ShipPurchases` no cargo ship was bought while one of those probes was still to buy: about 66 markets on 2026-10-06 (D108). Asked whether D88's wait for a route still holds, whether the probes wait while the credits are saved up for the cargo ship (the largest hold, D112, can cost about 1.8M, a probe about 30k), and whether the cargo ships still take turns with the drones after the probes. | **A cargo ship every half hour, before the probes** ("Keep D88's check (Recommended)", "Save up, probes wait (Recommended)", "Keep the turns too (Recommended)", 2026-10-07): beyond the list, once a route has waited for it (D88), the next cargo ship, the largest hold (D112), goes at a new place, 8, after every explorer and before the probes, when `Trade.ShipPurchaseIntervalMinutes` (new, 30) have passed since the trading plan last bought a cargo ship; the credits are saved up for it, and the probes wait. Till the half hour has passed it takes its turn with the drones after the probes, as before. The probes move to 9, the turns to 10 and the far probes to 11. Read as: the half hour counts from the plan's last cargo ship, of the list or beyond it, and with none on record (as after the deploy) the next goes at once; "money permitting" is the credit reserve every purchase keeps (D51). Amends D43. |
 
 ## Phases
 
@@ -274,11 +275,12 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.32 Shipyards first: the command ship fetches every explorer no probe can, and the probes park at the shipyards
   (D108–D111)
 - 6.33 The largest hold, every explorer before the probes, exploring in rings, and trade trips first at the rate limit
-  (D112–D115), in review (projects#198)
+  (D112–D115)
+- 6.34 A cargo ship every half hour, before the probes (D116), in review (projects#199)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
-done, and so is 6.32, asked the same day after them (D108–D111; its details are in `docs/archive/PLAN_HISTORY.md`); 6.33,
-asked on 2026-10-07, is in review:
+done, and so are 6.32, asked the same day after them (D108–D111), and 6.33, asked on 2026-10-07 (D112–D115; the details of
+both are in `docs/archive/PLAN_HISTORY.md`); 6.34, asked the same day, is in review:
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
@@ -318,96 +320,52 @@ asked on 2026-10-07, is in review:
   - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
     other systems (D68).
 
-- **6.33 The largest hold, explorers before probes, rings, and trade trips first** (D112–D115). Asked on 2026-10-07:
-  "For spacetraders: - when buying a new trade ship (purchasing order 9) it should pick whatever the known ship with the
-  highest cargo capacity is, as long as it is not scarce. - I'd like Explorers (order 10) to go in front of probes
-  (order 8) - I'd like exploring done in concentric circles based on trade distance. So first the first 5 systems as is
-  currently the case, then 6-10, then 11-15 etc.", and during the work: "I'd like trade ships to be prioritized in rate
-  limiting. So if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to wait for a miner or a
-  surveyor." Built on branch `ccr-1ca8b8f2-r8kgby` in projects, in review as projects#198; the dashboard's descriptions
-  are on the same branch in gembernodes, for the deploy PR.
+- **6.34 A cargo ship every half hour, before the probes** (D116). Asked on 2026-10-07: "I would like to switch priorities
+  between new trade ships and probes. So once every half hour, money permitting, a trade ship is bought, independent on
+  whether probes still need to be bought." Built on branch `ccr-caa38096-yjumz1` in projects, in review as projects#199;
+  the dashboard's description of the order is on the same branch in gembernodes, for the deploy PR.
   - Found (in the code; nothing was read from the bot, which this session can't reach):
-    - The order's numbers are the dashboard's positions (`PurchaseTier`): 8 the probes, 9 the drones and cargo ships
-      that take turns, 10 the further explorers (`MoreExplorers`), 11 the far probes. Since D108 only their place told
-      the first and the further explorers apart.
-    - At 9, beyond `Trade.ShipPurchases`, the trading plan bought one more of the list's last type at the cheapest
-      shipyard at home (`BuyCargoShipAsync`). The turn counted as cargo ships only the list's types and the shuttles and
-      haulers (`PurchaseOrder.Turn`): a refining or bulk freighter bought there would have left the cargo ships' turn
-      standing, and the drones waiting for good. `SHIP_BULK_FREIGHTER` wasn't in the domain's `ShipType`, so a purchase
-      of one would have gone into the ledger as `None`.
-    - The explorers took the systems within the trade reach first and the rest as one (D103, D106).
-    - The rate limiter knew writes and reads (D19, `RateLimitingHandler`), every write alike. A flight's arrival, with
-      the market refresh and the dock, runs from the scheduler's wake-up, apart from the goal's steps.
-  - Asked on 2026-10-07, all as recommended: "Within the trade reach" and "Next largest" (D112), "Ring of their gate"
-    (D114).
+    - The order's positions (`PurchaseTier`): 7 every explorer, 8 the probes of home and the trade reach, 9 the drones and
+      cargo ships that take turns, 10 the far probes. Beyond `Trade.ShipPurchases` the trading plan said what it needed
+      only at 9 (`BuyCargoShipAsync`), so no cargo ship was bought while a probe within the trade reach was still to buy:
+      on 2026-10-06 the trade reach had about 66 markets (D108).
+    - Beyond the list a cargo ship is a need only once a route worth `Trade.ShipPurchaseMinRouteProfit` has waited
+      `Trade.ShipPurchaseWaitMinutes` for a ship with every trader busy (D88, `TradeShipDemand`).
+    - The gate's miners' "once every half hour" (D92) counts from the last one bought, which the mining plan's state keeps;
+      nothing kept when the trading plan last bought a ship.
+  - Asked on 2026-10-07, all as recommended: "Keep D88's check", "Save up, probes wait", "Keep the turns too" (D116).
   - Done:
-    - **The largest hold** (D112; `LargestHoldAsync`, `AnsweredAsync` and `AsBought` in
-      `Automation/TradingAutomationService.cs`): beyond the list, the shipyards within the trade reach of home through
-      the built gates (`ExploreAtlas.Reachable`), home and every system a probe of ours counts for
-      (`ProbePlanner.Whereabouts`, from the goals the pass reads anyway) while the probe plan is on; their ships with a
-      price and a hold that would be cargo ships (`FleetRoles.IsCargoShip` on the ship as bought) and aren't SCARCE
-      there as cached; the largest hold, then the cheapest, then the nearest to home. The purchase goes through
-      `TryPurchaseUnlessScarceAsync` (new, in `Services/ShipPurchaseService.cs`), which refuses a ship the shipyard,
-      fetched again, lists SCARCE (`Scarce`). The list's ships are bought as before (`ListedAsync`).
-      `PurchaseOrder.Turn` counts every ship but a drone, a probe, a surveyor or an explorer as a cargo ship;
-      `ShipType.ShipBulkFreighter` (new).
-    - **Every explorer before the probes** (D113; `PurchaseTier`, `BuyAsync` in `Exploring/ExplorePlanService.cs`):
-      `MoreExplorers` is gone; every explorer is an `Explorer` need (7); `FarProbes` is 10.
-    - **Rings** (D114; `Ring`, `Next` and `NextByWays` in `Exploring/ExploreAtlas.cs`): a system's ring is its jumps
-      from home (`JumpsFromHome`) over the trade reach, rounded up; every exploring ship takes the nearest ring first,
-      and within it the system nearest to it, by jumps, or by the seconds for an explorer that warps; a system no known
-      gate leads to comes after every ring.
-    - **Trade trips first** (D115; `ApiPriority` (new, `Ports/ApiPriority.cs`), `RateLimitingHandler`,
-      `RequestBudget.TradeReserve` and `TradeRequestsWaiting`): a trade trip's steps (`ShipGoalExecutorService`) and its
-      flights' departures and arrivals (`NavigateToWaypointHandler`, `NavigateToWaypointArrivedHandler`) mark their
-      requests with an `AsyncLocal`, which flows into the handler. A marked request never gives way; another write gives
-      way while one waits, for 10 seconds at most (`MaxWriteDelay`), and leaves the last 5 of the burst to them; a read
-      gives way to them as to any write. Their waits are counted as `kind` `trade` in
-      `spacetraders_api_rate_limit_wait_seconds_total`.
-    - gembernodes: the purchase order's description on the SpaceTraders dashboard gives the new positions, and its rate
-      limit graph shows the seconds waited per minute by kind.
+    - **The cargo ship on the clock** (D116; `BeyondTheListTierAsync` in `Automation/TradingAutomationService.cs`,
+      `PurchaseTier.TimedCargoShip`): beyond the list, once D88's route has waited, the trading plan says it needs the
+      largest hold (D112) at `TimedCargoShip` (8) when `Trade.ShipPurchaseIntervalMinutes` (new, 30; 0 or less means 30)
+      have passed since it last bought a cargo ship, or none is on record, and at `Alternating` otherwise, as before. The
+      probes are 9, the turns 10 and the far probes 11.
+    - **When the plan last bought one** (`TradingAutomationPlanState.LastShipBoughtAt`, new): every cargo ship the trading
+      plan buys, the list's too, sets it; the plan reads its state once a pass, before its purchase, and writes it when the
+      routes, the goods not traded or this change.
+    - gembernodes: the purchase order's description on the SpaceTraders dashboard gives the new positions.
   - Readings in the build (yours to confirm or change):
-    - **"Known ship"** is a ship a shipyard lists with its hold. A shipyard lists its ships' details only while a ship
-      of ours is there, and the probes park at the shipyards within the trade reach (D110), so it is mostly every
-      shipyard there.
-    - **Abroad, only where a probe answers**: a purchase at a shipyard with none of our ships calls for one (D30), which
-      only a probe in that system answers; elsewhere it would wait for good and hold the drones' turn.
-    - **A trade ship is a cargo ship**: a ship with a mining laser, a siphon or a surveyor would get those roles (D58,
-      D38) whatever its hold, and an explorer explores, so neither is bought here.
-    - **SCARCE, as cached, then fetched**: the choice goes by the cached supply; the purchase fetches the shipyard again
-      and refuses a ship it lists SCARCE then, and the next pass takes the next largest. A shipyard is fetched when one
-      of our ships arrives there and before a purchase, so a SCARCE in the cache can be old: it keeps the ship out until
-      then.
-    - **Order 10 to 7, not between 7 and 8**: every explorer takes the first's place, so the probes keep 8 and the cargo
-      ships 9 as you know them; the far probes move from 11 to 10.
-    - **A trade ship for the rate limit is a ship on a trade trip**, whatever its type (the command ship or a drone on
-      one included); the refresh of the market it trades at goes first with its writes, as it decides the next batch; a
-      jettison, or anything else outside the trip's steps and flights, isn't marked.
-    - **Another write stops giving way after 10 seconds**, as a read does (D19), so a busy trading fleet can't starve
-      the miners and the surveyors.
+    - **"Once every half hour"** counts from the trading plan's last cargo ship, of the list or beyond it, as the gate's
+      miners count from their last (D92), not by the clock's half hours; a shuttle the mining plan buys for a collection
+      point (D83) doesn't count. With no purchase on record, as after the deploy, the next goes before the probes at once.
+    - **Money permitting** is the credit reserve every purchase keeps (D51); the credits are saved up for the cargo ship
+      as you chose, and a purchase that fails leaves the half hour where it was.
+    - **Before the probes only**: every explorer (7, D113) and the jump gate's loads (6, D64) stay before it.
+    - **`Trade.ShipPurchaseIntervalMinutes` at 0 or less means half an hour**, as `Mining.GateMinerIntervalMinutes` does;
+      a large value puts the cargo ships back after the probes.
   - Expect, once deployed:
-    - beyond the list, the next cargo ship is the largest hold the shipyards within the trade reach list (the markets
-      dashboard's shipyards table shows each ship's cargo), bought where a probe of ours is;
-    - while the explore plan wants another explorer, it comes before the probes (position 7 on the dashboard), and the
-      command ship fetches it where no probe of ours is in the shipyard's system;
-    - the explorers finish the systems 1 to 5 jumps from home, then go to those 6 to 10 away, before 11 to 15;
-    - `spacetraders_api_rate_limit_wait_seconds_total{kind="trade"}` stays small next to `write`.
-  - Tests: `TradingAutomationServiceTests` (beyond the list the largest hold within the trade reach where a probe of
-    ours answers, not where none does; a SCARCE one left out for the next largest; a ship with a mining laser and an
-    explorer left out; a shipyard beyond the reach left out), `ShipPurchaseServiceTests` (a cargo ship the shipyard
-    lists SCARCE when fetched again isn't bought; one not SCARCE is; `SHIP_BULK_FREIGHTER` read), `PurchaseOrderTests`
-    (after a heavy, bulk or refining freighter the drones' turn; an explorer doesn't take turns; a further explorer
-    before the probes and the turns; the positions 0 to 10), `ExplorersTests` (a further explorer's need is an
-    `Explorer` one), `ExploreAtlasTests` (the rings in turn, the nearest to the ship first in each; a ring's width),
-    `WarpExplorersTests` (a system behind a gate under construction in the ring of its gate; one found by a scan after
-    every ring), `RateLimitHandlerTests` (another write gives way to a trade trip's request, at most its limit; a trade
-    trip's sale and market refresh give way to none; a read gives way to one; its wait counted as `trade`; the trade
-    trips' reserve), `ShipGoalExecutorServiceTests` (a trade trip's step is marked, a mining trip's isn't),
-    `TradeFlightPriorityTests` (a trade trip's refuel, orbit, flight, arrival refresh and dock are marked, with no mark
-    around the handlers; a mining trip's aren't).
-  - To understand this, start with `LargestHoldAsync` in `Automation/TradingAutomationService.cs`, then `PurchaseTier`
-    and `Turn` in `Services/PurchaseOrder.cs`, then `Ring` in `Exploring/ExploreAtlas.cs`, then `ApiPriority` and
-    `WaitForBudgetAsync` in `Infrastructure.SpaceTradersAPI/RateLimiting/RateLimitingHandler.cs`.
-  - Done when: a cargo ship beyond the list is the largest hold within the trade reach that isn't SCARCE, the explorers
-    wanted are bought before the probes, the explorers finish each ring before the next, and a trade ship's requests
-    wait less than the others'.
+    - while a route has waited for a ship (D88), the Trading plan's row on the dashboard's purchase order at position 8
+      (`TimedCargoShip`), the probes' at 9 waiting behind it, until the cargo ship is bought;
+    - then probes for half an hour, the Trading plan's row at 10 (`Alternating`) while a route waits;
+    - a cargo ship about every half hour while the credits keep up and routes keep waiting.
+  - Tests: `PurchaseOrderTests` (the cargo ship on the clock after every explorer and before the probes, the turns and the
+    far probes; it doesn't wait for the drones' turn, which comes first between; the positions 0 to 11),
+    `TradingAutomationServiceTests` (31 minutes after the plan's last purchase the largest hold goes before the probes and
+    the state keeps the new purchase; at 29 minutes it takes its turn; the setting at 60, and unset; a purchase that fails
+    doesn't start the half hour; the time stays in the state as the routes change; the list's ship starts the half hour;
+    with none on record the largest hold goes before the probes; D88 still holds it back), `DefaultSettingsSeedTests` (the
+    new setting), `PrometheusMetricsTests` (the probes at 9).
+  - To understand this, start with `BeyondTheListTierAsync` and `BuyCargoShipAsync` in
+    `Automation/TradingAutomationService.cs`, then `PurchaseTier` in `Services/PurchaseOrder.cs`.
+  - Done when: while probes wait to be bought, a cargo ship is bought about every half hour that a route waits for one,
+    and the probes in between.

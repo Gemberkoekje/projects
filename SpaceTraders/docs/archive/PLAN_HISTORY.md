@@ -6,7 +6,7 @@
 > still to build. The text
 > is as it stood in `PLAN.md`, so "below", "above" and "the table" in it point within that file as it was.
 
-## Where things stood, 2026-10-01 to 2026-10-06
+## Where things stood, 2026-10-01 to 2026-10-07
 
 - The bot was taken off the cluster on 2026-05-26 (gembernodes `906fd99`), and its manifests were
   removed on 2026-09-26 (`3f9f785`). The 1Password item `spacetraders-secrets` still exists.
@@ -217,6 +217,9 @@
   D106), and at 15:54Z it found a second shipyard that sells explorers, X1-GY77-A2.
 - Slice 6.32 (shipyards first; with your decisions D108–D111) is merged (projects#197, main `4b4cbcad`, 2026-10-06
   17:45Z) and deployed by gembernodes#89, with the dashboards' descriptions of the slice (merged 17:54Z).
+- Slice 6.33 (the largest hold, every explorer before the probes, exploring in rings, trade trips first at the rate limit;
+  with your decisions D112–D115) is merged (projects#198, main `27050f8b`, 2026-10-07 05:19Z) and deployed by
+  gembernodes#90, with the dashboard's descriptions of the slice (merged 05:24Z).
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -3321,6 +3324,101 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.33 The largest hold, explorers before probes, rings, and trade trips first** (built on branch `ccr-1ca8b8f2-r8kgby`
+  in projects and gembernodes, asked on 2026-10-07, D112–D115; merged as projects#198, main `27050f8b`, its dashboard's
+  descriptions and the deploy as gembernodes#90, merged 2026-10-07 05:24Z).
+  Asked: "For spacetraders: - when buying a new trade ship (purchasing order 9) it should pick whatever the known ship with
+  the highest cargo capacity is, as long as it is not scarce. - I'd like Explorers (order 10) to go in front of probes
+  (order 8) - I'd like exploring done in concentric circles based on trade distance. So first the first 5 systems as is
+  currently the case, then 6-10, then 11-15 etc.", and during the work: "I'd like trade ships to be prioritized in rate
+  limiting. So if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to wait for a miner or a
+  surveyor."
+  - Found (in the code; nothing was read from the bot, which this session can't reach):
+    - The order's numbers are the dashboard's positions (`PurchaseTier`): 8 the probes, 9 the drones and cargo ships
+      that take turns, 10 the further explorers (`MoreExplorers`), 11 the far probes. Since D108 only their place told
+      the first and the further explorers apart.
+    - At 9, beyond `Trade.ShipPurchases`, the trading plan bought one more of the list's last type at the cheapest
+      shipyard at home (`BuyCargoShipAsync`). The turn counted as cargo ships only the list's types and the shuttles and
+      haulers (`PurchaseOrder.Turn`): a refining or bulk freighter bought there would have left the cargo ships' turn
+      standing, and the drones waiting for good. `SHIP_BULK_FREIGHTER` wasn't in the domain's `ShipType`, so a purchase
+      of one would have gone into the ledger as `None`.
+    - The explorers took the systems within the trade reach first and the rest as one (D103, D106).
+    - The rate limiter knew writes and reads (D19, `RateLimitingHandler`), every write alike. A flight's arrival, with
+      the market refresh and the dock, runs from the scheduler's wake-up, apart from the goal's steps.
+  - Asked on 2026-10-07, all as recommended: "Within the trade reach" and "Next largest" (D112), "Ring of their gate"
+    (D114).
+  - Done:
+    - **The largest hold** (D112; `LargestHoldAsync`, `AnsweredAsync` and `AsBought` in
+      `Automation/TradingAutomationService.cs`): beyond the list, the shipyards within the trade reach of home through
+      the built gates (`ExploreAtlas.Reachable`), home and every system a probe of ours counts for
+      (`ProbePlanner.Whereabouts`, from the goals the pass reads anyway) while the probe plan is on; their ships with a
+      price and a hold that would be cargo ships (`FleetRoles.IsCargoShip` on the ship as bought) and aren't SCARCE
+      there as cached; the largest hold, then the cheapest, then the nearest to home. The purchase goes through
+      `TryPurchaseUnlessScarceAsync` (new, in `Services/ShipPurchaseService.cs`), which refuses a ship the shipyard,
+      fetched again, lists SCARCE (`Scarce`). The list's ships are bought as before (`ListedAsync`).
+      `PurchaseOrder.Turn` counts every ship but a drone, a probe, a surveyor or an explorer as a cargo ship;
+      `ShipType.ShipBulkFreighter` (new).
+    - **Every explorer before the probes** (D113; `PurchaseTier`, `BuyAsync` in `Exploring/ExplorePlanService.cs`):
+      `MoreExplorers` is gone; every explorer is an `Explorer` need (7); `FarProbes` is 10.
+    - **Rings** (D114; `Ring`, `Next` and `NextByWays` in `Exploring/ExploreAtlas.cs`): a system's ring is its jumps
+      from home (`JumpsFromHome`) over the trade reach, rounded up; every exploring ship takes the nearest ring first,
+      and within it the system nearest to it, by jumps, or by the seconds for an explorer that warps; a system no known
+      gate leads to comes after every ring.
+    - **Trade trips first** (D115; `ApiPriority` (new, `Ports/ApiPriority.cs`), `RateLimitingHandler`,
+      `RequestBudget.TradeReserve` and `TradeRequestsWaiting`): a trade trip's steps (`ShipGoalExecutorService`) and its
+      flights' departures and arrivals (`NavigateToWaypointHandler`, `NavigateToWaypointArrivedHandler`) mark their
+      requests with an `AsyncLocal`, which flows into the handler. A marked request never gives way; another write gives
+      way while one waits, for 10 seconds at most (`MaxWriteDelay`), and leaves the last 5 of the burst to them; a read
+      gives way to them as to any write. Their waits are counted as `kind` `trade` in
+      `spacetraders_api_rate_limit_wait_seconds_total`.
+    - gembernodes: the purchase order's description on the SpaceTraders dashboard gives the new positions, and its rate
+      limit graph shows the seconds waited per minute by kind.
+  - Readings in the build (yours to confirm or change):
+    - **"Known ship"** is a ship a shipyard lists with its hold. A shipyard lists its ships' details only while a ship
+      of ours is there, and the probes park at the shipyards within the trade reach (D110), so it is mostly every
+      shipyard there.
+    - **Abroad, only where a probe answers**: a purchase at a shipyard with none of our ships calls for one (D30), which
+      only a probe in that system answers; elsewhere it would wait for good and hold the drones' turn.
+    - **A trade ship is a cargo ship**: a ship with a mining laser, a siphon or a surveyor would get those roles (D58,
+      D38) whatever its hold, and an explorer explores, so neither is bought here.
+    - **SCARCE, as cached, then fetched**: the choice goes by the cached supply; the purchase fetches the shipyard again
+      and refuses a ship it lists SCARCE then, and the next pass takes the next largest. A shipyard is fetched when one
+      of our ships arrives there and before a purchase, so a SCARCE in the cache can be old: it keeps the ship out until
+      then.
+    - **Order 10 to 7, not between 7 and 8**: every explorer takes the first's place, so the probes keep 8 and the cargo
+      ships 9 as you know them; the far probes move from 11 to 10.
+    - **A trade ship for the rate limit is a ship on a trade trip**, whatever its type (the command ship or a drone on
+      one included); the refresh of the market it trades at goes first with its writes, as it decides the next batch; a
+      jettison, or anything else outside the trip's steps and flights, isn't marked.
+    - **Another write stops giving way after 10 seconds**, as a read does (D19), so a busy trading fleet can't starve
+      the miners and the surveyors.
+  - Expect, once deployed:
+    - beyond the list, the next cargo ship is the largest hold the shipyards within the trade reach list (the markets
+      dashboard's shipyards table shows each ship's cargo), bought where a probe of ours is;
+    - while the explore plan wants another explorer, it comes before the probes (position 7 on the dashboard), and the
+      command ship fetches it where no probe of ours is in the shipyard's system;
+    - the explorers finish the systems 1 to 5 jumps from home, then go to those 6 to 10 away, before 11 to 15;
+    - `spacetraders_api_rate_limit_wait_seconds_total{kind="trade"}` stays small next to `write`.
+  - Tests: `TradingAutomationServiceTests` (beyond the list the largest hold within the trade reach where a probe of
+    ours answers, not where none does; a SCARCE one left out for the next largest; a ship with a mining laser and an
+    explorer left out; a shipyard beyond the reach left out), `ShipPurchaseServiceTests` (a cargo ship the shipyard
+    lists SCARCE when fetched again isn't bought; one not SCARCE is; `SHIP_BULK_FREIGHTER` read), `PurchaseOrderTests`
+    (after a heavy, bulk or refining freighter the drones' turn; an explorer doesn't take turns; a further explorer
+    before the probes and the turns; the positions 0 to 10), `ExplorersTests` (a further explorer's need is an
+    `Explorer` one), `ExploreAtlasTests` (the rings in turn, the nearest to the ship first in each; a ring's width),
+    `WarpExplorersTests` (a system behind a gate under construction in the ring of its gate; one found by a scan after
+    every ring), `RateLimitHandlerTests` (another write gives way to a trade trip's request, at most its limit; a trade
+    trip's sale and market refresh give way to none; a read gives way to one; its wait counted as `trade`; the trade
+    trips' reserve), `ShipGoalExecutorServiceTests` (a trade trip's step is marked, a mining trip's isn't),
+    `TradeFlightPriorityTests` (a trade trip's refuel, orbit, flight, arrival refresh and dock are marked, with no mark
+    around the handlers; a mining trip's aren't).
+  - To understand this, start with `LargestHoldAsync` in `Automation/TradingAutomationService.cs`, then `PurchaseTier`
+    and `Turn` in `Services/PurchaseOrder.cs`, then `Ring` in `Exploring/ExploreAtlas.cs`, then `ApiPriority` and
+    `WaitForBudgetAsync` in `Infrastructure.SpaceTradersAPI/RateLimiting/RateLimitingHandler.cs`.
+  - Done when: a cargo ship beyond the list is the largest hold within the trade reach that isn't SCARCE, the explorers
+    wanted are bought before the probes, the explorers finish each ring before the next, and a trade ship's requests
+    wait less than the others'.
 
 - **6.32 Shipyards first** (built on branch `claude/spacetraders-shipyard-probes`, asked on 2026-10-06, D108–D111; merged as
   projects#197, main `4b4cbcad`, its dashboards' descriptions and the deploy as gembernodes#89, merged 2026-10-06 17:54Z).

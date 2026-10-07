@@ -62,7 +62,9 @@ public interface ITradingAutomationService
 /// when no trader is left without a trip and a new ship would have a lucrative route from the shipyard, it
 /// buys the next type in <c>Trade.ShipPurchases</c>, and once the list is bought the ship with the largest hold that a
 /// shipyard within the trade reach lists, not SCARCE there (slice 6.33, D112), one at a time and within the credit reserve,
-/// when the order ships are bought in lets it (D43, <see cref="IPurchaseOrder"/>).
+/// when the order ships are bought in lets it (D43, <see cref="IPurchaseOrder"/>): beyond the list before the probes once
+/// <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since its last cargo ship, else in turn with the drones (slice 6.34,
+/// D116).
 /// </remarks>
 public sealed class TradingAutomationService(
     IShipRepository ships,
@@ -114,6 +116,15 @@ public sealed class TradingAutomationService(
     /// (D88).
     /// </summary>
     public const string ShipPurchaseWaitMinutesSetting = "Trade.ShipPurchaseWaitMinutes";
+
+    /// <summary>
+    /// The setting for how long after the plan's last cargo ship the next one beyond the list goes before the probes (slice 6.34,
+    /// D116): "once every half hour".
+    /// </summary>
+    public const string ShipPurchaseIntervalMinutesSetting = "Trade.ShipPurchaseIntervalMinutes";
+
+    /// <summary>Half an hour, as asked, while <c>Trade.ShipPurchaseIntervalMinutes</c> isn't set above 0 (D116).</summary>
+    private const int DefaultShipPurchaseIntervalMinutes = 30;
 
     /// <summary>Credits that buy a full hold of anything: whether a new cargo ship would have work, whatever the credits now.</summary>
     private const long AnyCredits = long.MaxValue / 4;
@@ -269,10 +280,21 @@ public sealed class TradingAutomationService(
             }
         }
 
-        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        await BuyCargoShipAsync(fleet, goalsOf, board, BusinessSystems.Of(await agents.GetAsync(cancellationToken)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
+        // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04). The state says when the
+        // plan last bought a cargo ship, which the next one beyond the list counts its half hour from (D116).
+        var existing = await plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, cancellationToken);
+        var boughtAt = await BuyCargoShipAsync(
+            fleet,
+            goalsOf,
+            board,
+            BusinessSystems.Of(await agents.GetAsync(cancellationToken)),
+            heldKeys,
+            HeldBuysOf(held, constructionTrips),
+            idle,
+            existing?.LastShipBoughtAt,
+            cancellationToken);
 
-        await SaveStateAsync(held, pending, judged, cancellationToken);
+        await SaveStateAsync(existing, held, pending, judged, boughtAt ?? existing?.LastShipBoughtAt, cancellationToken);
     }
 
     /// <summary>
@@ -357,9 +379,13 @@ public sealed class TradingAutomationService(
     /// with the credits left after it. The purchase keeps the credit reserve (<c>FleetExpansion.MinCreditReserve</c>,
     /// <see cref="IShipPurchaseService"/>). The order ships are bought in decides when (<see cref="IPurchaseOrder"/>): a ship
     /// of the list is saved up for, whatever the routes, after the contract's drone, a surveyor and a drone for each scarce
-    /// mineral; a ship beyond the list takes turns with the drones, and needs nothing until a route has waited so.
+    /// mineral; a ship beyond the list needs nothing until a route has waited so, and then goes before the probes once
+    /// <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the plan last bought one (slice 6.34, D116,
+    /// <see cref="BeyondTheListTierAsync"/>), and till then takes turns with the drones after them.
     /// </summary>
-    private async Task BuyCargoShipAsync(
+    /// <param name="lastBoughtAt">When the plan last bought a cargo ship, as its state keeps it; null for none on record.</param>
+    /// <returns>When this pass bought one; null when it bought none.</returns>
+    private async Task<DateTimeOffset?> BuyCargoShipAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyDictionary<string, ShipGoal?> goalsOf,
         FleetRoleBoard board,
@@ -367,6 +393,7 @@ public sealed class TradingAutomationService(
         IReadOnlySet<string> heldKeys,
         HeldBuys heldBuys,
         int idle,
+        DateTimeOffset? lastBoughtAt,
         CancellationToken cancellationToken)
     {
         var purchases = (await settings.GetAsync<string>(ShipPurchasesSetting, cancellationToken) ?? string.Empty)
@@ -374,7 +401,7 @@ public sealed class TradingAutomationService(
         if (purchases.Length == 0)
         {
             await purchaseOrder.ReportAsync(AutomationPlan.Trading, PurchaseNeed.None, cancellationToken);
-            return;
+            return null;
         }
 
         // A shuttle collecting at a far asteroid (D83) was bought for that, not from the list.
@@ -386,7 +413,7 @@ public sealed class TradingAutomationService(
         if (offer is not { } found)
         {
             await purchaseOrder.ReportAsync(AutomationPlan.Trading, PurchaseNeed.None, cancellationToken);
-            return;
+            return null;
         }
 
         // Slice 6.29 (D96): a cargo ship trades across the systems in reach, so the routes that wait for one count there too.
@@ -407,11 +434,15 @@ public sealed class TradingAutomationService(
         var hasWork = idle == 0
             && waited >= TimeSpan.FromMinutes(await settings.GetAsync<int>(ShipPurchaseWaitMinutesSetting, cancellationToken));
         var need = inList || hasWork
-            ? new PurchaseNeed(inList ? PurchaseTier.CargoShips : PurchaseTier.Alternating, shipType, shipyard.WaypointSymbol, forSale.PurchasePrice)
+            ? new PurchaseNeed(
+                inList ? PurchaseTier.CargoShips : await BeyondTheListTierAsync(lastBoughtAt, cancellationToken),
+                shipType,
+                shipyard.WaypointSymbol,
+                forSale.PurchasePrice)
             : PurchaseNeed.None;
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Trading, need, cancellationToken) || idle > 0)
         {
-            return;
+            return null;
         }
 
         var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
@@ -422,7 +453,7 @@ public sealed class TradingAutomationService(
                 "Trading plan: a new {ShipType} from {Shipyard} would have no lucrative route; no purchase.",
                 shipType,
                 shipyard.WaypointSymbol);
-            return;
+            return null;
         }
 
         // D112: beyond the list the ship isn't bought where the shipyard has it SCARCE now, whatever the cache said.
@@ -436,7 +467,34 @@ public sealed class TradingAutomationService(
                 shipType,
                 shipyard.WaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");
+            return null;
         }
+
+        return TimeProvider.System.GetUtcNow();
+    }
+
+    /// <summary>
+    /// Where a cargo ship beyond the list stands in the order ships are bought in (slice 6.34, D116), asked on 2026-10-07: "I would
+    /// like to switch priorities between new trade ships and probes. So once every half hour, money permitting, a trade ship is
+    /// bought, independent on whether probes still need to be bought." Before the probes (<see cref="PurchaseTier.TimedCargoShip"/>)
+    /// once <c>Trade.ShipPurchaseIntervalMinutes</c>, else half an hour, have passed since the plan last bought one, or while no
+    /// purchase is on record; till then in turn with the drones after the probes, as before (<see cref="PurchaseTier.Alternating"/>,
+    /// D43): "Keep the turns too". Either way only once D88's route has waited for it ("Keep D88's check"), and the credits are
+    /// saved up for it as for anything in the order ("Save up, probes wait").
+    /// </summary>
+    /// <param name="lastBoughtAt">When the plan last bought a cargo ship; null for none on record.</param>
+    /// <param name="cancellationToken">Stops the read of the setting.</param>
+    /// <returns>Its place in the order.</returns>
+    private async Task<PurchaseTier> BeyondTheListTierAsync(DateTimeOffset? lastBoughtAt, CancellationToken cancellationToken)
+    {
+        if (lastBoughtAt is not { } boughtAt)
+        {
+            return PurchaseTier.TimedCargoShip;
+        }
+
+        var minutes = await settings.GetAsync<int>(ShipPurchaseIntervalMinutesSetting, cancellationToken);
+        var interval = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultShipPurchaseIntervalMinutes);
+        return TimeProvider.System.GetUtcNow() - boughtAt >= interval ? PurchaseTier.TimedCargoShip : PurchaseTier.Alternating;
     }
 
     /// <summary>The next ship of <c>Trade.ShipPurchases</c> (D21), at the shipyard at home that sells it for the least.</summary>
@@ -909,17 +967,19 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// Records the held routes and the best pending ones, and why the other goods with a price gap aren't traded (D76). Only a
-    /// change is written: the state is the same pass after pass while nothing happens, and the tick runs every 5 seconds.
+    /// Records the held routes and the best pending ones, why the other goods with a price gap aren't traded (D76), and when the
+    /// plan last bought a cargo ship (D116). Only a change is written: the state is the same pass after pass while nothing
+    /// happens, and the tick runs every 5 seconds.
     /// </summary>
     private async Task SaveStateAsync(
+        TradingAutomationPlanState? existing,
         IReadOnlyList<HeldRoute> held,
         IReadOnlyDictionary<string, PendingRoute> pending,
         IReadOnlyDictionary<string, JudgedSystem> judged,
+        DateTimeOffset? lastShipBoughtAt,
         CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
-        var existing = await plans.GetAsync<TradingAutomationPlanState>(PlanTypes.TradingAutomation, cancellationToken);
         var firstSeen = (existing?.Opportunities ?? [])
             .GroupBy(opportunity => opportunity.OpportunityKey, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().FirstObservedAt, StringComparer.OrdinalIgnoreCase);
@@ -980,7 +1040,10 @@ public sealed class TradingAutomationService(
                 .OrderBy(good => good.SystemSymbol, StringComparer.Ordinal),
         ];
 
-        if (existing is not null && SameRoutes(existing.Opportunities, opportunities) && SameGoods(existing.NotTraded, notTraded))
+        if (existing is not null
+            && SameRoutes(existing.Opportunities, opportunities)
+            && SameGoods(existing.NotTraded, notTraded)
+            && existing.LastShipBoughtAt == lastShipBoughtAt)
         {
             return;
         }
@@ -992,6 +1055,7 @@ public sealed class TradingAutomationService(
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = opportunities,
                 NotTraded = notTraded,
+                LastShipBoughtAt = lastShipBoughtAt,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },
