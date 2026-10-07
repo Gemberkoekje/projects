@@ -2,8 +2,11 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Construction;
+using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.SpareTime;
@@ -57,8 +60,9 @@ public interface ITradingAutomationService
 /// The trip itself, with its check against the newest prices at each market, is the
 /// <c>TradeBetweenMarketsGoalExecutor</c>'s. The plan buys its own cargo ships (D21, which replaced D16):
 /// when no trader is left without a trip and a new ship would have a lucrative route from the shipyard, it
-/// buys the next type in <c>Trade.ShipPurchases</c>, and once the list is bought one more of its last type, one at a
-/// time and within the credit reserve, when the order ships are bought in lets it (D43, <see cref="IPurchaseOrder"/>).
+/// buys the next type in <c>Trade.ShipPurchases</c>, and once the list is bought the ship with the largest hold that a
+/// shipyard within the trade reach lists, not SCARCE there (slice 6.33, D112), one at a time and within the credit reserve,
+/// when the order ships are bought in lets it (D43, <see cref="IPurchaseOrder"/>).
 /// </remarks>
 public sealed class TradingAutomationService(
     IShipRepository ships,
@@ -78,6 +82,7 @@ public sealed class TradingAutomationService(
     PassedOverShips passedOver,
     TradeShipDemand demand,
     IAgentRepository agents,
+    IGateNetwork gates,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
     /// <summary>The most pending routes the plan's state keeps, best first.</summary>
@@ -85,6 +90,9 @@ public sealed class TradingAutomationService(
 
     /// <summary>A good with a price gap whose route waits for a free trader, as the state names it (B66).</summary>
     private const string Waiting = "waiting";
+
+    /// <summary>The supply at which no cargo ship beyond the list is bought (D112).</summary>
+    private const string ScarceSupply = "SCARCE";
 
     /// <summary>The plans whose ships trade only when their own plan passed them over (B63, D58).</summary>
     private static readonly AutomationPlan[] GatheringPlans = [AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Construction];
@@ -146,9 +154,11 @@ public sealed class TradingAutomationService(
         var gatherers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var onTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var surveyorsWithCargo = new List<ShipModel>();
+        var goalsOf = new Dictionary<string, ShipGoal?>(StringComparer.OrdinalIgnoreCase);
         foreach (var ship in fleet)
         {
             var goal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            goalsOf[ship.Symbol] = goal;
             var hasAssignment = withAssignment.Contains(ship.Symbol);
             var gathers = board.SpareTimeOn && board.GathersInSpareTime(ship);
             if (goal is TradeBetweenMarketsGoal trade && trade.Status != GoalStatus.Blocked)
@@ -260,7 +270,7 @@ public sealed class TradingAutomationService(
         }
 
         // Business stays where our ships work: not where the command ship explores (asked on 2026-10-04).
-        await BuyCargoShipAsync(fleet, board, BusinessSystems.Of(await agents.GetAsync(cancellationToken)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
+        await BuyCargoShipAsync(fleet, goalsOf, board, BusinessSystems.Of(await agents.GetAsync(cancellationToken)), heldKeys, HeldBuysOf(held, constructionTrips), idle, cancellationToken);
 
         await SaveStateAsync(held, pending, judged, cancellationToken);
     }
@@ -339,17 +349,19 @@ public sealed class TradingAutomationService(
     }
 
     /// <summary>
-    /// Buys cargo ships (D21): the next in <c>Trade.ShipPurchases</c>, and once the list is bought, one more of its last type
-    /// (D43), at the shipyard that sells it for the least, when every trader has a trip and the traders can't keep up: a route
-    /// worth <c>Trade.ShipPurchaseMinRouteProfit</c> that the new ship would have from there, and no trader holds, has waited
-    /// <c>Trade.ShipPurchaseWaitMinutes</c> for a ship (D88, <see cref="TradeShipDemand"/>); the purchase is then judged with the
-    /// credits left after it. The purchase keeps the credit reserve (<c>FleetExpansion.MinCreditReserve</c>,
+    /// Buys cargo ships (D21): the next in <c>Trade.ShipPurchases</c>, at the home shipyard that sells it for the least; once the
+    /// list is bought, the ship with the largest hold that a shipyard within the trade reach lists, not SCARCE there (slice 6.33,
+    /// D112, <see cref="LargestHoldAsync"/>). Either is bought when every trader has a trip and the traders can't keep up: a
+    /// route worth <c>Trade.ShipPurchaseMinRouteProfit</c> that the new ship would have from there, and no trader holds, has
+    /// waited <c>Trade.ShipPurchaseWaitMinutes</c> for a ship (D88, <see cref="TradeShipDemand"/>); the purchase is then judged
+    /// with the credits left after it. The purchase keeps the credit reserve (<c>FleetExpansion.MinCreditReserve</c>,
     /// <see cref="IShipPurchaseService"/>). The order ships are bought in decides when (<see cref="IPurchaseOrder"/>): a ship
     /// of the list is saved up for, whatever the routes, after the contract's drone, a surveyor and a drone for each scarce
     /// mineral; a ship beyond the list takes turns with the drones, and needs nothing until a route has waited so.
     /// </summary>
     private async Task BuyCargoShipAsync(
         IReadOnlyList<ShipModel> fleet,
+        IReadOnlyDictionary<string, ShipGoal?> goalsOf,
         FleetRoleBoard board,
         IReadOnlyList<string> businessSystems,
         IReadOnlySet<string> heldKeys,
@@ -368,39 +380,20 @@ public sealed class TradingAutomationService(
         // A shuttle collecting at a far asteroid (D83) was bought for that, not from the list.
         var cargoShips = fleet.Count(ship => FleetRoles.IsCargoShip(ship) && !board.IsCollector(ship));
         var inList = cargoShips < purchases.Length;
-        var shipType = inList ? purchases[cargoShips] : purchases[^1];
-        var systems = businessSystems.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var offer = (await shipyards.GetAllAsync(cancellationToken))
-            .Where(shipyard => systems.Contains(shipyard.SystemSymbol))
-            .SelectMany(shipyard => shipyard.Ships
-                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase)
-                    && ship.PurchasePrice > 0
-                    && ship.CargoCapacity > 0
-                    && ship.FuelCapacity > 0)
-                .Select(ship => (Shipyard: shipyard, Ship: ship)))
-            .OrderBy(candidate => candidate.Ship.PurchasePrice)
-            .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
-            .ToList();
-        if (offer.Count == 0)
+        var offer = inList
+            ? await ListedAsync(purchases[cargoShips], businessSystems, cancellationToken)
+            : await LargestHoldAsync(fleet, goalsOf, businessSystems, cancellationToken);
+        if (offer is not { } found)
         {
-            logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType}.", shipType);
             await purchaseOrder.ReportAsync(AutomationPlan.Trading, PurchaseNeed.None, cancellationToken);
             return;
         }
 
-        var (shipyard, forSale) = offer[0];
-
         // Slice 6.29 (D96): a cargo ship trades across the systems in reach, so the routes that wait for one count there too.
+        var (shipyard, forSale) = found;
+        var shipType = forSale.Type;
         var context = await tradeContexts.ReadReachAsync(shipyard.SystemSymbol, cancellationToken);
-        var newShip = new ShipModel(
-            "NEW-" + shipType,
-            shipyard.SystemSymbol,
-            shipyard.WaypointSymbol,
-            "DOCKED",
-            "CRUISE",
-            forSale.FuelCapacity,
-            forSale.FuelCapacity,
-            CargoCapacity: forSale.CargoCapacity);
+        var newShip = AsBought(shipyard, forSale);
 
         // D88: beyond the list a cargo ship adds value only when the traders can't keep up: a route worth
         // Trade.ShipPurchaseMinRouteProfit from the shipyard, that no trader holds, has waited Trade.ShipPurchaseWaitMinutes with
@@ -432,7 +425,10 @@ public sealed class TradingAutomationService(
             return;
         }
 
-        var purchased = await shipPurchases.TryPurchaseAsync(shipType, shipyard.WaypointSymbol, cancellationToken);
+        // D112: beyond the list the ship isn't bought where the shipyard has it SCARCE now, whatever the cache said.
+        var purchased = inList
+            ? await shipPurchases.TryPurchaseAsync(shipType, shipyard.WaypointSymbol, cancellationToken)
+            : await shipPurchases.TryPurchaseUnlessScarceAsync(shipType, shipyard.WaypointSymbol, cancellationToken);
         if (!purchased.IsSuccess)
         {
             logger.LogDebug(
@@ -442,6 +438,123 @@ public sealed class TradingAutomationService(
                 purchased.FailureReason ?? "Purchase failed.");
         }
     }
+
+    /// <summary>The next ship of <c>Trade.ShipPurchases</c> (D21), at the shipyard at home that sells it for the least.</summary>
+    /// <returns>The shipyard and the ship as it lists it; null when no shipyard at home lists it with a price and a hold.</returns>
+    private async Task<(ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)?> ListedAsync(
+        string shipType,
+        IReadOnlyList<string> businessSystems,
+        CancellationToken cancellationToken)
+    {
+        var systems = businessSystems.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var offer = (await shipyards.GetAllAsync(cancellationToken))
+            .Where(shipyard => systems.Contains(shipyard.SystemSymbol))
+            .SelectMany(shipyard => shipyard.Ships
+                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase)
+                    && ship.PurchasePrice > 0
+                    && ship.CargoCapacity > 0
+                    && ship.FuelCapacity > 0)
+                .Select(ship => (Shipyard: shipyard, Ship: ship)))
+            .OrderBy(candidate => candidate.Ship.PurchasePrice)
+            .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (offer.Shipyard is null)
+        {
+            logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType}.", shipType);
+            return null;
+        }
+
+        return offer;
+    }
+
+    /// <summary>
+    /// The cargo ship bought once <c>Trade.ShipPurchases</c> is (slice 6.33, D112), asked on 2026-10-07: "when buying a new trade
+    /// ship (purchasing order 9) it should pick whatever the known ship with the highest cargo capacity is, as long as it is not
+    /// scarce", with "Within the trade reach" and "Next largest". Of the ships the shipyards within <c>Trade.MaxHaulDistance</c>
+    /// jumps of home list with their hold, those that would be cargo ships (<see cref="FleetRoles.IsCargoShip"/>: a hold and a
+    /// tank, nothing to mine, siphon or survey with, no explorer) and that the shipyard doesn't have SCARCE, as cached: the
+    /// largest hold, of equal holds the cheapest, then the nearest to home. A shipyard abroad counts only where a probe of ours
+    /// answers a purchase's call for a ship (D30), so the purchase can't wait for a ship that never comes.
+    /// </summary>
+    /// <returns>The shipyard and the ship as it lists it; null when no shipyard within the reach lists one.</returns>
+    private async Task<(ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)?> LargestHoldAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyDictionary<string, ShipGoal?> goalsOf,
+        IReadOnlyList<string> businessSystems,
+        CancellationToken cancellationToken)
+    {
+        if (businessSystems.FirstOrDefault() is not { Length: > 0 } home)
+        {
+            return null;
+        }
+
+        var reach = await settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, cancellationToken) is var maxJumps and > 0
+            ? maxJumps
+            : TradeContextReader.DefaultMaxHaulDistance;
+        var network = await gates.ReadAsync(cancellationToken);
+        var jumps = network is null
+            ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [home] = 0 }
+            : ExploreAtlas.Reachable(network, home, TimeProvider.System.GetUtcNow());
+        var answered = await AnsweredAsync(fleet, goalsOf, home, cancellationToken);
+        var offer = (await shipyards.GetAllAsync(cancellationToken))
+            .Where(shipyard => jumps.TryGetValue(shipyard.SystemSymbol, out var away)
+                && away <= reach
+                && answered.Contains(shipyard.SystemSymbol))
+            .SelectMany(shipyard => shipyard.Ships
+                .Where(ship => ship.PurchasePrice > 0
+                    && !ScarceSupply.Equals(ship.Supply, StringComparison.OrdinalIgnoreCase)
+                    && FleetRoles.IsCargoShip(AsBought(shipyard, ship)))
+                .Select(ship => (Shipyard: shipyard, Ship: ship)))
+            .OrderByDescending(candidate => candidate.Ship.CargoCapacity)
+            .ThenBy(candidate => candidate.Ship.PurchasePrice)
+            .ThenBy(candidate => jumps[candidate.Shipyard.SystemSymbol])
+            .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (offer.Shipyard is null)
+        {
+            logger.LogDebug("Trading plan: no shipyard within the trade reach lists a cargo ship that isn't SCARCE (D112).");
+            return null;
+        }
+
+        return offer;
+    }
+
+    /// <summary>
+    /// The systems where a purchase's call for one of our ships (D30) is answered: home, where the plans have always bought; and
+    /// each system a probe of ours counts for (<see cref="ProbePlanner.Whereabouts"/>), there or on its way there, while the
+    /// probe plan, which answers the calls, is on.
+    /// </summary>
+    private async Task<HashSet<string>> AnsweredAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyDictionary<string, ShipGoal?> goalsOf,
+        string home,
+        CancellationToken cancellationToken)
+    {
+        var answered = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { home };
+        if (await settings.IsPlanEnabledAsync(AutomationPlan.ProbeDeployment, cancellationToken))
+        {
+            foreach (var probe in fleet.Where(FleetRoles.IsProbe))
+            {
+                answered.Add(ProbePlanner.Whereabouts(probe, goalsOf.GetValueOrDefault(probe.Symbol)).SystemSymbol);
+            }
+        }
+
+        return answered;
+    }
+
+    /// <summary>A ship for sale as the plans would see it once bought: at the shipyard, docked, its tank full and its hold empty.</summary>
+    private static ShipModel AsBought(ShipyardWaypointDto shipyard, ShipyardShipDto forSale)
+        => new(
+            "NEW-" + forSale.Type,
+            shipyard.SystemSymbol,
+            shipyard.WaypointSymbol,
+            "DOCKED",
+            "CRUISE",
+            forSale.FuelCapacity,
+            forSale.FuelCapacity,
+            CargoCapacity: forSale.CargoCapacity,
+            ShipType: forSale.Type,
+            MountSymbols: forSale.Mounts);
 
     /// <summary>
     /// A ship that gathers in its spare time (slice 6.8) trades only when a route waits for it once its hold is sold

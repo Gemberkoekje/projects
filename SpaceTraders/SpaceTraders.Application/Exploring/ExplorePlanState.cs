@@ -152,7 +152,7 @@ public sealed record ExplorerPurchaseState
     /// <summary>Where it stands.</summary>
     public ExplorerPurchaseStatus Status { get; init; }
 
-    /// <summary>Its place in the order ships are bought in: <see cref="PurchaseTier.Explorer"/> for the first, <see cref="PurchaseTier.MoreExplorers"/> after it.</summary>
+    /// <summary>Its place in the order ships are bought in: <see cref="PurchaseTier.Explorer"/>, the first and every further one (D113).</summary>
     public PurchaseTier Tier { get; init; }
 
     /// <summary>The shipyard it would be bought at; empty when none.</summary>

@@ -40,7 +40,8 @@ public interface IAutomationMetrics
     /// <summary>
     /// Adds the time a request waited for the local request budget
     /// (<c>spacetraders_api_rate_limit_wait_seconds_total</c>), by <paramref name="kind"/>: <c>read</c>
-    /// for a GET, which gives way to writes (D19), or <c>write</c> for anything else.
+    /// for a GET, which gives way to writes (D19), <c>write</c> for anything else, which gives way to a trade trip's requests,
+    /// or <c>trade</c> for a trade trip's request, a GET or not, which gives way to none (D115).
     /// </summary>
     void RateLimitWait(TimeSpan wait, string kind);
 
@@ -237,8 +238,8 @@ public interface IAutomationMetrics
     /// Records the order ships are bought in (slice 6.10b, D43): what each plan that buys ships would buy now, one series per
     /// plan, its value what the ship costs as cached
     /// (<c>spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}</c>). <c>position</c> is the tier's
-    /// place in the order, 1 for the contract's drone to 6 for drones and cargo ships in turn; the lowest is what the
-    /// credits are saved up for. A plan that needs nothing, or whose need changed, loses its old series.
+    /// place in the order (<see cref="Services.PurchaseTier"/>), 1 for the contract's drone to 10 for the far probes; the lowest
+    /// is what the credits are saved up for. A plan that needs nothing, or whose need changed, loses its old series.
     /// </summary>
     void PurchaseNeeds(IReadOnlyCollection<PurchaseNeedMetricsSample> needs);
 }

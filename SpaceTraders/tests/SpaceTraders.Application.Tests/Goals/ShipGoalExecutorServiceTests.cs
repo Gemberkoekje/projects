@@ -85,7 +85,7 @@ public sealed class ShipGoalExecutorServiceTests
 
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        await _scheduler.DidNotReceiveWithAnyArgs().ScheduleArrivalAsync(default!, default, default, default);
+        await _scheduler.DidNotReceiveWithAnyArgs().ScheduleArrivalAsync(default!, Guid.Empty, default, default);
     }
 
     [Fact]
@@ -169,6 +169,33 @@ public sealed class ShipGoalExecutorServiceTests
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
         _metrics.Received(1).GoalStep("TradeBetweenMarkets");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExecuteAsync_ATradeTripsStep_MarksItsRequestsForTheRateLimit_AMiningTripsDoesnt(bool trade)
+    {
+        // Slice 6.33 (D115), asked on 2026-10-07: "if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to
+        // wait for a miner or a surveyor." What a trade trip's step sends goes first at the rate limit; a mining trip's doesn't.
+        ShipGoal goal = trade
+            ? new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-001", SellWaypointSymbol = "X1-AB-002" }
+            : new MineAndSellGoal { TradeSymbol = "COPPER_ORE", SourceWaypointSymbol = "X1-AB-XB5C", SellWaypointSymbol = "X1-AB-H51" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(goal);
+        _executor.CanExecute(goal).Returns(true);
+        bool? marked = null;
+        _executor.ExecuteStepAsync(FullFuelShip, goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                marked = ApiPriority.IsTradeTrip;
+                return GoalExecutionResult.Progressing("step");
+            });
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        marked.Should().Be(trade);
+        ApiPriority.IsTradeTrip.Should().BeFalse("the mark ends with the step");
     }
 
     [Fact]

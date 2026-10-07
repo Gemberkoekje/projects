@@ -115,16 +115,16 @@ public sealed class WarpExplorersTests
     }
 
     [Theory]
-    [InlineData(5, "X1-S01")]
-    [InlineData(1, Zz69)]
-    public async Task TheSystemsWithinTheTradeReach_ComeFirst_ThenTheNearest_ByJumpOrWarp(int reach, string target)
+    [InlineData(1, "X1-S01")]
+    [InlineData(2, Zz69)]
+    public async Task TheRingsOfTheTradeReach_ComeInTurn_ASystemBehindAGateUnderConstructionInTheRingOfItsGate(int reach, string target)
     {
-        // D106, "Reach first, then nearest": X1-S01 lies 2 jumps from home, by X1-MID, and 3 from the explorer at X1-GT9, after
-        // a cooldown of some 930 seconds; X1-ZZ69 is a warp of 753 seconds away. Within a reach of 5 X1-S01 comes first; within
-        // one of 1 it doesn't, and the nearest by the seconds does.
+        // Slice 6.33 (D114), "Ring of their gate": X1-S01 lies 1 jump from home and 2 from the explorer at X1-GT9, after a
+        // cooldown of some 930 seconds; X1-ZZ69, behind X1-GT9's gate under construction, counts 2 jumps from home through it and
+        // is a warp of 753 seconds away. With rings 1 jump wide X1-S01's comes first; 2 wide, both lie in the first, and the
+        // nearest by the seconds goes first. D106 took X1-S01 first at a reach of 2: the gates' systems within it first.
         await SeedAsync();
-        await AddSystemAsync("X1-MID", from: Home, explored: true);
-        await AddSystemAsync("X1-S01", from: "X1-MID", explored: false);
+        await AddSystemAsync("X1-S01", from: Home, explored: false);
         _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(reach);
 
         await PassAsync();
@@ -138,6 +138,27 @@ public sealed class WarpExplorersTests
         {
             (await GoalAsync(Explorer)).Should().BeEquivalentTo(new { GateWaypointSymbol = Gt9Gate, DestinationGateWaypointSymbol = HomeGate });
         }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    public async Task ASystemFoundByAScan_WithNoGateKnown_ComesAfterEveryRing(int reach)
+    {
+        // D114, "Ring of their gate": X1-NEW, found by a scan, is a warp of some 500 seconds from the explorer at X1-GT9; no known
+        // gate leads there. X1-S01, 2 jumps from home by X1-MID, is 3 from the explorer and some 930 seconds of cooldown away.
+        // With rings of 1 jump, X1-S01 lies in the second, beyond D106's reach, where the nearest by the seconds went first:
+        // X1-NEW. Now any ring comes before X1-NEW.
+        await SeedAsync(zz69Explored: true);
+        await AddSystemAsync("X1-MID", from: Home, explored: true);
+        await AddSystemAsync("X1-S01", from: "X1-MID", explored: false);
+        await AddScannedSystemAsync("X1-NEW", 17833, 3477);
+        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(reach);
+
+        await PassAsync();
+
+        (await StateAsync()).Explorers.Single().TargetSystemSymbol.Should().Be("X1-S01");
+        (await GoalAsync(Explorer)).Should().BeEquivalentTo(new { GateWaypointSymbol = Gt9Gate, DestinationGateWaypointSymbol = HomeGate });
     }
 
     [Fact]
@@ -358,6 +379,21 @@ public sealed class WarpExplorersTests
         };
         await using var db = TestDbContextFactory.Create(_database);
         await new PlanRepository(db).UpsertAsync(PlanTypes.Explore, state);
+    }
+
+    /// <summary>
+    /// A system a scan found (D105), as the plan keeps it: known, with no gate, its position and a market's waypoint cached, its
+    /// waypoints fetched.
+    /// </summary>
+    private async Task AddScannedSystemAsync(string system, int x, int y)
+    {
+        var state = await StateAsync();
+        state = state with { Systems = [.. state.Systems, new KnownSystem { SystemSymbol = system, WaypointsFetchedAt = _now }] };
+        await using var db = TestDbContextFactory.Create(_database);
+        await new PlanRepository(db).UpsertAsync(PlanTypes.Explore, state);
+        await new SystemRepository(db).UpsertAsync(new SystemCacheModel(system, "X1", "RED_STAR", x, y, _now));
+        await new WaypointRepository(db).UpsertRangeAsync(
+            [new WaypointCacheModel($"{system}-A1", system, "PLANET", 0, 0, HasMarket: true, HasShipyard: false, _now, Market)]);
     }
 
     /// <summary>The ship is at <paramref name="waypoint"/>, docked, its goal ended: a flight or a warp's arrival.</summary>

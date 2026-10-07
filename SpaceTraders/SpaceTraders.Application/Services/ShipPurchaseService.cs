@@ -38,10 +38,25 @@ public sealed class ShipPurchaseService(
     private const string ProbeShipType = "SHIP_PROBE";
     private const string ScarceSupply = "SCARCE";
 
-    public async Task<ShipPurchaseResult> TryPurchaseAsync(
+    public Task<ShipPurchaseResult> TryPurchaseAsync(
         string shipType,
         string shipyardWaypoint,
         CancellationToken cancellationToken = default)
+        => PurchaseAsync(shipType, shipyardWaypoint, unlessScarce: false, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
+        string shipType,
+        string shipyardWaypoint,
+        CancellationToken cancellationToken = default)
+        => PurchaseAsync(shipType, shipyardWaypoint, unlessScarce: true, cancellationToken);
+
+    /// <summary>The purchase; with <paramref name="unlessScarce"/>, none where the shipyard has the ship SCARCE now (D112).</summary>
+    private async Task<ShipPurchaseResult> PurchaseAsync(
+        string shipType,
+        string shipyardWaypoint,
+        bool unlessScarce,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(shipType) || string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
@@ -80,11 +95,13 @@ public sealed class ShipPurchaseService(
 
         // D97 (slice 6.28, asked on 2026-10-06): "It should also check whether the probes are in SCARCE supply and not buy them
         // if they are", read as every probe purchase. The probe plan leaves a shipyard whose cached supply is SCARCE alone; this
-        // is the supply as the shipyard gives it now, which the last purchase there may have brought down.
-        if (shipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase)
+        // is the supply as the shipyard gives it now, which the last purchase there may have brought down. D112 (slice 6.33): the
+        // same for the cargo ship bought once Trade.ShipPurchases is.
+        var isProbe = shipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase);
+        if ((isProbe || unlessScarce)
             && (quote?.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))
         {
-            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceSupply} at {shipyardWaypoint} (D97).", quotedCost);
+            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceSupply} at {shipyardWaypoint} ({(isProbe ? "D97" : "D112")}).", quotedCost);
         }
 
         if (quotedCost != estimatedCost)

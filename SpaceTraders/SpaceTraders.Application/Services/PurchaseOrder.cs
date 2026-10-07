@@ -20,12 +20,12 @@ namespace SpaceTraders.Application.Services;
 ///   the probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
 ///   (slice 6.25, D92), which waits while a load can be bought: "If the gate can be built, it should be built, otherwise
 ///   extra miners can be built.";</item>
-///   <item>the first explorer (slice 6.30, D98), while the explore plan wants one, which the command ship fetches;</item>
+///   <item>every explorer the explore plan wants (slice 6.30, D98, D102: one for every 10 systems left to explore), the first
+///   and every further one before the probes (slice 6.33, D113); the command ship fetches one no probe of ours can (D108);</item>
 ///   <item>a probe for every market (D29): home's, then those of the explored systems within the trade reach (slice 6.28,
 ///   D97);</item>
-///   <item>then drones by the miners' rule (D28, D32) and cargo ships of the list's last type, in turn: a drone, a cargo
+///   <item>then drones by the miners' rule (D28, D32) and cargo ships with the largest hold (D112), in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy;</item>
-///   <item>every further explorer the explore plan wants (slice 6.30, D102: one for every 10 systems left to explore);</item>
 ///   <item>last, a probe for every market of the other explored systems (slice 6.28, D97).</item>
 /// </list>
 /// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
@@ -68,10 +68,19 @@ public sealed class PurchaseOrder(
     private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipSiphonDrone };
 
     /// <summary>
-    /// The cargo ships that take turns with the drones, besides the list's own types: the game's freighters, so the ones
-    /// bought before the list was changed still count.
+    /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes, the surveyors
+    /// and the explorers, and a type this version doesn't know. Every other type is one: the list's, and since slice 6.33 (D112)
+    /// whichever has the largest hold beyond it, such as a heavy or bulk freighter, so the drones' turn comes after each.
     /// </summary>
-    private static readonly IReadOnlySet<ShipType> CargoShipTypes = new HashSet<ShipType> { ShipType.ShipLightShuttle, ShipType.ShipLightHauler, ShipType.ShipHeavyFreighter };
+    private static readonly IReadOnlySet<ShipType> NotCargoShipTypes = new HashSet<ShipType>
+    {
+        ShipType.None,
+        ShipType.ShipProbe,
+        ShipType.ShipMiningDrone,
+        ShipType.ShipSiphonDrone,
+        ShipType.ShipSurveyor,
+        ShipType.ShipExplorer,
+    };
 
     /// <inheritdoc />
     public Task<bool> ReportAsync(AutomationPlan plan, PurchaseNeed need, CancellationToken cancellationToken)
@@ -147,19 +156,20 @@ public sealed class PurchaseOrder(
     /// <summary>
     /// Whose turn it is between drones and cargo ships (D43): the kind not bought last, so after the list's last cargo ship a
     /// drone comes first, then a cargo ship, and so on; the drones' when neither was ever bought. Any drone counts, the
-    /// contract's and a scarce mineral's too; probes and surveyors don't take turns. A turn that passed because one kind
-    /// had nothing to buy isn't made up later, so a kind never gets a run of turns, and an edited list or a lost ledger row
-    /// can't keep one kind waiting.
+    /// contract's and a scarce mineral's too; probes, surveyors and explorers don't take turns, and every other ship is a cargo
+    /// ship, whichever type the trading plan bought for its hold (D112). A turn that passed because one kind had nothing to buy
+    /// isn't made up later, so a kind never gets a run of turns, and an edited list or a lost ledger row can't keep one kind
+    /// waiting.
     /// </summary>
     /// <param name="purchases">The ships bought, the oldest first.</param>
-    /// <param name="list">The types in <c>Trade.ShipPurchases</c>, in order: cargo ships, besides the game's freighters.</param>
+    /// <param name="list">The types in <c>Trade.ShipPurchases</c>, in order: cargo ships, whatever their type.</param>
     /// <returns>The kind whose turn it is.</returns>
     internal static PurchaseKind Turn(IReadOnlyList<PurchaseRecord> purchases, IReadOnlyList<ShipType> list)
     {
         ArgumentNullException.ThrowIfNull(purchases);
         ArgumentNullException.ThrowIfNull(list);
 
-        var cargoTypes = CargoShipTypes.Concat(list.Where(type => type != ShipType.None)).ToHashSet();
+        var listed = list.Where(type => type != ShipType.None).ToHashSet();
         for (var index = purchases.Count - 1; index >= 0; index--)
         {
             if (DroneTypes.Contains(purchases[index].Type))
@@ -167,7 +177,7 @@ public sealed class PurchaseOrder(
                 return PurchaseKind.CargoShip;
             }
 
-            if (cargoTypes.Contains(purchases[index].Type))
+            if (listed.Contains(purchases[index].Type) || !NotCargoShipTypes.Contains(purchases[index].Type))
             {
                 return PurchaseKind.Drone;
             }
@@ -393,8 +403,10 @@ public enum PurchaseTier
     Construction = 6,
 
     /// <summary>
-    /// The first explorer (slice 6.30, D98: "Start with one before probes"), while the explore plan wants one (D102); the
-    /// command ship fetches it.
+    /// Every explorer the explore plan wants (slice 6.30, D98: "Start with one before probes"; D102: one for every 10 systems left
+    /// to explore). Asked on 2026-10-07, slice 6.33 (D113): "I'd like Explorers (order 10) to go in front of probes (order 8)",
+    /// so the further ones too, which stood after the drones and cargo ships that take turns. The command ship fetches one that no
+    /// probe of ours can (D108).
     /// </summary>
     Explorer = 7,
 
@@ -404,20 +416,18 @@ public enum PurchaseTier
     /// </summary>
     Probes = 8,
 
-    /// <summary>A drone by the miners' rule (D28, D32), or one more cargo ship of the list's last type, in turn.</summary>
+    /// <summary>
+    /// A drone by the miners' rule (D28, D32), or one more cargo ship, in turn: the ship with the largest hold a shipyard within
+    /// the trade reach lists, not SCARCE there (slice 6.33, D112).
+    /// </summary>
     Alternating = 9,
 
     /// <summary>
-    /// Every further explorer the explore plan wants (slice 6.30, D102: "First before probes, rest last"), after the drones and
-    /// cargo ships that take turns, once one of our ships is in the shipyard's system.
-    /// </summary>
-    MoreExplorers = 10,
-
-    /// <summary>
     /// A probe for a market of an explored system beyond the trade reach (slice 6.28, D97): "all explored markets when money
-    /// allows", last, after the drones and cargo ships that take turns and the further explorers.
+    /// allows", last, after the drones and cargo ships that take turns. 11 until slice 6.33 (D113) moved the further explorers,
+    /// which stood at 10, to <see cref="Explorer"/>.
     /// </summary>
-    FarProbes = 11,
+    FarProbes = 10,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

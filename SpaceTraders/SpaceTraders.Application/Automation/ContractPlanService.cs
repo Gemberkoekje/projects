@@ -947,5 +947,24 @@ public sealed class ContractPlanService(
                 PurchasedShip = ship,
             };
         }
+
+        /// <summary>As <see cref="TryPurchaseAsync"/>, but nothing where the cached shipyard has the ship SCARCE (D112).</summary>
+        public async Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
+            string shipType,
+            string shipyardWaypoint,
+            CancellationToken cancellationToken = default)
+        {
+            var shipyard = await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken);
+            var forSale = shipyard?.Ships.FirstOrDefault(s => s.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase));
+            return "SCARCE".Equals(forSale?.Supply, StringComparison.OrdinalIgnoreCase)
+                ? new ShipPurchaseResult
+                {
+                    IsSuccess = false,
+                    Failure = ShipPurchaseFailure.Scarce,
+                    FailureReason = $"{shipType} is SCARCE at {shipyardWaypoint} (D112).",
+                    EstimatedCost = forSale.PurchasePrice,
+                }
+                : await TryPurchaseAsync(shipType, shipyardWaypoint, cancellationToken);
+        }
     }
 }

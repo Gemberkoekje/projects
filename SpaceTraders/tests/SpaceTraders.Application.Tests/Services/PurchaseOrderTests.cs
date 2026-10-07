@@ -264,20 +264,39 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
-    public async Task AFurtherExplorer_WaitsForTheDronesAndCargoShipsThatTakeTurns_AndTheFarProbesForIt()
+    public async Task AFurtherExplorer_ComesBeforeTheProbes_AndTheDronesAndCargoShipsThatTakeTurns()
     {
-        // D102: "First before probes, rest last", before the far probes.
+        // Slice 6.33 (D113), asked on 2026-10-07: "I'd like Explorers (order 10) to go in front of probes (order 8)". The further
+        // explorers stood after the drones and cargo ships that take turns (D102: "First before probes, rest last"); every one
+        // now stands where the first does, and the explore plan says so for each.
         EveryoneSays(PurchaseNeed.None);
-        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+        _needs.Report(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"), DateTimeOffset.UtcNow);
 
-        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.MoreExplorers, "SHIP_EXPLORER"))).Should().BeFalse();
-        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue("a probe within the trade reach comes before it");
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.Explorer, "SHIP_EXPLORER"))).Should().BeTrue();
+    }
 
-        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
-        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow);
-
-        (await MayBuyAsync(AutomationPlan.Explore, Need(PurchaseTier.MoreExplorers, "SHIP_EXPLORER"))).Should().BeTrue();
-        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeFalse("the far probes come last");
+    [Fact]
+    public void EachTiersNumber_IsItsPositionInTheOrder_TheExplorersBeforeTheProbes()
+    {
+        // The SpaceTraders dashboard shows the number as the position (spacetraders_purchase_need_credits{position}), and you
+        // name the tiers by it: "Explorers (order 10) ... in front of probes (order 8)". Since slice 6.33 (D113) every explorer
+        // is 7, the probes stay 8 and the drones and cargo ships 9, and the far probes, 11 before, are 10.
+        Enum.GetValues<PurchaseTier>().Should().Equal(
+            PurchaseTier.None,
+            PurchaseTier.Contract,
+            PurchaseTier.Surveyor,
+            PurchaseTier.Coverage,
+            PurchaseTier.SurveyorPerArea,
+            PurchaseTier.CargoShips,
+            PurchaseTier.Construction,
+            PurchaseTier.Explorer,
+            PurchaseTier.Probes,
+            PurchaseTier.Alternating,
+            PurchaseTier.FarProbes);
+        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 11));
     }
 
     [Fact]
@@ -307,10 +326,12 @@ public sealed class PurchaseOrderTests
     [InlineData("CCD", PurchaseKind.CargoShip)]
     [InlineData("PSD", PurchaseKind.CargoShip)]
     [InlineData("DCP", PurchaseKind.Drone)]
+    [InlineData("DE", PurchaseKind.CargoShip)]
     public void TheTurn_GoesToTheKindNotBoughtLast_ADroneFirstAfterTheList(string since, PurchaseKind turn)
     {
-        // D: a drone, C: a hauler, P: a probe, S: a surveyor. Probes and surveyors don't take turns, and a turn that passed
-        // because one kind had nothing to buy isn't made up later: after two drones in a row, a hauler, then a drone again.
+        // D: a drone, C: a hauler, P: a probe, S: a surveyor, E: an explorer. Probes, surveyors and explorers don't take turns,
+        // and a turn that passed because one kind had nothing to buy isn't made up later: after two drones in a row, a hauler,
+        // then a drone again.
         List<PurchaseRecord> purchases =
         [
             Bought("SHIP-3", ShipType.ShipMiningDrone, 0),
@@ -326,6 +347,7 @@ public sealed class PurchaseOrderTests
                 'D' => ShipType.ShipSiphonDrone,
                 'C' => ShipType.ShipLightHauler,
                 'P' => ShipType.ShipProbe,
+                'E' => ShipType.ShipExplorer,
                 _ => ShipType.ShipSurveyor,
             };
             purchases.Add(Bought($"NEW-{index}", type, 10 + index));
@@ -348,6 +370,20 @@ public sealed class PurchaseOrderTests
 
         PurchaseOrder.Turn(purchases, [ShipType.ShipLightHauler]).Should().Be(PurchaseKind.Drone);
         PurchaseOrder.Turn([.. purchases, Bought("SHIP-7", ShipType.ShipMiningDrone, 3)], [ShipType.ShipLightHauler]).Should().Be(PurchaseKind.CargoShip);
+    }
+
+    [Theory]
+    [InlineData(ShipType.ShipHeavyFreighter)]
+    [InlineData(ShipType.ShipBulkFreighter)]
+    [InlineData(ShipType.ShipRefiningFreighter)]
+    public void AfterACargoShipOfAnyType_ItIsTheDronesTurn(ShipType cargoShip)
+    {
+        // Slice 6.33 (D112): beyond the list the trading plan buys the largest hold, whatever its type. Counted by the list and
+        // the shuttles and haulers alone, a refining or bulk freighter left the cargo ships' turn standing after it, and the
+        // drones waited for good.
+        List<PurchaseRecord> purchases = [Bought("SHIP-3", ShipType.ShipMiningDrone, 0), Bought("SHIP-4", cargoShip, 1)];
+
+        PurchaseOrder.Turn(purchases, [ShipType.ShipLightShuttle, ShipType.ShipLightHauler]).Should().Be(PurchaseKind.Drone);
     }
 
     [Fact]

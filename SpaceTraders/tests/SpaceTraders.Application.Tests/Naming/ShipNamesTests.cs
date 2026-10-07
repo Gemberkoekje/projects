@@ -172,11 +172,10 @@ public sealed class ShipNamesTests
     [Fact]
     public void EveryTypeAShipyardSells_HasNamesOfItsOwn()
     {
-        // The API's ShipType: the domain's enum, and SHIP_BULK_FREIGHTER, which it doesn't list.
+        // The API's ShipType: the domain's enum, which lists SHIP_BULK_FREIGHTER too since slice 6.33 (D112).
         var types = Enum.GetValues<SpaceTraders.Domain.Enums.ShipType>()
             .Where(type => type != SpaceTraders.Domain.Enums.ShipType.None)
             .Select(type => string.Concat(type.ToString().Select((letter, at) => at > 0 && char.IsUpper(letter) ? $"_{letter}" : $"{letter}")).ToUpperInvariant())
-            .Append("SHIP_BULK_FREIGHTER")
             .ToList();
 
         ShipNames.Lists.Keys.Should().BeEquivalentTo(types);

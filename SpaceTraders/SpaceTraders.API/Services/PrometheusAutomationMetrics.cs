@@ -148,7 +148,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "source");
         _rateLimitWaitSeconds = ZeroFirst(
             "spacetraders_api_rate_limit_wait_seconds_total",
-            "Seconds that requests waited for the local request budget (2 per second plus a burst of 30 per minute), by kind: read (GET, gives way to writes) or write.",
+            "Seconds that requests waited for the local request budget (2 per second plus a burst of 30 per minute), by kind: read (GET, gives way to writes), write (gives way to trade trips) or trade (a trade trip's request, gives way to none).",
             "kind");
         _messagesHandled = ZeroFirst(
             "spacetraders_messages_handled_total",

@@ -8,6 +8,20 @@ public interface IShipPurchaseService
         string shipType,
         string shipyardWaypoint,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// As <see cref="TryPurchaseAsync"/>, but buys nothing where the shipyard has the ship SCARCE, by its supply as fetched just
+    /// before the purchase (slice 6.33, D112: the cargo ship bought once <c>Trade.ShipPurchases</c> is, "as long as it is not
+    /// scarce"); <see cref="ShipPurchaseFailure.Scarce"/> then.
+    /// </summary>
+    /// <param name="shipType">The ship, such as <c>SHIP_LIGHT_HAULER</c>.</param>
+    /// <param name="shipyardWaypoint">The shipyard.</param>
+    /// <param name="cancellationToken">Stops the purchase.</param>
+    /// <returns>What happened.</returns>
+    Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
+        string shipType,
+        string shipyardWaypoint,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ShipPurchaseResult
@@ -44,6 +58,9 @@ public enum ShipPurchaseFailure
     /// <summary>None of our ships is at the shipyard, which the API requires; a ship is called there (D30).</summary>
     NoShipAtShipyard = 4,
 
-    /// <summary>A probe whose supply at the shipyard is SCARCE, as fetched just before the purchase: none is bought (D97).</summary>
+    /// <summary>
+    /// A probe (D97), or a cargo ship bought once <c>Trade.ShipPurchases</c> is (D112), whose supply at the shipyard is SCARCE, as
+    /// fetched just before the purchase: none is bought.
+    /// </summary>
     Scarce = 5,
 }

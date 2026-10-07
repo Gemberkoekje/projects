@@ -215,6 +215,8 @@
   explorer, SPECTER-5C, at X1-GT9-AE7B; it was home at 15:05Z. gembernodes#88 raised the API's CPU and memory limits
   (restart at 15:37Z). By 16:07Z the explorer hadn't warped yet: the systems within the trade reach come first (D103,
   D106), and at 15:54Z it found a second shipyard that sells explorers, X1-GY77-A2.
+- Slice 6.32 (shipyards first; with your decisions D108–D111) is merged (projects#197, main `4b4cbcad`, 2026-10-06
+  17:45Z) and deployed by gembernodes#89, with the dashboards' descriptions of the slice (merged 17:54Z).
 - Phase 6's checks, on the run that ended at the reset (on the cluster since 2026-10-02 08:50Z, so the last 2.2 days of
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
@@ -3319,6 +3321,84 @@ when it is seen for the first time.
     shuttle trades while its drone drifts and collects once it is parked, failing under the old rule).
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
+
+- **6.32 Shipyards first** (built on branch `claude/spacetraders-shipyard-probes`, asked on 2026-10-06, D108–D111; merged as
+  projects#197, main `4b4cbcad`, its dashboards' descriptions and the deploy as gembernodes#89, merged 2026-10-06 17:54Z).
+  Asked after 6.31's deploy: "Can we set up the command ship to go to that location if there isn't a probe there, and also
+  have probes deployed to shipyards with priority, with shipyards with explorer ships being even higher priority than
+  that?", the location being "The location where an explorer ship is supposed to be bought if it's in the purchase order
+  and enough credits are available".
+  - Found (read-only, 2026-10-06 between 15:45Z and 16:10Z, image `60f3922a`):
+    - The command ship bought the first explorer, SPECTER-5C, at X1-GT9-AE7B at 14:44Z, after setting off at 13:25Z, and
+      was home at 15:05Z. The explore plan wanted 2 explorers for the 20 systems left.
+    - The second (718,106 at X1-GT9-AE7B, `MoreExplorers`) waited for the order, not for a ship: credits 1,615,691, the
+      credit reserve 811,653. Ahead of it came the probe for X1-BC61 (`Probes`, waiting for a probe at X1-BC61-EE6B), the
+      rest of the probes within the trade reach (X1-BC61 8, X1-GT9 16, X1-TA92 15, X1-GY77 27 once explored) and the drones
+      and cargo ships that take turns. A further explorer also waited until one of our ships was in X1-GT9; SPECTER-60,
+      passing through on its way to another system, briefly was.
+    - 40 shipyards were known, each at a waypoint with the SHIPYARD trait and a market. Two sell SHIP_EXPLORER: X1-GT9-AE7B
+      (718,106, HIGH) and X1-GY77-A2 (865,362, MODERATE), which SPECTER-5C found at 15:54Z. No probe was at either; within
+      the trade reach X1-GT9-AE7B, X1-BC61-EE6B, X1-TA92-A18X, X1-TA92-X20X and X1-GY77's three had none.
+  - Asked on 2026-10-06, all as recommended: "Keep D102's order" (D108), "Across systems" (D109), "Stays parked" (D110),
+    "Probe tier" (D111).
+  - Done:
+    - **The command ship fetches every explorer, unless a probe answers** (D108; `BuyAsync`, `ProbeAnswersAsync`, `Fetches`
+      and `DecideAsync` in `Exploring/ExplorePlanService.cs`): a purchase that finds none of our ships at the shipyard is
+      `WaitingForAShipThere` while a probe of ours counts for the shipyard's system, there or on its way there
+      (`ProbePlanner.Whereabouts`, as the probe plan counts it: one passing through counts for where it goes), and the probe
+      plan is on; otherwise `CommandShipFetchesIt`, for the first explorer and every further one. A further explorer reports
+      its need to the order even with none of our ships in the shipyard's system. The fetch comes before the command ship's
+      way home once explorers explore; once on its way it stays with the purchase while it waits for the credits, the order
+      or a probe that came meanwhile.
+    - **Which system gets the next probe** (D109, D111; `Wants` in `Automation/ProbeDeploymentPlanService.cs`): fewer
+      probes than shipyards that sell SHIP_EXPLORER, wherever the gates reach it, at the probe tier; then, within the trade
+      reach, fewer probes than shipyards, then than markets; then, beyond it, the same at the far-probe tier. Each step goes
+      home first, then the nearest. For the probes bought and the spares lent.
+    - **Where a probe parks** (D110; `Park`, `Parked` and `Nearest` in `Probes/ProbePlanner.cs`): after the calls (D30), a
+      probe parks at each shipyard without one, those that sell explorers first, the nearest pair first. One at a shipyard
+      stays; one parked at a shipyard that sells no explorer gives way to one that does. The others roam (D29), or, with a
+      probe for every market, settle (B69), the shipyards first. A probe that comes into a system flies to a shipyard
+      without one first (`Entry`).
+    - A market is a shipyard by its waypoint's SHIPYARD trait, and one that sells SHIP_EXPLORER by the cached shipyard (its
+      types or its ships).
+    - Visibility: the probe plan's state gives each market's `Shipyard` and the next probe's `NextProbeFor`; the command
+      ship's `PlanStarted` line says no probe of ours is there to answer the purchase's call.
+  - Readings in the build (yours to confirm or change):
+    - **"A probe there"** is a probe of ours in the shipyard's system or on its way there, not only one at the shipyard: it
+      answers the purchase's call within minutes (D30), while the command ship is several jumps away.
+    - **Once on its way the command ship stays with the purchase** while the order holds the explorer back, as it already
+      did for the credits (D98): a drone's or a cargo ship's turn can come while it flies, and flying home and back would
+      cost the trip twice. It waits at the shipyard, where the purchase needs it.
+    - **A probe parked at a shipyard still answers a call at another** shipyard of its system (D30): the purchase that waits
+      comes first, and the shipyard it leaves gets the next free probe.
+    - **The counts decide which system is next**: a system with as many probes as shipyards counts as having them all, as
+      its probes park at its shipyards before they roam.
+    - **Home too**: home has a probe at each of its 28 markets now, so nothing changes there in this reset. After the next
+      reset the starting probe parks at a home shipyard (X1-FJ91 had three), and home's markets are roamed only by the probes
+      bought after the shipyards have theirs; the scout plan's first round and the ships at markets keep prices meanwhile.
+  - Expect, once deployed: the next probe is for X1-GT9 (`NextProbeFor` `Explorer`) and parks at X1-GT9-AE7B; X1-GY77-A2's
+    follows once X1-GY77 is explored, then the shipyards of X1-TA92 and X1-GY77, then the markets; X1-BC61's probe parks at
+    X1-BC61-EE6B. The second explorer still waits for the order (D102); by its turn a probe is at X1-GT9-AE7B, and it is
+    bought without the command ship.
+  - Noticed (not changed): the command ship's flight to the shipyard is a `MoveToWaypointGoal`, which
+    `AutomationSwitches.PlanFor` gives the survey plan (the survey ship's moves, D54), so with the survey plan switched off
+    the flight would wait. Every plan is on.
+  - Tests: `ExplorersTests` (a further explorer stays last, the command ship fetches it and comes home; a probe in the
+    shipyard's system answers the first one's call while the command ship explores on; a probe on its way there answers,
+    one passing through doesn't; with the probe plan off the command ship fetches; once on its way it stays while the order
+    holds the explorer back; until the order lets a further one through, the command ship keeps its work),
+    `ProbePlannerTests` (a probe at a shipyard stays parked while the others roam; a shipyard without one before a due
+    market; an explorer shipyard before every other, however far; a parked probe gives way to one; settling spares take a
+    shipyard first; a probe coming in takes an explorer shipyard, then the shipyard nearest the gate; `Whereabouts`),
+    `ProbeDeploymentPlanServiceTests` (a probe parks while another roams; an explorer shipyard gets the next probe before a
+    nearer system's markets; a shipyard before a nearer system's markets; beyond the trade reach the probe tier only for an
+    explorer shipyard; a probe for X1-KR90 flies to its shipyard K2).
+  - To understand this, start with `Plan`, `Park` and `Entry` in `Probes/ProbePlanner.cs`, then `Wants` and `BuyProbeAsync`
+    in `Automation/ProbeDeploymentPlanService.cs`, then `BuyAsync`, `ProbeAnswersAsync` and `Fetches` in
+    `Exploring/ExplorePlanService.cs`.
+  - Done when: an explorer is bought without the command ship wherever a probe is in its shipyard's system, the command
+    ship fetches one only where none is, and every shipyard within the trade reach has a probe, those that sell explorers
+    first, before the other markets get theirs.
 
 - **6.31 Warping** (built on branch `claude/spacetraders-warp`, asked on 2026-10-06, D100, D101, D104–D107; merged as
   projects#196, main `60f3922a`, its dashboard and the deploy as gembernodes#87, live since 2026-10-06 14:45Z): the explorer

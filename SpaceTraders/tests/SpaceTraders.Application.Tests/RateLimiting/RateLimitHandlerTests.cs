@@ -7,6 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Availability;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
@@ -90,6 +92,27 @@ public sealed class RequestBudgetTests
         budget.TryTake(Start, RequestBudget.WriteReserve).Should().Be(TimeSpan.FromSeconds(1) + RequestBudget.JourneyMargin, "the next read waits for the next second");
         budget.TryTake(Start).Should().Be(TimeSpan.Zero, "a write takes from the reserve");
         budget.BurstRemaining(Start).Should().Be(RequestBudget.WriteReserve - 1);
+    }
+
+    [Fact]
+    public void TryTake_ForAWriteThatGivesWay_LeavesTheLastBurstRequestsToTradeTrips()
+    {
+        // D115: however many other writes went just before, a trade trip's request still goes at once.
+        var budget = new RequestBudget();
+        for (var request = 0; request < RequestBudget.PerSecond + RequestBudget.Burst - RequestBudget.TradeReserve; request++)
+        {
+            budget.TryTake(Start, RequestBudget.TradeReserve).Should().Be(TimeSpan.Zero, $"write {request + 1} leaves the reserve alone");
+        }
+
+        budget.TryTake(Start, RequestBudget.TradeReserve).Should().BeGreaterThan(TimeSpan.Zero, "the next write waits");
+        budget.TryTake(Start).Should().Be(TimeSpan.Zero, "a trade trip's request takes from the reserve");
+        budget.BurstRemaining(Start).Should().Be(RequestBudget.TradeReserve - 1);
+    }
+
+    [Fact]
+    public void TheTradeTripsReserve_LiesWithinTheWritesReserve_SoAReadLeavesItToo()
+    {
+        RequestBudget.TradeReserve.Should().BePositive().And.BeLessThan(RequestBudget.WriteReserve);
     }
 
     [Fact]
@@ -210,6 +233,96 @@ public sealed class RateLimitingHandlerTests
     }
 
     [Fact]
+    public async Task AnotherWrite_GivesWayToATradeTripsRequest_ButNoLongerThanItsLimit()
+    {
+        // Slice 6.33 (D115), asked on 2026-10-07: "if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to
+        // wait for a miner or a surveyor." A miner's dock waits while a trade trip's request does; not forever, or a busy trading
+        // fleet would starve the miners.
+        var budget = new RequestBudget();
+        TradeRequestWaits(budget);
+        using var handler = new RateLimitingHandler(budget, new RateLimitStatus(), _metrics)
+        {
+            InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)),
+            MaxWriteDelay = TimeSpan.FromMilliseconds(300),
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var stopwatch = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://test/my/ships/SHIP-3/dock");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250), "the write gave way to the trade trip's request");
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "then it went, though the trade trip's request still waits");
+        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait >= TimeSpan.FromMilliseconds(250)), "write");
+    }
+
+    [Theory]
+    [InlineData("POST", "http://test/my/ships/SHIP-5/sell")]
+    [InlineData("GET", "http://test/systems/X1-AB/waypoints/X1-AB-A1/market")]
+    public async Task ATradeTripsRequest_GivesWayToNone(string method, string uri)
+    {
+        // D115: with other writes waiting, a trade trip's sale, or the refresh of the market it trades at, goes at once.
+        var budget = new RequestBudget();
+        budget.WriteWaiting();
+        budget.WriteWaiting();
+        using var handler = new RateLimitingHandler(budget, new RateLimitStatus(), _metrics)
+        {
+            InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)),
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var stopwatch = Stopwatch.StartNew();
+        using (ApiPriority.For(new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-A1" }))
+        {
+            using var request = new HttpRequestMessage(new HttpMethod(method), uri);
+            using var response = await invoker.SendAsync(request, CancellationToken.None);
+        }
+
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(200));
+        budget.WritesWaiting.Should().Be(2, "only the other writes still wait");
+        budget.TradeRequestsWaiting.Should().Be(0);
+        _metrics.DidNotReceive().RateLimitWait(Arg.Any<TimeSpan>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ARead_GivesWayToATradeTripsRequest_AsToAnyWrite()
+    {
+        var budget = new RequestBudget();
+        TradeRequestWaits(budget);
+        using var handler = new RateLimitingHandler(budget, new RateLimitStatus(), _metrics)
+        {
+            InnerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)),
+            MaxReadDelay = TimeSpan.FromMilliseconds(300),
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var stopwatch = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/systems/X1-AB/waypoints/X1-AB-D41/market");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
+
+        stopwatch.Elapsed.Should().BeGreaterThan(TimeSpan.FromMilliseconds(250));
+        _metrics.Received(1).RateLimitWait(Arg.Any<TimeSpan>(), "read");
+    }
+
+    [Fact]
+    public async Task ATradeTripsRequestThatWaitsForTheBudget_CountsItsWaitAsTrade()
+    {
+        var budget = new RequestBudget();
+        var now = TimeProvider.System.GetUtcNow();
+        for (var request = 0; request < RequestBudget.PerSecond + RequestBudget.Burst; request++)
+        {
+            budget.TryTake(now);
+        }
+
+        using (ApiPriority.For(new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-A1" }))
+        {
+            await SendAsync(new RateLimitingHandler(budget, new RateLimitStatus(), _metrics), requests: 1);
+        }
+
+        _metrics.Received(1).RateLimitWait(Arg.Is<TimeSpan>(wait => wait > TimeSpan.FromMilliseconds(500)), "trade");
+    }
+
+    [Fact]
     public async Task ANewHandler_TakesFromTheSameBudget()
     {
         // The HttpClient factory recreates its handlers every few minutes; the budget must not reset.
@@ -221,6 +334,13 @@ public sealed class RateLimitingHandlerTests
 
         budget.BurstRemaining(TimeProvider.System.GetUtcNow()).Should().Be(28);
         status.TotalRequests.Should().Be(4);
+    }
+
+    /// <summary>A trade trip's request waiting for the budget, as the handler counts one: a write, and a trade trip's (D115).</summary>
+    private static void TradeRequestWaits(RequestBudget budget)
+    {
+        budget.WriteWaiting();
+        budget.TradeRequestWaiting();
     }
 
     private static async Task SendAsync(RateLimitingHandler handler, int requests)
