@@ -323,17 +323,21 @@ public sealed class ExplorersTests
     }
 
     [Theory]
-    [InlineData(1, "X1-S01", HomeGate)]
-    [InlineData(5, "X1-FAR", "X1-FAR-G")]
-    public async Task AnExplorer_TakesTheSystemsWithinTheTradeReachFirst_ThoughOneBeyondIsNearerToIt(int reach, string target, string firstJump)
+    [InlineData(1, 9999, "X1-S01", HomeGate)]
+    [InlineData(5, 1, "X1-FAR", "X1-FAR-G")]
+    [InlineData(0, 1, "X1-FAR", "X1-FAR-G")]
+    public async Task AnExplorer_TakesTheSystemsOfTheFirstRingFirst_ThoughOneBeyondIsNearerToIt(int ringWidth, int tradeReach, string target, string firstJump)
     {
-        // D103: "Reach first, then nearest", the reach being Trade.MaxHaulDistance. X1-FAR hangs off X1-GT9, 2 jumps from home:
-        // the explorer at X1-GT9's gate is 1 jump from it, and 2 from the systems one jump from home. Within a reach of 1 they
-        // come first; within one of 5 all are, and the nearest goes first.
+        // D103: "Reach first, then nearest", in rings since slice 6.33 (D114). X1-FAR hangs off X1-GT9, 2 jumps from home: the
+        // explorer at X1-GT9's gate is 1 jump from it, and 2 from the systems one jump from home. In rings 1 jump wide they come
+        // first; in rings 5 wide all lie in the first, and the nearest goes first. The rings were as wide as the trade reach,
+        // Trade.MaxHaulDistance, until its 9999 of 2026-10-07 made one ring of every system; since slice 6.35 (D117: "Make a
+        // separate ring width setting defaulting to 5") they are Explore.RingWidth wide, 5 when it gives none.
         await SeedAsync();
         await AddSystemAsync("X1-FAR", from: Gt9);
         await AddShipAsync(Explorer, Gt9, Gt9Gate, "SHIP_EXPLORER");
-        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(reach);
+        _settings.GetAsync<int>(ExplorePlanService.RingWidthSetting, Arg.Any<CancellationToken>()).Returns(ringWidth);
+        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(tradeReach);
 
         await PassAsync();
 
