@@ -29,10 +29,11 @@
   with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. The first explorer,
   SPECTER-5C, was bought at X1-GT9-AE7B at 14:44Z that day and explores the systems within the trade reach first (X1-GY77
   at 15:54Z). Nothing was read from the bot since 6.32's deploy.
-- **Built, not merged:** slice 6.33 (the largest hold, every explorer before the probes, exploring in rings, trade trips
-  first at the rate limit; D112–D115), on branch `ccr-1ca8b8f2-r8kgby` in projects and gembernodes. In this reset the home
-  gate is built, so it works as soon as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices across
-  systems wait for the new home system's gate (D68).
+- **In review:** slice 6.33 (the largest hold, every explorer before the probes, exploring in rings, trade trips first at
+  the rate limit; D112–D115): projects#198. Its dashboard's descriptions wait on gembernodes' branch `ccr-1ca8b8f2-r8kgby`
+  for the deploy PR, which follows the merge with the new image. In this reset the home gate is built, so it works as soon
+  as it is deployed; after the next reset, on 2026-10-11 at 13:00Z, the slices across systems wait for the new home
+  system's gate (D68).
 - **Done:** phases 0–5, and phase 6's slices 6.1–6.32, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
@@ -273,11 +274,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.32 Shipyards first: the command ship fetches every explorer no probe can, and the probes park at the shipyards
   (D108–D111)
 - 6.33 The largest hold, every explorer before the probes, exploring in rings, and trade trips first at the rate limit
-  (D112–D115), built, not merged
+  (D112–D115), in review (projects#198)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done, and so is 6.32, asked the same day after them (D108–D111; its details are in `docs/archive/PLAN_HISTORY.md`); 6.33,
-asked on 2026-10-07, is built:
+asked on 2026-10-07, is in review:
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
@@ -323,8 +324,8 @@ asked on 2026-10-07, is built:
   (order 8) - I'd like exploring done in concentric circles based on trade distance. So first the first 5 systems as is
   currently the case, then 6-10, then 11-15 etc.", and during the work: "I'd like trade ships to be prioritized in rate
   limiting. So if a trade ship docks/undocks/jumps/navigates/buys/sells it should not have to wait for a miner or a
-  surveyor." Built on branch `ccr-1ca8b8f2-r8kgby` in projects, with the dashboard's descriptions in gembernodes; not
-  merged.
+  surveyor." Built on branch `ccr-1ca8b8f2-r8kgby` in projects, in review as projects#198; the dashboard's descriptions
+  are on the same branch in gembernodes, for the deploy PR.
   - Found (in the code; nothing was read from the bot, which this session can't reach):
     - The order's numbers are the dashboard's positions (`PurchaseTier`): 8 the probes, 9 the drones and cargo ships
       that take turns, 10 the further explorers (`MoreExplorers`), 11 the far probes. Since D108 only their place told
