@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using SpaceTraders.Infrastructure.Persistence;
@@ -96,6 +97,57 @@ public sealed class StartupSyncServiceTests
         ship.GoalKind.Should().Be("ScoutWaypoint");
         ship.GoalPayloadJson.Should().Be(goalJson);
         ship.GoalStatus.Should().Be((int)GoalStatus.Assigned);
+    }
+
+    [Fact]
+    public async Task StartAsync_KeepsWhatAnArrivalStoredWhileTheShipsWereFetched()
+    {
+        // B77: the ship event scheduler starts first in the chain, so an arrival due during a restart is handled while the sync
+        // fetches the ships' pages. On 2026-10-07 at 05:27:57Z SPECTER-121 jumped on to X1-FA16; at 05:28:01Z the sync saved it
+        // back at the X1-AT30 gate from its page, fetched before the jump. Its next jump was refused, and the plan left that
+        // gate alone for an hour. Here: the page has AGENT-1 docked at X1-AB-2, and meanwhile it flies on to X1-AB-1.
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-1", SystemSymbol = "X1-AB", Type = "PLANET" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON" });
+            db.Ships.Add(new CachedShip
+            {
+                AgentId = AgentId,
+                Symbol = "AGENT-1",
+                SystemSymbol = "X1-AB",
+                WaypointSymbol = "X1-AB-2",
+                Status = "DOCKED",
+                FuelCurrent = 300,
+                FuelCapacity = 400,
+                LastSyncedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var arrivesAt = DateTimeOffset.UtcNow.AddMinutes(1);
+        var page = await _apiClient.GetMyShipsAsync(1, 20, CancellationToken.None);
+        _apiClient.GetMyShipsAsync(1, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            await using var arrivalScope = provider.CreateAsyncScope();
+            await new ShipRepository(arrivalScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>()).UpdateNavAsync(
+                "AGENT-1",
+                new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-1", "CRUISE", "X1-AB-1", arrivesAt),
+                new FuelModel(250, 400));
+            return page;
+        });
+
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await using var scope = provider.CreateAsyncScope();
+        var ship = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Ships.SingleAsync(s => s.Symbol == "AGENT-1");
+        ship.Should().BeEquivalentTo(
+            new { Status = "IN_TRANSIT", WaypointSymbol = "X1-AB-1", DestWaypointSymbol = "X1-AB-1", ArrivesAt = (DateTimeOffset?)arrivesAt, FuelCurrent = 250 },
+            "what the arrival stored is newer than the page");
+        ship.ShipType.Should().Be("COMMAND", "what doesn't change with a flight comes from the page all the same");
     }
 
     [Fact]

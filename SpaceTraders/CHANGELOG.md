@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-07, B77)
+- Startup sync no longer puts a ship back where it was before an arrival moved it (B77). The ship event scheduler starts first in the startup chain, so an arrival due during a restart is handled while startup sync fetches the ships' pages; the sync saved every ship as its page had it, and a ship that had jumped, flown on or sold meanwhile was stored as before. At the 05:27Z deploy on 2026-10-07 SPECTER-121 was put back at the gate it had jumped from, its next jump was refused and the explore plan left X1-FA16's gate alone for an hour; at the 11:04Z deploy SPECTER-35 was stored in transit for 10 minutes after it had arrived. Now a ship whose row was written after its page was asked for (`LastSyncedAt`) keeps where it is, its cooldown, fuel and cargo; its type, mounts and modules still come from the page.
+
+### Docs – Changed (2026-10-07, B77)
+- `PLAN.md`: B77. `docs/HOW_IT_WORKS.md`: startup sync and the arrivals handled while it runs.
+
 ### Code – Fixed (2026-10-07, B76)
 - The explore plan keeps a free explorer while it waits to choose its system (B76). While a look that could change the choice is still to come (the gates an exploration has just shown, a system's waypoints for a warp), the plan waits a pass; an explorer of its own waited with its assignment open, but a free one, just bought or back from a trade, was left free, and the trading plan sent it off, though systems were left (D102: it trades only with none left). On 2026-10-07 each of the three explorers bought went trading within half a minute, for 15 to 44 minutes. Now the plan takes it (journal `PlanStarted`, "waits in …").
 
