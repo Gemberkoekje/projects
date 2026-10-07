@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals.Executors;
@@ -244,6 +245,44 @@ public sealed class WarpExplorersTests
     }
 
     [Fact]
+    public async Task AnExplorerDockedAfterATrade_GoesIntoOrbitToScan()
+    {
+        // B75: the API scans only from orbit, and an explorer with nothing left to explore comes back to the plan docked, after a
+        // trade (D102). Every scan from 2026-10-06 22:55Z failed so, 38 in the 24 hours to 2026-10-07 13:30Z: "Ship action
+        // failed. Ship is not currently in orbit at X1-MG87-EA1C."
+        await SeedAsync(zz69Explored: true);
+        await MoveAsync(Explorer, Gt9, "X1-GT9-B1");
+        var inOrbit = false;
+        _port.OrbitShipAsync(Explorer, Arg.Any<CancellationToken>())
+            .Returns(new NavModel("IN_ORBIT", Gt9, "X1-GT9-B1", "CRUISE", "X1-GT9-B1", _now))
+            .AndDoes(_ => inOrbit = true);
+        _port.ScanSystemsAsync(Explorer, Arg.Any<CancellationToken>()).Returns(_ => inOrbit
+            ? new ScanSystemsActionResult([new ScannedSystemModel("X1-AFAR", "X1", "RED_STAR", 16333, 3117, 1500)], 70, _now.AddSeconds(70))
+            : throw new InvalidOperationException("Ship action failed. Ship is not currently in orbit at X1-GT9-B1."));
+
+        await PassAsync();
+
+        await _port.Received(1).OrbitShipAsync(Explorer, Arg.Any<CancellationToken>());
+        (await StateAsync()).Systems.Single(system => system.SystemSymbol == Gt9).ScannedAt.Should().NotBeNull();
+        _log.Journal.Should().ContainSingle(line => line.EventKind == JournalEvents.SystemsScanned);
+    }
+
+    [Fact]
+    public async Task AnExplorerInOrbit_ScansWithoutAnotherOrbit()
+    {
+        await SeedAsync(zz69Explored: true);
+        _port.ScanSystemsAsync(Explorer, Arg.Any<CancellationToken>()).Returns(new ScanSystemsActionResult(
+            [new ScannedSystemModel("X1-AFAR", "X1", "RED_STAR", 16333, 3117, 1500)],
+            70,
+            _now.AddSeconds(70)));
+
+        await PassAsync();
+
+        await _port.DidNotReceiveWithAnyArgs().OrbitShipAsync(default!, default);
+        await _port.Received(1).ScanSystemsAsync(Explorer, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task WithNothingLeft_WhereTheGatesDontReach_TheExplorerWarpsBack_AndIsReleasedThereToTrade()
     {
         // Done when: "the explorer warps to such systems and back without being stranded". In X1-ZZ69, explored and scanned from,
@@ -425,6 +464,7 @@ public sealed class WarpExplorersTests
                 new PlanRepository(db),
                 _settings,
                 _port,
+                new OrbitSubCommand(_port, new ShipRepository(db), new MarketRepository(db), Substitute.For<IRefuelSubCommand>(), _log.For<OrbitSubCommand>()),
                 _purchases,
                 _order,
                 new JumpRefusals(),
