@@ -23,18 +23,14 @@
 
 ## Where things stand (2026-10-07)
 
-- **Running:** projects main `27050f8b` (projects#198: slice 6.33, the largest hold, every explorer before the probes,
-  exploring in rings, trade trips first at the rate limit), deployed by gembernodes#90 with the dashboard's descriptions of
-  the slice (merged 2026-10-07 05:24Z); gembernodes#88 raised the API's CPU and memory limits (restart at 2026-10-06
-  15:37Z). The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on
-  (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. The first explorer, SPECTER-5C, was bought
-  at X1-GT9-AE7B at 14:44Z that day and explores the systems within the trade reach first (X1-GY77 at 15:54Z). Nothing was
-  read from the bot since 6.32's deploy.
-- **In review:** slice 6.34 (a cargo ship every half hour, before the probes; D116): projects#199. Its dashboard's
-  description of the order waits on gembernodes' branch `ccr-caa38096-yjumz1` for the deploy PR, which follows the merge
-  with the new image. It works as soon as it is deployed; after the next reset, on 2026-10-11 at
-  13:00Z, it waits behind the new home gate's loads (D64), as the probes do.
-- **Done:** phases 0–5, and phase 6's slices 6.1–6.33, listed under [Phases](#phases).
+- **Running:** projects main `07cf58f3` (projects#199: slice 6.34, a cargo ship every half hour, before the probes),
+  deployed by gembernodes#91 with the dashboard's description of the slice (merged 2026-10-07 11:02Z, pod up 11:04Z);
+  gembernodes#88 raised the API's CPU and memory limits (restart at 2026-10-06 15:37Z). The agent is SPECTER of the reset
+  of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was
+  complete at 2026-10-06 03:17Z. Read from the bot at 2026-10-07 13:30Z: 57.0M credits, the credit reserve 9.4M, 5
+  explorers exploring, 464 probes, `Trade.MaxHaulDistance` 9999 (since about 04:35Z).
+- **In review:** B74 (below), on branch `claude/spacetraders-b74-parked-probes-idle`.
+- **Done:** phases 0–5, and phase 6's slices 6.1–6.34, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
@@ -65,6 +61,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 |---|---|---|---|
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 (done for the mining and survey trips, which navigate with their goal; the contract commands still dead-reckon for themselves) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
+| B74 | **`ShipLeftIdle` flags every probe parked at a shipyard** (found 2026-10-07).<br>• Since slice 6.32 (D110, "Stays parked") a system with fewer probes than markets parks a probe at each shipyard, so a purchase there needs no probe called; the plan gives it no due market. The rule still read every idle probe in a system with a due market as one the plan could send.<br>• At 13:30Z all 52 open `ShipLeftIdle` anomalies were probes holding a shipyard market in the probe plan's state (48 shipyards, 4 that sell SHIP_EXPLORER), each "while the ProbeDeployment plan has work it could do: N markets of X1-… that no probe or ship watches are due"; 111 such anomalies were raised in the 12 hours before. | `Health/ShipLeftIdleRule.cs`; `ShipLeftIdleRuleTests.AProbeParkedAtAShipyard_IsNotIdleByMistake_ButOneThatRoamsIs` (failed before the fix) | 6.32; fixed on branch `claude/spacetraders-b74-parked-probes-idle`, in review |
 
 ### Decisions
 
@@ -276,11 +273,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
   (D108–D111)
 - 6.33 The largest hold, every explorer before the probes, exploring in rings, and trade trips first at the rate limit
   (D112–D115)
-- 6.34 A cargo ship every half hour, before the probes (D116), in review (projects#199)
+- 6.34 A cargo ship every half hour, before the probes (D116)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
-done, and so are 6.32, asked the same day after them (D108–D111), and 6.33, asked on 2026-10-07 (D112–D115; the details of
-both are in `docs/archive/PLAN_HISTORY.md`); 6.34, asked the same day, is in review:
+done, and so are 6.32, asked the same day after them (D108–D111), and 6.33 and 6.34, asked on 2026-10-07 (D112–D116); the
+details of the three are in `docs/archive/PLAN_HISTORY.md`:
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
@@ -319,53 +316,3 @@ both are in `docs/archive/PLAN_HISTORY.md`); 6.34, asked the same day, is in rev
     (image `60f3922a`, live since 2026-10-06 14:45Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
   - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
     other systems (D68).
-
-- **6.34 A cargo ship every half hour, before the probes** (D116). Asked on 2026-10-07: "I would like to switch priorities
-  between new trade ships and probes. So once every half hour, money permitting, a trade ship is bought, independent on
-  whether probes still need to be bought." Built on branch `ccr-caa38096-yjumz1` in projects, in review as projects#199;
-  the dashboard's description of the order is on the same branch in gembernodes, for the deploy PR.
-  - Found (in the code; nothing was read from the bot, which this session can't reach):
-    - The order's positions (`PurchaseTier`): 7 every explorer, 8 the probes of home and the trade reach, 9 the drones and
-      cargo ships that take turns, 10 the far probes. Beyond `Trade.ShipPurchases` the trading plan said what it needed
-      only at 9 (`BuyCargoShipAsync`), so no cargo ship was bought while a probe within the trade reach was still to buy:
-      on 2026-10-06 the trade reach had about 66 markets (D108).
-    - Beyond the list a cargo ship is a need only once a route worth `Trade.ShipPurchaseMinRouteProfit` has waited
-      `Trade.ShipPurchaseWaitMinutes` for a ship with every trader busy (D88, `TradeShipDemand`).
-    - The gate's miners' "once every half hour" (D92) counts from the last one bought, which the mining plan's state keeps;
-      nothing kept when the trading plan last bought a ship.
-  - Asked on 2026-10-07, all as recommended: "Keep D88's check", "Save up, probes wait", "Keep the turns too" (D116).
-  - Done:
-    - **The cargo ship on the clock** (D116; `BeyondTheListTierAsync` in `Automation/TradingAutomationService.cs`,
-      `PurchaseTier.TimedCargoShip`): beyond the list, once D88's route has waited, the trading plan says it needs the
-      largest hold (D112) at `TimedCargoShip` (8) when `Trade.ShipPurchaseIntervalMinutes` (new, 30; 0 or less means 30)
-      have passed since it last bought a cargo ship, or none is on record, and at `Alternating` otherwise, as before. The
-      probes are 9, the turns 10 and the far probes 11.
-    - **When the plan last bought one** (`TradingAutomationPlanState.LastShipBoughtAt`, new): every cargo ship the trading
-      plan buys, the list's too, sets it; the plan reads its state once a pass, before its purchase, and writes it when the
-      routes, the goods not traded or this change.
-    - gembernodes: the purchase order's description on the SpaceTraders dashboard gives the new positions.
-  - Readings in the build (yours to confirm or change):
-    - **"Once every half hour"** counts from the trading plan's last cargo ship, of the list or beyond it, as the gate's
-      miners count from their last (D92), not by the clock's half hours; a shuttle the mining plan buys for a collection
-      point (D83) doesn't count. With no purchase on record, as after the deploy, the next goes before the probes at once.
-    - **Money permitting** is the credit reserve every purchase keeps (D51); the credits are saved up for the cargo ship
-      as you chose, and a purchase that fails leaves the half hour where it was.
-    - **Before the probes only**: every explorer (7, D113) and the jump gate's loads (6, D64) stay before it.
-    - **`Trade.ShipPurchaseIntervalMinutes` at 0 or less means half an hour**, as `Mining.GateMinerIntervalMinutes` does;
-      a large value puts the cargo ships back after the probes.
-  - Expect, once deployed:
-    - while a route has waited for a ship (D88), the Trading plan's row on the dashboard's purchase order at position 8
-      (`TimedCargoShip`), the probes' at 9 waiting behind it, until the cargo ship is bought;
-    - then probes for half an hour, the Trading plan's row at 10 (`Alternating`) while a route waits;
-    - a cargo ship about every half hour while the credits keep up and routes keep waiting.
-  - Tests: `PurchaseOrderTests` (the cargo ship on the clock after every explorer and before the probes, the turns and the
-    far probes; it doesn't wait for the drones' turn, which comes first between; the positions 0 to 11),
-    `TradingAutomationServiceTests` (31 minutes after the plan's last purchase the largest hold goes before the probes and
-    the state keeps the new purchase; at 29 minutes it takes its turn; the setting at 60, and unset; a purchase that fails
-    doesn't start the half hour; the time stays in the state as the routes change; the list's ship starts the half hour;
-    with none on record the largest hold goes before the probes; D88 still holds it back), `DefaultSettingsSeedTests` (the
-    new setting), `PrometheusMetricsTests` (the probes at 9).
-  - To understand this, start with `BeyondTheListTierAsync` and `BuyCargoShipAsync` in
-    `Automation/TradingAutomationService.cs`, then `PurchaseTier` in `Services/PurchaseOrder.cs`.
-  - Done when: while probes wait to be bought, a cargo ship is bought about every half hour that a route waits for one,
-    and the probes in between.
