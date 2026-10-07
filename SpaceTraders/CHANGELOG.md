@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-07, slice 6.36)
+- A purchase that waits for one of our ships lets the ones behind it through (D118), as asked on 2026-10-07: "Do you want a purchase that is only waiting for a ship to arrive to let the ones behind it go first?" - "Yes please, as long as the total doesn't dip below the total needed for the freighter." That day a bulk freighter waited 34 minutes for a probe to reach its shipyard (D30), with 57M credits against its 2.9M and the 9.4M reserve, and the probes behind it waited too. Now the order passes over a need whose purchase waits for one of our ships at its shipyard (an open `ShipyardCalls` call, `PurchaseOrder.WaitingForAShip`), as long as the later purchase leaves the waiting needs' prices and the credit reserve; the purchase keeps them as well (`PurchaseNeeds.Hold`, `HeldFor`, `ReportedNeed.Held`, used by `ShipPurchaseService`). `PurchaseOrder` takes `ShipyardCalls` and `IBudgetPolicy`.
+
+### Docs – Changed (2026-10-07, slice 6.36)
+- `PLAN.md`: slice 6.36 built, with its readings; where things stand after slice 6.35 merged, whose details moved to `docs/archive/PLAN_HISTORY.md`. `docs/HOW_IT_WORKS.md`: the order ships are bought in, and a purchase that waits for a ship.
+
 ### Code – Changed (2026-10-07, slice 6.35)
 - A separate ring width (D117), as asked on 2026-10-07: "Make a separate ring width setting defaulting to 5, please." The exploring ships take the systems around home ring by ring (D114), and the rings were as wide as the trade reach, `Trade.MaxHaulDistance`: at 9999 every system lay in one ring, and each explorer took the system nearest itself, leaving X1-PY67, 4 jumps from home, unexplored. `Explore.RingWidth` (new, 5; 0 or less means 5) now gives the rings' width (`ExplorePlanService.RingWidthAsync`, the `ringWidth` of `ExploreAtlas.Next`, `NextByWays` and `Ring`); the trade reach keeps its other uses.
 

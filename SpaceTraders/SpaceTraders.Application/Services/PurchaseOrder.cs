@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Domain.Enums;
 
 namespace SpaceTraders.Application.Services;
@@ -36,6 +37,9 @@ namespace SpaceTraders.Application.Services;
 /// something earlier, has said what it needs within <see cref="PurchaseNeeds.Lifetime"/>, nothing after it is bought: after
 /// a start, and after a pause in which no plan ran (a 502 pauses them for 3 minutes), the plans say again before anything
 /// is bought. The order says who may buy; the credit reserve stays the purchase's own check (<see cref="IShipPurchaseService"/>).
+/// Since slice 6.36 (D118) a need whose purchase waits only for one of our ships to reach its shipyard (D30) lets the needs
+/// after it go first, each as long as the credits after it leave the waiting ones' prices and the credit reserve, which the
+/// purchase keeps too (<see cref="PurchaseNeeds.HeldFor"/>); one that waits for credits still holds them back.
 /// </summary>
 public interface IPurchaseOrder
 {
@@ -50,6 +54,8 @@ public interface IPurchaseOrder
 /// <inheritdoc />
 public sealed class PurchaseOrder(
     PurchaseNeeds needs,
+    ShipyardCalls calls,
+    IBudgetPolicy budget,
     ISettingsRepository settings,
     ILedgerRepository ledger,
     ILogger<PurchaseOrder> logger) : IPurchaseOrder
@@ -105,8 +111,8 @@ public sealed class PurchaseOrder(
     /// <param name="plansOn">The plans that buy ships and are on.</param>
     /// <param name="turn">Whose turn it is between drones and cargo ships (<see cref="Turn"/>).</param>
     /// <param name="now">The time to judge by.</param>
-    /// <returns>What comes first, in words, for the log; empty when the plan may buy.</returns>
-    internal static IReadOnlyList<string> Ahead(
+    /// <returns>What comes first; empty when the plan may buy.</returns>
+    internal static IReadOnlyList<Before> Ahead(
         AutomationPlan plan,
         PurchaseNeed need,
         IReadOnlyDictionary<AutomationPlan, ReportedNeed> reported,
@@ -119,7 +125,7 @@ public sealed class PurchaseOrder(
         ArgumentNullException.ThrowIfNull(plansOn);
 
         var kind = KindOf(plan);
-        var ahead = new List<string>();
+        var ahead = new List<Before>();
         foreach (var other in plansOn.Where(other => other != plan).Order())
         {
             if (!reported.TryGetValue(other, out var report) || now - report.At > PurchaseNeeds.Lifetime)
@@ -129,7 +135,7 @@ public sealed class PurchaseOrder(
                 if (BuyingPlans.TryGetValue(other, out var earliest)
                     && (earliest < need.Tier || (earliest == need.Tier && IsGateLoadBeforeMiners(other, plan, need))))
                 {
-                    ahead.Add($"the {other} plan, not heard from lately");
+                    ahead.Add(new Before(other, PurchaseNeed.None));
                 }
 
                 continue;
@@ -149,11 +155,37 @@ public sealed class PurchaseOrder(
                     && otherKind == turn)
                 || (open.Tier == need.Tier && !open.WaitsForMarkets && IsGateLoadBeforeMiners(other, plan, need)))
             {
-                ahead.Add($"the {other} plan's {open.ShipType} ({open.Tier})");
+                ahead.Add(new Before(other, open));
             }
         }
 
         return ahead;
+    }
+
+    /// <summary>
+    /// The plans whose purchase waits for one of our ships at its shipyard (D30): what each said it needs, within
+    /// <see cref="PurchaseNeeds.Lifetime"/>, is a ship at a shipyard with an open call for that ship (<see cref="ShipyardCalls"/>),
+    /// which the purchase makes when no ship of ours is there. Slice 6.36 (D118): such a purchase lets the ones after it go first.
+    /// </summary>
+    /// <param name="reported">What each plan said it needs, as it last said it.</param>
+    /// <param name="calls">The shipyards where a purchase waits for one of our ships.</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <returns>The plans.</returns>
+    internal static IReadOnlySet<AutomationPlan> WaitingForAShip(
+        IReadOnlyDictionary<AutomationPlan, ReportedNeed> reported,
+        IReadOnlyList<ShipyardCall> calls,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(reported);
+        ArgumentNullException.ThrowIfNull(calls);
+
+        return reported
+            .Where(entry => entry.Value.Need.Tier != PurchaseTier.None
+                && now - entry.Value.At <= PurchaseNeeds.Lifetime
+                && calls.Any(call => call.WaypointSymbol.Equals(entry.Value.Need.ShipyardWaypointSymbol, StringComparison.OrdinalIgnoreCase)
+                    && call.ShipType.Equals(entry.Value.Need.ShipType, StringComparison.OrdinalIgnoreCase)))
+            .Select(entry => entry.Key)
+            .ToHashSet();
     }
 
     /// <summary>
@@ -230,10 +262,32 @@ public sealed class PurchaseOrder(
         }
 
         var turn = need.Tier == PurchaseTier.Alternating ? await TurnAsync(cancellationToken) : PurchaseKind.None;
-        var ahead = Ahead(plan, need, needs.Reported(), plansOn, turn, now);
+        var reported = needs.Reported();
+        var ahead = Ahead(plan, need, reported, plansOn, turn, now);
         if (ahead.Count == 0)
         {
             return true;
+        }
+
+        // Slice 6.36 (D118), asked on 2026-10-07: "Yes please, as long as the total doesn't dip below the total needed for the
+        // freighter." A purchase that waits only for one of our ships to reach its shipyard lets this one go first, as long as
+        // the credits after it leave the waiting ones' prices and the credit reserve; its purchase keeps them too.
+        var waiting = WaitingForAShip(reported, calls.Open(now), now);
+        if (ahead.All(before => before.Need.Tier != PurchaseTier.None && waiting.Contains(before.Plan)))
+        {
+            var held = ahead.Sum(before => before.Need.Price);
+            if ((await budget.EvaluateAsync(need.Price + held, cancellationToken)).CanAfford)
+            {
+                needs.Hold(plan, held);
+                logger.LogDebug(
+                    "Purchase order: the {Plan} plan's {ShipType} ({Tier}) goes before {Ahead}, which wait for one of our ships at their shipyards, and leaves {Held} for them (D118).",
+                    plan,
+                    need.ShipType,
+                    need.Tier,
+                    string.Join("; ", ahead),
+                    held);
+                return true;
+            }
         }
 
         logger.LogDebug(
@@ -319,6 +373,48 @@ public sealed class PurchaseNeeds
         lock (_gate)
         {
             return new Dictionary<AutomationPlan, ReportedNeed>(_needs);
+        }
+    }
+
+    /// <summary>
+    /// Records that the order let a plan's need go before needs whose purchase waits for one of our ships (slice 6.36, D118),
+    /// and what its purchase keeps for them: their prices.
+    /// </summary>
+    /// <param name="plan">The plan.</param>
+    /// <param name="held">The credits its purchase keeps, beyond the credit reserve.</param>
+    public void Hold(AutomationPlan plan, long held)
+    {
+        lock (_gate)
+        {
+            if (_needs.TryGetValue(plan, out var reported))
+            {
+                _needs[plan] = reported with { Held = held };
+            }
+        }
+    }
+
+    /// <summary>
+    /// What a purchase keeps, beyond the credit reserve, for the needs before it in the order that wait for one of our ships
+    /// (slice 6.36, D118): what the order let the need for that ship at that shipyard through with, when it said so within
+    /// <see cref="Lifetime"/>; 0 when nothing waited before it.
+    /// </summary>
+    /// <param name="shipType">The ship, such as <c>SHIP_PROBE</c>.</param>
+    /// <param name="shipyardWaypointSymbol">Where it is bought.</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <returns>The credits to keep.</returns>
+    public long HeldFor(string shipType, string shipyardWaypointSymbol, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(shipType);
+        ArgumentNullException.ThrowIfNull(shipyardWaypointSymbol);
+        lock (_gate)
+        {
+            return _needs.Values
+                .Where(reported => now - reported.At <= Lifetime
+                    && reported.Need.ShipType.Equals(shipType, StringComparison.OrdinalIgnoreCase)
+                    && reported.Need.ShipyardWaypointSymbol.Equals(shipyardWaypointSymbol, StringComparison.OrdinalIgnoreCase))
+                .Select(reported => reported.Held)
+                .DefaultIfEmpty(0)
+                .Max();
         }
     }
 
@@ -514,6 +610,26 @@ public sealed record ReportedNeed
 
     /// <summary>When it said it.</summary>
     public required DateTimeOffset At { get; init; }
+
+    /// <summary>
+    /// What its purchase keeps beyond the credit reserve: the prices of the needs before it that wait for one of our ships, when
+    /// the order let it go before them (slice 6.36, D118, <see cref="PurchaseNeeds.Hold"/>); 0 otherwise.
+    /// </summary>
+    public long Held { get; init; }
+}
+
+/// <summary>
+/// A plan whose need comes before another's in the order (D43): what it said it needs, or <see cref="PurchaseNeed.None"/> when it
+/// hasn't said so within <see cref="PurchaseNeeds.Lifetime"/>, and anything it could need may come first.
+/// </summary>
+/// <param name="Plan">The plan.</param>
+/// <param name="Need">What it said it needs; <see cref="PurchaseNeed.None"/> when not heard from lately.</param>
+internal sealed record Before(AutomationPlan Plan, PurchaseNeed Need)
+{
+    /// <summary>The plan and its need in words, for the log.</summary>
+    /// <returns>Such as "the Trading plan's SHIP_HEAVY_FREIGHTER (TimedCargoShip)".</returns>
+    public override string ToString()
+        => Need.Tier == PurchaseTier.None ? $"the {Plan} plan, not heard from lately" : $"the {Plan} plan's {Need.ShipType} ({Need.Tier})";
 }
 
 /// <summary>A ship bought.</summary>

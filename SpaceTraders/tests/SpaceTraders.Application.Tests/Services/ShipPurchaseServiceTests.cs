@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -78,6 +79,28 @@ public sealed class ShipPurchaseServiceTests
         name.Should().EndWith("-1");
         _names.NameOf("AGENT-2").Should().Be(name);
         _log.Journal.Should().ContainSingle().Which.Message.Should().EndWith($"; the bot calls it {name}.");
+    }
+
+    [Fact]
+    public async Task APurchaseTheOrderLetGoBeforeOnesThatWaitForOurShips_KeepsTheirPricesBeyondTheReserve()
+    {
+        // Slice 6.36 (D118): "as long as the total doesn't dip below the total needed for the freighter". The order let this
+        // drone go before a freighter whose purchase waits for one of our ships at its shipyard; the purchase keeps the
+        // freighter's price as well as the credit reserve.
+        _purchases.Report(AutomationPlan.Mining, new PurchaseNeed(PurchaseTier.Alternating, "SHIP_MINING_DRONE", Shipyard, 12_000), DateTimeOffset.UtcNow);
+        _purchases.Hold(AutomationPlan.Mining, 2_900_000);
+        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(call => new BudgetDecision(call.Arg<long>() <= 80_000, 100_000, 20_000, 80_000));
+
+        var result = await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        result.Failure.Should().Be(ShipPurchaseFailure.OverBudget);
+        await _budget.Received(1).EvaluateAsync(2_912_000, Arg.Any<CancellationToken>());
+        await _port.DidNotReceiveWithAnyArgs().PurchaseShipAsync(default!, default!, default);
+
+        _purchases.Report(AutomationPlan.Mining, new PurchaseNeed(PurchaseTier.Alternating, "SHIP_MINING_DRONE", Shipyard, 12_000), DateTimeOffset.UtcNow);
+
+        (await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard)).IsSuccess.Should().BeTrue("with nothing waiting before it, it keeps only the reserve");
     }
 
     [Fact]

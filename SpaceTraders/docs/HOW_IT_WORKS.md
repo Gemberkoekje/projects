@@ -1471,6 +1471,13 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the
   plans in their order (explore, contract, probe, survey, mining, siphon, construction, trading), so after a purchase the
   next one in line may come in the same tick.
+- **A purchase that waits for a ship** (slice 6.36, D118: "Yes please, as long as the total doesn't dip below the total
+  needed for the freighter."): a need whose purchase waits for one of our ships to reach its shipyard (the call its
+  purchase made is open, D30: a probe on its way, or the command ship fetching an explorer, D108) lets the needs after it
+  go first, each as long as the credits after it leave the waiting needs' prices and the credit reserve, its "credits
+  needed" on the dashboard (`PurchaseOrder.WaitingForAShip`). The purchase keeps them too, with the shipyard's price as it
+  asks it then (`PurchaseNeeds.HeldFor`, `ShipPurchaseService`). With several waiting, a purchase behind them keeps all
+  their prices; a need that waits for credits, or anything else before it, still holds it back.
 - **Visibility:** `spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}`, one series
   per plan that needs something, worth the ship's price: the lowest `position` is what the credits are
   saved up for. A purchase is journaled as before (`ShipPurchased`); a purchase held back by the order logs

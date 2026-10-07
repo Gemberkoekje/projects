@@ -21,7 +21,8 @@ namespace SpaceTraders.Application.Services;
 /// fetched again first, so the reserve is kept with the price the shipyard asks now: a cached price can be
 /// hours old, and every purchase moves it. Whether a plan may buy at all is the purchase order's
 /// (<see cref="IPurchaseOrder"/>, D43), which counts each purchase at once (<see cref="PurchaseNeeds"/>): the
-/// ledger's row comes a moment later.
+/// ledger's row comes a moment later. A purchase the order let go before purchases that wait for one of our
+/// ships keeps their prices beyond the reserve (slice 6.36, D118, <see cref="PurchaseNeeds.HeldFor"/>).
 /// </remarks>
 public sealed class ShipPurchaseService(
     ISpaceTradersPort port,
@@ -71,7 +72,9 @@ public sealed class ShipPurchaseService(
             return Failed(ShipPurchaseFailure.PriceUnknown, "Purchase price unknown (shipyard not yet visited or stale cache).", estimatedCost);
         }
 
-        var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
+        // Slice 6.36 (D118): a purchase the order let go before purchases that wait for one of our ships keeps their prices too.
+        var held = purchases.HeldFor(shipType, shipyardWaypoint, TimeProvider.System.GetUtcNow());
+        var decision = await budget.EvaluateAsync(estimatedCost + held, cancellationToken);
         if (!decision.CanAfford)
         {
             return Failed(ShipPurchaseFailure.OverBudget, decision.Reason, estimatedCost);
@@ -107,7 +110,7 @@ public sealed class ShipPurchaseService(
         if (quotedCost != estimatedCost)
         {
             estimatedCost = quotedCost;
-            decision = await budget.EvaluateAsync(quotedCost, cancellationToken);
+            decision = await budget.EvaluateAsync(quotedCost + held, cancellationToken);
             if (!decision.CanAfford)
             {
                 return Failed(ShipPurchaseFailure.OverBudget, decision.Reason, quotedCost);

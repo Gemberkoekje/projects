@@ -2,6 +2,7 @@ using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 
@@ -16,11 +17,15 @@ namespace SpaceTraders.Application.Tests.Services;
 public sealed class PurchaseOrderTests
 {
     private const string List = "SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER";
+    private const string FreighterShipyard = "X1-HB56-C18D";
+    private const string ProbeShipyard = "X1-HF61-B13X";
 
     /// <summary>When the ledger's purchases were made: before anything this process buys during a test.</summary>
     private static readonly DateTimeOffset Start = DateTimeOffset.UtcNow.AddDays(-1);
 
     private readonly PurchaseNeeds _needs = new();
+    private readonly ShipyardCalls _calls = new();
+    private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
     private readonly LogRecorder _log = new();
@@ -34,6 +39,7 @@ public sealed class PurchaseOrderTests
 
         _settings.GetAsync<string>(TradingAutomationService.ShipPurchasesSetting, Arg.Any<CancellationToken>()).Returns(List);
         LedgerHolds();
+        Credits(1_000_000_000, reserve: 0);
     }
 
     [Fact]
@@ -315,6 +321,68 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task AProbe_GoesBeforeACargoShipThatWaitsForOneOfOurShips_WhileTheCreditsLeaveTheCargoShipsTotal()
+    {
+        // Slice 6.36 (D118), asked on 2026-10-07: "Do you want a purchase that is only waiting for a ship to arrive to let the
+        // ones behind it go first?" - "Yes please, as long as the total doesn't dip below the total needed for the freighter."
+        // That day a bulk freighter at X1-HB56-C18D waited 33 minutes for a probe to reach the shipyard (D30), with 57M credits
+        // against its 2.9M and the 9.4M reserve, and the probes behind it waited too.
+        Credits(57_000_000, reserve: 9_400_000);
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Freighter(), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeFalse("until its purchase waits for a ship, the credits are saved up for it (D116)");
+
+        _calls.Call(FreighterShipyard, "SHIP_BULK_FREIGHTER", DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeTrue("the freighter waits for a ship, and its total stays");
+        _needs.HeldFor("SHIP_PROBE", ProbeShipyard, DateTimeOffset.UtcNow).Should().Be(2_900_000, "the probe's purchase keeps the freighter's price");
+
+        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Alternating, "SHIP_MINING_DRONE"))).Should().BeTrue("so do the turns after the probes");
+    }
+
+    [Fact]
+    public async Task AProbe_WaitsBehindACargoShipThatWaitsForOneOfOurShips_WhenItWouldDipBelowTheCargoShipsTotal()
+    {
+        // D118: "as long as the total doesn't dip below the total needed for the freighter": its price and the credit reserve.
+        Credits(12_310_000, reserve: 9_400_000);
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Freighter(), DateTimeOffset.UtcNow);
+        _calls.Call(FreighterShipyard, "SHIP_BULK_FREIGHTER", DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeFalse("12,310,000 less the probe is under the freighter's 12,300,000");
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("waits for the Trading plan's SHIP_BULK_FREIGHTER (TimedCargoShip)", StringComparison.Ordinal));
+
+        Credits(12_400_000, reserve: 9_400_000);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task WithTwoPurchasesWaitingForOurShips_AProbeLeavesBothTheirPrices()
+    {
+        // D118, read as: with several waiting, all their prices and the reserve once. The explorer the command ship fetches
+        // (D108) waits for a ship too.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Freighter(), DateTimeOffset.UtcNow);
+        _needs.Report(AutomationPlan.Explore, new PurchaseNeed(PurchaseTier.Explorer, "SHIP_EXPLORER", "X1-BC24-C15X", 700_000), DateTimeOffset.UtcNow);
+        _calls.Call(FreighterShipyard, "SHIP_BULK_FREIGHTER", DateTimeOffset.UtcNow);
+        _calls.Call("X1-BC24-C15X", "SHIP_EXPLORER", DateTimeOffset.UtcNow);
+        Credits(9_400_000 + 2_900_000 + 700_000 + 20_000, reserve: 9_400_000);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeFalse("the probe costs 21,322");
+
+        Credits(9_400_000 + 2_900_000 + 700_000 + 21_322, reserve: 9_400_000);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeTrue();
+        _needs.HeldFor("SHIP_PROBE", ProbeShipyard, DateTimeOffset.UtcNow).Should().Be(3_600_000);
+        (await MayBuyAsync(AutomationPlan.Trading, Freighter())).Should().BeTrue("the freighter goes before the explorer it waits behind too, keeping the explorer's total");
+        _needs.HeldFor("SHIP_BULK_FREIGHTER", FreighterShipyard, DateTimeOffset.UtcNow).Should().Be(700_000, "but not its own price");
+    }
+
+    [Fact]
     public void EachTiersNumber_IsItsPositionInTheOrder_TheCargoShipOnTheClockBeforeTheProbes()
     {
         // The SpaceTraders dashboard shows the number as the position (spacetraders_purchase_need_credits{position}), and you
@@ -455,6 +523,12 @@ public sealed class PurchaseOrderTests
 
     private static PurchaseNeed Need(PurchaseTier tier, string shipType) => new(tier, shipType, "X1-DC53-A2", 50_000);
 
+    /// <summary>The bulk freighter of 2026-10-07, the cargo ship on the clock (D116), as the trading plan said it needed it.</summary>
+    private static PurchaseNeed Freighter() => new(PurchaseTier.TimedCargoShip, "SHIP_BULK_FREIGHTER", FreighterShipyard, 2_900_000);
+
+    /// <summary>The probe waiting behind it that day.</summary>
+    private static PurchaseNeed Probe() => new(PurchaseTier.Probes, "SHIP_PROBE", ProbeShipyard, 21_322);
+
     private static PurchaseRecord Bought(string ship, ShipType type, int minute) => new(ship, type, Start.AddMinutes(minute));
 
     private void EveryoneSays(PurchaseNeed need)
@@ -477,6 +551,14 @@ public sealed class PurchaseOrderTests
                     .Reverse(),
             ]);
 
+    /// <summary>The credits and the credit reserve: a cost fits while the credits after it stay at the reserve.</summary>
+    private void Credits(long credits, long reserve)
+        => _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(call => new BudgetDecision(
+            credits - call.Arg<long>() >= reserve,
+            credits,
+            reserve,
+            Math.Max(0, credits - reserve)));
+
     private Task<bool> MayBuyAsync(AutomationPlan plan, PurchaseNeed need)
-        => new PurchaseOrder(_needs, _settings, _ledger, _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
+        => new PurchaseOrder(_needs, _calls, _budget, _settings, _ledger, _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
 }

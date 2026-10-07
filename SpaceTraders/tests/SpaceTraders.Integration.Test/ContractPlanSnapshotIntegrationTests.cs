@@ -11,6 +11,7 @@ using NSubstitute;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using Wolverine;
@@ -168,7 +169,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
             Substitute.For<IPlanRepository>(),
-            new PurchaseOrder(new PurchaseNeeds(), Substitute.For<ISettingsRepository>(), Substitute.For<ILedgerRepository>(), NullLogger<PurchaseOrder>.Instance),
+            new PurchaseOrder(new PurchaseNeeds(), new ShipyardCalls(), Substitute.For<IBudgetPolicy>(), Substitute.For<ISettingsRepository>(), Substitute.For<ILedgerRepository>(), NullLogger<PurchaseOrder>.Instance),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
