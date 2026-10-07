@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -139,7 +140,13 @@ public sealed class ShipGoalExecutorService(
         }
 
         metrics.GoalStep(activeGoal.Kind.ToString());
-        var result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
+
+        // D115: a trade trip's requests go before every other ship's while they wait for the rate limit.
+        GoalExecutionResult result;
+        using (ApiPriority.For(activeGoal))
+        {
+            result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
+        }
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal scoutGoal)
         {

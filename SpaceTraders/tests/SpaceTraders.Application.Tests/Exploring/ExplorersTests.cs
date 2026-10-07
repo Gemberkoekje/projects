@@ -18,7 +18,7 @@ namespace SpaceTraders.Application.Tests.Exploring;
 /// Slice 6.30 (D98, D99, D102). Asked on 2026-10-06: "I'd like more explorers to be added when there are more systems to be
 /// discovered. Maybe 1 explorer for every 10 undiscovered systems?", with "Reachable, round up", "Cap as a setting", "First
 /// before probes, rest last" and "Explorers can trade with 40 cargo space, so they can trade at the location they are at until
-/// a new unexplored location comes up." The systems are as the explore plan knew them that day, shortened: home X1-FJ91, whose
+/// a new unexplored location comes up." Since slice 6.33 (D113) the rest come before the probes too. The systems are as the explore plan knew them that day, shortened: home X1-FJ91, whose
 /// built gate connects to X1-GT9, explored, where X1-GT9-AE7B sells SHIP_EXPLORER for 702,315, to eleven systems not explored
 /// yet behind built gates, and to X1-XJ90, whose gate is still under construction. The plan runs pass after pass over the cache
 /// the real repositories keep; the API, the purchases and the order ships are bought in are fakes.
@@ -113,6 +113,9 @@ public sealed class ExplorersTests
     [Fact]
     public async Task AtTheShipyard_TheExplorerIsBought_AndTheCommandShipComesHomeToWork()
     {
+        // One explorer wanted: since slice 6.33 (D113) a second would come next, before the probes, and with no probe of ours in
+        // X1-GT9 the command ship would fetch that one too (D108).
+        Settings(perExplorer: 10, cap: 1);
         await SeedAsync();
         await PassAsync();
 
@@ -190,27 +193,27 @@ public sealed class ExplorersTests
     }
 
     [Fact]
-    public async Task AFurtherExplorer_StaysLast_AndTheCommandShipFetchesIt_WhenNoProbeIsThere()
+    public async Task AFurtherExplorer_ComesBeforeTheProbes_AndTheCommandShipFetchesIt_WhenNoProbeIsThere()
     {
         // D108: "Can we set up the command ship to go to that location if there isn't a probe there", the location being "where
-        // an explorer ship is supposed to be bought if it's in the purchase order and enough credits are available", with
-        // "Keep D102's order". It counts in the order though none of our ships is in X1-GT9 (D102 waited for one there): the
-        // command ship can meet it.
+        // an explorer ship is supposed to be bought if it's in the purchase order and enough credits are available". It counts in
+        // the order though none of our ships is in X1-GT9 (D102 waited for one there): the command ship can meet it. Slice 6.33
+        // (D113), asked on 2026-10-07: "I'd like Explorers (order 10) to go in front of probes (order 8)": the first explorer's
+        // place, no longer after the drones and cargo ships that take turns.
         await SeedAsync();
         await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
-        OrderLets(PurchaseTier.MoreExplorers);
 
         await PassAsync();
 
         await _order.Received().ReportAsync(
             AutomationPlan.Explore,
-            Arg.Is<PurchaseNeed>(need => need.Tier == PurchaseTier.MoreExplorers && need.ShipyardWaypointSymbol == Shipyard),
+            Arg.Is<PurchaseNeed>(need => need.Tier == PurchaseTier.Explorer && need.ShipyardWaypointSymbol == Shipyard),
             Arg.Any<CancellationToken>());
         (await GoalAsync(CommandShip)).Should().BeOfType<MoveToWaypointGoal>().Which.TargetWaypointSymbol.Should().Be(Shipyard);
         (await AssignmentAsync(CommandShip)).Should().BeEquivalentTo(new { AssignmentType = ExplorePlanService.AssignmentType, CompletedAt = (DateTimeOffset?)null });
         var state = await StateAsync();
         state.Status.Should().Be(ExploreStatus.FetchingExplorer);
-        state.Purchase.Should().BeEquivalentTo(new { Status = ExplorerPurchaseStatus.CommandShipFetchesIt, Tier = PurchaseTier.MoreExplorers, ShipyardWaypointSymbol = Shipyard });
+        state.Purchase.Should().BeEquivalentTo(new { Status = ExplorerPurchaseStatus.CommandShipFetchesIt, Tier = PurchaseTier.Explorer, ShipyardWaypointSymbol = Shipyard });
         _log.Journal.Should().ContainSingle(line => line.EventKind == JournalEvents.PlanStarted && line.Message.Contains(CommandShip, StringComparison.Ordinal))
             .Which.Message.Should().Contain(Shipyard);
 
@@ -249,7 +252,6 @@ public sealed class ExplorersTests
         // the call once there; one at X1-GT9's gate on its way to X1-S01 doesn't.
         await SeedAsync();
         await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
-        OrderLets(PurchaseTier.MoreExplorers);
         var (system, waypoint) = answers ? (Home, "X1-FJ91-A1") : (Gt9, Gt9Gate);
         await AddShipAsync("SPECTER-60", system, waypoint, "SHIP_PROBE");
         await SetGoalAsync("SPECTER-60", new DeployProbeGoal { TargetWaypointSymbol = flightTo });
@@ -284,11 +286,10 @@ public sealed class ExplorersTests
     [Fact]
     public async Task OnceOnItsWay_TheCommandShipStaysWithTheExplorer_WhileTheOrderHoldsItBack()
     {
-        // Read with D108, as D98 waits for the credits: a drone's or a cargo ship's turn came while it flew there. It waits at
+        // Read with D108, as D98 waits for the credits: the jump gate's next load came first while it flew there. It waits at
         // the shipyard, where the purchase needs it, rather than flying home and back.
         await SeedAsync();
         await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
-        OrderLets(PurchaseTier.MoreExplorers);
         await PassAsync();
 
         await MoveAsync(CommandShip, Gt9, Shipyard);
@@ -306,9 +307,11 @@ public sealed class ExplorersTests
     public async Task UntilTheOrderLetsAFurtherExplorerThrough_TheCommandShipKeepsItsWork()
     {
         // D108: "if it's in the purchase order and enough credits are available". At 15:55Z on 2026-10-06 the probes within
-        // the trade reach and the drones and cargo ships that take turns came first (D102).
+        // the trade reach and the drones and cargo ships that take turns came first (D102); since D113 only what comes before
+        // the explorers can, such as the jump gate's next load.
         await SeedAsync();
         await AddShipAsync(Explorer, "X1-S01", "X1-S01-G", "SHIP_EXPLORER");
+        OrderLets(PurchaseTier.None);
 
         await PassAsync();
 

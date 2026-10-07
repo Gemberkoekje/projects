@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
@@ -86,6 +87,10 @@ public sealed class NavigateToWaypointHandler(
             command.ShipSymbol,
             command.DestinationWaypoint);
 
+        // D115: a trade trip's refuel, orbit and flight go before every other ship's requests at the rate limit.
+        var activeGoalForNav = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
+        using var priority = ApiPriority.For(activeGoalForNav);
+
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         var status = ship?.LocalStatus ?? ShipLocalStatus.None;
 
@@ -140,7 +145,6 @@ public sealed class NavigateToWaypointHandler(
             await flightMode.EnsureAsync(ship!, command.FlightMode, cancellationToken);
         }
 
-        var activeGoalForNav = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
         await navigate.ExecuteAsync(
             command.ShipSymbol,
             command.DestinationWaypoint,
@@ -158,11 +162,12 @@ public sealed class NavigateToWaypointHandler(
 /// </summary>
 public sealed class NavigateToWaypointArrivedHandler(
     IShipRepository ships,
+    IShipGoalRepository goals,
     IWaypointRepository waypoints,
     IMarketRefresher marketRefresher,
     IShipyardRepository shipyards,
     IDockSubCommand dock,
-    Ports.ISpaceTradersPort port,
+    ISpaceTradersPort port,
     IMessageBus bus,
     ILogger<NavigateToWaypointArrivedHandler> logger)
 {
@@ -172,6 +177,9 @@ public sealed class NavigateToWaypointArrivedHandler(
             "NavigateToWaypointArrivedHandler: ship {ShipSymbol} arrived at {Destination}.",
             command.ShipSymbol,
             command.DestinationWaypoint);
+
+        // D115: the arrival runs apart from the goal's steps; a trade trip's refresh and dock go first at the rate limit.
+        using var priority = ApiPriority.For(await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken));
 
         // Step 5: refresh market and shipyard data at destination.
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);

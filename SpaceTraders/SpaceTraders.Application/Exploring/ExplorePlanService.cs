@@ -44,14 +44,16 @@ public interface IExplorePlanService
 /// Slice 6.30 (D98, D99, D102, D103) adds the explorers, and an order:
 /// <list type="bullet">
 ///   <item>Every exploring ship takes a system within the trade reach of home (<c>Trade.MaxHaulDistance</c>, 5) before any
-///   beyond it, the nearest to it first in each (D103: "first the systems within 5 jumps are explored before going further").</item>
+///   beyond it, the nearest to it first in each (D103: "first the systems within 5 jumps are explored before going further");
+///   since slice 6.33 (D114) ring by ring, each the trade reach wide: 1 to 5 jumps from home, then 6 to 10, then 11 to 15
+///   (<see cref="ExploreAtlas.Ring"/>).</item>
 ///   <item>It wants one explorer for every <c>Explore.SystemsPerExplorer</c> (10) systems left to explore, or part of that, at
 ///   most <c>Explore.MaxExplorers</c> (5; 0 for no cap): the systems it knows, hasn't explored and reaches from home through
 ///   built gates (<see cref="ExploreAtlas.SystemsLeft"/>).</item>
-///   <item>It buys them at the cheapest shipyard the gates reach that sells one, within the credit reserve: the first at
-///   <see cref="PurchaseTier.Explorer"/>, before the probes, every further one at <see cref="PurchaseTier.MoreExplorers"/>,
-///   after the drones and cargo ships that take turns. A probe of ours in the shipyard's system, or on its way there, answers
-///   the purchase's call for a ship (D30); with none, the command ship fetches the explorer (slice 6.32, D108).</item>
+///   <item>It buys them at the cheapest shipyard the gates reach that sells one, within the credit reserve, each at
+///   <see cref="PurchaseTier.Explorer"/>, before the probes (D98; the further ones too since slice 6.33, D113). A probe of ours
+///   in the shipyard's system, or on its way there, answers the purchase's call for a ship (D30); with none, the command ship
+///   fetches the explorer (slice 6.32, D108).</item>
 ///   <item>The explorers explore, each the nearest system no other exploring ship has taken; once there is one, the command
 ///   ship finishes its step, comes home and is released (D60). An explorer with no system left to take is released where it
 ///   is, and trades from there (D102) until one turns up.</item>
@@ -64,7 +66,9 @@ public interface IExplorePlanService
 ///   also to the systems the gates don't reach: behind a gate under construction, or with no gate the plan knows. A warp is
 ///   fuel-safe: it lands where the ship can refuel, or keeps the fuel to warp back (D100); BURN or CRUISE, never a drift (D104).</item>
 ///   <item>The systems within the trade reach of home through the gates come first, then the nearest by the seconds its way
-///   takes, whether by jumps or warps (D106, <see cref="ExploreAtlas.NextByWays"/>).</item>
+///   takes, whether by jumps or warps (D106, <see cref="ExploreAtlas.NextByWays"/>). Since slice 6.33 (D114) ring by ring: a
+///   system behind a gate under construction in the ring of the jumps through that gate, one found by a scan with no gate known
+///   after every ring, and within a ring the nearest by the seconds.</item>
 ///   <item>Before a warp goes to a system only a warp reaches, its waypoints are fetched (one system a pass, after the gates'
 ///   looks), so the ship lands where it can refuel.</item>
 ///   <item>With nothing left within its ways, an explorer with a sensor array scans from where it is, once a system, and the
@@ -424,7 +428,8 @@ public sealed class ExplorePlanService(
     /// <summary>
     /// The jumps from home within which a system is explored before any beyond (slice 6.30, D103): the trade reach,
     /// <c>Trade.MaxHaulDistance</c>, 5 when it gives none, as the probe plan reads it. Asked on 2026-10-06: "first the systems
-    /// within 5 jumps are explored before going further", with "The trade reach".
+    /// within 5 jumps are explored before going further", with "The trade reach". Since slice 6.33 (D114) the width of each ring
+    /// around home that is explored in turn (<see cref="ExploreAtlas.Ring"/>).
     /// </summary>
     private async Task<int> ReachAsync(CancellationToken ct)
         => await settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, ct) is var jumps and > 0
@@ -448,10 +453,11 @@ public sealed class ExplorePlanService(
 
     /// <summary>
     /// Buys the next explorer while fewer are there than wanted (slice 6.30, D98, D102), at the cheapest shipyard the gates
-    /// reach that sells one, when nothing comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>):
-    /// the first at <see cref="PurchaseTier.Explorer"/>, before the probes; every further one at
-    /// <see cref="PurchaseTier.MoreExplorers"/>, after the drones and cargo ships that take turns. <see cref="IShipPurchaseService"/>
-    /// keeps the credit reserve, and calls for a ship when none of ours is at the shipyard (D30). Slice 6.32 (D108): a probe of
+    /// reach that sells one, when nothing comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>): each at
+    /// <see cref="PurchaseTier.Explorer"/>, before the probes; asked on 2026-10-07 (slice 6.33, D113), "I'd like Explorers (order
+    /// 10) to go in front of probes (order 8)", so the further ones no longer wait for the drones and cargo ships that take
+    /// turns. <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when none of ours is at the
+    /// shipyard (D30). Slice 6.32 (D108): a probe of
     /// ours in the shipyard's system, or on its way there, answers the call (<see cref="ExplorerPurchaseStatus.WaitingForAShipThere"/>);
     /// with none, the command ship does, for every explorer (<see cref="ExplorerPurchaseStatus.CommandShipFetchesIt"/>), so a
     /// further one counts in the order even while none of our ships is in the shipyard's system.
@@ -463,7 +469,7 @@ public sealed class ExplorePlanService(
             return new ExplorerPurchaseState();
         }
 
-        var tier = owned == 0 ? PurchaseTier.Explorer : PurchaseTier.MoreExplorers;
+        const PurchaseTier tier = PurchaseTier.Explorer;
         var reach = ExploreAtlas.Reachable(state, state.HomeSystemSymbol, now);
         var offer = (await shipyards.GetAllAsync(ct))
             .SelectMany(shipyard => shipyard.Ships

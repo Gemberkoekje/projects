@@ -13,7 +13,8 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// its burst spent (<see cref="ForANewProcess"/>), as the server still counts what the process before it
 /// sent. Registered as a singleton: the HttpClient factory recreates its handlers every few minutes,
 /// and the budget has to outlive them. It also counts the writes waiting for it, which reads give way
-/// to (D19, <see cref="RateLimitingHandler"/>).
+/// to (D19, <see cref="RateLimitingHandler"/>), and the trade trips' requests among them, which the other writes give way to
+/// (D115).
 /// </remarks>
 public sealed class RequestBudget
 {
@@ -25,6 +26,13 @@ public sealed class RequestBudget
     /// finds this many requests left and goes at once.
     /// </summary>
     public const int WriteReserve = 10;
+
+    /// <summary>
+    /// The burst requests a write that gives way leaves to the trade trips' requests (PLAN.md slice 6.33, D115): however many
+    /// other writes went just before, a trade trip's request finds this many requests left and goes at once. Within the
+    /// <see cref="WriteReserve"/>, so a read leaves them too.
+    /// </summary>
+    public const int TradeReserve = 5;
 
     /// <summary>
     /// Added to each window for a request's journey to the server (B59). A request that leaves a second
@@ -42,9 +50,13 @@ public sealed class RequestBudget
     private readonly Lock _lock = new();
     private DateTimeOffset _pausedUntil = DateTimeOffset.MinValue;
     private int _writesWaiting;
+    private int _tradeRequestsWaiting;
 
-    /// <summary>The writes waiting for the budget now; reads give way to them (D19).</summary>
+    /// <summary>The writes waiting for the budget now, a trade trip's requests among them; reads give way to them (D19).</summary>
     public int WritesWaiting => Volatile.Read(ref _writesWaiting);
+
+    /// <summary>The trade trips' requests waiting for the budget now; the other writes give way to them (D115).</summary>
+    public int TradeRequestsWaiting => Volatile.Read(ref _tradeRequestsWaiting);
 
     /// <summary>
     /// A budget for a process that has just started, with its burst spent at <paramref name="now"/>: the
@@ -71,6 +83,12 @@ public sealed class RequestBudget
     /// <summary>A write that was waiting has taken its request from the budget, or given up.</summary>
     public void WriteServed() => Interlocked.Decrement(ref _writesWaiting);
 
+    /// <summary>Counts a trade trip's request as waiting for the budget, until <see cref="TradeRequestServed"/> (D115).</summary>
+    public void TradeRequestWaiting() => Interlocked.Increment(ref _tradeRequestsWaiting);
+
+    /// <summary>A trade trip's request that was waiting has taken its request from the budget, or given up.</summary>
+    public void TradeRequestServed() => Interlocked.Decrement(ref _tradeRequestsWaiting);
+
     /// <summary>
     /// Holds every request back until <paramref name="until"/> (B59): the rate limiter answered 429 and
     /// named when it lets the next request through. Until then the server's budget is empty for every
@@ -96,7 +114,8 @@ public sealed class RequestBudget
     /// <param name="now">The time of the request.</param>
     /// <param name="burstReserve">
     /// The burst requests this request must leave unused: <see cref="WriteReserve"/> for a read that
-    /// gives way, 0 for a write. The 2 per second are open to every request.
+    /// gives way, <see cref="TradeReserve"/> for another write that gives way to the trade trips' requests (D115), 0 for a
+    /// trade trip's request, or a request that gives way no longer. The 2 per second are open to every request.
     /// </param>
     /// <returns>Zero when the request may go; otherwise how long until it may ask again.</returns>
     public TimeSpan TryTake(DateTimeOffset now, int burstReserve = 0)

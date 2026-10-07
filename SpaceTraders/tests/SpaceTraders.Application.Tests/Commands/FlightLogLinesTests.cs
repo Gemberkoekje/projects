@@ -101,7 +101,7 @@ public sealed class FlightLogLinesTests
         _ship = _ship with { Status = "IN_ORBIT", ArrivesAt = null, DestWaypointSymbol = null };
         await new ShipArrivedEventHandler(_goals, _ships, _bus, _log.For<ShipArrivedEventHandler>())
             .Handle(new ShipArrivedEvent(ShipSymbol, _goal.GoalId, ArrivesAt), CancellationToken.None);
-        await new NavigateToWaypointArrivedHandler(_ships, _waypoints, new MarketRefresher(_port, _markets, _bus, _log.For<MarketRefresher>()), Substitute.For<IShipyardRepository>(), dock, _port, _bus, _log.For<NavigateToWaypointArrivedHandler>())
+        await new NavigateToWaypointArrivedHandler(_ships, _goals, _waypoints, new MarketRefresher(_port, _markets, _bus, _log.For<MarketRefresher>()), Substitute.For<IShipyardRepository>(), dock, _port, _bus, _log.For<NavigateToWaypointArrivedHandler>())
             .Handle(new NavigateToWaypointArrivedCommand(ShipSymbol, Destination, _goal.GoalId), CancellationToken.None);
         await new ShipNavigationCompletedHandler(_goalExecutor, _dashboard, _log.For<ShipNavigationCompletedHandler>())
             .Handle(new ShipNavigationCompletedEvent(ShipSymbol, Destination, _goal.GoalId), CancellationToken.None);

@@ -64,6 +64,7 @@ public sealed class ArrivalMarketPricesTests
     private Task HandleAsync()
         => new NavigateToWaypointArrivedHandler(
                 _ships,
+                Substitute.For<IShipGoalRepository>(),
                 _waypoints,
                 new MarketRefresher(_port, _markets, _bus, NullLogger<MarketRefresher>.Instance),
                 Substitute.For<IShipyardRepository>(),

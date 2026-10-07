@@ -136,6 +136,47 @@ public sealed class ExploreAtlasTests
     }
 
     [Fact]
+    public void TheRingsOfTheTradeReach_ComeInTurn_TheNearestToTheShipFirstInEach()
+    {
+        // Slice 6.33 (D114), asked on 2026-10-07: "I'd like exploring done in concentric circles based on trade distance. So first
+        // the first 5 systems as is currently the case, then 6-10, then 11-15 etc." Here each ring is 1 jump wide. X1-I hangs off
+        // X1-B, 2 jumps from home; X1-G off X1-E, 3. From X1-E, X1-G is 1 jump away and X1-I 3: both lay beyond D103's reach,
+        // where the nearest went first; X1-I's ring now comes before X1-G's.
+        var network = Network();
+        var state = network with
+        {
+            Systems =
+            [
+                .. network.Systems.Select(system => system.SystemSymbol == "X1-B" ? system with { Connections = [.. system.Connections!, "X1-I-G"] } : system),
+                Known("X1-I", []) with { ExploredAt = null },
+            ],
+        };
+
+        ExploreAtlas.Next(state, "X1-E", Now, reach: 1).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-I", Jumps = 3 });
+        ExploreAtlas.Next(state, "X1-E", Now, reach: 3).TargetSystemSymbol.Should().Be("X1-G", "in one ring, the nearer to the ship first");
+        ExploreAtlas.Next(state, "X1-E", Now, new HashSet<string> { "X1-I" }, reach: 1).TargetSystemSymbol.Should().Be("X1-G", "X1-I is taken: the next ring");
+    }
+
+    [Theory]
+    [InlineData(0, 5, 0)]
+    [InlineData(1, 5, 1)]
+    [InlineData(5, 5, 1)]
+    [InlineData(6, 5, 2)]
+    [InlineData(10, 5, 2)]
+    [InlineData(11, 5, 3)]
+    [InlineData(15, 5, 3)]
+    [InlineData(16, 5, 4)]
+    [InlineData(7, 0, 0)]
+    public void ARing_IsTheTradeReachWide_HomeInTheMiddle(int jumps, int reach, int ring)
+    {
+        // D114: "first the first 5 systems as is currently the case, then 6-10, then 11-15 etc."
+        var jumpsFromHome = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["X1-S"] = jumps };
+
+        ExploreAtlas.Ring(jumpsFromHome, "X1-S", reach).Should().Be(ring);
+        ExploreAtlas.Ring(jumpsFromHome, "X1-SCANNED", reach).Should().Be(reach > 0 ? int.MaxValue : 0, "no known gate leads there");
+    }
+
+    [Fact]
     public void TheWayHome_WhateverIsLeftToExplore()
     {
         // Slice 6.30 (D98): once an explorer explores, the command ship comes home, though X1-G is still to explore.
