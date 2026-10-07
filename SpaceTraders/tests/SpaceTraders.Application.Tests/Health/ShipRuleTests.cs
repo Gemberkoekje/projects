@@ -5,6 +5,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Domain.Enums;
@@ -266,6 +267,28 @@ public sealed class ShipLeftIdleRuleTests
         await _harness.EvaluateAsync(_rule, Start);
 
         (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(ShipyardKind.Shipyard)]
+    [InlineData(ShipyardKind.Explorer)]
+    public async Task AProbeParkedAtAShipyard_IsNotIdleByMistake_ButOneThatRoamsIs(ShipyardKind kind)
+    {
+        // Slice 6.32 (D110, "Stays parked"): with fewer probes than markets a probe parks at each shipyard, so a purchase there
+        // needs no probe called, and the plan gives it no due market. B74: the rule took it for a probe left idle; on 2026-10-07
+        // every one of the 52 ShipLeftIdle anomalies open at 13:30Z was a probe parked at a shipyard.
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", Shipyard = kind, ProbeSymbol = "SHIP-2" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", DueAt = Start.AddMinutes(-20) },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-C3", ProbeSymbol = "SHIP-4" }));
+        _fleet.Have(
+            FleetFixture.StartingProbe("SHIP-2", "X1-AB-A1", Start),
+            FleetFixture.StartingProbe("SHIP-4", "X1-AB-C3", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(30));
+
+        violations.Should().ContainSingle().Which.Subject.Should().Be("SHIP-4", "the plan gives a probe at a market a due market");
     }
 
     [Fact]
