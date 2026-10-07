@@ -429,7 +429,8 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   the plan chooses again, and no warp goes to that system for an hour.
 - **Scanning** (slice 6.31, D105: "Scan when none left"): with nothing left within its ways, an explorer with a warp drive
   and a sensor array scans from where it is (`POST my/ships/{ship}/scan/systems`), once a system, after its cooldown, and
-  the plan keeps it meanwhile. Every system found is cached with its position (`cached_systems`); those within its warps
+  the plan keeps it meanwhile. The API scans only from orbit: a docked explorer, as a trade leaves it (D102), goes into orbit
+  first (`IOrbitSubCommand`, B75). Every system found is cached with its position (`cached_systems`); those within its warps
   (the tank or the drive's range, the less) join the plan's systems (journal `SystemsScanned`). A scan that fails is tried
   again after 5 minutes.
 - **Scouting a system** (`ExploreSystemGoal`): its markets and shipyards with nothing cached yet, and its uncharted
@@ -2399,8 +2400,9 @@ treats as free (section 3):
   the survey role (slice 6.9), that the plan lists as able to reach it (B55); for a ship that can only
   survey, any target it can reach, as it surveys on (D52);
 - probe deployment: a market whose prices are due, with no probe at it or on its way and no other
-  ship of ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25). A probe parked
-  at its market while every market is watched is idle by design;
+  ship of ours at it, for any probe of its system (slice 6.3, D29; slice 6.28); the starting probe is one
+  (B25). A probe parked at its market while every market is watched is idle by design, and so is one the
+  plan parks at a shipyard (slice 6.32, D110: the probe each shipyard market has in the plan's state, B74);
 - mining: a low-supply opening without a ship (Pending), for a miner the plan lists as able to reach
   its asteroid (slice 6.4). A drone whose tank can't reach the open ones is idle by design;
 - siphon: likewise, a gas opening without a ship, for a siphoner the plan lists as able to reach its

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -92,6 +93,7 @@ public sealed class ExplorePlanService(
     IPlanRepository plans,
     ISettingsRepository settings,
     ISpaceTradersPort port,
+    IOrbitSubCommand orbit,
     IShipPurchaseService shipPurchases,
     IPurchaseOrder purchaseOrder,
     JumpRefusals refusals,
@@ -1011,8 +1013,8 @@ public sealed class ExplorePlanService(
     /// the explorer scans from where it is, caches what it finds, and warps to those systems, nearest first"): once from each
     /// system, by an explorer with a warp drive and a sensor array, after its cooldown. Every system found is cached with its
     /// position; those within its warps (<see cref="WayShip.MaxWarp"/>) join the plan's systems, and their waypoints are fetched,
-    /// one a pass, before a warp goes there (<see cref="LookForWarpsAsync"/>). A scan that fails is tried again after a few
-    /// minutes.
+    /// one a pass, before a warp goes there (<see cref="LookForWarpsAsync"/>). The API scans only from orbit, so a docked ship, as
+    /// a trade leaves it (D102), goes into orbit first (B75). A scan that fails is tried again after a few minutes.
     /// </summary>
     /// <returns>Whether it scanned or waits for its cooldown to; and the state.</returns>
     private async Task<(bool Scanning, ExplorePlanState State)> ScanAsync(ExplorePlanState state, ShipModel ship, DateTimeOffset now, CancellationToken ct)
@@ -1035,6 +1037,11 @@ public sealed class ExplorePlanService(
         ScanSystemsActionResult scan;
         try
         {
+            if (ship.LocalStatus == ShipLocalStatus.Docked)
+            {
+                await orbit.ExecuteAsync(ship.Symbol, ct);
+            }
+
             scan = await port.ScanSystemsAsync(ship.Symbol, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)

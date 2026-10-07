@@ -1,6 +1,7 @@
 using System.Globalization;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Probes;
 using SpaceTraders.Application.Roles;
 
 namespace SpaceTraders.Application.Health;
@@ -20,7 +21,8 @@ namespace SpaceTraders.Application.Health;
 ///   <item>contract: the active plan's contract, for the plan's ship and, while units remain, for any
 ///   other miner (D23, slice 6.4); or, while the plan waits for a ship or budget, any miner;</item>
 ///   <item>probes: a market whose prices are due, with no probe at it or on its way and no other ship of
-///   ours at it, for any probe (slice 6.3, D29); the starting probe is one (B25);</item>
+///   ours at it, for any probe of its system (slice 6.3, D29; slice 6.28) but one parked at a shipyard (slice 6.32, D110,
+///   B74); the starting probe is one (B25);</item>
 ///   <item>survey: a target to survey, for a ship that can survey (D20, slice 6.4), or, with the role board on, the ship
 ///   with the survey role (slice 6.9), that the plan lists as able to reach it (B55);</item>
 ///   <item>mining: an opening in low supply without a ship (Pending), for a miner the plan lists as able
@@ -144,9 +146,11 @@ public sealed class ShipLeftIdleRule(
 
         // The plan gives every free probe a due market of its system that nothing watches (D29, per system since slice 6.28),
         // so a probe can only be left idle while one waits when the plan has stopped. A probe that stays at a shipyard for a
-        // purchase (D30) waits seconds: a call lasts two minutes after the last attempt.
+        // purchase (D30) waits seconds: a call lasts two minutes after the last attempt. One parked at a shipyard (slice 6.32,
+        // D110: "Stays parked") gets no due market, by design (B74).
         if (context.IsOn(AutomationPlan.ProbeDeployment) && await probePlans.GetAsync(cancellationToken) is { } probes)
         {
+            var parked = Parked(probes);
             foreach (var system in probes.Systems)
             {
                 if (system.Markets.Count(market => market.IsUnwatched && market.DueAt <= context.Now) is > 0 and var unwatched)
@@ -154,7 +158,9 @@ public sealed class ShipLeftIdleRule(
                     waiting.Add(new WaitingWork(
                         AutomationPlan.ProbeDeployment,
                         string.Create(CultureInfo.InvariantCulture, $"{unwatched} markets of {system.SystemSymbol} that no probe or ship watches are due"),
-                        ship => FleetRoles.IsProbe(ship.Ship) && string.Equals(ship.Ship.SystemSymbol, system.SystemSymbol, StringComparison.OrdinalIgnoreCase)));
+                        ship => FleetRoles.IsProbe(ship.Ship)
+                            && string.Equals(ship.Ship.SystemSymbol, system.SystemSymbol, StringComparison.OrdinalIgnoreCase)
+                            && !parked.Contains(ship.Symbol)));
                 }
             }
         }
@@ -242,6 +248,17 @@ public sealed class ShipLeftIdleRule(
 
         return waiting;
     }
+
+    /// <summary>
+    /// The probes the probe plan parks at a shipyard (slice 6.32, D110), as its last pass left them: the probe each shipyard of
+    /// each system has, there or on its way.
+    /// </summary>
+    private static HashSet<string> Parked(ProbeDeploymentPlanState probes)
+        => probes.Systems
+            .SelectMany(system => system.Markets)
+            .Where(market => market.Shipyard != ShipyardKind.None && market.ProbeSymbol.Length > 0)
+            .Select(market => market.ProbeSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Whether a ship is one the survey plan lists as able to reach one of the targets (B55).</summary>
     private static bool Lists(IReadOnlyList<SurveyPlanTarget> targets, FleetShip ship)

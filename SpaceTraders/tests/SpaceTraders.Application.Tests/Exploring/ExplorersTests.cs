@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -630,6 +631,7 @@ public sealed class ExplorersTests
                 new PlanRepository(db),
                 _settings,
                 _port,
+                new OrbitSubCommand(_port, new ShipRepository(db), new MarketRepository(db), Substitute.For<IRefuelSubCommand>(), _log.For<OrbitSubCommand>()),
                 _purchases,
                 _order,
                 _refusals,
