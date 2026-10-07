@@ -44,10 +44,10 @@ public interface IExplorePlanService
 /// </list>
 /// Slice 6.30 (D98, D99, D102, D103) adds the explorers, and an order:
 /// <list type="bullet">
-///   <item>Every exploring ship takes a system within the trade reach of home (<c>Trade.MaxHaulDistance</c>, 5) before any
-///   beyond it, the nearest to it first in each (D103: "first the systems within 5 jumps are explored before going further");
-///   since slice 6.33 (D114) ring by ring, each the trade reach wide: 1 to 5 jumps from home, then 6 to 10, then 11 to 15
-///   (<see cref="ExploreAtlas.Ring"/>).</item>
+///   <item>Every exploring ship takes a system within 5 jumps of home before any beyond it, the nearest to it first in each
+///   (D103: "first the systems within 5 jumps are explored before going further"); since slice 6.33 (D114) ring by ring: 1 to 5
+///   jumps from home, then 6 to 10, then 11 to 15 (<see cref="ExploreAtlas.Ring"/>), each <c>Explore.RingWidth</c> wide (5;
+///   slice 6.35, D117), the trade reach's width until then.</item>
 ///   <item>It wants one explorer for every <c>Explore.SystemsPerExplorer</c> (10) systems left to explore, or part of that, at
 ///   most <c>Explore.MaxExplorers</c> (5; 0 for no cap): the systems it knows, hasn't explored and reaches from home through
 ///   built gates (<see cref="ExploreAtlas.SystemsLeft"/>).</item>
@@ -66,7 +66,7 @@ public interface IExplorePlanService
 ///   <item>An explorer with a warp drive goes the fastest way, through the gates or by warps (<see cref="SystemWays"/>), and so
 ///   also to the systems the gates don't reach: behind a gate under construction, or with no gate the plan knows. A warp is
 ///   fuel-safe: it lands where the ship can refuel, or keeps the fuel to warp back (D100); BURN or CRUISE, never a drift (D104).</item>
-///   <item>The systems within the trade reach of home through the gates come first, then the nearest by the seconds its way
+///   <item>The systems within the first ring of home through the gates come first, then the nearest by the seconds its way
 ///   takes, whether by jumps or warps (D106, <see cref="ExploreAtlas.NextByWays"/>). Since slice 6.33 (D114) ring by ring: a
 ///   system behind a gate under construction in the ring of the jumps through that gate, one found by a scan with no gate known
 ///   after every ring, and within a ring the nearest by the seconds.</item>
@@ -111,6 +111,12 @@ public sealed class ExplorePlanService(
 
     /// <summary>The setting for the most explorers the plan buys (D102); 0 for no cap.</summary>
     public const string MaxExplorersSetting = "Explore.MaxExplorers";
+
+    /// <summary>The setting for the width, in jumps from home, of each ring the exploring ships take in turn (D114, D117).</summary>
+    public const string RingWidthSetting = "Explore.RingWidth";
+
+    /// <summary>The width of each ring when <see cref="RingWidthSetting"/> gives none (D117: "defaulting to 5").</summary>
+    public const int DefaultRingWidth = 5;
 
     private const string JumpGateType = "JUMP_GATE";
     private const string Antimatter = "ANTIMATTER";
@@ -168,8 +174,8 @@ public sealed class ExplorePlanService(
         state = await LearnAsync(state, [ship, .. explorers], [.. explorers.Where(Warps.HasDrive)], now, cancellationToken);
         state = await CountAsync(state, now, cancellationToken);
         state = state with { Purchase = await BuyAsync(state, fleet, explorers.Count, now, cancellationToken) };
-        var reach = await ReachAsync(cancellationToken);
-        state = await StepAsync(state, ship, explorers.Count > 0 || state.Purchase.Status == ExplorerPurchaseStatus.Bought, reach, now, cancellationToken);
+        var ringWidth = await RingWidthAsync(cancellationToken);
+        state = await StepAsync(state, ship, explorers.Count > 0 || state.Purchase.Status == ExplorerPurchaseStatus.Bought, ringWidth, now, cancellationToken);
 
         // The explorers the fleet has, each with what the plan does with it; one bought this pass joins on the next.
         state = state with
@@ -178,7 +184,7 @@ public sealed class ExplorePlanService(
         };
         foreach (var explorer in explorers)
         {
-            state = await StepExplorerAsync(state, explorer, reach, now, cancellationToken);
+            state = await StepExplorerAsync(state, explorer, ringWidth, now, cancellationToken);
         }
 
         await SaveAsync(existing, state, now, cancellationToken);
@@ -428,15 +434,15 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>
-    /// The jumps from home within which a system is explored before any beyond (slice 6.30, D103): the trade reach,
-    /// <c>Trade.MaxHaulDistance</c>, 5 when it gives none, as the probe plan reads it. Asked on 2026-10-06: "first the systems
-    /// within 5 jumps are explored before going further", with "The trade reach". Since slice 6.33 (D114) the width of each ring
-    /// around home that is explored in turn (<see cref="ExploreAtlas.Ring"/>).
+    /// The width of each ring around home that is explored in turn (slice 6.33, D114, <see cref="ExploreAtlas.Ring"/>), in jumps:
+    /// <c>Explore.RingWidth</c>, 5 when it gives none. Asked on 2026-10-06: "first the systems within 5 jumps are explored before
+    /// going further" (D103); the rings were as wide as the trade reach, <c>Trade.MaxHaulDistance</c>, until on 2026-10-07 the
+    /// reach of 9999 made one ring of every system (slice 6.35, D117): "Make a separate ring width setting defaulting to 5".
     /// </summary>
-    private async Task<int> ReachAsync(CancellationToken ct)
-        => await settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, ct) is var jumps and > 0
+    private async Task<int> RingWidthAsync(CancellationToken ct)
+        => await settings.GetAsync<int>(RingWidthSetting, ct) is var jumps and > 0
             ? jumps
-            : TradeContextReader.DefaultMaxHaulDistance;
+            : DefaultRingWidth;
 
     /// <summary>
     /// The systems left to explore and the explorers wanted for them (slice 6.30, D102): asked on 2026-10-06, "I'd like more
@@ -561,7 +567,7 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>The command ship's next step, when it is exploring, fetching an explorer, or free (its trip has ended).</summary>
-    private async Task<ExplorePlanState> StepAsync(ExplorePlanState state, ShipModel ship, bool explorersExplore, int reach, DateTimeOffset now, CancellationToken ct)
+    private async Task<ExplorePlanState> StepAsync(ExplorePlanState state, ShipModel ship, bool explorersExplore, int ringWidth, DateTimeOffset now, CancellationToken ct)
     {
         var goal = await goals.GetActiveGoalAsync(ship.Symbol, ct);
         var assignment = await assignments.FindAsync(ship.Symbol, ct);
@@ -593,7 +599,7 @@ public sealed class ExplorePlanService(
                 return state;
             }
 
-            return await DecideAsync(state, ship, assignment, explorersExplore, reach, now, ct);
+            return await DecideAsync(state, ship, assignment, explorersExplore, ringWidth, now, ct);
         }
 
         if (!FleetRoles.IsFree(ship, goal, hasOpenAssignment: false))
@@ -601,7 +607,7 @@ public sealed class ExplorePlanService(
             return state.Status is ExploreStatus.Done ? state : state with { Status = ExploreStatus.Waiting, TargetSystemSymbol = string.Empty };
         }
 
-        return await DecideAsync(state, ship, assignment: null, explorersExplore, reach, now, ct);
+        return await DecideAsync(state, ship, assignment: null, explorersExplore, ringWidth, now, ct);
     }
 
     /// <summary>
@@ -615,7 +621,7 @@ public sealed class ExplorePlanService(
         ShipModel ship,
         ShipAssignmentDto? assignment,
         bool explorersExplore,
-        int reach,
+        int ringWidth,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -650,7 +656,7 @@ public sealed class ExplorePlanService(
             return await HomeAsync(state, ship, assignment, now, ct);
         }
 
-        var step = ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), reach);
+        var step = ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), ringWidth);
         switch (step.Kind)
         {
             case ExploreStepKind.Explore:
@@ -789,7 +795,7 @@ public sealed class ExplorePlanService(
     }
 
     /// <summary>An explorer's next step (slice 6.30), when it is exploring or free (its trip has ended).</summary>
-    private async Task<ExplorePlanState> StepExplorerAsync(ExplorePlanState state, ShipModel ship, int reach, DateTimeOffset now, CancellationToken ct)
+    private async Task<ExplorePlanState> StepExplorerAsync(ExplorePlanState state, ShipModel ship, int ringWidth, DateTimeOffset now, CancellationToken ct)
     {
         var entry = FindExplorer(state, ship.Symbol) ?? new ExploringShip { ShipSymbol = ship.Symbol, Status = ExploreStatus.Waiting };
         var goal = await goals.GetActiveGoalAsync(ship.Symbol, ct);
@@ -819,7 +825,7 @@ public sealed class ExplorePlanService(
                 return state;
             }
 
-            return await DecideExplorerAsync(state, entry, ship, assignment, reach, now, ct);
+            return await DecideExplorerAsync(state, entry, ship, assignment, ringWidth, now, ct);
         }
 
         if (!FleetRoles.IsFree(ship, goal, hasOpenAssignment: false))
@@ -828,7 +834,7 @@ public sealed class ExplorePlanService(
             return Put(state, entry with { Status = ExploreStatus.Waiting, TargetSystemSymbol = string.Empty });
         }
 
-        return await DecideExplorerAsync(state, entry, ship, assignment: null, reach, now, ct);
+        return await DecideExplorerAsync(state, entry, ship, assignment: null, ringWidth, now, ct);
     }
 
     /// <summary>
@@ -844,7 +850,7 @@ public sealed class ExplorePlanService(
         ExploringShip entry,
         ShipModel ship,
         ShipAssignmentDto? assignment,
-        int reach,
+        int ringWidth,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -866,8 +872,8 @@ public sealed class ExplorePlanService(
         }
 
         var step = Warps.HasDrive(ship)
-            ? ExploreAtlas.NextByWays(state, await ChartAsync(state, now, ct), WayShip.Of(ship, now), now, Taken(state, ship.Symbol), reach)
-            : ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), reach);
+            ? ExploreAtlas.NextByWays(state, await ChartAsync(state, now, ct), WayShip.Of(ship, now), now, Taken(state, ship.Symbol), ringWidth)
+            : ExploreAtlas.Next(state, here, now, Taken(state, ship.Symbol), ringWidth);
         switch (step.Kind)
         {
             case ExploreStepKind.Explore:

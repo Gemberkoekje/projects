@@ -129,10 +129,10 @@ public sealed class ExploreAtlasTests
             ],
         };
 
-        ExploreAtlas.Next(state, "X1-D", Now, reach: 2).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-H", Jumps = 3 });
-        ExploreAtlas.Next(state, "X1-D", Now, reach: 3).TargetSystemSymbol.Should().Be("X1-G", "both are within the reach: the nearer to the ship first");
+        ExploreAtlas.Next(state, "X1-D", Now, ringWidth: 2).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-H", Jumps = 3 });
+        ExploreAtlas.Next(state, "X1-D", Now, ringWidth: 3).TargetSystemSymbol.Should().Be("X1-G", "both are within the ringWidth: the nearer to the ship first");
         ExploreAtlas.Next(state, "X1-D", Now).TargetSystemSymbol.Should().Be("X1-G", "without a reach, the nearest");
-        ExploreAtlas.Next(state, "X1-D", Now, new HashSet<string> { "X1-H" }, reach: 2).TargetSystemSymbol.Should().Be("X1-G", "X1-H is taken");
+        ExploreAtlas.Next(state, "X1-D", Now, new HashSet<string> { "X1-H" }, ringWidth: 2).TargetSystemSymbol.Should().Be("X1-G", "X1-H is taken");
     }
 
     [Fact]
@@ -152,9 +152,9 @@ public sealed class ExploreAtlasTests
             ],
         };
 
-        ExploreAtlas.Next(state, "X1-E", Now, reach: 1).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-I", Jumps = 3 });
-        ExploreAtlas.Next(state, "X1-E", Now, reach: 3).TargetSystemSymbol.Should().Be("X1-G", "in one ring, the nearer to the ship first");
-        ExploreAtlas.Next(state, "X1-E", Now, new HashSet<string> { "X1-I" }, reach: 1).TargetSystemSymbol.Should().Be("X1-G", "X1-I is taken: the next ring");
+        ExploreAtlas.Next(state, "X1-E", Now, ringWidth: 1).Should().BeEquivalentTo(new { Kind = ExploreStepKind.Explore, TargetSystemSymbol = "X1-I", Jumps = 3 });
+        ExploreAtlas.Next(state, "X1-E", Now, ringWidth: 3).TargetSystemSymbol.Should().Be("X1-G", "in one ring, the nearer to the ship first");
+        ExploreAtlas.Next(state, "X1-E", Now, new HashSet<string> { "X1-I" }, ringWidth: 1).TargetSystemSymbol.Should().Be("X1-G", "X1-I is taken: the next ring");
     }
 
     [Theory]

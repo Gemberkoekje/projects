@@ -118,7 +118,7 @@ public sealed class WarpExplorersTests
     [Theory]
     [InlineData(1, "X1-S01")]
     [InlineData(2, Zz69)]
-    public async Task TheRingsOfTheTradeReach_ComeInTurn_ASystemBehindAGateUnderConstructionInTheRingOfItsGate(int reach, string target)
+    public async Task TheRings_ComeInTurn_ASystemBehindAGateUnderConstructionInTheRingOfItsGate(int reach, string target)
     {
         // Slice 6.33 (D114), "Ring of their gate": X1-S01 lies 1 jump from home and 2 from the explorer at X1-GT9, after a
         // cooldown of some 930 seconds; X1-ZZ69, behind X1-GT9's gate under construction, counts 2 jumps from home through it and
@@ -126,7 +126,7 @@ public sealed class WarpExplorersTests
         // nearest by the seconds goes first. D106 took X1-S01 first at a reach of 2: the gates' systems within it first.
         await SeedAsync();
         await AddSystemAsync("X1-S01", from: Home, explored: false);
-        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(reach);
+        _settings.GetAsync<int>(ExplorePlanService.RingWidthSetting, Arg.Any<CancellationToken>()).Returns(reach);
 
         await PassAsync();
 
@@ -154,7 +154,7 @@ public sealed class WarpExplorersTests
         await AddSystemAsync("X1-MID", from: Home, explored: true);
         await AddSystemAsync("X1-S01", from: "X1-MID", explored: false);
         await AddScannedSystemAsync("X1-NEW", 17833, 3477);
-        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(reach);
+        _settings.GetAsync<int>(ExplorePlanService.RingWidthSetting, Arg.Any<CancellationToken>()).Returns(reach);
 
         await PassAsync();
 

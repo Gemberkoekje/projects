@@ -74,6 +74,9 @@ public sealed class DefaultSettingsSeedTests
         "Explore.SystemsPerExplorer",
         "Explore.MaxExplorers",
 
+        // The rings the exploring ships take in turn (slice 6.33, D114), their own width since slice 6.35 (D117).
+        "Explore.RingWidth",
+
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",
 

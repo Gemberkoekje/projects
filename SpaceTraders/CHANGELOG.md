@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-07, slice 6.35)
+- A separate ring width (D117), as asked on 2026-10-07: "Make a separate ring width setting defaulting to 5, please." The exploring ships take the systems around home ring by ring (D114), and the rings were as wide as the trade reach, `Trade.MaxHaulDistance`: at 9999 every system lay in one ring, and each explorer took the system nearest itself, leaving X1-PY67, 4 jumps from home, unexplored. `Explore.RingWidth` (new, 5; 0 or less means 5) now gives the rings' width (`ExplorePlanService.RingWidthAsync`, the `ringWidth` of `ExploreAtlas.Next`, `NextByWays` and `Ring`); the trade reach keeps its other uses.
+
+### Docs – Changed (2026-10-07, slice 6.35)
+- `PLAN.md`: slice 6.35 with D117, and D114 marked as amended; D118 (slice 6.36, next), and D43, D108 and D116 marked as amended by it; where things stand after B74–B77 merged. `docs/HOW_IT_WORKS.md`: where the explorers go, and the settings.
+
 ### Code – Fixed (2026-10-07, B77)
 - Startup sync no longer puts a ship back where it was before an arrival moved it (B77). The ship event scheduler starts first in the startup chain, so an arrival due during a restart is handled while startup sync fetches the ships' pages; the sync saved every ship as its page had it, and a ship that had jumped, flown on or sold meanwhile was stored as before. At the 05:27Z deploy on 2026-10-07 SPECTER-121 was put back at the gate it had jumped from, its next jump was refused and the explore plan left X1-FA16's gate alone for an hour; at the 11:04Z deploy SPECTER-35 was stored in transit for 10 minutes after it had arrived. Now a ship whose row was written after its page was asked for (`LastSyncedAt`) keeps where it is, its cooldown, fuel and cargo; its type, mounts and modules still come from the page.
 

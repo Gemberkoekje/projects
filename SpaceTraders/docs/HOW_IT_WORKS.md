@@ -381,13 +381,15 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   further one can be due before such a shipyard has its probe: then the command ship fetches it. A further explorer
   counts in the order even while none of our ships is in the shipyard's system: the command ship can meet it.
 - **Where it goes** (`ExploreAtlas`): a system not explored yet that no other exploring ship has taken, in rings around
-  home as wide as the trade reach (`Trade.MaxHaulDistance`, 5; `ExploreAtlas.Ring`): 1 to 5 jumps from home first, then
-  6 to 10, then 11 to 15, and so on (slice 6.33, D114: "I'd like exploring done in concentric circles based on trade
-  distance"; D103 put the first ring first and took the rest as one), the nearest by jumps through built gates in each
-  (a jump needs the gates at both ends built), then by symbol; no limit (D59). The jumps are those the systems dashboard
-  shows (`ExploreAtlas.JumpsFromHome`). While a look that could change the choice is still to come, it waits a pass; a
-  free explorer, such as one just bought or back from a trade, is taken meanwhile (journal `PlanStarted`, "waits in …"),
-  so the trading plan doesn't send it off while systems are left (B76).
+  home `Explore.RingWidth` jumps wide (5; `ExploreAtlas.Ring`): 1 to 5 jumps from home first, then 6 to 10, then 11 to
+  15, and so on (slice 6.33, D114: "I'd like exploring done in concentric circles based on trade distance"; D103 put the
+  first ring first and took the rest as one). The rings were as wide as the trade reach (`Trade.MaxHaulDistance`) until
+  slice 6.35 (D117: "Make a separate ring width setting defaulting to 5"), when a reach of 9999 had made one ring of every
+  system. Within a ring the nearest by jumps through built gates (a jump needs the gates at both ends built), then by
+  symbol; no limit (D59). The jumps are those the systems dashboard shows (`ExploreAtlas.JumpsFromHome`). While a look
+  that could change the choice is still to come, it waits a pass; a free explorer, such as one just bought or back from a
+  trade, is taken meanwhile (journal `PlanStarted`, "waits in …"), so the trading plan doesn't send it off while systems
+  are left (B76).
   With nothing left the command ship jumps home (D60), and at home its assignment ends: the other plans give it work
   again; away with no built way home, it waits (`no_way_home`, journaled once, Warning). An explorer with nothing left
   is released where it is and trades from there (D102): trading is its only role (`FleetRoles.PotentialRoles`), never a
@@ -1994,6 +1996,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Trade.MaxPriceAgeMinutes` (30) | How old, in minutes, a market's prices may be for a trade route to buy or sell there, at home too (slice 6.29, D96); 0 or less means 30. Older prices still say where fuel is sold |
 | `Explore.SystemsPerExplorer` (10) | The explore plan wants one explorer for every this many systems it knows, hasn't explored and reaches through built gates, or part of that (slice 6.30, D102); 0 buys none |
 | `Explore.MaxExplorers` (5) | The most explorers the explore plan buys (D102); 0 for no cap |
+| `Explore.RingWidth` (5) | The width, in jumps from home, of each ring the exploring ships take in turn (D114, slice 6.35, D117): 1 to 5 jumps first, then 6 to 10, and so on, the nearest to each ship first within a ring; 0 or less means 5. The trade reach's width until slice 6.35 |
 | `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`) | The cargo ships the trading plan buys, in order: the Nth while the fleet has fewer than N cargo ships (D21); beyond the list, the largest hold within the trade reach, not SCARCE (D112); empty buys none |
 | `Trade.ShipPurchaseMinRouteProfit` (10000) | Credits a route must earn, from the shipyard, to count as work for a cargo ship beyond `Trade.ShipPurchases` (D88) |
 | `Trade.ShipPurchaseWaitMinutes` (30) | Minutes such a route must have waited, every trader busy, before the trading plan buys a cargo ship beyond the list (D88) |

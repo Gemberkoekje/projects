@@ -81,9 +81,9 @@ public sealed record GateJump
 
 /// <summary>
 /// Where the explore plan goes next (asked on 2026-10-04), from what it knows of the gates: the nearest system not explored
-/// yet, by jumps through active gates, ring by ring around home (slice 6.33, D114: the trade reach's width each, <see cref="Ring"/>),
-/// and home once none is left. A jump needs both gates built, and the plan leaves a gate the API refused a jump to alone for an
-/// hour (<see cref="RecheckAfter"/>).
+/// yet, by jumps through active gates, ring by ring around home (slice 6.33, D114, <see cref="Ring"/>; each
+/// <c>Explore.RingWidth</c> wide since slice 6.35, D117), and home once none is left. A jump needs both gates built, and the
+/// plan leaves a gate the API refused a jump to alone for an hour (<see cref="RecheckAfter"/>).
 /// </summary>
 public static class ExploreAtlas
 {
@@ -111,16 +111,16 @@ public static class ExploreAtlas
     /// within 5 jumps are explored before going further", with "Reach first, then nearest" and "The trade reach" (D103); then on
     /// 2026-10-07 (slice 6.33, D114): "I'd like exploring done in concentric circles based on trade distance. So first the first 5
     /// systems as is currently the case, then 6-10, then 11-15 etc.": a system in a nearer ring around home
-    /// (<paramref name="reach"/> jumps wide, <see cref="Ring"/>) comes before every one in a farther ring, the nearest to the
+    /// (<paramref name="ringWidth"/> jumps wide, <see cref="Ring"/>) comes before every one in a farther ring, the nearest to the
     /// ship first in each.
     /// </summary>
     /// <param name="state">What the plan knows.</param>
     /// <param name="hereSystem">The system the ship is in.</param>
     /// <param name="now">The time to judge by.</param>
     /// <param name="taken">The systems the other exploring ships explore or are on their way to; none when null.</param>
-    /// <param name="reach">How many jumps from home each ring spans (<c>Trade.MaxHaulDistance</c>); 0 for no rings, the nearest first.</param>
+    /// <param name="ringWidth">How many jumps from home each ring spans (<c>Explore.RingWidth</c>, slice 6.35); 0 for no rings, the nearest first.</param>
     /// <returns>The step.</returns>
-    public static ExploreStep Next(ExplorePlanState state, string hereSystem, DateTimeOffset now, IReadOnlySet<string>? taken = null, int reach = 0)
+    public static ExploreStep Next(ExplorePlanState state, string hereSystem, DateTimeOffset now, IReadOnlySet<string>? taken = null, int ringWidth = 0)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(hereSystem);
@@ -139,8 +139,8 @@ public static class ExploreAtlas
 
         // The ring first; within a ring the search's order, the nearest to the ship first (OrderBy keeps it).
         var open = order.Where(system => system.ExploredAt is null && taken?.Contains(system.SystemSymbol) != true).ToList();
-        var fromHome = reach > 0 && open.Count > 0 ? JumpsFromHome(state, now) : new Dictionary<string, int>();
-        var target = open.OrderBy(system => Ring(fromHome, system.SystemSymbol, reach)).FirstOrDefault();
+        var fromHome = ringWidth > 0 && open.Count > 0 ? JumpsFromHome(state, now) : new Dictionary<string, int>();
+        var target = open.OrderBy(system => Ring(fromHome, system.SystemSymbol, ringWidth)).FirstOrDefault();
         if (target is not null)
         {
             return Towards(atlas, parents, hereSystem, target.SystemSymbol, ExploreStepKind.Explore);
@@ -181,7 +181,7 @@ public static class ExploreAtlas
     /// The next step of an exploring ship with a warp drive (PLAN.md slice 6.31, D100, D101, D106): the nearest system not
     /// explored yet that no other exploring ship has taken, by the fastest way, through the gates or by warps
     /// (<see cref="SystemWays"/>). Asked on 2026-10-06, "Reach first, then nearest" (D106), and on 2026-10-07 (slice 6.33, D114)
-    /// in rings of the trade reach around home (<see cref="Ring"/>), with "Ring of their gate": a system behind a gate still under
+    /// in rings around home (<see cref="Ring"/>), with "Ring of their gate": a system behind a gate still under
     /// construction counts the jumps through that gate, and one no known gate leads to, found by a scan, comes after every ring;
     /// within a ring the nearest by the seconds its way takes, whether jumps or warps get there. It waits while something that
     /// could change the choice isn't
@@ -195,9 +195,9 @@ public static class ExploreAtlas
     /// <param name="ship">The ship, where it is now.</param>
     /// <param name="now">The time to judge by.</param>
     /// <param name="taken">The systems the other exploring ships explore or are on their way to; none when null.</param>
-    /// <param name="reach">How many jumps from home each ring spans (<c>Trade.MaxHaulDistance</c>); 0 for no rings, the nearest first.</param>
+    /// <param name="ringWidth">How many jumps from home each ring spans (<c>Explore.RingWidth</c>, slice 6.35); 0 for no rings, the nearest first.</param>
     /// <returns>The step.</returns>
-    public static ExploreStep NextByWays(ExplorePlanState state, WayChart chart, WayShip ship, DateTimeOffset now, IReadOnlySet<string>? taken = null, int reach = 0)
+    public static ExploreStep NextByWays(ExplorePlanState state, WayChart chart, WayShip ship, DateTimeOffset now, IReadOnlySet<string>? taken = null, int ringWidth = 0)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(chart);
@@ -219,10 +219,10 @@ public static class ExploreAtlas
 
         var ways = SystemWays.From(chart, ship);
         var fromHome = Reachable(state, state.HomeSystemSymbol, now);
-        var rings = reach > 0 ? JumpsFromHome(state, now) : new Dictionary<string, int>();
+        var rings = ringWidth > 0 ? JumpsFromHome(state, now) : new Dictionary<string, int>();
         var target = state.Systems
             .Where(system => system.ExploredAt is null && taken?.Contains(system.SystemSymbol) != true && ways.ContainsKey(system.SystemSymbol))
-            .OrderBy(system => Ring(rings, system.SystemSymbol, reach))
+            .OrderBy(system => Ring(rings, system.SystemSymbol, ringWidth))
             .ThenBy(system => ways[system.SystemSymbol].Seconds)
             .ThenBy(system => system.SystemSymbol, StringComparer.Ordinal)
             .FirstOrDefault();
@@ -332,26 +332,26 @@ public static class ExploreAtlas
     /// <summary>
     /// The ring around home a system lies in (slice 6.33, D114), asked on 2026-10-07: "I'd like exploring done in concentric
     /// circles based on trade distance. So first the first 5 systems as is currently the case, then 6-10, then 11-15 etc.": ring
-    /// 1 for 1 to <paramref name="reach"/> jumps from home, ring 2 for the next <paramref name="reach"/>, and so on; home is ring
+    /// 1 for 1 to <paramref name="ringWidth"/> jumps from home, ring 2 for the next <paramref name="ringWidth"/>, and so on; home is ring
     /// 0. The jumps are those <see cref="JumpsFromHome"/> counts, with "Ring of their gate": one more to a system whose gate is
     /// still under construction, which only a warp reaches for now. A system no known gate leads to, found by a scan, lies beyond
     /// every ring.
     /// </summary>
     /// <param name="jumpsFromHome">The jumps from home, by system (<see cref="JumpsFromHome"/>).</param>
     /// <param name="systemSymbol">The system.</param>
-    /// <param name="reach">How many jumps each ring spans (<c>Trade.MaxHaulDistance</c>); 0 or less puts every system in ring 0.</param>
+    /// <param name="ringWidth">How many jumps each ring spans (<c>Explore.RingWidth</c>, slice 6.35); 0 or less puts every system in ring 0.</param>
     /// <returns>The ring; <see cref="int.MaxValue"/> beyond every ring.</returns>
-    public static int Ring(IReadOnlyDictionary<string, int> jumpsFromHome, string systemSymbol, int reach)
+    public static int Ring(IReadOnlyDictionary<string, int> jumpsFromHome, string systemSymbol, int ringWidth)
     {
         ArgumentNullException.ThrowIfNull(jumpsFromHome);
         ArgumentNullException.ThrowIfNull(systemSymbol);
 
-        if (reach <= 0)
+        if (ringWidth <= 0)
         {
             return 0;
         }
 
-        return jumpsFromHome.TryGetValue(systemSymbol, out var jumps) ? (jumps + reach - 1) / reach : int.MaxValue;
+        return jumpsFromHome.TryGetValue(systemSymbol, out var jumps) ? (jumps + ringWidth - 1) / ringWidth : int.MaxValue;
     }
 
     private static ExploreStep Home(Atlas atlas, IReadOnlyDictionary<string, string> parents, string home, string hereSystem)
