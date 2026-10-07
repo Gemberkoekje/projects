@@ -409,6 +409,37 @@ public sealed class ExplorersTests
     }
 
     [Fact]
+    public async Task AFreeExplorer_IsKeptWhileThePlanLooksAtTheGatesItJustLearnedOf_SoNoTradeTakesIt()
+    {
+        // B76: on 2026-10-07 at 11:49:19Z an explorer was bought at X1-BC24-C15X, "the 5 of the 5 wanted for the 41 systems left
+        // to explore", while the plan still had gates to look at that an exploration had just shown it: it waits for those
+        // (ExploreStepKind.Wait), and left the new explorer free. The role board gave it the trade role and the trading plan a
+        // 39-minute trade, 31 seconds after the purchase; the two explorers before it went the same way. D102: an explorer
+        // trades only with no system left to take.
+        Settings(perExplorer: 10, cap: 1);
+        await SeedAsync();
+        await AddShipAsync(Explorer, Gt9, Shipyard, "SHIP_EXPLORER");
+        await LearnOfAsync(Gt9, "X1-N1", "X1-N2");
+        foreach (var system in new[] { "X1-N1", "X1-N2" })
+        {
+            _port.GetWaypointAsync(system, $"{system}-G", Arg.Any<CancellationToken>())
+                .Returns(new WaypointDataModel($"{system}-G", system, "JUMP_GATE", 0, 0, HasMarket: false, HasShipyard: false));
+        }
+
+        await PassAsync();
+
+        (await GoalAsync(Explorer)).Should().BeNull("the plan looks at one gate a pass, and X1-N2's is still to look at");
+        (await AssignmentAsync(Explorer)).Should().BeEquivalentTo(
+            new { AssignmentType = ExplorePlanService.AssignmentType, CompletedAt = (DateTimeOffset?)null },
+            "the plan keeps it while it waits, or a trade would take it");
+
+        await PassAsync();
+
+        (await GoalAsync(Explorer)).Should().BeEquivalentTo(new { GateWaypointSymbol = Gt9Gate, DestinationGateWaypointSymbol = "X1-N1-G" });
+        (await StateAsync()).Explorers.Single().Should().BeEquivalentTo(new { Status = ExploreStatus.Exploring, TargetSystemSymbol = "X1-N1" });
+    }
+
+    [Fact]
     public async Task InASystemNotExplored_TheShipChartsWhatIsUncharted_TheGateFirst_ButNoAsteroidsOrGasGiants()
     {
         // D99: "Every uncharted market or shipyard, I'm not sure if every single asteroid needs to be charted but I don't want
@@ -533,6 +564,27 @@ public sealed class ExplorersTests
             [
                 .. state.Systems.Select(known => known.SystemSymbol == from ? known with { Connections = [.. known.Connections ?? [], $"{system}-G"] } : known),
                 Known(system, $"{system}-G", explored: false),
+            ],
+        };
+        await using var db = TestDbContextFactory.Create(_database);
+        await new PlanRepository(db).UpsertAsync(PlanTypes.Explore, state);
+    }
+
+    /// <summary>
+    /// New systems behind <paramref name="from"/>'s gate whose gates the plan hasn't looked at yet, as the connections of a
+    /// system just explored show them.
+    /// </summary>
+    private async Task LearnOfAsync(string from, params string[] systems)
+    {
+        var state = await StateAsync();
+        state = state with
+        {
+            Systems =
+            [
+                .. state.Systems.Select(known => known.SystemSymbol == from
+                    ? known with { Connections = [.. known.Connections ?? [], .. systems.Select(system => $"{system}-G")] }
+                    : known),
+                .. systems.Select(system => new KnownSystem { SystemSymbol = system, GateWaypointSymbol = $"{system}-G" }),
             ],
         };
         await using var db = TestDbContextFactory.Create(_database);
