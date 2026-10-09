@@ -103,6 +103,27 @@ public sealed class WarpExplorersTests
     }
 
     [Fact]
+    public async Task ASystemOnlyAWarpReaches_IsFetchedBeforeTheGatesDueALookAgain_SoTheExplorersDontWaitBehindThem()
+    {
+        // B78: every explorer waits until the waypoints of a system only a warp reaches are fetched (ExploreStepKind.Wait), and that
+        // fetch came after every other look, one a pass. On 2026-10-08 the plan knew 24 gates under construction, each looked at
+        // again hourly, and a pass came every 2 to 9 minutes: the hourly looks never ran out, and from about 19:50Z to 04:30Z the
+        // 5 explorers waited, each with an explore assignment and no goal, until X1-BS22 and X1-KA53 were fetched at 04:26:49 and
+        // 04:30:07. Here 3 explored systems' gates under construction are due a look again.
+        await SeedAsync();
+        await AddGatesDueAgainAsync("X1-UC1", "X1-UC2", "X1-UC3");
+
+        await PassAsync();
+
+        await _port.Received(1).GetWaypointsAsync(Zz69, 1, 20, Arg.Any<CancellationToken>());
+        (await GoalAsync(Explorer)).Should().BeOfType<WarpGoal>().Which.DestinationWaypointSymbol.Should().Be(Zz69Gate);
+
+        await PassesAsync(3);
+
+        await _port.Received(3).GetWaypointAsync(Arg.Any<string>(), Arg.Is<string>(gate => gate.StartsWith("X1-UC", StringComparison.Ordinal)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ASystemOnlyAWarpReaches_DoesntCountTowardsTheExplorersWanted()
     {
         // D107, "No, gates only": D102 counts the systems the gates reach from home.
@@ -418,6 +439,35 @@ public sealed class WarpExplorersTests
         };
         await using var db = TestDbContextFactory.Create(_database);
         await new PlanRepository(db).UpsertAsync(PlanTypes.Explore, state);
+    }
+
+    /// <summary>
+    /// Explored systems whose gates are still under construction, last looked at 2 hours ago, so each is due a look again
+    /// (<see cref="ExploreAtlas.RecheckAfter"/>); the API says they are still under construction.
+    /// </summary>
+    private async Task AddGatesDueAgainAsync(params string[] systems)
+    {
+        var state = await StateAsync();
+        state = state with
+        {
+            Systems =
+            [
+                .. state.Systems,
+                .. systems.Select(system => Known(system, $"{system}-G", explored: true) with
+                {
+                    Gate = GateState.UnderConstruction,
+                    GateCheckedAt = _now.AddHours(-2),
+                    WaypointsFetchedAt = _now.AddHours(-2),
+                }),
+            ],
+        };
+        await using var db = TestDbContextFactory.Create(_database);
+        await new PlanRepository(db).UpsertAsync(PlanTypes.Explore, state);
+        foreach (var system in systems)
+        {
+            _port.GetWaypointAsync(system, $"{system}-G", Arg.Any<CancellationToken>())
+                .Returns(new WaypointDataModel($"{system}-G", system, "JUMP_GATE", 0, 0, HasMarket: false, HasShipyard: false, TraitsJson: "[]", IsUnderConstruction: true));
+        }
     }
 
     /// <summary>

@@ -71,7 +71,7 @@ public interface IExplorePlanService
 ///   system behind a gate under construction in the ring of the jumps through that gate, one found by a scan with no gate known
 ///   after every ring, and within a ring the nearest by the seconds.</item>
 ///   <item>Before a warp goes to a system only a warp reaches, its waypoints are fetched (one system a pass, after the gates'
-///   looks), so the ship lands where it can refuel.</item>
+///   first looks and before the looks due again, B78), so the ship lands where it can refuel.</item>
 ///   <item>With nothing left within its ways, an explorer with a sensor array scans from where it is, once a system, and the
 ///   systems within its warps join the plan's (D105); with nothing left after that, one in a system the gates don't reach goes
 ///   back to one they do, and is released there to trade (D102).</item>
@@ -216,39 +216,54 @@ public sealed class ExplorePlanService(
         }
 
         state = await GatesFromCacheAsync(state, now, ct);
-        var look = NextLook(state, now);
+        var look = NextLook(state, now, due: false);
+        if (look.Kind == Look.None)
+        {
+            // B78: a system only a warp reaches, never asked for, comes before the looks due again: every explorer waits for it
+            // (ExploreAtlas.NextByWays), and with enough gates under construction, each looked at again hourly, those never ran out.
+            var warpLooks = await WarpLooksAsync(state, warping, now, ct);
+            if (warpLooks.FirstOrDefault(system => Find(state, system)?.WaypointsCheckedAt is null) is { } waitedFor)
+            {
+                return await FetchSystemAsync(state, waitedFor, now, ct);
+            }
+
+            look = NextLook(state, now, due: true);
+            if (look.Kind == Look.None)
+            {
+                return warpLooks.Count == 0 ? state : await FetchSystemAsync(state, warpLooks[0], now, ct);
+            }
+        }
+
         return look switch
         {
             (Look.Gate, var system) => await LookAtGateAsync(state, system, now, ct),
             (Look.Connections, var system) => await LookAtConnectionsAsync(state, system, now, ct),
-            _ => await LookForWarpsAsync(state, warping, now, ct),
+            _ => state,
         };
     }
 
     /// <summary>
-    /// With nothing else to look at, the waypoints of a system only a warp reaches, the nearest to the explored systems and the
-    /// ships with a warp drive first (slice 6.31, <see cref="ExploreAtlas.WarpLooks"/>), fetched as those of a system an
-    /// exploring ship has just jumped into: a warp lands where the ship can refuel, so where that is must be known first. One
-    /// system a pass.
+    /// The systems only a warp reaches whose waypoints are still to be fetched, the nearest to the explored systems and the ships
+    /// with a warp drive first (slice 6.31, <see cref="ExploreAtlas.WarpLooks"/>). Each is fetched as a system an exploring ship
+    /// has just jumped into: a warp lands where the ship can refuel, so where that is must be known first. One system a pass.
     /// </summary>
-    private async Task<ExplorePlanState> LookForWarpsAsync(ExplorePlanState state, IReadOnlyList<ShipModel> warping, DateTimeOffset now, CancellationToken ct)
+    private async Task<IReadOnlyList<string>> WarpLooksAsync(ExplorePlanState state, IReadOnlyList<ShipModel> warping, DateTimeOffset now, CancellationToken ct)
     {
         if (warping.Count == 0)
         {
-            return state;
+            return [];
         }
 
         var positions = (await systems.GetAllAsync(ct))
             .GroupBy(system => system.Symbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => (group.First().X, group.First().Y), StringComparer.OrdinalIgnoreCase);
         var fetched = (await waypoints.GetVisitedSystemSymbolsAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var looks = ExploreAtlas.WarpLooks(
+        return ExploreAtlas.WarpLooks(
             state,
             positions,
             fetched,
             [.. warping.Select(ship => (ship.SystemSymbol ?? string.Empty, WayShip.Of(ship, now).MaxWarp))],
             now);
-        return looks.Count == 0 ? state : await FetchSystemAsync(state, looks[0], now, ct);
     }
 
     /// <summary>Fetches a system and all its waypoints, and caches them; the gate among them is as the API says now.</summary>
@@ -321,11 +336,12 @@ public sealed class ExplorePlanService(
 
     /// <summary>
     /// The one look this pass, the most needed first: a gate never looked at, nearest home first; the connections of an
-    /// explored system never asked for; then whatever is due again, the longest waiting first: a gate under construction
-    /// after <see cref="ExploreAtlas.RecheckAfter"/>, a look that failed after <see cref="ExploreAtlas.RetryAfter"/>, an
-    /// explored system's connections that came back empty after an hour.
+    /// explored system never asked for; then, with <paramref name="due"/>, whatever is due again, the longest waiting first: a
+    /// gate under construction after <see cref="ExploreAtlas.RecheckAfter"/>, a look that failed after
+    /// <see cref="ExploreAtlas.RetryAfter"/>, an explored system's connections that came back empty after an hour. Between the
+    /// two come the systems only a warp reaches that were never asked for (B78, <see cref="LearnAsync"/>).
     /// </summary>
-    private static (Look Kind, string SystemSymbol) NextLook(ExplorePlanState state, DateTimeOffset now)
+    private static (Look Kind, string SystemSymbol) NextLook(ExplorePlanState state, DateTimeOffset now, bool due)
     {
         var jumps = ExploreAtlas.JumpsFromHome(state, now);
         var byDistance = state.Systems
@@ -349,14 +365,19 @@ public sealed class ExplorePlanService(
             return (Look.Connections, neverAsked.SystemSymbol);
         }
 
-        var due = new List<(DateTimeOffset Since, Look Kind, string SystemSymbol)>();
+        if (!due)
+        {
+            return (Look.None, string.Empty);
+        }
+
+        var again = new List<(DateTimeOffset Since, Look Kind, string SystemSymbol)>();
         foreach (var system in state.Systems.Where(system => system.GateWaypointSymbol.Length > 0))
         {
             var checkedAt = system.GateCheckedAt ?? DateTimeOffset.MinValue;
             if ((system.Gate == GateState.UnderConstruction && now - checkedAt >= ExploreAtlas.RecheckAfter)
                 || (system.Gate == GateState.Unknown && now - checkedAt >= ExploreAtlas.RetryAfter))
             {
-                due.Add((checkedAt, Look.Gate, system.SystemSymbol));
+                again.Add((checkedAt, Look.Gate, system.SystemSymbol));
             }
 
             if (system.ExploredAt is not null
@@ -365,13 +386,13 @@ public sealed class ExplorePlanService(
                 && system.ConnectionsCheckedAt is { } asked
                 && now - asked >= ExploreAtlas.RecheckAfter)
             {
-                due.Add((asked, Look.Connections, system.SystemSymbol));
+                again.Add((asked, Look.Connections, system.SystemSymbol));
             }
         }
 
-        return due.Count == 0
+        return again.Count == 0
             ? (Look.None, string.Empty)
-            : due.OrderBy(look => look.Since).ThenBy(look => look.SystemSymbol, StringComparer.Ordinal).Select(look => (look.Kind, look.SystemSymbol)).First();
+            : again.OrderBy(look => look.Since).ThenBy(look => look.SystemSymbol, StringComparer.Ordinal).Select(look => (look.Kind, look.SystemSymbol)).First();
     }
 
     /// <summary>Looks at a system's gate: built, or still under construction. A cached gate waypoint is kept up to date.</summary>
