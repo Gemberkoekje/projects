@@ -112,6 +112,30 @@ public sealed class ExplorersTests
     }
 
     [Fact]
+    public async Task AnExplorerTheShipyardHasScarce_IsNotBought_AndTheCommandShipDoesntFetchIt()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". X1-GT9-AE7B, the one shipyard that sells explorers, has them SCARCE, as cached: the plan needs none it can't
+        // buy, which would hold back everything after it in the order, and the command ship stays at its work.
+        await SeedAsync();
+        await using (var db = TestDbContextFactory.Create(_database))
+        {
+            await new ShipyardRepository(db).UpsertAsync(new ShipyardDataModel(
+                Shipyard,
+                Gt9,
+                """[{"type":"SHIP_EXPLORER"}]""",
+                $$"""[{"type":"SHIP_EXPLORER","purchasePrice":{{Price}},"supply":"SCARCE","frame":{"fuelCapacity":800},"modules":[{"symbol":"MODULE_CARGO_HOLD_II","capacity":40}]}]"""));
+        }
+
+        await PassAsync();
+
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.ShipyardsScarce);
+        await _order.DidNotReceive().ReportAsync(AutomationPlan.Explore, Arg.Is<PurchaseNeed>(need => need.Tier != PurchaseTier.None), Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!);
+        (await GoalAsync(CommandShip) is MoveToWaypointGoal).Should().BeFalse("no explorer can be bought for it to fetch");
+    }
+
+    [Fact]
     public async Task AtTheShipyard_TheExplorerIsBought_AndTheCommandShipComesHomeToWork()
     {
         // One explorer wanted: since slice 6.33 (D113) a second would come next, before the probes, and with no probe of ours in

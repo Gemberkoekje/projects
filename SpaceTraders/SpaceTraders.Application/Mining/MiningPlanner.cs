@@ -311,7 +311,8 @@ public static class MiningPlanner
     /// miner drifts there first, and mines at the asteroid nearest it within a CRUISE round trip. Opportunities other miners
     /// hold are left out: one miner per sell market and ore (a drone shares one only when none is left,
     /// <see cref="SharedTargets"/>). The mining plan buys a drone only when its first trip here would serve a market short
-    /// of its ore.
+    /// of its ore. Abroad (slice 6.40, D122) a market whose prices are too old to decide by is none
+    /// (<see cref="TradeMarketMap.StaleMarkets"/>), and nor is a pair left to a trade trip (<see cref="MiningContext.LeftToTrade"/>).
     /// </summary>
     /// <param name="context">The miner's system.</param>
     /// <param name="miner">The miner.</param>
@@ -327,7 +328,7 @@ public static class MiningPlanner
         var candidates = new Dictionary<string, MiningTarget>(StringComparer.OrdinalIgnoreCase);
         void Offer(MiningTarget target)
         {
-            if (heldKeys.Contains(target.Key))
+            if (heldKeys.Contains(target.Key) || context.LeftToTrade.Contains(target.Key))
             {
                 return;
             }
@@ -373,7 +374,7 @@ public static class MiningPlanner
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(asteroid => IsExtractable(map, asteroid) && ArrivalAt(asteroid).Reached)
             .ToList();
-        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
+        foreach (var market in map.MarketWaypoints.Where(map.IsFresh).Order(StringComparer.Ordinal))
         {
             // D77: a market that has all of an ore it wants gets none mined for it.
             var ores = map.GoodsAt(market)
@@ -624,7 +625,8 @@ public static class MiningPlanner
     /// The low-supply opportunities of a system (D22): each market with an ore in low supply that it makes something from
     /// (D91), and the asteroid nearest it whose traits yield the ore. A ship that can reach the asteroid can take the
     /// opportunity. A market that only pays for the ore is mined for only when nothing else is left, so it is no opening that
-    /// waits for a ship.
+    /// waits for a ship. Nor is a market whose prices are too old to decide by (<see cref="TradeMarketMap.StaleMarkets"/>), as
+    /// abroad (slice 6.40, D122).
     /// </summary>
     /// <param name="map">The system.</param>
     /// <returns>The opportunities, by market and ore.</returns>
@@ -633,7 +635,7 @@ public static class MiningPlanner
         ArgumentNullException.ThrowIfNull(map);
 
         var opportunities = new List<MiningOpportunity>();
-        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
+        foreach (var market in map.MarketWaypoints.Where(map.IsFresh).Order(StringComparer.Ordinal))
         {
             foreach (var good in map.GoodsAt(market)
                 .Where(good => AsteroidDeposits.Ores.Contains(good.Symbol) && IsLowSupply(good) && map.MakesSomethingFrom(market, good.Symbol))

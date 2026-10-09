@@ -238,7 +238,7 @@ public interface IAutomationMetrics
     /// Records the order ships are bought in (slice 6.10b, D43): what each plan that buys ships would buy now, one series per
     /// plan, its value what the ship costs as cached
     /// (<c>spacetraders_purchase_need_credits{plan,tier,position,ship_type,shipyard}</c>). <c>position</c> is the tier's
-    /// place in the order (<see cref="Services.PurchaseTier"/>), 1 for the contract's drone to 11 for the far probes; the lowest
+    /// place in the order (<see cref="Services.PurchaseTier"/>), 1 for the contract's drone to 12 for a miner abroad; the lowest
     /// is what the credits are saved up for. A plan that needs nothing, or whose need changed, loses its old series.
     /// </summary>
     void PurchaseNeeds(IReadOnlyCollection<PurchaseNeedMetricsSample> needs);

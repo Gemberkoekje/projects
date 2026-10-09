@@ -74,10 +74,12 @@ public sealed class ProbeDeploymentPlanService(
     /// <summary>The ship the plan buys (D29).</summary>
     public const string ProbeShipType = "SHIP_PROBE";
 
+    /// <summary>The ships the plan buys: an interceptor wherever one is sold, else a probe (slice 6.38, D119).</summary>
+    private static readonly string[] ProbeShipTypes = [FleetRoles.InterceptorShipType, ProbeShipType];
+
     /// <summary>How old a market's prices may get when <c>Market.RefreshMinutes</c> gives no interval.</summary>
     internal const int DefaultDueMinutes = 5;
 
-    private const string ScarceSupply = "SCARCE";
     private const string AntimatterSymbol = "ANTIMATTER";
 
     private static readonly JsonSerializerOptions CompareOptions = new();
@@ -417,21 +419,24 @@ public sealed class ProbeDeploymentPlanService(
     /// <summary>
     /// Buys the next probe (D29, D97) for the first system short of one (<see cref="Wants"/>, slice 6.32: the shipyards first),
     /// at the shipyard where it costs least with the antimatter of the jumps there counted, when nothing comes before it in the
-    /// order ships are bought in (D43). <see cref="IShipPurchaseService"/> keeps the credit reserve, refuses a probe at SCARCE
-    /// supply when it fetches the shipyard again, and calls for a ship when none of ours is at the shipyard (D30). A probe
-    /// bought for another system flies there at once.
+    /// order ships are bought in (D43). Slice 6.38 (D119): an interceptor wherever a shipyard it could come from sells one, the
+    /// cheapest such, and a SHIP_PROBE only where none does. <see cref="IShipPurchaseService"/> keeps the credit reserve,
+    /// refuses a ship at SCARCE supply when it fetches the shipyard again (D121), and calls for a ship when none of ours is at
+    /// the shipyard (D30). A probe bought for another system flies there at once.
     /// </summary>
     private async Task<ProbePurchase> BuyProbeAsync(Pass pass, CancellationToken cancellationToken)
     {
         var offers = pass.Shipyards
             .SelectMany(shipyard => shipyard.Ships
-                .Where(ship => ship.Type.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
+                .Where(ship => ProbeShipTypes.Contains(ship.Type, StringComparer.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
                 .Select(ship => new ProbeOffer(
                     shipyard.WaypointSymbol,
                     shipyard.SystemSymbol.Length > 0 ? shipyard.SystemSymbol : WaypointSymbols.SystemOf(shipyard.WaypointSymbol),
                     ship.PurchasePrice,
-                    (ship.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))))
-            .OrderBy(offer => offer.Price)
+                    ScarceShips.IsScarce(ship),
+                    ship.Type.ToUpperInvariant())))
+            .OrderByDescending(offer => offer.IsInterceptor)
+            .ThenBy(offer => offer.Price)
             .ThenBy(offer => offer.Shipyard, StringComparer.Ordinal)
             .ToList();
 
@@ -439,7 +444,10 @@ public sealed class ProbeDeploymentPlanService(
         var wants = Wants(pass);
         if (wants.Count == 0)
         {
-            return new ProbePurchase(ProbePurchaseStatus.EveryMarketHasOne, string.Empty, homeOffer?.Shipyard ?? string.Empty, homeOffer?.Price ?? 0, 0);
+            return new ProbePurchase(ProbePurchaseStatus.EveryMarketHasOne, string.Empty, homeOffer?.Shipyard ?? string.Empty, homeOffer?.Price ?? 0, 0)
+            {
+                ShipType = homeOffer?.ShipType ?? string.Empty,
+            };
         }
 
         var scarce = false;
@@ -459,7 +467,10 @@ public sealed class ProbeDeploymentPlanService(
 
         if (waiting is { Source: var wait, For: var kind })
         {
-            return new ProbePurchase(ProbePurchaseStatus.WaitingForAProbeToArrive, wait.For.Symbol, wait.Offer.Shipyard, wait.Offer.Price, wait.Antimatter, kind);
+            return new ProbePurchase(ProbePurchaseStatus.WaitingForAProbeToArrive, wait.For.Symbol, wait.Offer.Shipyard, wait.Offer.Price, wait.Antimatter, kind)
+            {
+                ShipType = wait.Offer.ShipType,
+            };
         }
 
         return new ProbePurchase(
@@ -468,7 +479,10 @@ public sealed class ProbeDeploymentPlanService(
             homeOffer?.Shipyard ?? string.Empty,
             homeOffer?.Price ?? 0,
             0,
-            wants[0].For);
+            wants[0].For)
+        {
+            ShipType = homeOffer?.ShipType ?? string.Empty,
+        };
     }
 
     /// <summary>
@@ -533,10 +547,10 @@ public sealed class ProbeDeploymentPlanService(
     }
 
     /// <summary>
-    /// The shipyards a probe for <paramref name="system"/> can come from, the cheapest first with the antimatter of the jumps
-    /// counted (D97): those in a system a probe can get to (home's, or one the gates reach), from where a probe can get to
-    /// <paramref name="system"/>, not at SCARCE supply (noted in <paramref name="scarce"/>); the system's own only with
-    /// <paramref name="ownToo"/>.
+    /// The shipyards a probe for <paramref name="system"/> can come from, the interceptors first (slice 6.38, D119), then the
+    /// cheapest with the antimatter of the jumps counted (D97): those in a system a probe can get to (home's, or one the gates
+    /// reach), from where a probe can get to <paramref name="system"/>, not at SCARCE supply (noted in <paramref name="scarce"/>,
+    /// D121); the system's own only with <paramref name="ownToo"/>.
     /// </summary>
     private static List<(ProbeOffer Offer, long Antimatter)> Options(Pass pass, IReadOnlyList<ProbeOffer> offers, ServedSystem system, bool ownToo, ref bool scarce)
     {
@@ -561,8 +575,10 @@ public sealed class ProbeDeploymentPlanService(
             options.Add((offer, antimatter));
         }
 
+        // Slice 6.38 (D119): "When available, I'd like INTERCEPTORS to be used instead of PROBES."
         return [.. options
-            .OrderBy(option => option.Offer.Price + option.Antimatter)
+            .OrderByDescending(option => option.Offer.IsInterceptor)
+            .ThenBy(option => option.Offer.Price + option.Antimatter)
             .ThenBy(option => option.Offer.Price)
             .ThenBy(option => option.Offer.Shipyard, StringComparer.Ordinal)];
     }
@@ -588,22 +604,28 @@ public sealed class ProbeDeploymentPlanService(
     {
         if (!await purchaseOrder.ReportAsync(
             AutomationPlan.ProbeDeployment,
-            new PurchaseNeed(tier, ProbeShipType, offer.Shipyard, offer.Price),
+            new PurchaseNeed(tier, offer.ShipType, offer.Shipyard, offer.Price),
             cancellationToken))
         {
-            return new ProbePurchase(ProbePurchaseStatus.WaitingForAnotherPurchase, system.Symbol, offer.Shipyard, offer.Price, antimatter, wantedFor);
+            return new ProbePurchase(ProbePurchaseStatus.WaitingForAnotherPurchase, system.Symbol, offer.Shipyard, offer.Price, antimatter, wantedFor)
+            {
+                ShipType = offer.ShipType,
+            };
         }
 
         ShipPurchaseResult result;
         try
         {
-            result = await shipPurchases.TryPurchaseAsync(ProbeShipType, offer.Shipyard, cancellationToken);
+            result = await shipPurchases.TryPurchaseAsync(offer.ShipType, offer.Shipyard, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             // The probes fly on: a purchase that keeps failing shows as RepeatingError.
-            logger.LogWarning(ex, "Probe plan: buying a {ShipType} at {WaypointSymbol} failed.", ProbeShipType, offer.Shipyard);
-            return new ProbePurchase(ProbePurchaseStatus.None, system.Symbol, offer.Shipyard, offer.Price, antimatter, wantedFor);
+            logger.LogWarning(ex, "Probe plan: buying a {ShipType} at {WaypointSymbol} failed.", offer.ShipType, offer.Shipyard);
+            return new ProbePurchase(ProbePurchaseStatus.None, system.Symbol, offer.Shipyard, offer.Price, antimatter, wantedFor)
+            {
+                ShipType = offer.ShipType,
+            };
         }
 
         var status = result switch
@@ -632,7 +654,7 @@ public sealed class ProbeDeploymentPlanService(
             }
         }
 
-        return new ProbePurchase(status, system.Symbol, offer.Shipyard, price, antimatter, wantedFor);
+        return new ProbePurchase(status, system.Symbol, offer.Shipyard, price, antimatter, wantedFor) { ShipType = offer.ShipType };
     }
 
     private async Task SendAsync(ProbeMove move, CancellationToken cancellationToken)
@@ -712,6 +734,7 @@ public sealed class ProbeDeploymentPlanService(
             NextProbeSystem = purchase.System,
             NextProbeFor = purchase.For,
             NextProbeShipyard = purchase.Shipyard,
+            NextProbeShipType = purchase.ShipType,
             NextProbePrice = purchase.Price,
             NextProbeAntimatter = purchase.Antimatter,
             Calls =
@@ -747,14 +770,25 @@ public sealed class ProbeDeploymentPlanService(
     /// <summary>A probe of the fleet: the plan's view of it, the system it counts for, and the system it is in.</summary>
     private sealed record FleetProbe(ProbeShip View, string System, string In);
 
-    /// <summary>A shipyard's offer of a probe, as cached.</summary>
-    private sealed record ProbeOffer(string Shipyard, string System, long Price, bool Scarce);
+    /// <summary>A shipyard's offer of a probe, or of an interceptor in its place (slice 6.38, D119), as cached.</summary>
+    private sealed record ProbeOffer(string Shipyard, string System, long Price, bool Scarce, string ShipType)
+    {
+        /// <summary>Whether it is an interceptor, which comes before any probe (D119).</summary>
+        public bool IsInterceptor => ShipType.Equals(FleetRoles.InterceptorShipType, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Where a probe for <see cref="For"/> is bought now, or, with <see cref="Waits"/>, will be once a probe arrives (B72).</summary>
     private sealed record ProbeSource(ServedSystem For, ProbeOffer Offer, long Antimatter, bool Waits);
 
-    /// <summary>What the pass did about the next probe, where it would be bought, and what it is for (slice 6.32).</summary>
-    private sealed record ProbePurchase(ProbePurchaseStatus Status, string System, string Shipyard, long Price, long Antimatter, ShipyardKind For = ShipyardKind.None);
+    /// <summary>
+    /// What the pass did about the next probe, where it would be bought, what it is for (slice 6.32), and which ship it is: a
+    /// SHIP_PROBE, or an interceptor in its place (slice 6.38, D119).
+    /// </summary>
+    private sealed record ProbePurchase(ProbePurchaseStatus Status, string System, string Shipyard, long Price, long Antimatter, ShipyardKind For = ShipyardKind.None)
+    {
+        /// <summary>The ship it would buy; empty when no shipyard is known.</summary>
+        public string ShipType { get; init; } = string.Empty;
+    }
 
     /// <summary>
     /// A system short of a probe (<see cref="Wants"/>): what the probe is for, a shipyard that sells SHIP_EXPLORER, another

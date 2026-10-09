@@ -154,12 +154,14 @@ public sealed class FleetRoleBoard
     /// <summary>
     /// Whether the trading plan may give the ship a route: a hold and a tank, and the trade role, or the mining, siphon or
     /// construction role when that plan had no trip for it (the board); with the board off, any such ship that doesn't
-    /// survey (D20). A ship that gathers in its spare time trades by its own rule (D34).
+    /// survey (D20). A ship that gathers in its spare time trades by its own rule (D34). A probe, or an interceptor bought in a
+    /// probe's place (slice 6.38, D119), never does: the probe plan flies it.
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <returns>True for a ship the trading plan may treat as a trader.</returns>
     public bool IsTrader(ShipModel ship)
         => ship.IsTradingCapable
+            && !FleetRoles.IsProbe(ship)
             && (RolesOn
                 ? RoleOf(ship) is FleetRole.Trade or FleetRole.Mine or FleetRole.Siphon or FleetRole.Construct
                 : !FleetRoles.IsSurveyor(ship, SurveyOn));

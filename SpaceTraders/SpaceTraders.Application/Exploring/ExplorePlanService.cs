@@ -500,21 +500,31 @@ public sealed class ExplorePlanService(
 
         const PurchaseTier tier = PurchaseTier.Explorer;
         var reach = ExploreAtlas.Reachable(state, state.HomeSystemSymbol, now);
-        var offer = (await shipyards.GetAllAsync(ct))
+        var offers = (await shipyards.GetAllAsync(ct))
             .SelectMany(shipyard => shipyard.Ships
                 .Where(forSale => forSale.Type.Equals(FleetRoles.ExplorerShipType, StringComparison.OrdinalIgnoreCase) && forSale.PurchasePrice > 0)
                 .Select(forSale => (
                     Shipyard: shipyard.WaypointSymbol,
                     System: shipyard.SystemSymbol.Length > 0 ? shipyard.SystemSymbol : WaypointSymbols.SystemOf(shipyard.WaypointSymbol),
-                    Price: forSale.PurchasePrice)))
+                    Price: forSale.PurchasePrice,
+                    Scarce: ScarceShips.IsScarce(forSale))))
             .Where(candidate => reach.ContainsKey(candidate.System))
+            .ToList();
+
+        // D121: never where the shipyard has it SCARCE.
+        var offer = offers
+            .Where(candidate => !candidate.Scarce)
             .OrderBy(candidate => candidate.Price)
             .ThenBy(candidate => reach[candidate.System])
             .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
             .FirstOrDefault();
         if (offer.Shipyard is null)
         {
-            return new ExplorerPurchaseState { Status = ExplorerPurchaseStatus.NoShipyardSellsOne, Tier = tier };
+            return new ExplorerPurchaseState
+            {
+                Status = offers.Count > 0 ? ExplorerPurchaseStatus.ShipyardsScarce : ExplorerPurchaseStatus.NoShipyardSellsOne,
+                Tier = tier,
+            };
         }
 
         var purchase = new ExplorerPurchaseState { Tier = tier, ShipyardWaypointSymbol = offer.Shipyard, Price = offer.Price };
@@ -556,6 +566,7 @@ public sealed class ExplorePlanService(
                     ? ExplorerPurchaseStatus.WaitingForAShipThere
                     : ExplorerPurchaseStatus.CommandShipFetchesIt,
                 { Failure: ShipPurchaseFailure.PriceUnknown } => ExplorerPurchaseStatus.NoShipyardSellsOne,
+                { Failure: ShipPurchaseFailure.Scarce } => ExplorerPurchaseStatus.ShipyardsScarce,
                 _ => ExplorerPurchaseStatus.None,
             },
             Price = result.EstimatedCost > 0 ? result.EstimatedCost : offer.Price,

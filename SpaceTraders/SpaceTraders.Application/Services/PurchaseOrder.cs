@@ -30,7 +30,9 @@ namespace SpaceTraders.Application.Services;
 ///   D97);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships with the largest hold (D112), in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy;</item>
-///   <item>last, a probe for every market of the other explored systems (slice 6.28, D97).</item>
+///   <item>a probe for every market of the other explored systems (slice 6.28, D97);</item>
+///   <item>last, a miner for a system abroad, one per ore its markets are short of (slice 6.40, D122): "outside of the home area,
+///   mining is low priority, and should never be in the way of trading".</item>
 /// </list>
 /// A need counts while its plan is on, and only while it can be met (its plan's cap not reached, a known shipyard selling
 /// the ship): a need that never can be would stop everything after it. Until each plan that is on, and could need
@@ -73,19 +75,25 @@ public sealed class PurchaseOrder(
         [AutomationPlan.ProbeDeployment] = PurchaseTier.Probes,
     };
 
-    /// <summary>The drones the plans buy, which take turns with the cargo ships.</summary>
-    private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipSiphonDrone };
+    /// <summary>
+    /// The drones the plans buy, which take turns with the cargo ships: the ore hounds bought in a mining drone's place too (slice
+    /// 6.39, D120).
+    /// </summary>
+    private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipOreHound, ShipType.ShipSiphonDrone };
 
     /// <summary>
-    /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes, the surveyors
-    /// and the explorers, and a type this version doesn't know. Every other type is one: the list's, and since slice 6.33 (D112)
-    /// whichever has the largest hold beyond it, such as a heavy or bulk freighter, so the drones' turn comes after each.
+    /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes and the
+    /// interceptors bought in their place (slice 6.38, D119), the surveyors and the explorers, and a type this version doesn't
+    /// know. Every other type is one: the list's, and since slice 6.33 (D112) whichever has the largest hold beyond it, such as
+    /// a heavy or bulk freighter, so the drones' turn comes after each.
     /// </summary>
     private static readonly IReadOnlySet<ShipType> NotCargoShipTypes = new HashSet<ShipType>
     {
         ShipType.None,
         ShipType.ShipProbe,
+        ShipType.ShipInterceptor,
         ShipType.ShipMiningDrone,
+        ShipType.ShipOreHound,
         ShipType.ShipSiphonDrone,
         ShipType.ShipSurveyor,
         ShipType.ShipExplorer,
@@ -537,6 +545,14 @@ public enum PurchaseTier
     /// which stood at 10, to <see cref="Explorer"/>, and 11 again since slice 6.34 (D116) put the cargo ship on the clock at 8.
     /// </summary>
     FarProbes = 11,
+
+    /// <summary>
+    /// A miner for a system abroad (slice 6.40, D122), an ore hound where one is sold, else a mining drone (D120): one per ore a
+    /// market there that makes something from it has SCARCE or LIMITED, last of all. Asked on 2026-10-09: "I'd like mining to be
+    /// done wherever there's low ore supply, not just in the home area. However, outside of the home area, mining is low
+    /// priority, and should never be in the way of trading, which is generally more lucrative."
+    /// </summary>
+    MiningAbroad = 12,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

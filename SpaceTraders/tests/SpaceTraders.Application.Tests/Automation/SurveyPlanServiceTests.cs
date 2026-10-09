@@ -39,6 +39,7 @@ public sealed class SurveyPlanServiceTests
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -84,6 +85,58 @@ public sealed class SurveyPlanServiceTests
 
         _order.Of(AutomationPlan.Survey).Should().Be(new PurchaseNeed(PurchaseTier.Surveyor, "SHIP_SURVEYOR", H52, 33_905));
         await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ASurveyorTheShipyardHasScarce_IsNotBought_NorANeed()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". H52 has the surveyor SCARCE, as cached: a need that can't be met would hold back everything after it.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_SURVEYOR"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_SURVEYOR", PurchasePrice = 33_905, FuelCapacity = 80, Supply = "SCARCE" }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task ForOreHoundsThatSurveyForThemselves_NoSurveyShipIsBought_NorDoesAnOreHoundTakeSurveys()
+    {
+        // Slice 6.39 (D120): an ore hound surveys for its own trips; the survey ships serve the miners that can't survey.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-7", FleetRole.Mine));
+        Fleet(CommandShip(), Drone() with { Symbol = "SHIP-7", ShipType = "SHIP_ORE_HOUND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _activeGoals.Should().NotContainKey("SHIP-7");
+    }
+
+    [Fact]
+    public async Task ForMiningDronesAbroad_NoSurveyShipIsBought()
+    {
+        // Slice 6.40 (D122): abroad the miners mine without the survey ships. Home is X1-KR90 here, so X1-DC53 is abroad.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-KR90-A1", 1_000_000, "COBALT", 3));
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Theory]
@@ -647,6 +700,7 @@ public sealed class SurveyPlanServiceTests
                 _shipyards,
                 _purchases,
                 _order,
+                _agents,
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }

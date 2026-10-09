@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
@@ -10,9 +12,10 @@ namespace SpaceTraders.Application.Goals.Executors;
 
 /// <summary>
 /// Executor for <see cref="DeployProbeGoal"/>: one flight of a probe (PLAN.md slice 6.3). The probe flies in
-/// CRUISE: it has no tank, so no flight costs it fuel, and DRIFT would only make it ten times slower. Its
-/// arrival fetches the market and the shipyard there, and docks it; then the goal ends, and the probe plan
-/// gives it the next market, or leaves it where it is.
+/// CRUISE: it has no tank, so no flight costs it fuel, and DRIFT would only make it ten times slower. An interceptor, bought
+/// in a probe's place (slice 6.38, D119), has a tank: it flies as every ship with one does, the fastest way through
+/// refuelling stops (<see cref="GoalFlight"/>, D84). The arrival fetches the market and the shipyard there, and docks it;
+/// then the goal ends, and the probe plan gives it the next market, or leaves it where it is.
 /// </summary>
 /// <remarks>
 /// A flight to another system (PLAN.md slice 6.28) jumps through the built gates on the way, as every flight between systems
@@ -24,6 +27,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 public sealed class DeployProbeGoalExecutor(
     IShipGoalRepository goals,
     GoalJumps jumps,
+    ITradeContextReader tradeContexts,
+    IDockSubCommand dock,
     IMessageBus bus,
     ILogger<DeployProbeGoalExecutor> logger) : IShipGoalExecutor
 {
@@ -54,8 +59,8 @@ public sealed class DeployProbeGoalExecutor(
         }
 
         // The old probe plan parked probes in DRIFT, and the navigation's fuel fallback can leave a ship in
-        // it (B47).
-        if (string.Equals(ship.FlightMode, DriftMode, StringComparison.OrdinalIgnoreCase))
+        // it (B47). An interceptor's flights set each leg's mode.
+        if (ship.FuelCapacity == 0 && string.Equals(ship.FlightMode, DriftMode, StringComparison.OrdinalIgnoreCase))
         {
             logger.LogDebug("DeployProbeGoalExecutor: probe {ShipSymbol} switches from DRIFT to CRUISE.", ship.Symbol);
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, CruiseMode), ct);
@@ -65,6 +70,13 @@ public sealed class DeployProbeGoalExecutor(
         if (!string.Equals(ship.SystemSymbol, WaypointSymbols.SystemOf(flight.TargetWaypointSymbol), StringComparison.OrdinalIgnoreCase))
         {
             return await AbroadAsync(ship, flight, ct);
+        }
+
+        // Slice 6.38 (D119): an interceptor's flight costs fuel; the planner gives each leg its mode and its refuelling stops.
+        if (ship.FuelCapacity > 0)
+        {
+            var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+            return await GoalFlight.TowardsAsync(context.Map, ship, flight.TargetWaypointSymbol, dock, bus, ct);
         }
 
         await bus.InvokeAsync(new NavigateToWaypointCommand(ship.Symbol, flight.TargetWaypointSymbol), ct);

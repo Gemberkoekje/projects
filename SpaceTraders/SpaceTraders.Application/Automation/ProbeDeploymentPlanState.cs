@@ -44,6 +44,12 @@ public sealed record ProbeDeploymentPlanState
     /// </summary>
     public string NextProbeShipyard { get; init; } = string.Empty;
 
+    /// <summary>
+    /// The ship it would be: <c>SHIP_INTERCEPTOR</c> where a shipyard it could come from sells one, else <c>SHIP_PROBE</c>
+    /// (slice 6.38, D119); empty when no shipyard is known.
+    /// </summary>
+    public string NextProbeShipType { get; init; } = string.Empty;
+
     /// <summary>What a probe costs there, as cached; 0 when no shipyard is known.</summary>
     public long NextProbePrice { get; init; }
 

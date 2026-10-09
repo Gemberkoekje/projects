@@ -9,7 +9,8 @@ namespace SpaceTraders.Application.Automation;
 /// term: plans should just work across systems … But let's start simple"): the headquarters' system alone, as D60 meant
 /// (PLAN.md slice 6.28). What a ship finds elsewhere is information, for the systems dashboard: no plan buys a ship, or plans
 /// work, in a system because the explorer, a probe that watches its markets, or a trader is in it. Only the trading plan's
-/// traders cross systems (slice 6.29, D96), and the role board gives a ship abroad the trade role alone.
+/// traders cross systems (slice 6.29, D96), and the role board gives a ship abroad the trade role alone; since slice 6.40
+/// (D122) the mining plan also buys miners abroad, last of all, and a mining drone there mines in its system.
 /// </summary>
 public static class BusinessSystems
 {
@@ -31,4 +32,19 @@ public static class BusinessSystems
     /// <returns>The headquarters' system; none while the agent or its headquarters isn't known.</returns>
     public static IReadOnlyList<string> Of(AgentModel? agent)
         => agent?.HeadquartersSymbol is { Length: > 0 } headquarters ? [WaypointSymbols.SystemOf(headquarters)] : [];
+
+    /// <summary>
+    /// Whether a system is abroad: outside the systems the plans do business in (<see cref="Of"/>). None is while those aren't
+    /// known, as before startup sync caches the agent.
+    /// </summary>
+    /// <param name="systems">The systems the plans do business in.</param>
+    /// <param name="systemSymbol">The system; a ship's, null while it has none.</param>
+    /// <returns>True for a system outside them.</returns>
+    public static bool IsAbroad(IReadOnlyCollection<string> systems, string? systemSymbol)
+    {
+        ArgumentNullException.ThrowIfNull(systems);
+        return systems.Count > 0
+            && !string.IsNullOrWhiteSpace(systemSymbol)
+            && !systems.Contains(systemSymbol, StringComparer.OrdinalIgnoreCase);
+    }
 }

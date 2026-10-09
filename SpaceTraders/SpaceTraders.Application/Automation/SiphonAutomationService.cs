@@ -354,20 +354,23 @@ public sealed class SiphonAutomationService(
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
         foreach (var systemSymbol in systems)
         {
-            var shipyard = shipyardList
-                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
-                    && candidate.Ships.Any(ship => ship.Type.Equals(SiphonDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0))
-                .OrderBy(candidate => candidate.Ships.First(ship => ship.Type.Equals(SiphonDroneShipType, StringComparison.OrdinalIgnoreCase)).PurchasePrice)
-                .ThenBy(candidate => candidate.WaypointSymbol, StringComparer.Ordinal)
+            // D121: never where the shipyard has it SCARCE.
+            var listing = shipyardList
+                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(candidate => candidate.Ships
+                    .Where(ship => ship.Type.Equals(SiphonDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && !ScarceShips.IsScarce(ship))
+                    .Select(ship => (Shipyard: candidate, Ship: ship)))
+                .OrderBy(candidate => candidate.Ship.PurchasePrice)
+                .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
                 .FirstOrDefault();
-            if (shipyard is null)
+            if (listing.Shipyard is null)
             {
-                logger.LogDebug("Siphon plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, SiphonDroneShipType);
+                logger.LogDebug("Siphon plan: no shipyard in {SystemSymbol} with a known price for {ShipType} that isn't SCARCE.", systemSymbol, SiphonDroneShipType);
                 continue;
             }
 
+            var (shipyard, forSale) = listing;
             var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
-            var forSale = shipyard.Ships.First(ship => ship.Type.Equals(SiphonDroneShipType, StringComparison.OrdinalIgnoreCase));
             var newDrone = new ShipModel(
                 "NEW-DRONE",
                 systemSymbol,

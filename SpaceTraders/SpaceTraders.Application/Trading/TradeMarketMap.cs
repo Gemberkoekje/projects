@@ -135,6 +135,18 @@ public sealed class TradeMarketMap
     public TradeMarketMap WithoutJumps()
         => ReferenceEquals(Gates, TradeGates.None) ? this : new TradeMarketMap(this);
 
+    /// <summary>
+    /// The same map with the markets whose prices are too old to decide by (<see cref="StaleMarkets"/>): what mining abroad reads
+    /// (PLAN.md slice 6.40, D122), where only the markets the probes keep fresh count.
+    /// </summary>
+    /// <param name="staleMarkets">The markets whose prices are too old.</param>
+    /// <returns>The map, those markets stale.</returns>
+    public TradeMarketMap WithStaleMarkets(IReadOnlySet<string> staleMarkets)
+    {
+        ArgumentNullException.ThrowIfNull(staleMarkets);
+        return new TradeMarketMap(this) { Gates = Gates, StaleMarkets = staleMarkets };
+    }
+
     /// <summary>The system a waypoint is in: as its cached waypoint says, else as its symbol does.</summary>
     /// <param name="waypointSymbol">The waypoint.</param>
     /// <returns>The system.</returns>

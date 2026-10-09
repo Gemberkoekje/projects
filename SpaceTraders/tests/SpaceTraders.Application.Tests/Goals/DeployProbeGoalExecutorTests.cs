@@ -123,6 +123,32 @@ public sealed class DeployProbeGoalExecutorTests
     }
 
     [Fact]
+    public async Task AnInterceptor_FliesTheWayThePlannerGivesIt_ForItHasATank()
+    {
+        // Slice 6.38 (D119): an interceptor flies in a probe's place, but a flight costs it fuel. It flies as every ship with a
+        // tank does (GoalFlight, D84): each leg in the mode the route planner gives it; a probe's flight carries no mode.
+        var result = await StepAsync(Interceptor("X1-AB-HQ", "DOCKED"), HomeGate);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == Probe1 && c.DestinationWaypoint == HomeGate && c.FlightMode.Length > 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnInterceptorInDrift_IsNotSwitchedToCruiseFirst_ItsLegsSetTheirMode()
+    {
+        // B47's switch is for a probe, which has no tank; an interceptor's flight sets each leg's mode.
+        var result = await StepAsync(Interceptor("X1-AB-HQ", "DOCKED") with { FlightMode = "DRIFT" }, HomeGate);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<PatchShipNavCommand>(), Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<NavigateToWaypointCommand>(c => c.DestinationWaypoint == HomeGate && c.FlightMode.Length > 0),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task InFlight_ItWaits()
     {
         var result = await StepAsync(Probe("X1-AB-MKT", "IN_TRANSIT") with { ArrivesAt = DateTimeOffset.MaxValue });
@@ -208,7 +234,7 @@ public sealed class DeployProbeGoalExecutorTests
             .ThrowsAsync(new JumpRefusedException(CdGate, 4254, "under construction", new InvalidOperationException("400")));
         var goal = new DeployProbeGoal { TargetWaypointSymbol = CdMarket };
 
-        var result = await new DeployProbeGoalExecutor(_goals, Jumps(), _bus, NullLogger<DeployProbeGoalExecutor>.Instance)
+        var result = await new DeployProbeGoalExecutor(_goals, Jumps(), _tradeContexts, Substitute.For<IDockSubCommand>(), _bus, NullLogger<DeployProbeGoalExecutor>.Instance)
             .ExecuteStepAsync(Probe(HomeGate, "IN_ORBIT"), goal, new ShipGoalContext(), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Blocked);
@@ -219,6 +245,10 @@ public sealed class DeployProbeGoalExecutorTests
 
     private static ShipModel Probe(string waypoint, string status) =>
         new(Probe1, "X1-AB", waypoint, status, "CRUISE", 0, 0, ShipType: "SATELLITE");
+
+    /// <summary>An interceptor (slice 6.38, D119), as bought: a tank, and no hold.</summary>
+    private static ShipModel Interceptor(string waypoint, string status) =>
+        new(Probe1, "X1-AB", waypoint, status, "CRUISE", 400, 400, ShipType: "SHIP_INTERCEPTOR");
 
     private void Credits(long credits)
         => _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-AB-HQ", credits, "COSMIC", 3));
@@ -242,6 +272,6 @@ public sealed class DeployProbeGoalExecutorTests
             _log.For<GoalJumps>());
 
     private Task<GoalExecutionResult> StepAsync(ShipModel probe, string target = "X1-AB-MKT")
-        => new DeployProbeGoalExecutor(_goals, Jumps(), _bus, NullLogger<DeployProbeGoalExecutor>.Instance)
+        => new DeployProbeGoalExecutor(_goals, Jumps(), _tradeContexts, Substitute.For<IDockSubCommand>(), _bus, NullLogger<DeployProbeGoalExecutor>.Instance)
             .ExecuteStepAsync(probe, new DeployProbeGoal { TargetWaypointSymbol = target }, new ShipGoalContext(), CancellationToken.None);
 }

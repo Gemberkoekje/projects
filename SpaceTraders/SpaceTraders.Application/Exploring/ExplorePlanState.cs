@@ -78,6 +78,9 @@ public enum ExplorerPurchaseStatus
 
     /// <summary>No shipyard the gates reach is known to sell one.</summary>
     NoShipyardSellsOne = 6,
+
+    /// <summary>Every shipyard the gates reach that sells one has it at SCARCE supply: none is bought there (D121).</summary>
+    ShipyardsScarce = 7,
 }
 
 /// <summary>

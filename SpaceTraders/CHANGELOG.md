@@ -7,6 +7,85 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Docs – Changed (2026-10-09, slice 2.19)
+- Two runs on one chart (D123), as asked on 2026-10-09: "If possible, I'd like the option to overlay 2 (weekly) runs, so I
+  can compare the value curve and see if it becomes better", with "Picker + 31 days in Prometheus". Built in gembernodes
+  (no bot code): a "Compare with" picker and two panels on the SpaceTraders dashboard, and 31 days in Prometheus.
+  `PLAN.md`: slice 2.19 built. `docs/HOW_IT_WORKS.md`: the picker, under the metrics' `reset_date`.
+
+### Code – Changed (2026-10-09, slice 6.40)
+- Mining abroad (D122), as asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the
+  home area. However, outside of the home area, mining is low priority, and should never be in the way of trading, which is
+  generally more lucrative", then "One per short ore, no cap". With nothing to buy at home, the mining plan buys a miner (an
+  ore hound where one is sold, else a mining drone) for the first system abroad whose markets the probes keep fresh with
+  fewer mining drones than ores its markets are short of, last in the order ships are bought in (`PurchaseTier.MiningAbroad`,
+  new, 12), with no cap (`Mining.MaxDrones` counts home's). Abroad a market whose prices are older than
+  `Trade.MaxPriceAgeMinutes` is stale and mined for by nobody (`IMiningContextReader.SystemsAbroadAsync`,
+  `ITradeContextReader.FreshMarketsAsync`, `TradeMarketMap.WithStaleMarkets`, new), there are no collection points, and a
+  pair whose market a trade trip is on its way to sell the ore at is left to the trade (`MiningContext.LeftToTrade`, new).
+  The role board lets a mining drone or an ore hound abroad mine; the contract takes only miners at home, the survey plan
+  buys survey ships only for home's drones (`SurveyPlanService` takes `IAgentRepository`), and only home's free miners hold
+  back home's drones in turn with the cargo ships.
+
+### Docs – Changed (2026-10-09, slice 6.40)
+- `PLAN.md`: slice 6.40 built. `docs/HOW_IT_WORKS.md`: mining abroad; the order ships are bought in; the role board, the
+  contract and the survey plan at home; the purchase order metric's tiers.
+
+### Code – Changed (2026-10-09, slice 6.39)
+- Ore hounds instead of mining drones (D120), as asked on 2026-10-09: "When available, use ORE HOUNDS instead of MINING
+  DRONES. I think they can both survey and mine, so have them survey until the desired mineral is found, then mine the
+  survey", with no limit. Every purchase of a miner (the contract's, the mining plan's for scarce ores, the gate's miners,
+  the turns) buys a `SHIP_ORE_HOUND` wherever a shipyard the plan buys from sells one that isn't SCARCE, the cheapest such,
+  and a `SHIP_MINING_DRONE` only where none does (`MinerShips`, new); the collection points are judged with its tank. An
+  ore hound is a mining drone in every rule (`FleetRoles.IsOreHound`, new, in `IsMiningDrone`): it never takes the survey
+  role, and the turns count it as a drone. At its asteroid it surveys while no usable survey there lists its trip's ore,
+  keeping the surveys for every miner, then extracts with the best that lists it (`FleetRoles.SurveysForItself`,
+  `MineResourceVolumeHandler.SurveyForItselfAsync`); a failed survey leaves that step to extract without one. The survey
+  ships are bought, and a ship that can survey takes the survey role, only for the miners that need surveys
+  (`FleetRoles.NeedsSurveyShips`). The contract plan's stop reason names both ships.
+
+### Docs – Changed (2026-10-09, slice 6.39)
+- `PLAN.md`: slice 6.39 built; D20, D48 and D55 marked as amended by D120. `docs/HOW_IT_WORKS.md`: the ships the contract,
+  survey and mining plans buy; the role board's survey and drone rules; the ore hound's surveys in
+  `MineResourceVolumeCommand`; a purchase stores the new ship's mounts since slice 6.31 (the text still said they waited
+  for the next startup sync).
+
+### Code – Changed (2026-10-09, slice 6.38)
+- Interceptors instead of probes (D119), as asked on 2026-10-09: "When available, I'd like INTERCEPTORS to be used instead of
+  PROBES. As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE." The probe plan buys a `SHIP_INTERCEPTOR`
+  wherever a shipyard it buys from sells one that isn't SCARCE, the cheapest such with the antimatter counted, and a
+  `SHIP_PROBE` only where none does (`ProbeDeploymentPlanService.BuyProbeAsync`, `Options`); its state names the ship
+  (`NextProbeShipType`, new). An interceptor is a probe to every plan (`FleetRoles.IsInterceptor`, new, in `IsProbe`): the
+  probe plan flies it, the role board gives it no role, and no plan trades with it (`FleetRoleBoard.IsTrader`). It has a
+  tank, so its flights go as every ship with one does, through refuelling stops (`DeployProbeGoalExecutor` takes
+  `ITradeContextReader` and `IDockSubCommand`); a probe flies in CRUISE as before. In the purchase order it takes no turn
+  with the drones and cargo ships, as a probe takes none. Then asked: "Do not forget that stationary interceptors are
+  intended and not cause of a 'stalled ship' warning": a parked interceptor raises neither `ShipStuck` nor `ShipLeftIdle`,
+  which tests pin.
+
+### Docs – Changed (2026-10-09, slice 6.38)
+- `PLAN.md`: slice 6.38 built. `docs/HOW_IT_WORKS.md`: the probe plan's ships, purchase, flight and state; the purchase
+  order's turns; the probe executor.
+
+### Code – Changed (2026-10-09, slice 6.37)
+- No ship is bought where the shipyard has it SCARCE (D121), as asked on 2026-10-09: "As with the other ships, do not buy
+  INTERCEPTORS if the supply is SCARCE", then "Every purchase". Until then only the probes (D97) and the largest hold
+  beyond `Trade.ShipPurchases` (D112) kept to it. `ShipPurchaseService.TryPurchaseAsync` now refuses every ship whose cached
+  listing is SCARCE, before it calls one of our ships to the shipyard, and every ship the shipyard, fetched again just
+  before, lists SCARCE (`ShipPurchaseFailure.Scarce`); `IShipPurchaseService.TryPurchaseUnlessScarceAsync` is gone. The
+  contract plan, the survey plan, the mining plan (drones and shuttles), the siphon plan, the trading plan's list and the
+  explore plan leave a SCARCE listing out when they choose where to buy, take another shipyard that sells the ship, and
+  otherwise need nothing, so nothing after them in the order waits for a purchase that can't be made. The explore plan says
+  `ShipyardsScarce` (new) when every shipyard that sells an explorer has it SCARCE. `ScarceShips` (new) holds the check.
+
+### Docs – Changed (2026-10-09, slice 6.37)
+- `PLAN.md`: D119–D123, asked on 2026-10-09, with D28, D29, D47, D60, D97 and D112 marked as amended; slices 6.37–6.40 and
+  2.19 planned, 6.37 built. `docs/HOW_IT_WORKS.md`: purchasing, the cargo ships and the explorers at SCARCE.
+
+### Docs – Changed (2026-10-09)
+- `PLAN.md`: where things stand after gembernodes#92 deployed B74–B77 and slices 6.35 and 6.36, and gembernodes#93 deployed
+  B78; B74–B78 and slice 6.36's details moved to `docs/archive/PLAN_HISTORY.md`.
+
 ### Code – Fixed (2026-10-09, B78)
 - The explorers no longer wait for hours, all together, behind the explore plan's looks due again (B78). An explorer with a warp drive waits while a system only a warp reaches, within a warp of an explored system, has never had its waypoints fetched; the plan makes one look a pass and fetched those after every gate or connections look due again. With 24 gates under construction, each looked at again hourly, and a pass every 2 to 9 minutes, those never ran out: from 2026-10-08 about 19:50Z to 2026-10-09 04:30Z the five explorers waited until X1-BS22 and X1-KA53 were fetched, about 14 of 48 hours in all. Now such a system, never asked for, is fetched after the gates and connections never looked at and before the looks due again (`ExplorePlanService.LearnAsync`, `WarpLooksAsync`, `NextLook`'s `due`); one whose fetch failed still comes after them.
 

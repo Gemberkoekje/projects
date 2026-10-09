@@ -210,6 +210,75 @@ public sealed class MineResourceVolumeHandlerTests
     }
 
     [Fact]
+    public async Task AnOreHound_WithNoSurveyThatHoldsItsOre_SurveysInstead_AndKeepsTheSurveys()
+    {
+        // Slice 6.39 (D120), asked on 2026-10-09: "I think they can both survey and mine, so have them survey until the desired
+        // mineral is found, then mine the survey." The asteroid's one survey holds ice water, not iron.
+        var hound = OreHound("SHIP-7");
+        _ships.FindAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(hound);
+        _surveys.GetActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new StoredSurvey(Survey("SIG-ICE", "ICE_WATER", "QUARTZ_SAND"), "SHIP-1", DateTimeOffset.UtcNow, 0)]);
+        IReadOnlyList<SurveyModel> taken = [Survey("SIG-NEW", "ICE_WATER", "IRON_ORE")];
+        var cooldown = DateTimeOffset.UtcNow.AddSeconds(83);
+        _port.SurveyAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(new SurveyActionResult(taken, 83, cooldown));
+
+        var result = await Handler().ExecuteAsync(new MineResourceVolumeCommand("SHIP-7", "IRON_ORE", "X1-AB-AST", 30) { KeepOtherOres = true }, CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await _surveyKeeper.Received(1).TakenAsync("SHIP-7", "IRON_ORE", taken, Arg.Any<CancellationToken>());
+        await _ships.Received(1).UpdateCooldownAsync("SHIP-7", cooldown, Arg.Any<CancellationToken>());
+        await _port.DidNotReceiveWithAnyArgs().ExtractResourcesAsync(default!, default);
+        await _port.DidNotReceiveWithAnyArgs().ExtractWithSurveyAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task AnOreHound_WithASurveyThatHoldsItsOre_MinesWithIt_ThoughAnotherShipTookIt()
+    {
+        // D120: "then mine the survey". A survey another ship took counts as found.
+        _ships.FindAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(OreHound("SHIP-7"));
+        _surveys.GetActiveAsync(Arg.Any<CancellationToken>()).Returns(
+            [new StoredSurvey(Survey("SIG-IRON", "IRON_ORE", "ICE_WATER"), "SHIP-1", DateTimeOffset.UtcNow, 0)]);
+        _port.ExtractWithSurveyAsync("SHIP-7", Arg.Any<SurveyModel>(), Arg.Any<CancellationToken>()).Returns(Extraction("IRON_ORE", 7));
+
+        await Handler().ExecuteAsync(new MineResourceVolumeCommand("SHIP-7", "IRON_ORE", "X1-AB-AST", 30), CancellationToken.None);
+
+        await _port.Received(1).ExtractWithSurveyAsync("SHIP-7", Arg.Is<SurveyModel>(survey => survey.Signature == "SIG-IRON"), Arg.Any<CancellationToken>());
+        await _port.DidNotReceiveWithAnyArgs().SurveyAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task AnOreHoundWhoseSurveyFails_ExtractsWithoutOne()
+    {
+        // A failure that repeats shows as RepeatingError; the hound mines on meanwhile.
+        _ships.FindAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(OreHound("SHIP-7"));
+        _port.SurveyAsync("SHIP-7", Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("400"));
+        _port.ExtractResourcesAsync("SHIP-7", Arg.Any<CancellationToken>()).Returns(Extraction("IRON_ORE", 7));
+
+        var result = await Handler().ExecuteAsync(new MineResourceVolumeCommand("SHIP-7", "IRON_ORE", "X1-AB-AST", 30), CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await _port.Received(1).ExtractResourcesAsync("SHIP-7", Arg.Any<CancellationToken>());
+        _log.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Warning).Which.Message.Should().Contain("SHIP-7");
+    }
+
+    [Fact]
+    public async Task AnOreHoundWithoutASurveyor_AndADrone_ExtractWithoutASurvey_AsBefore()
+    {
+        // D120: only a ship that can survey surveys for itself.
+        foreach (var miner in new[] { OreHound("SHIP-7") with { MountSymbols = ["MOUNT_MINING_LASER_II"] }, AtAsteroid("SHIP-3") with { ShipType = "SHIP_MINING_DRONE", MountSymbols = ["MOUNT_MINING_LASER_I"] } })
+        {
+            _ships.FindAsync(miner.Symbol, Arg.Any<CancellationToken>()).Returns(miner);
+            _port.ExtractResourcesAsync(miner.Symbol, Arg.Any<CancellationToken>()).Returns(Extraction("IRON_ORE", 3));
+
+            await Handler().ExecuteAsync(new MineResourceVolumeCommand(miner.Symbol, "IRON_ORE", "X1-AB-AST", 30), CancellationToken.None);
+
+            await _port.Received(1).ExtractResourcesAsync(miner.Symbol, Arg.Any<CancellationToken>());
+        }
+
+        await _port.DidNotReceiveWithAnyArgs().SurveyAsync(default!, default);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DropsASurveyTheApiRefuses_AndExtractsNothingThisStep()
     {
         _ships.FindAsync("SHIP-3", Arg.Any<CancellationToken>()).Returns(AtAsteroid("SHIP-3"));
@@ -344,6 +413,10 @@ public sealed class MineResourceVolumeHandlerTests
             CargoCurrent: 0,
             CargoCapacity: 40,
             CargoInventory: []);
+
+    /// <summary>An ore hound (slice 6.39, D120) as bought, in orbit at the asteroid: a mining laser and a surveyor.</summary>
+    private static ShipModel OreHound(string symbol)
+        => AtAsteroid(symbol) with { ShipType = "SHIP_ORE_HOUND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] };
 
     private static ExtractionActionResult Extraction(string good, int units)
         => new(good, units, new CargoModel(units, 40, [new CargoItemModel(good, units)]), CooldownSeconds: 70);

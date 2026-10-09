@@ -4,21 +4,16 @@ namespace SpaceTraders.Application.Services;
 
 public interface IShipPurchaseService
 {
-    Task<ShipPurchaseResult> TryPurchaseAsync(
-        string shipType,
-        string shipyardWaypoint,
-        CancellationToken cancellationToken = default);
-
     /// <summary>
-    /// As <see cref="TryPurchaseAsync"/>, but buys nothing where the shipyard has the ship SCARCE, by its supply as fetched just
-    /// before the purchase (slice 6.33, D112: the cargo ship bought once <c>Trade.ShipPurchases</c> is, "as long as it is not
-    /// scarce"); <see cref="ShipPurchaseFailure.Scarce"/> then.
+    /// Buys the ship at the shipyard, within the credit reserve, where one of our ships is (D30). Nothing is bought where the
+    /// shipyard has the ship SCARCE, by its supply as fetched just before the purchase (D121, which D97 and D112 began);
+    /// <see cref="ShipPurchaseFailure.Scarce"/> then.
     /// </summary>
     /// <param name="shipType">The ship, such as <c>SHIP_LIGHT_HAULER</c>.</param>
     /// <param name="shipyardWaypoint">The shipyard.</param>
     /// <param name="cancellationToken">Stops the purchase.</param>
     /// <returns>What happened.</returns>
-    Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
+    Task<ShipPurchaseResult> TryPurchaseAsync(
         string shipType,
         string shipyardWaypoint,
         CancellationToken cancellationToken = default);
@@ -59,8 +54,8 @@ public enum ShipPurchaseFailure
     NoShipAtShipyard = 4,
 
     /// <summary>
-    /// A probe (D97), or a cargo ship bought once <c>Trade.ShipPurchases</c> is (D112), whose supply at the shipyard is SCARCE, as
-    /// fetched just before the purchase: none is bought.
+    /// The ship's supply at the shipyard is SCARCE, as fetched just before the purchase: none is bought (D121; for the probes D97,
+    /// for the largest hold D112, before it).
     /// </summary>
     Scarce = 5,
 }

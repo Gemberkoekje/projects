@@ -157,6 +157,58 @@ public sealed class ContractPlanServiceTests
     }
 
     [Fact]
+    public async Task AnIdleMinerAbroad_IsNotTheContractsShip()
+    {
+        // Slice 6.40 (D122): a drone abroad mines there, for the mining plan; the contract works at home, where no miner is idle.
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-2",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("IRON_ORE", "X1-AB-MKT", 60, 10) }))
+        ]);
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-AB-A1", 1_000_000, "COBALT", 3));
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("SHIP-MINER-1", "X1-CD", "X1-CD-START", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 40, ShipType: "SHIP_MINING_DRONE", MountSymbols: ["MOUNT_MINING_LASER_I"]),
+        ]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            Substitute.For<IShipyardRepository>(),
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
+            agents,
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
+            new OpenPurchaseOrder(),
+            NullLogger<ContractPlanService>.Instance);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.DidNotReceive().UpsertAsync(Arg.Is<ContractMineralPlanState>(p => p.ShipSymbol == "SHIP-MINER-1"), Arg.Any<CancellationToken>());
+        await assignments.DidNotReceive().UpsertAsync(Arg.Is<ShipAssignmentDto>(a => a.ShipSymbol == "SHIP-MINER-1"), Arg.Any<CancellationToken>());
+        await plans.Received(1).UpsertAsync(Arg.Is<ContractMineralPlanState>(p => p.Status == ContractMineralPlanStatus.PendingBudget), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task EnsureBootstrappedAsync_CreatesPendingBudgetPlan_WhenNoMinerAndCannotPurchase()
     {
         var plans = Substitute.For<IContractMineralPlanRepository>();
@@ -240,6 +292,147 @@ public sealed class ContractPlanServiceTests
             Arg.Any<CancellationToken>());
 
         await assignments.DidNotReceive().UpsertAsync(Arg.Any<ShipAssignmentDto>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TheContractsDrone_IsNotBought_NorANeed_WhereTheShipyardHasItScarce()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". The home shipyard has the drone SCARCE, as cached.
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        var shipyards = Substitute.For<IShipyardRepository>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
+        var order = new OpenPurchaseOrder();
+
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-3",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto>
+                {
+                    new("COPPER_ORE", "X1-AB-MKT", 30, 0),
+                }))
+        ]);
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, "X1-AB-A1", 1_000_000, "COSMIC", 1));
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+        shipyards.FindByWaypointAsync("X1-AB-SHIPYARD", Arg.Any<CancellationToken>()).Returns(new ShipyardWaypointDto
+        {
+            WaypointSymbol = "X1-AB-SHIPYARD",
+            SystemSymbol = "X1-AB",
+            ShipTypes = ["SHIP_MINING_DRONE"],
+            Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 100_000, Supply = "SCARCE" }],
+        });
+
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            shipyards,
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            shipPurchases,
+            agents,
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
+            order,
+            NullLogger<ContractPlanService>.Instance);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        order.Of(AutomationPlan.Contract).Should().Be(PurchaseNeed.None);
+        await shipPurchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task TheContractsMiner_IsAnOreHound_WhereAShipyardAtHomeSellsOne()
+    {
+        // Slice 6.39 (D120), asked on 2026-10-09: "When available, use ORE HOUNDS instead of MINING DRONES." The home shipyard
+        // sells drones; another at home sells ore hounds.
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        var shipyards = Substitute.For<IShipyardRepository>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
+        var order = new OpenPurchaseOrder();
+
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-3",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto>
+                {
+                    new("COPPER_ORE", "X1-AB-MKT", 30, 0),
+                }))
+        ]);
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, "X1-AB-A1", 1_000_000, "COSMIC", 1));
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+        shipyards.FindByWaypointAsync("X1-AB-SHIPYARD", Arg.Any<CancellationToken>()).Returns(new ShipyardWaypointDto
+        {
+            WaypointSymbol = "X1-AB-SHIPYARD",
+            SystemSymbol = "X1-AB",
+            ShipTypes = ["SHIP_MINING_DRONE"],
+            Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 100_000 }],
+        });
+        shipyards.FindShipyardForTypeAsync("SHIP_ORE_HOUND", Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns("X1-AB-YARD2");
+        shipyards.FindByWaypointAsync("X1-AB-YARD2", Arg.Any<CancellationToken>()).Returns(new ShipyardWaypointDto
+        {
+            WaypointSymbol = "X1-AB-YARD2",
+            SystemSymbol = "X1-AB",
+            ShipTypes = ["SHIP_ORE_HOUND"],
+            Ships = [new ShipyardShipDto { Type = "SHIP_ORE_HOUND", PurchasePrice = 210_000 }],
+        });
+        shipPurchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = false, Failure = ShipPurchaseFailure.OverBudget, FailureReason = "over budget" });
+
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            shipyards,
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<ISpaceTradersPort>(),
+            shipPurchases,
+            agents,
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
+            order,
+            NullLogger<ContractPlanService>.Instance);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        order.Of(AutomationPlan.Contract).Should().Be(new PurchaseNeed(PurchaseTier.Contract, "SHIP_ORE_HOUND", "X1-AB-YARD2", 210_000));
+        await shipPurchases.Received(1).TryPurchaseAsync("SHIP_ORE_HOUND", "X1-AB-YARD2", Arg.Any<CancellationToken>());
+        await shipPurchases.DidNotReceive().TryPurchaseAsync("SHIP_MINING_DRONE", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -63,6 +63,14 @@ public interface ITradeContextReader
     /// <param name="cancellationToken">Stops the reads.</param>
     /// <returns>The map of the systems in reach, the credits and the minimum profit per unit.</returns>
     Task<TradeContext> ReadReachAsync(string systemSymbol, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The markets whose prices are recent enough to decide by (D96): seen with prices at most <c>Trade.MaxPriceAgeMinutes</c>
+    /// ago. Mining abroad reads only those (PLAN.md slice 6.40, D122).
+    /// </summary>
+    /// <param name="cancellationToken">Stops the reads.</param>
+    /// <returns>Their waypoints, in every system.</returns>
+    Task<IReadOnlySet<string>> FreshMarketsAsync(CancellationToken cancellationToken);
 }
 
 /// <inheritdoc />
@@ -150,9 +158,9 @@ public sealed class TradeContextReader(
         }
 
         var allMarkets = await markets.GetAllSnapshotsAsync(cancellationToken);
-        var maxAge = TimeSpan.FromMinutes(await settings.GetAsync<int>(MaxPriceAgeMinutesSetting, cancellationToken) is var minutes and > 0 ? minutes : DefaultMaxPriceAgeMinutes);
+        var maxAge = await MaxPriceAgeAsync(cancellationToken);
         var stale = (await markets.GetAllFreshnessAsync(cancellationToken))
-            .Where(market => inReach.Contains(market.SystemSymbol) && (!market.HasPrices || now - market.LastObservedAt > maxAge))
+            .Where(market => inReach.Contains(market.SystemSymbol) && !IsFresh(market, now, maxAge))
             .Select(market => market.WaypointSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -178,6 +186,25 @@ public sealed class TradeContextReader(
 
         return new TradeContext(map, basics.Credits, basics.MinProfitPerUnit, basics.FuelReserve);
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlySet<string>> FreshMarketsAsync(CancellationToken cancellationToken)
+    {
+        var now = TimeProvider.System.GetUtcNow();
+        var maxAge = await MaxPriceAgeAsync(cancellationToken);
+        return (await markets.GetAllFreshnessAsync(cancellationToken))
+            .Where(market => IsFresh(market, now, maxAge))
+            .Select(market => market.WaypointSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Whether a market's prices are recent enough to decide by (D96): seen with prices within the age.</summary>
+    private static bool IsFresh(MarketFreshnessRecord market, DateTimeOffset now, TimeSpan maxAge)
+        => market.HasPrices && now - market.LastObservedAt <= maxAge;
+
+    /// <summary>How old a market's prices may be (D96): <c>Trade.MaxPriceAgeMinutes</c>, else as it is seeded.</summary>
+    private async Task<TimeSpan> MaxPriceAgeAsync(CancellationToken cancellationToken)
+        => TimeSpan.FromMinutes(await settings.GetAsync<int>(MaxPriceAgeMinutesSetting, cancellationToken) is var minutes and > 0 ? minutes : DefaultMaxPriceAgeMinutes);
 
     /// <summary>What a unit of ANTIMATTER costs at each market that sells it, as last seen: a jump buys one at the gate's (D63).</summary>
     private static Dictionary<string, long> AntimatterPrices(IEnumerable<MarketSnapshot> allMarkets)

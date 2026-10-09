@@ -66,6 +66,7 @@ public sealed class SurveyPlanService(
     IShipyardRepository shipyards,
     IShipPurchaseService shipPurchases,
     IPurchaseOrder purchaseOrder,
+    IAgentRepository agents,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
     /// <summary>The ship the plan buys to survey (D47): a drone frame with a surveyor, and no hold.</summary>
@@ -294,7 +295,8 @@ public sealed class SurveyPlanService(
     }
 
     /// <summary>
-    /// A surveyor for the first system, by symbol, with a mining drone (<see cref="FleetRoles.IsMiningDrone"/>) that needs one,
+    /// A surveyor for the first system at home, by symbol, with a mining drone that needs one (<see cref="FleetRoles.NeedsSurveyShips"/>:
+    /// not an ore hound, which surveys for itself, D120); a drone abroad mines without the survey ships (slice 6.40, D122),
     /// at the system's shipyard that sells a <c>SHIP_SURVEYOR</c> for the least; none when no shipyard there is known to sell
     /// one. A system with no ship that can only survey needs its designated surveyor (D47,
     /// <see cref="PurchaseTier.Surveyor"/>); one with fewer of them than areas with mining drones, as they fly between them,
@@ -305,12 +307,15 @@ public sealed class SurveyPlanService(
         IReadOnlyDictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)> drones,
         CancellationToken cancellationToken)
     {
+        // Slice 6.39 (D120): the survey ships serve the miners that don't survey for themselves; an ore hound does. Slice 6.40
+        // (D122): only at home.
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        var home = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
         foreach (var systemSymbol in fleet
-            .Where(FleetRoles.IsMiningDrone)
+            .Where(FleetRoles.NeedsSurveyShips)
             .Select(ship => ship.SystemSymbol)
             .OfType<string>()
-            .Where(system => system.Length > 0)
+            .Where(system => system.Length > 0 && !BusinessSystems.IsAbroad(home, system))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.Ordinal))
         {
@@ -329,17 +334,18 @@ public sealed class SurveyPlanService(
                 tier = PurchaseTier.SurveyorPerArea;
             }
 
+            // D121: never where the shipyard has it SCARCE.
             var offer = shipyardList
                 .Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(shipyard => shipyard.Ships
-                    .Where(ship => ship.Type.Equals(SurveyorShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
+                    .Where(ship => ship.Type.Equals(SurveyorShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && !ScarceShips.IsScarce(ship))
                     .Select(ship => (Shipyard: shipyard.WaypointSymbol, Price: ship.PurchasePrice)))
                 .OrderBy(candidate => candidate.Price)
                 .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
                 .ToList();
             if (offer.Count == 0)
             {
-                logger.LogDebug("Survey plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, SurveyorShipType);
+                logger.LogDebug("Survey plan: no shipyard in {SystemSymbol} with a known price for {ShipType} that isn't SCARCE.", systemSymbol, SurveyorShipType);
                 continue;
             }
 
@@ -375,12 +381,13 @@ public sealed class SurveyPlanService(
 
     /// <summary>
     /// Where each mining drone in a system works (D54): the market its trip sells at, a drone still drifting there included;
-    /// between trips, where it is. A drone on other work doesn't count.
+    /// between trips, where it is. A drone on other work doesn't count, and nor does an ore hound, which surveys for itself
+    /// (slice 6.39, D120).
     /// </summary>
     private async Task<IReadOnlyList<string>> DroneWaypointsAsync(IReadOnlyList<ShipModel> fleet, string systemSymbol, CancellationToken cancellationToken)
     {
         var waypoints = new List<string>();
-        foreach (var drone in fleet.Where(ship => FleetRoles.IsMiningDrone(ship)
+        foreach (var drone in fleet.Where(ship => FleetRoles.NeedsSurveyShips(ship)
             && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
         {
             var goal = await goals.GetActiveGoalAsync(drone.Symbol, cancellationToken);

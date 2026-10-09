@@ -93,9 +93,6 @@ public sealed class TradingAutomationService(
     /// <summary>A good with a price gap whose route waits for a free trader, as the state names it (B66).</summary>
     private const string Waiting = "waiting";
 
-    /// <summary>The supply at which no cargo ship beyond the list is bought (D112).</summary>
-    private const string ScarceSupply = "SCARCE";
-
     /// <summary>The plans whose ships trade only when their own plan passed them over (B63, D58).</summary>
     private static readonly AutomationPlan[] GatheringPlans = [AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Construction];
 
@@ -456,10 +453,8 @@ public sealed class TradingAutomationService(
             return null;
         }
 
-        // D112: beyond the list the ship isn't bought where the shipyard has it SCARCE now, whatever the cache said.
-        var purchased = inList
-            ? await shipPurchases.TryPurchaseAsync(shipType, shipyard.WaypointSymbol, cancellationToken)
-            : await shipPurchases.TryPurchaseUnlessScarceAsync(shipType, shipyard.WaypointSymbol, cancellationToken);
+        // D112, D121: the ship isn't bought where the shipyard has it SCARCE now, whatever the cache said.
+        var purchased = await shipPurchases.TryPurchaseAsync(shipType, shipyard.WaypointSymbol, cancellationToken);
         if (!purchased.IsSuccess)
         {
             logger.LogDebug(
@@ -497,7 +492,10 @@ public sealed class TradingAutomationService(
         return TimeProvider.System.GetUtcNow() - boughtAt >= interval ? PurchaseTier.TimedCargoShip : PurchaseTier.Alternating;
     }
 
-    /// <summary>The next ship of <c>Trade.ShipPurchases</c> (D21), at the shipyard at home that sells it for the least.</summary>
+    /// <summary>
+    /// The next ship of <c>Trade.ShipPurchases</c> (D21), at the shipyard at home that sells it for the least; never where the
+    /// shipyard has it SCARCE (D121).
+    /// </summary>
     /// <returns>The shipyard and the ship as it lists it; null when no shipyard at home lists it with a price and a hold.</returns>
     private async Task<(ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)?> ListedAsync(
         string shipType,
@@ -511,14 +509,15 @@ public sealed class TradingAutomationService(
                 .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase)
                     && ship.PurchasePrice > 0
                     && ship.CargoCapacity > 0
-                    && ship.FuelCapacity > 0)
+                    && ship.FuelCapacity > 0
+                    && !ScarceShips.IsScarce(ship))
                 .Select(ship => (Shipyard: shipyard, Ship: ship)))
             .OrderBy(candidate => candidate.Ship.PurchasePrice)
             .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
             .FirstOrDefault();
         if (offer.Shipyard is null)
         {
-            logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType}.", shipType);
+            logger.LogDebug("Trading plan: no shipyard with a known price and hold for {ShipType} that isn't SCARCE (D121).", shipType);
             return null;
         }
 
@@ -560,7 +559,7 @@ public sealed class TradingAutomationService(
                 && answered.Contains(shipyard.SystemSymbol))
             .SelectMany(shipyard => shipyard.Ships
                 .Where(ship => ship.PurchasePrice > 0
-                    && !ScarceSupply.Equals(ship.Supply, StringComparison.OrdinalIgnoreCase)
+                    && !ScarceShips.IsScarce(ship)
                     && FleetRoles.IsCargoShip(AsBought(shipyard, ship)))
                 .Select(ship => (Shipyard: shipyard, Ship: ship)))
             .OrderByDescending(candidate => candidate.Ship.CargoCapacity)
