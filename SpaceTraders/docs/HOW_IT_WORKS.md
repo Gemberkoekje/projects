@@ -352,10 +352,12 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   that failed after 5 minutes. A system an exploring ship has just jumped into has its system and all its waypoints
   fetched at once (`cached_systems`, `cached_waypoints`), as startup sync stores them. The state also lists each explorer
   with what the plan does with it, the systems left to explore, the explorers wanted, and where the next one's purchase
-  stands (`Purchase`). With an explorer that has a warp drive (slice 6.31), once nothing else is to be looked at, it fetches
-  the same way the system and waypoints of one system a pass that only a warp reaches (`ExploreAtlas.WarpLooks`: behind a
-  gate under construction, or found by a scan), the nearest to the explored systems and the explorers first; the systems a
-  scan found within its warps join its systems, and it records the systems scanned from (`ScannedAt`).
+  stands (`Purchase`). With an explorer that has a warp drive (slice 6.31), it fetches the same way the system and waypoints
+  of one system a pass that only a warp reaches (`ExploreAtlas.WarpLooks`: behind a gate under construction, or found by a
+  scan), the nearest to the explored systems and the explorers first: one never asked for after the gates and connections
+  never looked at, but before the looks due again (B78: the explorers wait for it, and with two dozen gates under
+  construction the hourly looks never ran out); one whose fetch failed after those. The systems a scan found within its
+  warps join its systems, and it records the systems scanned from (`ScannedAt`).
 - **Who explores:** the explorers (`SHIP_EXPLORER`, cached as `EXPLORER` after startup sync; `FleetRoles.IsExplorer`), or
   the command ship (cached type `COMMAND`) while there is none. The plan takes a ship when it is free (its trip has ended,
   D61: no goal, no assignment, not in transit) and a system is left for it, with an `Explore` assignment, so no other plan

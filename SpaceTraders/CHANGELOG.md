@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-09, B78)
+- The explorers no longer wait for hours, all together, behind the explore plan's looks due again (B78). An explorer with a warp drive waits while a system only a warp reaches, within a warp of an explored system, has never had its waypoints fetched; the plan makes one look a pass and fetched those after every gate or connections look due again. With 24 gates under construction, each looked at again hourly, and a pass every 2 to 9 minutes, those never ran out: from 2026-10-08 about 19:50Z to 2026-10-09 04:30Z the five explorers waited until X1-BS22 and X1-KA53 were fetched, about 14 of 48 hours in all. Now such a system, never asked for, is fetched after the gates and connections never looked at and before the looks due again (`ExplorePlanService.LearnAsync`, `WarpLooksAsync`, `NextLook`'s `due`); one whose fetch failed still comes after them.
+
+### Docs – Changed (2026-10-09, B78)
+- `PLAN.md`: B78. `docs/HOW_IT_WORKS.md`: the order of the explore plan's looks.
+
 ### Code – Changed (2026-10-07, slice 6.36)
 - A purchase that waits for one of our ships lets the ones behind it through (D118), as asked on 2026-10-07: "Do you want a purchase that is only waiting for a ship to arrive to let the ones behind it go first?" - "Yes please, as long as the total doesn't dip below the total needed for the freighter." That day a bulk freighter waited 34 minutes for a probe to reach its shipyard (D30), with 57M credits against its 2.9M and the 9.4M reserve, and the probes behind it waited too. Now the order passes over a need whose purchase waits for one of our ships at its shipyard (an open `ShipyardCalls` call, `PurchaseOrder.WaitingForAShip`), as long as the later purchase leaves the waiting needs' prices and the credit reserve; the purchase keeps them as well (`PurchaseNeeds.Hold`, `HeldFor`, `ReportedNeed.Held`, used by `ShipPurchaseService`). `PurchaseOrder` takes `ShipyardCalls` and `IBudgetPolicy`.
 
