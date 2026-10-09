@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Docs – Changed (2026-10-09, slice 2.19)
+- Two runs on one chart (D123), as asked on 2026-10-09: "If possible, I'd like the option to overlay 2 (weekly) runs, so I
+  can compare the value curve and see if it becomes better", with "Picker + 31 days in Prometheus". Built in gembernodes
+  (no bot code): a "Compare with" picker and two panels on the SpaceTraders dashboard, and 31 days in Prometheus.
+  `PLAN.md`: slice 2.19 built. `docs/HOW_IT_WORKS.md`: the picker, under the metrics' `reset_date`.
+
 ### Code – Changed (2026-10-09, slice 6.40)
 - Mining abroad (D122), as asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the
   home area. However, outside of the home area, mining is low priority, and should never be in the way of trading, which is

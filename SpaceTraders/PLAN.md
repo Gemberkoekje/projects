@@ -425,7 +425,23 @@ asked on 2026-10-09, are being built:
       markets), `AbroadRoleTests`, `ContractMinersTests`, `ContractPlanServiceTests`, `SurveyPlanServiceTests`.
     - To understand this, start with `AbroadNeedAsync` and `ReadContextAsync` in `Automation/MiningAutomationService.cs`,
       then `MiningContextReader` in `Mining/MiningContext.cs`.
-  - **2.19 Two runs on one chart** (D123): next, in gembernodes.
+  - **2.19 Two runs on one chart** (D123): built, in gembernodes (branch `claude/laughing-babbage-f8yqdj`, its NOTES.md).
+    - Found: every series carries its run's reset date (D70), but each run shows on its own dates, and Prometheus kept 15
+      days (the chart's default).
+    - Done: a "Compare with" picker on the SpaceTraders dashboard (the runs Prometheus holds, newest first, but the one under
+      Reset); "Total value, two runs" and "Value gained per hour, two runs" under Total value, the compared run dashed and
+      read earlier by the seconds between the two runs' first samples (two hidden variables, `shift` and `shift_hour`, to 5
+      minutes); `server.retention: "31d"` in `prometheus-release.yaml`. A second commit brings the dashboards' descriptions
+      up to slices 6.37–6.40 (position 12 of the purchase order, ore hounds, interceptors, SCARCE).
+    - Readings in the build (yours to confirm or change): the compared run's lines are drawn on the dashboard's time range, so
+      widen it (say, the last 7 days) to see whole runs; with several runs ticked under Reset, the shift starts from the
+      earliest of them.
+    - Expect, once deployed: the picker opens on the run before the current one; right after the deploy Prometheus still
+      holds only the last 15 days, and keeps up to 31 from then on. The TSDB grows to about twice its size on the NFS share
+      (its claim asks for 2Gi, which the NFS driver most likely doesn't enforce).
+    - Tests: `promtool test rules` (Prometheus 2.55.1, what chart 25.30.2 runs) against two synthetic runs, 18 checks (a
+      newer run compared, no run to compare with, a compared run that had ended); Grafana 11.6.1 against a local Prometheus
+      with a backfilled week-long run and one 30 hours old, at desktop and phone width.
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade

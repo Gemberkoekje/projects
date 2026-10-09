@@ -2340,7 +2340,10 @@ The seven pages in `src/Future` are not routed.
   reset mixed both runs. `ResetDateLabel` reads it from the agent id at every write; a reset ends the
   process, so a process has one value once agent bootstrap has set it. What is written before that
   (bootstrap's own API calls) carries an empty value, which Prometheus stores as no label. The three
-  SpaceTraders dashboards filter every query on it with a "Reset" picker, the newest run first.
+  SpaceTraders dashboards filter every query on it with a "Reset" picker, the newest run first. Since slice 2.19 (D123,
+  gembernodes) the SpaceTraders dashboard's "Compare with" picker lays another run over it: "Total value, two runs" and
+  "Value gained per hour, two runs" draw the other run shifted so both start with their first sample at the same moment;
+  Prometheus keeps 31 days, so runs up to about four weeks back can be compared.
 
   Every `spacetraders_*` counter series reaches Prometheus at 0 before it counts anything
   (`ZeroFirstCounter`, B43). Prometheus's `increase()` and `rate()` never count the value a series
