@@ -77,14 +77,16 @@ public sealed class PurchaseOrder(
     private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipSiphonDrone };
 
     /// <summary>
-    /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes, the surveyors
-    /// and the explorers, and a type this version doesn't know. Every other type is one: the list's, and since slice 6.33 (D112)
-    /// whichever has the largest hold beyond it, such as a heavy or bulk freighter, so the drones' turn comes after each.
+    /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes and the
+    /// interceptors bought in their place (slice 6.38, D119), the surveyors and the explorers, and a type this version doesn't
+    /// know. Every other type is one: the list's, and since slice 6.33 (D112) whichever has the largest hold beyond it, such as
+    /// a heavy or bulk freighter, so the drones' turn comes after each.
     /// </summary>
     private static readonly IReadOnlySet<ShipType> NotCargoShipTypes = new HashSet<ShipType>
     {
         ShipType.None,
         ShipType.ShipProbe,
+        ShipType.ShipInterceptor,
         ShipType.ShipMiningDrone,
         ShipType.ShipSiphonDrone,
         ShipType.ShipSurveyor,

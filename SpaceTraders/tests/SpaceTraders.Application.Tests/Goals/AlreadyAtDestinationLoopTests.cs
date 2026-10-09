@@ -93,7 +93,7 @@ public sealed class AlreadyAtDestinationLoopTests
             _bus,
             Substitute.For<IGoalWarps>(),
             NullLogger<GoalJumps>.Instance);
-        var executor = new DeployProbeGoalExecutor(_goals, jumps, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
+        var executor = new DeployProbeGoalExecutor(_goals, jumps, Substitute.For<ITradeContextReader>(), _dock, _bus, NullLogger<DeployProbeGoalExecutor>.Instance);
 
         await RunOneStepAsync(
             executor,

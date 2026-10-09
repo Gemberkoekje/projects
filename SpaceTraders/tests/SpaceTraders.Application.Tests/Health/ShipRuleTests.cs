@@ -123,6 +123,19 @@ public sealed class ShipStuckRuleTests
     }
 
     [Fact]
+    public async Task AnInterceptorParkedAtItsMarket_IsNotStuck()
+    {
+        // Slice 6.38 (D119), asked on 2026-10-09: "Do not forget that stationary interceptors are intended and not cause of a
+        // 'stalled ship' warning." An interceptor bought in a probe's place stays at its market or shipyard without a goal, as a
+        // probe does, for hours.
+        _fleet.Have(FleetFixture.Interceptor("SHIP-9", "X1-AB-A1", Start.AddHours(-5)));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddHours(2))).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ABlockedGoal_IsTheCircuitBreakersRule()
     {
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start));
@@ -289,6 +302,42 @@ public sealed class ShipLeftIdleRuleTests
         var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(30));
 
         violations.Should().ContainSingle().Which.Subject.Should().Be("SHIP-4", "the plan gives a probe at a market a due market");
+    }
+
+    [Theory]
+    [InlineData(ShipyardKind.Shipyard)]
+    [InlineData(ShipyardKind.Explorer)]
+    public async Task AnInterceptorParkedAtAShipyard_IsNotIdleByMistake_AsAProbeIsnt(ShipyardKind kind)
+    {
+        // Slice 6.38 (D119): "Do not forget that stationary interceptors are intended and not cause of a 'stalled ship' warning."
+        // An interceptor parked at a shipyard is the probe plan's (D110), as B74 has it for a probe; one at a market while a
+        // market of its system waits for a probe is a probe the plan left idle.
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", Shipyard = kind, ProbeSymbol = "SHIP-9" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", DueAt = Start.AddMinutes(-20) },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-C3", ProbeSymbol = "SHIP-10" }));
+        _fleet.Have(
+            FleetFixture.Interceptor("SHIP-9", "X1-AB-A1", Start),
+            FleetFixture.Interceptor("SHIP-10", "X1-AB-C3", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(30));
+
+        violations.Should().ContainSingle().Which.Subject.Should().Be("SHIP-10", "the plan gives an interceptor at a market a due market");
+    }
+
+    [Fact]
+    public async Task WithEveryMarketWatched_AnInterceptorAtItsMarketIsNotIdleByMistake()
+    {
+        // D29 with D119: an interceptor at every market, without a goal, watching it.
+        _probes.GetAsync(Arg.Any<CancellationToken>()).Returns(ProbePlan(
+            new ProbeMarketState { WaypointSymbol = "X1-AB-A1", ProbeSymbol = "SHIP-9" },
+            new ProbeMarketState { WaypointSymbol = "X1-AB-B2", WatchedByShip = true }));
+        _fleet.Have(FleetFixture.Interceptor("SHIP-9", "X1-AB-A1", Start));
+
+        await _harness.EvaluateAsync(_rule, Start);
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
     }
 
     [Fact]

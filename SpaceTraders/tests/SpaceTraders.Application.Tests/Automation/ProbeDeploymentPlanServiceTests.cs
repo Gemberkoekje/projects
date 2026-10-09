@@ -128,6 +128,65 @@ public sealed class ProbeDeploymentPlanServiceTests
     }
 
     [Fact]
+    public async Task WhereAShipyardSellsInterceptors_OneIsBoughtInsteadOfAProbe_ThoughItCostsMore()
+    {
+        // Slice 6.38 (D119), asked on 2026-10-09: "When available, I'd like INTERCEPTORS to be used instead of PROBES." C39
+        // sells one for more than either shipyard asks for a probe.
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645), ("SHIP_LIGHT_SHUTTLE", 117_273)),
+            Shipyard("X1-DC53-C39", ("SHIP_PROBE", 103_729), ("SHIP_INTERCEPTOR", 140_000)),
+            Shipyard(H52, ("SHIP_MINING_DRONE", 48_328)),
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_INTERCEPTOR", "X1-DC53-C39", 140_000));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_INTERCEPTOR", "X1-DC53-C39", Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_PROBE", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _state!.NextProbeShipType.Should().Be("SHIP_INTERCEPTOR");
+        _state.NextProbeShipyard.Should().Be("X1-DC53-C39");
+    }
+
+    [Fact]
+    public async Task AnInterceptorTheShipyardHasScarce_LeavesTheProbeToBeBought()
+    {
+        // D119 with D121: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE."
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard("X1-DC53-C39", ("SHIP_PROBE", 103_729)) with
+            {
+                ShipTypes = ["SHIP_PROBE", "SHIP_INTERCEPTOR"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_PROBE", PurchasePrice = 103_729 },
+                    new ShipyardShipDto { Type = "SHIP_INTERCEPTOR", PurchasePrice = 140_000, Supply = "SCARCE" },
+                ],
+            },
+        ]);
+
+        await RunAsync();
+
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_INTERCEPTOR", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        _state!.NextProbeShipType.Should().Be("SHIP_PROBE");
+    }
+
+    [Fact]
+    public async Task AnInterceptor_IsFlownAsAProbe()
+    {
+        // D119: an interceptor does a probe's work. As bought, before a restart caches its frame; it sits where the starting
+        // probe does in TheStartingProbe_IsAProbe_AndFliesToTheMarketWhosePricesNeedItMost, and goes where it went.
+        Fleet(CommandShip(), new ShipModel("SPECTER-9", SystemSymbol, H52, "DOCKED", "CRUISE", 100, 100, ShipType: "SHIP_INTERCEPTOR"), Drone());
+
+        await RunAsync();
+
+        _activeGoals["SPECTER-9"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(A1);
+        _state!.Probes.Should().Be(1);
+    }
+
+    [Fact]
     public async Task AProbe_IsANeedInTheOrderShipsAreBoughtIn_AndWaitsWhileSomethingComesFirst()
     {
         // Slice 6.10b (D43): the contract's drone, a surveyor, a drone for each scarce mineral and the cargo ships of

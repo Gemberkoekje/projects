@@ -7,6 +7,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-09, slice 6.38)
+- Interceptors instead of probes (D119), as asked on 2026-10-09: "When available, I'd like INTERCEPTORS to be used instead of
+  PROBES. As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE." The probe plan buys a `SHIP_INTERCEPTOR`
+  wherever a shipyard it buys from sells one that isn't SCARCE, the cheapest such with the antimatter counted, and a
+  `SHIP_PROBE` only where none does (`ProbeDeploymentPlanService.BuyProbeAsync`, `Options`); its state names the ship
+  (`NextProbeShipType`, new). An interceptor is a probe to every plan (`FleetRoles.IsInterceptor`, new, in `IsProbe`): the
+  probe plan flies it, the role board gives it no role, and no plan trades with it (`FleetRoleBoard.IsTrader`). It has a
+  tank, so its flights go as every ship with one does, through refuelling stops (`DeployProbeGoalExecutor` takes
+  `ITradeContextReader` and `IDockSubCommand`); a probe flies in CRUISE as before. In the purchase order it takes no turn
+  with the drones and cargo ships, as a probe takes none. Then asked: "Do not forget that stationary interceptors are
+  intended and not cause of a 'stalled ship' warning": a parked interceptor raises neither `ShipStuck` nor `ShipLeftIdle`,
+  which tests pin.
+
+### Docs – Changed (2026-10-09, slice 6.38)
+- `PLAN.md`: slice 6.38 built. `docs/HOW_IT_WORKS.md`: the probe plan's ships, purchase, flight and state; the purchase
+  order's turns; the probe executor.
+
 ### Code – Changed (2026-10-09, slice 6.37)
 - No ship is bought where the shipyard has it SCARCE (D121), as asked on 2026-10-09: "As with the other ships, do not buy
   INTERCEPTORS if the supply is SCARCE", then "Every purchase". Until then only the probes (D97) and the largest hold

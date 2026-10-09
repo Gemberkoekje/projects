@@ -283,7 +283,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.35 A separate ring width (D117)
 - 6.36 A purchase that waits for a ship lets the ones behind it through (D118)
 - 6.37 No ship bought at SCARCE (D121), being built (below)
-- 6.38 Interceptors instead of probes (D119), being built
+- 6.38 Interceptors instead of probes (D119), being built (below)
 - 6.39 Ore hounds instead of mining drones, surveying for themselves (D120), being built
 - 6.40 Mining abroad, last in the order (D122), being built
 
@@ -320,7 +320,35 @@ asked on 2026-10-09, are being built:
       `MiningAutomationServiceTests` (another shipyard that has it LIMITED is chosen), `SiphonAutomationServiceTests`,
       `TradingAutomationServiceTests` (the list's next ship elsewhere, or no need), `ExplorersTests`.
     - To understand this, start with `TryPurchaseAsync` in `Services/ShipPurchaseService.cs`, then `ScarceShips`.
-  - **6.38 Interceptors instead of probes** (D119): next.
+  - **6.38 Interceptors instead of probes** (D119): built. Then asked: "Do not forget that stationary interceptors are
+    intended and not cause of a 'stalled ship' warning."
+    - Found: the probe plan bought only `SHIP_PROBE`, and flew its probes in CRUISE without a fuel stop, as a probe has no
+      tank; `FleetRoles.IsProbe` knew a probe by its type and frame alone, so an interceptor would have been a ship for the
+      other plans (and, with a hold and the role board off, a trader); the purchase order counted any type but a probe, a
+      drone, a surveyor and an explorer as a cargo ship in the turns.
+    - Done:
+      - **An interceptor is a probe** (`FleetRoles.IsInterceptor`, new, in `IsProbe`): `SHIP_INTERCEPTOR` as bought,
+        `INTERCEPTOR` after startup sync, or its frame. So the probe plan flies it, parks it at a shipyard, sends it to a
+        call (D30, D110); the role board gives it no role; `ShipLeftIdle` treats it as a probe (a parked one is no idle ship,
+        B74), and `ShipStuck` watches only ships with work, which a parked one has none of. With the board off, no probe is
+        a trader (`FleetRoleBoard.IsTrader`).
+      - **The purchase** (`ProbeDeploymentPlanService.BuyProbeAsync`, `Options`): the offers of interceptors come before
+        every probe's, the cheapest first with the antimatter counted, so a probe is bought only where no interceptor can be;
+        one SCARCE is left out (D121). The need, the purchase and the plan's state (`NextProbeShipType`, new) name the ship.
+      - **The flight** (`DeployProbeGoalExecutor`): a ship with a tank flies its legs as every ship with one does
+        (`GoalFlight`, refuelling on the way, D84); a probe without one flies in CRUISE as before.
+      - **The turns** (`PurchaseOrder`): an interceptor takes none, as a probe takes none.
+    - Readings in the build (yours to confirm or change): "available" is any shipyard the probe plan buys from that lists an
+      interceptor, whatever it costs against a probe; the probes there are keep working; an interceptor's frame or role is
+      enough to know it, its listing's details aren't read here.
+    - Expect, once deployed: on the purchase order table the probe plan's ship is `SHIP_INTERCEPTOR` where a shipyard in
+      reach sells one; new ones named after birds of prey (FALCON-1, …); no `ShipLeftIdle` or `ShipStuck` for a parked one.
+    - Tests: `ProbeDeploymentPlanServiceTests` (an interceptor bought though dearer, a probe where the interceptor is SCARCE,
+      an interceptor flown as a probe), `DeployProbeGoalExecutorTests` (an interceptor's legs carry their mode, no CRUISE
+      switch), `InterceptorTests` (new: a probe by type, role or frame; no role, no trader), `PurchaseOrderTests` (no turn),
+      `ShipRuleTests` (a parked interceptor is neither stuck nor idle; one at a market while a market waits is idle).
+    - To understand this, start with `BuyProbeAsync` and `Options` in `Automation/ProbeDeploymentPlanService.cs`, then
+      `IsInterceptor` in `Automation/FleetRoles.cs`.
   - **6.39 Ore hounds instead of mining drones** (D120): next.
   - **6.40 Mining abroad** (D122): next.
   - **2.19 Two runs on one chart** (D123): next, in gembernodes.

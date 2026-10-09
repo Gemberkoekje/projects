@@ -141,18 +141,41 @@ public static class FleetRoles
     }
 
     /// <summary>
+    /// The ship the probe plan buys in a probe's place wherever a shipyard it buys from sells one (PLAN.md slice 6.38, D119):
+    /// asked on 2026-10-09, "When available, I'd like INTERCEPTORS to be used instead of PROBES."
+    /// </summary>
+    public const string InterceptorShipType = "SHIP_INTERCEPTOR";
+
+    /// <summary>
     /// Whether the ship is a probe, which the probe plan flies and nothing else uses (D29): a probe frame, or
     /// the type a probe is cached with, <c>SHIP_PROBE</c> when bought and its registration role
-    /// <c>SATELLITE</c> after startup sync. The starting probe is one (B25).
+    /// <c>SATELLITE</c> after startup sync. The starting probe is one (B25). An interceptor, bought in a probe's place, is one
+    /// too (slice 6.38, D119, <see cref="IsInterceptor"/>).
     /// </summary>
     /// <param name="ship">The ship.</param>
-    /// <returns>True for a probe.</returns>
+    /// <returns>True for a probe or an interceptor.</returns>
     public static bool IsProbe(ShipModel ship)
     {
         ArgumentNullException.ThrowIfNull(ship);
         return ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
             || ship.ShipType.Equals("SATELLITE", StringComparison.OrdinalIgnoreCase)
-            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_PROBE\"", StringComparison.OrdinalIgnoreCase);
+            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_PROBE\"", StringComparison.OrdinalIgnoreCase)
+            || IsInterceptor(ship);
+    }
+
+    /// <summary>
+    /// Whether the ship is an interceptor (slice 6.38, D119), which the probe plan flies as a probe: the type it is cached with,
+    /// <c>SHIP_INTERCEPTOR</c> when bought and its registration role <c>INTERCEPTOR</c> after startup sync, or an interceptor's
+    /// frame. Unlike a probe it has a tank: its flights refuel at markets on the way.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for an interceptor.</returns>
+    public static bool IsInterceptor(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.ShipType.Equals(InterceptorShipType, StringComparison.OrdinalIgnoreCase)
+            || ship.ShipType.Equals("INTERCEPTOR", StringComparison.OrdinalIgnoreCase)
+            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_INTERCEPTOR\"", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

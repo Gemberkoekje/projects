@@ -69,6 +69,10 @@ internal sealed class FleetFixture
     public static ShipModel StartingProbe(string symbol, string waypoint, DateTimeOffset lastSyncedAt)
         => new(symbol, "X1-AB", waypoint, "DOCKED", "CRUISE", FuelCurrent: 0, FuelCapacity: 0, LastSyncedAt: lastSyncedAt, ShipType: "SATELLITE");
 
+    /// <summary>An interceptor the probe plan bought in a probe's place (slice 6.38, D119): a tank, and no hold.</summary>
+    public static ShipModel Interceptor(string symbol, string waypoint, DateTimeOffset lastSyncedAt)
+        => new(symbol, "X1-AB", waypoint, "DOCKED", "CRUISE", FuelCurrent: 100, FuelCapacity: 100, LastSyncedAt: lastSyncedAt, ShipType: "SHIP_INTERCEPTOR");
+
     public static ShipAssignmentDto ContractAssignment(string ship, string contractId)
         => new(ship, "Contract", "X1-AB-A1", "X1-AB-H58", "IRON_ORE", contractId, 0, RuleHarness.Start.AddHours(-1), null, RequiredUnits: 15);
 

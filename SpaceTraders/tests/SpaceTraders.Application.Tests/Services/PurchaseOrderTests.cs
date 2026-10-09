@@ -493,6 +493,16 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public void AnInterceptor_TakesNoTurn_AsAProbeTakesNone()
+    {
+        // Slice 6.38 (D119): the probe plan buys interceptors in the probes' place. Counted as a cargo ship, one would have given
+        // the drones the turn the cargo ships were owed.
+        List<PurchaseRecord> purchases = [Bought("SHIP-3", ShipType.ShipMiningDrone, 0), Bought("SHIP-4", ShipType.ShipInterceptor, 1)];
+
+        PurchaseOrder.Turn(purchases, [ShipType.ShipLightShuttle]).Should().Be(PurchaseKind.CargoShip);
+    }
+
+    [Fact]
     public void WithoutAnyDroneOrCargoShipBought_ItIsTheDronesTurn()
     {
         PurchaseOrder.Turn([Bought("SHIP-2", ShipType.ShipProbe, 0)], []).Should().Be(PurchaseKind.Drone);
