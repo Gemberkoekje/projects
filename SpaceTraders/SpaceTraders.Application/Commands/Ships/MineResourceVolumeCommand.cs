@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -15,7 +16,8 @@ namespace SpaceTraders.Application.Commands.Ships;
 /// Mines <see cref="TradeSymbol"/> at <see cref="SourceWaypoint"/> until the trip holds
 /// <see cref="RequiredUnitsTotal"/> of it (at most a full hold): one extraction per call, with the best
 /// survey of the waypoint for the good when there is one (slice 6.4), and other goods jettisoned, but for the
-/// ores a mining trip keeps (<see cref="KeepOtherOres"/>, D71).
+/// ores a mining trip keeps (<see cref="KeepOtherOres"/>, D71). An ore hound with a surveyor surveys instead while no usable
+/// survey of the waypoint holds the good, however many surveys that takes (slice 6.39, D120).
 /// </summary>
 public sealed record MineResourceVolumeCommand
 {
@@ -221,6 +223,22 @@ public sealed class MineResourceVolumeHandler(
         var stored = await surveys.GetActiveAsync(cancellationToken);
         var surveyed = SurveySelection.TryPickBest(stored.Select(s => s.Survey), command.SourceWaypoint, command.TradeSymbol, now, out var survey);
 
+        // Slice 6.39 (D120), asked on 2026-10-09: "have them survey until the desired mineral is found, then mine the survey",
+        // with "No limit". A survey another ship took counts; a failed survey leaves the extraction to go without one.
+        if (!surveyed && FleetRoles.SurveysForItself(ship) && await SurveyForItselfAsync(ship, command, now, cancellationToken))
+        {
+            return new ShipCommandResult(
+                ship.Symbol,
+                ShipLocalStatus.InOrbit,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol ?? string.Empty,
+                FuelCurrent: ship.FuelCurrent,
+                FuelCapacity: ship.FuelCapacity,
+                CargoCurrent: ship.CargoCurrent,
+                CargoCapacity: ship.CargoCapacity,
+                Accepted: true);
+        }
+
         ExtractionActionResult extractResult;
         try
         {
@@ -291,6 +309,43 @@ public sealed class MineResourceVolumeHandler(
             CargoCurrent: extractResult.Cargo.Units,
             CargoCapacity: extractResult.Cargo.Capacity,
             Accepted: true);
+    }
+
+    /// <summary>
+    /// An ore hound's survey for its own trip (slice 6.39, D120): it surveys where it is, keeps the surveys for every miner
+    /// (<see cref="ISurveyKeeper"/>, which journals each, <c>Surveyed</c>), and waits its cooldown; the next call extracts with
+    /// one that holds the trip's ore, or surveys again.
+    /// </summary>
+    /// <returns>False when the survey failed: the call extracts without one instead.</returns>
+    private async Task<bool> SurveyForItselfAsync(ShipModel ship, MineResourceVolumeCommand command, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        SurveyActionResult result;
+        try
+        {
+            result = await port.SurveyAsync(ship.Symbol, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // A failure that repeats shows as RepeatingError; the ship mines on without a survey meanwhile.
+            logger.LogWarning(
+                ex,
+                "Ship {ShipSymbol} couldn't survey {WaypointSymbol} for {TradeSymbol}; it extracts without a survey.",
+                ship.Symbol,
+                command.SourceWaypoint,
+                command.TradeSymbol);
+            return false;
+        }
+
+        await ships.UpdateCooldownAsync(ship.Symbol, result.CooldownExpiresAt ?? now.AddSeconds(result.CooldownSeconds), cancellationToken);
+        await surveyKeeper.TakenAsync(ship.Symbol, command.TradeSymbol, result.Surveys, cancellationToken);
+        logger.LogDebug(
+            "Ship {ShipSymbol} surveyed {WaypointSymbol} for its own trip: {Surveys} survey(s), {WithOre} holding {TradeSymbol} (D120).",
+            ship.Symbol,
+            command.SourceWaypoint,
+            result.Surveys.Count,
+            result.Surveys.Count(taken => SurveySelection.Share(taken, command.TradeSymbol) > 0),
+            command.TradeSymbol);
+        return true;
     }
 
     private async Task TryRefuelBeforeUndockingAsync(ShipModel ship, CancellationToken cancellationToken)

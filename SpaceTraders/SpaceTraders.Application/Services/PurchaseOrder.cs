@@ -73,8 +73,11 @@ public sealed class PurchaseOrder(
         [AutomationPlan.ProbeDeployment] = PurchaseTier.Probes,
     };
 
-    /// <summary>The drones the plans buy, which take turns with the cargo ships.</summary>
-    private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipSiphonDrone };
+    /// <summary>
+    /// The drones the plans buy, which take turns with the cargo ships: the ore hounds bought in a mining drone's place too (slice
+    /// 6.39, D120).
+    /// </summary>
+    private static readonly IReadOnlySet<ShipType> DroneTypes = new HashSet<ShipType> { ShipType.ShipMiningDrone, ShipType.ShipOreHound, ShipType.ShipSiphonDrone };
 
     /// <summary>
     /// The ships bought that aren't cargo ships taking turns with the drones: the drones themselves, the probes and the
@@ -88,6 +91,7 @@ public sealed class PurchaseOrder(
         ShipType.ShipProbe,
         ShipType.ShipInterceptor,
         ShipType.ShipMiningDrone,
+        ShipType.ShipOreHound,
         ShipType.ShipSiphonDrone,
         ShipType.ShipSurveyor,
         ShipType.ShipExplorer,

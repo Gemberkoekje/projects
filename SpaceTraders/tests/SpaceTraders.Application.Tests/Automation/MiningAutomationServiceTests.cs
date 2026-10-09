@@ -496,6 +496,46 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhereAShipyardSellsOreHounds_OneIsBoughtInsteadOfADrone_ThoughItCostsMore()
+    {
+        // Slice 6.39 (D120), asked on 2026-10-09: "When available, use ORE HOUNDS instead of MINING DRONES." H52 sells both; the
+        // drone for a scarce ore (D48) is an ore hound.
+        Fleet(Drone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE", "SHIP_ORE_HOUND"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 },
+                    new ShipyardShipDto { Type = "SHIP_ORE_HOUND", PurchasePrice = 212_000, FuelCapacity = 400, CargoCapacity = 30, Mounts = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] },
+                ],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.Coverage, "SHIP_ORE_HOUND", H52, 212_000));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_ORE_HOUND", H52, Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_MINING_DRONE", Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnOreHound_IsAMiner_WhoseFirstTripServesTheScarcestMarket_AsADronesWould()
+    {
+        // D120: an ore hound is a mining drone in every rule; it surveys for its own trips while the survey plan is on.
+        SurveyPlanIs(true);
+        Fleet(Drone() with { Symbol = "SHIP-7", ShipType = "SHIP_ORE_HOUND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] });
+
+        await RunAsync();
+
+        _activeGoals["SHIP-7"].Should().BeOfType<MineAndSellGoal>();
+    }
+
+    [Fact]
     public async Task ADrone_IsNotBoughtWhereTheShipyardHasItScarce_ButWhereAnotherHasIt()
     {
         // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every

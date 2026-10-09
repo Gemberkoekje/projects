@@ -279,8 +279,8 @@ public static class RolePlanner
 
     /// <summary>
     /// The ships with more than one role that survey: per system, none where a ship can only survey, or where no other
-    /// ship can mine; else the one with the least to lose, the one surveying now keeping it unless another would lose
-    /// less by more than the head start.
+    /// ship can mine that needs surveys (an ore hound surveys for itself, slice 6.39, D120); else the one with the least to
+    /// lose, the one surveying now keeping it unless another would lose less by more than the head start.
     /// </summary>
     private static IEnumerable<RoleCandidate> SurveyHolders(IReadOnlyList<RoleCandidate> ships, double bonus)
     {
@@ -297,6 +297,7 @@ public static class RolePlanner
             var withMiners = candidates
                 .Where(candidate => ships.Any(other => other != candidate
                     && other.Roles.Contains(FleetRole.Mine)
+                    && !FleetRoles.SurveysForItself(other.Ship)
                     && string.Equals(other.Ship.SystemSymbol, candidate.Ship.SystemSymbol, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
             if (withMiners.Count == 0)
@@ -336,10 +337,11 @@ public static class RolePlanner
 
     /// <summary>
     /// Whether the ship is a drone (D58): it can mine or siphon, whichever plan of those is on, and can't survey, so not the
-    /// command ship, whatever role that has.
+    /// command ship, whatever role that has; or an ore hound, which surveys only for its own trips (slice 6.39, D120).
     /// </summary>
     private static bool IsDrone(RoleCandidate ship)
-        => !FleetRoles.CanSurvey(ship.Ship) && ship.Roles.Any(role => role is FleetRole.Mine or FleetRole.Siphon);
+        => (!FleetRoles.CanSurvey(ship.Ship) || FleetRoles.IsOreHound(ship.Ship))
+            && ship.Roles.Any(role => role is FleetRole.Mine or FleetRole.Siphon);
 
     /// <summary>A drone's gathering role (D58): mining for a mining drone, siphoning for a siphon drone.</summary>
     private static FleetRole GatheringRole(RoleCandidate drone)

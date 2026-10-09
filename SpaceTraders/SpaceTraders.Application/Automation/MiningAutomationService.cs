@@ -88,7 +88,6 @@ public sealed class MiningAutomationService(
     /// </summary>
     public const string GateMinerIntervalSetting = "Mining.GateMinerIntervalMinutes";
 
-    private const string MiningDroneShipType = "SHIP_MINING_DRONE";
     private const string LightShuttleShipType = "SHIP_LIGHT_SHUTTLE";
     private const string Collection = "collection";
     private const string Gate = "gate";
@@ -506,8 +505,9 @@ public sealed class MiningAutomationService(
     }
 
     /// <summary>
-    /// The system's collection points (D83, <see cref="MiningPlanner.CollectionPoints"/>), judged with the tanks of a mining
-    /// drone and a light shuttle as the cheapest shipyard there sells them; none while either isn't sold there.
+    /// The system's collection points (D83, <see cref="MiningPlanner.CollectionPoints"/>), judged with the tanks of the miner
+    /// the plan would buy (an ore hound where one is sold, else a mining drone, D120) and a light shuttle as the cheapest
+    /// shipyard there sells them; none while either isn't sold there.
     /// </summary>
     private static IReadOnlyList<CollectionPoint> CollectionPointsIn(
         MiningContext context,
@@ -515,7 +515,7 @@ public sealed class MiningAutomationService(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<ShipyardWaypointDto> shipyardList)
     {
-        var drone = CheapestListing(shipyardList, systemSymbol, MiningDroneShipType);
+        var drone = MinerShips.Cheapest(InSystem(shipyardList, systemSymbol), ship => ship.FuelCapacity > 0);
         var shuttle = CheapestListing(shipyardList, systemSymbol, LightShuttleShipType);
         if (drone is null || shuttle is null)
         {
@@ -525,9 +525,13 @@ public sealed class MiningAutomationService(
         var droneTank = fleet.FirstOrDefault(FleetRoles.IsMiningDrone)?.FuelCapacity ?? drone.Value.Ship.FuelCapacity;
         return MiningPlanner.CollectionPoints(
             context.Map,
-            new ShipModel("NEW-DRONE", systemSymbol, drone.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", droneTank, droneTank, CargoCapacity: drone.Value.Ship.CargoCapacity, ShipType: MiningDroneShipType),
+            MinerShips.AsBought(drone.Value.Shipyard, drone.Value.Ship) with { FuelCurrent = droneTank, FuelCapacity = droneTank },
             new ShipModel("NEW-SHUTTLE", systemSymbol, shuttle.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", shuttle.Value.Ship.FuelCapacity, shuttle.Value.Ship.FuelCapacity, CargoCapacity: shuttle.Value.Ship.CargoCapacity, ShipType: LightShuttleShipType));
     }
+
+    /// <summary>The shipyards of a system, as cached.</summary>
+    private static IEnumerable<ShipyardWaypointDto> InSystem(IReadOnlyList<ShipyardWaypointDto> shipyardList, string systemSymbol)
+        => shipyardList.Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The cheapest shipyard of a system that sells a ship type with a known price and tank, and its listing; never one that has
@@ -751,34 +755,17 @@ public sealed class MiningAutomationService(
         var forSystems = new List<(string System, MiningContext Context, ShipModel NewDrone, PurchaseNeed Need)>();
         foreach (var systemSymbol in systems)
         {
-            // D121: never where the shipyard has it SCARCE.
-            var listing = shipyardList
-                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
-                .SelectMany(candidate => candidate.Ships
-                    .Where(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && !ScarceShips.IsScarce(ship))
-                    .Select(ship => (Shipyard: candidate, Ship: ship)))
-                .OrderBy(candidate => candidate.Ship.PurchasePrice)
-                .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
-                .FirstOrDefault();
-            if (listing.Shipyard is null)
+            // D120: an ore hound where one is sold, else a drone; D121: never where the shipyard has it SCARCE.
+            if (MinerShips.Cheapest(InSystem(shipyardList, systemSymbol)) is not { } listing)
             {
-                logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for {ShipType} that isn't SCARCE.", systemSymbol, MiningDroneShipType);
+                logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for an ore hound or a mining drone that isn't SCARCE.", systemSymbol);
                 continue;
             }
 
             var (shipyard, forSale) = listing;
             var context = await miningContexts.ReadAsync(systemSymbol, cancellationToken);
-            var newDrone = new ShipModel(
-                "NEW-DRONE",
-                systemSymbol,
-                shipyard.WaypointSymbol,
-                "DOCKED",
-                "CRUISE",
-                forSale.FuelCapacity,
-                forSale.FuelCapacity,
-                CargoCapacity: forSale.CargoCapacity,
-                ShipType: MiningDroneShipType);
-            var need = new PurchaseNeed(PurchaseTier.Coverage, MiningDroneShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
+            var newDrone = MinerShips.AsBought(shipyard, forSale);
+            var need = new PurchaseNeed(PurchaseTier.Coverage, newDrone.ShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
             forSystems.Add((systemSymbol, context, newDrone, need));
 
             // D83: a far asteroid's SCARCE or LIMITED ores count a drone each too (D48). D92: a gate miner mines only its ore

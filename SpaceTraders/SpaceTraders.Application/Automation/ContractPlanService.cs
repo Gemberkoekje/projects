@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
@@ -42,7 +43,6 @@ public sealed class ContractPlanService(
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
     private const string ContractAssignmentType = "Contract";
-    private const string MinerShipType = "SHIP_MINING_DRONE";
 
     private static readonly HashSet<string> KnownMineralSymbols =
     [
@@ -205,7 +205,7 @@ public sealed class ContractPlanService(
                 Status = ContractMineralPlanStatus.PendingBudget,
                 CreatedAt = now,
                 UpdatedAt = now,
-                StopReason = "No idle mining ship available and unable to purchase SHIP_MINING_DRONE.",
+                StopReason = "No idle mining ship available and unable to purchase an ore hound or a mining drone.",
             }, cancellationToken);
 
             logger.LogInformation(
@@ -599,64 +599,76 @@ public sealed class ContractPlanService(
     /// Buys the contract's drone when no miner is free for it (D23): first in the order ships are bought in (D43), so the
     /// plans after it save up for it, at a shipyard whose price for it is known; without a price nothing could buy it. Only
     /// a shipyard at home counts, not one the command ship has just explored (asked on 2026-10-04), or where a probe watches
-    /// the markets (D60, slice 6.28).
+    /// the markets (D60, slice 6.28). An ore hound where such a shipyard sells one, else a mining drone (slice 6.39, D120);
+    /// neither where the shipyard has it SCARCE (D121).
     /// </summary>
     private async Task<ShipModel?> TryPurchaseMinerDroneAsync(CancellationToken cancellationToken)
     {
         var systems = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
-        var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(MinerShipType, systems, cancellationToken);
-        if (string.IsNullOrWhiteSpace(shipyardWaypoint))
+        foreach (var shipType in MinerShips.Preferred)
         {
-            logger.LogDebug(
-                "Contract plan purchase fallback: no shipyard waypoint found for ship type {ShipType}.",
-                MinerShipType);
-            return null;
+            var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(shipType, systems, cancellationToken);
+            if (string.IsNullOrWhiteSpace(shipyardWaypoint))
+            {
+                logger.LogDebug(
+                    "Contract plan purchase fallback: no shipyard waypoint found for ship type {ShipType}.",
+                    shipType);
+                continue;
+            }
+
+            var forSale = (await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken))?.Ships
+                .FirstOrDefault(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase));
+            if (forSale is not { PurchasePrice: > 0 })
+            {
+                logger.LogDebug(
+                    "Contract plan purchase fallback: the price of a {ShipType} at {WaypointSymbol} isn't known yet.",
+                    shipType,
+                    shipyardWaypoint);
+                continue;
+            }
+
+            // D121: no ship is bought where the shipyard has it SCARCE.
+            if (ScarceShips.IsScarce(forSale))
+            {
+                logger.LogDebug(
+                    "Contract plan purchase fallback: {WaypointSymbol} has {ShipType} at SCARCE supply; none is bought there (D121).",
+                    shipyardWaypoint,
+                    shipType);
+                continue;
+            }
+
+            return await BuyMinerAsync(shipType, shipyardWaypoint, forSale.PurchasePrice, cancellationToken);
         }
 
-        var forSale = (await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken))?.Ships
-            .FirstOrDefault(ship => ship.Type.Equals(MinerShipType, StringComparison.OrdinalIgnoreCase));
-        var price = forSale?.PurchasePrice ?? 0;
-        if (price <= 0)
-        {
-            logger.LogDebug(
-                "Contract plan purchase fallback: the price of a {ShipType} at {WaypointSymbol} isn't known yet.",
-                MinerShipType,
-                shipyardWaypoint);
-            return null;
-        }
+        return null;
+    }
 
-        // D121: no ship is bought where the shipyard has it SCARCE.
-        if (ScarceShips.IsScarce(forSale!))
-        {
-            logger.LogDebug(
-                "Contract plan purchase fallback: {WaypointSymbol} has {ShipType} at SCARCE supply; none is bought there (D121).",
-                shipyardWaypoint,
-                MinerShipType);
-            return null;
-        }
-
+    /// <summary>Buys the contract's miner when the order ships are bought in lets it (D43).</summary>
+    private async Task<ShipModel?> BuyMinerAsync(string shipType, string shipyardWaypoint, long price, CancellationToken cancellationToken)
+    {
         if (!await purchaseOrder.ReportAsync(
             AutomationPlan.Contract,
-            new PurchaseNeed(PurchaseTier.Contract, MinerShipType, shipyardWaypoint, price),
+            new PurchaseNeed(PurchaseTier.Contract, shipType, shipyardWaypoint, price),
             cancellationToken))
         {
             return null;
         }
 
-        var purchased = await shipPurchases.TryPurchaseAsync(MinerShipType, shipyardWaypoint, cancellationToken);
+        var purchased = await shipPurchases.TryPurchaseAsync(shipType, shipyardWaypoint, cancellationToken);
         if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
             logger.LogDebug(
                 "Contract plan purchase fallback: purchase denied for {ShipType} at {WaypointSymbol} - {Reason}",
-                MinerShipType,
+                shipType,
                 shipyardWaypoint,
                 purchased.FailureReason ?? "Purchase failed.");
             return null;
         }
 
         logger.LogInformation(
-            "Contract plan purchased new miner drone {ShipSymbol} at {ShipyardWaypoint} for contract work.",
+            "Contract plan purchased new miner {ShipSymbol} ({ShipType}) at {ShipyardWaypoint} for contract work.",
             purchased.PurchasedShip.Symbol,
+            shipType,
             shipyardWaypoint);
 
         return purchased.PurchasedShip;

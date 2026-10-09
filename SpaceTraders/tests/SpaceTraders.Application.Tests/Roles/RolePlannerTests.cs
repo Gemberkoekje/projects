@@ -186,6 +186,40 @@ public sealed class RolePlannerTests
     }
 
     [Fact]
+    public void AnOreHound_GathersFirst_AsADroneDoes()
+    {
+        // Slice 6.39 (D120): "When available, use ORE HOUNDS instead of MINING DRONES." It can survey, but only for its own
+        // trips: a drone in every rule, it mines whatever trading would pay.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(CommandShip(), CommandRoles, Trade("trade|A", 20_000), Mine("mine|H51|COPPER_ORE", 5_000)),
+                Candidate(OreHound(), DroneRoles, Trade("trade|B", 30_000), Mine("mine|F49|SILICON_CRYSTALS", 4_000)),
+                Candidate(Drone(), DroneRoles, Mine("mine|H51|IRON_ORE", 3_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2);
+
+        Role(decisions, "SHIP-7").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
+        Role(decisions, "SHIP-1").Should().Be((FleetRole.Survey, RolePlanner.SurveyFirst), "SHIP-3, a drone, mines with surveys");
+    }
+
+    [Fact]
+    public void WhereOnlyOreHoundsMine_TheCommandShipDoesntSurveyForThem()
+    {
+        // D120: surveys are for the miners that can't survey; an ore hound surveys for itself.
+        var decisions = RolePlanner.Decide(
+            [
+                Candidate(CommandShip(), CommandRoles, Trade("trade|A", 20_000), Mine("mine|H51|COPPER_ORE", 5_000)),
+                Candidate(OreHound(), DroneRoles, Mine("mine|F49|SILICON_CRYSTALS", 4_000)),
+            ],
+            contractWantsOre: false,
+            headStart: 0.2);
+
+        Role(decisions, "SHIP-1").Should().Be((FleetRole.Trade, RolePlanner.MostProfitable));
+        Role(decisions, "SHIP-7").Should().Be((FleetRole.Mine, RolePlanner.GathersFirst));
+    }
+
+    [Fact]
     public void ADroneWorkingOnAScarceMineral_KeepsGatheringIt_ThoughTradingPaysItMore()
     {
         // Slice 6.10b (D48): "at least 1 drone per mineral that is scarce or limited". Without it SHIP-4 would trade, and the
@@ -303,6 +337,11 @@ public sealed class RolePlannerTests
     private static RoleOption Mine(string key, int perHour) => new(FleetRole.Mine, key, key, perHour, 3_600);
 
     private static RoleOption Siphon(string key, int perHour) => new(FleetRole.Siphon, key, key, perHour, 3_600);
+
+    /// <summary>An ore hound (slice 6.39, D120): a mining laser and a surveyor, a hold and a tank.</summary>
+    private static ShipModel OreHound()
+        => new("SHIP-7", SystemSymbol, XB5C, "IN_ORBIT", "CRUISE", 400, 400, CargoCapacity: 30, ShipType: "SHIP_ORE_HOUND",
+            MountSymbols: ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"]);
 
     /// <summary>A survey ship: a surveyor and nothing to carry anything in.</summary>
     private static ShipModel Surveyor()

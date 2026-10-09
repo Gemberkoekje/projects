@@ -493,6 +493,16 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public void AnOreHound_TakesTheDronesTurn()
+    {
+        // Slice 6.39 (D120): the mining plan buys ore hounds in the drones' place. Counted as a cargo ship, one would have taken
+        // the cargo ships' turn.
+        List<PurchaseRecord> purchases = [Bought("SHIP-4", ShipType.ShipLightShuttle, 0), Bought("SHIP-5", ShipType.ShipOreHound, 1)];
+
+        PurchaseOrder.Turn(purchases, [ShipType.ShipLightShuttle]).Should().Be(PurchaseKind.CargoShip);
+    }
+
+    [Fact]
     public void AnInterceptor_TakesNoTurn_AsAProbeTakesNone()
     {
         // Slice 6.38 (D119): the probe plan buys interceptors in the probes' place. Counted as a cargo ship, one would have given

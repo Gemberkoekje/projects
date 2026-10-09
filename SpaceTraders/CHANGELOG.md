@@ -7,6 +7,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-09, slice 6.39)
+- Ore hounds instead of mining drones (D120), as asked on 2026-10-09: "When available, use ORE HOUNDS instead of MINING
+  DRONES. I think they can both survey and mine, so have them survey until the desired mineral is found, then mine the
+  survey", with no limit. Every purchase of a miner (the contract's, the mining plan's for scarce ores, the gate's miners,
+  the turns) buys a `SHIP_ORE_HOUND` wherever a shipyard the plan buys from sells one that isn't SCARCE, the cheapest such,
+  and a `SHIP_MINING_DRONE` only where none does (`MinerShips`, new); the collection points are judged with its tank. An
+  ore hound is a mining drone in every rule (`FleetRoles.IsOreHound`, new, in `IsMiningDrone`): it never takes the survey
+  role, and the turns count it as a drone. At its asteroid it surveys while no usable survey there lists its trip's ore,
+  keeping the surveys for every miner, then extracts with the best that lists it (`FleetRoles.SurveysForItself`,
+  `MineResourceVolumeHandler.SurveyForItselfAsync`); a failed survey leaves that step to extract without one. The survey
+  ships are bought, and a ship that can survey takes the survey role, only for the miners that need surveys
+  (`FleetRoles.NeedsSurveyShips`). The contract plan's stop reason names both ships.
+
+### Docs – Changed (2026-10-09, slice 6.39)
+- `PLAN.md`: slice 6.39 built; D20, D48 and D55 marked as amended by D120. `docs/HOW_IT_WORKS.md`: the ships the contract,
+  survey and mining plans buy; the role board's survey and drone rules; the ore hound's surveys in
+  `MineResourceVolumeCommand`; a purchase stores the new ship's mounts since slice 6.31 (the text still said they waited
+  for the next startup sync).
+
 ### Code – Changed (2026-10-09, slice 6.38)
 - Interceptors instead of probes (D119), as asked on 2026-10-09: "When available, I'd like INTERCEPTORS to be used instead of
   PROBES. As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE." The probe plan buys a `SHIP_INTERCEPTOR`

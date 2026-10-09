@@ -110,6 +110,20 @@ public sealed class SurveyPlanServiceTests
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
+    [Fact]
+    public async Task ForOreHoundsThatSurveyForThemselves_NoSurveyShipIsBought_NorDoesAnOreHoundTakeSurveys()
+    {
+        // Slice 6.39 (D120): an ore hound surveys for its own trips; the survey ships serve the miners that can't survey.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-7", FleetRole.Mine));
+        Fleet(CommandShip(), Drone() with { Symbol = "SHIP-7", ShipType = "SHIP_ORE_HOUND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _activeGoals.Should().NotContainKey("SHIP-7");
+    }
+
     [Theory]
     [InlineData("SHIP_SURVEYOR", new string[0])]
     [InlineData("SURVEYOR", new[] { "MOUNT_SURVEYOR_I" })]

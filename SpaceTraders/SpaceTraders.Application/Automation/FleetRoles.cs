@@ -45,7 +45,8 @@ public static class FleetRoles
 
     /// <summary>
     /// Whether the ship is a surveyor, which surveys before anything else (D20); with the spare-time plan on, it trades
-    /// or gathers when it has nothing to survey (slice 6.8, D34).
+    /// or gathers when it has nothing to survey (slice 6.8, D34). An ore hound is none: it surveys for its own trips
+    /// (slice 6.39, D120).
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="surveyPlanOn">Whether the survey plan is switched on.</param>
@@ -53,7 +54,7 @@ public static class FleetRoles
     public static bool IsSurveyor(ShipModel ship, bool surveyPlanOn)
     {
         ArgumentNullException.ThrowIfNull(ship);
-        return surveyPlanOn && ship.HasSurveyEquipment;
+        return surveyPlanOn && ship.HasSurveyEquipment && !IsOreHound(ship);
     }
 
     /// <summary>Whether the ship mines: a mining laser, a hold and a tank, and not a surveyor.</summary>
@@ -116,11 +117,49 @@ public static class FleetRoles
 
     /// <summary>
     /// Whether the ship is a mining drone (slice 6.10b, D48): it can mine (<see cref="CanMine"/>) and can't survey, so not
-    /// the command ship, whichever role it has. The mining plan keeps one per SCARCE or LIMITED ore.
+    /// the command ship, whichever role it has; or an ore hound, bought in a drone's place, which surveys only for its own
+    /// trips (slice 6.39, D120). The mining plan keeps one per SCARCE or LIMITED ore.
     /// </summary>
     /// <param name="ship">The ship.</param>
-    /// <returns>True for a mining drone, or another ship that mines and doesn't survey.</returns>
-    public static bool IsMiningDrone(ShipModel ship) => CanMine(ship) && !CanSurvey(ship);
+    /// <returns>True for a mining drone, an ore hound, or another ship that mines and doesn't survey.</returns>
+    public static bool IsMiningDrone(ShipModel ship) => CanMine(ship) && (!CanSurvey(ship) || IsOreHound(ship));
+
+    /// <summary>
+    /// The ship the plans buy in a mining drone's place wherever a shipyard they buy from sells one (PLAN.md slice 6.39, D120):
+    /// asked on 2026-10-09, "When available, use ORE HOUNDS instead of MINING DRONES."
+    /// </summary>
+    public const string OreHoundShipType = "SHIP_ORE_HOUND";
+
+    /// <summary>
+    /// Whether the ship is an ore hound (slice 6.39, D120): the type it is cached with when bought, <c>SHIP_ORE_HOUND</c>, or a
+    /// miner's frame, which it keeps after startup sync caches its registration role. A mining drone in every rule.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for an ore hound.</returns>
+    public static bool IsOreHound(ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(ship);
+        return ship.ShipType.Equals(OreHoundShipType, StringComparison.OrdinalIgnoreCase)
+            || (ship.FrameJson ?? string.Empty).Contains("\"FRAME_MINER\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Whether the ship surveys for its own trips (slice 6.39, D120): an ore hound with a surveyor mount. Asked on 2026-10-09:
+    /// "I think they can both survey and mine, so have them survey until the desired mineral is found, then mine the survey."
+    /// At its asteroid it surveys while no usable survey there lists its trip's ore, then extracts with the best that does;
+    /// it never takes the survey role, and no survey ship is bought for it.
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a ship that surveys before it extracts, when no survey holds its ore.</returns>
+    public static bool SurveysForItself(ShipModel ship) => IsOreHound(ship) && ship.HasSurveyEquipment;
+
+    /// <summary>
+    /// Whether the ship mines with the surveys the survey ships take (D47, D54, D55): a mining drone that doesn't survey for
+    /// itself (slice 6.39, D120).
+    /// </summary>
+    /// <param name="ship">The ship.</param>
+    /// <returns>True for a mining drone a survey ship serves.</returns>
+    public static bool NeedsSurveyShips(ShipModel ship) => IsMiningDrone(ship) && !SurveysForItself(ship);
 
     /// <summary>
     /// Whether the ship is a cargo ship, as the trading plan buys them (D21): a hold and a tank, and nothing
@@ -210,7 +249,8 @@ public static class FleetRoles
             return ship.IsTradingCapable ? [FleetRole.Trade] : roles;
         }
 
-        if (CanSurvey(ship))
+        // Slice 6.39 (D120): an ore hound surveys only for its own trips.
+        if (CanSurvey(ship) && !IsOreHound(ship))
         {
             roles.Add(FleetRole.Survey);
         }
