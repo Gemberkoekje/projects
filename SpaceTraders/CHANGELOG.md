@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-09, slice 6.37)
+- No ship is bought where the shipyard has it SCARCE (D121), as asked on 2026-10-09: "As with the other ships, do not buy
+  INTERCEPTORS if the supply is SCARCE", then "Every purchase". Until then only the probes (D97) and the largest hold
+  beyond `Trade.ShipPurchases` (D112) kept to it. `ShipPurchaseService.TryPurchaseAsync` now refuses every ship whose cached
+  listing is SCARCE, before it calls one of our ships to the shipyard, and every ship the shipyard, fetched again just
+  before, lists SCARCE (`ShipPurchaseFailure.Scarce`); `IShipPurchaseService.TryPurchaseUnlessScarceAsync` is gone. The
+  contract plan, the survey plan, the mining plan (drones and shuttles), the siphon plan, the trading plan's list and the
+  explore plan leave a SCARCE listing out when they choose where to buy, take another shipyard that sells the ship, and
+  otherwise need nothing, so nothing after them in the order waits for a purchase that can't be made. The explore plan says
+  `ShipyardsScarce` (new) when every shipyard that sells an explorer has it SCARCE. `ScarceShips` (new) holds the check.
+
+### Docs – Changed (2026-10-09, slice 6.37)
+- `PLAN.md`: D119–D123, asked on 2026-10-09, with D28, D29, D47, D60, D97 and D112 marked as amended; slices 6.37–6.40 and
+  2.19 planned, 6.37 built. `docs/HOW_IT_WORKS.md`: purchasing, the cargo ships and the explorers at SCARCE.
+
 ### Docs – Changed (2026-10-09)
 - `PLAN.md`: where things stand after gembernodes#92 deployed B74–B77 and slices 6.35 and 6.36, and gembernodes#93 deployed
   B78; B74–B78 and slice 6.36's details moved to `docs/archive/PLAN_HISTORY.md`.

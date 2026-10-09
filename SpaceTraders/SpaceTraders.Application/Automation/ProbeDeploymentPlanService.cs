@@ -77,7 +77,6 @@ public sealed class ProbeDeploymentPlanService(
     /// <summary>How old a market's prices may get when <c>Market.RefreshMinutes</c> gives no interval.</summary>
     internal const int DefaultDueMinutes = 5;
 
-    private const string ScarceSupply = "SCARCE";
     private const string AntimatterSymbol = "ANTIMATTER";
 
     private static readonly JsonSerializerOptions CompareOptions = new();
@@ -430,7 +429,7 @@ public sealed class ProbeDeploymentPlanService(
                     shipyard.WaypointSymbol,
                     shipyard.SystemSymbol.Length > 0 ? shipyard.SystemSymbol : WaypointSymbols.SystemOf(shipyard.WaypointSymbol),
                     ship.PurchasePrice,
-                    (ship.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))))
+                    ScarceShips.IsScarce(ship))))
             .OrderBy(offer => offer.Price)
             .ThenBy(offer => offer.Shipyard, StringComparer.Ordinal)
             .ToList();

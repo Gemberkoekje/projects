@@ -496,6 +496,58 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task ADrone_IsNotBoughtWhereTheShipyardHasItScarce_ButWhereAnotherHasIt()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". H52 has the drone SCARCE, as cached; H51 sells it for more, at LIMITED.
+        Fleet(Drone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15, Supply = "SCARCE" }],
+            },
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H51,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 52_000, FuelCapacity = 80, CargoCapacity = 15, Supply = "LIMITED" }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.Coverage, "SHIP_MINING_DRONE", H51, 52_000));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", H51, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ADroneScarceAtEveryShipyard_IsNoNeed()
+    {
+        // D121: a need that can't be met would hold back everything after it in the order.
+        Fleet(Drone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_MINING_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15, Supply = "SCARCE" }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task WhereOnlyTheExploringCommandShipIs_NoDroneIsBought_AndNoOpeningsAreListed()
     {
         // Asked on 2026-10-04: while the command ship explores, business stays home ("For now: come home … start simple").

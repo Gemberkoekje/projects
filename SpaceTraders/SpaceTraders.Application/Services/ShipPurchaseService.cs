@@ -22,7 +22,8 @@ namespace SpaceTraders.Application.Services;
 /// hours old, and every purchase moves it. Whether a plan may buy at all is the purchase order's
 /// (<see cref="IPurchaseOrder"/>, D43), which counts each purchase at once (<see cref="PurchaseNeeds"/>): the
 /// ledger's row comes a moment later. A purchase the order let go before purchases that wait for one of our
-/// ships keeps their prices beyond the reserve (slice 6.36, D118, <see cref="PurchaseNeeds.HeldFor"/>).
+/// ships keeps their prices beyond the reserve (slice 6.36, D118, <see cref="PurchaseNeeds.HeldFor"/>). No ship is bought where
+/// the shipyard, fetched again just before, has it SCARCE (D121, <see cref="ScarceShips"/>).
 /// </remarks>
 public sealed class ShipPurchaseService(
     ISpaceTradersPort port,
@@ -36,28 +37,11 @@ public sealed class ShipPurchaseService(
     IMessageBus bus,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
-    private const string ProbeShipType = "SHIP_PROBE";
-    private const string ScarceSupply = "SCARCE";
-
-    public Task<ShipPurchaseResult> TryPurchaseAsync(
-        string shipType,
-        string shipyardWaypoint,
-        CancellationToken cancellationToken = default)
-        => PurchaseAsync(shipType, shipyardWaypoint, unlessScarce: false, cancellationToken);
-
     /// <inheritdoc />
-    public Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
+    public async Task<ShipPurchaseResult> TryPurchaseAsync(
         string shipType,
         string shipyardWaypoint,
         CancellationToken cancellationToken = default)
-        => PurchaseAsync(shipType, shipyardWaypoint, unlessScarce: true, cancellationToken);
-
-    /// <summary>The purchase; with <paramref name="unlessScarce"/>, none where the shipyard has the ship SCARCE now (D112).</summary>
-    private async Task<ShipPurchaseResult> PurchaseAsync(
-        string shipType,
-        string shipyardWaypoint,
-        bool unlessScarce,
-        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(shipType) || string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
@@ -70,6 +54,12 @@ public sealed class ShipPurchaseService(
         if (cached is null || estimatedCost <= 0)
         {
             return Failed(ShipPurchaseFailure.PriceUnknown, "Purchase price unknown (shipyard not yet visited or stale cache).", estimatedCost);
+        }
+
+        // D121: the plans choose no shipyard whose cached listing has the ship SCARCE; should one, no ship is called there for it.
+        if (ScarceShips.IsScarce(ShipOf(cached, shipType)?.Supply))
+        {
+            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceShips.Supply} at {shipyardWaypoint} (D121).", estimatedCost);
         }
 
         // Slice 6.36 (D118): a purchase the order let go before purchases that wait for one of our ships keeps their prices too.
@@ -96,15 +86,13 @@ public sealed class ShipPurchaseService(
         var quote = await QuoteAsync(cached, shipType, cancellationToken);
         var quotedCost = quote?.PurchasePrice is > 0 and var quotedPrice ? quotedPrice : estimatedCost;
 
-        // D97 (slice 6.28, asked on 2026-10-06): "It should also check whether the probes are in SCARCE supply and not buy them
-        // if they are", read as every probe purchase. The probe plan leaves a shipyard whose cached supply is SCARCE alone; this
-        // is the supply as the shipyard gives it now, which the last purchase there may have brought down. D112 (slice 6.33): the
-        // same for the cargo ship bought once Trade.ShipPurchases is.
-        var isProbe = shipType.Equals(ProbeShipType, StringComparison.OrdinalIgnoreCase);
-        if ((isProbe || unlessScarce)
-            && (quote?.Supply ?? string.Empty).Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase))
+        // D121 (asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase"), which D97 began for the probes and D112 carried on for the largest hold. The plans leave a shipyard whose
+        // cached supply is SCARCE alone; this is the supply as the shipyard gives it now, which the last purchase there may have
+        // brought down.
+        if (ScarceShips.IsScarce(quote?.Supply))
         {
-            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceSupply} at {shipyardWaypoint} ({(isProbe ? "D97" : "D112")}).", quotedCost);
+            return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceShips.Supply} at {shipyardWaypoint} (D121).", quotedCost);
         }
 
         if (quotedCost != estimatedCost)

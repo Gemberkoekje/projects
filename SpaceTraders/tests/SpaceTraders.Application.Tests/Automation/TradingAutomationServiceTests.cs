@@ -86,8 +86,6 @@ public sealed class TradingAutomationServiceTests
         ]);
         _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ShipPurchaseResult { IsSuccess = true });
-        _purchases.TryPurchaseUnlessScarceAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult { IsSuccess = true });
         _jettison.JettisonAsync(Arg.Any<ShipModel>(), Arg.Any<CargoItemModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
@@ -785,6 +783,52 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task TheListsNextShip_IsNotBoughtWhereTheShipyardHasItScarce_ButWhereAnotherHasIt()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". A1 has the shuttle SCARCE, as cached; a second shipyard at home, A2, sells it for more, at LIMITED.
+        const string A2 = $"{SystemSymbol}-A2";
+        SurveyPlanOn();
+        Fleet(CommandShip());
+        CreditsAre(300_000);
+        Shipyards(
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = A1,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_LIGHT_SHUTTLE"],
+                Ships = [ForSale("SHIP_LIGHT_SHUTTLE", 40, 117_273, "SCARCE") with { FuelCapacity = 300 }],
+            },
+            ShipyardAbroad(A2, SystemSymbol, ForSale("SHIP_LIGHT_SHUTTLE", 40, 130_000, "LIMITED") with { FuelCapacity = 300 }));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE", A2, 130_000));
+        await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TheListsNextShip_ScarceAtEveryShipyard_IsNotANeed()
+    {
+        // D121: a need that can't be met would hold back everything after it in the order.
+        SurveyPlanOn();
+        Fleet(CommandShip());
+        CreditsAre(300_000);
+        Shipyards(new ShipyardWaypointDto
+        {
+            WaypointSymbol = A1,
+            SystemSymbol = SystemSymbol,
+            ShipTypes = ["SHIP_LIGHT_SHUTTLE"],
+            Ships = [ForSale("SHIP_LIGHT_SHUTTLE", 40, 117_273, "SCARCE") with { FuelCapacity = 300 }],
+        });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None);
+        await NothingBoughtAsync();
+    }
+
+    [Fact]
     public async Task WhereOnlyTheExploringCommandShipIs_NoCargoShipIsBought()
     {
         // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells shuttles, and a shuttle
@@ -865,7 +909,7 @@ public sealed class TradingAutomationServiceTests
 
         // D116: the list's last ship was bought within the half hour, so the next takes its turn after the probes.
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER", A1, 354_210));
-        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -891,7 +935,7 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
-        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -910,8 +954,8 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, 1_800_000));
-        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, Arg.Any<CancellationToken>());
-        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_HEAVY_FREIGHTER", TradeAcrossFixture.CdMarket, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -926,7 +970,7 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
-        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -974,7 +1018,7 @@ public sealed class TradingAutomationServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.TimedCargoShip, "SHIP_LIGHT_HAULER", A1, 354_210));
-        await _purchases.Received(1).TryPurchaseUnlessScarceAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
         _state!.LastShipBoughtAt.Should().BeOnOrAfter(before);
     }
 
@@ -1015,7 +1059,7 @@ public sealed class TradingAutomationServiceTests
         // D116: the half hour counts from a ship bought, so the next pass saves up for the same one again.
         BeyondTheListWithTheGates();
         Shipyards(HomeShipyard());
-        _purchases.TryPurchaseUnlessScarceAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ShipPurchaseResult { IsSuccess = false, Failure = ShipPurchaseFailure.OverBudget, FailureReason = "Over budget." });
 
         await RunAsync();
@@ -1245,11 +1289,8 @@ public sealed class TradingAutomationServiceTests
         => _tradeContexts.ReadReachAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, credits));
 
     /// <summary>Neither purchase was made: of the list's ship, nor of the largest hold beyond it (D112).</summary>
-    private async Task NothingBoughtAsync()
-    {
-        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
-        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseUnlessScarceAsync(default!, default!, default);
-    }
+    private Task NothingBoughtAsync()
+        => _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
 
     /// <summary>
     /// For D112: the list is bought and every trader is on a trip; the gates of <see cref="TradeAcrossFixture"/> lead from home to

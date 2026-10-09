@@ -86,6 +86,30 @@ public sealed class SurveyPlanServiceTests
         await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ASurveyorTheShipyardHasScarce_IsNotBought_NorANeed()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". H52 has the surveyor SCARCE, as cached: a need that can't be met would hold back everything after it.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = H52,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_SURVEYOR"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_SURVEYOR", PurchasePrice = 33_905, FuelCapacity = 80, Supply = "SCARCE" }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
     [Theory]
     [InlineData("SHIP_SURVEYOR", new string[0])]
     [InlineData("SURVEYOR", new[] { "MOUNT_SURVEYOR_I" })]

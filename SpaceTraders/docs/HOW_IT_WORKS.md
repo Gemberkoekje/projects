@@ -368,7 +368,8 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   `Explore.MaxExplorers` (5; 0 for no cap); `Explore.SystemsPerExplorer` 0 buys none. The systems left are those it
   knows, hasn't explored and reaches from home through built gates (`ExploreAtlas.SystemsLeft`): one behind a gate under
   construction counts once the gate is built. They are bought at the cheapest shipyard the gates reach that sells one
-  (X1-GT9-AE7B in the reset of 2026-10-04), each at `PurchaseTier.Explorer`, before the probes: the first since slice
+  (X1-GT9-AE7B in the reset of 2026-10-04) and doesn't have it SCARCE (slice 6.37, D121; with every one SCARCE, none is
+  needed: `ShipyardsScarce`), each at `PurchaseTier.Explorer`, before the probes: the first since slice
   6.30 (D98), the rest since slice 6.33 (D113: "I'd like Explorers (order 10) to go in front of probes (order 8)"; until
   then they stood after the drones and cargo ships that take turns, see [the order ships are bought
   in](#the-order-ships-are-bought-in-purchaseorder-slice-610b)). The API sells a ship only where one of ours is (D30). A
@@ -1272,8 +1273,8 @@ buy.
 - **Cargo ships** (D21, which replaced D16): when every trader has a trip, the plan buys the next
   ship in `Trade.ShipPurchases` (`SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER`): the Nth
   while the fleet has fewer than N cargo ships (a hold and a tank, nothing to mine, siphon or survey
-  with), at the shipyard that sells it for the least, and only when the new ship would have a
-  lucrative route from the shipyard with the credits left after the purchase. Once the list is bought, one at a time,
+  with), at the shipyard at home that sells it for the least and doesn't have it SCARCE (D121), and only when the new ship
+  would have a lucrative route from the shipyard with the credits left after the purchase. Once the list is bought, one at a time,
   in turn with the drones (D43), the ship with the largest hold (slice 6.33, D112, asked on 2026-10-07: "it should pick
   whatever the known ship with the highest cargo capacity is, as long as it is not scarce", with "Within the trade reach"
   and "Next largest"): of the ships that the shipyards within `Trade.MaxHaulDistance` jumps of home list with their hold
@@ -1281,7 +1282,7 @@ buy.
   doesn't have SCARCE, as cached, the largest hold, of equal holds the cheapest, then the nearest to home
   (`LargestHoldAsync`). A shipyard abroad counts only where a probe of ours is or is on its way (`ProbePlanner.Whereabouts`)
   while the probe plan is on, to answer the purchase's call (D30); the new ship trades from there (D96). The purchase
-  refuses it where the shipyard, fetched again just before, lists it SCARCE (`TryPurchaseUnlessScarceAsync`, `Scarce`),
+  refuses it where the shipyard, fetched again just before, lists it SCARCE (`Scarce`, as every purchase since D121),
   and the next pass takes the next largest. Beyond the list, too, only when the traders can't keep up
   (D88, asked on 2026-10-05: "can you add a limitation on buying more trade ships unless a trade ship actually adds
   value?"): a route worth `Trade.ShipPurchaseMinRouteProfit` (10,000) that the new ship would have from the shipyard,
@@ -1379,24 +1380,32 @@ last, gives it something to do then; your decisions are D34–D37.
   1. It needs the ship type's price cached for that shipyard. Early in a reset, no ship has
      visited a shipyard yet, so purchases fail with "price unknown".
   2. It asks `BudgetPolicy`.
-  3. It needs one of our ships at the shipyard, not in flight: the API sells a ship only there (D30).
+  3. It refuses a ship the shipyard's cached listing has SCARCE (`Scarce`, D121, below), and calls for no ship there.
+  4. It needs one of our ships at the shipyard, not in flight: the API sells a ship only there (D30).
      Without one it makes no API call; it records a call at the shipyard (`ShipyardCalls`, in memory,
      open for 2 minutes after the last attempt), which the probe plan answers with its nearest free
      probe, and the plan's next attempt buys. A purchase closes the call.
-  4. With a ship there, it fetches the shipyard again and asks `BudgetPolicy` again with the price
+  5. With a ship there, it fetches the shipyard again and asks `BudgetPolicy` again with the price
      the shipyard asks now (a cached price can be hours old, and every purchase moves it); when the
-     fetch fails it uses the cached price.
-  5. It buys the ship and saves the new credits and the ship. Mounts are not recorded until the
+     fetch fails it uses the cached price. It refuses a ship the shipyard, fetched again, lists at SCARCE (`Scarce`).
+  6. It buys the ship and saves the new credits and the ship. Mounts are not recorded until the
      next startup sync. Mining capability also follows from the ship type, so a purchased
      `SHIP_MINING_DRONE` still counts as a miner. With the role board on, the new ship waits a tick for
      its role (slice 6.9).
-  6. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`, and records the
+  7. It publishes `NewShipPurchasedEvent` (for the ledger) and `AgentCreditsChangedEvent`, and records the
      purchase for the order ships are bought in at once (`PurchaseNeeds.Bought`): the ledger's row comes a
      moment later.
-  7. It tells the name book the fleet, the new ship in it, and its `ShipPurchased` line says the name the
+  8. It tells the name book the fleet, the new ship in it, and its `ShipPurchased` line says the name the
      bot gives the ship: "the bot calls it PICKAXE-3" (slice 2.14, see [Names](#names-shipnames-slice-214)).
-  - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`
-    or `NoShipAtShipyard`.
+  - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`,
+    `NoShipAtShipyard` or `Scarce`.
+- **No ship at SCARCE** (slice 6.37, D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the
+  supply is SCARCE", then "Every purchase"): no plan buys a ship where the shipyard has it SCARCE (`ScarceShips`). Each plan
+  leaves a shipyard whose cached listing says SCARCE alone when it chooses where to buy (the contract's drone, the survey
+  ships, the mining and siphon drones, the collection points' shuttles, the cargo ships of the list and beyond it, the
+  explorers, the probes), takes another shipyard that sells the ship if there is one, and otherwise needs nothing, so
+  nothing after it in the order waits for a purchase that can't be made. Until then only the probes (D97) and the largest
+  hold (D112) kept to it.
 - **`BudgetPolicy`:** spendable credits are the cached credits minus the credit reserve (slice 6.10b,
   D51, `CreditReserve`): `FleetExpansion.MinCreditReserve` (60,000) and
   `FleetExpansion.ReservePerTradingCargoUnit` (1,000) for every unit the ships that trade can carry, so

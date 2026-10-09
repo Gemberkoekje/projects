@@ -529,12 +529,15 @@ public sealed class MiningAutomationService(
             new ShipModel("NEW-SHUTTLE", systemSymbol, shuttle.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", shuttle.Value.Ship.FuelCapacity, shuttle.Value.Ship.FuelCapacity, CargoCapacity: shuttle.Value.Ship.CargoCapacity, ShipType: LightShuttleShipType));
     }
 
-    /// <summary>The cheapest shipyard of a system that sells a ship type with a known price and tank, and its listing.</summary>
+    /// <summary>
+    /// The cheapest shipyard of a system that sells a ship type with a known price and tank, and its listing; never one that has
+    /// it SCARCE (D121).
+    /// </summary>
     private static (ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)? CheapestListing(IReadOnlyList<ShipyardWaypointDto> shipyardList, string systemSymbol, string shipType)
         => shipyardList
             .Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
             .SelectMany(shipyard => shipyard.Ships
-                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && ship.FuelCapacity > 0)
+                .Where(ship => ship.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && ship.FuelCapacity > 0 && !ScarceShips.IsScarce(ship))
                 .Select(ship => ((ShipyardWaypointDto Shipyard, ShipyardShipDto Ship)?)(shipyard, ship)))
             .OrderBy(listing => listing!.Value.Ship.PurchasePrice)
             .ThenBy(listing => listing!.Value.Shipyard.WaypointSymbol, StringComparer.Ordinal)
@@ -748,20 +751,23 @@ public sealed class MiningAutomationService(
         var forSystems = new List<(string System, MiningContext Context, ShipModel NewDrone, PurchaseNeed Need)>();
         foreach (var systemSymbol in systems)
         {
-            var shipyard = shipyardList
-                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
-                    && candidate.Ships.Any(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0))
-                .OrderBy(candidate => candidate.Ships.First(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase)).PurchasePrice)
-                .ThenBy(candidate => candidate.WaypointSymbol, StringComparer.Ordinal)
+            // D121: never where the shipyard has it SCARCE.
+            var listing = shipyardList
+                .Where(candidate => candidate.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(candidate => candidate.Ships
+                    .Where(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && !ScarceShips.IsScarce(ship))
+                    .Select(ship => (Shipyard: candidate, Ship: ship)))
+                .OrderBy(candidate => candidate.Ship.PurchasePrice)
+                .ThenBy(candidate => candidate.Shipyard.WaypointSymbol, StringComparer.Ordinal)
                 .FirstOrDefault();
-            if (shipyard is null)
+            if (listing.Shipyard is null)
             {
-                logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, MiningDroneShipType);
+                logger.LogDebug("Mining plan: no shipyard in {SystemSymbol} with a known price for {ShipType} that isn't SCARCE.", systemSymbol, MiningDroneShipType);
                 continue;
             }
 
+            var (shipyard, forSale) = listing;
             var context = await miningContexts.ReadAsync(systemSymbol, cancellationToken);
-            var forSale = shipyard.Ships.First(ship => ship.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase));
             var newDrone = new ShipModel(
                 "NEW-DRONE",
                 systemSymbol,

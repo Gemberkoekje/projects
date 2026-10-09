@@ -229,40 +229,46 @@ public sealed class ShipPurchaseServiceTests
     }
 
     [Fact]
-    public async Task UnlessScarce_ACargoShipTheShipyardHasAtScarce_WhenFetchedAgain_IsNotBought()
+    public async Task ACargoShipTheShipyardHasAtScarce_WhenFetchedAgain_IsNotBought()
     {
-        // D112 (slice 6.33): the cargo ship bought beyond Trade.ShipPurchases, "as long as it is not scarce". The cache said
-        // MODERATE, which the trading plan goes by; the shipyard, fetched again with our ship there, says SCARCE.
+        // D112 (slice 6.33), D121: the cargo ship bought beyond Trade.ShipPurchases, "as long as it is not scarce". The cache
+        // said MODERATE, which the trading plan goes by; the shipyard, fetched again with our ship there, says SCARCE.
         var fresh = new ShipyardDataModel(Shipyard, "X1-AB", "[]", "[{\"type\":\"SHIP_HEAVY_FREIGHTER\",\"purchasePrice\":1900000,\"supply\":\"SCARCE\"}]");
         _port.GetShipyardAsync("X1-AB", Shipyard, Arg.Any<CancellationToken>()).Returns(fresh);
         _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(Selling("SHIP_HEAVY_FREIGHTER", 1_800_000, "MODERATE"), Selling("SHIP_HEAVY_FREIGHTER", 1_900_000, "SCARCE"));
 
-        var result = await Service().TryPurchaseUnlessScarceAsync("SHIP_HEAVY_FREIGHTER", Shipyard);
+        var result = await Service().TryPurchaseAsync("SHIP_HEAVY_FREIGHTER", Shipyard);
 
         result.Failure.Should().Be(ShipPurchaseFailure.Scarce);
-        result.FailureReason.Should().Contain("D112");
+        result.FailureReason.Should().Contain("D121");
         await _port.DidNotReceiveWithAnyArgs().PurchaseShipAsync(default!, default!, default);
     }
 
     [Fact]
-    public async Task UnlessScarce_AShipTheShipyardDoesNotHaveScarce_IsBoughtAsBefore()
+    public async Task AShipTheShipyardDoesNotHaveScarce_IsBought()
     {
         _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(Selling("SHIP_MINING_DRONE", 12_000, "LIMITED"));
 
-        var result = await Service().TryPurchaseUnlessScarceAsync("SHIP_MINING_DRONE", Shipyard);
+        var result = await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
 
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public async Task ADroneAtScarce_IsBoughtAsBefore()
+    public async Task ADroneTheShipyardHasAtScarce_IsNotBought_AndNoShipIsCalledThereForIt()
     {
-        // D97 is about probes; the other plans' purchases go by their own rules.
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". Until then a drone was bought at SCARCE, as only the probes (D97) and the largest hold (D112) kept to it.
+        // The cached listing says SCARCE and no ship of ours is there: nothing is bought, and no probe is called to the shipyard
+        // for a purchase that would be refused once it got there.
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
         _shipyards.FindByWaypointAsync(Shipyard, Arg.Any<CancellationToken>()).Returns(Selling("SHIP_MINING_DRONE", 12_000, "SCARCE"));
 
         var result = await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
 
-        result.IsSuccess.Should().BeTrue();
+        result.Failure.Should().Be(ShipPurchaseFailure.Scarce);
+        _calls.Open(TimeProvider.System.GetUtcNow()).Should().BeEmpty();
+        await _port.DidNotReceiveWithAnyArgs().PurchaseShipAsync(default!, default!, default);
     }
 
     [Fact]

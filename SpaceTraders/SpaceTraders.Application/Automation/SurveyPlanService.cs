@@ -329,17 +329,18 @@ public sealed class SurveyPlanService(
                 tier = PurchaseTier.SurveyorPerArea;
             }
 
+            // D121: never where the shipyard has it SCARCE.
             var offer = shipyardList
                 .Where(shipyard => shipyard.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(shipyard => shipyard.Ships
-                    .Where(ship => ship.Type.Equals(SurveyorShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0)
+                    .Where(ship => ship.Type.Equals(SurveyorShipType, StringComparison.OrdinalIgnoreCase) && ship.PurchasePrice > 0 && !ScarceShips.IsScarce(ship))
                     .Select(ship => (Shipyard: shipyard.WaypointSymbol, Price: ship.PurchasePrice)))
                 .OrderBy(candidate => candidate.Price)
                 .ThenBy(candidate => candidate.Shipyard, StringComparer.Ordinal)
                 .ToList();
             if (offer.Count == 0)
             {
-                logger.LogDebug("Survey plan: no shipyard in {SystemSymbol} with a known price for {ShipType}.", systemSymbol, SurveyorShipType);
+                logger.LogDebug("Survey plan: no shipyard in {SystemSymbol} with a known price for {ShipType} that isn't SCARCE.", systemSymbol, SurveyorShipType);
                 continue;
             }
 

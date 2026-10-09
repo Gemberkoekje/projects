@@ -419,6 +419,29 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task ASiphonDrone_ScarceAtEveryShipyard_IsNoNeed()
+    {
+        // D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE", then "Every
+        // purchase". C39 has the drone SCARCE, as cached: a need that can't be met would hold back everything after it.
+        Fleet(SiphonDrone());
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = C39,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_PROBE", "SHIP_SIPHON_DRONE"],
+                Ships = [new ShipyardShipDto { Type = "SHIP_SIPHON_DRONE", PurchasePrice = 42_000, FuelCapacity = 80, CargoCapacity = 15, Supply = "SCARCE" }],
+            },
+        ]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task OnceEachScarceGasHasADrone_ADroneIsBoughtWhenEverySiphonerWorks_InTurnWithTheCargoShips()
     {
         // D43, D32: SHIP-7 trades, so G50's hydrocarbon waits for a drone.

@@ -613,14 +613,25 @@ public sealed class ContractPlanService(
             return null;
         }
 
-        var price = (await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken))?.Ships
-            .FirstOrDefault(ship => ship.Type.Equals(MinerShipType, StringComparison.OrdinalIgnoreCase))?.PurchasePrice ?? 0;
+        var forSale = (await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken))?.Ships
+            .FirstOrDefault(ship => ship.Type.Equals(MinerShipType, StringComparison.OrdinalIgnoreCase));
+        var price = forSale?.PurchasePrice ?? 0;
         if (price <= 0)
         {
             logger.LogDebug(
                 "Contract plan purchase fallback: the price of a {ShipType} at {WaypointSymbol} isn't known yet.",
                 MinerShipType,
                 shipyardWaypoint);
+            return null;
+        }
+
+        // D121: no ship is bought where the shipyard has it SCARCE.
+        if (ScarceShips.IsScarce(forSale!))
+        {
+            logger.LogDebug(
+                "Contract plan purchase fallback: {WaypointSymbol} has {ShipType} at SCARCE supply; none is bought there (D121).",
+                shipyardWaypoint,
+                MinerShipType);
             return null;
         }
 
@@ -946,25 +957,6 @@ public sealed class ContractPlanService(
                 ActualCost = purchased.Cost,
                 PurchasedShip = ship,
             };
-        }
-
-        /// <summary>As <see cref="TryPurchaseAsync"/>, but nothing where the cached shipyard has the ship SCARCE (D112).</summary>
-        public async Task<ShipPurchaseResult> TryPurchaseUnlessScarceAsync(
-            string shipType,
-            string shipyardWaypoint,
-            CancellationToken cancellationToken = default)
-        {
-            var shipyard = await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken);
-            var forSale = shipyard?.Ships.FirstOrDefault(s => s.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase));
-            return "SCARCE".Equals(forSale?.Supply, StringComparison.OrdinalIgnoreCase)
-                ? new ShipPurchaseResult
-                {
-                    IsSuccess = false,
-                    Failure = ShipPurchaseFailure.Scarce,
-                    FailureReason = $"{shipType} is SCARCE at {shipyardWaypoint} (D112).",
-                    EstimatedCost = forSale.PurchasePrice,
-                }
-                : await TryPurchaseAsync(shipType, shipyardWaypoint, cancellationToken);
         }
     }
 }
