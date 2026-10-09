@@ -7,6 +7,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-09, slice 6.40)
+- Mining abroad (D122), as asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the
+  home area. However, outside of the home area, mining is low priority, and should never be in the way of trading, which is
+  generally more lucrative", then "One per short ore, no cap". With nothing to buy at home, the mining plan buys a miner (an
+  ore hound where one is sold, else a mining drone) for the first system abroad whose markets the probes keep fresh with
+  fewer mining drones than ores its markets are short of, last in the order ships are bought in (`PurchaseTier.MiningAbroad`,
+  new, 12), with no cap (`Mining.MaxDrones` counts home's). Abroad a market whose prices are older than
+  `Trade.MaxPriceAgeMinutes` is stale and mined for by nobody (`IMiningContextReader.SystemsAbroadAsync`,
+  `ITradeContextReader.FreshMarketsAsync`, `TradeMarketMap.WithStaleMarkets`, new), there are no collection points, and a
+  pair whose market a trade trip is on its way to sell the ore at is left to the trade (`MiningContext.LeftToTrade`, new).
+  The role board lets a mining drone or an ore hound abroad mine; the contract takes only miners at home, the survey plan
+  buys survey ships only for home's drones (`SurveyPlanService` takes `IAgentRepository`), and only home's free miners hold
+  back home's drones in turn with the cargo ships.
+
+### Docs – Changed (2026-10-09, slice 6.40)
+- `PLAN.md`: slice 6.40 built. `docs/HOW_IT_WORKS.md`: mining abroad; the order ships are bought in; the role board, the
+  contract and the survey plan at home; the purchase order metric's tiers.
+
 ### Code – Changed (2026-10-09, slice 6.39)
 - Ore hounds instead of mining drones (D120), as asked on 2026-10-09: "When available, use ORE HOUNDS instead of MINING
   DRONES. I think they can both survey and mine, so have them survey until the desired mineral is found, then mine the

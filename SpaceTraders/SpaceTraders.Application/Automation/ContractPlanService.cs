@@ -534,6 +534,10 @@ public sealed class ContractPlanService(
         }
     }
 
+    /// <summary>
+    /// The contract's first ship: an idle miner at home, in the systems the plans do business in. A drone abroad mines there for
+    /// the mining plan (slice 6.40, D122).
+    /// </summary>
     private async Task<ShipModel?> TrySelectIdleMiningShipAsync(CancellationToken cancellationToken)
     {
         var allShips = await ships.GetAllAsync(cancellationToken);
@@ -548,9 +552,16 @@ public sealed class ContractPlanService(
         var activeAssignmentsByShip = activeAssignments
             .Where(a => !a.CompletedAt.HasValue)
             .ToDictionary(a => a.ShipSymbol, StringComparer.OrdinalIgnoreCase);
+        var home = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
 
         foreach (var ship in allShips.OrderBy(s => s.Symbol, StringComparer.OrdinalIgnoreCase))
         {
+            if (BusinessSystems.IsAbroad(home, ship.SystemSymbol))
+            {
+                logger.LogDebug("Contract plan ship selection: skipping ship {ShipSymbol}, which is abroad in {SystemSymbol}.", ship.Symbol, ship.SystemSymbol);
+                continue;
+            }
+
             if (activeAssignmentsByShip.TryGetValue(ship.Symbol, out var assignment))
             {
                 logger.LogDebug(
@@ -832,7 +843,8 @@ public sealed class ContractPlanService(
     /// <summary>
     /// Every free miner joins the active contract (D23), mining at the plan's asteroid and delivering to
     /// its destination. Several ships may bring more than the contract still needs; what is left over is
-    /// sold once the contract is fulfilled (the mining plan).
+    /// sold once the contract is fulfilled (the mining plan). Only those at home: a drone abroad mines there for the mining plan
+    /// (slice 6.40, D122).
     /// </summary>
     /// <remarks>
     /// An assignment lasts one round trip: the delivery closes it (D26), and the ship joins again here,
@@ -856,10 +868,12 @@ public sealed class ContractPlanService(
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var now = TimeProvider.System.GetUtcNow();
+        var home = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
 
         foreach (var ship in await ships.GetAllAsync(cancellationToken))
         {
             if (!board.MinesForContract(ship)
+                || BusinessSystems.IsAbroad(home, ship.SystemSymbol)
                 || !FleetRoles.IsFree(ship, await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken), withAssignment.Contains(ship.Symbol)))
             {
                 continue;

@@ -254,6 +254,37 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task AMinerAbroad_WaitsForEverythingElse_TheTurnsAndTheFarProbesToo()
+    {
+        // Slice 6.40 (D122), asked on 2026-10-09: "outside of the home area, mining is low priority, and should never be in the
+        // way of trading". It stands last, after the cargo ships that take turns with the drones and the far probes.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND"))).Should().BeFalse("a cargo ship comes first");
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+        _needs.Report(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND"))).Should().BeFalse("the far probes keep the prices abroad fresh");
+
+        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AMinerAbroad_HoldsBackNoCargoShip_ThoughTheDronesHaveTheTurn()
+    {
+        // Slice 6.40 (D122): the miner abroad takes no turn with the cargo ships; the drones' turn passes when only it waits.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Mining, Need(PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.FarProbes, "SHIP_PROBE"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.Alternating, "SHIP_LIGHT_HAULER"))).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task TheFirstExplorer_ComesAfterTheGatesLoads_AndBeforeTheProbes()
     {
         // Slice 6.30, D98: "Start with one before probes", after the jump gate's loads (D64).
@@ -388,7 +419,7 @@ public sealed class PurchaseOrderTests
         // The SpaceTraders dashboard shows the number as the position (spacetraders_purchase_need_credits{position}), and you
         // name the tiers by it: "Explorers (order 10) ... in front of probes (order 8)". Since slice 6.33 (D113) every explorer
         // is 7. Slice 6.34 (D116) put the cargo ship on the clock at 8, before the probes, which moved to 9, the drones and cargo
-        // ships that take turns to 10 and the far probes to 11.
+        // ships that take turns to 10 and the far probes to 11. Slice 6.40 (D122) put the miners abroad last, at 12.
         Enum.GetValues<PurchaseTier>().Should().Equal(
             PurchaseTier.None,
             PurchaseTier.Contract,
@@ -401,8 +432,9 @@ public sealed class PurchaseOrderTests
             PurchaseTier.TimedCargoShip,
             PurchaseTier.Probes,
             PurchaseTier.Alternating,
-            PurchaseTier.FarProbes);
-        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 12));
+            PurchaseTier.FarProbes,
+            PurchaseTier.MiningAbroad);
+        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 13));
     }
 
     [Fact]

@@ -66,6 +66,7 @@ public sealed class SurveyPlanService(
     IShipyardRepository shipyards,
     IShipPurchaseService shipPurchases,
     IPurchaseOrder purchaseOrder,
+    IAgentRepository agents,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
     /// <summary>The ship the plan buys to survey (D47): a drone frame with a surveyor, and no hold.</summary>
@@ -294,8 +295,8 @@ public sealed class SurveyPlanService(
     }
 
     /// <summary>
-    /// A surveyor for the first system, by symbol, with a mining drone that needs one (<see cref="FleetRoles.NeedsSurveyShips"/>:
-    /// not an ore hound, which surveys for itself, D120),
+    /// A surveyor for the first system at home, by symbol, with a mining drone that needs one (<see cref="FleetRoles.NeedsSurveyShips"/>:
+    /// not an ore hound, which surveys for itself, D120); a drone abroad mines without the survey ships (slice 6.40, D122),
     /// at the system's shipyard that sells a <c>SHIP_SURVEYOR</c> for the least; none when no shipyard there is known to sell
     /// one. A system with no ship that can only survey needs its designated surveyor (D47,
     /// <see cref="PurchaseTier.Surveyor"/>); one with fewer of them than areas with mining drones, as they fly between them,
@@ -306,13 +307,15 @@ public sealed class SurveyPlanService(
         IReadOnlyDictionary<string, (TradeMarketMap Map, IReadOnlyList<string> Waypoints)> drones,
         CancellationToken cancellationToken)
     {
-        // Slice 6.39 (D120): the survey ships serve the miners that don't survey for themselves; an ore hound does.
+        // Slice 6.39 (D120): the survey ships serve the miners that don't survey for themselves; an ore hound does. Slice 6.40
+        // (D122): only at home.
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        var home = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
         foreach (var systemSymbol in fleet
             .Where(FleetRoles.NeedsSurveyShips)
             .Select(ship => ship.SystemSymbol)
             .OfType<string>()
-            .Where(system => system.Length > 0)
+            .Where(system => system.Length > 0 && !BusinessSystems.IsAbroad(home, system))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.Ordinal))
         {

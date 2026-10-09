@@ -135,6 +135,22 @@ public sealed class TradeContextReaderTests
         map.ConstructionSystemSymbol.Should().Be(System);
     }
 
+    [Fact]
+    public async Task TheFreshMarkets_AreThoseSeenWithPricesWithinTheAge_InEverySystem()
+    {
+        // Slice 6.40 (D122): mining abroad reads only these, as a trade route does (D96). Trade.MaxPriceAgeMinutes unset: 30.
+        var now = DateTimeOffset.UtcNow;
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketFreshnessRecord("X1-FJ91-A1", System, now.AddMinutes(-5)),
+            new MarketFreshnessRecord("X1-HN44-A1", "X1-HN44", now.AddMinutes(-29)),
+            new MarketFreshnessRecord("X1-HN44-A2", "X1-HN44", now.AddMinutes(-31)),
+            new MarketFreshnessRecord("X1-NF46-A1", "X1-NF46", now.AddMinutes(-1), HasPrices: false),
+        ]);
+
+        (await Reader().FreshMarketsAsync(CancellationToken.None)).Should().BeEquivalentTo(["X1-FJ91-A1", "X1-HN44-A1"]);
+    }
+
     private static KnownSystem Known(string system, string gate, DateTimeOffset now, params string[] connections) => new()
     {
         SystemSymbol = system,

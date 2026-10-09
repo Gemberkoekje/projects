@@ -10,6 +10,7 @@ using SpaceTraders.Application.Roles;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Tests.Roles;
 using SpaceTraders.Application.Tests.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
 using static SpaceTraders.Application.Tests.Mining.MiningFixture;
@@ -28,6 +29,9 @@ namespace SpaceTraders.Application.Tests.Automation;
 /// </summary>
 public sealed class MiningAutomationServiceTests
 {
+    /// <summary>Home, in the tests of mining abroad (slice 6.40, D122).</summary>
+    private const string Kr90 = "X1-KR90";
+
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
@@ -592,7 +596,6 @@ public sealed class MiningAutomationServiceTests
     {
         // Asked on 2026-10-04: while the command ship explores, business stays home ("For now: come home … start simple").
         // X1-KR90 has a shipyard that sells drones, and ores in short supply; the command ship, exploring, is docked there.
-        const string Kr90 = "X1-KR90";
         Fleet(CommandShip(waypoint: H52, status: "DOCKED") with { SystemSymbol = Kr90 });
         _assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns(
             [new ShipAssignmentDto("SHIP-1", "Explore", H52, null, null, null, 0, DateTimeOffset.UtcNow, null)]);
@@ -620,7 +623,6 @@ public sealed class MiningAutomationServiceTests
     {
         // Slice 6.28 (D60): business stays home. A probe now watches the markets of systems abroad; X1-KR90 sells drones, and
         // its ores are short. Before the change a probe there made X1-KR90 a system the plans did business in.
-        const string Kr90 = "X1-KR90";
         const string Yard = "X1-KR90-YARD";
         Fleet(new ShipModel("SHIP-9", Kr90, Yard, "DOCKED", "CRUISE", 0, 0, ShipType: "SHIP_PROBE"));
         _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(Context());
@@ -885,6 +887,126 @@ public sealed class MiningAutomationServiceTests
         await _plans.Received(1).UpsertAsync(PlanTypes.MiningAutomation, Arg.Any<MiningAutomationPlanState>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Abroad_AMinerIsBoughtLast_ForEachOreItsMarketsAreShortOf()
+    {
+        // Slice 6.40 (D122), asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the
+        // home area", with "One per short ore, no cap". X1-DC53, abroad here, is short of five ores (copper, gold, iron, quartz
+        // and silicon): with four miners there, a fifth, last in the order, though Mining.MaxDrones is reached.
+        Abroad();
+        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(2);
+        HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-4", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-5", H51, "COPPER_ORE");
+        HeldBy("SHIP-6", B7, "GOLD_ORE", B14);
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6", B7));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.MiningAbroad, "SHIP_MINING_DRONE", H52, 48_328));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Abroad_OnceEachShortOreHasAMiner_NoMoreAreBought()
+    {
+        Abroad();
+        HeldBy("SHIP-3", F49, "SILICON_CRYSTALS");
+        HeldBy("SHIP-4", F49, "QUARTZ_SAND");
+        HeldBy("SHIP-5", H51, "COPPER_ORE");
+        HeldBy("SHIP-6", B7, "GOLD_ORE", B14);
+        HeldBy("SHIP-7", H51, "IRON_ORE");
+        Fleet(Drone("SHIP-3"), Drone("SHIP-4"), Drone("SHIP-5"), Drone("SHIP-6", B7), Drone("SHIP-7"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Abroad_AnOreHoundIsBought_WhereOneIsSold_AndNothingWhereEveryMinerIsScarce()
+    {
+        // D120, D121: as at home.
+        Abroad();
+        ShipyardSells(
+            new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 },
+            new ShipyardShipDto { Type = "SHIP_ORE_HOUND", PurchasePrice = 210_000, FuelCapacity = 400, CargoCapacity = 30, Mounts = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] });
+        Fleet();
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND", H52, 210_000));
+
+        ShipyardSells(new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15, Supply = "SCARCE" });
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
+    public async Task Abroad_AMinerLeavesAPairToATradeTripOnItsWayToSellThere()
+    {
+        // Slice 6.40 (D122): "outside of the home area, mining is low priority, and should never be in the way of trading". F49's
+        // silicon, the scarcest and best paid, is left to SHIP-9's trade; the drone mines F49's quartz, SCARCE too.
+        Abroad();
+        _activeGoals["SHIP-9"] = new TradeBetweenMarketsGoal { TradeSymbol = "SILICON_CRYSTALS", BuyWaypointSymbol = H51, SellWaypointSymbol = F49 };
+        Fleet(Drone(), Hauler("SHIP-9"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("QUARTZ_SAND", F49));
+        _state!.Opportunities.Should().NotContain(opportunity => opportunity.OpportunityKey == MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS"));
+    }
+
+    [Fact]
+    public async Task AtHome_AMinerStillServesAMarketATradeTripSellsAt()
+    {
+        // D122 is for abroad: at home miners and traders share the markets, as before.
+        _activeGoals["SHIP-9"] = new TradeBetweenMarketsGoal { TradeSymbol = "SILICON_CRYSTALS", BuyWaypointSymbol = H51, SellWaypointSymbol = F49 };
+        Fleet(Drone(), Hauler("SHIP-9"));
+
+        await RunAsync();
+
+        var trip = _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>().Subject;
+        (trip.TradeSymbol, trip.SellWaypointSymbol).Should().Be(("SILICON_CRYSTALS", F49));
+    }
+
+    [Fact]
+    public async Task Abroad_ADroneTakesNoPlaceAtAFarAsteroid()
+    {
+        // D122: abroad without collection points (D83). At home this drone takes a place at B13 for B7's iron
+        // (ADroneWithNothingUncoveredToServe_TakesAPlaceAtTheFarAsteroid_DriftingToItsMarketFirst); abroad it shares a pair
+        // instead (D77), and no shuttle is bought.
+        Abroad();
+        CollectingAtB13();
+        Fleet([.. EveryPairHeld(), Drone("SHIP-3")]);
+
+        await RunAsync();
+
+        _activeGoals["SHIP-3"].Should().BeOfType<MineAndSellGoal>();
+        _state!.CollectionPoints.Should().BeEmpty();
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+    }
+
+    [Fact]
+    public async Task TheMinersAbroad_LeaveHomesDronesAndTheirCapAlone()
+    {
+        // D122: Mining.MaxDrones counts home's miners; a free drone abroad has nothing to do with home's openings. At home every
+        // scarce ore has its drone and H51's iron waits (SixDronesOneTrading): the next drone is bought for it, in turn (D43).
+        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(8);
+        _contexts.ReadAsync(Kr90, Arg.Any<CancellationToken>()).Returns(new MiningContext(new TradeMarketMap([], [], new Dictionary<string, IReadOnlyList<string>>()), [], 129_357, Now));
+        SixDronesOneTrading();
+        var home = await _ships.GetAllAsync();
+        Fleet([.. home, Drone("SHIP-10") with { SystemSymbol = Kr90, WaypointSymbol = $"{Kr90}-A1" }, Drone("SHIP-11") with { SystemSymbol = Kr90, WaypointSymbol = $"{Kr90}-A1" }]);
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Should().Be(new PurchaseNeed(PurchaseTier.Alternating, "SHIP_MINING_DRONE", H52, 48_328));
+    }
+
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 
     /// <summary>
@@ -1113,6 +1235,26 @@ public sealed class MiningAutomationServiceTests
     /// <summary>The market, with all of every good it wants but fuel (D77).</summary>
     private static MarketSnapshot OresAbundant(MarketSnapshot market)
         => market with { TradeGoods = [.. market.TradeGoods.Select(good => good.Symbol == "FUEL" ? good : good with { Supply = "ABUNDANT" })] };
+
+    /// <summary>
+    /// Home is elsewhere, X1-KR90 (slice 6.40, D122): the test's system is abroad, its markets kept fresh by the probes.
+    /// </summary>
+    private void Abroad()
+    {
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{Kr90}-A1", 1_000_000, "COBALT", 3));
+        _contexts.SystemsAbroadAsync(Arg.Any<CancellationToken>()).Returns([SystemSymbol]);
+    }
+
+    /// <summary>H52 sells these ships.</summary>
+    private void ShipyardSells(params ShipyardShipDto[] ships)
+        => _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto { WaypointSymbol = H52, SystemSymbol = SystemSymbol, ShipTypes = [.. ships.Select(ship => ship.Type)], Ships = ships },
+        ]);
+
+    /// <summary>A light hauler: a hold and a tank, nothing to mine with.</summary>
+    private static ShipModel Hauler(string symbol)
+        => new(symbol, SystemSymbol, H51, "DOCKED", "CRUISE", 400, 400, CargoCapacity: 40, ShipType: "SHIP_LIGHT_HAULER");
 
     private void HeldBy(string ship, string market, string ore, string asteroid = XB5C)
         => _activeGoals[ship] = new MineAndSellGoal { TradeSymbol = ore, SourceWaypointSymbol = asteroid, SellWaypointSymbol = market };

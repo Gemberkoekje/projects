@@ -27,6 +27,23 @@ public sealed class AbroadRoleTests
             .Should().BeEmpty("with the trading plan off, a ship abroad has no role");
     }
 
+    [Fact]
+    public void AMiningDroneAbroad_AlsoMines_WithTheMiningPlan()
+    {
+        // Slice 6.40 (D122), asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the home
+        // area. However, outside of the home area, mining is low priority, and should never be in the way of trading." A drone
+        // or an ore hound abroad mines in its system; the command ship, which could trade, still only trades there.
+        var settings = Settings() with { BusinessSystems = new HashSet<string> { SystemSymbol } };
+        var droneAbroad = Drone() with { SystemSymbol = "X1-CD", WaypointSymbol = "X1-CD-A1" };
+        var houndAbroad = droneAbroad with { ShipType = "SHIP_ORE_HOUND", MountSymbols = ["MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_I"] };
+
+        settings.Available(droneAbroad, contractWantsOre: false).Should().Equal(FleetRole.Mine, FleetRole.Trade);
+        settings.Available(houndAbroad, contractWantsOre: false).Should().Equal(FleetRole.Mine, FleetRole.Trade);
+        settings.Available(CommandShip() with { SystemSymbol = "X1-CD" }, contractWantsOre: true).Should().Equal(FleetRole.Trade);
+        var miningOff = Settings(AutomationPlan.Trading) with { BusinessSystems = new HashSet<string> { SystemSymbol } };
+        miningOff.Available(droneAbroad, contractWantsOre: true).Should().Equal([FleetRole.Trade], "the contract works at home");
+    }
+
     private static RoleSettings Settings(params AutomationPlan[] on)
         => new(
             on.Length == 0 ? new HashSet<AutomationPlan> { AutomationPlan.Survey, AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Trading } : new HashSet<AutomationPlan>(on),

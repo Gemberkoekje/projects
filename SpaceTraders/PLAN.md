@@ -285,7 +285,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.37 No ship bought at SCARCE (D121), being built (below)
 - 6.38 Interceptors instead of probes (D119), being built (below)
 - 6.39 Ore hounds instead of mining drones, surveying for themselves (D120), being built (below)
-- 6.40 Mining abroad, last in the order (D122), being built
+- 6.40 Mining abroad, last in the order (D122), being built (below)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done, and so are 6.32, asked the same day after them (D108–D111), and 6.33 and 6.34, asked on 2026-10-07 (D112–D116); the
@@ -388,7 +388,43 @@ asked on 2026-10-09, are being built:
       gathers first; the command ship doesn't survey for ore hounds alone), `PurchaseOrderTests` (it takes the drones' turn).
     - To understand this, start with `MinerShips` in `Mining/MinerShips.cs`, then `SurveyForItselfAsync` in
       `Commands/Ships/MineResourceVolumeCommand.cs` and `IsOreHound` in `Automation/FleetRoles.cs`.
-  - **6.40 Mining abroad** (D122): next.
+  - **6.40 Mining abroad** (D122): built.
+    - Found: the mining plan bought drones only at home (`BusinessSystems`, D60) but gave a trip to any free miner in its own
+      system; the role board let a ship abroad only trade; the contract plan took every free miner and the survey plan
+      bought a survey ship for every system with drones, wherever they were; `Mining.MaxDrones` counted every mining ship,
+      and a free miner anywhere stopped home's drone purchases in turn with the cargo ships.
+    - Done:
+      - **Where:** a system abroad is one outside the systems the plans do business in with a market whose prices are at most
+        `Trade.MaxPriceAgeMinutes` old (`IMiningContextReader.SystemsAbroadAsync`, `ITradeContextReader.FreshMarketsAsync`,
+        new). Its mining context marks the older markets stale (`TradeMarketMap.WithStaleMarkets`, new), and stale markets
+        are neither targets nor openings (`MiningPlanner.MiningTargets`, `LowSupplyOpportunities`); at home nothing changes.
+      - **The purchase** (`MiningAutomationService.AbroadNeedAsync`, `PurchaseTier.MiningAbroad`, new, 12): with nothing to
+        buy at home, for the first system abroad by symbol with fewer mining drones than ores a miner bought there could
+        serve a market short of (`MiningPlanner.ScarceOres`, each ore once), an ore hound where one is sold, else a mining
+        drone (D120, D121); one a pass, no cap; `Mining.MaxDrones` counts home's.
+      - **The trips:** abroad no collection points; a pair whose market a trade trip is on its way to sell the ore at is
+        left to the trade (`MiningContext.LeftToTrade`, new): no miner takes or shares it, it counts as no short ore, and it
+        is no opening. Only home's free miners hold back home's drones in turn with the cargo ships.
+      - **Home only:** the contract takes only miners at home (`ContractPlanService`); the survey ships are bought only for
+        home's drones (`SurveyPlanService`, which takes `IAgentRepository`).
+      - **The role board** (`RoleSettings.Available`): a mining drone or an ore hound abroad can mine too, with the mining
+        plan on; every other ship abroad still only trades.
+    - Readings in the build (yours to confirm or change): "the probes keep fresh" is any market seen with prices within
+      `Trade.MaxPriceAgeMinutes`, so a stale market abroad is left out, not the whole system; a short ore is one a miner bought
+      there could serve, at a market that makes something from it (D91), each counted once per system, not per area; the
+      systems abroad are taken by symbol, not by distance, as a miner bought there stays there; "in the way of trading" is
+      read as: last in the order, no ship that could trade is taken off trading, and no miner for a pair a trade trip is on
+      its way to sell at. A trade route planned later can still meet a market a miner has filled.
+    - Expect, once deployed: `MiningAbroad` rows on the purchase order table once nothing else waits; "was bought to mine
+      in X1-..., abroad" lines; `MiningStarted` lines from miners in other systems; no `SHIP_SURVEYOR` or light shuttle
+      bought abroad.
+    - Tests: `MiningAutomationServiceTests` (bought last, one per short ore, an ore hound where sold, none where SCARCE; a
+      pair left to a trade trip abroad but not at home; no collection point abroad; home's cap and free miners),
+      `PurchaseOrderTests` (last, after the turns and the far probes; holds back no cargo ship), `MiningPlannerTests`
+      (stale markets, pairs left to the trade), `MiningContextReaderTests` (new), `TradeContextReaderTests` (fresh
+      markets), `AbroadRoleTests`, `ContractMinersTests`, `ContractPlanServiceTests`, `SurveyPlanServiceTests`.
+    - To understand this, start with `AbroadNeedAsync` and `ReadContextAsync` in `Automation/MiningAutomationService.cs`,
+      then `MiningContextReader` in `Mining/MiningContext.cs`.
   - **2.19 Two runs on one chart** (D123): next, in gembernodes.
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's

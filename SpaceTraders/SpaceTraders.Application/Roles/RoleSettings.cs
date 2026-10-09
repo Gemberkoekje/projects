@@ -105,7 +105,8 @@ public sealed record RoleSettings
 
     /// <summary>
     /// The systems the plans do business in (<c>BusinessSystems</c>, D60): the headquarters'. A ship outside them can only trade
-    /// (slice 6.29, D96). Empty, any system, until the role board reads the agent.
+    /// (slice 6.29, D96), or mine when it is a mining drone (slice 6.40, D122). Empty, any system, until the role board reads the
+    /// agent.
     /// </summary>
     public IReadOnlySet<string> BusinessSystems { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -146,7 +147,9 @@ public sealed record RoleSettings
     /// The roles a ship could take whose plan is on (D38): surveying with the survey plan; mining with the mining plan,
     /// or while the contract wants ore (D40); siphoning with the siphon plan; trading with the trading plan; constructing
     /// with the construction plan, while the jump gate of the ship's system needs materials (slice 6.6). A ship abroad, or on a
-    /// trade trip that takes it abroad, can only trade (PLAN.md slice 6.29, D96): every other plan works at home (D60).
+    /// trade trip that takes it abroad, can only trade (PLAN.md slice 6.29, D96): every other plan works at home (D60). But a
+    /// mining drone or ore hound abroad also mines, with the mining plan, in its system (slice 6.40, D122): asked on 2026-10-09,
+    /// mining abroad "should never be in the way of trading", so no ship that could trade instead is given it.
     /// </summary>
     /// <param name="ship">The ship.</param>
     /// <param name="contractWantsOre">Whether the contract plan's contract still wants ore.</param>
@@ -163,6 +166,7 @@ public sealed record RoleSettings
         return [.. FleetRoles.PotentialRoles(ship).Where(role => role switch
         {
             FleetRole.Trade => Switches.Contains(AutomationPlan.Trading),
+            FleetRole.Mine when away => Switches.Contains(AutomationPlan.Mining) && FleetRoles.IsMiningDrone(ship),
             _ when away => false,
             FleetRole.Survey => Switches.Contains(AutomationPlan.Survey),
             FleetRole.Mine => Switches.Contains(AutomationPlan.Mining) || contractWantsOre,

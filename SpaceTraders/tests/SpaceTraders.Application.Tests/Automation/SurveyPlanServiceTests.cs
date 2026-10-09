@@ -39,6 +39,7 @@ public sealed class SurveyPlanServiceTests
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly OpenPurchaseOrder _order = new();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -122,6 +123,20 @@ public sealed class SurveyPlanServiceTests
         _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
         _activeGoals.Should().NotContainKey("SHIP-7");
+    }
+
+    [Fact]
+    public async Task ForMiningDronesAbroad_NoSurveyShipIsBought()
+    {
+        // Slice 6.40 (D122): abroad the miners mine without the survey ships. Home is X1-KR90 here, so X1-DC53 is abroad.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-KR90-A1", 1_000_000, "COBALT", 3));
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Trade), ("SHIP-3", FleetRole.Mine));
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Theory]
@@ -685,6 +700,7 @@ public sealed class SurveyPlanServiceTests
                 _shipyards,
                 _purchases,
                 _order,
+                _agents,
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }

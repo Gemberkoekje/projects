@@ -62,6 +62,12 @@ public interface IMiningAutomationService
 ///   ABUNDANT, or is out of its reach, it follows the rules above. Asked on 2026-10-05: "extra miners to be bought for the
 ///   ores that supply the build gate materials once every half hour (and those miners being dedicated to those ores) until
 ///   each of the smelters have at least HIGH saturation."</item>
+///   <item>abroad (slice 6.40, D122), last in the order ships are bought in (<see cref="PurchaseTier.MiningAbroad"/>), a miner for
+///   each ore a market of a system abroad has SCARCE or LIMITED, with no cap; a miner there mines in its system by the rules
+///   above, only for the markets the probes keep fresh, without collection points, and not for a market a trade trip is on its
+///   way to sell the ore at. Asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in the
+///   home area. However, outside of the home area, mining is low priority, and should never be in the way of trading, which is
+///   generally more lucrative."</item>
 /// </list>
 /// Its state lists the low-supply openings, with the miners that could take one (<c>ShipLeftIdle</c>
 /// reads them, D13), and is written only when it changes.
@@ -116,10 +122,18 @@ public sealed class MiningAutomationService(
             .Select(assignment => assignment.ShipSymbol)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Business stays home (D60, slice 6.28): drones are bought there only; the command ship works for no plan while it
-        // explores (asked on 2026-10-04).
+        // Business stays home (D60, slice 6.28): drones are bought there, and abroad last of all (slice 6.40, D122); the command
+        // ship works for no plan while it explores (asked on 2026-10-04).
         var explorers = BusinessSystems.Explorers(active);
         var systems = BusinessSystems.Of(await agents.GetAsync(cancellationToken));
+
+        // Slice 6.40 (D122): abroad, a pair whose market a trade trip is on its way to sell the ore at is left to the trade.
+        var tradeSells = fleet
+            .Select(ship => read.GoalOf(ship.Symbol))
+            .OfType<TradeBetweenMarketsGoal>()
+            .Where(trade => trade.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            .Select(trade => MiningPlanner.OpportunityKey(trade.SellWaypointSymbol, trade.TradeSymbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // D83: the shuttles designated for each collection point, by point, as the last pass left them.
         var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken);
@@ -192,15 +206,17 @@ public sealed class MiningAutomationService(
             .ToDictionary(group => group.Key, group => group.Select(entry => (entry.Ship.Symbol, entry.Job.TradeSymbol)).ToList(), StringComparer.OrdinalIgnoreCase);
         var pointsBySystem = new Dictionary<string, IReadOnlyList<CollectionPoint>>(StringComparer.OrdinalIgnoreCase);
 
-        var freeAtStart = free.Count > 0;
+        // A free miner abroad takes nothing at home: only home's say whether a drone there would have an opening.
+        var freeAtStart = free.Any(ship => !BusinessSystems.IsAbroad(systems, ship.SystemSymbol));
         var gaveTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var opportunities = new List<MiningAutomationOpportunityState>();
         foreach (var system in fleet
             .Where(ship => board.IsMiner(ship) && !explorers.Contains(ship.Symbol) && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
             .GroupBy(ship => ship.SystemSymbol!, StringComparer.OrdinalIgnoreCase))
         {
-            var context = await miningContexts.ReadAsync(system.Key, cancellationToken);
-            var points = CollectionPointsIn(context, system.Key, fleet, shipyardList);
+            // Slice 6.40 (D122): abroad no collection points, and the pairs left to the trade.
+            var context = await ReadContextAsync(system.Key, systems, tradeSells, cancellationToken);
+            IReadOnlyList<CollectionPoint> points = BusinessSystems.IsAbroad(systems, system.Key) ? [] : CollectionPointsIn(context, system.Key, fleet, shipyardList);
             pointsBySystem[system.Key] = points;
             var dedicated = DedicatedIn(context, gateMiners);
             var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, system.Key, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -225,7 +241,7 @@ public sealed class MiningAutomationService(
                 }
             }
 
-            foreach (var opportunity in MiningPlanner.LowSupplyOpportunities(context.Map))
+            foreach (var opportunity in MiningPlanner.LowSupplyOpportunities(context.Map).Where(opportunity => !context.LeftToTrade.Contains(opportunity.Key)))
             {
                 var held = heldBy.TryGetValue(opportunity.Key, out var holder);
                 var able = candidates
@@ -255,7 +271,7 @@ public sealed class MiningAutomationService(
             fleet.Where(board.IsMiner).Select(ship => ship.Symbol),
             free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
-        await BuyAsync(fleet, systems, board, heldKeys, covered, freeAtStart, new Collecting(pointsBySystem, places, designated, parked, rounds), gateMiners, shipyardList, cancellationToken);
+        await BuyAsync(fleet, systems, board, heldKeys, covered, freeAtStart, new Collecting(pointsBySystem, places, designated, parked, rounds), gateMiners, shipyardList, tradeSells, cancellationToken);
         await SaveStateAsync(existing, opportunities, CollectionPointStates(pointsBySystem, places, designated), gateMiners, cancellationToken);
     }
 
@@ -270,6 +286,16 @@ public sealed class MiningAutomationService(
         return gateMiners
             .Where(miner => ores.Contains(miner.TradeSymbol))
             .ToDictionary(miner => miner.ShipSymbol, miner => miner.TradeSymbol, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The mining context of a system (<see cref="IMiningContextReader"/>); abroad (slice 6.40, D122) with the pairs a trade trip
+    /// is on its way to sell its ore at left to the trade (<see cref="MiningContext.LeftToTrade"/>).
+    /// </summary>
+    private async Task<MiningContext> ReadContextAsync(string systemSymbol, IReadOnlyList<string> systems, IReadOnlySet<string> tradeSells, CancellationToken cancellationToken)
+    {
+        var context = await miningContexts.ReadAsync(systemSymbol, cancellationToken);
+        return BusinessSystems.IsAbroad(systems, systemSymbol) ? context with { LeftToTrade = tradeSells } : context;
     }
 
     /// <summary>
@@ -599,9 +625,10 @@ public sealed class MiningAutomationService(
         Collecting collecting,
         List<GateMinerState> gateMiners,
         IReadOnlyList<ShipyardWaypointDto> shipyardList,
+        IReadOnlySet<string> tradeSells,
         CancellationToken cancellationToken)
     {
-        var purchase = await NeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken);
+        var purchase = await NeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, tradeSells, cancellationToken);
         var need = purchase.Need;
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Mining, need, cancellationToken))
         {
@@ -637,6 +664,14 @@ public sealed class MiningAutomationService(
                 "Mining plan: ship {ShipSymbol} was bought for the jump gate's smelters, and mines only {TradeSymbol} for them while the gate needs a material made from it (D92).",
                 drone.Symbol,
                 purchase.GateOre);
+        }
+
+        if (purchase.AbroadSystem.Length > 0 && purchased.PurchasedShip is { } miner)
+        {
+            logger.LogInformation(
+                "Mining plan: ship {ShipSymbol} was bought to mine in {SystemSymbol}, abroad, for the ores its markets are short of (D122).",
+                miner.Symbol,
+                purchase.AbroadSystem);
         }
     }
 
@@ -695,7 +730,9 @@ public sealed class MiningAutomationService(
     ///   first;</item>
     ///   <item>otherwise, when every miner works, a drone whose first trip by the miners' own ranking (the trips under way
     ///   held) would serve a market short of its ore (<see cref="PurchaseTier.Alternating"/>, D22, D28), which, with the
-    ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>).</item>
+    ///   role board on, the board would have mine (<see cref="IRoleAdvisor"/>);</item>
+    ///   <item>with nothing to buy at home, a miner for a system abroad (<see cref="AbroadNeedAsync"/>, slice 6.40, D122), whether
+    ///   the contract mines or not: it takes no miner abroad.</item>
     /// </list>
     /// </summary>
     private async Task<Purchase> NeedAsync(
@@ -708,23 +745,75 @@ public sealed class MiningAutomationService(
         Collecting collecting,
         IReadOnlyList<GateMinerState> gateMiners,
         IReadOnlyList<ShipyardWaypointDto> shipyardList,
+        IReadOnlySet<string> tradeSells,
         CancellationToken cancellationToken)
     {
-        if (await ContractTakesMinersAsync(cancellationToken))
+        if (!await ContractTakesMinersAsync(cancellationToken))
         {
-            return Purchase.Nothing;
-        }
-
-        // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one.
-        foreach (var systemSymbol in systems)
-        {
-            if (ShuttleNeed(systemSymbol, collecting, shipyardList) is { Need.Tier: not PurchaseTier.None } shuttle)
+            // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one.
+            foreach (var systemSymbol in systems)
             {
-                return shuttle;
+                if (ShuttleNeed(systemSymbol, collecting, shipyardList) is { Need.Tier: not PurchaseTier.None } shuttle)
+                {
+                    return shuttle;
+                }
+            }
+
+            if (await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken) is { Need.Tier: not PurchaseTier.None } drone)
+            {
+                return drone;
             }
         }
 
-        return await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken);
+        return await AbroadNeedAsync(fleet, systems, tradeSells, shipyardList, cancellationToken);
+    }
+
+    /// <summary>
+    /// A miner for a system abroad (slice 6.40, D122), last in the order ships are bought in (<see cref="PurchaseTier.MiningAbroad"/>):
+    /// for the first system abroad, by symbol, whose markets the probes keep fresh (<see cref="IMiningContextReader.SystemsAbroadAsync"/>),
+    /// with fewer mining drones in it than ores a miner bought there could serve a market short of (<see cref="MiningPlanner.ScarceOres"/>,
+    /// each ore once: SCARCE or LIMITED at a market that makes something from it, D22, D91), the pairs a trade trip is on its way
+    /// to sell at left out (<see cref="MiningContext.LeftToTrade"/>). The miner is an ore hound where a shipyard of the system sells
+    /// one, else a mining drone (D120), never one the shipyard has SCARCE (D121); a system without such a shipyard gets none.
+    /// <c>Mining.MaxDrones</c> counts only home's: asked on 2026-10-09, "One per short ore, no cap".
+    /// </summary>
+    private async Task<Purchase> AbroadNeedAsync(
+        IReadOnlyList<ShipModel> fleet,
+        IReadOnlyList<string> systems,
+        IReadOnlySet<string> tradeSells,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList,
+        CancellationToken cancellationToken)
+    {
+        foreach (var systemSymbol in await miningContexts.SystemsAbroadAsync(cancellationToken))
+        {
+            if (MinerShips.Cheapest(InSystem(shipyardList, systemSymbol)) is not { } listing)
+            {
+                continue;
+            }
+
+            var (shipyard, forSale) = listing;
+            var context = await ReadContextAsync(systemSymbol, systems, tradeSells, cancellationToken);
+            var newMiner = MinerShips.AsBought(shipyard, forSale);
+            var shortOres = MiningPlanner.ScarceOres(context, newMiner)
+                .Select(area => area.Good)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            var miners = fleet.Count(ship => FleetRoles.IsMiningDrone(ship)
+                && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
+            if (miners < shortOres)
+            {
+                logger.LogDebug(
+                    "Mining plan: {SystemSymbol}, abroad, has {Miners} miner(s) for {ShortOres} ore(s) its markets are short of; a {ShipType} at {Shipyard} is next (D122).",
+                    systemSymbol,
+                    miners,
+                    shortOres,
+                    newMiner.ShipType,
+                    shipyard.WaypointSymbol);
+                return new Purchase(new PurchaseNeed(PurchaseTier.MiningAbroad, newMiner.ShipType, shipyard.WaypointSymbol, forSale.PurchasePrice), AbroadSystem: systemSymbol);
+            }
+        }
+
+        return Purchase.Nothing;
     }
 
     private async Task<Purchase> DroneNeedAsync(
@@ -745,7 +834,9 @@ public sealed class MiningAutomationService(
             maxDrones = DefaultMaxMiningDrones;
         }
 
-        var drones = fleet.Count(ship => ship.IsMiningCapable);
+        // Slice 6.40 (D122): the cap is home's; the miners abroad have none.
+        var drones = fleet.Count(ship => ship.IsMiningCapable
+            && !(FleetRoles.IsMiningDrone(ship) && BusinessSystems.IsAbroad(systems, ship.SystemSymbol)));
         if (drones >= maxDrones)
         {
             logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
@@ -908,9 +999,10 @@ public sealed class MiningAutomationService(
 
     /// <summary>
     /// What the plan would buy this pass: the need it tells the order ships are bought in, the key of the collection point a
-    /// shuttle is for (D83), and the ore a drone for the jump gate's smelters is for (D92); each empty when it isn't one.
+    /// shuttle is for (D83), the ore a drone for the jump gate's smelters is for (D92), and the system abroad a miner is for
+    /// (slice 6.40, D122); each empty when it isn't one.
     /// </summary>
-    private sealed record Purchase(PurchaseNeed Need, string ShuttlePoint = "", string GateOre = "")
+    private sealed record Purchase(PurchaseNeed Need, string ShuttlePoint = "", string GateOre = "", string AbroadSystem = "")
     {
         /// <summary>Nothing to buy.</summary>
         public static readonly Purchase Nothing = new(PurchaseNeed.None);

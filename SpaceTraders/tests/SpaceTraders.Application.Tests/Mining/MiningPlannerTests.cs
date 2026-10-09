@@ -335,6 +335,31 @@ public sealed class MiningPlannerTests
     }
 
     [Fact]
+    public void AMarketWhosePricesAreTooOld_IsNoTarget_NorAnOpening()
+    {
+        // Slice 6.40 (D122): abroad only the markets the probes keep fresh count, as for a trade route (D96). F49 was last seen
+        // too long ago: its silicon and quartz are neither mined for nor counted as short.
+        var context = new MiningContext(Map().WithStaleMarkets(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { F49 }), [], 129_357, Now);
+
+        MiningPlanner.MiningTargets(context, Drone(), new HashSet<string>()).Should().NotContain(target => target.SellWaypointSymbol == F49);
+        MiningPlanner.ScarceOres(context, Drone()).Select(area => area.Good).Should().NotContain(["QUARTZ_SAND", "SILICON_CRYSTALS"]);
+        MiningPlanner.LowSupplyOpportunities(context.Map).Should().NotContain(opening => opening.SellWaypointSymbol == F49);
+        MiningPlanner.MiningTargets(Context(), Drone(), new HashSet<string>()).Should().Contain(target => target.SellWaypointSymbol == F49, "at home every market counts");
+    }
+
+    [Fact]
+    public void APairLeftToTheTrade_IsNoTarget_ButTheMarketsOtherOresAre()
+    {
+        // Slice 6.40 (D122): abroad a trade trip on its way to sell F49 silicon keeps the miners off that pair, shared or not.
+        var context = Context() with { LeftToTrade = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { MiningPlanner.OpportunityKey(F49, "SILICON_CRYSTALS") } };
+
+        MiningPlanner.MiningTargets(context, Drone(), new HashSet<string>())
+            .Where(target => target.SellWaypointSymbol == F49).Select(target => target.Ore).Distinct().Should().Equal("QUARTZ_SAND");
+        MiningPlanner.SharedTargets(context, Drone(), new Dictionary<string, int>()).Should().NotContain(target => target.Ore == "SILICON_CRYSTALS");
+        MiningPlanner.ScarceOres(context, Drone()).Select(area => area.Good).Should().NotContain("SILICON_CRYSTALS");
+    }
+
+    [Fact]
     public void TheLowSupplyOpenings_AreEveryMarketWithAnOreInLowSupply_WithTheAsteroidNearestIt()
     {
         var openings = MiningPlanner.LowSupplyOpportunities(Map());

@@ -30,6 +30,7 @@ public sealed class ContractMinersTests
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IPlanRepository _planStates = Substitute.For<IPlanRepository>();
+    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly LogRecorder _log = new();
     private readonly List<ShipAssignmentDto> _open = [];
 
@@ -109,6 +110,18 @@ public sealed class ContractMinersTests
         await RunAsync();
 
         _open.Select(a => a.ShipSymbol).Should().BeEquivalentTo("SHIP-3", "SHIP-1", "SHIP-4");
+    }
+
+    [Fact]
+    public async Task AFreeDroneAbroad_DoesntJoin()
+    {
+        // Slice 6.40 (D122): a drone abroad mines there, for the mining plan; the contract works at home.
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, $"{SystemSymbol}-A1", 1_000_000, "COBALT", 3));
+        Fleet(Drone("SHIP-3", XB5C, "IN_ORBIT"), Drone("SHIP-4") with { SystemSymbol = "X1-KR90", WaypointSymbol = "X1-KR90-A1" });
+
+        await RunAsync();
+
+        _open.Select(a => a.ShipSymbol).Should().Equal("SHIP-3");
     }
 
     [Fact]
@@ -246,7 +259,7 @@ public sealed class ContractMinersTests
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IShipPurchaseService>(),
-            Substitute.For<IAgentRepository>(),
+            _agents,
             Substitute.For<IMessageBus>(),
             _goals,
             _settings,
