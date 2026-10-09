@@ -21,19 +21,16 @@
 - **Claude: mechanic.** Fixes things that don't work the way they are intended to, and nothing
   else. See "Claude's role" in `CLAUDE.md`.
 
-## Where things stand (2026-10-07)
+## Where things stand (2026-10-09)
 
-- **Running:** projects main `07cf58f3` (projects#199: slice 6.34, a cargo ship every half hour, before the probes),
-  deployed by gembernodes#91 with the dashboard's description of the slice (merged 2026-10-07 11:02Z, pod up 11:04Z);
-  gembernodes#88 raised the API's CPU and memory limits (restart at 2026-10-06 15:37Z). The agent is SPECTER of the reset
-  of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on (slice 2.12). Its jump gate, X1-FJ91-I64, was
-  complete at 2026-10-06 03:17Z. Read from the bot at 2026-10-07 13:30Z: 57.0M credits, the credit reserve 9.4M, 5
-  explorers exploring, 464 probes, `Trade.MaxHaulDistance` 9999 (since about 04:35Z).
-- **Merged, not yet deployed:** B74–B77 (below; projects#200–#203, main `05a78d74`, 2026-10-07 14:25Z), and slice 6.35,
-  a separate ring width (D117; projects#204, main `0fd5a829`, 14:37Z).
-- **In review:** slice 6.36, a purchase that waits for one of our ships lets the ones behind it through (D118), on branch
-  `claude/spacetraders-waiting-purchase-lets-others-through`.
-- **Done:** phases 0–5, and phase 6's slices 6.1–6.35, listed under [Phases](#phases).
+- **Running:** projects main `8e4e5165` (projects#206: B78, the explorers no longer wait behind the gates due a look),
+  deployed by gembernodes#93 (merged 2026-10-09 19:38Z). gembernodes#92 deployed B74–B77 and slices 6.35 and 6.36 before it
+  (main `f7d8ba94`, merged 2026-10-07 14:55Z); gembernodes#88 raised the API's CPU and memory limits (restart at 2026-10-06
+  15:37Z). The agent is SPECTER of the reset of 2026-10-04 13:00Z, home system X1-FJ91 (28 markets), with every plan on
+  (slice 2.12). Its jump gate, X1-FJ91-I64, was complete at 2026-10-06 03:17Z. Last read from the bot at 2026-10-07 13:30Z:
+  57.0M credits, the credit reserve 9.4M, 5 explorers exploring, 464 probes, `Trade.MaxHaulDistance` 9999 (since about
+  04:35Z). The next reset is on 2026-10-11 at 13:00Z (weekly, by the API's status).
+- **Done:** phases 0–5, and phase 6's slices 6.1–6.36, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period began with the reset of 2026-10-04 13:00Z, every plan on since 18:09Z, and ends at the next reset. Phase 4's
@@ -55,7 +52,7 @@
 
 ## Known issues
 
-The open bugs. The fixed ones, B1–B73 but B17 and B24, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
+The open bugs. The fixed ones, B1–B78 but B17 and B24, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
 fixes: look there before giving a symptom a new number. Each fix starts with a test that reproduces the misbehaviour.
 
 ### Bugs: behaviour that contradicts the code's own intent
@@ -64,11 +61,6 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 |---|---|---|---|
 | B17 | **Some ships stay "in transit" after arriving.**<br>• The arrival handler ignores a wake-up whose goal id doesn't match the ship's active goal, and the mining and contract commands navigate without a goal id.<br>• Executors reload the ship with `FindAsync`, which doesn't apply arrival dead-reckoning. Only `GetAllAsync` does, in memory.<br>• The contract commands dead-reckon for themselves, but a mining drone keeps seeing "in transit" after its first leg. | `ShipArrivedEventHandler.cs:26-34`, `ShipRepository.cs` (`FindAsync` vs `GetAllAsync`), `MineResourceVolumeCommand.cs:67-100` | 6.4 (done for the mining and survey trips, which navigate with their goal; the contract commands still dead-reckon for themselves) |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
-| B74 | **`ShipLeftIdle` flags every probe parked at a shipyard** (found 2026-10-07).<br>• Since slice 6.32 (D110, "Stays parked") a system with fewer probes than markets parks a probe at each shipyard, so a purchase there needs no probe called; the plan gives it no due market. The rule still read every idle probe in a system with a due market as one the plan could send.<br>• At 13:30Z all 52 open `ShipLeftIdle` anomalies were probes holding a shipyard market in the probe plan's state (48 shipyards, 4 that sell SHIP_EXPLORER), each "while the ProbeDeployment plan has work it could do: N markets of X1-… that no probe or ship watches are due"; 111 such anomalies were raised in the 12 hours before. | `Health/ShipLeftIdleRule.cs`; `ShipLeftIdleRuleTests.AProbeParkedAtAShipyard_IsNotIdleByMistake_ButOneThatRoamsIs` (failed before the fix) | 6.32; fixed, merged as projects#200 (main `d4e12f03`), not deployed yet |
-| B75 | **Every scan for systems fails: the API scans only from orbit** (found 2026-10-07).<br>• An explorer with nothing left within its ways scans from where it is (D105). It comes back to the plan docked, after a trade (D102), and the plan scanned without putting it into orbit: `400 Ship action failed. Ship is not currently in orbit at X1-MG87-EA1C`, logged as "couldn't scan for the systems around X1-MG87; trying again in a few minutes".<br>• Since 2026-10-06 22:55Z every scan failed, 38 in the 24 hours to 2026-10-07 13:30Z (`spacetraders_api_requests_total{endpoint="my/ships/{shipSymbol}/scan/systems",status="400"}`), one every 5 minutes while an explorer had nothing left; no `SystemsScanned` line was ever logged. | `ScanAsync` in `Exploring/ExplorePlanService.cs`; `WarpExplorersTests.AnExplorerDockedAfterATrade_GoesIntoOrbitToScan` (failed before the fix) | 6.31; fixed, merged as projects#201 (main `30581748`), not deployed yet |
-| B76 | **A new explorer goes trading while systems are left to explore** (found 2026-10-07).<br>• The explore plan waits a pass while a look that could change its choice is still to come: the gates an exploration has just shown, a system's waypoints for a warp (`ExploreStepKind.Wait`). An explorer of its own waits with its assignment open; a free one, just bought or back from a trade, was left free. The role board then gave it the trade role ("only_role") and the trading plan a trip, against D102: an explorer trades only with no system left to take.<br>• NANSEN-5 (SPECTER-209), bought at X1-BC24-C15X at 11:49:19Z, "the 5 of the 5 wanted for the 41 systems left to explore": trade role at 11:49:38, a 39-minute trade at 11:49:50; the plan was still looking at gates X1-HF61's exploration (11:45:44) had shown (X1-XF24's unknown till 11:49, X1-UY47's 11:50–11:52), and SPECTER-121 waited in X1-HF61 till 11:51:19 for the same looks. NANSEN-4 (08:31, three trades in 44 minutes) and NANSEN-3 (06:03, 15 minutes) went the same way. | `DecideExplorerAsync` in `Exploring/ExplorePlanService.cs`; `ExplorersTests.AFreeExplorer_IsKeptWhileThePlanLooksAtTheGatesItJustLearnedOf_SoNoTradeTakesIt` (failed before the fix) | 6.30; fixed, merged as projects#202 (main `a313b46b`), not deployed yet |
-| B77 | **A restart can put a ship back where it was before an arrival moved it** (found 2026-10-07).<br>• The ship event scheduler starts first in the startup chain (step 2), so an arrival due during a restart is handled at once: the ship jumps, flies on or sells. Startup sync (step 8) fetches every ship, 20 a page, and saves them all at the end, so a ship moved between its page's fetch and the save was stored as the page had it.<br>• Deploy of 05:27Z: SPECTER-121 (NANSEN-2) jumped from X1-AT30 to X1-FA16 at 05:27:57; "Startup ship refresh saved for 419 ship(s)" at 05:28:01 put it back at the X1-AT30 gate, without the jump's cooldown. The explore plan's first tick (05:33:41) sent it through that gate again: the API refused (409), the circuit breaker tripped (`CircuitBreakerTripped`), and the plan left X1-FA16's gate alone for an hour (`jump_refused`), so once it had scouted X1-FA16 the explorer had no way out and traded for 40 minutes ("no system is left for it to explore (25 left, each taken)").<br>• Deploy of 11:04Z: SPECTER-35 arrived at X1-FJ91-C45 and siphoned at 11:05:00; the save at 11:05:06 stored it in transit again, until "is still stored in transit … its arrival is scheduled again" at 11:14:17. | `StartAsync` in `SpaceTraders.API/Services/StartupSyncService.cs`; `StartupSyncServiceTests.StartAsync_KeepsWhatAnArrivalStoredWhileTheShipsWereFetched` (failed before the fix) | 1.12 (startup sync); fixed, merged as projects#203 (main `05a78d74`), not deployed yet |
-| B78 | **The explorers wait for hours, all together, for a system only a warp reaches** (found 2026-10-09).<br>• An explorer with a warp drive waits while the waypoints of a system only a warp reaches, within a warp of an explored system, were never fetched (`ExploreStepKind.Wait`, slice 6.31). The explore plan makes one look a pass, and fetched those last, after every look due again: with 24 gates under construction, each looked at again hourly, and a pass every 2 to 9 minutes, the looks due again never ran out. The condition is the same for every explorer, so all five waited, each with its explore assignment and no goal, out of `ShipStuck`'s sight.<br>• 2026-10-08 19:47–20:01Z to 2026-10-09 04:31Z: the five explorers logged nothing; 15 to 22 gate looks an hour (`systems/{systemSymbol}/waypoints/{waypointSymbol}`) and no system fetched (`systems/{systemSymbol}`, 0 from 21:00Z); X1-BS22 and X1-KA53, behind gates under construction, were fetched at 04:26:49 and 04:30:07, and within two minutes the five had Jump goals (`ShipStuck` at 04:31:43, 511–525 minutes since their last update) and moved. The same at 10-08 01:34Z, 08:41Z, 13:21Z and 10-09 12:59Z: about 14 of 48 hours. | `LearnAsync` in `Exploring/ExplorePlanService.cs`; `WarpExplorersTests.ASystemOnlyAWarpReaches_IsFetchedBeforeTheGatesDueALookAgain_SoTheExplorersDontWaitBehindThem` (failed before the fix) | 6.31; fixed, in review |
 
 ### Decisions
 
@@ -284,11 +276,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
   (D112–D115)
 - 6.34 A cargo ship every half hour, before the probes (D116)
 - 6.35 A separate ring width (D117)
-- 6.36 A purchase that waits for a ship lets the ones behind it through (D118), in review
+- 6.36 A purchase that waits for a ship lets the ones behind it through (D118)
 
 The slices across systems, as planned on 2026-10-06 (D94–D101; D102 and D103 with 6.30's go, D104–D107 with 6.31's), are
 done, and so are 6.32, asked the same day after them (D108–D111), and 6.33 and 6.34, asked on 2026-10-07 (D112–D116); the
-details of the three are in `docs/archive/PLAN_HISTORY.md`. So is 6.35, asked the same day (its details are there too); 6.36, asked with it, is in review:
+details of the three are in `docs/archive/PLAN_HISTORY.md`. So are 6.35 and 6.36, asked the same day:
 
 - **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
   slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
@@ -327,35 +319,3 @@ details of the three are in `docs/archive/PLAN_HISTORY.md`. So is 6.35, asked th
     (image `60f3922a`, live since 2026-10-06 14:45Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
   - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
     other systems (D68).
-
-- **6.36 A purchase that waits for a ship lets the ones behind it through** (D118). Asked on 2026-10-07, after the day's
-  investigation: "Do you want a purchase that is only waiting for a ship to arrive to let the ones behind it go first?" -
-  "Yes please, as long as the total doesn't dip below the total needed for the freighter." Built on branch
-  `claude/spacetraders-waiting-purchase-lets-others-through`, in review.
-  - Found: the bulk freighter at X1-HB56-C18D (`TimedCargoShip`, 8) waited from 13:17Z to 13:51Z for probe SPECTER-216 to
-    reach the shipyard, as a ship is sold only where one of ours is (D30), with 57M credits against its 2.9M and the 9.4M
-    credit reserve; the probes behind it waited too (D116). Earlier that day the probes had waited 19 minutes behind an
-    explorer the command ship was fetching (D108).
-  - Done:
-    - **The order** (`PurchaseOrder`): a need whose purchase waits for one of our ships at its shipyard
-      (`WaitingForAShip`: the call its purchase made is open, `ShipyardCalls`, D30) no longer holds the needs after it
-      back, as long as their purchase leaves the waiting needs' prices and the credit reserve (`IBudgetPolicy`, with the
-      later need's price and theirs). Anything else before it, or credits short of that, still holds it back, as before.
-    - **The purchase** (`ShipPurchaseService`) keeps the same: the order records what it let a need through with
-      (`PurchaseNeeds.Hold`, `ReportedNeed.Held`), and the purchase adds it to its budget check, with the shipyard's price
-      as it asks it now (`PurchaseNeeds.HeldFor`).
-  - Readings in the build (yours to confirm or change):
-    - **Any plan's purchase** that waits for a ship counts, the explorer the command ship fetches (D108) too.
-    - **Several waiting**: a purchase behind them keeps all their prices, and the reserve once.
-    - **"The total needed"** is the dashboard's "credits needed": the waiting purchase's price as cached, and the credit
-      reserve. When it is bought, it is at the price the shipyard asks then, as every purchase is.
-    - **A purchase that waits for credits** still holds the rest back (D116, "Save up, probes wait").
-    - **A construction load** let through so keeps them when its trip starts; its batches are priced as they go (D81).
-  - Expect, once deployed: while a purchase on the dashboard's purchase order waits for a ship (a `ProbeCalled` line,
-    a probe flying to its shipyard), the purchases after it go on, each leaving its "credits needed".
-  - Tests: `PurchaseOrderTests` (a probe goes before the freighter once its purchase waits for a ship, not before; it
-    waits while it would dip below the freighter's total; with two waiting it leaves both, and the freighter goes before
-    a waiting explorer keeping the explorer's), `ShipPurchaseServiceTests` (the purchase keeps the waiting price beyond
-    the reserve).
-  - To understand this, start with `DecideAsync` and `WaitingForAShip` in `Services/PurchaseOrder.cs`, then `HeldFor`
-    there and its use in `Services/ShipPurchaseService.cs`.

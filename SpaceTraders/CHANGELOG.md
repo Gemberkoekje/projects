@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Docs – Changed (2026-10-09)
+- `PLAN.md`: where things stand after gembernodes#92 deployed B74–B77 and slices 6.35 and 6.36, and gembernodes#93 deployed
+  B78; B74–B78 and slice 6.36's details moved to `docs/archive/PLAN_HISTORY.md`.
+
 ### Code – Fixed (2026-10-09, B78)
 - The explorers no longer wait for hours, all together, behind the explore plan's looks due again (B78). An explorer with a warp drive waits while a system only a warp reaches, within a warp of an explored system, has never had its waypoints fetched; the plan makes one look a pass and fetched those after every gate or connections look due again. With 24 gates under construction, each looked at again hourly, and a pass every 2 to 9 minutes, those never ran out: from 2026-10-08 about 19:50Z to 2026-10-09 04:30Z the five explorers waited until X1-BS22 and X1-KA53 were fetched, about 14 of 48 hours in all. Now such a system, never asked for, is fetched after the gates and connections never looked at and before the looks due again (`ExplorePlanService.LearnAsync`, `WarpLooksAsync`, `NextLook`'s `due`); one whose fetch failed still comes after them.
 
