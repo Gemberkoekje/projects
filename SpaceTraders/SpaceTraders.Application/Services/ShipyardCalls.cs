@@ -11,15 +11,23 @@ namespace SpaceTraders.Application.Services;
 /// </summary>
 /// <remarks>
 /// In memory, a singleton. A plan that still wants the ship calls again on every tick, so a call lasts
-/// <see cref="Lifetime"/> after the last one: a plan that stops wanting it, because the credits went
-/// elsewhere, lets the probe go again. After a restart the plans call again on their first tick.
+/// <see cref="Lifetime"/> after the last one, or longer while the plan's next pass hasn't come (<see cref="GameTicks.Counts"/>,
+/// B79): a plan that stops wanting it, because the credits went elsewhere, lets the probe go again. After a restart the
+/// plans call again on their first tick.
 /// </remarks>
-public sealed class ShipyardCalls
+/// <param name="ticks">When the game loop's ticks began.</param>
+public sealed class ShipyardCalls(GameTicks ticks)
 {
-    /// <summary>How long a call stays open after the last time a plan made it.</summary>
+    /// <summary>How long a call stays open at least after the last time a plan made it.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(2);
 
     private readonly ConcurrentDictionary<string, ShipyardCall> _calls = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Creates the calls with no ticks known: a call stays open for <see cref="Lifetime"/>.</summary>
+    public ShipyardCalls()
+        : this(new GameTicks())
+    {
+    }
 
     /// <summary>Records that a purchase of <paramref name="shipType"/> waits at <paramref name="waypointSymbol"/>.</summary>
     /// <param name="waypointSymbol">The shipyard's waypoint.</param>
@@ -29,7 +37,7 @@ public sealed class ShipyardCalls
         => _calls.AddOrUpdate(
             waypointSymbol,
             shipyard => new ShipyardCall(shipyard, shipType, at, at),
-            (shipyard, open) => open.LastCalledAt + Lifetime < at
+            (shipyard, open) => !ticks.Counts(open.LastCalledAt, at, Lifetime)
                 ? new ShipyardCall(shipyard, shipType, at, at)
                 : open with { ShipType = shipType, LastCalledAt = at });
 
@@ -42,7 +50,7 @@ public sealed class ShipyardCalls
     /// <returns>The open calls.</returns>
     public IReadOnlyList<ShipyardCall> Open(DateTimeOffset now)
         => [.. _calls.Values
-            .Where(call => now - call.LastCalledAt <= Lifetime)
+            .Where(call => ticks.Counts(call.LastCalledAt, now, Lifetime))
             .OrderBy(call => call.Since)
             .ThenBy(call => call.WaypointSymbol, StringComparer.Ordinal)];
 }

@@ -23,8 +23,9 @@ public sealed class PurchaseOrderTests
     /// <summary>When the ledger's purchases were made: before anything this process buys during a test.</summary>
     private static readonly DateTimeOffset Start = DateTimeOffset.UtcNow.AddDays(-1);
 
-    private readonly PurchaseNeeds _needs = new();
-    private readonly ShipyardCalls _calls = new();
+    private readonly GameTicks _ticks = new();
+    private readonly PurchaseNeeds _needs;
+    private readonly ShipyardCalls _calls;
     private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
@@ -32,6 +33,8 @@ public sealed class PurchaseOrderTests
 
     public PurchaseOrderTests()
     {
+        _needs = new PurchaseNeeds(_ticks);
+        _calls = new ShipyardCalls(_ticks);
         foreach (var plan in PurchaseOrder.BuyingPlans.Keys)
         {
             PlanIs(plan, on: true);
@@ -102,6 +105,67 @@ public sealed class PurchaseOrderTests
         _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
 
         (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InATickLongerThanTheLifetime_TheProbePlan_GoesByWhatThePlansAfterItSaidInTheTickBefore()
+    {
+        // B79, 2026-10-10: a tick took 3 to 7 minutes, and the probe plan runs before the survey, mining, siphon, construction
+        // and trading plans. Their word from the tick before was older than the lifetime, so the probe plan waited for plans that
+        // needed nothing: 15 interceptors in 18 hours, with 242M credits against a 66M reserve.
+        var now = DateTimeOffset.UtcNow;
+        _ticks.Begin(now - TimeSpan.FromMinutes(4) - TimeSpan.FromSeconds(30));
+        EveryoneSaysAt(PurchaseNeed.None, now - TimeSpan.FromMinutes(4));
+        _ticks.Begin(now - TimeSpan.FromSeconds(10));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_INTERCEPTOR"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InATickLongerThanTheLifetime_APlanThatSaidItNeedsSomethingEarlier_StillComesFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _ticks.Begin(now - TimeSpan.FromMinutes(5));
+        EveryoneSaysAt(PurchaseNeed.None, now - TimeSpan.FromMinutes(4));
+        _needs.Report(AutomationPlan.Trading, Freighter(), now - TimeSpan.FromMinutes(4));
+        _ticks.Begin(now - TimeSpan.FromSeconds(10));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Probe())).Should().BeFalse();
+        _needs.Open(now).Select(open => open.Plan).Should().Equal(AutomationPlan.Trading, AutomationPlan.ProbeDeployment);
+    }
+
+    [Fact]
+    public async Task AfterAPauseOfShortTicks_APlanNotHeardFromLately_StillHoldsBackWhatComesAfterIt()
+    {
+        // A 502 pauses the plans for 3 minutes, while the ticks go on every 5 seconds: the trading plan's word is from before
+        // the tick before.
+        var now = DateTimeOffset.UtcNow;
+        _ticks.Begin(now - TimeSpan.FromMinutes(4));
+        EveryoneSaysAt(PurchaseNeed.None, now - TimeSpan.FromMinutes(3) - TimeSpan.FromSeconds(30));
+        for (var seconds = 180; seconds >= 5; seconds -= 5)
+        {
+            _ticks.Begin(now - TimeSpan.FromSeconds(seconds));
+        }
+
+        _needs.Report(AutomationPlan.Contract, PurchaseNeed.None, now);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_INTERCEPTOR"))).Should().BeFalse();
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("the Trading plan, not heard from lately", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InATickLongerThanTheLifetime_ACallMadeInTheTickBefore_StaysOpen()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _ticks.Begin(now - TimeSpan.FromMinutes(5));
+        _calls.Call(FreighterShipyard, "SHIP_BULK_FREIGHTER", now - TimeSpan.FromMinutes(4));
+        _ticks.Begin(now - TimeSpan.FromSeconds(10));
+
+        _calls.Open(now).Select(call => call.WaypointSymbol).Should().Equal(FreighterShipyard);
+
+        _ticks.Begin(now);
+
+        _calls.Open(now).Should().BeEmpty("the plan had its pass in the tick before and didn't call again");
     }
 
     [Fact]
@@ -583,13 +647,16 @@ public sealed class PurchaseOrderTests
 
     private static PurchaseRecord Bought(string ship, ShipType type, int minute) => new(ship, type, Start.AddMinutes(minute));
 
-    private void EveryoneSays(PurchaseNeed need)
+    private void EveryoneSaysAt(PurchaseNeed need, DateTimeOffset at)
     {
         foreach (var plan in PurchaseOrder.BuyingPlans.Keys)
         {
-            _needs.Report(plan, need, DateTimeOffset.UtcNow);
+            _needs.Report(plan, need, at);
         }
     }
+
+    private void EveryoneSays(PurchaseNeed need)
+        => EveryoneSaysAt(need, DateTimeOffset.UtcNow);
 
     private void PlanIs(AutomationPlan plan, bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(plan), Arg.Any<CancellationToken>()).Returns(on);
