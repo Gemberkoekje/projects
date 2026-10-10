@@ -1425,7 +1425,7 @@ last, gives it something to do then; your decisions are D34–D37.
   3. It refuses a ship the shipyard's cached listing has SCARCE (`Scarce`, D121, below), and calls for no ship there.
   4. It needs one of our ships at the shipyard, not in flight: the API sells a ship only there (D30).
      Without one it makes no API call; it records a call at the shipyard (`ShipyardCalls`, in memory,
-     open for 2 minutes after the last attempt), which the probe plan answers with its nearest free
+     open until the plan's next pass, a tick later, or 2 minutes after the last attempt if that is later, B79), which the probe plan answers with its nearest free
      probe, and the plan's next attempt buys. A purchase closes the call.
   5. With a ship there, it fetches the shipyard again and asks `BudgetPolicy` again with the price
      the shipyard asks now (a cached price can be hours old, and every purchase moves it); when the
@@ -1517,9 +1517,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   may buy when no other plan that is on has a need that comes first, or between drones and cargo ships,
   the turn. A need counts while its plan is on, and only while it can be met: its plan's cap not reached, a
   known shipyard selling the ship. Until each plan that is on, and could need something earlier, has said
-  what it needs within the last 2 minutes, nothing after it is bought: after a start, or a pause in which
-  no plan ran (a 502 pauses them for 3 minutes), the probe plan, which runs before the survey, mining,
-  siphon and trading plans, waits a tick; a plan that fails before it says holds the purchases after it. The
+  what it needs in this tick or the one before, or within the last 2 minutes (`PurchaseNeeds.Counts`, `GameTicks`,
+  B79), nothing after it is bought. A tick that runs the plans takes minutes, so the probe plan goes by what the survey,
+  mining, siphon, construction and trading plans, which run after it, said in the tick before. After a start, or a pause
+  in which no plan ran (a 502 pauses them for 3 minutes, while the ticks go on every 5 seconds), the probe plan waits a
+  tick; a plan that fails before it says holds the purchases after it. The
   construction plan, which runs after the mining plan, holds back the gate's miners until it has said what it needs
   (D92): its load could be one it may buy now.
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it

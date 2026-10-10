@@ -57,12 +57,15 @@ public static class DependencyInjection
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IShipPurchaseService, ShipPurchaseService>();
 
+        // When the game loop's ticks began, which the calls and the needs below are judged by (B79).
+        services.AddSingleton<GameTicks>();
+
         // A purchase that waits for one of our ships at a shipyard, from tick to tick, for the probe plan
         // to answer (slice 6.3, D30).
-        services.AddSingleton<ShipyardCalls>();
+        services.AddSingleton(provider => new ShipyardCalls(provider.GetRequiredService<GameTicks>()));
 
         // The order ships are bought in (slice 6.10b, D43): what each plan would buy, from tick to tick.
-        services.AddSingleton<PurchaseNeeds>();
+        services.AddSingleton(provider => new PurchaseNeeds(provider.GetRequiredService<GameTicks>()));
         services.AddSingleton<FullHoldSavings>();
         services.AddSingleton<PassedOverShips>();
         services.AddScoped<IPurchaseOrder, PurchaseOrder>();

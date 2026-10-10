@@ -8,6 +8,7 @@ using SpaceTraders.Application.Exploring;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Application.Automation;
@@ -16,6 +17,8 @@ namespace SpaceTraders.Application.Automation;
 /// Background service.
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
+///  - Records that a tick began (<see cref="GameTicks"/>), a paused one too, which the order ships are bought in judges the
+///    plans' words by (B79).
 ///  - With automation switched on (<see cref="AutomationSwitches"/>): bootstraps each plan that is
 ///    switched on, runs one goal step per ship, runs the contract plan's assignments, and last
 ///    refreshes one market where a ship is, when one is due (<see cref="IMarketWatchService"/>).
@@ -25,6 +28,7 @@ public sealed class GameLoopService(
     IServiceScopeFactory serviceScopeFactory,
     IApiAvailabilityState apiAvailability,
     ILeaderElection leaderElection,
+    GameTicks ticks,
     ILogger<GameLoopService> logger) : BackgroundService
 {
     private static readonly TimeSpan DeadReckoningInterval = TimeSpan.FromSeconds(5);
@@ -62,6 +66,10 @@ public sealed class GameLoopService(
 
         // Every line logged during the tick carries its number; each step adds its plan or ship.
         using var tickContext = logger.BeginScope(new Dictionary<string, object> { ["Tick"] = Interlocked.Increment(ref _tick) });
+
+        // Every tick, a paused one too: what a plan said counts until its next pass, a tick later (B79), and after a pause
+        // of many short ticks the plans say again before anything is bought.
+        ticks.Begin(TimeProvider.System.GetUtcNow());
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var bus = services.GetRequiredService<Wolverine.IMessageBus>();

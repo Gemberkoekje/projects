@@ -14,6 +14,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -37,6 +38,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
     private readonly IMarketWatchService _marketWatch = Substitute.For<IMarketWatchService>();
     private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
+    private readonly GameTicks _ticks = new();
 
     public GameLoopServiceTests()
     {
@@ -282,6 +284,24 @@ public sealed class GameLoopServiceTests : IDisposable
         await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Tick_WhileApiCallsArePaused_StillCountsAsATick_SoThePlansWordsFromBeforeThePauseGrowOld()
+    {
+        // B79: what a plan said counts until its next pass, a tick later. A paused tick runs no plan, so after it a word said
+        // before it is old, and the order ships are bought in waits until the plans say again.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Contract.Enabled");
+        _apiAvailability.PausedUntil.Returns(TimeProvider.System.GetUtcNow().AddMinutes(2));
+        var beforeThePause = TimeProvider.System.GetUtcNow().AddMinutes(-1);
+
+        await TickAsync();
+        var duringThePause = TimeProvider.System.GetUtcNow();
+        await TickAsync();
+
+        var later = duringThePause.AddHours(1);
+        _ticks.Counts(beforeThePause, later, TimeSpan.Zero).Should().BeFalse();
+        _ticks.Counts(duringThePause, later, TimeSpan.Zero).Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(40, 1, 0, false)]
     [InlineData(40, 39, 0, false)]
@@ -363,6 +383,7 @@ public sealed class GameLoopServiceTests : IDisposable
             _serviceScopeFactory,
             _apiAvailability,
             leaderElection,
+            _ticks,
             logger ?? NullLogger<GameLoopService>.Instance);
 
         var tickMethod = typeof(GameLoopService)
