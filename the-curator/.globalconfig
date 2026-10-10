@@ -1,0 +1,15 @@
+is_global = true
+
+# Suppressions and severity changes live here (house rule, ../instructions.md).
+# Each line says why.
+
+# XML documentation is written for Core's public types and the members that need
+# explaining, but not every record property: the content records mirror the JSON
+# schema documented in docs/CONTENT_GUIDE.md.
+dotnet_diagnostic.CS1591.severity = none
+
+# House rule: every enum has an empty (zero) value.
+dotnet_diagnostic.CA1008.severity = warning
+
+# Cache and reuse JsonSerializerOptions.
+dotnet_diagnostic.CA1869.severity = warning

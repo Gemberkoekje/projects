@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The game's rules and state. Never references Godot (golden rule 1): this project
+    has no package or project references, and ProjectStructureTests checks it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Curator.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

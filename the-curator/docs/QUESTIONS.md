@@ -1,0 +1,12 @@
+# Questions
+
+Design and setup questions met while building, with the choice made so work could carry on (CLAUDE.md rule 6). **Open** means the designer hasn't confirmed it; **settled** means they have, or it's a plain fact.
+
+| # | Question | Choice made | Status |
+|---|---|---|---|
+| Q1 | The brief lays out a repository root, but the project lives in `the-curator/` inside a multi-project repo. | All paths in the docs are relative to `the-curator/`. The solution, `src/`, `game/` and `docs/` sit there. | settled |
+| Q2 | What happens to the designer's existing skeleton (`project.godot`, `node_2d.tscn`, `Magical_Library.png`)? | `project.godot` and the icon moved into `game/` (the brief's Godot root). The app name is now "The Curator", and the assembly is now `Curator.Godot` to match the brief's csproj name. `node_2d.tscn` gave way to `scenes/Main.tscn`. `Magical_Library.png` is now a mood reference in `docs/reference/` and isn't used in the game; the designer confirmed this. | settled |
+| Q3 | Which target framework? Godot 4.6 generates `net8.0` projects, but .NET 8 support ends in November 2026 and the designer's other projects use `net10.0`. | `net10.0` for Core, the tests and the Godot project. Godot 4.6.3 ran it fine with only the .NET 10 runtime installed (Godot loads the newest installed runtime). **Needs the .NET 10 SDK on the designer's PC.** To go back to `net8.0`, change all three csproj files together. | open |
+| Q4 | A 1920×1080 window is as big as a 1080p screen, so the taskbar hides part of it. | The viewport stays 1920×1080 (all layout uses those coordinates). The window opens at 1600×900 and scales the picture. Fullscreen comes with the settings menu in M5. | open |
+| Q5 | A4 assumes the work happens on the designer's Windows PC with Godot installed; it happened in a Linux cloud container. | Everything was verified with the Linux .NET build of Godot 4.6.3: headless runs for bots and smoke tests, and Xvfb with software rendering for screenshots. Windows-only parts (the `d3d12` driver, the Windows export preset) haven't been tried. | open |
+| Q6 | The designer asked for interim art made with Easel (`easel-paint`), Claude painting stroke by stroke, not generated images. Where does it go, given `game/art/painted/` is the designer's? | Easel paintings go in `game/art/easel/<slotId>.png`. Each art slot looks for `painted/` first, then `easel/`, then falls back to the flat procedural placeholder. Deleting an Easel file brings back the placeholder; dropping in a photographed painting overrides both. | settled |

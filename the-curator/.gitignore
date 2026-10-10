@@ -1,3 +1,11 @@
 # Godot 4+ specific ignores
 .godot/
-/android/
+/game/android/
+
+# .NET build output
+bin/
+obj/
+*.user
+
+# Screenshots, reports and logs (BUILD_BRIEF §3)
+/out/

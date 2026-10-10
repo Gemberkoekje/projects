@@ -1,0 +1,40 @@
+name: CI - The Curator
+
+on:
+  push:
+    paths:
+      - 'the-curator/**'
+      - '.github/workflows/ci-the-curator.yml'
+  pull_request:
+    paths:
+      - 'the-curator/**'
+      - '.github/workflows/ci-the-curator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test (ubuntu)
+    # Builds Curator.Core, its tests and the Godot C# project. The Godot project
+    # compiles from the Godot.NET.Sdk NuGet package, so no Godot editor is needed.
+    # The tests cover the rules, the replay, content validation and the balance
+    # guardrails (BUILD_BRIEF §8.1-8.4).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ./the-curator/TheCurator.sln
+
+      - name: Build
+        run: dotnet build ./the-curator/TheCurator.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test ./the-curator/TheCurator.sln --no-build --configuration Release --verbosity normal
