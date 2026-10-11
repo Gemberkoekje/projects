@@ -1,0 +1,49 @@
+{
+  "id": "osric-penn",
+  "name": "Osric Penn",
+  "description": "A black armband. A good coat gone thin at the elbows. Holds his hat in both hands.",
+  "role": "filler",
+  "fillerOrder": 6,
+  "visits": [
+    {
+      "id": "osric-penn-1",
+      "step": 1,
+      "greeting": "I hope I'm not intruding. I wasn't sure who else to ask.",
+      "request": {
+        "topic": "preservation",
+        "text": "A preservation spell, if there is such a thing. My wife grew roses. I'd like to keep them as they are."
+      },
+      "goal": { "tags": ["preservation"], "minPower": 1 },
+      "temptations": [{ "tag": "stasis", "use": "accident" }],
+      "readThoughts": { "default": "Her roses. Every one of them, just as she left them." },
+      "answers": {
+        "purpose": {
+          "0": "Some roses.",
+          "1": "My wife's roses. She passed in the spring. They're the last thing of hers still growing."
+        },
+        "knowledge": { "0": "I don't know much about spells. I'm sorry." },
+        "experience": { "0": "None. I kept the accounts; she kept the garden." }
+      },
+      "decisions": {
+        "lent": { "line": "Thank you. She would have liked you, I think." },
+        "offerRefused": { "line": "Forgive me — I don't think that's the right sort of book." },
+        "declined": { "line": "No, of course. I understand." },
+        "walkedOut": { "line": "I'm sorry. I shouldn't have come." }
+      },
+      "outcomes": {
+        "mixedAccident": {
+          "channel": "letter",
+          "from": "O. Penn",
+          "text": "The cut roses keep beautifully. They are on the table, where she liked them. I tried the other charm on her rosebush, the one by the door. It is very still now. I don't know if that is what I wanted. — Osric Penn"
+        },
+        "good": {
+          "channel": "letter",
+          "from": "O. Penn",
+          "text": "The roses keep beautifully. Thank you for your kindness. — Osric Penn"
+        },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,14 @@
+<Project Sdk="Godot.NET.Sdk/4.6.3">
+
+  <!-- Presentation only: renders Core's projections and sends it commands (golden rule 1). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Curator.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\Curator.Core\Curator.Core.csproj" />
+  </ItemGroup>
+
+</Project>

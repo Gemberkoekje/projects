@@ -11,7 +11,9 @@ vault):
 It does **not** apply anywhere else. sts2_decompiled/, DatumPrikker/,
 AiUsageMonitoring/, and HackerMinigames/ were only summarized (not graphed) and have
 no graphify-out/graph.json — ignore the graphify guidance in those folders; see
-graphify-out/PROJECTS_OVERVIEW.md for their summaries. The root itself has no
+graphify-out/PROJECTS_OVERVIEW.md for their summaries. the-curator/ (The Curator, a
+Godot 4 + C# game) is newer than the graph and has none either; follow its own
+the-curator/CLAUDE.md. The root itself has no
 graph.json either, so **cd into one of the graphed project folders above** before
 running the graphify query/path/explain commands; they resolve graphify-out/
 relative to the current directory.

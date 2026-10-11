@@ -1,0 +1,75 @@
+{
+  "id": "wren-hale",
+  "name": "Wren Hale",
+  "description": "Weather-worn coat. Practical.",
+  "role": "story",
+  "startTrust": 0,
+  "visits": [
+    {
+      "id": "wren-hale-1",
+      "step": 1,
+      "earliestDay": 2,
+      "greeting": "Morning.",
+      "request": { "bookId": "lanterns", "topic": "domestic", "text": "Something to dry linen quick. Lanterns, I heard." },
+      "goal": { "tags": ["fire-destructive"], "minPower": 1 },
+      "temptations": [{ "tag": "fire-destructive", "use": "accident" }],
+      "readThoughts": { "default": "Twelve paces of bare earth. Twelve at least.", "unlocks": ["wren-hale-1-paces"] },
+      "answers": { "purpose": { "0": "Washing.", "2": "A firebreak, if you must know." } },
+      "questions": [
+        {
+          "id": "wren-hale-1-paces",
+          "text": "What needs twelve paces of bare earth?",
+          "unlockedBy": "readThoughts",
+          "answers": { "0": "Nothing you'd know.", "1": "A firebreak. Round Lower Hollis." },
+          "setFlags": ["wren-hale:asked-paces"]
+        },
+        {
+          "id": "wren-hale-1-fireball",
+          "text": "There's a fireball in that book. Did you know?",
+          "unlockedBy": "identifiedPage:lanterns-4",
+          "answers": { "0": "Is there." }
+        }
+      ],
+      "decisions": { "lent": { "line": "Ta." }, "alternative": { "line": "This'll do." } },
+      "outcomes": {
+        "mixedAccident": { "channel": "return", "text": "A hayrick burned. My hands are singed.", "setFlags": ["wren-hale:hayrick"] },
+        "good": { "channel": "newspaper", "headline": "Lower Hollis firebreak holds", "text": "A firebreak held." },
+        "unhelpful": { "channel": "none", "trust": 1 },
+        "harm": { "channel": "gossip", "text": "Did you hear? A field burned at Lower Hollis." },
+        "declined": { "channel": "gossip", "delayDays": 2, "text": "Did you hear? The Hales dug a firebreak by hand." }
+      }
+    },
+    {
+      "id": "wren-hale-2-candid",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["alternative"] },
+      "greeting": "Your linen charm works. I lied about what I wanted.",
+      "request": { "bookId": "lanterns", "topic": "fire", "text": "Lanterns, please. For a firebreak." },
+      "goal": { "tags": ["fire-destructive"], "minPower": 1 },
+      "temptations": [{ "tag": "fire-destructive", "use": "benign" }],
+      "readThoughts": { "default": "Small fires all week. Small, then bigger." },
+      "outcomes": {
+        "good": { "channel": "newspaper", "headline": "Lower Hollis firebreak holds", "text": "The firebreak held through the dry spell." },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    },
+    {
+      "id": "wren-hale-2-subdued",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["lent"] },
+      "greeting": "My hands.",
+      "request": { "topic": "healing", "text": "Something for burns." },
+      "goal": { "tags": ["healing-minor"], "minPower": 1 },
+      "readThoughts": { "default": "Don't look at the hands." },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

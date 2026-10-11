@@ -1,0 +1,14 @@
+{
+  "id": "lanterns",
+  "title": "Lanterns and Lesser Fires",
+  "spineTag": "fire",
+  "rarity": "uncommon",
+  "summary": "Light and warmth for the dark months.",
+  "pages": [
+    { "id": "lanterns-1", "spellName": "Linen-Dry", "tags": ["drying"], "power": 1, "danger": 0, "text": "Hold the cloth to a low flame {~and it dries~} without scorching.", "ingredients": ["candle-stub", "salt"] },
+    { "id": "lanterns-2", "spellName": "Warm Hands", "tags": ["warmth"], "power": 1, "danger": 0, "text": "Cup the hands {~around nothing~} and breathe.", "ingredients": ["ash", "honey"] },
+    { "id": "lanterns-3", "spellName": "Kindle", "tags": ["fire-small"], "power": 1, "danger": 1, "text": "A spark {~from a dry word~}.", "ingredients": ["ash", "brannowort"] },
+    { "id": "lanterns-4", "spellName": "{~Fire~}ball", "tags": ["fire-destructive"], "power": 3, "danger": 3, "text": "{~Gather the heat~} until it will not be held, {~then let it go~}.", "ingredients": ["hufeykrey", "ash", "karrowseed"] }
+  ],
+  "placeholder": true
+}

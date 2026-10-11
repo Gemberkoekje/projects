@@ -1,0 +1,76 @@
+{
+  "id": "common-wards",
+  "title": "Common Wards & Small Mendings",
+  "spineTag": "warding",
+  "rarity": "uncommon",
+  "summary": "Sound, practical wards for any household. Recommended to new tenants. — R. A.",
+  "pages": [
+    {
+      "id": "common-wards-1",
+      "spellName": "Stitch-Fast",
+      "tags": ["mending"],
+      "power": 1,
+      "danger": 0,
+      "text": "Draw the thread through the wax three times, {~each time against the light~}, and the seam will hold {~through any weather~} until the cloth itself gives out.",
+      "ingredients": ["beeswax", "red-thread"]
+    },
+    {
+      "id": "common-wards-2",
+      "spellName": "Threshold Chalk",
+      "tags": ["warding"],
+      "power": 1,
+      "danger": 0,
+      "text": "Chalk drawn along the sill keeps out draughts, {?vell-mites?}, and {~the smaller sorts of ill will~}. Renew at {~each new moon~}.",
+      "ingredients": ["chalk", "salt", "tessel-dust"]
+    },
+    {
+      "id": "common-wards-3",
+      "spellName": "The Quiet Latch",
+      "tags": ["warding"],
+      "power": 1,
+      "danger": 1,
+      "text": "A latch so charmed will not lift for any hand {~it has not been introduced to~}. To {~introduce a hand~}, speak {?Varre?} {~and the bearer's name~} at the keyhole.",
+      "ingredients": ["iron-filings", "candle-stub"]
+    },
+    {
+      "id": "common-wards-4",
+      "spellName": "Mend the Glaze",
+      "tags": ["mending"],
+      "power": 1,
+      "danger": 0,
+      "text": "For cracked crockery. Warm the pieces by the hearth, {~press the edges close~}, and breathe along the line {~until the crack forgets itself~}.",
+      "ingredients": ["honey", "ash"]
+    },
+    {
+      "id": "common-wards-5",
+      "spellName": "Ward of Small Hours",
+      "tags": ["warding"],
+      "power": 1,
+      "danger": 0,
+      "text": "Knot the thread above the bed. Bad dreams {~catch in the knots~} and are {~gone by morning~}; burn the thread {~at the year's end~}.",
+      "ingredients": ["red-thread", "willow-bark", "oskeling"]
+    },
+    {
+      "id": "common-wards-6",
+      "spellName": "Unbidden Door",
+      "tags": ["opening"],
+      "power": 2,
+      "danger": 2,
+      "text": "{~Every ward has a seam.~} Find it with {?brannowort?} smoke, {~then speak the latch's own word back to it~}. No door so kept {~will refuse you~}, and none {~will remember you passed~}.",
+      "ingredients": ["brannowort", "iron-filings", "hufeykrey"],
+      "authorNote": "Outlier. Readable on purpose: a player who lands here should start to wonder what the Board wanted with this book."
+    },
+    {
+      "id": "common-wards-7",
+      "spellName": "{~Unread~}",
+      "tags": ["unknown"],
+      "power": 0,
+      "danger": 3,
+      "text": "{~The page will not settle under your eyes.~}",
+      "ingredients": [],
+      "unidentifiable": true,
+      "authorNote": "Story page. Never identifiable in the prototype; removed when the book returns on day 6. Contents reserved for the world arc."
+    }
+  ],
+  "placeholder": true
+}

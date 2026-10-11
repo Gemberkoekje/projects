@@ -1,0 +1,12 @@
+{
+  "id": "advanced-botanical",
+  "title": "Advanced Botanical Compounds",
+  "spineTag": "botanical",
+  "rarity": "rare",
+  "pages": [
+    { "id": "advanced-botanical-1", "spellName": "Name the Leaf", "tags": ["plant-lore"], "power": 1, "danger": 0, "text": "Lay the leaf flat {~and say what it is not~}.", "ingredients": ["salt", "vellin-sap"] },
+    { "id": "advanced-botanical-2", "spellName": "Root and Rind", "tags": ["plant-lore"], "power": 2, "danger": 0, "text": "The root {~remembers its soil~}.", "ingredients": ["willow-bark", "vellin-sap"] },
+    { "id": "advanced-botanical-3", "spellName": "Quickrot", "tags": ["decay"], "power": 2, "danger": 2, "text": "{~What grows~} may be asked to stop {~growing~}.", "ingredients": ["karrowseed", "ash"] }
+  ],
+  "placeholder": true
+}

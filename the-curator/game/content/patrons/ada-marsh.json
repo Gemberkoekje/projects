@@ -1,0 +1,38 @@
+{
+  "id": "ada-marsh",
+  "name": "Ada Marsh",
+  "description": "Grey shawl, the same jet brooch every time. Takes the chair by the stove without asking.",
+  "role": "filler",
+  "startTrust": 2,
+  "fillerOrder": 1,
+  "preGameLoans": [
+    { "bookId": "hearth-and-kettle", "borrowedDay": -40, "returnedDay": -33 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -26, "returnedDay": -21 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -14, "returnedDay": -9 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -6, "returnedDay": -2 }
+  ],
+  "visits": [
+    {
+      "id": "ada-marsh-1",
+      "step": 1,
+      "greeting": "Good morning, dear. Lovely and quiet in here.",
+      "request": { "bookId": "hearth-and-kettle", "topic": "domestic", "text": "The usual, please." },
+      "goal": { "tags": ["warmth"], "minPower": 1 },
+      "readThoughts": { "default": "Banked coals. The cat asleep on the hearth." },
+      "answers": {
+        "purpose": { "2": "The coals, dear. They won't keep through the night without it, and the cat complains." },
+        "source": { "2": "The curator before you put it in my hands. I've never needed another." }
+      },
+      "decisions": {
+        "lent": { "line": "Thank you, dear. Same time next week." },
+        "alternative": { "line": "Something new? Well. I'll give it a go." },
+        "declined": { "line": "Oh. Well. Another day, then." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

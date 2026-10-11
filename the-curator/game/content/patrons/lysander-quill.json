@@ -1,0 +1,40 @@
+{
+  "id": "lysander-quill",
+  "name": "Lysander Quill",
+  "description": "Spectacles on a ribbon, ink on every finger. Reads the spines while he waits.",
+  "role": "filler",
+  "fillerOrder": 9,
+  "warded": true,
+  "visits": [
+    {
+      "id": "lysander-quill-1",
+      "step": 1,
+      "greeting": "A scholar's request, curator, and a dull one, I promise.",
+      "request": {
+        "bookId": "on-keeping",
+        "topic": "preservation",
+        "text": "On Keeping. For my monograph on the history of preservation charms. Footnotes, mostly."
+      },
+      "goal": { "tags": ["preservation"], "minPower": 2 },
+      "temptations": [{ "tag": "stasis", "use": "benign" }],
+      "readThoughts": { "default": "Pages forty to sixty. The Ollery bequest." },
+      "answers": {
+        "purpose": {
+          "0": "Research. Footnotes, as I said.",
+          "1": "A history of keeping charms. The Ollery estate collected them. So, it seems, did your library."
+        },
+        "source": { "0": "The Ollery catalogue lists it." }
+      },
+      "decisions": {
+        "lent": { "line": "Splendid. I'll return it annotated. Lightly." },
+        "alternative": { "line": "Not the volume I wanted, but scholarship is patient." },
+        "declined": { "line": "A pity. The footnotes will suffer." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

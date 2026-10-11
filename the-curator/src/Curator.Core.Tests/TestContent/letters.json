@@ -1,0 +1,13 @@
+{
+  "tutorial": [
+    { "day": 1, "from": "The Board", "title": "Rules of the desk", "text": "The card, the catalogue, Identify, the stamp." },
+    { "day": 2, "from": "The Board", "title": "Asking", "text": "Questions, Read Thoughts, patience, the notebook." },
+    { "day": 3, "from": "The Board", "title": "Choosing", "text": "Offering another book, declining, and consequences." }
+  ],
+  "debt": {
+    "1": { "from": "The Board", "text": "The accounts show a deficit." },
+    "2": { "from": "The Board", "text": "The deficit persists." },
+    "3": { "from": "The Board", "text": "The Board is displeased." }
+  },
+  "placeholder": true
+}

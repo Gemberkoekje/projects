@@ -1,0 +1,27 @@
+{
+  "good": [
+    { "channel": "none" },
+    { "channel": "letter", "from": "{name}", "text": "{book} did just what I hoped. Thank you." }
+  ],
+  "unhelpful": [
+    { "channel": "none" },
+    { "channel": "gossip", "text": "Did you hear? {name} says the library's books are all charm and no use." }
+  ],
+  "harmMisuse": [
+    { "channel": "none" },
+    { "channel": "newspaper", "headline": "Mischief on Lantern Street", "text": "Damage was reported overnight." }
+  ],
+  "harmAccident": [
+    { "channel": "none" },
+    { "channel": "gossip", "text": "Did you hear? Something went wrong at {name}'s." }
+  ],
+  "mixedMisuse": [
+    { "channel": "none" },
+    { "channel": "newspaper", "headline": "Odd doings reported", "text": "Neighbours report an unusual week." }
+  ],
+  "mixedAccident": [
+    { "channel": "none" },
+    { "channel": "letter", "from": "{name}", "text": "It worked — mostly. I'd rather not say about the rest." }
+  ],
+  "placeholder": true
+}

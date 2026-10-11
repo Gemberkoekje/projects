@@ -1,0 +1,66 @@
+{
+  "id": "household-arts-3",
+  "title": "Household Arts, Vol. III",
+  "spineTag": "domestic",
+  "rarity": "common",
+  "summary": "Every charm a careful housekeeper needs, from the week's first wash to the last of the silver. — M. Voss",
+  "pages": [
+    {
+      "id": "household-arts-3-1",
+      "spellName": "Brisk Wringing",
+      "tags": ["drying"],
+      "power": 1,
+      "danger": 0,
+      "text": "Twist the cloth three times against the grain {~and name the house aloud~}; the water {~leaves it gladly~}. Hang {~where the wind can find it~}.",
+      "ingredients": ["salt", "rainwater"]
+    },
+    {
+      "id": "household-arts-3-2",
+      "spellName": "Lift the Mark",
+      "tags": ["stain-lifting"],
+      "power": 1,
+      "danger": 0,
+      "text": "{~Lay the cloth flat and work the paste into~} the afflicted area until {~the colour rises into it~}. {~Rinse in cold, and~} do not use near open water.",
+      "ingredients": ["hufeykrey", "garble-blar", "eye-of-newt", "whicker-flick"],
+      "authorNote": "The designer's original example page. Shares eye of newt with Hold Fast on purpose."
+    },
+    {
+      "id": "household-arts-3-3",
+      "spellName": "Kettle's Patience",
+      "tags": ["warmth"],
+      "power": 1,
+      "danger": 0,
+      "text": "A kettle so charmed keeps its warmth from {~first light~} to supper. {~Mind the handle~}; {~it remembers the heat longer than the water does~}.",
+      "ingredients": ["ash", "candle-stub"]
+    },
+    {
+      "id": "household-arts-3-4",
+      "spellName": "Moth-Away",
+      "tags": ["pest-warding"],
+      "power": 1,
+      "danger": 0,
+      "text": "Hang a muslin bag of this in the wardrobe. Moths {~and worse~} keep their distance {~for a season~}.",
+      "ingredients": ["cedar-shavings", "whicker-flick"]
+    },
+    {
+      "id": "household-arts-3-5",
+      "spellName": "{~Hold~} Fast",
+      "tags": ["preservation"],
+      "power": 2,
+      "danger": 2,
+      "text": "Whatever this touches {~stays as it is~}: bread will not stale, {~petals will not fall~}, {~ink will not fade~}. {~Never~} upon anything that still breathes {~— it will keep that, too~}.",
+      "ingredients": ["eye-of-newt", "beeswax", "hufeykrey"],
+      "authorNote": "Outlier. Legible text reads '...upon anything that still breathes' without the 'never': ominous, ambiguous."
+    },
+    {
+      "id": "household-arts-3-6",
+      "spellName": "Fold and Press",
+      "tags": ["household"],
+      "power": 1,
+      "danger": 0,
+      "text": "Linen folded under this {~keeps its crease~} for a week {~and its scent for longer~}.",
+      "ingredients": ["river-stone", "garble-blar"]
+    }
+  ],
+  "placeholder": true
+}

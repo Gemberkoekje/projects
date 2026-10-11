@@ -1,0 +1,46 @@
+{
+  "id": "hearth-and-kettle",
+  "title": "Hearth & Kettle",
+  "spineTag": "domestic",
+  "rarity": "common",
+  "summary": "Plain charms for plain kitchens.",
+  "pages": [
+    {
+      "id": "hearth-and-kettle-1",
+      "spellName": "Linen Breeze",
+      "tags": ["drying"],
+      "power": 1,
+      "danger": 0,
+      "text": "Open the window a hand's width and {~call the breeze by its old name~}. The washing dries {~before the bread has risen~}.",
+      "ingredients": ["salt", "willow-bark"]
+    },
+    {
+      "id": "hearth-and-kettle-2",
+      "spellName": "Gentle Lift",
+      "tags": ["stain-lifting"],
+      "power": 1,
+      "danger": 0,
+      "text": "For wine, ink and grass. {~Dab, never rub~}; the mark {~comes away into the cloth~}.",
+      "ingredients": ["lemon-rind", "salt", "garble-blar"]
+    },
+    {
+      "id": "hearth-and-kettle-3",
+      "spellName": "Banked Coals",
+      "tags": ["warmth"],
+      "power": 1,
+      "danger": 0,
+      "text": "Coals banked {~with this word~} keep {~till morning~} without smoking the room.",
+      "ingredients": ["ash", "oskeling"]
+    },
+    {
+      "id": "hearth-and-kettle-4",
+      "spellName": "Sweet Larder",
+      "tags": ["pest-warding"],
+      "power": 1,
+      "danger": 0,
+      "text": "Mice {~find the larder door uninteresting~}. Renew {~when the honey crystallises~}.",
+      "ingredients": ["honey", "cedar-shavings"]
+    }
+  ],
+  "placeholder": true
+}

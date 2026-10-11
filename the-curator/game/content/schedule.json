@@ -1,0 +1,17 @@
+{
+  "calendar": {
+    "months": ["Frostwane", "Seedmonth", "Bloomtide", "Highsun", "Harvestide", "Emberfall"],
+    "daysPerMonth": 30,
+    "day1": { "day": 3, "month": "Seedmonth" }
+  },
+  "days": [
+    { "day": 1, "startMana": 1, "slots": ["board-clerk"] },
+    { "day": 2, "slots": ["elara-voss", "filler", "jory-fenn"] },
+    { "day": 3, "slots": ["hennie-dorrow", "filler", "wren-hale"] },
+    { "day": 4, "slots": ["jory-fenn", "elara-voss", "filler"] },
+    { "day": 5, "slots": ["wren-hale", "filler", "hennie-dorrow"] },
+    { "day": 6, "slots": ["elara-voss", "filler", "filler"] },
+    { "day": 7, "slots": ["jory-fenn", "filler", "filler"] }
+  ],
+  "placeholder": true
+}
