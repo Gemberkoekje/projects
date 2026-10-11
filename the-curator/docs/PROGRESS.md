@@ -275,3 +275,22 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - The speech panel's place (Q31).
 - The shot set has no plain night view; night shows behind the summaries.
 - Windows is untested (Q5).
+
+## After M6 — Beta builds
+
+**Built**
+- **A Windows beta zip from CI.** The Curator's workflow gains two jobs after build and test:
+  - `windows-build` installs Godot 4.6.3 .NET and its Windows export templates, checked against pinned SHA-512 hashes and cached. It runs `tools/packaging/build-windows.sh` and keeps the zip as a workflow artifact, so a pull request's build can be tried before merging.
+  - `beta-release` runs on pushes to main, or a manual run on main. It publishes the zip as a pre-release, "The Curator 0.1.N-beta" (tag `the-curator-v0.1.N-beta`, N being the workflow's run number). Only this job may write to the repository.
+- **`tools/packaging/build-windows.sh <version>`** exports the Windows build and packs it, the same in CI and locally:
+  - It stamps the version into the game, for the title screen, and into the exe's file properties. Both files are put back afterwards.
+  - The zip holds `TheCurator.exe`, its pack, the bundled .NET runtime, a playtester's README and the licences for Godot (read from the engine itself) and every font.
+  - The folder isn't called `release/` because the repository's root `.gitignore` ignores every folder by that name.
+- **The title screen shows the version** of a release build. Development runs show none.
+
+**Verified**
+- The Windows export builds from a clean checkout: 9 seconds, with `TheCurator.exe`, a 3.8 MB pack and the .NET runtime. The exe carries the stamped file and product version.
+- The script's zip is 77 MB, and the stamped files come back unchanged.
+- A Linux export through the same pipeline played the whole week headless: careful and lend-all, with the same numbers as the editor. It also rendered the screenshot set, fonts and paintings included. That shows the exported pack, content and .NET runtime work outside the editor.
+
+**Not verified**: the Windows build running on Windows (Q5).
