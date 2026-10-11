@@ -280,7 +280,7 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 
 **Built**
 - **A Windows beta zip from CI.** The Curator's workflow gains two jobs after build and test:
-  - `windows-build` installs Godot 4.6.3 .NET and its Windows export templates, checked against pinned SHA-512 hashes and cached. It runs `tools/packaging/build-windows.sh` and keeps the zip as a workflow artifact, so a pull request's build can be tried before merging.
+  - `windows-build` installs Godot 4.6.3 .NET and its Windows export templates, checked against pinned SHA-512 hashes and cached. It runs `tools/packaging/build-windows.sh` and keeps the build as a workflow artifact, so a pull request's build can be tried before merging. The artifact is the unzipped folder, which the release job zips: GitHub zips every artifact for download, so the first version, which uploaded the zip itself, handed out a zip inside a zip.
   - `beta-release` runs on pushes to main, or a manual run on main. It publishes the zip as a pre-release, "The Curator 0.1.N-beta" (tag `the-curator-v0.1.N-beta`, N being the workflow's run number). Only this job may write to the repository.
 - **`tools/packaging/build-windows.sh <version>`** exports the Windows build and packs it, the same in CI and locally:
   - It stamps the version into the game, for the title screen, and into the exe's file properties. Both files are put back afterwards.
