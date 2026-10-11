@@ -6,7 +6,7 @@
 > still to build. The text
 > is as it stood in `PLAN.md`, so "below", "above" and "the table" in it point within that file as it was.
 
-## Where things stood, 2026-10-01 to 2026-10-09
+## Where things stood, 2026-10-01 to 2026-10-11
 
 - The bot was taken off the cluster on 2026-05-26 (gembernodes `906fd99`), and its manifests were
   removed on 2026-09-26 (`3f9f785`). The 1Password item `spacetraders-secrets` still exists.
@@ -234,6 +234,17 @@
   its period): 6.10b's and 6.10c's are met. The other loops ran without anomalies of their own, but none has had a full
   period yet; the first is the one that began at 13:00Z, with every plan on since 18:09Z. The only anomalies left open
   were B59's 429s.
+- Slices 6.37–6.40 (no ship bought at SCARCE, interceptors instead of probes, ore hounds instead of mining drones,
+  mining abroad; with your decisions D119–D122) and slice 2.19 (two runs on one chart, D123) are merged (projects#207,
+  2026-10-09 21:41Z) and deployed by gembernodes#94 (main `9ac6d028`, merged 22:37Z), with 31 days in Prometheus.
+- B79, found on 2026-10-10 (the probes, the drones in turn and the miners abroad waited for plans that needed nothing),
+  is merged (projects#208, 17:43Z) and deployed by gembernodes#95 (main `6d89c1d3`, merged 17:49Z, pod up 17:51Z). The run
+  then stood at 242M credits, the credit reserve 66M.
+- The server reset at 2026-10-11 13:00Z. The bot restarted six times while the universe was being reset (B23) and
+  registered a new agent at 13:06:49Z, SPECTER again, home system X1-KT73; its first contract was fulfilled at 13:50:56Z.
+- Phase 6's checks, on the run that ended then (2026-10-04 13:00Z to 2026-10-11 13:00Z, the first full period): not met.
+  194 `ShipLeftIdle`, 141 `ShipStuck`, 13 `ApiThrottled`, 4 `RepeatingError`, 1 `CircuitBreakerTripped`; they gave
+  B80–B82 (`PLAN.md`), and the 429s of the API's rate limiter, about 90 a day.
 
 ## Fixed bugs
 
@@ -319,6 +330,7 @@ the misbehaviour.
 | B76 | **A new explorer goes trading while systems are left to explore** (found 2026-10-07).<br>• The explore plan waits a pass while a look that could change its choice is still to come: the gates an exploration has just shown, a system's waypoints for a warp (`ExploreStepKind.Wait`). An explorer of its own waits with its assignment open; a free one, just bought or back from a trade, was left free. The role board then gave it the trade role ("only_role") and the trading plan a trip, against D102: an explorer trades only with no system left to take.<br>• NANSEN-5 (SPECTER-209), bought at X1-BC24-C15X at 11:49:19Z, "the 5 of the 5 wanted for the 41 systems left to explore": trade role at 11:49:38, a 39-minute trade at 11:49:50; the plan was still looking at gates X1-HF61's exploration (11:45:44) had shown (X1-XF24's unknown till 11:49, X1-UY47's 11:50–11:52), and SPECTER-121 waited in X1-HF61 till 11:51:19 for the same looks. NANSEN-4 (08:31, three trades in 44 minutes) and NANSEN-3 (06:03, 15 minutes) went the same way. | `DecideExplorerAsync` in `Exploring/ExplorePlanService.cs`; `ExplorersTests.AFreeExplorer_IsKeptWhileThePlanLooksAtTheGatesItJustLearnedOf_SoNoTradeTakesIt` (failed before the fix) | 6.30; fixed, merged as projects#202 (main `a313b46b`), deployed by gembernodes#92 |
 | B77 | **A restart can put a ship back where it was before an arrival moved it** (found 2026-10-07).<br>• The ship event scheduler starts first in the startup chain (step 2), so an arrival due during a restart is handled at once: the ship jumps, flies on or sells. Startup sync (step 8) fetches every ship, 20 a page, and saves them all at the end, so a ship moved between its page's fetch and the save was stored as the page had it.<br>• Deploy of 05:27Z: SPECTER-121 (NANSEN-2) jumped from X1-AT30 to X1-FA16 at 05:27:57; "Startup ship refresh saved for 419 ship(s)" at 05:28:01 put it back at the X1-AT30 gate, without the jump's cooldown. The explore plan's first tick (05:33:41) sent it through that gate again: the API refused (409), the circuit breaker tripped (`CircuitBreakerTripped`), and the plan left X1-FA16's gate alone for an hour (`jump_refused`), so once it had scouted X1-FA16 the explorer had no way out and traded for 40 minutes ("no system is left for it to explore (25 left, each taken)").<br>• Deploy of 11:04Z: SPECTER-35 arrived at X1-FJ91-C45 and siphoned at 11:05:00; the save at 11:05:06 stored it in transit again, until "is still stored in transit … its arrival is scheduled again" at 11:14:17. | `StartAsync` in `SpaceTraders.API/Services/StartupSyncService.cs`; `StartupSyncServiceTests.StartAsync_KeepsWhatAnArrivalStoredWhileTheShipsWereFetched` (failed before the fix) | 1.12 (startup sync); fixed, merged as projects#203 (main `05a78d74`), deployed by gembernodes#92 |
 | B78 | **The explorers wait for hours, all together, for a system only a warp reaches** (found 2026-10-09).<br>• An explorer with a warp drive waits while the waypoints of a system only a warp reaches, within a warp of an explored system, were never fetched (`ExploreStepKind.Wait`, slice 6.31). The explore plan makes one look a pass, and fetched those last, after every look due again: with 24 gates under construction, each looked at again hourly, and a pass every 2 to 9 minutes, the looks due again never ran out. The condition is the same for every explorer, so all five waited, each with its explore assignment and no goal, out of `ShipStuck`'s sight.<br>• 2026-10-08 19:47–20:01Z to 2026-10-09 04:31Z: the five explorers logged nothing; 15 to 22 gate looks an hour (`systems/{systemSymbol}/waypoints/{waypointSymbol}`) and no system fetched (`systems/{systemSymbol}`, 0 from 21:00Z); X1-BS22 and X1-KA53, behind gates under construction, were fetched at 04:26:49 and 04:30:07, and within two minutes the five had Jump goals (`ShipStuck` at 04:31:43, 511–525 minutes since their last update) and moved. The same at 10-08 01:34Z, 08:41Z, 13:21Z and 10-09 12:59Z: about 14 of 48 hours. | `LearnAsync` in `Exploring/ExplorePlanService.cs`; `WarpExplorersTests.ASystemOnlyAWarpReaches_IsFetchedBeforeTheGatesDueALookAgain_SoTheExplorersDontWaitBehindThem` (failed before the fix) | 6.31; fixed, merged as projects#206 (main `8e4e5165`), deployed by gembernodes#93 |
+| B79 | **The probes, the drones in turn and the miners abroad wait for plans that need nothing** (found on 2026-10-10).<br>• A plan's word in the order ships are bought in counted for 2 minutes; a tick takes 3 to 7, and the probe plan runs before the survey, mining, siphon, construction and trading plans, so their word from the tick before was too old and held it back.<br>• Fix: a word counts until the plan's next pass, said in this tick or the one before (`GameTicks`), and so does a shipyard's call. | 2026-10-10: probe plan `Purchase` = 6 (`WaitingForAnotherPurchase`); the window was open in 26 of 199 ticks, and each of the 15 interceptors was bought in one (the trading plan's word 52 s to 1 min 39 s old); 242M credits, 66M reserve | 6.10b (D43) (fixed: merged as projects#208, deployed by gembernodes#95 on 2026-10-10 17:49Z) |
 
 ## Phases
 
@@ -1359,6 +1371,9 @@ asked that day, D76)
 - To understand this, start with `CheckRoutes` and `TryEvaluateFrom` in `Trading/TradeRoutePlanner.cs`, then
   `Trading/TradeRouteJudgement.cs`, then `SaveStateAsync` in `Automation/TradingAutomationService.cs`; in gembernodes,
   the trade routes panel of `infrastructure/monitoring/dashboards/spacetraders-markets-dashboard.json`.
+
+**2.19 Two runs on one chart** (D123; merged with slices 6.37–6.40 as projects#207 and in gembernodes, deployed by
+gembernodes#94 on 2026-10-09 22:37Z): its details are with 6.37–6.40 under phase 6, as it was asked with them.
 
 **Phase 2 in short** (done 2026-10-01; the dashboard and alerts merged in gembernodes PR #10, the Grafana restart pending)
 - Prometheus can scrape the bot (port 9090, no key), and every number the dashboard needs is a
@@ -3340,6 +3355,157 @@ when it is seen for the first time.
   - To understand this, start with `RankingProfit` and `CompareBestFirst` in `Trading/TradeRoutePlanner.cs`, then
     `Collectors` in `Automation/RolePlanService.cs`.
 
+- **6.37–6.40 and 2.19** (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on 2026-10-09 22:37Z; built on branch `claude/laughing-babbage-f8yqdj` in projects and
+  gembernodes, one commit per slice). Asked: "Some spacetraders updates for you to chew on: When available, I'd like
+  INTERCEPTORS to be used instead of PROBES. As with the other ships, do not buy INTERCEPTORS if the supply is SCARCE. When
+  available, use ORE HOUNDS instead of MINING DRONES. I think they can both survey and mine, so have them survey until the
+  desired mineral is found, then mine the survey. I'd like mining to be done wherever there's low ore supply, not just in
+  the home area. However, outside of the home area, mining is low priority, and should never be in the way of trading,
+  which is generally more lucrative. If possible, I'd like the option to overlay 2 (weekly) runs, so I can compare the value
+  curve and see if it becomes better." Then: "For the ore hound, figure out how the MINERAL PROCESSOR works (if at all). If
+  we can immediately sell iron on the market instead of selling iron ore, that would have my preference." Nothing was read
+  from the bot, which this session can't reach; the game's facts are from the API's own spec (v2.3.0, served at
+  `https://api.spacetraders.io/v2/documentation/json`) and its error codes.
+  - **6.37 No ship bought at SCARCE** (D121): built.
+    - Found: only the probes (D97, the plan and the purchase) and the largest hold beyond the list (D112,
+      `TryPurchaseUnlessScarceAsync`) kept to it.
+    - Done: `ScarceShips` (new) says whether a listing is SCARCE. `ShipPurchaseService.TryPurchaseAsync` refuses every ship
+      the cached listing has SCARCE, before it calls a ship to the shipyard, and every ship the shipyard, fetched again,
+      lists SCARCE (`ShipPurchaseFailure.Scarce`); `TryPurchaseUnlessScarceAsync` is gone. Each plan leaves a SCARCE listing
+      out when it chooses where to buy: the contract's drone (`TryPurchaseMinerDroneAsync`), the survey ships
+      (`SurveyorNeedAsync`), the mining drones and shuttles (`DroneNeedAsync`, `CheapestListing`), the siphon drones
+      (`DroneNeedAsync`), the list's cargo ships (`ListedAsync`), the explorers (`BuyAsync`, with `ShipyardsScarce`, new,
+      when every one that sells it has it SCARCE); the probes and the largest hold did already.
+    - Expect, once deployed: no `ShipPurchased` line for a ship its shipyard lists SCARCE on the markets dashboard's
+      shipyards table; a plan whose ship is SCARCE everywhere shows no line in the purchase order table.
+    - Tests: `ShipPurchaseServiceTests` (a drone at SCARCE isn't bought and no ship is called for it, failing before; a
+      cargo ship SCARCE when fetched again), `ContractPlanServiceTests`, `SurveyPlanServiceTests`,
+      `MiningAutomationServiceTests` (another shipyard that has it LIMITED is chosen), `SiphonAutomationServiceTests`,
+      `TradingAutomationServiceTests` (the list's next ship elsewhere, or no need), `ExplorersTests`.
+    - To understand this, start with `TryPurchaseAsync` in `Services/ShipPurchaseService.cs`, then `ScarceShips`.
+  - **6.38 Interceptors instead of probes** (D119): built. Then asked: "Do not forget that stationary interceptors are
+    intended and not cause of a 'stalled ship' warning."
+    - Found: the probe plan bought only `SHIP_PROBE`, and flew its probes in CRUISE without a fuel stop, as a probe has no
+      tank; `FleetRoles.IsProbe` knew a probe by its type and frame alone, so an interceptor would have been a ship for the
+      other plans (and, with a hold and the role board off, a trader); the purchase order counted any type but a probe, a
+      drone, a surveyor and an explorer as a cargo ship in the turns.
+    - Done:
+      - **An interceptor is a probe** (`FleetRoles.IsInterceptor`, new, in `IsProbe`): `SHIP_INTERCEPTOR` as bought,
+        `INTERCEPTOR` after startup sync, or its frame. So the probe plan flies it, parks it at a shipyard, sends it to a
+        call (D30, D110); the role board gives it no role; `ShipLeftIdle` treats it as a probe (a parked one is no idle ship,
+        B74), and `ShipStuck` watches only ships with work, which a parked one has none of. With the board off, no probe is
+        a trader (`FleetRoleBoard.IsTrader`).
+      - **The purchase** (`ProbeDeploymentPlanService.BuyProbeAsync`, `Options`): the offers of interceptors come before
+        every probe's, the cheapest first with the antimatter counted, so a probe is bought only where no interceptor can be;
+        one SCARCE is left out (D121). The need, the purchase and the plan's state (`NextProbeShipType`, new) name the ship.
+      - **The flight** (`DeployProbeGoalExecutor`): a ship with a tank flies its legs as every ship with one does
+        (`GoalFlight`, refuelling on the way, D84); a probe without one flies in CRUISE as before.
+      - **The turns** (`PurchaseOrder`): an interceptor takes none, as a probe takes none.
+    - Readings in the build (yours to confirm or change): "available" is any shipyard the probe plan buys from that lists an
+      interceptor, whatever it costs against a probe; the probes there are keep working; an interceptor's frame or role is
+      enough to know it, its listing's details aren't read here.
+    - Expect, once deployed: on the purchase order table the probe plan's ship is `SHIP_INTERCEPTOR` where a shipyard in
+      reach sells one; new ones named after birds of prey (FALCON-1, …); no `ShipLeftIdle` or `ShipStuck` for a parked one.
+    - Tests: `ProbeDeploymentPlanServiceTests` (an interceptor bought though dearer, a probe where the interceptor is SCARCE,
+      an interceptor flown as a probe), `DeployProbeGoalExecutorTests` (an interceptor's legs carry their mode, no CRUISE
+      switch), `InterceptorTests` (new: a probe by type, role or frame; no role, no trader), `PurchaseOrderTests` (no turn),
+      `ShipRuleTests` (a parked interceptor is neither stuck nor idle; one at a market while a market waits is idle).
+    - To understand this, start with `BuyProbeAsync` and `Options` in `Automation/ProbeDeploymentPlanService.cs`, then
+      `IsInterceptor` in `Automation/FleetRoles.cs`.
+  - **6.39 Ore hounds instead of mining drones** (D120): built.
+    - Found: every plan that buys a miner (the contract, the mining plan's drones for scarce ores, the gate's miners, the
+      turns, the collection points) bought only `SHIP_MINING_DRONE`; a mining drone was a ship that can mine and can't
+      survey (`FleetRoles.IsMiningDrone`), so an ore hound with its surveyor would have been a surveyor: with the survey plan
+      on it would only have surveyed (D20), no drone count would have held it, and the mining plan would have bought drones
+      for the ores it was meant to mine; the extraction (`MineResourceVolumeCommand`) used a survey others took, or none.
+    - Done:
+      - **Which miner is bought** (`MinerShips`, new): an ore hound wherever a shipyard the plan buys from sells one that isn't
+        SCARCE, the cheapest such, else the cheapest mining drone (D121), judged as bought (`AsBought`: the listing's tank,
+        hold and mounts). The contract plan (`TryPurchaseMinerDroneAsync`), the mining plan's drones (`DroneNeedAsync`) and
+        the collection points' drone tank (`CollectionPointsIn`) use it; the turns count an ore hound as a drone
+        (`PurchaseOrder`).
+      - **An ore hound is a mining drone** (`FleetRoles.IsOreHound`, new: `SHIP_ORE_HOUND` as bought, or the miner's frame
+        after startup sync): `IsMiningDrone` counts it; `IsSurveyor` and `PotentialRoles` don't, so it never takes the survey
+        role; the role board's drones include it (`coverage`, `gathers_first`, D58).
+      - **It surveys for itself** (`FleetRoles.SurveysForItself`, `MineResourceVolumeHandler.SurveyForItselfAsync`): at its
+        asteroid, while no usable survey there lists the trip's ore, it surveys instead of extracting, the surveys kept for
+        every miner (`Surveyed`), then extracts with the best that lists it; no limit. A survey another ship took counts; a
+        survey that fails is logged as a warning and that step extracts without one. An ore hound without a surveyor is
+        served by the survey ships, as a drone is.
+      - **The survey ships** (`SurveyPlanService`, `RolePlanner.SurveyHolders`): bought, and a ship that can survey takes the
+        survey role, only for the miners that need surveys (`FleetRoles.NeedsSurveyShips`): a system whose miners all survey
+        for themselves buys none, and the areas count only the drones that need them.
+    - Readings in the build (yours to confirm or change): "available" is any shipyard the plan buys from that lists an ore
+      hound, whatever it costs against a drone (for the contract, the shipyards at home; for the mining plan, the system's);
+      an ore hound synced at startup is known by its frame, `FRAME_MINER`, as the name book already knows it (slice 2.14), as
+      its listing's details aren't read here. No refining: refining needs a refinery module, which the ore hound isn't known to
+      carry, and turns 100 ore into 10 metal (D120).
+    - Expect, once deployed: on the purchase order table the contract's and the mining plan's ship is `SHIP_ORE_HOUND` where
+      a shipyard sells one; new ones named after hounds (BEAGLE-1, …); `Surveyed` lines from them at their asteroids, then
+      `Extracted` lines with a `Signature`; no `SHIP_SURVEYOR` bought for a system whose miners are all ore hounds.
+    - Tests: `OreHoundTests` (new: a drone by type or frame that surveys for itself, never a surveyor; the command ship still
+      surveys; the ore hound bought though dearer, a drone where it is SCARCE), `MineResourceVolumeHandlerTests` (surveys
+      instead with no survey for its ore; mines with another ship's; extracts without one when the survey fails; a drone as
+      before), `ContractPlanServiceTests`, `MiningAutomationServiceTests` (bought in the drone's place; a miner whose first
+      trip serves the scarcest market), `SurveyPlanServiceTests` (no survey ship for ore hounds), `RolePlannerTests` (it
+      gathers first; the command ship doesn't survey for ore hounds alone), `PurchaseOrderTests` (it takes the drones' turn).
+    - To understand this, start with `MinerShips` in `Mining/MinerShips.cs`, then `SurveyForItselfAsync` in
+      `Commands/Ships/MineResourceVolumeCommand.cs` and `IsOreHound` in `Automation/FleetRoles.cs`.
+  - **6.40 Mining abroad** (D122): built.
+    - Found: the mining plan bought drones only at home (`BusinessSystems`, D60) but gave a trip to any free miner in its own
+      system; the role board let a ship abroad only trade; the contract plan took every free miner and the survey plan
+      bought a survey ship for every system with drones, wherever they were; `Mining.MaxDrones` counted every mining ship,
+      and a free miner anywhere stopped home's drone purchases in turn with the cargo ships.
+    - Done:
+      - **Where:** a system abroad is one outside the systems the plans do business in with a market whose prices are at most
+        `Trade.MaxPriceAgeMinutes` old (`IMiningContextReader.SystemsAbroadAsync`, `ITradeContextReader.FreshMarketsAsync`,
+        new). Its mining context marks the older markets stale (`TradeMarketMap.WithStaleMarkets`, new), and stale markets
+        are neither targets nor openings (`MiningPlanner.MiningTargets`, `LowSupplyOpportunities`); at home nothing changes.
+      - **The purchase** (`MiningAutomationService.AbroadNeedAsync`, `PurchaseTier.MiningAbroad`, new, 12): with nothing to
+        buy at home, for the first system abroad by symbol with fewer mining drones than ores a miner bought there could
+        serve a market short of (`MiningPlanner.ScarceOres`, each ore once), an ore hound where one is sold, else a mining
+        drone (D120, D121); one a pass, no cap; `Mining.MaxDrones` counts home's.
+      - **The trips:** abroad no collection points; a pair whose market a trade trip is on its way to sell the ore at is
+        left to the trade (`MiningContext.LeftToTrade`, new): no miner takes or shares it, it counts as no short ore, and it
+        is no opening. Only home's free miners hold back home's drones in turn with the cargo ships.
+      - **Home only:** the contract takes only miners at home (`ContractPlanService`); the survey ships are bought only for
+        home's drones (`SurveyPlanService`, which takes `IAgentRepository`).
+      - **The role board** (`RoleSettings.Available`): a mining drone or an ore hound abroad can mine too, with the mining
+        plan on; every other ship abroad still only trades.
+    - Readings in the build (yours to confirm or change): "the probes keep fresh" is any market seen with prices within
+      `Trade.MaxPriceAgeMinutes`, so a stale market abroad is left out, not the whole system; a short ore is one a miner bought
+      there could serve, at a market that makes something from it (D91), each counted once per system, not per area; the
+      systems abroad are taken by symbol, not by distance, as a miner bought there stays there; "in the way of trading" is
+      read as: last in the order, no ship that could trade is taken off trading, and no miner for a pair a trade trip is on
+      its way to sell at. A trade route planned later can still meet a market a miner has filled.
+    - Expect, once deployed: `MiningAbroad` rows on the purchase order table once nothing else waits; "was bought to mine
+      in X1-..., abroad" lines; `MiningStarted` lines from miners in other systems; no `SHIP_SURVEYOR` or light shuttle
+      bought abroad.
+    - Tests: `MiningAutomationServiceTests` (bought last, one per short ore, an ore hound where sold, none where SCARCE; a
+      pair left to a trade trip abroad but not at home; no collection point abroad; home's cap and free miners),
+      `PurchaseOrderTests` (last, after the turns and the far probes; holds back no cargo ship), `MiningPlannerTests`
+      (stale markets, pairs left to the trade), `MiningContextReaderTests` (new), `TradeContextReaderTests` (fresh
+      markets), `AbroadRoleTests`, `ContractMinersTests`, `ContractPlanServiceTests`, `SurveyPlanServiceTests`.
+    - To understand this, start with `AbroadNeedAsync` and `ReadContextAsync` in `Automation/MiningAutomationService.cs`,
+      then `MiningContextReader` in `Mining/MiningContext.cs`.
+  - **2.19 Two runs on one chart** (D123): built, in gembernodes (branch `claude/laughing-babbage-f8yqdj`, its NOTES.md).
+    - Found: every series carries its run's reset date (D70), but each run shows on its own dates, and Prometheus kept 15
+      days (the chart's default).
+    - Done: a "Compare with" picker on the SpaceTraders dashboard (the runs Prometheus holds, newest first, but the one under
+      Reset); "Total value, two runs" and "Value gained per hour, two runs" under Total value, the compared run dashed and
+      read earlier by the seconds between the two runs' first samples (two hidden variables, `shift` and `shift_hour`, to 5
+      minutes); `server.retention: "31d"` in `prometheus-release.yaml`. A second commit brings the dashboards' descriptions
+      up to slices 6.37–6.40 (position 12 of the purchase order, ore hounds, interceptors, SCARCE).
+    - Readings in the build (yours to confirm or change): the compared run's lines are drawn on the dashboard's time range, so
+      widen it (say, the last 7 days) to see whole runs; with several runs ticked under Reset, the shift starts from the
+      earliest of them.
+    - Expect, once deployed: the picker opens on the run before the current one; right after the deploy Prometheus still
+      holds only the last 15 days, and keeps up to 31 from then on. The TSDB grows to about twice its size on the NFS share
+      (its claim asks for 2Gi, which the NFS driver most likely doesn't enforce).
+    - Tests: `promtool test rules` (Prometheus 2.55.1, what chart 25.30.2 runs) against two synthetic runs, 18 checks (a
+      newer run compared, no run to compare with, a compared run that had ended); Grafana 11.6.1 against a local Prometheus
+      with a backfilled week-long run and one 30 hours old, at desktop and phone width.
+
 - **6.36 A purchase that waits for a ship lets the ones behind it through** (built on branch
   `claude/spacetraders-waiting-purchase-lets-others-through`, asked on 2026-10-07, D118; merged as projects#205, main
   `f7d8ba94`, deployed by gembernodes#92 with the dashboards' descriptions, merged 2026-10-07 14:55Z). Asked, after the day's
@@ -3617,6 +3783,44 @@ when it is seen for the first time.
   - Done when: an explorer is bought without the command ship wherever a probe is in its shipyard's system, the command
     ship fetches one only where none is, and every shipyard within the trade reach has a probe, those that sell explorers
     first, before the other markets get theirs.
+
+- **6.27–6.31 Across systems** (planned on 2026-10-06, D94–D107, all done; numbered after projects#189's
+  slice 6.26 and D93, open that day). Asked: "1. I'd like to CHART unchartered systems and waypoints. 2. I'd like to expand the trade
+  system so other systems actually get considered and used. I want a "profit per time unit" so the system can choose
+  between a short route that pays less or a long route that pays more. 3. I'd like the new ship type, EXPLORER, to be bought
+  to help with exploring. 4. I'd like probes to be at each new market." And: "Ask questions, and first make/update the plan
+  so you don't overcommit yourself." Built in the order below (D94), one PR each (with a gembernodes PR where a dashboard
+  changes), with a stop after each for your check.
+  - **What the bot's data said** (2026-10-06, about 07:30Z, image `f2068e5`):
+    - The home gate X1-FJ91-I64 was finished at about 04:12Z. By 07:23Z the command ship had jumped seven times (5,024 to
+      5,560 antimatter a jump), explored X1-HN44, X1-NF46, X1-AD37, X1-GT9, X1-TA92 and X1-AA31, and was scouting X1-PX46.
+      It goes to the nearest system from where it is, so X1-QA35 and X1-QR21, one jump from home, are still to explore.
+      Five gates it saw are under construction: X1-XJ90 (one jump from home), X1-JU15, X1-JX83, X1-YG40 and X1-ZZ69. Its
+      jump from X1-AA31 to X1-PX46, about 1,890 apart, left a cooldown of 596 seconds.
+    - All 514 waypoints cached in those systems are charted, by other agents: nothing in reach needs charting.
+    - Home's trade has thinned: the four routes running expected 1,881 to 4,254 a trip. The widest gaps the command ship
+      saw abroad, on its one visit: EQUIPMENT 1,414 a unit in X1-HN44 (trade volume 20); FIREARMS 761, DRUGS 740 and
+      ASSAULT_RIFLES 670 in X1-AA31; SHIP_PLATING 433 in X1-TA92. Home's widest: SHIP_PARTS 210, MEDICINE 180.
+    - Credits 2,004,964, the credit reserve 535,553. The bot made 1.12 API requests a second (the limit is 2). The market
+      watch fetches one market a tick, so at most about 60 markets every 5 minutes.
+    - A gate jump needs no jump drive: SPECTER-1 has none (a cargo hold, crew quarters, mineral and gas processors) and
+      jumped seven times. Probes and cargo ships should jump as well; a probe's first jump confirms it.
+    - The next reset is on 2026-10-11 at 13:00Z. After it the new home system's gate has to be built first (D68) before
+      6.28–6.31 do anything; 6.27 works from the start. In this reset the gate is built, so each works once deployed.
+  - **6.27 Profit per hour** (D95): done, merged as projects#190, its routes table as gembernodes#81, deployed by
+    gembernodes#82 (image `6a0bcf2`, live since 2026-10-06 09:05Z); its details are in `docs/archive/PLAN_HISTORY.md`.
+  - **6.28 Probes at the markets abroad** (D97, D101): done, merged as projects#192 with B72's fix (projects#193), its
+    dashboard as gembernodes#83, deployed by gembernodes#84 (image `edb83c8`, live since 2026-10-06 10:55Z). Its details are
+    in `docs/archive/PLAN_HISTORY.md`.
+  - **6.29 Trade across systems** (D95, D96): done, merged as projects#194, its routes table's jumps column and the deploy
+    as gembernodes#85 (image `7555d61`, live since 2026-10-06 12:01Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
+  - **6.30 The explorers, and charting** (D98, D99, D102, D103): done, merged as projects#195 with B73's fix, its systems
+    dashboard and the deploy as gembernodes#86 (image `8c37dd7e`, live since 2026-10-06 13:19Z). Its details are in
+    `docs/archive/PLAN_HISTORY.md`.
+  - **6.31 Warping** (D100, D101, D104–D107): done, merged as projects#196, its dashboard and the deploy as gembernodes#87
+    (image `60f3922a`, live since 2026-10-06 14:45Z). Its details are in `docs/archive/PLAN_HISTORY.md`.
+  - Outside these slices: mining, siphoning, surveys, contracts and the other plans' purchases abroad (D60); the gates of
+    other systems (D68).
 
 - **6.31 Warping** (built on branch `claude/spacetraders-warp`, asked on 2026-10-06, D100, D101, D104–D107; merged as
   projects#196, main `60f3922a`, its dashboard and the deploy as gembernodes#87, live since 2026-10-06 14:45Z): the explorer
@@ -4319,3 +4523,4 @@ your PC, 1Password or kubectl:
 | 2.16 | A "Profit by ship" table under the SpaceTraders dashboard's Roles table: each ship's profit, its purchase, market buys, market sales, fuel and other, and the fleet's totals; the panels below moved down by its height (merged: PR #64, which deployed the build) |
 | 2.17 | "Trade routes, in the order traders take them" under the market tree on the markets dashboard, from `/status/trading-routes` through the SpaceTraders API data source (merged: PR #65, which deployed the build) |
 | 2.18 | The trade routes table under the market tree: after the routes, a row for each other good with a price gap, "not traded", with why not in a new "why not" column, and the description that says so (branch `ccr-f3fba810-ie3vm6`, not merged). Its rows show once the bot runs a build with slice 2.18: deploy that build with it |
+| 2.19 | A "Compare with" picker on the SpaceTraders dashboard, "Total value, two runs" and "Value gained per hour, two runs", `server.retention: "31d"` in `prometheus-release.yaml`, and the dashboards' descriptions of slices 6.37–6.40 (merged: PR #94, which deployed the build) |
