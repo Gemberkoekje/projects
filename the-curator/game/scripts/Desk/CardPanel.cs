@@ -18,7 +18,7 @@ public partial class CardPanel : Control, IGameView
     private readonly Label description = UiTheme.Para("", UiTheme.PrintItalic, 19, UiTheme.Ink);
     private readonly Label firstVisit = UiTheme.Text("", UiTheme.Print, 19, UiTheme.Faint);
     private readonly GridContainer loans = new() { Columns = 3 };
-    private readonly Label empty = UiTheme.Text(UiText.NoCard, UiTheme.PrintItalic, 22, new Color(0.95f, 0.88f, 0.75f, 0.55f));
+    private readonly Label empty = UiTheme.Text(UiText.NoCard, UiTheme.PrintItalic, 22, new Color(0.95f, 0.88f, 0.75f, 0.9f));
     private readonly HBoxContainer decisions = new();
     private readonly Button lend = new();
     private readonly Button decline = new();
@@ -61,6 +61,11 @@ public partial class CardPanel : Control, IGameView
         empty.Position = new Vector2(20, 140);
         empty.Size = new Vector2(420, 40);
         empty.HorizontalAlignment = HorizontalAlignment.Center;
+        // Bare wood behind it: a soft dark halo keeps it legible on the light and the dark grain alike.
+        empty.AddThemeColorOverride("font_shadow_color", new Color(0.12f, 0.08f, 0.05f, 0.75f));
+        empty.AddThemeConstantOverride("shadow_outline_size", 8);
+        empty.AddThemeConstantOverride("shadow_offset_x", 0);
+        empty.AddThemeConstantOverride("shadow_offset_y", 0);
         AddChild(empty);
 
         decisions.Position = new Vector2(0, 342);

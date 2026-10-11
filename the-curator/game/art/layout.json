@@ -15,7 +15,7 @@
       ],
       "z": -40,
       "parallax": 0.85,
-      "lightMask": 7,
+      "lightMask": 3,
       "placeholder": "stone",
       "color": "#6e6a66"
     },

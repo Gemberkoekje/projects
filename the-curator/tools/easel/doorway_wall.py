@@ -84,6 +84,6 @@ s.look(path=f"stage{STAGE}.png")
 s.look(values=True, path=f"stage{STAGE}_values.png")
 print(s.budget_line() if hasattr(s, "budget_line") else s.stroke_count)
 if STAGE >= 99:
-    s.stroke([n(1240, 690), n(1252, 684), n(1262, 689)], "liner", "joint", size=0.002, opacity=0.6, note="signature")
+    s.stroke([n(1240, 690), n(1252, 684), n(1262, 689)], "liner", "joint", size=0.002, opacity=0.25, note="signature")
     print(s.checklist())
     s.export("doorway_wall_rgb.png")

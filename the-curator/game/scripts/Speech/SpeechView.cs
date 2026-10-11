@@ -17,7 +17,7 @@ public partial class SpeechView : Control, IGameView
     private readonly PanelContainer talk = new();
     private readonly Label patronName = UiTheme.Text("", UiTheme.Print, 30, UiTheme.SpeechInk);
     private readonly Label description = UiTheme.Para("", UiTheme.PrintItalic, 19, UiTheme.CuratorInk);
-    private readonly ScrollContainer transcriptScroll = new() { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+    private readonly ScrollContainer transcriptScroll = new() { Name = "Transcript", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
     private readonly VBoxContainer transcript = new();
     private readonly PanelContainer ask = new();
     private readonly Pips patience = new();
@@ -60,6 +60,10 @@ public partial class SpeechView : Control, IGameView
         transcript.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         transcript.AddThemeConstantOverride("separation", 10);
         transcriptScroll.AddChild(transcript);
+        // New lines are measured a frame or two after they're added, so the view follows the scroll range
+        // as it grows; scrolling once, straight away, lands on the old bottom.
+        var bar = transcriptScroll.GetVScrollBar();
+        bar.Changed += () => transcriptScroll.ScrollVertical = (int)bar.MaxValue;
         talkColumn.AddChild(transcriptScroll);
         talk.AddChild(talkColumn);
         AddChild(talk);
@@ -75,13 +79,16 @@ public partial class SpeechView : Control, IGameView
         patienceRow.AddChild(UiTheme.Text(UiText.Patience, UiTheme.PrintItalic, 19, UiTheme.CuratorInk));
         patience.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         patienceRow.AddChild(patience);
-        tell.AutowrapMode = TextServer.AutowrapMode.Off;
-        tell.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        patienceRow.AddChild(tell);
+        patienceRow.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
         readThoughts.FocusMode = FocusModeEnum.None;
         readThoughts.Pressed += () => Game.Send(new ReadThoughts());
         patienceRow.AddChild(readThoughts);
         askColumn.AddChild(patienceRow);
+        // The impatience tell gets a line of its own: beside the pips it pushed the row wider than the
+        // panel at the larger text sizes.
+        tell.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        tell.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        askColumn.AddChild(tell);
         var questionScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, SizeFlagsVertical = SizeFlags.ExpandFill };
         questions.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         questions.AddThemeConstantOverride("separation", 2);
@@ -132,6 +139,7 @@ public partial class SpeechView : Control, IGameView
         RenderTranscript(visit.VisitId, visit.Transcript);
         patience.Show(visit.Patience, Math.Max(visit.Patience, 1));
         tell.Text = visit.Impatient ? visit.Tell : "";
+        tell.Visible = visit.Impatient;
 
         foreach (var child in questions.GetChildren())
         {
@@ -216,6 +224,5 @@ public partial class SpeechView : Control, IGameView
 
         shownVisit = visitId;
         shownLines = lines.Count;
-        Callable.From(() => transcriptScroll.ScrollVertical = (int)transcriptScroll.GetVScrollBar().MaxValue).CallDeferred();
     }
 }

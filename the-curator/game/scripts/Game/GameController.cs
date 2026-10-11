@@ -367,6 +367,20 @@ public partial class GameController : Node, ICommandSender
         GetViewport().SetInputAsHandled();
     }
 
+    /// <summary>Answers an open yes-or-no question (closing early) with no, as Esc does.</summary>
+    /// <returns>Whether a question was open.</returns>
+    public bool DismissQuestion()
+    {
+        if (!Screen.Confirm.Visible)
+        {
+            return false;
+        }
+
+        Screen.Confirm.Visible = false;
+        Refresh();
+        return true;
+    }
+
     /// <summary>Puts the day summary away, as its button does; after the last day, the week summary follows.</summary>
     public void DismissSummary()
     {
@@ -430,6 +444,9 @@ public partial class GameController : Node, ICommandSender
                 Screen.World.Lights.SetPhase(phase, immediate);
             }
 
+            // Turning the reading lamp on or off is a switch, not a change of light: it applies at once,
+            // even behind the settings menu while the game is paused.
+            immediate |= phase == shownPhase && ReadingLamp != tintedLamp;
             tintedLamp = ReadingLamp;
             if (Screen.Layout.Phases.TryGetValue(phase, out var light))
             {

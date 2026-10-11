@@ -40,6 +40,7 @@ public partial class Main : Node
     public override void _Ready()
     {
         ErrorLog.Install();
+        GetTree().NodeAdded += UiTheme.KeepScrollWheel;
         options = CommandLine.Parse(OS.GetCmdlineUserArgs());
 
         // Test and screenshot runs start from the default settings, whatever this machine has saved.
@@ -154,6 +155,8 @@ public partial class Main : Node
         game?.Destroy(world, resetCamera: true);
         game = null;
         GetTree().Paused = false;
+        // Behind the title the room is scenery: no panning until a game starts.
+        world.Camera.SetProcessUnhandledInput(false);
         world.Lights.SetPhase(DayPhase.Morning, immediate: true);
         if (content is null)
         {
@@ -169,7 +172,7 @@ public partial class Main : Node
     public override void _UnhandledInput(InputEvent @event)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        if (!@event.IsActionPressed("menu") || game is null)
+        if (!@event.IsActionPressed("menu"))
         {
             return;
         }
@@ -177,6 +180,14 @@ public partial class Main : Node
         if (settingsPanel.Visible)
         {
             settingsPanel.Visible = false;
+        }
+        else if (game is null)
+        {
+            return;
+        }
+        else if (game.Controller.DismissQuestion())
+        {
+            // Esc answered "Not yet".
         }
         else if (!game.Controller.Modal || pause.Visible)
         {
@@ -190,6 +201,7 @@ public partial class Main : Node
     /// <inheritdoc />
     public override void _ExitTree()
     {
+        GetTree().NodeAdded -= UiTheme.KeepScrollWheel;
         UiTheme.Release();
         ArtLibrary.Release();
     }
@@ -227,6 +239,7 @@ public partial class Main : Node
         title.Visible = false;
         pause.Visible = false;
         game = GameUi.Build(this, world, ui, debugLayer, layout, theme, session);
+        world.Camera.SetProcessUnhandledInput(true);
         game.Controller.Autosave = autosave;
         game.Controller.ReadingLamp = settings.ReadingLamp;
         game.Controller.LeftForTitle += ShowTitle;
@@ -242,6 +255,7 @@ public partial class Main : Node
         if (textSizeChanged)
         {
             UiTheme.ScaleFonts(theme);
+            pause.Rebuild();
         }
 
         if (game is null)
@@ -256,10 +270,12 @@ public partial class Main : Node
             var session = game.Controller.Session;
             var autosave = game.Controller.Autosave;
             var desk = game.Controller.CaptureDesk();
+            var paused = pause.Visible;
             game.Destroy(world, resetCamera: false);
             game = null;
             Begin(session, autosave);
             Controller.RestoreDesk(desk);
+            pause.Visible = paused;
             UpdatePaused();
             return;
         }

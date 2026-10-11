@@ -41,6 +41,6 @@ if STAGE >= 3:
 s.look(path=f"stage{STAGE}.png")
 print(s.budget_line() if hasattr(s, "budget_line") else s.stroke_count)
 if STAGE >= 99:
-    s.stroke([(0.965, 0.93), (0.975, 0.91), (0.985, 0.925)], "liner", "seam", size=0.002, opacity=0.6, note="signature")
+    s.stroke([(0.965, 0.93), (0.975, 0.91), (0.985, 0.925)], "liner", "seam", size=0.002, opacity=0.25, note="signature")
     print(s.checklist())
     s.export("counter.png")

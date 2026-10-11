@@ -172,6 +172,8 @@ public partial class ShotRunner : Node
         Game.World.Camera.LookDown(immediate: true);
         Game.OpenBook("common-wards");
         await Shoot("day3_larger_text");
+        Game.Open(DeskDocument.Catalogue);
+        await Shoot("day3_larger_catalogue");
         Root.TrySettings(textSize: 0, readingLamp: false);
         await Seconds(0.3);
         Game.World.Camera.LookDown(immediate: true);

@@ -191,18 +191,8 @@ public partial class NotebookPanel : Control, IGameView
             page.AddChild(grid);
         }
 
-        page.AddChild(Rule());
-        page.AddChild(Hand(UiText.Thoughts, 28, UiTheme.Faint));
-        if (notebook.Thoughts.Count == 0)
-        {
-            page.AddChild(Hand("—", 24, UiTheme.Faint));
-        }
-
-        foreach (var thought in notebook.Thoughts)
-        {
-            page.AddChild(HandPara($"{thought.Date}: …{thought.Fragment}…", 25, UiTheme.Ink));
-        }
-
+        // A noted thought is copied into the free notes with its date (GDD §9's third section), so it
+        // isn't listed again here.
         page.AddChild(Rule());
         page.AddChild(Hand(UiText.FreeNotes, 28, UiTheme.Faint));
         var free = new TextEdit

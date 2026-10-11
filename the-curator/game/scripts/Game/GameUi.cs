@@ -81,11 +81,6 @@ public sealed class GameUi
 
         controller.AddDocuments(documents);
         controller.AddDocuments(speech);
-        foreach (var root in new Node[] { documents, speech, debug })
-        {
-            Callable.From(() => UiTheme.KeepScrollWheel(root)).CallDeferred();
-        }
-
         return built;
     }
 

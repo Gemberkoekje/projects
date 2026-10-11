@@ -74,6 +74,6 @@ s.look(values=True, path=f"stage{STAGE}_values.png")
 print(s.budget_line() if hasattr(s, "budget_line") else s.stroke_count)
 if STAGE >= 99:
     # Signed small, low in the shade, close in value to what it sits on.
-    s.stroke([(0.93, 0.955), (0.95, 0.945), (0.965, 0.952)], "liner", "joint", size=0.004, opacity=0.6, note="signature")
+    s.stroke([(0.93, 0.955), (0.95, 0.945), (0.965, 0.952)], "liner", "joint", size=0.004, opacity=0.25, note="signature")
     print(s.checklist())
     s.export("beyond_doorway.png")

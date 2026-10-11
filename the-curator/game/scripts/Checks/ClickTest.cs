@@ -1,4 +1,5 @@
 using Curator.Core.Content;
+using Curator.Presentation.Desk;
 using Curator.Presentation.Game;
 using Godot;
 
@@ -17,7 +18,9 @@ public partial class ClickTest : Node
     // Unset until Setup (a justified nullable: nothing to test yet).
     private Main? main;
 
-    private GameController Game => (main ?? throw new InvalidOperationException("Set up the click test first.")).Controller;
+    private Main Host => main ?? throw new InvalidOperationException("Set up the click test first.");
+
+    private GameController Game => Host.Controller;
 
     /// <summary>Prepares the test.</summary>
     /// <param name="mainNode">The main scene, whose game is played and continued.</param>
@@ -96,6 +99,30 @@ public partial class ClickTest : Node
         await Tap(Key.C, 'c');
         Check("and C again puts it away", Game.CaptureDesk().Document == DeskDocument.None);
 
+        // The wheel scrolls a document; at the document's end it stops there instead of panning the camera.
+        await Tap(Key.C, 'c');
+        var drawers = Visible<ScrollContainer>().Where(s => Ancestors(s).OfType<CataloguePanel>().Any() && s.GetVScrollBar().Visible).ToList();
+        Check("the catalogue drawer scrolls", drawers.Count > 0);
+        if (drawers.Count > 0)
+        {
+            drawers[0].ScrollVertical = 0;
+            await Frames(2);
+            await Wheel(Centre(drawers[0]), MouseButton.WheelUp);
+            await Seconds(0.6);
+            Check("the wheel at the top of the drawer doesn't pan the camera", !Game.World.Camera.LookingUp);
+        }
+
+        await Tap(Key.C, 'c');
+        if (TryFindBareWood(out var bare))
+        {
+            await Wheel(bare, MouseButton.WheelUp);
+        }
+
+        await Seconds(0.7);
+        Check("the wheel over bare wood still pans up", Game.World.Camera.LookingUp);
+        await Click("Look down at the desk");
+        await Seconds(0.7);
+
         // The notebook's first tab is the ingredient log: what the identified page listed is in it.
         await Tap(Key.N, 'n');
         await Click("Ingredients");
@@ -121,11 +148,31 @@ public partial class ClickTest : Node
             await Seconds(1.0);
             var at = views.Visit();
             Check($"patron {visit + 1} arrives", at.Present && !at.Decided);
-            var question = at.Questions.FirstOrDefault(q => !q.Asked);
-            if (question is not null)
+
+            // The first patron is asked three questions, so the transcript runs past its panel.
+            var asks = visit == 0 ? 3 : 1;
+            for (var asked = 0; asked < asks && views.Visit().CanAsk; asked++)
             {
-                await Click(question.Text);
-                Check($"patron {visit + 1} answers a question", views.Visit().Conversation.Count == 1 || !views.Visit().Present);
+                var open = views.Visit().Questions.Where(q => !q.Asked).ToList();
+                if (open.Count == 0)
+                {
+                    break;
+                }
+
+                await Click(open[0].Text);
+            }
+
+            Check($"patron {visit + 1} answers {asks} question(s)", views.Visit().Conversation.Count == asks || !views.Visit().Present);
+            if (visit == 0)
+            {
+                await Frames(8);
+                var transcripts = Visible<ScrollContainer>().Where(s => s.Name == "Transcript").ToList();
+                Check("the transcript is on screen", transcripts.Count > 0);
+                foreach (var bar in transcripts.Take(1).Select(t => t.GetVScrollBar()))
+                {
+                    GD.Print($"     transcript: scrolled {bar.Value} of {bar.MaxValue - bar.Page}");
+                    Check("the transcript runs past its panel, and the newest answer is in view", bar.MaxValue > bar.Page && bar.Value >= bar.MaxValue - bar.Page - 1);
+                }
             }
 
             await Click("Look down at the desk");
@@ -153,6 +200,22 @@ public partial class ClickTest : Node
         await Click("Next morning");
         await Seconds(0.3);
         Check("day 3 begins", !Game.Modal && Game.Session.Views.Hud().Day == 3);
+
+        // A text-size change made from the pause menu's settings comes back to the pause menu.
+        await Tap(Key.Escape);
+        Host.TrySettings(2, false);
+        await Frames(4);
+        Check("a text-size change keeps the pause menu open", GetTree().Paused && FindButton("Resume") is not null);
+        Host.TrySettings(0, false);
+        await Frames(4);
+        await Tap(Key.Escape);
+        Check("Esc then resumes", !GetTree().Paused && FindButton("Resume") is null);
+
+        // Esc answers the close-early question with "Not yet".
+        await Click("Close for the day");
+        Check("closing early asks first", Game.Modal);
+        await Tap(Key.Escape);
+        Check("Esc answers not yet", !Game.Modal && Game.Session.State.Day == 3 && FindButton("Resume") is null);
 
         // Save and continue: the evening saved day 3's morning; leave mid-visit, continue, and that progress is gone.
         var savedEvents = Game.Session.Events.Count;
@@ -219,8 +282,16 @@ public partial class ClickTest : Node
         await Frames(3);
     }
 
-    // Clicks the first spot on screen where the mouse would be over the bare wood behind the documents.
     private async Task ClickBareWood()
+    {
+        if (TryFindBareWood(out var point))
+        {
+            await ClickAt(point);
+        }
+    }
+
+    // The first spot on screen where the mouse would be over the bare wood behind the documents.
+    private bool TryFindBareWood(out Vector2 point)
     {
         var bare = GetTree().Root.FindChild("BareWood", true, false);
         var size = GetViewport().GetVisibleRect().Size;
@@ -228,18 +299,29 @@ public partial class ClickTest : Node
         {
             for (var x = 60f; x < size.X - 60f; x += 40f)
             {
-                var point = new Vector2(x, y);
+                point = new Vector2(x, y);
                 GetViewport().PushInput(new InputEventMouseMotion { Position = point, GlobalPosition = point }, true);
                 if (GetViewport().GuiGetHoveredControl() == bare)
                 {
-                    await ClickAt(point);
-                    return;
+                    return true;
                 }
             }
         }
 
-        failures.Add("no bare wood to click");
-        GD.Print("FAIL no bare wood to click");
+        point = default;
+        failures.Add("no bare wood to point at");
+        GD.Print("FAIL no bare wood to point at");
+        return false;
+    }
+
+    private async Task Wheel(Vector2 point, MouseButton button)
+    {
+        foreach (var pressed in new[] { true, false })
+        {
+            var wheel = new InputEventMouseButton { ButtonIndex = button, Pressed = pressed, Factor = 1f, Position = point, GlobalPosition = point };
+            GetViewport().PushInput(wheel, true);
+            await Frames(2);
+        }
     }
 
     private async Task Tap(Key key, char letter = '\0')

@@ -9,3 +9,6 @@ obj/
 
 # Screenshots, reports and logs (BUILD_BRIEF §3)
 /out/
+
+# Exports (game/export_presets.cfg writes to build/)
+/build/

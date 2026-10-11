@@ -114,6 +114,9 @@ public partial class CataloguePanel : Control, IGameView
         }
 
         button.AddChild(column);
+        // A button doesn't lay out its children, so the card follows the column's height itself: at the
+        // larger text sizes the lines wrap more and a fixed card would cut them off.
+        column.MinimumSizeChanged += () => button.CustomMinimumSize = new Vector2(358, Math.Max(168, column.GetCombinedMinimumSize().Y + 16));
         return button;
     }
 }

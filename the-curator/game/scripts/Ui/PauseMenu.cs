@@ -5,6 +5,8 @@ namespace Curator.Presentation.Ui;
 /// <summary>Esc pauses (BUILD_BRIEF §7.12): resume, settings, back to the title, quit.</summary>
 public partial class PauseMenu : Control
 {
+    private readonly VBoxContainer column = new() { CustomMinimumSize = new Vector2(480, 0) };
+
     /// <summary>Raised for Settings.</summary>
     public event Action Settings = delegate { };
 
@@ -25,9 +27,20 @@ public partial class PauseMenu : Control
         var sheet = new PanelContainer();
         sheet.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Paper, 32));
         center.AddChild(sheet);
-        var column = new VBoxContainer { CustomMinimumSize = new Vector2(480, 0) };
         column.AddThemeConstantOverride("separation", 14);
         sheet.AddChild(column);
+        Rebuild();
+    }
+
+    /// <summary>Builds the menu's contents again, at the current text size.</summary>
+    public void Rebuild()
+    {
+        foreach (var child in column.GetChildren())
+        {
+            column.RemoveChild(child);
+            child.QueueFree();
+        }
+
         column.AddChild(UiTheme.Text("Paused", UiTheme.Print, 36, UiTheme.Ink));
         column.AddChild(UiTheme.Button("Resume", () => Visible = false));
         column.AddChild(UiTheme.Button("Settings", () => Settings()));

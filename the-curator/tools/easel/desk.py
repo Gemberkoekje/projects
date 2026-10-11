@@ -47,9 +47,12 @@ if STAGE >= 4:
 if STAGE >= 5:
     # 5. Two knots drawn out along the grain, each its own: a tight dark one, a long pale-ringed one.
     s.stroke([(0.215, 0.33), (0.23, 0.328), (0.248, 0.331)], "round_hard", "knot", size=0.012, opacity=0.7, pressure="swell", tip_wobble=0.6)
-    s.stroke([(0.18, 0.316), (0.23, 0.308), (0.28, 0.318)], "bristle", "oak_dark", size=0.012, opacity=0.4, pressure="taper")
+    # The grain bends round each knot: a thin line above and below, not a band with square ends.
+    s.stroke([(0.16, 0.318), (0.205, 0.312), (0.232, 0.309), (0.26, 0.312), (0.30, 0.318)], "round_hard", "oak_dark", size=0.003, opacity=0.45, pressure="taper")
+    s.stroke([(0.17, 0.343), (0.21, 0.349), (0.232, 0.352), (0.255, 0.349), (0.29, 0.343)], "round_hard", "oak_dark", size=0.003, opacity=0.35, pressure="taper")
     s.stroke([(0.74, 0.69), (0.77, 0.688), (0.80, 0.692)], "round_hard", p.mix("knot", "oak", 0.4), size=0.014, opacity=0.55, pressure="swell", tip_wobble=0.6)
-    s.stroke([(0.69, 0.672), (0.77, 0.664), (0.85, 0.676)], "bristle", "oak_light", size=0.01, opacity=0.4, pressure="taper")
+    s.stroke([(0.69, 0.676), (0.74, 0.671), (0.77, 0.669), (0.80, 0.671), (0.85, 0.677)], "round_hard", "oak_light", size=0.003, opacity=0.45, pressure="taper")
+    s.stroke([(0.70, 0.703), (0.745, 0.709), (0.77, 0.711), (0.795, 0.709), (0.84, 0.702)], "round_hard", "oak_light", size=0.003, opacity=0.35, pressure="taper")
 if STAGE >= 6:
     # 6. A few highlights on the plank edges nearest the candle (right), lost toward the left.
     for y in (0.218, 0.433, 0.603):
@@ -57,6 +60,6 @@ if STAGE >= 6:
 s.look(path=f"stage{STAGE}.png")
 print(s.budget_line() if hasattr(s, "budget_line") else s.stroke_count)
 if STAGE >= 99:
-    s.stroke([(0.965, 0.95), (0.975, 0.94), (0.985, 0.948)], "liner", "seam", size=0.002, opacity=0.6, note="signature")
+    s.stroke([(0.965, 0.95), (0.975, 0.94), (0.985, 0.948)], "liner", "seam", size=0.002, opacity=0.25, note="signature")
     print(s.checklist())
     s.export("desk.png")

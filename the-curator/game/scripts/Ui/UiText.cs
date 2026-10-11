@@ -47,7 +47,6 @@ public static class UiText
     public const string BackToday = "Back today";
     public const string Gone = "Gone";
     public const string WatchedLoans = "Watched loans";
-    public const string Thoughts = "Thoughts noted";
     public const string FreeNotes = "Notes";
     public const string FreeNotesHint = "Whatever you like. The Board doesn't read it.";
     public const string LedgerNoteHint = "a note…";

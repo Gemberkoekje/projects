@@ -132,19 +132,30 @@ public static class UiTheme
     public static StyleBox PaperSheet(string slot, float margin) => PaperSheet(slot, new Vector4(margin, margin, margin, margin));
 
     /// <summary>
-    /// Stops scroll areas handing the wheel on when they reach an end, so scrolling a document to its
-    /// top doesn't pan the camera (the wheel still pans over the room itself).
+    /// Keeps the wheel inside a scroll area that has something to scroll, and inside text fields, so
+    /// scrolling a document to its end never pans the camera. A scroll area whose content fits lets the
+    /// wheel through, so it still pans over short documents and the room. Connected to the tree's
+    /// node_added, so controls built later (a page rebuilt after an edit) are covered too.
     /// </summary>
-    /// <param name="root">Where to start looking.</param>
-    public static void KeepScrollWheel(Node root)
+    /// <param name="node">A node just added to the tree.</param>
+    public static void KeepScrollWheel(Node node)
     {
-        ArgumentNullException.ThrowIfNull(root);
-        foreach (var control in root.FindChildren("*", "Control", true, false).OfType<Control>().Prepend(root as Control).OfType<Control>())
+        if (node is ScrollContainer scroll)
         {
-            if (control is ScrollContainer or TextEdit)
+            var bar = scroll.GetVScrollBar();
+            void Follow()
             {
-                control.MouseForcePassScrollEvents = false;
+                // Stop, not Pass: a Pass control hands every wheel event on, forced or not.
+                scroll.MouseFilter = bar.Visible ? Control.MouseFilterEnum.Stop : Control.MouseFilterEnum.Pass;
+                scroll.MouseForcePassScrollEvents = !bar.Visible;
             }
+
+            bar.VisibilityChanged += Follow;
+            Follow();
+        }
+        else if (node is TextEdit text)
+        {
+            text.MouseForcePassScrollEvents = false;
         }
     }
 
