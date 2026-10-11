@@ -43,9 +43,18 @@ public static class BotRunner
     /// <param name="bot">The bot.</param>
     /// <param name="days">The last day to play.</param>
     /// <returns>False when there's nothing more to do.</returns>
-    public static bool PlayStep(GameSession session, IStrategyBot bot, int days = int.MaxValue)
+    public static bool PlayStep(GameSession session, IStrategyBot bot, int days = int.MaxValue) => PlayStep(session, session, bot, days);
+
+    /// <summary>Takes one step of a bot's game, sending its commands through <paramref name="sender"/>.</summary>
+    /// <param name="session">The session to read.</param>
+    /// <param name="sender">Where to send commands: the session, or Godot's controller.</param>
+    /// <param name="bot">The bot.</param>
+    /// <param name="days">The last day to play.</param>
+    /// <returns>False when there's nothing more to do.</returns>
+    public static bool PlayStep(GameSession session, ICommandSender sender, IStrategyBot bot, int days = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sender);
         ArgumentNullException.ThrowIfNull(bot);
         if (session.State.Status == DayStatus.WeekOver || session.State.Day > days)
         {
@@ -59,15 +68,15 @@ public static class BotRunner
                 return false;
             }
 
-            BotMoves.Must(session, new CloseForTheDay());
+            BotMoves.Must(sender, new CloseForTheDay());
             return true;
         }
 
-        BotMoves.Must(session, new RingBell());
+        BotMoves.Must(sender, new RingBell());
         if (session.State.InVisit)
         {
             var before = session.Events.Count;
-            bot.PlayVisit(session);
+            bot.PlayVisit(session, sender);
             if (session.State.InVisit || session.Events.Count - before > MaxCommandsPerVisit * 10)
             {
                 throw new InvalidOperationException($"{bot.Name} left visit {session.State.Visit.VisitId} undecided.");

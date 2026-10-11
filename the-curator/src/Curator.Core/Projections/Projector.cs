@@ -119,6 +119,24 @@ public sealed class Projector
             Transcript(requestedOut));
     }
 
+    // One line per event for the debug overlay: its type and the fields that say something.
+    private static string Describe(GameEvent e)
+    {
+        const int MaxValue = 48;
+        var fields = e.GetType().GetProperties()
+            .Where(p => p.Name is not (nameof(GameEvent.Sequence) or nameof(GameEvent.Day)))
+            .Select(p => (p.Name, Value: p.GetValue(e) switch
+            {
+                string text => text,
+                System.Collections.IEnumerable items => string.Join("|", items.Cast<object>()),
+                bool flag => flag ? "yes" : "",
+                var other => Convert.ToString(other, System.Globalization.CultureInfo.InvariantCulture) ?? "",
+            }))
+            .Where(f => f.Value.Length > 0 && f.Value != "0")
+            .Select(f => $"{f.Name}={(f.Value.Length > MaxValue ? f.Value[..MaxValue] + "\u2026" : f.Value)}");
+        return $"#{e.Sequence} day {e.Day} {e.GetType().Name}: {string.Join(", ", fields)}";
+    }
+
     // The current visit's lines, read from the log since its VisitStarted so they keep their order.
     private List<SpeechLine> Transcript(bool requestedOut)
     {
@@ -458,7 +476,7 @@ public sealed class Projector
             state.HasVisit ? state.Visit.Patience : 0,
             outcomes,
             state.Flags.Order(StringComparer.Ordinal).ToList(),
-            session.Events.TakeLast(20).Select(e => $"#{e.Sequence} day {e.Day}: {e}").ToList());
+            session.Events.TakeLast(20).Select(Describe).ToList());
     }
 
     private string Date(int day) => CalendarRules.DateText(Content.Schedule.Calendar, day);

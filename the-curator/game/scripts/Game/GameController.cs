@@ -14,7 +14,7 @@ namespace Curator.Presentation.Game;
 /// after each one (BUILD_BRIEF §7.1). Views never read each other; they call back in here.
 /// Holds only presentation state: which document is open, which returned books were shelved.
 /// </summary>
-public partial class GameController : Node
+public partial class GameController : Node, ICommandSender
 {
     private const float PatronFadeSeconds = 0.6f;
     private const float PatronLeavesAfter = 2.5f;
@@ -33,9 +33,22 @@ public partial class GameController : Node
     private DayPhase shownPhase;
     private int trayDay;
     private bool summaryOpen;
+    private bool weekOpen;
     private bool patronLeaving;
     // The silhouette's fade may or may not be running; null means none (a justified nullable: entity or none).
     private Tween? patronFade;
+
+    /// <summary>Raised when the player leaves the game for the title screen.</summary>
+    public event Action LeftForTitle = delegate { };
+
+    /// <summary>Whether each evening is saved to user://save.json (off for screenshots, bots and tests).</summary>
+    public bool Autosave { get; set; }
+
+    /// <summary>Whether documents keep full brightness in every phase (the reading-lamp setting).</summary>
+    public bool ReadingLamp { get; set; }
+
+    /// <summary>The book open on the desk, or empty.</summary>
+    public string OpenBookId => openBookId;
 
     /// <summary>The game being played.</summary>
     public GameSession Session => session ?? throw new InvalidOperationException("The controller isn't set up yet.");
@@ -44,7 +57,10 @@ public partial class GameController : Node
     public WorldView World => Screen.World;
 
     /// <summary>Whether a summary or question is covering the screen.</summary>
-    public bool Modal => summaryOpen || Screen.Confirm.Visible;
+    public bool Modal => summaryOpen || weekOpen || Screen.Confirm.Visible;
+
+    /// <summary>Whether the week summary is showing.</summary>
+    public bool WeekSummaryShowing => weekOpen;
 
     private Parts Screen => parts ?? throw new InvalidOperationException("The controller isn't set up yet.");
 
@@ -55,11 +71,12 @@ public partial class GameController : Node
     /// <param name="lineToast">Where gentle lines appear.</param>
     /// <param name="confirmPanel">The close-early question.</param>
     /// <param name="summaryPanel">The day summary.</param>
-    public void Setup(GameSession gameSession, WorldView worldView, ArtLayout artLayout, LineToast lineToast, ConfirmPanel confirmPanel, DaySummaryPanel summaryPanel)
+    /// <param name="weekPanel">The week summary.</param>
+    public void Setup(GameSession gameSession, WorldView worldView, ArtLayout artLayout, LineToast lineToast, ConfirmPanel confirmPanel, DaySummaryPanel summaryPanel, WeekSummaryPanel weekPanel)
     {
         session = gameSession;
-        parts = new Parts(worldView, artLayout, lineToast, confirmPanel, summaryPanel);
-        worldView.Camera.ViewChanged += _ => Refresh();
+        parts = new Parts(worldView, artLayout, lineToast, confirmPanel, summaryPanel, weekPanel);
+        worldView.Camera.ViewChanged += OnViewChanged;
     }
 
     /// <summary>Adds a view to push projections to.</summary>
@@ -105,6 +122,11 @@ public partial class GameController : Node
         }
 
         var ended = result.Events.OfType<DayEnded>().LastOrDefault();
+        if (ended is not null && Autosave)
+        {
+            SaveStore.Save(Session);
+        }
+
         if (ended is not null)
         {
             summaryOpen = true;
@@ -236,6 +258,13 @@ public partial class GameController : Node
     }
 
     /// <inheritdoc />
+    public override void _ExitTree()
+    {
+        // The world outlives this game's controller (the title, a text-size rebuild): let go of its camera.
+        parts?.World.Camera.ViewChanged -= OnViewChanged;
+    }
+
+    /// <inheritdoc />
     public override void _UnhandledInput(InputEvent @event)
     {
         ArgumentNullException.ThrowIfNull(@event);
@@ -264,30 +293,65 @@ public partial class GameController : Node
         GetViewport().SetInputAsHandled();
     }
 
+    /// <summary>Puts the day summary away, as its button does; after the last day, the week summary follows.</summary>
+    public void DismissSummary()
+    {
+        if (summaryOpen)
+        {
+            Screen.Summary.Visible = false;
+            CloseSummary();
+        }
+    }
+
+    /// <summary>Leaves the week summary for the title screen.</summary>
+    public void LeaveForTitle()
+    {
+        weekOpen = false;
+        Screen.Week.Visible = false;
+        LeftForTitle();
+    }
+
+    /// <summary>Shows the week summary now, for a game restored after the week ended.</summary>
+    public void ShowWeekSummary()
+    {
+        weekOpen = true;
+        Screen.Week.Open(Session.Views.WeekSummary(), LeaveForTitle);
+        Refresh();
+    }
+
+    private void OnViewChanged(bool lookingUp) => Refresh();
+
     private void CloseSummary()
     {
         summaryOpen = false;
+        if (Session.State.Status == DayStatus.WeekOver)
+        {
+            ShowWeekSummary();
+            return;
+        }
+
         Refresh();
     }
 
     private void UpdateWorld(HudView hud, VisitView visit)
     {
-        var phase = summaryOpen ? DayPhase.Night : hud.Phase;
+        var phase = summaryOpen || weekOpen ? DayPhase.Night : hud.Phase;
         if (phase != shownPhase && phase != DayPhase.None)
         {
             var immediate = shownPhase == DayPhase.None;
             Screen.World.Lights.SetPhase(phase, immediate);
             if (Screen.Layout.Phases.TryGetValue(phase, out var light))
             {
+                var tint = ReadingLamp ? Colors.White : light.DocumentTint;
                 foreach (var item in documents)
                 {
                     if (immediate)
                     {
-                        item.Modulate = light.DocumentTint;
+                        item.Modulate = tint;
                     }
                     else
                     {
-                        CreateTween().TweenProperty(item, "modulate", light.DocumentTint, Screen.Layout.BlendSeconds);
+                        CreateTween().TweenProperty(item, "modulate", tint, Screen.Layout.BlendSeconds);
                     }
                 }
             }
@@ -324,5 +388,5 @@ public partial class GameController : Node
         }
     }
 
-    private sealed record Parts(WorldView World, ArtLayout Layout, LineToast Toast, ConfirmPanel Confirm, DaySummaryPanel Summary);
+    private sealed record Parts(WorldView World, ArtLayout Layout, LineToast Toast, ConfirmPanel Confirm, DaySummaryPanel Summary, WeekSummaryPanel Week);
 }

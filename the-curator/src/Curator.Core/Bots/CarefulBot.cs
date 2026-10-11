@@ -26,12 +26,13 @@ public sealed class CarefulBot : IStrategyBot
     public string Name => "careful";
 
     /// <inheritdoc />
-    public void PlayVisit(GameSession session)
+    public void PlayVisit(GameSession session, ICommandSender sender)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sender);
         if (session.Views.Visit().Questions.Any(q => q.Id == PurposeQuestion && !q.Asked))
         {
-            BotMoves.Must(session, new AskQuestion(PurposeQuestion));
+            BotMoves.Must(sender, new AskQuestion(PurposeQuestion));
         }
 
         if (!session.State.InVisit)
@@ -43,7 +44,7 @@ public sealed class CarefulBot : IStrategyBot
         var slotsLeft = session.Content.Day(session.State.Day).Slots.Count - session.State.Visit.SlotIndex;
         if (visit.CanReadThoughts && session.State.Mana >= visit.ReadThoughtsCost + (IdentifiesPerBook * visit.IdentifyCost * slotsLeft))
         {
-            BotMoves.Must(session, new ReadThoughts());
+            BotMoves.Must(sender, new ReadThoughts());
         }
 
         if (session.Views.Visit().CanLendRequested)
@@ -57,7 +58,7 @@ public sealed class CarefulBot : IStrategyBot
                     break;
                 }
 
-                BotMoves.Must(session, new Identify(requested));
+                BotMoves.Must(sender, new Identify(requested));
                 if (!session.State.InVisit)
                 {
                     return;
@@ -66,17 +67,17 @@ public sealed class CarefulBot : IStrategyBot
 
             if (MaxDangerSeen(session, requested) < DangerSeen)
             {
-                BotMoves.Must(session, new LendRequested());
+                BotMoves.Must(sender, new LendRequested());
                 return;
             }
         }
 
-        if (BotMoves.OfferUntilTaken(session, SafestFirst(session, BotMoves.OfferCandidates(session, sameTopicOnly: true))))
+        if (BotMoves.OfferUntilTaken(session, sender, SafestFirst(session, BotMoves.OfferCandidates(session, sameTopicOnly: true))))
         {
             return;
         }
 
-        BotMoves.Must(session, session.Views.Visit().CanDecline ? new Decline() : new LendRequested());
+        BotMoves.Must(sender, session.Views.Visit().CanDecline ? new Decline() : new LendRequested());
     }
 
     private static IEnumerable<string> SafestFirst(GameSession session, IEnumerable<CatalogueCard> cards) =>

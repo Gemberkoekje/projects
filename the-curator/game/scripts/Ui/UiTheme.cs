@@ -197,6 +197,18 @@ public static class UiTheme
         return rich;
     }
 
+    /// <summary>Indents a control from the left: hanging text keeps its indent on every line.</summary>
+    /// <param name="control">The control.</param>
+    /// <param name="pixels">The indent.</param>
+    /// <returns>The indented control.</returns>
+    public static MarginContainer Indent(Control control, int pixels)
+    {
+        var margin = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        margin.AddThemeConstantOverride("margin_left", pixels);
+        margin.AddChild(control);
+        return margin;
+    }
+
     /// <summary>A button that never takes keyboard focus, so Space always rings the bell.</summary>
     /// <param name="text">The caption.</param>
     /// <param name="pressed">What it does.</param>

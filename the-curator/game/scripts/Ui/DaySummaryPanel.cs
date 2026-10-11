@@ -86,15 +86,13 @@ public partial class DaySummaryPanel : Control
         body.AddChild(UiTheme.Text(heading, UiTheme.PrintItalic, 24, UiTheme.Faint));
         if (items.Count == 0)
         {
-            body.AddChild(UiTheme.Text($"    {UiText.Nothing}", UiTheme.Print, 21, UiTheme.Faint));
+            body.AddChild(UiTheme.Indent(UiTheme.Text(UiText.Nothing, UiTheme.Print, 21, UiTheme.Faint), 24));
             return;
         }
 
         foreach (var item in items)
         {
-            var label = UiTheme.Para($"    {item}", UiTheme.Print, 21, UiTheme.Ink);
-            label.CustomMinimumSize = new Vector2(860, 0);
-            body.AddChild(label);
+            body.AddChild(UiTheme.Indent(UiTheme.Para(item, UiTheme.Print, 21, UiTheme.Ink), 24));
         }
     }
 }

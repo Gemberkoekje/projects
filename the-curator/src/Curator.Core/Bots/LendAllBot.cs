@@ -10,20 +10,21 @@ public sealed class LendAllBot : IStrategyBot
     public string Name => "lend-all";
 
     /// <inheritdoc />
-    public void PlayVisit(GameSession session)
+    public void PlayVisit(GameSession session, ICommandSender sender)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sender);
         if (session.Views.Visit().CanLendRequested)
         {
-            BotMoves.Must(session, new LendRequested());
+            BotMoves.Must(sender, new LendRequested());
             return;
         }
 
-        if (BotMoves.OfferUntilTaken(session, BotMoves.OfferCandidates(session, sameTopicOnly: false).Select(c => c.BookId)))
+        if (BotMoves.OfferUntilTaken(session, sender, BotMoves.OfferCandidates(session, sameTopicOnly: false).Select(c => c.BookId)))
         {
             return;
         }
 
-        BotMoves.Must(session, new Decline());
+        BotMoves.Must(sender, new Decline());
     }
 }

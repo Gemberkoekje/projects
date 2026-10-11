@@ -1,3 +1,4 @@
+using Curator.Core.Bots;
 using Curator.Core.Commands;
 using Curator.Core.Game;
 using Curator.Presentation.Game;
@@ -7,25 +8,32 @@ namespace Curator.Presentation.Shots;
 
 /// <summary>
 /// Screenshot mode (BUILD_BRIEF §7.11): plays a scripted sequence through the controller — the same
-/// calls the mouse makes — saves PNGs and quits. Needs a renderer, so it runs windowed (under Xvfb
-/// in the cloud).
+/// calls the mouse makes — saves PNGs and quits. Title; day 1 morning up and down; the clerk's visit
+/// with the book open after an Identify; the notebook; a day-2 visit at dusk; day summaries; the debug
+/// overlay and the menus; then the rest of the week fast-forwarded by the careful bot, and the week
+/// summary. Needs a renderer, so it runs windowed (under Xvfb in the cloud).
 /// </summary>
 public partial class ShotRunner : Node
 {
     private string directory = "";
-    // Unset until Setup (a justified nullable: nothing to photograph yet).
-    private GameController? controller;
+    private long seed = 1;
     private int shot;
+    // Unset until Setup (a justified nullable: nothing to photograph yet).
+    private Main? main;
 
-    private GameController Game => controller ?? throw new InvalidOperationException("Set up the shot runner first.");
+    private Main Root => main ?? throw new InvalidOperationException("Set up the shot runner first.");
+
+    private GameController Game => Root.Controller;
 
     /// <summary>Prepares the run.</summary>
     /// <param name="outputDirectory">Where the PNGs go.</param>
-    /// <param name="gameController">The game to play.</param>
-    public void Setup(string outputDirectory, GameController gameController)
+    /// <param name="mainNode">The main scene, to start the game from the title.</param>
+    /// <param name="gameSeed">The seed to play.</param>
+    public void Setup(string outputDirectory, Main mainNode, long gameSeed)
     {
         directory = outputDirectory;
-        controller = gameController;
+        main = mainNode;
+        seed = gameSeed;
     }
 
     /// <inheritdoc />
@@ -35,11 +43,16 @@ public partial class ShotRunner : Node
         {
             DirAccess.MakeDirRecursiveAbsolute(directory);
             GetWindow().Size = new Vector2I(1920, 1080);
+            await Seconds(0.5);
+            await Shoot("title");
+            Root.StartNew(seed, autosave: false);
             await Seconds(0.3);
             await PlayDayOne();
             await PlayDayTwo();
+            await ShowOverlays();
+            await FastForward();
             GD.Print($"Shots written to {directory}: {string.Join(", ", Game.World.ArtSources().Select(a => $"{a.Slot}={a.Source}"))}");
-            GetTree().Quit(0);
+            GetTree().Quit(ErrorLog.Errors == 0 ? 0 : 1);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or KeyNotFoundException)
         {
@@ -96,7 +109,7 @@ public partial class ShotRunner : Node
     private async Task PlayDayTwo()
     {
         var camera = Game.World.Camera;
-        PressSummaryButton();
+        Game.DismissSummary();
         await Seconds(1.8);
         camera.LookDown(immediate: true);
         Game.Open(DeskDocument.Newspaper);
@@ -128,6 +141,62 @@ public partial class ShotRunner : Node
         await Shoot("day2_summary");
     }
 
+    private async Task ShowOverlays()
+    {
+        Game.DismissSummary();
+        await Seconds(1.8);
+        var camera = Game.World.Camera;
+        camera.LookDown(immediate: true);
+        Game.Open(DeskDocument.Tray);
+        await Shoot("day3_tray");
+        Game.Open(DeskDocument.None);
+        if (Game.Session.DebugEnabled)
+        {
+            await Press("debug_overlay");
+            await Shoot("day3_debug_overlay");
+            await Press("debug_overlay");
+        }
+
+        await Press("menu");
+        await Shoot("day3_pause_menu");
+        await Press("menu");
+        Root.OpenSettings();
+        await Shoot("day3_settings");
+        await Press("menu");
+
+        // The text-size setting rebuilds the views around the same game; the reading lamp lifts the document tint.
+        Root.TrySettings(textSize: 2, readingLamp: false);
+        await Seconds(0.3);
+        Game.World.Camera.LookDown(immediate: true);
+        Game.OpenBook("common-wards");
+        await Shoot("day3_larger_text");
+        Root.TrySettings(textSize: 0, readingLamp: false);
+        await Seconds(0.3);
+        Game.World.Camera.LookDown(immediate: true);
+        Game.Open(DeskDocument.None);
+    }
+
+    private async Task FastForward()
+    {
+        var bot = BotRunner.Bots["careful"]();
+        for (var guard = 0; guard < 200 && !Game.WeekSummaryShowing; guard++)
+        {
+            if (Game.Modal)
+            {
+                Game.DismissSummary();
+            }
+            else if (!BotRunner.PlayStep(Game.Session, Game, bot))
+            {
+                break;
+            }
+
+            await Frames(1);
+        }
+
+        await Seconds(1.8);
+        await Shoot("week_summary");
+    }
+
     // Settles the visit at the counter plainly: lend if allowed, else decline, else offer a shelved book.
     private void Settle()
     {
@@ -147,11 +216,13 @@ public partial class ShotRunner : Node
         }
     }
 
-    private void PressSummaryButton()
+    private async Task Press(string action)
     {
-        var summary = GetTree().Root.FindChild("DaySummary", true, false) as Control;
-        var button = summary?.FindChildren("*", "Button", true, false).OfType<Button>().LastOrDefault();
-        button?.EmitSignal(BaseButton.SignalName.Pressed);
+        var press = new InputEventAction { Action = action, Pressed = true };
+        Input.ParseInputEvent(press);
+        await Frames(2);
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
+        await Frames(2);
     }
 
     private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);

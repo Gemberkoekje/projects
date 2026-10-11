@@ -76,7 +76,7 @@
           "channel": "newspaper",
           "delayDays": 3,
           "headline": "Examiner mislays the spring results",
-          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are \"unaccountably blank\". The paper will be re-sat.",
+          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are “unaccountably blank”. The paper will be re-sat.",
           "setFlags": ["jory-fenn:examiner-forgot"]
         },
         "good": {
@@ -205,7 +205,7 @@
           "channel": "newspaper",
           "delayDays": 1,
           "headline": "Examiner mislays the spring results",
-          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are \"unaccountably blank\". The paper will be re-sat.",
+          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are “unaccountably blank”. The paper will be re-sat.",
           "setFlags": ["jory-fenn:examiner-forgot"]
         },
         "good": { "channel": "none" },

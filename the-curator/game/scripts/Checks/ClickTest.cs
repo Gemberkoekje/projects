@@ -5,26 +5,30 @@ using Godot;
 namespace Curator.Presentation.Checks;
 
 /// <summary>
-/// <c>--clicktest</c>: plays the first two days by real mouse clicks — events pushed at each button's place
+/// <c>--clicktest</c>: plays the first two days by real mouse clicks, then leaves and continues the saved game, — events pushed at each button's place
 /// on screen — and checks that every step did what it should. Exit code 0 when all pass. It proves
 /// the mouse path works end to end, including controls on the layers that follow the camera.
 /// </summary>
 public partial class ClickTest : Node
 {
-    // Unset until Setup (a justified nullable: nothing to test yet).
-    private GameController? controller;
+    private const string TestSave = "user://clicktest-save.json";
     private readonly List<string> failures = [];
+    // Unset until Setup (a justified nullable: nothing to test yet).
+    private Main? main;
 
-    private GameController Game => controller ?? throw new InvalidOperationException("Set up the click test first.");
+    private GameController Game => (main ?? throw new InvalidOperationException("Set up the click test first.")).Controller;
 
     /// <summary>Prepares the test.</summary>
-    /// <param name="gameController">The game.</param>
-    public void Setup(GameController gameController) => controller = gameController;
+    /// <param name="mainNode">The main scene, whose game is played and continued.</param>
+    public void Setup(Main mainNode) => main = mainNode;
 
     /// <inheritdoc />
     public override async void _Ready()
     {
         GetWindow().Size = new Vector2I(1920, 1080);
+        SaveStore.SavePath = TestSave;
+        SaveStore.Delete();
+        Game.Autosave = true;
         await Seconds(0.5);
         var views = Game.Session.Views;
 
@@ -101,9 +105,26 @@ public partial class ClickTest : Node
         await Seconds(0.3);
         Check("day 3 begins", !Game.Modal && Game.Session.Views.Hud().Day == 3);
 
+        // Save and continue: the evening saved day 3's morning; leave mid-visit, continue, and that progress is gone.
+        var savedEvents = Game.Session.Events.Count;
+        Check("the evening was saved", SaveStore.Exists);
+        await Click("Look up at the counter");
+        await Seconds(0.7);
+        await Click("Ring the bell");
+        await Seconds(0.6);
+        Check("day 3's first patron arrives", Game.Session.Views.Visit().Present);
+        await Press("menu");
+        await Click("Back to the title");
+        await Seconds(0.3);
+        await Click("Continue");
+        await Seconds(0.5);
+        var resumed = Game.Session;
+        Check("Continue resumes day 3's morning, losing the unsaved visit", resumed.State.Day == 3 && !resumed.Views.Visit().Present && resumed.Events.Count == savedEvents);
+        SaveStore.Delete();
+
         if (failures.Count == 0)
         {
-            GD.Print("CLICKTEST PASS: days 1 and 2 played by mouse");
+            GD.Print("CLICKTEST PASS: days 1 and 2 played by mouse, then saved and continued");
             GetTree().Quit(0);
         }
         else
@@ -163,6 +184,14 @@ public partial class ClickTest : Node
 
     private bool FindVisibleText(string text, string type) =>
         GetTree().Root.FindChildren("*", type, true, false).OfType<Label>().Any(l => l.IsVisibleInTree() && l.Text == text);
+
+    private async Task Press(string action)
+    {
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true });
+        await Frames(2);
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
+        await Frames(2);
+    }
 
     private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
 

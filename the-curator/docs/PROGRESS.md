@@ -169,3 +169,39 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - `--clicktest` is a command-line mode the brief doesn't list. It's a smoke test of the mouse path.
 
 **Open**: nothing new.
+
+## M5 — Playable week
+
+**Built**
+- **Title** over the library at morning: New game, Continue, Settings, Quit. Continue is enabled when `user://save.json` restores cleanly. If the content changed since the save, a note says so; if the save can't be read, the note says why and Continue stays off.
+- **Saves** (§7.12):
+  - The game autosaves each evening, written to a temporary file and then swapped in.
+  - A save holds the schema version, seed, content version, events, free notes by patron and ledger notes by loan.
+  - Continue resumes the next morning; leaving mid-day loses that day. A game saved after the week ended continues at the week summary.
+- **Esc** opens the pause menu: Resume, Settings, Back to the title, Quit.
+- **Settings**, kept in `user://settings.cfg`: fullscreen; text size (Normal, Large, Larger), which rebuilds the views around the same game; and the reading lamp, which keeps documents at full brightness at dusk and night.
+- **The week**: after day 7's summary comes the week summary (§5.15). It shows money, loans, declines and walk-outs, what was heard and when and how, late word, how many loans were never heard of, each story patron's trust (or "never came"), and the tutorial book's state. Then it returns to the title.
+- **Debug overlay** (F1, debug builds): the visit's goal, temptations, trust and patience; reputation and band; every resolved outcome with its surface day, channel and key; flags; the seed; and the last 20 events, each on one line (Core's `Describe`). Cheats go through `Debug…` commands, so they're logged: F2 +5 mana, F3 ends the day, F4 reveals every page of the open book.
+- **Command line** (§7.11):
+  - `--seed`; `--new` starts a game straight away, ignoring the save.
+  - `--shots`: title; day 1 morning up and down; letters; the clerk's visit with a question, the catalogue and the book open after an Identify; the lend; the notebook; the day summary; day 2's newspaper, third visit with Read Thoughts, dusk farewell and desk; day 2's summary; the tray, the debug overlay, the pause menu and the settings; larger text; then days 3–7 fast-forwarded by the careful bot and the week summary.
+  - `--autoplay <bot> [--days n]` drives a bot through the presentation layer: every command goes through the controller, which redraws every view. It runs one bell or one closing per frame, dismissing summaries as a player would, and exits 0 when the engine logged no errors (counted by a Godot `Logger`).
+- **Core**: `ICommandSender`, which the session and the Godot controller both implement, so bots can send through either. A compact one-line description of each event for the overlay.
+
+**Verified**
+- All three bots exit 0 headless, each finishing the week with the same numbers as Core's balance tests on seed 1:
+  - lend-all: money 30, 16 lent.
+  - decline-all: money −21, 1 lent (the forced visit).
+  - careful: money 20, 12 lent.
+- An unknown bot logs an error and exits 1, so the error count works.
+- `--clicktest` passes 23 checks. Days 1 and 2 are played by mouse. Then a visit starts on day 3, Esc leads back to the title, and Continue resumes day 3's morning with that visit gone. The test uses its own save file and deletes it.
+- The full `--shots` set (22 images) passes §8.6, the night summaries and week summary included. The run exits 0.
+- `dotnet test` is green (222 tests).
+
+**Fixed along the way**: after a game's UI was torn down (back to the title, or a text-size rebuild), the old controller still listened to the camera, and the next pan reached a freed object.
+
+**Differs from the brief**
+- `--new` skips the title as well as ignoring the save. That's the reading that makes it useful from the command line.
+- `--shots` and `--autoplay` never write saves, and `--clicktest` writes only its own test save. None of them touch a player's save or settings.
+
+**Open**: review pass 3 (next commit).

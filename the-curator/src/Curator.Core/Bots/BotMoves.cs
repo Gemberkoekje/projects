@@ -8,13 +8,13 @@ namespace Curator.Core.Bots;
 public static class BotMoves
 {
     /// <summary>Sends a command that must be accepted.</summary>
-    /// <param name="session">The session.</param>
+    /// <param name="sender">Where to send it.</param>
     /// <param name="command">The command.</param>
     /// <exception cref="InvalidOperationException">The game refused it: a bot bug.</exception>
-    public static void Must(GameSession session, Command command)
+    public static void Must(ICommandSender sender, Command command)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        var result = session.Handle(command);
+        ArgumentNullException.ThrowIfNull(sender);
+        var result = sender.Send(command);
         if (!result.Accepted)
         {
             throw new InvalidOperationException($"Bot command {command} was refused: {result.Rejection}.");
@@ -40,9 +40,10 @@ public static class BotMoves
 
     /// <summary>Offers books in order until one is taken or the patron leaves.</summary>
     /// <param name="session">The session.</param>
+    /// <param name="sender">Where to send the offers.</param>
     /// <param name="candidates">The books, best first.</param>
     /// <returns>True when the visit is over.</returns>
-    public static bool OfferUntilTaken(GameSession session, IEnumerable<string> candidates)
+    public static bool OfferUntilTaken(GameSession session, ICommandSender sender, IEnumerable<string> candidates)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(candidates);
@@ -58,7 +59,7 @@ public static class BotMoves
                 continue;
             }
 
-            Must(session, new OfferBook(bookId));
+            Must(sender, new OfferBook(bookId));
         }
 
         return !session.State.InVisit;

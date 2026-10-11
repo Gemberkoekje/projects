@@ -3,95 +3,173 @@ using Curator.Core.Content;
 using Curator.Core.Game;
 using Curator.Presentation.Art;
 using Curator.Presentation.Checks;
-using Curator.Presentation.Desk;
 using Curator.Presentation.Game;
 using Curator.Presentation.Shots;
-using Curator.Presentation.Speech;
 using Curator.Presentation.Ui;
 using Curator.Presentation.World;
 using Godot;
 
 namespace Curator.Presentation;
 
-/// <summary>The root of the main scene: builds the world, the UI and the debug layer, then starts the game.</summary>
+/// <summary>
+/// The root of the main scene: builds the world, the UI and the debug layer, shows the title, and
+/// starts or continues games. Command-line modes skip the title (BUILD_BRIEF §7.11).
+/// </summary>
 public partial class Main : Node
 {
+    private readonly TitleScreen title = new() { Name = "Title" };
+    private readonly PauseMenu pause = new() { Name = "Pause" };
+    private readonly SettingsPanel settingsPanel = new() { Name = "Settings" };
+    private readonly WorldView world = new() { Name = "World" };
+    private readonly CanvasLayer ui = new() { Name = "Ui", Layer = 10 };
+    private readonly CanvasLayer debugLayer = new() { Name = "Debug", Layer = 20 };
+    private readonly CanvasLayer menus = new() { Name = "Menus", Layer = 30 };
+    private CommandLine options = CommandLine.Parse([]);
+    private ArtLayout layout = ArtLayout.Empty;
+    private GameSettings settings = new();
+    private Theme theme = new();
+    // Null when the content has errors (a justified nullable: no game can start).
+    private ContentSet? content;
+    // Null on the title screen (a justified nullable: no game is running).
+    private GameUi? game;
+
+    /// <summary>The running game's controller.</summary>
+    public GameController Controller => game?.Controller ?? throw new InvalidOperationException("No game is running.");
+
     /// <inheritdoc />
     public override void _Ready()
     {
-        var options = CommandLine.Parse(OS.GetCmdlineUserArgs());
-        var layout = ArtLayout.Load();
-        var world = new WorldView { Name = "World" };
+        ErrorLog.Install();
+        options = CommandLine.Parse(OS.GetCmdlineUserArgs());
+        settings = GameSettings.Load();
+        settings.Apply();
+        layout = ArtLayout.Load();
         world.Build(layout);
         AddChild(world);
-        var ui = new CanvasLayer { Name = "Ui", Layer = 10 };
         AddChild(ui);
-        AddChild(new CanvasLayer { Name = "Debug", Layer = 20 });
-        var theme = UiTheme.Build();
+        AddChild(debugLayer);
+        AddChild(menus);
+        theme = UiTheme.Build();
+        foreach (var control in new Control[] { title, pause, settingsPanel })
+        {
+            control.Theme = theme;
+            menus.AddChild(control);
+        }
 
-        ContentSet content;
+        title.Visible = false;
+        title.NewGame += () => StartNew(options.Seed, autosave: true);
+        title.Continue += ContinueSaved;
+        title.Settings += () => settingsPanel.Open(settings);
+        pause.Settings += () => settingsPanel.Open(settings);
+        pause.LeaveForTitle += ShowTitle;
+        settingsPanel.Changed += SettingsChanged;
+
         try
         {
             content = ContentLoader.Load(new GodotContentSource());
         }
         catch (ContentLoadException ex)
         {
-            ShowContentErrors(ui, theme, ex);
+            ShowContentErrors(ex);
+            if (options.Autoplay.Length > 0 || options.ClickTest || options.ShotsDir.Length > 0)
+            {
+                GetTree().Quit(1);
+            }
+
             return;
         }
 
-        var seed = options.Seed != 0 ? options.Seed : Random.Shared.NextInt64(1, int.MaxValue);
-        var session = new GameSession(content, OS.IsDebugBuild());
-        session.Handle(new NewGame(seed));
-
-        var controller = new GameController { Name = "Game" };
-        var documents = new Control { Name = "Documents", Theme = theme, MouseFilter = Control.MouseFilterEnum.Ignore, Size = new Vector2(1920, 1800) };
-        var desk = new DeskView { Name = "DeskView" };
-        var counter = new CounterProps { Name = "Counter" };
-        documents.AddChild(desk);
-        documents.AddChild(counter);
-        world.Desk.AddChild(documents);
-
-        var speechLayer = new CanvasLayer { Name = "Speech", Layer = 9, FollowViewportEnabled = true };
-        var speech = new SpeechView { Name = "SpeechView", Theme = theme };
-        speechLayer.AddChild(speech);
-        ui.AddChild(speechLayer);
-        var hud = new Hud { Name = "Hud", Theme = theme };
-        var toast = new LineToast { Name = "Line", Theme = theme };
-        var summary = new DaySummaryPanel { Name = "DaySummary", Theme = theme };
-        var confirm = new ConfirmPanel { Name = "Confirm", Theme = theme };
-        ui.AddChild(hud);
-        ui.AddChild(toast);
-        ui.AddChild(summary);
-        ui.AddChild(confirm);
-
-        AddChild(controller);
-        controller.Setup(session, world, layout, toast, confirm, summary);
-        hud.Bind(controller);
-        speech.Bind(controller);
-        desk.Bind(controller, layout);
-        counter.Bind(controller);
-        controller.AddView(hud);
-        controller.AddView(speech);
-        controller.AddView(desk);
-        controller.AddView(counter);
-        controller.AddView(toast);
-        controller.AddDocuments(documents);
-        controller.AddDocuments(speech);
-        controller.Refresh();
-
-        if (options.ClickTest)
+        if (options.Autoplay.Length > 0)
         {
+            StartNew(options.Seed == 0 ? 1 : options.Seed, autosave: false);
+            var autoplay = new AutoplayRunner { Name = "Autoplay" };
+            autoplay.Setup(Controller, options.Autoplay, options.Days);
+            AddChild(autoplay);
+        }
+        else if (options.ClickTest)
+        {
+            StartNew(options.Seed == 0 ? 1 : options.Seed, autosave: false);
             var test = new ClickTest { Name = "ClickTest" };
-            test.Setup(controller);
+            test.Setup(this);
             AddChild(test);
         }
         else if (options.ShotsDir.Length > 0)
         {
+            ShowTitle();
             var shots = new ShotRunner { Name = "Shots" };
-            shots.Setup(ResolveOutput(options.ShotsDir), controller);
+            shots.Setup(ResolveOutput(options.ShotsDir), this, options.Seed == 0 ? 1 : options.Seed);
             AddChild(shots);
         }
+        else if (options.NewGame)
+        {
+            StartNew(options.Seed, autosave: true);
+        }
+        else
+        {
+            ShowTitle();
+        }
+    }
+
+    /// <summary>Starts a new game.</summary>
+    /// <param name="seed">The seed; 0 picks one.</param>
+    /// <param name="autosave">Whether evenings are saved.</param>
+    public void StartNew(long seed, bool autosave)
+    {
+        var session = new GameSession(content ?? throw new InvalidOperationException("No content."), OS.IsDebugBuild());
+        session.Handle(new NewGame(seed != 0 ? seed : Random.Shared.NextInt64(1, int.MaxValue)));
+        Begin(session, autosave);
+    }
+
+    /// <summary>Changes the settings for this run only, without saving them (screenshots use this).</summary>
+    /// <param name="textSize">The text size, an index into <see cref="GameSettings.TextScales"/>.</param>
+    /// <param name="readingLamp">Whether the reading lamp is on.</param>
+    public void TrySettings(int textSize, bool readingLamp)
+    {
+        var textSizeChanged = settings.TextSize != textSize;
+        settings.TextSize = textSize;
+        settings.ReadingLamp = readingLamp;
+        settings.Apply();
+        SettingsChanged(textSizeChanged);
+    }
+
+    /// <summary>Shows the settings panel, as the menus do.</summary>
+    public void OpenSettings() => settingsPanel.Open(settings);
+
+    /// <summary>Shows the title screen, ending any game.</summary>
+    public void ShowTitle()
+    {
+        game?.Destroy(world);
+        game = null;
+        world.Lights.SetPhase(DayPhase.Morning, immediate: true);
+        if (content is null)
+        {
+            title.Open(false, "");
+            return;
+        }
+
+        var canContinue = SaveStore.TryRestore(content, OS.IsDebugBuild(), out _, out var note);
+        title.Open(canContinue, SaveStore.Exists ? note : "");
+    }
+
+    /// <inheritdoc />
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+        if (!@event.IsActionPressed("menu") || game is null)
+        {
+            return;
+        }
+
+        if (settingsPanel.Visible)
+        {
+            settingsPanel.Visible = false;
+        }
+        else if (!game.Controller.Modal || pause.Visible)
+        {
+            pause.Visible = !pause.Visible;
+        }
+
+        GetViewport().SetInputAsHandled();
     }
 
     /// <inheritdoc />
@@ -118,7 +196,51 @@ public partial class Main : Node
         return Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(ProjectSettings.GlobalizePath("res://"), "..", path));
     }
 
-    private static void ShowContentErrors(CanvasLayer ui, Theme theme, ContentLoadException ex)
+    private void ContinueSaved()
+    {
+        if (content is not null && SaveStore.TryRestore(content, OS.IsDebugBuild(), out var session, out _))
+        {
+            Begin(session, autosave: true);
+        }
+    }
+
+    private void Begin(GameSession session, bool autosave)
+    {
+        game?.Destroy(world);
+        title.Visible = false;
+        pause.Visible = false;
+        game = GameUi.Build(this, world, ui, debugLayer, layout, theme, session);
+        game.Controller.Autosave = autosave;
+        game.Controller.ReadingLamp = settings.ReadingLamp;
+        game.Controller.LeftForTitle += ShowTitle;
+        game.Controller.Refresh();
+        if (session.State.Status == DayStatus.WeekOver)
+        {
+            game.Controller.ShowWeekSummary();
+        }
+    }
+
+    private void SettingsChanged(bool textSizeChanged)
+    {
+        if (game is null)
+        {
+            return;
+        }
+
+        if (textSizeChanged)
+        {
+            // Text sizes are baked into each control as it's built, so the views are rebuilt; the game carries on.
+            var session = game.Controller.Session;
+            var autosave = game.Controller.Autosave;
+            Begin(session, autosave);
+            return;
+        }
+
+        game.Controller.ReadingLamp = settings.ReadingLamp;
+        game.Controller.Refresh();
+    }
+
+    private void ShowContentErrors(ContentLoadException ex)
     {
         foreach (var problem in ex.Problems)
         {

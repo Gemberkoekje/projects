@@ -9,7 +9,7 @@ namespace Curator.Core.Game;
 /// The game: content, the event log, the state folded from it, and the curator's notes.
 /// Godot sends commands here and renders <see cref="Views"/> (BUILD_BRIEF §4.1).
 /// </summary>
-public sealed class GameSession
+public sealed class GameSession : ICommandSender
 {
     private readonly List<GameEvent> events = [];
 
@@ -128,6 +128,9 @@ public sealed class GameSession
         events.AddRange(processor.Emitted);
         return CommandResult.Done(processor.Emitted);
     }
+
+    /// <inheritdoc />
+    CommandResult ICommandSender.Send(Command command) => Handle(command);
 
     /// <summary>The save for this session as it stands.</summary>
     /// <returns>The save.</returns>

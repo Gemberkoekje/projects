@@ -10,22 +10,23 @@ public sealed class DeclineAllBot : IStrategyBot
     public string Name => "decline-all";
 
     /// <inheritdoc />
-    public void PlayVisit(GameSession session)
+    public void PlayVisit(GameSession session, ICommandSender sender)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sender);
         var visit = session.Views.Visit();
         if (visit.CanDecline)
         {
-            BotMoves.Must(session, new Decline());
+            BotMoves.Must(sender, new Decline());
             return;
         }
 
         if (visit.CanLendRequested)
         {
-            BotMoves.Must(session, new LendRequested());
+            BotMoves.Must(sender, new LendRequested());
             return;
         }
 
-        BotMoves.OfferUntilTaken(session, BotMoves.OfferCandidates(session, sameTopicOnly: false).Select(c => c.BookId));
+        BotMoves.OfferUntilTaken(session, sender, BotMoves.OfferCandidates(session, sameTopicOnly: false).Select(c => c.BookId));
     }
 }
