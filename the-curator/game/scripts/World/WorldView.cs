@@ -60,6 +60,19 @@ public partial class WorldView : Node2D
         AddChild(Camera);
     }
 
+    /// <inheritdoc />
+    public override void _Process(double delta)
+    {
+        // Parallax on the pan (§7.2, a nice-to-have): layers behind the counter travel a little less than
+        // the camera, each by its slot's "parallax" in layout.json. At the up view every layer is exactly
+        // where the layout puts it; by the down view they're hidden behind the counter.
+        var travel = Camera.Travel;
+        foreach (var node in slots.Values.Append(Patron))
+        {
+            node.Position = node.Slot.Rect.Position + new Vector2(0, (1f - node.Slot.Parallax) * travel);
+        }
+    }
+
     /// <summary>Shows a patron's silhouette (their own painting if there is one), or hides it.</summary>
     /// <param name="patronId">The patron, or empty to empty the archway.</param>
     public void ShowPatron(string patronId)

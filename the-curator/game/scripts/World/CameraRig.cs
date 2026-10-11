@@ -20,6 +20,9 @@ public partial class CameraRig : Camera2D
     /// <summary>Whether the camera is on (or heading to) the up view.</summary>
     public bool LookingUp { get; private set; } = true;
 
+    /// <summary>How far the camera has travelled down from the up view, in canvas pixels (0 to 720).</summary>
+    public float Travel => Position.Y - UpCenter.Y;
+
     /// <inheritdoc />
     public override void _Ready()
     {

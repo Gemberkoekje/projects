@@ -1,5 +1,5 @@
 {
-  "about": "Art slots (BUILD_BRIEF §7.3). Rects are x, y, w, h on the 1920x1800 canvas; the up view shows y 0-1080, the down view y 720-1800. Each slot shows art/painted/<id>.png if present, else art/easel/<id>.png, else a flat placeholder. Light masks: 1 everything, 2 far layers (window light), 4 the archway and patron (archway light), 8 counter and desk (candle light). Tune rects here, not in code.",
+  "about": "Art slots (BUILD_BRIEF §7.3). Rects are x, y, w, h on the 1920x1800 canvas; the up view shows y 0-1080, the down view y 720-1800. Each slot shows art/painted/<id>.png if present, else art/easel/<id>.png, else a flat placeholder. Light masks: 1 everything, 2 far layers (window light), 4 the archway and patron (archway light), 8 counter and desk (candle light). Parallax: how far a layer travels with the camera pan (1 keeps pace; the layers behind the counter lag a little). Tune rects here, not in code.",
   "canvas": [
     1920,
     1800
@@ -14,6 +14,7 @@
         600
       ],
       "z": -40,
+      "parallax": 0.85,
       "lightMask": 7,
       "placeholder": "stone",
       "color": "#6e6a66"
@@ -27,6 +28,7 @@
         720
       ],
       "z": -30,
+      "parallax": 0.9,
       "lightMask": 3,
       "placeholder": "wallArch",
       "color": "#4a3a2e",
@@ -46,6 +48,7 @@
         620
       ],
       "z": -20,
+      "parallax": 0.9,
       "lightMask": 5,
       "placeholder": "silhouette",
       "color": "#16110f"
@@ -59,6 +62,7 @@
         720
       ],
       "z": -10,
+      "parallax": 0.9,
       "lightMask": 3,
       "placeholder": "shelf",
       "color": "#5a3c24"
@@ -72,6 +76,7 @@
         720
       ],
       "z": -10,
+      "parallax": 0.9,
       "lightMask": 3,
       "placeholder": "shelf",
       "color": "#5a3c24"
@@ -85,6 +90,7 @@
         460
       ],
       "z": -9,
+      "parallax": 0.9,
       "lightMask": 3,
       "placeholder": "cabinet",
       "color": "#2b2622"

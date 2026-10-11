@@ -85,6 +85,7 @@ public sealed class ArtLayout
     {
         var rect = Rect(slot.GetProperty("rect"));
         var arch = slot.TryGetProperty("arch", out var archElement) ? Rect(archElement) : default;
+        var parallax = slot.TryGetProperty("parallax", out var parallaxElement) ? parallaxElement.GetSingle() : 1f;
         return new ArtSlot(
             slot.GetProperty("id").GetString() ?? "",
             rect,
@@ -92,7 +93,8 @@ public sealed class ArtLayout
             slot.GetProperty("lightMask").GetInt32(),
             slot.GetProperty("placeholder").GetString() ?? "",
             Color.FromHtml(slot.GetProperty("color").GetString()),
-            arch);
+            arch,
+            parallax);
     }
 
     private static PhaseLight ReadPhase(JsonElement phase) => new(
