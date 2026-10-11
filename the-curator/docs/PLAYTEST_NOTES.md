@@ -4,7 +4,9 @@ For the designer: how to run the prototype week, what to watch for while you pla
 
 ## How to run it
 
-You need the **.NET 10 SDK** and **Godot 4.6.3, .NET build** (`Godot_v4.6.3-stable_mono_win64`). The projects target .NET 10 (Q3).
+**A beta build is the easiest.** Each change merged to main publishes a Windows zip on the repository's Releases page, as a pre-release named "The Curator 0.1.N-beta". Download the newest one, unzip it anywhere and run `TheCurator.exe`; nothing needs installing. The same link works for playtesters, and the README inside tells them how to play. The title screen shows the version, so feedback can name its build.
+
+**To run it from the project**, you need the **.NET 10 SDK** and **Godot 4.6.3, .NET build** (`Godot_v4.6.3-stable_mono_win64`). The projects target .NET 10 (Q3).
 
 **From the Godot editor.** Import `the-curator/game/project.godot` and press Play (F5). The editor builds the C# itself.
 
@@ -43,7 +45,7 @@ The notebook keeps a page per patron and, on its first tab, an ingredient log: e
 
 ## Known issues
 
-- **Windows is untested.** All the work ran on Linux. The `d3d12` driver and the Windows export preset (`game/export_presets.cfg`) haven't been tried (Q5); a real export also needs Godot's export templates.
+- **Windows is untested.** All the work ran on Linux. The Windows build is exported in CI, and the same pipeline's Linux build plays the week, but nobody has run the Windows build on Windows yet, and the `d3d12` driver is untried (Q5).
 - **Careful play still causes about 4 mixed outcomes a week**, against the brief's "at most 1" (Q25). See `docs/BALANCE_REPORT.md` for why and what would change it.
 - **Outright harm never happens if you lend what's asked for.** Every tempting request is for a book that also does what the patron wants, so the worst result is mixed (Q33).
 - **Some written branches can't be reached**: Jory's Clerk's Companion branch (Q27), answers at trust levels no visit reaches, and Lysander's fragment (Q30).

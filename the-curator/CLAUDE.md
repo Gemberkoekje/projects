@@ -27,15 +27,19 @@ dotnet test
 ```bash
 # Cloud / Linux: the same commands with `godot`. Screenshot runs need a display:
 xvfb-run -a -s "-screen 0 1920x1080x24" godot --path game --audio-driver Dummy -- --shots out/shots --seed 1
+
+# The Windows beta zip, as CI builds it (needs the 4.6.3.stable.mono export templates; writes build/):
+GODOT=godot tools/packaging/build-windows.sh 0.1.0-beta build
 ```
 
-- `TheCurator.sln` (here) is the solution for building and testing. `game/Curator.Godot.sln` exists only because Godot's editor build and export look for a solution beside the project; `game/export_presets.cfg` holds the Windows export (untested on Windows).
+- `TheCurator.sln` (here) is the solution for building and testing. `game/Curator.Godot.sln` exists only because Godot's editor build and export look for a solution beside the project; `game/export_presets.cfg` holds the Windows export (not yet run on a Windows machine).
+- Beta builds: every push to main exports the Windows build and publishes `TheCurator-0.1.<run>-beta-windows.zip` as a GitHub pre-release (tag `the-curator-v0.1.<run>-beta`); every run also keeps the zip as a workflow artifact for 14 days (`.github/workflows/ci-the-curator.yml`, `tools/packaging/`).
 - Saves and settings live in Godot's `user://` folder (`save.json`, `settings.cfg`). F1–F4 (debug overlay and cheats) work in debug builds only.
 - Godot version: **4.6.3 stable, .NET build** (the project's `Godot.NET.Sdk/4.6.3`). Keep to the 4.6 API.
 - .NET SDK: **10.0** (verified with 10.0.401). Every project targets **`net10.0`**; `ProjectStructureTests` fails if the three ever differ.
 - C# follows the workspace rules in `../instructions.md` (no implicit usings, warnings are errors, suppressions only in `.globalconfig` with a reason).
 
-**Cloud sessions** start without .NET or Godot. Install them with `dot.net/v1/dotnet-install.sh --channel 10.0` and the Linux .NET build of Godot from `https://downloads.godotengine.org/?version=4.6.3&flavor=stable&slug=mono_linux_x86_64.zip&platform=linux.64`. GitHub release downloads are blocked there; that mirror isn't. `mesa-vulkan-drivers` gives Xvfb runs a software Vulkan renderer.
+**Cloud sessions** start without .NET or Godot. Install them with `dot.net/v1/dotnet-install.sh --channel 10.0` and the Linux .NET build of Godot from `https://downloads.godotengine.org/?version=4.6.3&flavor=stable&slug=mono_linux_x86_64.zip&platform=linux.64`. If GitHub release downloads are blocked there, that mirror works. `mesa-vulkan-drivers` gives Xvfb runs a software Vulkan renderer.
 
 ## Golden rules
 1. Rules and state live in `Curator.Core`, which never references Godot. Godot code sends commands and renders projections; no game rules in `game/scripts/`.

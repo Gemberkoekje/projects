@@ -48,6 +48,18 @@ public partial class TitleScreen : Control
         column.AddChild(Big(UiTheme.Button("Quit", () => GetTree().Quit())));
         note.HorizontalAlignment = HorizontalAlignment.Center;
         column.AddChild(note);
+
+        // A release build carries its version (stamped by tools/packaging/build-windows.sh), so playtesters
+        // can say which build they played; development runs have none and show nothing.
+        var version = ProjectSettings.GetSetting("application/config/version", "").AsString();
+        if (version.Length > 0)
+        {
+            var stamp = UiTheme.Text($"Version {version}", UiTheme.PrintItalic, 20, UiTheme.CuratorInk);
+            stamp.HorizontalAlignment = HorizontalAlignment.Right;
+            stamp.Position = new Vector2(1920 - 40 - 600, 1080 - 56);
+            stamp.Size = new Vector2(600, 32);
+            AddChild(stamp);
+        }
     }
 
     /// <summary>Shows the title.</summary>
