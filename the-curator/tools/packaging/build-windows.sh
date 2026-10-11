@@ -6,7 +6,8 @@
 # Run from the-curator/. Needs the Godot 4.6.3 .NET editor (GODOT, default `godot`) with the
 # 4.6.3.stable.mono export templates installed, the .NET 10 SDK, and zip. CI runs this
 # (.github/workflows/ci-the-curator.yml); it works the same locally on Linux or macOS.
-# Prints the zip's path last, and writes it to $GITHUB_OUTPUT as `zip` when that is set.
+# Prints the zip's path last. Under GitHub Actions it also writes `zip` and `folder` (the unzipped
+# build) to $GITHUB_OUTPUT.
 set -euo pipefail
 
 version="${1:?usage: tools/packaging/build-windows.sh <version> [out-dir]}"
@@ -62,5 +63,6 @@ done
 (cd "$out" && zip -qr9 "$zip" "$name")
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "zip=${zip}" >>"$GITHUB_OUTPUT"
+  echo "folder=${stage}" >>"$GITHUB_OUTPUT"
 fi
 echo "$zip"

@@ -33,7 +33,7 @@ GODOT=godot tools/packaging/build-windows.sh 0.1.0-beta build
 ```
 
 - `TheCurator.sln` (here) is the solution for building and testing. `game/Curator.Godot.sln` exists only because Godot's editor build and export look for a solution beside the project; `game/export_presets.cfg` holds the Windows export (not yet run on a Windows machine).
-- Beta builds: every push to main exports the Windows build and publishes `TheCurator-0.1.<run>-beta-windows.zip` as a GitHub pre-release (tag `the-curator-v0.1.<run>-beta`); every run also keeps the zip as a workflow artifact for 14 days (`.github/workflows/ci-the-curator.yml`, `tools/packaging/`).
+- Beta builds: every push to main exports the Windows build and publishes `TheCurator-0.1.<run>-beta-windows.zip` as a GitHub pre-release (tag `the-curator-v0.1.<run>-beta`); every run also keeps the unzipped build as a workflow artifact for 14 days (GitHub zips it for download) (`.github/workflows/ci-the-curator.yml`, `tools/packaging/`).
 - Saves and settings live in Godot's `user://` folder (`save.json`, `settings.cfg`). F1–F4 (debug overlay and cheats) work in debug builds only.
 - Godot version: **4.6.3 stable, .NET build** (the project's `Godot.NET.Sdk/4.6.3`). Keep to the 4.6 API.
 - .NET SDK: **10.0** (verified with 10.0.401). Every project targets **`net10.0`**; `ProjectStructureTests` fails if the three ever differ.
