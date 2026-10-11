@@ -17,6 +17,8 @@ namespace Curator.Presentation.Game;
 /// <param name="Document">The document open on the desk.</param>
 /// <param name="Shelved">Returned books already put back on the shelf today, by loan.</param>
 /// <param name="LookingUp">Whether the camera is on the up view.</param>
+/// <param name="SummaryShowing">Whether a day or week summary covers the screen (the HUD already shows tomorrow).</param>
+/// <param name="LettersRead">Whether today's letters have been opened.</param>
 /// <remarks>The nullable views mean "none": no patron, no open book, no notebook page yet.</remarks>
 public sealed record Snapshot(
     HudView Hud,
@@ -29,4 +31,6 @@ public sealed record Snapshot(
     NotebookView? Notebook,
     DeskDocument Document,
     IReadOnlySet<string> Shelved,
-    bool LookingUp);
+    bool LookingUp,
+    bool SummaryShowing,
+    bool LettersRead);

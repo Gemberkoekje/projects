@@ -41,9 +41,20 @@ public partial class Main : Node
     {
         ErrorLog.Install();
         options = CommandLine.Parse(OS.GetCmdlineUserArgs());
-        settings = GameSettings.Load();
+
+        // Test and screenshot runs start from the default settings, whatever this machine has saved.
+        var checking = options.Autoplay.Length > 0 || options.ClickTest || options.ShotsDir.Length > 0;
+        settings = checking ? new GameSettings() : GameSettings.Load();
         settings.Apply();
         layout = ArtLayout.Load();
+        UiTheme.UsePaperColors(layout.PaperColors);
+
+        // Esc pauses (§7.12): the game's nodes stop while the menus, and the runners, carry on.
+        ProcessMode = ProcessModeEnum.Always;
+        foreach (var paused in new Node[] { world, ui, debugLayer })
+        {
+            paused.ProcessMode = ProcessModeEnum.Pausable;
+        }
         world.Build(layout);
         AddChild(world);
         AddChild(ui);
@@ -63,6 +74,8 @@ public partial class Main : Node
         pause.Settings += () => settingsPanel.Open(settings);
         pause.LeaveForTitle += ShowTitle;
         settingsPanel.Changed += SettingsChanged;
+        pause.VisibilityChanged += UpdatePaused;
+        settingsPanel.VisibilityChanged += UpdatePaused;
 
         try
         {
@@ -138,8 +151,9 @@ public partial class Main : Node
     /// <summary>Shows the title screen, ending any game.</summary>
     public void ShowTitle()
     {
-        game?.Destroy(world);
+        game?.Destroy(world, resetCamera: true);
         game = null;
+        GetTree().Paused = false;
         world.Lights.SetPhase(DayPhase.Morning, immediate: true);
         if (content is null)
         {
@@ -166,6 +180,7 @@ public partial class Main : Node
         }
         else if (!game.Controller.Modal || pause.Visible)
         {
+            game.Controller.ReleaseFocus();
             pause.Visible = !pause.Visible;
         }
 
@@ -204,9 +219,11 @@ public partial class Main : Node
         }
     }
 
+    private void UpdatePaused() => GetTree().Paused = game is not null && (pause.Visible || settingsPanel.Visible);
+
     private void Begin(GameSession session, bool autosave)
     {
-        game?.Destroy(world);
+        game?.Destroy(world, resetCamera: true);
         title.Visible = false;
         pause.Visible = false;
         game = GameUi.Build(this, world, ui, debugLayer, layout, theme, session);
@@ -222,6 +239,11 @@ public partial class Main : Node
 
     private void SettingsChanged(bool textSizeChanged)
     {
+        if (textSizeChanged)
+        {
+            UiTheme.ScaleFonts(theme);
+        }
+
         if (game is null)
         {
             return;
@@ -229,10 +251,16 @@ public partial class Main : Node
 
         if (textSizeChanged)
         {
-            // Text sizes are baked into each control as it's built, so the views are rebuilt; the game carries on.
+            // Text sizes are baked into each control as it's built, so the views are rebuilt; the game,
+            // the camera and the desk carry on as they were.
             var session = game.Controller.Session;
             var autosave = game.Controller.Autosave;
+            var desk = game.Controller.CaptureDesk();
+            game.Destroy(world, resetCamera: false);
+            game = null;
             Begin(session, autosave);
+            Controller.RestoreDesk(desk);
+            UpdatePaused();
             return;
         }
 

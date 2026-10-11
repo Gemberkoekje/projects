@@ -25,6 +25,7 @@ namespace Curator.Core.Projections;
 /// <param name="Fragment">What it surfaced, or empty.</param>
 /// <param name="Noticed">Whether a warded mind noticed.</param>
 /// <param name="NoThoughtsLine">Shown when Read Thoughts found nothing.</param>
+/// <param name="NoticedLine">The tell shown when a warded mind noticed.</param>
 /// <param name="ReadThoughtsCost">Its mana cost.</param>
 /// <param name="IdentifyCost">Identify's mana cost.</param>
 /// <param name="Patience">Their patience.</param>
@@ -65,6 +66,7 @@ public sealed record VisitView(
     string Fragment,
     bool Noticed,
     string NoThoughtsLine,
+    string NoticedLine,
     int ReadThoughtsCost,
     int IdentifyCost,
     int Patience,

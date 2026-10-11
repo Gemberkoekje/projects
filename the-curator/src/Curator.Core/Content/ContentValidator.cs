@@ -194,6 +194,11 @@ public static class ContentValidator
             {
                 Warn(file, "$.genericLines.noThoughts", "no line for Read Thoughts finding nothing");
             }
+
+            if (lines2.Noticed.Trim().Length == 0)
+            {
+                Warn(file, "$.genericLines.noticed", "no tell for a warded mind noticing Read Thoughts");
+            }
         }
 
         private void Ingredients()

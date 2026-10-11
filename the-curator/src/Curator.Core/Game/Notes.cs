@@ -30,6 +30,16 @@ public sealed class Notes
         free[patronId] = text;
     }
 
+    /// <summary>Adds a line to the end of a patron's free notes.</summary>
+    /// <param name="patronId">The patron.</param>
+    /// <param name="line">The line.</param>
+    public void AppendFreeNote(string patronId, string line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        var text = FreeNotes(patronId);
+        free[patronId] = text.Length == 0 ? line : $"{text.TrimEnd('\n')}\n{line}";
+    }
+
     /// <summary>A watched loan's note.</summary>
     /// <param name="loanId">The loan.</param>
     /// <returns>The note, or empty.</returns>

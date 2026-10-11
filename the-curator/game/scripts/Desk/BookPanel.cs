@@ -156,11 +156,7 @@ public partial class BookPanel : Control, IGameView
     private static PanelContainer Page(Vector4 margins, float width)
     {
         var page = new PanelContainer { CustomMinimumSize = new Vector2(width, 696) };
-        var box = UiTheme.Box(new Color("ece0c6"), new Color("8a7458"), 1, 2, margins);
-        box.ShadowColor = new Color(0f, 0f, 0f, 0.35f);
-        box.ShadowSize = 6;
-        box.ShadowOffset = new Vector2(3, 4);
-        page.AddThemeStyleboxOverride("panel", box);
+        page.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperPage, margins));
         return page;
     }
 

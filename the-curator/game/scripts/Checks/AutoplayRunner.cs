@@ -26,7 +26,7 @@ public partial class AutoplayRunner : Node
     /// <summary>Prepares the run.</summary>
     /// <param name="gameController">The game.</param>
     /// <param name="name">The bot, as the command line spells it.</param>
-    /// <param name="lastDay">The last day to play.</param>
+    /// <param name="lastDay">The last day to play, through its evening.</param>
     public void Setup(GameController gameController, string name, int lastDay)
     {
         controller = gameController;

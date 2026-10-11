@@ -120,6 +120,7 @@ public sealed class QuestionTests
         var visit = session.Views.Visit();
         Assert.True(visit.Noticed);
         Assert.Equal("", visit.Fragment);
+        Assert.Equal("Their eyes narrow. They felt that.", visit.NoticedLine);
         Assert.Equal(1, session.State.Patron("lysander-quill").Trust);
         Assert.Contains("lysander-quill:noticed", session.State.Flags);
     }

@@ -21,4 +21,7 @@ public sealed record GenericLines
 
     /// <summary>Shown when Read Thoughts finds nothing (a warded mind, or no fragment written).</summary>
     public string NoThoughts { get; init; } = "";
+
+    /// <summary>The tell when a warded mind notices Read Thoughts (and trusts the curator less).</summary>
+    public string Noticed { get; init; } = "";
 }

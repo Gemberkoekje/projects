@@ -26,6 +26,7 @@ public partial class SpeechView : Control, IGameView
     private readonly Button readThoughts = new();
     private readonly VBoxContainer thought = new();
     private readonly Label fragment = UiTheme.Para("", UiTheme.PrintItalic, 30, new Color("fff6e4"));
+    private readonly Label noticed = UiTheme.Para("", UiTheme.PrintItalic, 22, UiTheme.ThoughtGlow);
     private readonly Button noteThought = new();
     private string shownVisit = "";
     private int shownLines = -1;
@@ -99,6 +100,9 @@ public partial class SpeechView : Control, IGameView
         fragment.AddThemeConstantOverride("shadow_offset_x", 0);
         fragment.AddThemeConstantOverride("shadow_offset_y", 0);
         thought.AddChild(fragment);
+        noticed.CustomMinimumSize = new Vector2(640, 0);
+        noticed.HorizontalAlignment = HorizontalAlignment.Center;
+        thought.AddChild(noticed);
         var noteRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         noteThought.Text = UiText.NoteIt;
         noteThought.FocusMode = FocusModeEnum.None;
@@ -126,7 +130,7 @@ public partial class SpeechView : Control, IGameView
         patronName.Text = visit.PatronName;
         description.Text = visit.PatronDescription;
         RenderTranscript(visit.VisitId, visit.Transcript);
-        patience.Show(visit.Patience, visit.Patience);
+        patience.Show(visit.Patience, Math.Max(visit.Patience, 1));
         tell.Text = visit.Impatient ? visit.Tell : "";
 
         foreach (var child in questions.GetChildren())
@@ -151,6 +155,8 @@ public partial class SpeechView : Control, IGameView
         readThoughts.TooltipText = visit.CanReadThoughts ? "" : Game.WhyNot(new ReadThoughts());
 
         fragment.Text = visit.Fragment.Length > 0 ? visit.Fragment : visit.NoThoughtsLine;
+        noticed.Text = visit.Noticed ? visit.NoticedLine : "";
+        noticed.Visible = visit.Noticed;
         noteThought.Visible = visit.CanNoteThought;
     }
 
@@ -185,6 +191,7 @@ public partial class SpeechView : Control, IGameView
             SpeechKind.BookOut => $"[i][color={curator}]— {text}[/color][/i]",
             SpeechKind.Offered => $"[i][color={curator}]You offer {text}.[/color][/i]",
             SpeechKind.Gossip => $"[i][color={speech}]“{text}”[/color][/i]",
+            SpeechKind.Narration => $"[i][color={curator}]{text}[/color][/i]",
             _ => $"[color={speech}]“{text}”[/color]",
         };
         return rich;

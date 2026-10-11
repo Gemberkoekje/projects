@@ -28,10 +28,12 @@ public partial class CounterProps : Control, IGameView
         var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End, Size = Size };
         row.AddThemeConstantOverride("separation", 14);
         Style(bell, UiText.Bell, new Color("b08d3c"), new Color("5e4614"));
+        bell.AddThemeColorOverride("font_disabled_color", new Color(0.12f, 0.09f, 0.05f, 0.75f));
         bell.Pressed += () => Game.RingBell();
         Style(close, UiText.CloseLibrary, new Color("6b4a2e"), new Color("2e1d10"));
         close.AddThemeColorOverride("font_color", UiTheme.SpeechInk);
         close.AddThemeColorOverride("font_hover_color", Colors.White);
+        close.AddThemeColorOverride("font_disabled_color", new Color(UiTheme.SpeechInk, 0.55f));
         close.Pressed += () => Game.RequestClose();
         row.AddChild(bell);
         row.AddChild(close);
@@ -61,7 +63,7 @@ public partial class CounterProps : Control, IGameView
             {
                 "hover" => back.Lightened(0.15f),
                 "pressed" => back.Darkened(0.15f),
-                "disabled" => new Color(back.Darkened(0.3f), 0.6f),
+                "disabled" => new Color(back.Darkened(0.2f), 0.75f),
                 _ => back,
             };
             var box = UiTheme.Box(fill, border, 2, 8, new Vector4(18, 6, 18, 6));

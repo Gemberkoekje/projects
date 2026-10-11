@@ -8,7 +8,7 @@
   "deflections": {
     "0": ["I'd rather keep that to myself.", "Does it matter?"],
     "1": ["Oh — nothing interesting.", "This and that, really."],
-    "2": ["It's for something at home. Nothing grand."],
+    "2": ["Nothing worth the telling, really."],
     "3": ["I'll tell you another time. I promise."]
   },
   "genericLines": {
@@ -19,7 +19,8 @@
     "walkedOut": "They leave without another word.",
     "impatient": "They glance at the door.",
     "bookOut": "That one's out on loan, I'm afraid.",
-    "noThoughts": "Nothing comes to the surface."
+    "noThoughts": "Nothing comes to the surface.",
+    "noticed": "Their eyes narrow. They felt that."
   },
   "placeholder": true
 }

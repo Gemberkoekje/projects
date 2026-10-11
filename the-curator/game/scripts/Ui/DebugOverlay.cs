@@ -30,9 +30,9 @@ public partial class DebugOverlay : Control, IGameView
         MouseFilter = MouseFilterEnum.Ignore;
         Position = new Vector2(1180, 130);
         Size = new Vector2(720, 930);
-        var panel = new PanelContainer { Size = Size, CustomMinimumSize = Size, MouseFilter = MouseFilterEnum.Ignore };
+        var panel = new PanelContainer { Size = Size, CustomMinimumSize = Size, MouseFilter = MouseFilterEnum.Pass };
         panel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.03f, 0.05f, 0.1f, 0.88f), new Color(0.5f, 0.7f, 1f, 0.5f), 1, 6, new Vector4(16, 12, 16, 12)));
-        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, MouseFilter = MouseFilterEnum.Ignore };
+        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, MouseFilter = MouseFilterEnum.Stop, MouseForcePassScrollEvents = false };
         text.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         scroll.AddChild(text);
         panel.AddChild(scroll);
@@ -76,6 +76,7 @@ public partial class DebugOverlay : Control, IGameView
     /// <inheritdoc />
     public void Render(Snapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         if (!Visible)
         {
             return;
@@ -99,8 +100,8 @@ public partial class DebugOverlay : Control, IGameView
         lines.Add("");
         lines.Add($"flags: {string.Join(", ", debug.Flags)}");
         lines.Add("");
-        lines.Add("last events:");
-        lines.AddRange(debug.RecentEvents.Select(e => $"  {e}"));
+        lines.Add("last events, newest first:");
+        lines.AddRange(debug.RecentEvents.Reverse().Select(e => $"  {e}"));
         text.Text = string.Join("\n", lines);
     }
 }

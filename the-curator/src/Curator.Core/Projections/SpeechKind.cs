@@ -34,4 +34,7 @@ public enum SpeechKind
 
     /// <summary>The patron's exit line.</summary>
     Exit,
+
+    /// <summary>Narration rather than speech: the generic line when a patron walks out without one of their own.</summary>
+    Narration,
 }

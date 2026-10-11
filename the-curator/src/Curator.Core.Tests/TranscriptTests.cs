@@ -1,4 +1,5 @@
 using Curator.Core.Commands;
+using Curator.Core.Events;
 using Curator.Core.Projections;
 
 namespace Curator.Core.Tests;
@@ -42,5 +43,41 @@ public sealed class TranscriptTests
         var session = TestWorld.NewGame();
 
         Assert.Empty(session.Views.Visit().Transcript);
+    }
+
+    [Fact]
+    public void AGenericWalkOutLineIsNarrationNotSpeech()
+    {
+        var source = TestWorld.Source();
+        source.Edit("patrons/elara-voss.json", n => n["visits"]![0]!["decisions"]!.AsObject().Remove("walkedOut"));
+        var session = TestWorld.NewGame(source.Load(), 1, debug: false);
+        session.ToDay(2);
+        session.Ring("elara-voss-1");
+        foreach (var question in new[] { "purpose", "knowledge", "source", "experience" })
+        {
+            session.Do(new AskQuestion(question));
+        }
+
+        session.Do(new Identify("household-arts-3"));
+        session.Do(new Identify("household-arts-3"));
+
+        Assert.Single(session.All<PatronWalkedOut>());
+        var last = session.Views.Visit().Transcript[^1];
+        Assert.Equal((SpeechKind.Narration, TestWorld.Content.Questions.GenericLines.WalkedOut), (last.Kind, last.Text));
+    }
+
+    [Fact]
+    public void APatronsOwnWalkOutLineIsSpeech()
+    {
+        var session = PatienceAndTrustTests.Elara();
+        foreach (var question in new[] { "purpose", "knowledge", "source", "experience" })
+        {
+            session.Do(new AskQuestion(question));
+        }
+
+        session.Do(new Identify("household-arts-3"));
+        session.Do(new Identify("household-arts-3"));
+
+        Assert.Equal(SpeechKind.Exit, session.Views.Visit().Transcript[^1].Kind);
     }
 }

@@ -87,6 +87,9 @@ public partial class Hud : Control, IGameView
     public void Render(Snapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+
+        // Closing has already started tomorrow (Q8): behind a summary the HUD would show the wrong day.
+        Visible = !snapshot.SummaryShowing;
         var hud = snapshot.Hud;
         var culture = CultureInfo.InvariantCulture;
         mana.Show(hud.Mana, Math.Max(hud.Mana, 1));
@@ -95,11 +98,12 @@ public partial class Hud : Control, IGameView
         date.Text = hud.Day > 0
             ? string.Create(culture, $"Day {hud.Day} of {hud.WeekDays}  ·  {hud.Date}  ·  {UiText.Phase(hud.Phase)}")
             : "";
-        visitBox.Visible = hud.InVisit;
+        // Looking up, the speech panel shows all of this; the HUD repeats it only at the desk (§7.6).
+        visitBox.Visible = hud.InVisit && !snapshot.LookingUp;
         if (hud.InVisit)
         {
             patron.Text = hud.PatronName;
-            patience.Show(hud.Patience, hud.Patience);
+            patience.Show(hud.Patience, Math.Max(hud.Patience, 1));
             request.Text = hud.RequestedBookTitle.Length > 0
                 ? $"Asks for {hud.RequestedBookTitle} ({hud.Topic})"
                 : $"Asks for something on {hud.Topic}";

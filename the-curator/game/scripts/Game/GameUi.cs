@@ -36,9 +36,14 @@ public sealed class GameUi
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(ui);
         ArgumentNullException.ThrowIfNull(debugLayer);
-        var controller = new GameController { Name = "Game" };
+        var controller = new GameController { Name = "Game", ProcessMode = Node.ProcessModeEnum.Pausable };
         var built = new GameUi(controller);
         var documents = new Control { Name = "Documents", Theme = theme, MouseFilter = Control.MouseFilterEnum.Ignore, Size = new Vector2(1920, 1800) };
+
+        // Behind everything on the desk and counter: a click on bare wood takes focus from any note.
+        var bareWood = new FocusCatcher { Name = "BareWood", Size = documents.Size };
+        bareWood.Clicked += controller.ReleaseFocus;
+        documents.AddChild(bareWood);
         var desk = new DeskView { Name = "DeskView" };
         var counter = new CounterProps { Name = "Counter" };
         documents.AddChild(desk);
@@ -76,12 +81,18 @@ public sealed class GameUi
 
         controller.AddDocuments(documents);
         controller.AddDocuments(speech);
+        foreach (var root in new Node[] { documents, speech, debug })
+        {
+            Callable.From(() => UiTheme.KeepScrollWheel(root)).CallDeferred();
+        }
+
         return built;
     }
 
     /// <summary>Removes the controller and every view; the world stays.</summary>
     /// <param name="world">The world, whose patron is cleared.</param>
-    public void Destroy(WorldView world)
+    /// <param name="resetCamera">Whether the camera goes back to the up view (not for a rebuild mid-game).</param>
+    public void Destroy(WorldView world, bool resetCamera)
     {
         ArgumentNullException.ThrowIfNull(world);
         foreach (var node in owned)
@@ -92,7 +103,10 @@ public sealed class GameUi
 
         owned.Clear();
         world.ShowPatron("");
-        world.Camera.LookUp(immediate: true);
+        if (resetCamera)
+        {
+            world.Camera.LookUp(immediate: true);
+        }
     }
 
     private void Own(Node parent, Node node)

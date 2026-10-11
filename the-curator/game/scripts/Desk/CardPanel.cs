@@ -40,7 +40,7 @@ public partial class CardPanel : Control, IGameView
     {
         Size = new Vector2(460, 470);
         MouseFilter = MouseFilterEnum.Ignore;
-        card.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Card, 18));
+        card.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperCard, 18));
         card.Size = new Vector2(460, 330);
         card.CustomMinimumSize = card.Size;
         var column = new VBoxContainer();
@@ -75,7 +75,7 @@ public partial class CardPanel : Control, IGameView
         decisions.AddChild(decline);
         AddChild(decisions);
 
-        slip.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Paper, 10));
+        slip.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperCard, 10));
         slip.Position = new Vector2(0, 398);
         var slipRow = new HBoxContainer();
         slipRow.AddThemeConstantOverride("separation", 14);

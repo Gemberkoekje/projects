@@ -50,7 +50,7 @@ public partial class LettersPanel : Control, IGameView
         if (letters.Count == 0)
         {
             var none = new PanelContainer();
-            none.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Paper, 26));
+            none.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperPage, 26));
             none.AddChild(UiTheme.Text(UiText.NoLetters, UiTheme.PrintItalic, 24, UiTheme.Faint));
             body.AddChild(none);
         }
@@ -58,7 +58,7 @@ public partial class LettersPanel : Control, IGameView
         foreach (var letter in letters)
         {
             var sheet = new PanelContainer();
-            sheet.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Paper, 28));
+            sheet.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperPage, 28));
             var column = new VBoxContainer();
             column.AddThemeConstantOverride("separation", 8);
             column.AddChild(UiTheme.Text($"From {letter.From}", UiTheme.PrintItalic, 20, UiTheme.Faint));

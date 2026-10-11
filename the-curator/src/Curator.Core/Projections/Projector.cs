@@ -63,7 +63,7 @@ public sealed class Projector
         {
             return new VisitView(
                 false, "", "", "", "", [], [], "", "", "", "", false, "", "", [], [], "", false, "", false,
-                Generic.NoThoughts, Content.Balance.Mana.ReadThoughtsCost, Content.Balance.Mana.IdentifyCost, 0, false,
+                Generic.NoThoughts, Generic.Noticed, Content.Balance.Mana.ReadThoughtsCost, Content.Balance.Mana.IdentifyCost, 0, false,
                 Generic.Impatient, false, false, DecisionKind.None, "", false, false, false, false, false, [], "", false, []);
         }
 
@@ -99,6 +99,7 @@ public sealed class Projector
             visit.Fragment,
             visit.Noticed,
             Generic.NoThoughts,
+            Generic.Noticed,
             Content.Balance.Mana.ReadThoughtsCost,
             Content.Balance.Mana.IdentifyCost,
             visit.Patience,
@@ -180,7 +181,8 @@ public sealed class Projector
                     lines.Add(new SpeechLine(SpeechKind.Offered, Content.Book(lent.BookId).Title));
                     break;
                 case VisitEnded ended when ended.ExitLine.Length > 0:
-                    lines.Add(new SpeechLine(SpeechKind.Exit, ended.ExitLine));
+                    var narrated = ended.Decision == DecisionKind.WalkedOut && ended.ExitLine == Generic.WalkedOut;
+                    lines.Add(new SpeechLine(narrated ? SpeechKind.Narration : SpeechKind.Exit, ended.ExitLine));
                     break;
                 default:
                     break;

@@ -76,7 +76,7 @@ public partial class CataloguePanel : Control, IGameView
         var button = new Button { FocusMode = FocusModeEnum.None, CustomMinimumSize = new Vector2(358, 168) };
         foreach (var state in new[] { "normal", "hover", "pressed" })
         {
-            var back = state == "hover" ? new Color("fbf4e4") : state == "pressed" ? new Color("e6dac0") : UiTheme.Card;
+            var back = state == "hover" ? UiTheme.Card.Lightened(0.3f) : state == "pressed" ? UiTheme.Card.Darkened(0.06f) : UiTheme.Card;
             button.AddThemeStyleboxOverride(state, UiTheme.Box(back, new Color("9b8467"), 1, 3, new Vector4(12, 10, 12, 10)));
         }
 
@@ -106,7 +106,7 @@ public partial class CataloguePanel : Control, IGameView
         column.AddChild(status);
         if (card.Summary.Length > 0)
         {
-            var summary = UiTheme.Para($"“{card.Summary}”", UiTheme.PrintItalic, 17, UiTheme.Faint);
+            var summary = UiTheme.Para($"“{card.Summary}”", UiTheme.PrintItalic, 18, UiTheme.Faint);
             summary.MouseFilter = MouseFilterEnum.Ignore;
             summary.MaxLinesVisible = 2;
             summary.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;

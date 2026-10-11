@@ -2,6 +2,7 @@ using Curator.Core.Commands;
 using Curator.Core.Content;
 using Curator.Core.Events;
 using Curator.Core.Projections;
+using Curator.Core.Rules;
 
 namespace Curator.Core.Game;
 
@@ -126,6 +127,13 @@ public sealed class GameSession : ICommandSender
         }
 
         events.AddRange(processor.Emitted);
+        foreach (var noted in processor.Emitted.OfType<ThoughtNoted>())
+        {
+            // NoteThought copies the fragment, dated, into the free notes (BUILD_BRIEF §4.2). The notes
+            // are saved beside the log, so a restored game has the line without replaying anything.
+            Notes.AppendFreeNote(noted.PatronId, $"{CalendarRules.DateText(Content.Schedule.Calendar, noted.Day)}: {noted.Fragment}");
+        }
+
         return CommandResult.Done(processor.Emitted);
     }
 

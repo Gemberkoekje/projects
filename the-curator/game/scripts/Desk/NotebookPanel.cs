@@ -13,7 +13,6 @@ namespace Curator.Presentation.Desk;
 /// </summary>
 public partial class NotebookPanel : Control, IGameView
 {
-    private static readonly Color NotebookPaper = new("e8dcc0");
     private readonly VBoxContainer tabs = new();
     private readonly VBoxContainer page = new();
     private string shownKey = "";
@@ -49,11 +48,7 @@ public partial class NotebookPanel : Control, IGameView
         book.AddChild(cover);
 
         var sheet = new PanelContainer { CustomMinimumSize = new Vector2(916, 696) };
-        var paper = UiTheme.Box(NotebookPaper, new Color("8a7458"), 1, 2, new Vector4(34, 22, 30, 22));
-        paper.ShadowColor = new Color(0f, 0f, 0f, 0.35f);
-        paper.ShadowSize = 6;
-        paper.ShadowOffset = new Vector2(3, 4);
-        sheet.AddThemeStyleboxOverride("panel", paper);
+        sheet.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperNotebook, new Vector4(34, 22, 30, 22)));
         var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         page.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         page.AddThemeConstantOverride("separation", 8);
@@ -90,7 +85,7 @@ public partial class NotebookPanel : Control, IGameView
             tab.AddThemeFontSizeOverride("font_size", UiTheme.Size(24));
             if (notebook is not null && entry.PatronId == notebook.PatronId)
             {
-                tab.AddThemeStyleboxOverride("normal", UiTheme.Box(NotebookPaper, new Color("f6d48a"), 2, 4, new Vector4(10, 2, 10, 2)));
+                tab.AddThemeStyleboxOverride("normal", UiTheme.Box(UiTheme.PaperColor(UiTheme.PaperNotebook), new Color("f6d48a"), 2, 4, new Vector4(10, 2, 10, 2)));
             }
 
             tabs.AddChild(tab);

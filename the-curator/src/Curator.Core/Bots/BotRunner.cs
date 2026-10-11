@@ -22,7 +22,7 @@ public static class BotRunner
     /// <param name="content">The content.</param>
     /// <param name="bot">The bot.</param>
     /// <param name="seed">The seed.</param>
-    /// <param name="days">How many days to play; the whole week by default.</param>
+    /// <param name="days">How many days to play, each through its evening; the whole week by default.</param>
     /// <returns>How it went.</returns>
     public static BotResult Play(ContentSet content, IStrategyBot bot, long seed, int days = int.MaxValue)
     {
@@ -41,7 +41,7 @@ public static class BotRunner
     /// </summary>
     /// <param name="session">The session.</param>
     /// <param name="bot">The bot.</param>
-    /// <param name="days">The last day to play.</param>
+    /// <param name="days">The last day to play through its evening.</param>
     /// <returns>False when there's nothing more to do.</returns>
     public static bool PlayStep(GameSession session, IStrategyBot bot, int days = int.MaxValue) => PlayStep(session, session, bot, days);
 
@@ -49,7 +49,7 @@ public static class BotRunner
     /// <param name="session">The session to read.</param>
     /// <param name="sender">Where to send commands: the session, or Godot's controller.</param>
     /// <param name="bot">The bot.</param>
-    /// <param name="days">The last day to play.</param>
+    /// <param name="days">The last day to play through its evening.</param>
     /// <returns>False when there's nothing more to do.</returns>
     public static bool PlayStep(GameSession session, ICommandSender sender, IStrategyBot bot, int days = int.MaxValue)
     {
@@ -63,11 +63,6 @@ public static class BotRunner
 
         if (!session.Views.Hud().SlotsLeft)
         {
-            if (session.State.Day >= days)
-            {
-                return false;
-            }
-
             BotMoves.Must(sender, new CloseForTheDay());
             return true;
         }

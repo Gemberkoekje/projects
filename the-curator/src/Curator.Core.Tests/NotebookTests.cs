@@ -73,6 +73,7 @@ public sealed class NotebookTests
 
         var thought = Assert.Single(session.Views.Notebook("wren-hale").Thoughts);
         Assert.Equal(("4 Seedmonth", "Twelve paces of bare earth. Twelve at least."), (thought.Date, thought.Fragment));
+        Assert.Equal("4 Seedmonth: Twelve paces of bare earth. Twelve at least.", session.Views.Notebook("wren-hale").FreeNotes);
         session.Refused(new NoteThought(), RejectionReason.AlreadyNoted);
     }
 
@@ -117,5 +118,21 @@ public sealed class NotebookTests
         Assert.Equal("22 Emberfall", card.FirstVisitDate);
         Assert.All(card.Loans, l => Assert.Equal("Hearth & Kettle", l.BookTitle));
         Assert.Equal(("27 Frostwane", "1 Seedmonth"), (card.Loans[^1].BorrowedDate, card.Loans[^1].ReturnedDate));
+    }
+
+    [Fact]
+    public void ANotedFragmentGoesBelowWhatTheCuratorAlreadyWrote()
+    {
+        var session = TestWorld.NewGame();
+        session.ToDay(2);
+        session.FinishDayUntil("wren-hale-1");
+        session.Notes.SetFreeNotes("wren-hale", "Oilskin coat. Hands in pockets.\n");
+        session.Do(new ReadThoughts());
+
+        session.Do(new NoteThought());
+
+        Assert.Equal("Oilskin coat. Hands in pockets.\n4 Seedmonth: Twelve paces of bare earth. Twelve at least.", session.Notes.FreeNotes("wren-hale"));
+        var restored = GameSession.Restore(TestWorld.Content, session.ToSave());
+        Assert.Equal(session.Notes.FreeNotes("wren-hale"), restored.Notes.FreeNotes("wren-hale"));
     }
 }

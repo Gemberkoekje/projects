@@ -55,7 +55,7 @@ public partial class TrayPanel : Control, IGameView
         foreach (var book in waiting)
         {
             var slip = new PanelContainer();
-            slip.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Card, 14));
+            slip.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperCard, 14));
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 14);
             var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };

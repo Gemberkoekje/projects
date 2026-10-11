@@ -31,6 +31,8 @@ public partial class GameController : Node, ICommandSender
     private string patronVisitId = "";
     private DeskDocument document;
     private DayPhase shownPhase;
+    private bool tintedLamp;
+    private int lettersReadDay;
     private int trayDay;
     private bool summaryOpen;
     private bool weekOpen;
@@ -118,7 +120,14 @@ public partial class GameController : Node, ICommandSender
         var after = Session.Views.Visit();
         if (!Screen.World.Camera.LookingUp && after.Present && after.LastLine.Length > 0 && after.LastLine != before.LastLine)
         {
-            Screen.Toast.Speak(after.PatronName, after.LastLine);
+            if (after.Transcript.Count > 0 && after.Transcript[^1].Kind == SpeechKind.Narration)
+            {
+                Screen.Toast.Say(after.LastLine);
+            }
+            else
+            {
+                Screen.Toast.Speak(after.PatronName, after.LastLine);
+            }
         }
 
         var ended = result.Events.OfType<DayEnded>().LastOrDefault();
@@ -147,11 +156,47 @@ public partial class GameController : Node, ICommandSender
     }
 
     /// <summary>Rings the bell for the next patron.</summary>
-    public void RingBell() => Send(new RingBell());
+    public void RingBell()
+    {
+        ReleaseFocus();
+        Send(new RingBell());
+    }
+
+    /// <summary>Takes keyboard focus away from any note being written, so the keys go back to the game.</summary>
+    public void ReleaseFocus() => GetViewport()?.GuiReleaseFocus();
+
+    /// <summary>What the desk looks like now, to carry over when the views are rebuilt.</summary>
+    /// <returns>The state.</returns>
+    public DeskState CaptureDesk() => new(Screen.World.Camera.LookingUp, document, openBookId, notebookPatronId, [.. shelved], trayDay, lettersReadDay);
+
+    /// <summary>Puts the desk back as it was before the views were rebuilt.</summary>
+    /// <param name="state">The state captured from the old controller.</param>
+    public void RestoreDesk(DeskState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        document = state.Document;
+        openBookId = state.OpenBookId;
+        notebookPatronId = state.NotebookPatronId;
+        trayDay = state.TrayDay;
+        lettersReadDay = state.LettersReadDay;
+        shelved.Clear();
+        shelved.UnionWith(state.Shelved);
+        if (state.LookingUp)
+        {
+            Screen.World.Camera.LookUp(immediate: true);
+        }
+        else
+        {
+            Screen.World.Camera.LookDown(immediate: true);
+        }
+
+        Refresh();
+    }
 
     /// <summary>Closes the library, asking first if patrons are still to come.</summary>
     public void RequestClose()
     {
+        ReleaseFocus();
         var hud = Session.Views.Hud();
         if (hud.CanClose && hud.SlotsLeft)
         {
@@ -167,7 +212,9 @@ public partial class GameController : Node, ICommandSender
     /// <param name="which">The document.</param>
     public void Toggle(DeskDocument which)
     {
+        ReleaseFocus();
         document = document == which ? DeskDocument.None : which;
+        MarkRead(document);
         Refresh();
     }
 
@@ -175,7 +222,9 @@ public partial class GameController : Node, ICommandSender
     /// <param name="which">The document.</param>
     public void Open(DeskDocument which)
     {
+        ReleaseFocus();
         document = which;
+        MarkRead(document);
         Refresh();
     }
 
@@ -183,6 +232,7 @@ public partial class GameController : Node, ICommandSender
     /// <param name="bookId">The book.</param>
     public void OpenBook(string bookId)
     {
+        ReleaseFocus();
         openBookId = bookId;
         document = DeskDocument.Book;
         Refresh();
@@ -192,6 +242,7 @@ public partial class GameController : Node, ICommandSender
     /// <param name="patronId">The patron.</param>
     public void ShowNotebookPage(string patronId)
     {
+        ReleaseFocus();
         notebookPatronId = patronId;
         document = DeskDocument.Notebook;
         Refresh();
@@ -249,7 +300,9 @@ public partial class GameController : Node, ICommandSender
             notebookPatronId.Length > 0 ? projector.Notebook(notebookPatronId) : null,
             document == DeskDocument.Book && openBookId.Length == 0 ? DeskDocument.None : document,
             shelved,
-            Screen.World.Camera.LookingUp);
+            Screen.World.Camera.LookingUp,
+            summaryOpen || weekOpen,
+            lettersReadDay == hud.Day);
         UpdateWorld(hud, visit);
         foreach (var view in views)
         {
@@ -277,13 +330,19 @@ public partial class GameController : Node, ICommandSender
         {
             RingBell();
         }
-        else if (@event.IsActionPressed("notebook"))
+        else if (@event.IsActionPressed("notebook") || @event.IsActionPressed("catalogue"))
         {
-            Toggle(DeskDocument.Notebook);
-        }
-        else if (@event.IsActionPressed("catalogue"))
-        {
-            Toggle(DeskDocument.Catalogue);
+            // The key asks for the document, so the camera goes down to the desk where it lies.
+            var which = @event.IsActionPressed("notebook") ? DeskDocument.Notebook : DeskDocument.Catalogue;
+            if (Screen.World.Camera.LookingUp)
+            {
+                Screen.World.Camera.LookDown();
+                Open(which);
+            }
+            else
+            {
+                Toggle(which);
+            }
         }
         else
         {
@@ -319,7 +378,19 @@ public partial class GameController : Node, ICommandSender
         Refresh();
     }
 
-    private void OnViewChanged(bool lookingUp) => Refresh();
+    private void OnViewChanged(bool lookingUp)
+    {
+        ReleaseFocus();
+        Refresh();
+    }
+
+    private void MarkRead(DeskDocument opened)
+    {
+        if (opened == DeskDocument.Letters)
+        {
+            lettersReadDay = Session.State.Day;
+        }
+    }
 
     private void CloseSummary()
     {
@@ -336,10 +407,15 @@ public partial class GameController : Node, ICommandSender
     private void UpdateWorld(HudView hud, VisitView visit)
     {
         var phase = summaryOpen || weekOpen ? DayPhase.Night : hud.Phase;
-        if (phase != shownPhase && phase != DayPhase.None)
+        if ((phase != shownPhase || ReadingLamp != tintedLamp) && phase != DayPhase.None)
         {
             var immediate = shownPhase == DayPhase.None;
-            Screen.World.Lights.SetPhase(phase, immediate);
+            if (phase != shownPhase)
+            {
+                Screen.World.Lights.SetPhase(phase, immediate);
+            }
+
+            tintedLamp = ReadingLamp;
             if (Screen.Layout.Phases.TryGetValue(phase, out var light))
             {
                 var tint = ReadingLamp ? Colors.White : light.DocumentTint;

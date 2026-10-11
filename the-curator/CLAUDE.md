@@ -20,8 +20,8 @@ dotnet test
 & $env:GODOT --path game                                          # play: the title screen (run `dotnet build` first; the editor's Play button builds for you)
 & $env:GODOT --path game -- --new --seed 7                        # straight into a new game, ignoring the save
 & $env:GODOT --path game -- --shots out/shots --seed 1            # screenshot run (windowed): the full §7.11 sequence, 22 PNGs
-& $env:GODOT --path game -- --clicktest --seed 1                  # plays days 1–2 by injected mouse clicks, then saves and continues; exit code 0 when every step works
-& $env:GODOT --path game --headless -- --autoplay careful --seed 1 # a strategy bot (lend-all, decline-all, careful) plays the week through the UI; exit code 0 when no errors were logged
+& $env:GODOT --path game -- --clicktest --seed 1                  # plays days 1–2 by injected clicks and keys, then saves and continues; exit code 0 when every step works
+& $env:GODOT --path game --headless -- --autoplay careful --seed 1 # a strategy bot (lend-all, decline-all, careful) plays the week through the UI (`--days n`: n whole days); exit code 0 when no errors were logged
 ```
 
 ```bash
@@ -29,6 +29,7 @@ dotnet test
 xvfb-run -a -s "-screen 0 1920x1080x24" godot --path game --audio-driver Dummy -- --shots out/shots --seed 1
 ```
 
+- `TheCurator.sln` (here) is the solution for building and testing. `game/Curator.Godot.sln` exists only because Godot's editor build and export look for a solution beside the project; `game/export_presets.cfg` holds the Windows export (untested on Windows).
 - Saves and settings live in Godot's `user://` folder (`save.json`, `settings.cfg`). F1–F4 (debug overlay and cheats) work in debug builds only.
 - Godot version: **4.6.3 stable, .NET build** (the project's `Godot.NET.Sdk/4.6.3`). Keep to the 4.6 API.
 - .NET SDK: **10.0** (verified with 10.0.401). Every project targets **`net10.0`**; `ProjectStructureTests` fails if the three ever differ.

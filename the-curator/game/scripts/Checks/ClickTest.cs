@@ -5,9 +5,10 @@ using Godot;
 namespace Curator.Presentation.Checks;
 
 /// <summary>
-/// <c>--clicktest</c>: plays the first two days by real mouse clicks, then leaves and continues the saved game, — events pushed at each button's place
-/// on screen — and checks that every step did what it should. Exit code 0 when all pass. It proves
-/// the mouse path works end to end, including controls on the layers that follow the camera.
+/// <c>--clicktest</c>: plays the first two days by real mouse clicks and key presses — events pushed at
+/// each button's place on screen — then leaves and continues the saved game, checking that every step
+/// did what it should. Exit code 0 when all pass. It proves the mouse and keyboard paths work end to
+/// end: controls on the layers that follow the camera, Esc pausing, and a note field letting go of the keyboard.
 /// </summary>
 public partial class ClickTest : Node
 {
@@ -32,6 +33,15 @@ public partial class ClickTest : Node
         await Seconds(0.5);
         var views = Game.Session.Views;
 
+        // Esc pauses the game: the bell's key does nothing until it resumes.
+        await Tap(Key.Escape);
+        Check("Esc pauses the game", GetTree().Paused && FindButton("Resume") is not null);
+        await Tap(Key.Space, ' ');
+        await Seconds(0.3);
+        Check("the bell's key is ignored while paused", !views.Visit().Present);
+        await Tap(Key.Escape);
+        Check("Esc again resumes", !GetTree().Paused && FindButton("Resume") is null);
+
         await Click("Ring the bell");
         await Seconds(1.0);
         Check("the bell brings the clerk", views.Visit().Present && Game.World.Camera.LookingUp);
@@ -54,6 +64,37 @@ public partial class ClickTest : Node
 
         await Click("Note it");
         Check("Note it writes the loan into the notebook", Game.Session.State.Loans.Any(l => l.LedgerNoted));
+
+        // A note field holds the keyboard while it's written in; a click on bare wood lets go of it.
+        if (Game.CaptureDesk().Document != DeskDocument.Notebook)
+        {
+            await Tap(Key.N, 'n');
+        }
+
+        Check("N opens the notebook", Game.CaptureDesk().Document == DeskDocument.Notebook);
+        var fields = Visible<TextEdit>();
+        Check("the page has a free-notes field", fields.Count > 0);
+        if (fields.Count > 0)
+        {
+            var notes = fields[0];
+            foreach (var scroll in Ancestors(notes).OfType<ScrollContainer>())
+            {
+                scroll.EnsureControlVisible(notes);
+            }
+
+            await Frames(3);
+            await ClickAt(Centre(notes));
+            Check("a click into the free notes takes the keyboard", GetViewport().GuiGetFocusOwner() == notes);
+        }
+
+        await Tap(Key.C, 'c');
+        Check("while writing, C is a letter, not the catalogue", Game.CaptureDesk().Document == DeskDocument.Notebook);
+        await ClickBareWood();
+        Check("a click on bare wood lets go of the keyboard", GetViewport().GuiGetFocusOwner() is null);
+        await Tap(Key.C, 'c');
+        Check("then C opens the catalogue", Game.CaptureDesk().Document == DeskDocument.Catalogue);
+        await Tap(Key.C, 'c');
+        Check("and C again puts it away", Game.CaptureDesk().Document == DeskDocument.None);
 
         await Click("Close for the day");
         await Seconds(0.5);
@@ -153,15 +194,68 @@ public partial class ClickTest : Node
             return;
         }
 
-        var center = button.GetGlobalTransformWithCanvas() * (button.Size / 2f);
+        await ClickAt(Centre(button));
+    }
+
+    private static Vector2 Centre(Control control) => control.GetGlobalTransformWithCanvas() * (control.Size / 2f);
+
+    private async Task ClickAt(Vector2 point)
+    {
         foreach (var pressed in new[] { true, false })
         {
-            var click = new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = pressed, Position = center, GlobalPosition = center };
+            var click = new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = pressed, Position = point, GlobalPosition = point };
             GetViewport().PushInput(click, true);
             await Frames(2);
         }
 
         await Frames(3);
+    }
+
+    // Clicks the first spot on screen where the mouse would be over the bare wood behind the documents.
+    private async Task ClickBareWood()
+    {
+        var bare = GetTree().Root.FindChild("BareWood", true, false);
+        var size = GetViewport().GetVisibleRect().Size;
+        for (var y = 60f; y < size.Y - 60f; y += 40f)
+        {
+            for (var x = 60f; x < size.X - 60f; x += 40f)
+            {
+                var point = new Vector2(x, y);
+                GetViewport().PushInput(new InputEventMouseMotion { Position = point, GlobalPosition = point }, true);
+                if (GetViewport().GuiGetHoveredControl() == bare)
+                {
+                    await ClickAt(point);
+                    return;
+                }
+            }
+        }
+
+        failures.Add("no bare wood to click");
+        GD.Print("FAIL no bare wood to click");
+    }
+
+    private async Task Tap(Key key, char letter = '\0')
+    {
+        foreach (var pressed in new[] { true, false })
+        {
+            var press = new InputEventKey { Keycode = key, PhysicalKeycode = key, Unicode = letter, Pressed = pressed };
+            GetViewport().PushInput(press);
+            await Frames(2);
+        }
+
+        await Frames(2);
+    }
+
+    private List<T> Visible<T>()
+        where T : Control =>
+        [.. GetTree().Root.FindChildren("*", typeof(T).Name, true, false).OfType<T>().Where(c => c.IsVisibleInTree())];
+
+    private static IEnumerable<Node> Ancestors(Node node)
+    {
+        for (var parent = node.GetParent(); parent is not null; parent = parent.GetParent())
+        {
+            yield return parent;
+        }
     }
 
     // The visible, enabled button with this text; index picks among several, -1 takes the last.

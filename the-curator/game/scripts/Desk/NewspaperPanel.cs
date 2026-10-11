@@ -24,7 +24,7 @@ public partial class NewspaperPanel : Control, IGameView
         Size = new Vector2(1166, 696);
         var sheet = new PanelContainer { Size = new Vector2(980, 696), Position = new Vector2(93, 0) };
         sheet.CustomMinimumSize = sheet.Size;
-        sheet.AddThemeStyleboxOverride("panel", UiTheme.Sheet(UiTheme.Newsprint, 30));
+        sheet.AddThemeStyleboxOverride("panel", UiTheme.PaperSheet(UiTheme.PaperNews, 30));
         AddChild(sheet);
         var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         body.SizeFlagsHorizontal = SizeFlags.ExpandFill;

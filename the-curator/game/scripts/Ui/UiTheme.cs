@@ -20,14 +20,17 @@ public static class UiTheme
     /// <summary>Muted ink for secondary lines.</summary>
     public static readonly Color Faint = new("74665a");
 
-    /// <summary>Parchment for documents.</summary>
-    public static readonly Color Paper = new("efe4cf");
+    /// <summary>The paper slots of §7.3: a photographed texture in art/painted/ wins, else these colours from layout.json.</summary>
+    public const string PaperCard = "paper_card";
 
-    /// <summary>The library card's stock.</summary>
-    public static readonly Color Card = new("f4ecd9");
+    /// <summary>The notebook's paper slot.</summary>
+    public const string PaperNotebook = "paper_notebook";
 
-    /// <summary>Newsprint.</summary>
-    public static readonly Color Newsprint = new("e7e2d6");
+    /// <summary>The page paper slot: open books, letters, summaries and menus.</summary>
+    public const string PaperPage = "paper_page";
+
+    /// <summary>The newspaper's paper slot.</summary>
+    public const string PaperNews = "newspaper";
 
     /// <summary>Speech panels: dark and see-through, so the scene shows behind them.</summary>
     public static readonly Color SpeechBack = new(0.08f, 0.055f, 0.04f, 0.82f);
@@ -45,6 +48,24 @@ public static class UiTheme
     public static readonly Color Stamp = new("7a2e22");
 
     private static readonly Dictionary<string, Font> Fonts = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, Color> PaperFallbacks = new(StringComparer.Ordinal)
+    {
+        [PaperCard] = new("f4ecd9"),
+        [PaperNotebook] = new("e8dcc0"),
+        [PaperPage] = new("efe4cf"),
+        [PaperNews] = new("e7e2d6"),
+    };
+
+    private static IReadOnlyDictionary<string, Color> paperColors = PaperFallbacks;
+
+    /// <summary>Parchment for pages, summaries and menus.</summary>
+    public static Color Paper => PaperColor(PaperPage);
+
+    /// <summary>The library card's stock.</summary>
+    public static Color Card => PaperColor(PaperCard);
+
+    /// <summary>Newsprint.</summary>
+    public static Color Newsprint => PaperColor(PaperNews);
 
     /// <summary>Scales all document text (the text-size setting).</summary>
     public static float TextScale { get; set; } = 1f;
@@ -64,6 +85,69 @@ public static class UiTheme
     /// <summary>Illegible passages: Redacted Script.</summary>
     public static Font Scribble => Load("res://fonts/redacted-script/RedactedScript-Regular.ttf");
 
+    /// <summary>Takes the paper colours from layout.json (§7.3: tune them there, not in code).</summary>
+    /// <param name="colors">The <c>paperFallback</c> colours by slot.</param>
+    public static void UsePaperColors(IReadOnlyDictionary<string, Color> colors)
+    {
+        ArgumentNullException.ThrowIfNull(colors);
+        paperColors = colors;
+    }
+
+    /// <summary>A paper slot's fallback colour.</summary>
+    /// <param name="slot">The slot, such as <see cref="PaperCard"/>.</param>
+    /// <returns>The colour.</returns>
+    public static Color PaperColor(string slot) =>
+        paperColors.TryGetValue(slot, out var color) ? color : PaperFallbacks.GetValueOrDefault(slot, new Color("efe4cf"));
+
+    /// <summary>A sheet of a paper slot: its photographed texture if there is one, else its colour, with a soft shadow.</summary>
+    /// <param name="slot">The slot.</param>
+    /// <param name="margins">Content margins: left, top, right, bottom.</param>
+    /// <returns>The style box.</returns>
+    public static StyleBox PaperSheet(string slot, Vector4 margins)
+    {
+        if (Art.ArtLibrary.TryGet(slot, out var texture))
+        {
+            return new StyleBoxTexture
+            {
+                Texture = texture,
+                ContentMarginLeft = margins.X,
+                ContentMarginTop = margins.Y,
+                ContentMarginRight = margins.Z,
+                ContentMarginBottom = margins.W,
+            };
+        }
+
+        var paper = PaperColor(slot);
+        var box = Box(paper, paper.Darkened(0.25f), 1, 3, margins);
+        box.ShadowColor = new Color(0f, 0f, 0f, 0.35f);
+        box.ShadowSize = 6;
+        box.ShadowOffset = new Vector2(3, 4);
+        return box;
+    }
+
+    /// <summary>A sheet of a paper slot with the same margin on every side.</summary>
+    /// <param name="slot">The slot.</param>
+    /// <param name="margin">The margin.</param>
+    /// <returns>The style box.</returns>
+    public static StyleBox PaperSheet(string slot, float margin) => PaperSheet(slot, new Vector4(margin, margin, margin, margin));
+
+    /// <summary>
+    /// Stops scroll areas handing the wheel on when they reach an end, so scrolling a document to its
+    /// top doesn't pan the camera (the wheel still pans over the room itself).
+    /// </summary>
+    /// <param name="root">Where to start looking.</param>
+    public static void KeepScrollWheel(Node root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        foreach (var control in root.FindChildren("*", "Control", true, false).OfType<Control>().Prepend(root as Control).OfType<Control>())
+        {
+            if (control is ScrollContainer or TextEdit)
+            {
+                control.MouseForcePassScrollEvents = false;
+            }
+        }
+    }
+
     /// <summary>A document font size, scaled by the text-size setting.</summary>
     /// <param name="pixels">The size at 1080p and normal text size.</param>
     /// <returns>The size to use.</returns>
@@ -73,7 +157,7 @@ public static class UiTheme
     /// <returns>The theme.</returns>
     public static Theme Build()
     {
-        var theme = new Theme { DefaultFont = Print, DefaultFontSize = 22 };
+        var theme = new Theme { DefaultFont = Print };
         theme.SetColor("font_color", "Label", Ink);
         foreach (var (state, back, border) in new[]
         {
@@ -92,7 +176,6 @@ public static class UiTheme
         theme.SetColor("font_pressed_color", "Button", Ink);
         theme.SetColor("font_focus_color", "Button", Ink);
         theme.SetColor("font_disabled_color", "Button", new Color(0.17f, 0.13f, 0.09f, 0.45f));
-        theme.SetFontSize("font_size", "Button", 20);
         theme.SetStylebox("normal", "LineEdit", Box(new Color(1f, 1f, 1f, 0.25f), new Color(0.43f, 0.35f, 0.26f, 0.5f), 1, 3, new Vector4(6, 2, 6, 2)));
         theme.SetStylebox("focus", "LineEdit", Box(new Color(1f, 1f, 1f, 0.4f), new Color("3b2c1f"), 1, 3, new Vector4(6, 2, 6, 2)));
         theme.SetColor("font_color", "LineEdit", Ink);
@@ -106,7 +189,17 @@ public static class UiTheme
         theme.SetColor("default_color", "RichTextLabel", Ink);
         theme.SetStylebox("panel", "TooltipPanel", Box(Paper, new Color("6d5843"), 1, 4, new Vector4(10, 6, 10, 6)));
         theme.SetColor("font_color", "TooltipLabel", Ink);
+        ScaleFonts(theme);
         return theme;
+    }
+
+    /// <summary>Sizes the theme's default text and button captions for the text-size setting; controls using the theme follow at once.</summary>
+    /// <param name="theme">The theme <see cref="Build"/> made.</param>
+    public static void ScaleFonts(Theme theme)
+    {
+        ArgumentNullException.ThrowIfNull(theme);
+        theme.DefaultFontSize = Size(22);
+        theme.SetFontSize("font_size", "Button", Size(20));
     }
 
     /// <summary>A flat box with a border and rounded corners.</summary>

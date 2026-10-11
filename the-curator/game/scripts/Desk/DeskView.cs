@@ -55,8 +55,8 @@ public partial class DeskView : Control, IGameView
         card.Position = new Vector2(24, 18);
         AddChild(card);
 
-        Place(newspaper, UiText.Newspaper, new Color("e4dccb"), new Rect2(24, 492, 140, 210), DeskDocument.Newspaper, UiTheme.Ink);
-        Place(letters, UiText.Letters, new Color("efe4cf"), new Rect2(176, 492, 140, 210), DeskDocument.Letters, UiTheme.Ink);
+        Place(newspaper, UiText.Newspaper, UiTheme.Newsprint, new Rect2(24, 492, 140, 210), DeskDocument.Newspaper, UiTheme.Ink);
+        Place(letters, UiText.Letters, UiTheme.Paper, new Rect2(176, 492, 140, 210), DeskDocument.Letters, UiTheme.Ink);
         Place(tray, UiText.Tray, new Color("6b4a2e"), new Rect2(328, 492, 156, 210), DeskDocument.Tray, UiTheme.SpeechInk);
         Place(notebook, UiText.Notebook, new Color("4a2f22"), new Rect2(1688, 440, 210, 124), DeskDocument.Notebook, UiTheme.SpeechInk);
         Place(catalogue, UiText.Catalogue, new Color("5a3d26"), new Rect2(1688, 578, 210, 124), DeskDocument.Catalogue, UiTheme.SpeechInk);
@@ -84,8 +84,8 @@ public partial class DeskView : Control, IGameView
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         card.Render(snapshot);
-        letters.SetBadge(snapshot.Morning.Letters.Count);
-        tray.SetBadge(snapshot.Morning.Returns.Count(r => !snapshot.Shelved.Contains(r.LoanId)));
+        letters.SetBadge(snapshot.SummaryShowing || snapshot.LettersRead ? 0 : snapshot.Morning.Letters.Count);
+        tray.SetBadge(snapshot.SummaryShowing ? 0 : snapshot.Morning.Returns.Count(r => !snapshot.Shelved.Contains(r.LoanId)));
         foreach (var (item, which) in new[] { (newspaper, DeskDocument.Newspaper), (letters, DeskDocument.Letters), (tray, DeskDocument.Tray), (notebook, DeskDocument.Notebook), (catalogue, DeskDocument.Catalogue) })
         {
             item.Restyle(snapshot.Document == which || (which == DeskDocument.Catalogue && snapshot.Document == DeskDocument.Book));

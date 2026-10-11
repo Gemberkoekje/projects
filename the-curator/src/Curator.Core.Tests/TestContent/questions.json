@@ -45,7 +45,8 @@
     "walkedOut": "They leave without another word.",
     "impatient": "They glance at the door.",
     "bookOut": "That one's out on loan, I'm afraid.",
-    "noThoughts": "Nothing comes to the surface."
+    "noThoughts": "Nothing comes to the surface.",
+    "noticed": "Their eyes narrow. They felt that."
   },
   "placeholder": true
 }

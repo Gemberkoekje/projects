@@ -1,4 +1,5 @@
 using Curator.Core.Bots;
+using Curator.Core.Events;
 using Curator.Core.Game;
 
 namespace Curator.Core.Tests;
@@ -22,8 +23,19 @@ public sealed class BotTests
     {
         var result = BotRunner.Play(TestWorld.Content, new LendAllBot(), seed: 1, days: 3);
 
-        Assert.Equal(3, result.Session.State.Day);
+        // Three whole days, evenings included: it stops at day 4's morning.
+        Assert.Equal(4, result.Session.State.Day);
         Assert.Equal(DayStatus.Open, result.Session.State.Status);
+        Assert.Equal(3, result.Session.Events.OfType<DayEnded>().Count());
+        Assert.False(result.Session.State.InVisit);
+    }
+
+    [Fact]
+    public void PlayingSevenDaysIsTheWholeWeek()
+    {
+        var result = BotRunner.Play(TestWorld.Content, new LendAllBot(), seed: 1, days: 7);
+
+        Assert.Equal(DayStatus.WeekOver, result.Session.State.Status);
     }
 
     [Fact]

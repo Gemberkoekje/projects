@@ -204,4 +204,19 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - `--new` skips the title as well as ignoring the save. That's the reading that makes it useful from the command line.
 - `--shots` and `--autoplay` never write saves, and `--clicktest` writes only its own test save. None of them touch a player's save or settings.
 
-**Open**: review pass 3 (next commit).
+**Review pass 3** (a reviewer played the build; fixed in a separate commit):
+- **Esc pauses.** The game's nodes stop while the pause menu or settings are open; the menus carry on. Space can't ring the bell behind the menu.
+- **Note fields let go of the keyboard.** A click on bare wood, a pan, opening or closing a document, the bell, closing and Esc all take focus from a note, so the shortcuts work again.
+- **The reading lamp** takes effect at once, not at the next change of phase.
+- **The mouse wheel** at the end of a scrolling document no longer pans the camera.
+- **Paper art slots** (`paper_card`, `paper_notebook`, `paper_page`, `newspaper`) are used: a painted texture when one arrives, else the layout's paper colour.
+- **A Windows export preset** (`game/export_presets.cfg`, "Windows Desktop", JSON included) and `game/Curator.Godot.sln`, which Godot's export and editor build look for. A pack export works on Linux (all 39 content files and `layout.json` are in it). **A real Windows export is untested**: it needs Godot's export templates on the designer's PC.
+- **The generic walk-out line** ("They leave without another word.") is narration, in italics without quotes, not the patron's speech.
+- **A text-size change** keeps the camera, the open document, the book, the notebook page, shelved returns and the tray.
+- **Disabled counter buttons** are readable: darker ink on a more opaque face.
+- **The debug overlay** lists the newest events first and scrolls with the wheel.
+- **The HUD** hides behind the day and week summaries, so it no longer shows tomorrow's numbers early.
+- Smaller: a noted thought is also written into the patron's free notes, with its date; the catalogue summary is 18 px (the minimum); test runs use default settings, not the player's; the deflection "It's for something at home" became "Nothing worth the telling, really.", which fits any question.
+- Matters of taste taken up: the text size now scales button captions, the question list included; a warded patron who notices Read Thoughts shows a tell (`genericLines.noticed`: "Their eyes narrow. They felt that."); patience and mana show one empty pip at 0 instead of nothing; N and C pan down to the desk before opening; the letters badge clears once the day's letters are read; `--days n` plays n whole days, evenings included (it stopped before day n's evening, so `--days 7` never reached the week summary); the HUD's visit summary shows only while looking down, as §7.6 has it.
+- Left as they are, with questions: the speech panel's place (Q31) and real weekday names beside invented months (Q32). The `--shots` set still has no plain night view; night shows behind the summaries.
+- After the fixes: `dotnet test` 226 green; the three bots unchanged (lend-all 30, decline-all −21, careful 20); `--clicktest` passes 33 checks, adding Esc-pauses-the-bell and the note-focus round trip; `--shots` 22 images, all looked at.
