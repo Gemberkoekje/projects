@@ -1,3 +1,4 @@
+using Curator.Core.Commands;
 using Curator.Core.Text;
 
 namespace Curator.Core.Content;
@@ -69,6 +70,7 @@ public static class ContentValidator
             Generic();
             Newspaper();
             Letters();
+            Desk();
             Flags();
             Reachability();
         }
@@ -973,6 +975,35 @@ public static class ContentValidator
 
                 NonEmpty(file, $"$.debt.{level}.text", letter.Text, "letter text");
                 NonEmpty(file, $"$.debt.{level}.from", letter.From, "sender");
+            }
+        }
+
+        private void Desk()
+        {
+            const string file = "desk.json";
+            var desk = parts.Desk;
+            NonEmpty(file, "$.identifyFailed", desk.IdentifyFailed, "line");
+            NonEmpty(file, "$.pageRepeated", desk.PageRepeated, "line");
+            NonEmpty(file, "$.pageResisted", desk.PageResisted, "note");
+            NonEmpty(file, "$.pageRemoved", desk.PageRemoved, "note");
+            NonEmpty(file, "$.closeEarly", desk.CloseEarly, "question");
+            if (!desk.Refusals.ContainsKey(DeskFile.DefaultRefusal))
+            {
+                Error(file, "$.refusals", $"needs a '{DeskFile.DefaultRefusal}' line");
+            }
+
+            var reasons = Enum.GetValues<RejectionReason>()
+                .Where(r => r != RejectionReason.None)
+                .Select(Camel)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var (key, line) in desk.Refusals)
+            {
+                if (key != DeskFile.DefaultRefusal && !reasons.Contains(key))
+                {
+                    Error(file, $"$.refusals.{key}", $"'{key}' is not a refusal reason");
+                }
+
+                NonEmpty(file, $"$.refusals.{key}", line, "line");
             }
         }
 

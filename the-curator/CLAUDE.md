@@ -18,7 +18,8 @@ dotnet test
 #   setx GODOT "C:\path\to\Godot_v4.6.3-stable_mono_win64.exe"
 & $env:GODOT --headless --path game --import                      # once after cloning, and after new paintings arrive
 & $env:GODOT --path game                                          # play (run `dotnet build` first; the editor's Play button builds for you)
-& $env:GODOT --path game -- --shots out/shots --seed 1            # screenshot run (windowed) — from M5
+& $env:GODOT --path game -- --shots out/shots --seed 1            # screenshot run (windowed): days 1–2 since M4, the full set from M5
+& $env:GODOT --path game -- --clicktest --seed 1                  # plays days 1–2 by injected mouse clicks; exit code 0 when every step works
 & $env:GODOT --path game --headless -- --autoplay careful --seed 1 # strategy bot — from M5
 ```
 

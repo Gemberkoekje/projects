@@ -50,7 +50,8 @@ public sealed class Projector
             slotsLeft,
             session.Check(new RingBell()) == RejectionReason.None,
             session.Check(new CloseForTheDay()) == RejectionReason.None,
-            state.Status == DayStatus.WeekOver);
+            state.Status == DayStatus.WeekOver,
+            Content.Desk.CloseEarly);
     }
 
     /// <summary>The visit at the counter, decided or not.</summary>
@@ -63,13 +64,14 @@ public sealed class Projector
             return new VisitView(
                 false, "", "", "", "", [], [], "", "", "", "", false, "", "", [], [], "", false, "", false,
                 Generic.NoThoughts, Content.Balance.Mana.ReadThoughtsCost, Content.Balance.Mana.IdentifyCost, 0, false,
-                Generic.Impatient, false, false, DecisionKind.None, "", false, false, false, false, false, [], "", false);
+                Generic.Impatient, false, false, DecisionKind.None, "", false, false, false, false, false, [], "", false, []);
         }
 
         var visit = state.Visit;
         var patron = Content.Patron(visit.PatronId);
         var requested = visit.RequestedBookId.Length > 0;
-        var requestedOut = requested && !state.Book(visit.RequestedBookId).InLibrary;
+        var lentHere = visit.LoanId.Length > 0 && state.Loan(visit.LoanId).BookId == visit.RequestedBookId;
+        var requestedOut = requested && !lentHere && !state.Book(visit.RequestedBookId).InLibrary;
         var inProgress = visit.InProgress;
         var questions = QuestionRules.Available(Content, state)
             .Select(q => new QuestionView(q.Id, q.Text, q.Specific, q.Asked))
@@ -113,7 +115,61 @@ public sealed class Projector
             session.Check(new Decline()) == RejectionReason.None,
             visit.OffersRefused,
             noteLoan,
-            session.Check(new NoteThought()) == RejectionReason.None);
+            session.Check(new NoteThought()) == RejectionReason.None,
+            Transcript(requestedOut));
+    }
+
+    // The current visit's lines, read from the log since its VisitStarted so they keep their order.
+    private List<SpeechLine> Transcript(bool requestedOut)
+    {
+        var events = session.Events;
+        var start = events.Count - 1;
+        while (start >= 0 && events[start] is not VisitStarted)
+        {
+            start--;
+        }
+
+        var patronId = State.Visit.PatronId;
+        var lines = new List<SpeechLine>();
+        for (var i = start + 1; i < events.Count; i++)
+        {
+            switch (events[i])
+            {
+                case GossipShared gossip:
+                    lines.Add(new SpeechLine(SpeechKind.Gossip, gossip.Text));
+                    break;
+                case OutcomeSurfaced { Channel: OutcomeChannel.Return } surfaced when State.Resolution(surfaced.ResolutionId).PatronId == patronId:
+                    lines.Add(new SpeechLine(SpeechKind.Return, State.Resolution(surfaced.ResolutionId).Text));
+                    break;
+                case RequestMade request:
+                    lines.Add(new SpeechLine(SpeechKind.Greeting, request.Greeting));
+                    lines.Add(new SpeechLine(SpeechKind.Request, request.RequestText));
+                    if (requestedOut)
+                    {
+                        lines.Add(new SpeechLine(SpeechKind.BookOut, Generic.BookOut));
+                    }
+
+                    break;
+                case QuestionAsked asked:
+                    lines.Add(new SpeechLine(SpeechKind.Asked, asked.QuestionText));
+                    lines.Add(new SpeechLine(SpeechKind.Answer, asked.Answer));
+                    break;
+                case OfferRefused refused:
+                    lines.Add(new SpeechLine(SpeechKind.Offered, Content.Book(refused.BookId).Title));
+                    lines.Add(new SpeechLine(SpeechKind.Refused, refused.Line));
+                    break;
+                case BookLent lent when lent.AsAlternative || State.Visit.RequestedBookId.Length == 0:
+                    lines.Add(new SpeechLine(SpeechKind.Offered, Content.Book(lent.BookId).Title));
+                    break;
+                case VisitEnded ended when ended.ExitLine.Length > 0:
+                    lines.Add(new SpeechLine(SpeechKind.Exit, ended.ExitLine));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return lines;
     }
 
     /// <summary>The morning desk: today's paper, letters and returns.</summary>
@@ -213,7 +269,44 @@ public sealed class Projector
             State.InVisit,
             isRequested,
             isRequested && session.Check(new LendRequested()) == RejectionReason.None,
-            session.Check(new OfferBook(bookId)) == RejectionReason.None);
+            session.Check(new OfferBook(bookId)) == RejectionReason.None,
+            Content.Desk.PageResisted,
+            Content.Desk.PageRemoved);
+    }
+
+    /// <summary>The gentle in-world line for a refused command (desk.json), never an error message.</summary>
+    /// <param name="reason">Why the command was refused.</param>
+    /// <returns>The line; the default line when the reason has none of its own.</returns>
+    public string RefusalLine(RejectionReason reason)
+    {
+        var refusals = Content.Desk.Refusals;
+        var name = reason.ToString();
+        var key = char.ToLowerInvariant(name[0]) + name[1..];
+        return refusals.TryGetValue(key, out var line) ? line : refusals.GetValueOrDefault(DeskFile.DefaultRefusal, "");
+    }
+
+    /// <summary>What an Identify turned up, as a line for the desk.</summary>
+    /// <param name="events">The events the Identify appended.</param>
+    /// <returns>The line; empty when a new page came into focus (the page itself says enough).</returns>
+    public string IdentifyNote(IReadOnlyList<GameEvent> events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        foreach (var e in events)
+        {
+            switch (e)
+            {
+                case IdentifyFailed:
+                    return Content.Desk.IdentifyFailed;
+                case PageResisted:
+                    return Content.Desk.PageResisted;
+                case PageIdentified { Repeat: true }:
+                    return Content.Desk.PageRepeated;
+                default:
+                    break;
+            }
+        }
+
+        return "";
     }
 
     /// <summary>A patron's library card.</summary>

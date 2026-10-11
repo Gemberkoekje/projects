@@ -11,7 +11,7 @@ public static class ContentLoader
     public static readonly IReadOnlyList<string> RootFiles =
     [
         "balance.json", "tags.json", "questions.json", "ingredients.json", "schedule.json",
-        "outcomes_generic.json", "newspaper.json", "letters.json",
+        "outcomes_generic.json", "newspaper.json", "letters.json", "desk.json",
     ];
 
     /// <summary>Loads and validates content.</summary>
@@ -55,6 +55,7 @@ public static class ContentLoader
         var generic = Parse<OutcomesGenericFile>(source, "outcomes_generic.json", problems, texts);
         var newspaper = Parse<NewspaperFile>(source, "newspaper.json", problems, texts);
         var letters = Parse<LettersFile>(source, "letters.json", problems, texts);
+        var desk = Parse<DeskFile>(source, "desk.json", problems, texts);
 
         var fileById = new Dictionary<string, string>(StringComparer.Ordinal);
         var books = ParseFolder<Book>(source, "books", problems, texts, fileById, b => b.Id);
@@ -62,7 +63,7 @@ public static class ContentLoader
 
         var version = Hash(texts);
         if (balance is null || tags is null || questions is null || ingredients is null || schedule is null ||
-            generic is null || newspaper is null || letters is null)
+            generic is null || newspaper is null || letters is null || desk is null)
         {
             return (null, problems, version);
         }
@@ -77,6 +78,7 @@ public static class ContentLoader
             OutcomesGeneric = generic,
             Newspaper = newspaper,
             Letters = letters,
+            Desk = desk,
             Books = books,
             Patrons = patrons,
             FileById = fileById,

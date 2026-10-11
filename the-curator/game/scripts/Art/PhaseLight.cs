@@ -8,4 +8,5 @@ namespace Curator.Presentation.Art;
 /// <param name="WindowEnergy">The window light's strength.</param>
 /// <param name="CandleEnergy">The candle's strength.</param>
 /// <param name="ArchwayEnergy">The archway light's strength.</param>
-public sealed record PhaseLight(Color Ambient, Color Window, float WindowEnergy, float CandleEnergy, float ArchwayEnergy);
+/// <param name="DocumentTint">How the phase tints documents and speech: enough to sit in the scene, never enough to hurt legibility.</param>
+public sealed record PhaseLight(Color Ambient, Color Window, float WindowEnergy, float CandleEnergy, float ArchwayEnergy, Color DocumentTint);

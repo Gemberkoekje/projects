@@ -17,11 +17,14 @@ public partial class WorldView : Node2D
     /// <summary>The light.</summary>
     public Lighting Lights { get; } = new() { Name = "Lights" };
 
-    /// <summary>Where desk objects are added (M4).</summary>
-    public Node2D Desk { get; } = new() { Name = "Desk", ZIndex = 15 };
+    /// <summary>
+    /// The desk's documents: a layer that follows the camera, so they pan with the room, but sits
+    /// outside the ambient tint, so night never makes them unreadable (§7.4).
+    /// </summary>
+    public CanvasLayer Desk { get; } = new() { Name = "Desk", Layer = 2, FollowViewportEnabled = true };
 
     /// <summary>The patron's silhouette.</summary>
-    public SlotNode Patron { get; private set; } = new();
+    public SlotNode Patron { get; } = new() { Name = "Silhouette" };
 
     /// <summary>Builds the scene from the layout.</summary>
     /// <param name="layout">The layout.</param>
@@ -41,7 +44,6 @@ public partial class WorldView : Node2D
         var patronRoot = new Node2D { Name = "Patron" };
         AddChild(patronRoot);
         var patronSlot = layout.Slots.First(s => s.Id == "patron_default");
-        Patron = new SlotNode();
         Patron.Show(patronSlot);
         Patron.Visible = false;
         patronRoot.AddChild(Patron);

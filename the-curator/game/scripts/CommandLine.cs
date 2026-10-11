@@ -17,6 +17,9 @@ public sealed class CommandLine
     /// <summary>The strategy bot to drive, or empty.</summary>
     public string Autoplay { get; private set; } = "";
 
+    /// <summary>Play day 1 by injected mouse clicks and check each step (a smoke test of the mouse path).</summary>
+    public bool ClickTest { get; private set; }
+
     /// <summary>How many days the bot plays.</summary>
     public int Days { get; private set; } = int.MaxValue;
 
@@ -38,6 +41,9 @@ public sealed class CommandLine
                     break;
                 case "--new":
                     line.NewGame = true;
+                    break;
+                case "--clicktest":
+                    line.ClickTest = true;
                     break;
                 case "--shots" when next.Length > 0:
                     line.ShotsDir = next;

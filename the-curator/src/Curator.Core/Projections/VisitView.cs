@@ -42,6 +42,7 @@ namespace Curator.Core.Projections;
 /// <param name="OffersRefused">Books they turned down.</param>
 /// <param name="NoteLoanId">A loan that can be written into the notebook now, or empty.</param>
 /// <param name="CanNoteThought">Whether the fragment can be copied into the notebook now.</param>
+/// <param name="Transcript">Everything said in the visit so far, in order.</param>
 public sealed record VisitView(
     bool Present,
     string VisitId,
@@ -80,4 +81,5 @@ public sealed record VisitView(
     bool CanDecline,
     IReadOnlyList<string> OffersRefused,
     string NoteLoanId,
-    bool CanNoteThought);
+    bool CanNoteThought,
+    IReadOnlyList<SpeechLine> Transcript);

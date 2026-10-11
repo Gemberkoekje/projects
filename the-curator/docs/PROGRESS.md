@@ -115,3 +115,57 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - No Easel paintings yet. The playable week (M4–M5) comes first, then the interim Easel art, so the art can't hold up the game. Until then every slot shows its flat placeholder.
 
 **Open**: nothing new.
+
+## M4 — Desk and speech
+
+**Built**
+- `GameController` owns the `GameSession`. It sends commands and, after each one, pushes a fresh snapshot of Core's projections to every view. The views only call back into it.
+  - It holds presentation state only: which document is open, which returned books were shelved (Q9), and the notebook page showing.
+  - A refused command shows its gentle line from `desk.json`, never an error. Disabled buttons show the same line as their tooltip.
+- **Up view** (§7.6):
+  - The silhouette fades in when a patron arrives and out after their exit line.
+  - Beside the archway, a panel holds the visit's transcript (a new Core projection, so its order comes from the event log), with the patron's name and description.
+  - Beneath it are patience pips, Read Thoughts with its cost, and the questions: standard first, then unlocked ones marked new.
+  - The Read Thoughts fragment floats near the patron's head, in italics with a soft glow, with "Note it" beneath.
+- **Down view** (§7.5):
+  - The library card sits with "Stamp and lend" and "Hand back the card" beneath it. After a lend, the stamp's slip offers "Note it".
+  - The newspaper, letters and returns tray lie beneath the card. In the tray, "Note it" appears while a return can be noted, and a click puts the book back on the shelf.
+  - The notebook and catalogue drawer lie by the candle. One document at a time opens in the middle of the desk.
+  - The open book is a two-page spread:
+    - Left page: the cover (painting or tinted fallback), facts, the previous owner's note, the unread count, and Identify (with its cost and whether it costs patience), Offer this instead, and Stamp and lend for the requested book.
+    - Right page: identified pages in partial translation, with notes for resisted pages and torn stubs.
+  - The notebook has the automatic header, watched loans with an editable note column, the thoughts noted, and free notes in the handwriting font. Notes aren't events; they're saved beside the log (§7.12).
+  - N opens the notebook and C the catalogue.
+- **HUD** (§7.7):
+  - Mana pips and money sit top left; day, date and phase top centre.
+  - During a visit, the top right shows who is waiting, their patience, what they asked for, and the impatience tell.
+  - Tabs at the top and bottom edge pan the camera. While looking down, the patron's lines appear at the top of the screen, so nothing they say is missed.
+- The bell and the closing sign stand on the counter, seen from both views. Space rings the bell too.
+- Closing with patrons still to come asks first, with the line from `desk.json`. Closing shows the day summary over the night scene.
+- **Text** (§7.8):
+  - Page markup renders as BBCode: translated text in IM Fell English ink, untranslated in grey Pinyon Script, illegible as faded Redacted Script.
+  - Known ingredients are in ink, unknown ones in script. The notebook is in Caveat.
+  - The four OFL fonts are bundled with their licences (`game/fonts/README.md`).
+  - Body text is 19–22 px, the notebook 24–26 px. `UiTheme.TextScale` is ready for the text-size setting (M5).
+- **Core additions**:
+  - `desk.json` (Q24), validated: every key must be a refusal reason, plus a `default`.
+  - `Projector.RefusalLine` and `Projector.IdentifyNote`.
+  - Desk notes on `BookView` and the close-early question on `HudView`.
+  - The visit transcript (`SpeechLine`).
+  - A fix: a requested book counted as "out" once it had been lent to the patron who asked for it.
+- `--clicktest` plays days 1 and 2 by injected mouse clicks at each button's place on screen. The day-2 run asks each of three patrons a question, then lends, declines and lends. Each step is checked and the exit code is 0 when all pass.
+- `--shots` now plays day 1 (letters, the clerk's visit, a question, the catalogue, the book after an Identify, the lend, the notebook, the summary) and day 2 (the newspaper, the third visit with Read Thoughts, the dusk farewell, the desk at dusk, the summary).
+
+**Verified**
+- `dotnet test` is green (222 tests).
+- `--clicktest` passes: days 1 and 2 by mouse, 20 checks.
+- The `--shots` images pass §8.6. Text is legible in every phase, the night summary included. The silhouette reads against the lit archway. The candle is warm. Nothing overlaps once the gentle lines fade.
+- No rule logic outside Core: every button reads its `Can…` flag from a projection.
+- The game quits cleanly, with no leaked objects or engine errors at exit.
+
+**Differs from the brief**
+- The desk's documents and the speech panel sit on canvas layers that follow the camera, rather than under `World` and `Ui` as plain nodes. They pan with the room but stay outside the night tint (§7.4 legibility). A milder per-phase document tint (in `layout.json`) keeps them in the scene, and the "reading lamp" setting (M5) will turn it off.
+- Lines a patron says while the curator looks down also appear at the top of the screen.
+- `--clicktest` is a command-line mode the brief doesn't list. It's a smoke test of the mouse path.
+
+**Open**: nothing new.

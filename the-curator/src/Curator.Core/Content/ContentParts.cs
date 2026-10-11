@@ -19,6 +19,8 @@ public sealed record ContentParts
 
     public required LettersFile Letters { get; init; }
 
+    public required DeskFile Desk { get; init; }
+
     public required IReadOnlyList<Book> Books { get; init; }
 
     public required IReadOnlyList<Patron> Patrons { get; init; }

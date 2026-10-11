@@ -45,6 +45,13 @@ public static class ArtLibrary
         return false;
     }
 
+    /// <summary>Lets go of the cached textures, so nothing is left in use when the game quits.</summary>
+    public static void Release()
+    {
+        Cache.Clear();
+        Missing.Clear();
+    }
+
     /// <summary>Where a slot's art came from: "painted", "easel" or "placeholder".</summary>
     /// <param name="slotId">The slot id.</param>
     /// <returns>The source.</returns>

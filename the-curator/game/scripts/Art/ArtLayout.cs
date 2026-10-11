@@ -100,7 +100,8 @@ public sealed class ArtLayout
         Color.FromHtml(phase.GetProperty("window").GetString()),
         phase.GetProperty("windowEnergy").GetSingle(),
         phase.GetProperty("candleEnergy").GetSingle(),
-        phase.GetProperty("archwayEnergy").GetSingle());
+        phase.GetProperty("archwayEnergy").GetSingle(),
+        Color.FromHtml(phase.GetProperty("documentTint").GetString()));
 
     private static Rect2 Rect(JsonElement values)
     {

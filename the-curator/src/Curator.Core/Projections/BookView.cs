@@ -22,6 +22,8 @@ namespace Curator.Core.Projections;
 /// <param name="IsRequested">Whether the patron at the counter asked for it.</param>
 /// <param name="CanLend">Whether it can be stamped and lent now.</param>
 /// <param name="CanOffer">Whether it can be offered instead now.</param>
+/// <param name="ResistedNote">The note shown for a page that won't come into focus.</param>
+/// <param name="RemovedNote">The note shown for a torn-out page.</param>
 public sealed record BookView(
     string BookId,
     string Title,
@@ -40,4 +42,6 @@ public sealed record BookView(
     bool CostsPatience,
     bool IsRequested,
     bool CanLend,
-    bool CanOffer);
+    bool CanOffer,
+    string ResistedNote,
+    string RemovedNote);

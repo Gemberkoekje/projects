@@ -20,6 +20,7 @@ namespace Curator.Core.Projections;
 /// <param name="CanRingBell">Whether the bell can be rung now.</param>
 /// <param name="CanClose">Whether the library can close for the day now.</param>
 /// <param name="WeekOver">Whether the week has ended.</param>
+/// <param name="CloseEarlyPrompt">Asked before closing while patrons are still to come.</param>
 public sealed record HudView(
     int Mana,
     int Money,
@@ -37,4 +38,5 @@ public sealed record HudView(
     bool SlotsLeft,
     bool CanRingBell,
     bool CanClose,
-    bool WeekOver);
+    bool WeekOver,
+    string CloseEarlyPrompt);

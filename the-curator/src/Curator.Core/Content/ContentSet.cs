@@ -27,6 +27,7 @@ public sealed class ContentSet
         OutcomesGeneric = parts.OutcomesGeneric;
         Newspaper = parts.Newspaper;
         Letters = parts.Letters;
+        Desk = parts.Desk;
         Books = parts.Books.OrderBy(b => b.Id, StringComparer.Ordinal).ToList();
         Patrons = parts.Patrons.OrderBy(p => p.Id, StringComparer.Ordinal).ToList();
         Fillers = Patrons.Where(p => p.Role == PatronRole.Filler)
@@ -60,6 +61,8 @@ public sealed class ContentSet
     public NewspaperFile Newspaper { get; }
 
     public LettersFile Letters { get; }
+
+    public DeskFile Desk { get; }
 
     /// <summary>Every book, ordered by id.</summary>
     public IReadOnlyList<Book> Books { get; }

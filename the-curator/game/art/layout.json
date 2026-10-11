@@ -165,35 +165,40 @@
         "window": "#fff1d8",
         "windowEnergy": 0.55,
         "candleEnergy": 0.35,
-        "archwayEnergy": 0.7
+        "archwayEnergy": 0.7,
+        "documentTint": "#fbf6ee"
       },
       "midday": {
         "ambient": "#f8f4ec",
         "window": "#ffffff",
         "windowEnergy": 0.6,
         "candleEnergy": 0.3,
-        "archwayEnergy": 0.6
+        "archwayEnergy": 0.6,
+        "documentTint": "#ffffff"
       },
       "afternoon": {
         "ambient": "#e6d6bd",
         "window": "#ffdcaa",
         "windowEnergy": 0.55,
         "candleEnergy": 0.45,
-        "archwayEnergy": 0.75
+        "archwayEnergy": 0.75,
+        "documentTint": "#f7eddd"
       },
       "dusk": {
         "ambient": "#a68677",
         "window": "#ff955a",
         "windowEnergy": 0.5,
         "candleEnergy": 0.9,
-        "archwayEnergy": 0.95
+        "archwayEnergy": 0.95,
+        "documentTint": "#efdcc6"
       },
       "night": {
         "ambient": "#3e4060",
         "window": "#9eb4ff",
         "windowEnergy": 0.35,
         "candleEnergy": 1.35,
-        "archwayEnergy": 1.0
+        "archwayEnergy": 1.0,
+        "documentTint": "#e2d3bd"
       }
     },
     "candle": {

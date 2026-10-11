@@ -1,0 +1,30 @@
+{
+  "identifyFailed": "The letters swim and won't settle. The mana is spent all the same.",
+  "pageRepeated": "A page you've read before swims up again.",
+  "pageResisted": "This page won't come into focus.",
+  "pageRemoved": "Only a torn stub where a page was.",
+  "closeEarly": "Someone may still come today. Close the library anyway?",
+  "refusals": {
+    "default": "Not just now.",
+    "weekOver": "The week is done. The Board will write.",
+    "dayNotOpen": "The library is closed for the night.",
+    "patronAtCounter": "Someone is already at the counter.",
+    "noSlotsLeft": "No one else is expected today.",
+    "noVisit": "There's no one at the counter.",
+    "questionUnavailable": "That question doesn't belong to this visit.",
+    "questionAlreadyAsked": "You've asked that already.",
+    "alreadyReadThoughts": "The spell won't take twice in one visit.",
+    "notEnoughMana": "Not enough mana left today.",
+    "unknownBook": "There's no such book on the shelves.",
+    "bookNotOnShelf": "That book is out on loan.",
+    "noBookRequested": "They haven't asked for a particular book.",
+    "offerIsRequestedBook": "That's the very book they asked for.",
+    "visitIsForced": "The writ allows only lending.",
+    "forcedVisitWaiting": "Someone with a writ is still to come. The library stays open.",
+    "nothingToRead": "There's nothing left in it to read.",
+    "notTheMoment": "The moment to note that has passed.",
+    "alreadyNoted": "It's in the notebook already.",
+    "nothingToNote": "There's nothing to note yet."
+  },
+  "placeholder": true
+}
