@@ -220,3 +220,17 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - Matters of taste taken up: the text size now scales button captions, the question list included; a warded patron who notices Read Thoughts shows a tell (`genericLines.noticed`: "Their eyes narrow. They felt that."); patience and mana show one empty pip at 0 instead of nothing; N and C pan down to the desk before opening; the letters badge clears once the day's letters are read; `--days n` plays n whole days, evenings included (it stopped before day n's evening, so `--days 7` never reached the week summary); the HUD's visit summary shows only while looking down, as §7.6 has it.
 - Left as they are, with questions: the speech panel's place (Q31) and real weekday names beside invented months (Q32). The `--shots` set still has no plain night view; night shows behind the summaries.
 - After the fixes: `dotnet test` 226 green; the three bots unchanged (lend-all 30, decline-all −21, careful 20); `--clicktest` passes 33 checks, adding Esc-pauses-the-bell and the note-focus round trip; `--shots` 22 images, all looked at.
+
+## Interim art — painted in Easel
+
+**Built**
+- Eight art slots painted stroke by stroke with Easel (`easel-paint` 0.8.0), as the designer asked: `beyond_doorway`, `doorway_wall`, `shelf_left`, `shelf_right`, `locked_shelf`, `counter`, `desk` and `patron_default`. Together they make the whole up view and the desk; only the candle is still drawn in code.
+- Each painting started from a written plan of values and a light, was checked against Easel's value readouts and checklist as it went, and is signed small in a shaded corner.
+- The wall's arch is see-through and the patron's surround transparent. Both are cut out after painting, along the same outlines the paint was laid in (`tools/easel/cut_arch.py`, `cut_patron.py`).
+- The scripts are in `tools/easel/`, one per painting, with a README. They're seeded, and each was re-run to confirm it writes the shipped PNG pixel for pixel.
+
+**Not painted**: the candle and its flame; the paper textures (documents use the layout's paper colours); per-patron silhouettes (everyone uses `patron_default`).
+
+**Verified**: the 22 `--shots` images with the paintings in place, all looked at; the click test and the three bots are unaffected. Slot lookup is unchanged, so a photographed painting in `game/art/painted/` still wins over its Easel stand-in, and deleting an Easel file brings back the placeholder (the M5 clean-checkout run had none of them).
+
+**Differs from the brief**: `tools/` is a new folder. The brief's layout has no home for the paintings' sources.
