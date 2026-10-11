@@ -19,7 +19,7 @@ dotnet test
 & $env:GODOT --headless --path game --import                      # once after cloning, and after new paintings arrive
 & $env:GODOT --path game                                          # play: the title screen (run `dotnet build` first; the editor's Play button builds for you)
 & $env:GODOT --path game -- --new --seed 7                        # straight into a new game, ignoring the save
-& $env:GODOT --path game -- --shots out/shots --seed 1            # screenshot run (windowed): the full §7.11 sequence, 22 PNGs
+& $env:GODOT --path game -- --shots out/shots --seed 1            # screenshot run (windowed): the full §7.11 sequence, 24 PNGs
 & $env:GODOT --path game -- --clicktest --seed 1                  # plays days 1–2 by injected clicks and keys, then saves and continues; exit code 0 when every step works
 & $env:GODOT --path game --headless -- --autoplay careful --seed 1 # a strategy bot (lend-all, decline-all, careful) plays the week through the UI (`--days n`: n whole days); exit code 0 when no errors were logged
 ```

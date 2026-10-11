@@ -207,8 +207,8 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 **Review pass 3** (a reviewer played the build; fixed in a separate commit):
 - **Esc pauses.** The game's nodes stop while the pause menu or settings are open; the menus carry on. Space can't ring the bell behind the menu.
 - **Note fields let go of the keyboard.** A click on bare wood, a pan, opening or closing a document, the bell, closing and Esc all take focus from a note, so the shortcuts work again.
-- **The reading lamp** takes effect at once, not at the next change of phase.
-- **The mouse wheel** at the end of a scrolling document no longer pans the camera.
+- **The reading lamp** takes effect without waiting for the next change of phase. *(It still waited for the menus to close and then blended in; M6 made it immediate.)*
+- **The mouse wheel** at the end of a scrolling document no longer pans the camera. *(This first fix didn't work; the final review caught it, and M6 fixed it.)*
 - **Paper art slots** (`paper_card`, `paper_notebook`, `paper_page`, `newspaper`) are used: a painted texture when one arrives, else the layout's paper colour.
 - **A Windows export preset** (`game/export_presets.cfg`, "Windows Desktop", JSON included) and `game/Curator.Godot.sln`, which Godot's export and editor build look for. A pack export works on Linux (all 39 content files and `layout.json` are in it). **A real Windows export is untested**: it needs Godot's export templates on the designer's PC.
 - **The generic walk-out line** ("They leave without another word.") is narration, in italics without quotes, not the patron's speech.
@@ -217,7 +217,7 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - **The debug overlay** lists the newest events first and scrolls with the wheel.
 - **The HUD** hides behind the day and week summaries, so it no longer shows tomorrow's numbers early.
 - Smaller: a noted thought is also written into the patron's free notes, with its date; the catalogue summary is 18 px (the minimum); test runs use default settings, not the player's; the deflection "It's for something at home" became "Nothing worth the telling, really.", which fits any question.
-- Matters of taste taken up: the text size now scales button captions, the question list included; a warded patron who notices Read Thoughts shows a tell (`genericLines.noticed`: "Their eyes narrow. They felt that."); patience and mana show one empty pip at 0 instead of nothing; N and C pan down to the desk before opening; the letters badge clears once the day's letters are read; `--days n` plays n whole days, evenings included (it stopped before day n's evening, so `--days 7` never reached the week summary); the HUD's visit summary shows only while looking down, as §7.6 has it.
+- Matters of taste taken up: the text size now scales button captions, the question list included; a warded patron who notices Read Thoughts shows a tell (`genericLines.noticed`; M6 rewrote it without a face); patience and mana show one empty pip at 0 instead of nothing; N and C pan down to the desk before opening; the letters badge clears once the day's letters are read; `--days n` plays n whole days, evenings included (it stopped before day n's evening, so `--days 7` never reached the week summary); the HUD's visit summary shows only while looking down, as §7.6 has it.
 - Left as they are, with questions: the speech panel's place (Q31) and real weekday names beside invented months (Q32). The `--shots` set still has no plain night view; night shows behind the summaries.
 - After the fixes: `dotnet test` 226 green; the three bots unchanged (lend-all 30, decline-all −21, careful 20); `--clicktest` passes 33 checks, adding Esc-pauses-the-bell and the note-focus round trip; `--shots` 22 images, all looked at.
 
@@ -234,3 +234,43 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 **Verified**: the 22 `--shots` images with the paintings in place, all looked at; the click test and the three bots are unaffected. Slot lookup is unchanged, so a photographed painting in `game/art/painted/` still wins over its Easel stand-in, and deleting an Easel file brings back the placeholder (the M5 clean-checkout run had none of them).
 
 **Differs from the brief**: `tools/` is a new folder. The brief's layout has no home for the paintings' sources.
+
+## M6 — Hand-off
+
+**Built**
+- `docs/BALANCE_REPORT.md`: the final bot numbers over 10 seeds, with `balance.json` still at the brief's defaults. It says what the numbers mean and which levers would move them. One finding is new: no bot ever causes outright harm, only mixed outcomes (Q33).
+- `docs/PLAYTEST_NOTES.md`: how to run it on Windows, the controls, what to look for, known issues and the open questions.
+- **Nice-to-haves**, each its own commit:
+  - **Ingredient log.** It's the notebook's first tab. It lists every ingredient on a page the curator has identified, as the page writes it, with the book, page and spell where it turned up. Ingredients are filed by name, ignoring a leading article. Core's `Projector.IngredientLog()` has tests.
+  - **Parallax on the pan** (§7.2). The layers behind the counter travel a little less than the camera: 0.9, and 0.85 for the room beyond the arch. It's set per slot by `"parallax"` in `layout.json`. The up view is exactly as laid out.
+  - **Warded patrons** were already in the rules, with Lysander warded. M5 added the tell.
+  - **Resistant books** are built and tested (`identifyResistance`, unidentifiable pages) but no book resists. Giving one resistance would make careful play miss even more (Q25).
+
+**Final review** (a fresh agent with the docs and the repository). Fixed:
+- **The transcript followed one step behind**, so the newest answer stayed hidden. It now follows the scroll range as new lines are measured.
+- **The wheel still panned the camera at a document's end**: review pass 3's fix didn't work. A scroll area that has something to scroll now stops the wheel (Stop, not Pass); one whose content fits lets it through, so the wheel still pans over the room. The rule applies to every scroll area and text field as it's created, rebuilt pages included. Behind the title the camera doesn't pan at all.
+- **Catalogue cards clipped their text** at Large and Larger. Cards now grow to fit.
+- **A text-size change closed the pause menu.** It now comes back to it, and the menu rebuilds at the new size.
+- **"No one at the counter."** was faint on the painted desk. It's near-opaque now, with a soft halo.
+- **Export**: `build/` is ignored, and the fonts' licences ship with the export.
+- **The noticed tell described a face** ("Their eyes narrow"), against the content guide. It's now "They go very still. They felt that."
+- Matters of taste taken up:
+  - The room beyond the arch no longer takes the archway light, which had blown it out.
+  - The paintings' signatures are fainter, and the desk's knots lost their square-ended smears.
+  - The notebook has the GDD's three sections: noted thoughts live in the free notes and aren't listed twice.
+  - The impatience tell has its own line, so the row no longer overflows at Larger.
+  - Esc closes Settings on the title and answers the close-early question with "Not yet".
+  - Turning the reading lamp on or off applies at once.
+
+**Verified**
+- `dotnet test` is green (230 tests).
+- The three bots are unchanged: lend-all 30, decline-all −21, careful 20.
+- `--clicktest` passes 43 checks. New since M5: the wheel at the drawer's top stays put while the wheel over bare wood pans; the transcript runs past its panel with the newest answer in view; a text-size change keeps the pause menu; Esc answers the close-early question. With the wheel and transcript fixes removed, those checks fail.
+- `--shots` gives 24 images, all looked at. The ingredient log and the catalogue at Larger are new.
+
+**Still open**:
+- The careful-bot guardrail (Q25).
+- No outright harm (Q33).
+- The speech panel's place (Q31).
+- The shot set has no plain night view; night shows behind the summaries.
+- Windows is untested (Q5).
