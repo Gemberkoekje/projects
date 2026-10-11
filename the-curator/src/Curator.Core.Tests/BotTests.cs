@@ -47,8 +47,7 @@ public sealed class BotTests
             results.AddRange(BotRunner.Bots.Values.Select(bot => BotRunner.Play(TestWorld.Content, bot(), seed)));
         }
 
-        var guardrails = Guardrails.Check(results.First(r => r.Bot == "lend-all"), results.First(r => r.Bot == "careful"), results.First(r => r.Bot == "decline-all"));
-        var report = BalanceReport.Render(results, guardrails);
+        var report = BalanceReport.Render(results, Guardrails.Evaluate(results));
         var outDir = Path.Combine(RepoPaths.Root, "out");
         Directory.CreateDirectory(outDir);
         File.WriteAllText(Path.Combine(outDir, "balance-report-testcontent.md"), report);

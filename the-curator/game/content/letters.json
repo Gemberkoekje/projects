@@ -1,0 +1,40 @@
+{
+  "tutorial": [
+    {
+      "day": 1,
+      "from": "The Board",
+      "title": "Rules of the desk",
+      "text": "Curator — The Board welcomes you to Lantern Street. Each patron carries a library card: their history with us, which you may read and may not write on. Every book has a card in the catalogue drawer; pull it and the book comes to the desk. Identify will show you a page of any book in the library, at the cost of a little mana. When a patron asks for a book, stamp their card and lend it. A clerk of the Board will call this morning with a writ. Lend what the writ asks for. — The Board"
+    },
+    {
+      "day": 2,
+      "from": "The Board",
+      "title": "On asking",
+      "text": "Curator — You may ask a patron what they need a book for, and other things besides; they will tell you what they are willing to. Each question tries their patience, as does reading a book while they wait. Read Thoughts costs more mana and costs them nothing, since they cannot tell. The notebook is yours, and the Board does not read it. Write in it. — The Board"
+    },
+    {
+      "day": 3,
+      "from": "The Board",
+      "title": "On refusing",
+      "text": "Curator — You need not lend what is asked for. You may offer another book; a patron will take it if it suits their purpose, or if they trust you enough. You may hand back the card. Do not expect to learn at once what comes of a loan. Some news reaches the desk in days, and some never does. Upkeep is due each evening. — The Board"
+    }
+  ],
+  "debt": {
+    "1": {
+      "from": "The Board",
+      "title": "Accounts",
+      "text": "The Board notes that the library's accounts closed last night in deficit. It trusts this is temporary."
+    },
+    "2": {
+      "from": "The Board",
+      "title": "Accounts, again",
+      "text": "The Board notes a second deficit. Upkeep is not optional. The Board would prefer not to write a third time."
+    },
+    "3": {
+      "from": "The Board",
+      "title": "Accounts",
+      "text": "The Board has written before. The library's accounts remain in deficit. The Board is considering its position, and the curator's."
+    }
+  },
+  "placeholder": true
+}

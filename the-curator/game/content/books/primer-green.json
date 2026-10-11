@@ -1,0 +1,55 @@
+{
+  "id": "primer-green",
+  "title": "A Primer of Green Things",
+  "spineTag": "botanical",
+  "rarity": "common",
+  "summary": "For children and beginners. Nothing in here will hurt you. — Lantern Street Schoolroom",
+  "pages": [
+    {
+      "id": "primer-green-1",
+      "spellName": "Bean and Pea",
+      "tags": ["growth"],
+      "power": 1,
+      "danger": 0,
+      "text": "Soak the seed overnight {~in water that has seen the moon~}, then plant it {~a knuckle deep~}. It comes up eager, and it {~climbs~}.",
+      "ingredients": ["rainwater", "honey"]
+    },
+    {
+      "id": "primer-green-2",
+      "spellName": "A Kinder Soil",
+      "tags": ["growth"],
+      "power": 1,
+      "danger": 0,
+      "text": "Work the ash {~into the bed~} in autumn and the {?skellis?} in spring. {~Turn it twice, never thrice.~}",
+      "ingredients": ["ash", "skellis", "barley-straw"]
+    },
+    {
+      "id": "primer-green-3",
+      "spellName": "Which Weed Is Which",
+      "tags": ["plant-lore"],
+      "power": 1,
+      "danger": 0,
+      "text": "Pull one of each and lay them in a row on the path. {~The ones that wilt first~} were never yours to keep.",
+      "ingredients": ["salt", "nettle"]
+    },
+    {
+      "id": "primer-green-4",
+      "spellName": "Seedling's Shade",
+      "tags": ["growth"],
+      "power": 1,
+      "danger": 0,
+      "text": "Prop a slate {~against the south wind~} and say {~the seedling's name~} each morning. It grows {~straighter for being known~}.",
+      "ingredients": ["river-stone", "willow-bark"]
+    },
+    {
+      "id": "primer-green-5",
+      "spellName": "Counting Rings",
+      "tags": ["plant-lore"],
+      "power": 1,
+      "danger": 0,
+      "text": "A cut stem tells its years {~to anyone patient with a lens~}. Wet the cut first.",
+      "ingredients": ["lemon-rind", "vellin-sap"]
+    }
+  ],
+  "placeholder": true
+}

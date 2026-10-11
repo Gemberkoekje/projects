@@ -1,0 +1,339 @@
+{
+  "id": "jory-fenn",
+  "name": "Jory Fenn",
+  "description": "Ink-stained cuffs, a satchel strap worn shiny. Can't keep still.",
+  "role": "story",
+  "startTrust": 1,
+  "visits": [
+    {
+      "id": "jory-fenn-1",
+      "step": 1,
+      "earliestDay": 2,
+      "greeting": "Hello — sorry — is this where you ask? For books? Of course it is. Sorry.",
+      "request": {
+        "bookId": "patient-mind",
+        "topic": "memory",
+        "text": "The Patient Mind, please. My examination's in three days and nothing will stay in my head."
+      },
+      "goal": { "tags": ["memory-aid"], "minPower": 1 },
+      "temptations": [
+        { "tag": "memory-erasure", "use": "misuse" },
+        { "tag": "forgery", "use": "misuse" }
+      ],
+      "readThoughts": {
+        "default": "Spring paper. Red ink. Gone.",
+        "byTrust": { "2": "Spring paper. Red ink across the top. Harrow's desk drawer." },
+        "unlocks": ["jory-fenn-1-spring"]
+      },
+      "answers": {
+        "purpose": {
+          "1": "Revising. Dates, mostly, and the order of the Board's charters, which nobody needs, but there it is.",
+          "2": "Revising. I failed the spring paper, so this one has to — it just has to go well."
+        },
+        "knowledge": {
+          "1": "Memory charms? It's called The Patient Mind. I assume it's patient. And about minds. Sorry.",
+          "2": "Remembering things. And — I've heard there's a page about the other way round. Forgetting."
+        },
+        "source": {
+          "1": "Everyone at the Academy knows it. Well. Everyone who's failed something."
+        },
+        "experience": {
+          "1": "Little ones. A charm for finding my pen. It mostly works.",
+          "3": "I put a fixing charm on my marks once, just to see. I undid it. I did undo it."
+        }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-1-spring",
+          "text": "What happened with the spring paper?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "1": "Nothing. Why? Nothing happened with it.",
+            "2": "I failed it. Harrow marked it. It's in his drawer with all the red on it, and I think about it every night.",
+            "3": "I failed it, and I've thought about him forgetting it more than I've thought about the dates. That's the truth."
+          }
+        },
+        {
+          "id": "jory-fenn-1-unlearning",
+          "text": "One page in that book is about making someone forget. Had you heard?",
+          "unlockedBy": "identifiedPage:patient-mind-4",
+          "answers": {
+            "0": "No. Why would I?",
+            "1": "No! I mean — everyone's heard. Doesn't mean anyone would.",
+            "2": "I'd heard. I've thought about it. I'm telling you because I don't want to."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you — thank you. I'll bring it back early. I always bring things back early." },
+        "alternative": { "line": "Oh. Will it — will it help? All right. All right, I'll trust you. I think." },
+        "offerRefused": { "line": "Sorry — I don't think that's — I really need the memory one." },
+        "declined": { "line": "Right. No. That's fine. That's — fine." },
+        "walkedOut": { "line": "I have to go, I'm sorry, I've revision —" }
+      },
+      "outcomes": {
+        "mixedMisuse": {
+          "channel": "newspaper",
+          "delayDays": 3,
+          "headline": "Examiner mislays the spring results",
+          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are \"unaccountably blank\". The paper will be re-sat.",
+          "setFlags": ["jory-fenn:examiner-forgot"]
+        },
+        "good": {
+          "channel": "return",
+          "text": "It worked! I mean — I worked. The book helped. I remembered all of it. Well. Most of it."
+        },
+        "unhelpful": {
+          "channel": "return",
+          "text": "It was a nice book. It didn't help with the dates. I'm not blaming you. I'm blaming the dates."
+        },
+        "harmMisuse": {
+          "channel": "gossip",
+          "text": "Did you hear? Someone's been altering marks in the Academy ledgers. Very neat work, apparently. They're checking every page."
+        }
+      }
+    },
+    {
+      "id": "jory-fenn-2-brittle",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["lent", "alternative"] },
+      "greeting": [
+        { "when": { "flagsAll": ["jory-fenn:examiner-forgot"] }, "text": "Have you seen the paper? About Harrow? No, don't — never mind. Hello." },
+        { "text": "Hello again. Sorry. I haven't really slept." }
+      ],
+      "request": {
+        "topic": "healing",
+        "text": "Something to help me sleep. I can't stop going over it. Dates, charters, dates."
+      },
+      "goal": { "tags": ["sleep"], "minPower": 1 },
+      "temptations": [{ "tag": "sleep-deep", "use": "accident" }],
+      "readThoughts": {
+        "default": "Twelfth charter, thirteenth charter, fourteenth. Three in the morning.",
+        "unlocks": ["jory-fenn-2-brittle-night"]
+      },
+      "answers": {
+        "purpose": {
+          "1": "Sleep. Just sleep. Ordinary sleep. Is that a thing you have?",
+          "2": "If I sleep through the night I'll be fine. If I don't I'll go in there and forget my own name."
+        },
+        "knowledge": {
+          "1": "Something gentle? I don't want to be knocked out. I have to wake up for it."
+        },
+        "experience": {
+          "1": "I tried counting. I got to four thousand."
+        }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-2-brittle-night",
+          "text": "When did you last sleep a night through?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "1": "Tuesday? What's today?",
+            "2": "Since the spring results. Honestly. Since then."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you. Sleep. I'll sleep. Good." },
+        "offerRefused": { "line": "I — sorry, I don't think that's for sleeping." },
+        "declined": { "line": "Okay. I'll try counting again." }
+      },
+      "overrides": {
+        "sleep-neighbours": {
+          "category": "harm",
+          "channel": "return",
+          "text": "I slept. Right through it. The bell, my landlady, the examination. They let me sit it late, in a corridor. I don't know how it went.",
+          "setFlags": ["jory-fenn:slept-through"]
+        }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "return",
+          "text": "I slept. Eight hours. I didn't know people did that."
+        },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    },
+    {
+      "id": "jory-fenn-2-sullen",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["declined"] },
+      "patience": 3,
+      "greeting": "Me again. I'll be quick.",
+      "request": {
+        "topic": "memory",
+        "text": "Anything on memory. Anything at all."
+      },
+      "goal": { "tags": ["memory-aid"], "minPower": 1 },
+      "temptations": [
+        { "tag": "memory-erasure", "use": "misuse" },
+        { "tag": "forgery", "use": "misuse" }
+      ],
+      "readThoughts": {
+        "default": "Spring paper. Red ink. Two days left.",
+        "unlocks": ["jory-fenn-2-sullen-spring"]
+      },
+      "answers": {
+        "purpose": { "0": "Revising.", "1": "Revising. Same as last time." },
+        "knowledge": { "0": "Whatever you'll let me have." }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-2-sullen-spring",
+          "text": "Is this still about the spring paper?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "0": "There's no spring paper.",
+            "1": "It's about passing. That's all.",
+            "2": "It's always about the spring paper."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Fine. Thanks." },
+        "offerRefused": { "line": "That's not memory." },
+        "declined": { "line": "Course not." }
+      },
+      "outcomes": {
+        "mixedMisuse": {
+          "channel": "newspaper",
+          "delayDays": 1,
+          "headline": "Examiner mislays the spring results",
+          "text": "Mr T. Harrow of the Academy reports that he cannot recall the spring examination results, and that his notes on them are \"unaccountably blank\". The paper will be re-sat.",
+          "setFlags": ["jory-fenn:examiner-forgot"]
+        },
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harmMisuse": {
+          "channel": "gossip",
+          "text": "Did you hear? Someone's been altering marks in the Academy ledgers. Very neat work, apparently. They're checking every page."
+        }
+      }
+    },
+    {
+      "id": "jory-fenn-3-slept",
+      "step": 3,
+      "earliestDay": 7,
+      "when": { "minTrust": 2, "flagsAll": ["jory-fenn:slept-through"] },
+      "greeting": "They marked the corridor paper. I passed. Barely. I'm never sleeping again.",
+      "request": {
+        "bookId": "parlour-tricks",
+        "topic": "illusion",
+        "text": "Tricks for the Parlour? I want something fun, for once. Something that isn't for anything."
+      },
+      "goal": { "tags": ["illusion"], "minPower": 1 },
+      "readThoughts": {
+        "default": "Coins behind ears. My sister laughing.",
+        "unlocks": ["jory-fenn-3-slept-sister"]
+      },
+      "answers": {
+        "purpose": { "2": "Fun. My sister's birthday. She thinks I'm boring." }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-3-slept-sister",
+          "text": "Your sister?",
+          "unlockedBy": "readThoughts",
+          "answers": { "2": "Bess. She's nine. She'll be unbearable if I get the coin trick wrong." }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you. Really. For all of it." },
+        "alternative": { "line": "Is it fun? It had better be fun." },
+        "declined": { "line": "That's fair. I'd decline me too." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    },
+    {
+      "id": "jory-fenn-3-forgot",
+      "step": 3,
+      "earliestDay": 7,
+      "when": { "minTrust": 2, "flagsAll": ["jory-fenn:examiner-forgot"] },
+      "greeting": "I passed. I think I passed because Harrow forgot. I don't know if that was me.",
+      "request": {
+        "bookId": "parlour-tricks",
+        "topic": "illusion",
+        "text": "Tricks for the Parlour? I want something fun, for once. Something that isn't for anything."
+      },
+      "goal": { "tags": ["illusion"], "minPower": 1 },
+      "readThoughts": {
+        "default": "Harrow's blank notes. My name not in them.",
+        "unlocks": ["jory-fenn-3-forgot-harrow"]
+      },
+      "answers": {
+        "purpose": {
+          "2": "Fun. Coins behind ears. My sister's birthday.",
+          "3": "Something that doesn't matter. I'd like something that doesn't matter."
+        }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-3-forgot-harrow",
+          "text": "Do you think it was you?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "2": "I don't know. I never said the words. I thought about it so hard, though.",
+            "3": "I read the page. I didn't say it. I'll never know, will I."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you. Really. For all of it." },
+        "alternative": { "line": "Is it fun? It had better be fun." },
+        "declined": { "line": "That's fair. I'd decline me too." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    },
+    {
+      "id": "jory-fenn-3-own",
+      "step": 3,
+      "earliestDay": 7,
+      "when": { "minTrust": 2 },
+      "greeting": "I passed. On my own. I wanted you to know.",
+      "request": {
+        "bookId": "parlour-tricks",
+        "topic": "illusion",
+        "text": "Tricks for the Parlour? I want something fun, for once. Something that isn't for anything."
+      },
+      "goal": { "tags": ["illusion"], "minPower": 1 },
+      "readThoughts": {
+        "default": "My name on the pass list. Third from the top.",
+        "unlocks": ["jory-fenn-3-own-list"]
+      },
+      "answers": {
+        "purpose": { "2": "Fun. Coins behind ears. My sister's birthday." }
+      },
+      "questions": [
+        {
+          "id": "jory-fenn-3-own-list",
+          "text": "Where were you on the list?",
+          "unlockedBy": "readThoughts",
+          "answers": { "2": "Third. Third! I've never been third at anything." }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you. Really. For all of it." },
+        "alternative": { "line": "Is it fun? It had better be fun." },
+        "declined": { "line": "That's fair. I'd decline me too." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

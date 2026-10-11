@@ -1,0 +1,56 @@
+{
+  "id": "parlour-tricks",
+  "title": "Tricks for the Parlour",
+  "spineTag": "illusion",
+  "rarity": "common",
+  "summary": "For birthdays and long winter evenings. — Aunt Philippa",
+  "pages": [
+    {
+      "id": "parlour-tricks-1",
+      "spellName": "The Vanishing Coin",
+      "tags": ["illusion"],
+      "power": 1,
+      "danger": 0,
+      "text": "Close the hand {~around the coin~} and open it on the word; the coin is behind the ear of {~whoever laughs first~}.",
+      "ingredients": ["river-stone", "whicker-flick"]
+    },
+    {
+      "id": "parlour-tricks-2",
+      "spellName": "Birdsong in a Teacup",
+      "tags": ["illusion"],
+      "power": 1,
+      "danger": 0,
+      "text": "Stir three times {~widdershins~}. The cup sings {~for as long as it is warm~}.",
+      "ingredients": ["honey", "goose-feather"]
+    },
+    {
+      "id": "parlour-tricks-3",
+      "spellName": "Paper Moths",
+      "tags": ["illusion"],
+      "power": 1,
+      "danger": 0,
+      "text": "Fold the paper into a moth {~with the crease toward you~}. It flies once around the room {~and lands on the cake~}.",
+      "ingredients": ["chalk", "whicker-flick"]
+    },
+    {
+      "id": "parlour-tricks-4",
+      "spellName": "Second Face",
+      "tags": ["glamour"],
+      "power": 2,
+      "danger": 2,
+      "text": "Draw the face you want {~on the glass~} and breathe it onto your own. It holds {~until sunset~}, {~or longer if you forget it is there~}.",
+      "ingredients": ["lemon-rind", "tessel-dust", "beeswax"],
+      "authorNote": "Outlier. A child's accident, and a con artist's tool."
+    },
+    {
+      "id": "parlour-tricks-5",
+      "spellName": "Coloured Smoke",
+      "tags": ["illusion"],
+      "power": 1,
+      "danger": 0,
+      "text": "A pinch in the candle {~gives green, then blue~}, then {~a colour nobody has a name for~}.",
+      "ingredients": ["candle-stub", "copper-wire"]
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,56 @@
+{
+  "id": "gardeners-almanac",
+  "title": "A Gardener's Almanac of Small Weathers",
+  "spineTag": "weather",
+  "rarity": "common",
+  "summary": "Small weathers for small gardens. — Mrs E. Toft",
+  "pages": [
+    {
+      "id": "gardeners-almanac-1",
+      "spellName": "Red Sky, Read Right",
+      "tags": ["weather-reading"],
+      "power": 1,
+      "danger": 0,
+      "text": "Red at evening means fair {~only if the swallows fly high~}. Low swallows, {~close the shutters~}.",
+      "ingredients": ["goose-feather", "salt"]
+    },
+    {
+      "id": "gardeners-almanac-2",
+      "spellName": "A Shower for the Beans",
+      "tags": ["weather-rain"],
+      "power": 1,
+      "danger": 0,
+      "text": "A small rain {~over a small bed~}. Do not ask it {~twice in a week~}.",
+      "ingredients": ["rainwater", "skellis"]
+    },
+    {
+      "id": "gardeners-almanac-3",
+      "spellName": "Frost Warning",
+      "tags": ["weather-reading"],
+      "power": 1,
+      "danger": 0,
+      "text": "Leave a saucer of milk {~on the sill~}; a skin by midnight means frost {~before dawn~}.",
+      "ingredients": ["milk", "chalk"]
+    },
+    {
+      "id": "gardeners-almanac-4",
+      "spellName": "Hailcall",
+      "tags": ["weather-storm"],
+      "power": 2,
+      "danger": 2,
+      "text": "{~To clear the sky of pigeons~}, ring the bell upward {~seven times~}. Stones the size of peas, {~or larger~}.",
+      "ingredients": ["iron-filings", "rainwater", "dunmallow"],
+      "authorNote": "Outlier, harmless in the hands of a sailor's wife: danger needs a temptation."
+    },
+    {
+      "id": "gardeners-almanac-5",
+      "spellName": "The Calm Day",
+      "tags": ["weather-reading"],
+      "power": 1,
+      "danger": 0,
+      "text": "To know a calm day {~a day ahead~}, watch the smoke {~from a single chimney~} at dusk.",
+      "ingredients": ["candle-stub", "willow-bark"]
+    }
+  ],
+  "placeholder": true
+}

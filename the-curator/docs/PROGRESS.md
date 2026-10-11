@@ -54,3 +54,25 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - Rulings on gaps in the brief are Q9–Q16.
 
 **Open**: Q7–Q24 for the designer.
+
+## M2 — Content
+
+**Built**
+- `game/content/` is complete per `CONTENT_GUIDE.md`. Everything new is a placeholder (`"placeholder": true`):
+  - 12 books, 15 with the three gold ones. Twelve of the 15 have at least one outlier page (danger 2 or more).
+  - 13 patrons, 15 with the gold clerk and Elara: four story patrons (Elara, Wren, Jory, Hennie), ten one-visit fillers and the tutorial clerk.
+  - `outcomes_generic.json`, `newspaper.json` (masthead, daily flavour, reputation tone lines) and `letters.json` (tutorial notes, the three Board debt letters).
+  - `ingredients.json` now holds the new books' ingredients; `questions.json` has the two generic lines from Q17.
+- The gold files are untouched. Validation found no schema errors in them.
+- `out/content-report.md`, written by the tests, is the designer's reading copy. For each patron it lists every visit with its greeting, request, needs and temptations, Read Thoughts fragments, questions and what they unlock, outcomes and overrides, then a lend matrix: for each relevant book, the outcome category, channel and outcome it leads to.
+- The guardrails (§8.4) are enforced on the real content by `BalanceTests`, over 10 seeds. Five of the six hold on every seed. The sixth, careful causes at most 1 harm or mixed outcome, can't hold with the bot as specified (Q25). The test checks a stand-in instead: careful causes fewer than lend-all on every seed, and at least 2 fewer on average. The report still shows the original line as failing.
+- `out/balance-report.md` gained a guardrail table and a silence section. About a third of outcomes should never surface (CONTENT_GUIDE §7): lend-all 37%, careful 43%.
+- `RealContentTests`: no validation errors or warnings, the whole catalogue is present, and the content report covers every visit.
+
+**Verified**: `dotnet test` is green (213 tests), validation and guardrails included.
+
+**Differs from the brief**
+- The careful-bot guardrail is relaxed (Q25).
+- Jory's results visit has a third variant (Q26).
+
+**Open**: Q25 and Q26. Review pass 2 is running; its fixes come in the next commit.

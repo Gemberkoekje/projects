@@ -1,0 +1,39 @@
+{
+  "id": "ines-carrow",
+  "name": "Ines Carrow",
+  "description": "A sailor's jumper, too big for her. Keeps glancing at the window.",
+  "role": "filler",
+  "fillerOrder": 3,
+  "visits": [
+    {
+      "id": "ines-carrow-1",
+      "step": 1,
+      "greeting": "Good day. Is it — can you get the weather here? From books?",
+      "request": {
+        "bookId": "gardeners-almanac",
+        "topic": "weather",
+        "text": "A Gardener's Almanac of Small Weathers. My husband sails on the next calm day, and I want to know which day that is."
+      },
+      "goal": { "tags": ["weather-reading"], "minPower": 1 },
+      "readThoughts": { "default": "Grey sky over the harbour wall. Which grey?" },
+      "answers": {
+        "purpose": { "0": "The weather.", "1": "The weather. For a boat. For a man on a boat." },
+        "experience": { "1": "I can read a tide table. That's not the same, is it." }
+      },
+      "decisions": {
+        "lent": { "line": "Thank you. Truly." },
+        "alternative": { "line": "Will this tell me the weather? Then thank you." },
+        "declined": { "line": "Oh. I'll watch the gulls, then." }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "letter",
+          "from": "I. Carrow",
+          "text": "He sailed on the calm day, as the book said, and came home on the next. Thank you. — Ines"
+        },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

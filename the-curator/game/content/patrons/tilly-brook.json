@@ -1,0 +1,41 @@
+{
+  "id": "tilly-brook",
+  "name": "Tilly Brook",
+  "description": "Plaits and a missing front tooth. Stands on tiptoe to see over the counter.",
+  "role": "filler",
+  "startTrust": 2,
+  "fillerOrder": 5,
+  "visits": [
+    {
+      "id": "tilly-brook-1",
+      "step": 1,
+      "greeting": "Hello! Are you the curator? Do you have magic tricks? Real ones?",
+      "request": {
+        "bookId": "parlour-tricks",
+        "topic": "illusion",
+        "text": "Tricks for the Parlour! For my friends. It's my birthday on Sunday."
+      },
+      "goal": { "tags": ["illusion"], "minPower": 1 },
+      "temptations": [{ "tag": "glamour", "use": "accident" }],
+      "readThoughts": { "default": "A coin behind Pip's ear. Pip laughing." },
+      "answers": {
+        "purpose": { "2": "Tricks! The coin one. And the birds. My brother Pip says I can't." },
+        "experience": { "2": "I can hang a spoon off my nose. That's not magic. That's practice." }
+      },
+      "decisions": {
+        "lent": { "line": "Thank you thank you thank you! I'll bring it back!" },
+        "alternative": { "line": "Is this one magic too? Okay!" },
+        "declined": { "line": "Oh. Okay." }
+      },
+      "outcomes": {
+        "mixedAccident": {
+          "channel": "gossip",
+          "text": "Did you hear? The Brook boy wore a cat's face for a whole afternoon, whiskers and all. His mother says he cried when it wore off — he wanted to keep it."
+        },
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

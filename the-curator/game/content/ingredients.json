@@ -14,6 +14,17 @@
     { "id": "red-thread", "name": "Red thread", "known": true },
     { "id": "willow-bark", "name": "Willow bark", "known": true },
     { "id": "lemon-rind", "name": "Lemon rind", "known": true },
+    { "id": "rosemary", "name": "Rosemary", "known": true },
+    { "id": "lavender", "name": "Lavender", "known": true },
+    { "id": "goose-feather", "name": "A goose feather", "known": true },
+    { "id": "black-ink", "name": "Black ink", "known": true },
+    { "id": "sealing-wax", "name": "Sealing wax", "known": true },
+    { "id": "chamomile", "name": "Chamomile", "known": true },
+    { "id": "barley-straw", "name": "Barley straw", "known": true },
+    { "id": "copper-wire", "name": "Copper wire", "known": true },
+    { "id": "rose-petals", "name": "Dried rose petals", "known": true },
+    { "id": "milk", "name": "Warm milk", "known": true },
+    { "id": "nettle", "name": "Nettle", "known": true },
     { "id": "hufeykrey", "name": "Hufeykrey", "known": false },
     { "id": "garble-blar", "name": "Garble blar", "known": false },
     { "id": "whicker-flick", "name": "Whicker flick", "known": false },
@@ -21,7 +32,13 @@
     { "id": "brannowort", "name": "Brannowort", "known": false },
     { "id": "tessel-dust", "name": "Tessel dust", "known": false },
     { "id": "vellin-sap", "name": "Vellin sap", "known": false },
-    { "id": "karrowseed", "name": "Karrowseed", "known": false }
+    { "id": "karrowseed", "name": "Karrowseed", "known": false },
+    { "id": "dunmallow", "name": "Dunmallow", "known": false },
+    { "id": "skellis", "name": "Skellis", "known": false },
+    { "id": "ombrewort", "name": "Ombrewort", "known": false },
+    { "id": "pellicand", "name": "Pellicand", "known": false },
+    { "id": "quillith", "name": "Quillith", "known": false },
+    { "id": "morrow-ash", "name": "Morrow-ash", "known": false }
   ],
   "placeholder": true
 }

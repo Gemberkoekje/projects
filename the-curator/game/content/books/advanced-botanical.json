@@ -1,0 +1,47 @@
+{
+  "id": "advanced-botanical",
+  "title": "Advanced Botanical Compounds",
+  "spineTag": "botanical",
+  "rarity": "rare",
+  "summary": "The standard reference. Indispensable to the serious collector. — H. Ambry",
+  "pages": [
+    {
+      "id": "advanced-botanical-1",
+      "spellName": "Name the Leaf",
+      "tags": ["plant-lore"],
+      "power": 1,
+      "danger": 0,
+      "text": "Lay the leaf on dark cloth and {~say what it is not~}. Its true name {~rises along the vein~}, faint as watermark.",
+      "ingredients": ["vellin-sap", "salt"]
+    },
+    {
+      "id": "advanced-botanical-2",
+      "spellName": "Root and Rind",
+      "tags": ["plant-lore"],
+      "power": 2,
+      "danger": 0,
+      "text": "Scrape a little rind into the bowl. Root, stem and leaf {~each keep~} the {?ombrewort?}-memory of their soil, which this {~draws out as colour~}.",
+      "ingredients": ["willow-bark", "ombrewort", "rainwater"]
+    },
+    {
+      "id": "advanced-botanical-3",
+      "spellName": "The Herbarist's Glass",
+      "tags": ["plant-lore"],
+      "power": 2,
+      "danger": 0,
+      "text": "Breathe on the glass and hold it {~a hand above~} the pressed specimen. The living colour shows {~as it was in the field~}, and with it {~the habit of the plant~}.",
+      "ingredients": ["lemon-rind", "vellin-sap"]
+    },
+    {
+      "id": "advanced-botanical-4",
+      "spellName": "{~Quick~}rot",
+      "tags": ["decay"],
+      "power": 2,
+      "danger": 2,
+      "text": "What grows {~may be asked to stop~}, and what has stopped {~may be asked to go back into the ground~}. {~Small quantities only.~} It does not know {~where to end~}.",
+      "ingredients": ["karrowseed", "ash", "dunmallow"],
+      "authorNote": "Outlier. Elara's accident and Hennie's misuse. Legible: \"It does not know ... where to end\"."
+    }
+  ],
+  "placeholder": true
+}

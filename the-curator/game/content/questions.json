@@ -17,7 +17,9 @@
     "offerRefused": "That's not what I asked for.",
     "declined": "I see.",
     "walkedOut": "They leave without another word.",
-    "impatient": "They glance at the door."
+    "impatient": "They glance at the door.",
+    "bookOut": "That one's out on loan, I'm afraid.",
+    "noThoughts": "Nothing comes to the surface."
   },
   "placeholder": true
 }

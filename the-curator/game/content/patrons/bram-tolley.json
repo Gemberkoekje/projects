@@ -1,0 +1,38 @@
+{
+  "id": "bram-tolley",
+  "name": "Bram Tolley",
+  "description": "Flour in his eyebrows. Brings the smell of the bakery in with him.",
+  "role": "filler",
+  "fillerOrder": 4,
+  "visits": [
+    {
+      "id": "bram-tolley-1",
+      "step": 1,
+      "greeting": "Morning! Busy? Not busy. Good. I'm never not busy, me.",
+      "request": {
+        "topic": "domestic",
+        "text": "Something for warmth. My ovens go cold by the small hours come winter, and bread won't rise in a cold oven."
+      },
+      "goal": { "tags": ["warmth"], "minPower": 1 },
+      "readThoughts": { "default": "Four in the morning. Flour to the elbow. Cold brick." },
+      "answers": {
+        "purpose": { "0": "Bread! What else?", "1": "The ovens. Brick holds heat, they say. Not my brick." },
+        "source": { "0": "Ada Marsh swears by your kitchen books. Don't tell her I said." }
+      },
+      "decisions": {
+        "lent": { "line": "Champion. There's a loaf in it for you." },
+        "offerRefused": { "line": "Won't warm an oven, that. Something kitchen-ish?" },
+        "declined": { "line": "Ah well. Extra coal it is." }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "letter",
+          "from": "B. Tolley",
+          "text": "A loaf on the house, any morning you like. The ovens hold till dawn now. — Bram, Tolley's Bakery"
+        },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}
