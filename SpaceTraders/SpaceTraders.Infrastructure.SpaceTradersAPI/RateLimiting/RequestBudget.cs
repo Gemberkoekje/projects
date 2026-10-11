@@ -1,3 +1,5 @@
+using SpaceTraders.Application.Ports;
+
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
 /// <summary>
@@ -14,9 +16,9 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// sent. Registered as a singleton: the HttpClient factory recreates its handlers every few minutes,
 /// and the budget has to outlive them. It also counts the writes waiting for it, which reads give way
 /// to (D19, <see cref="RateLimitingHandler"/>), and the trade trips' requests among them, which the other writes give way to
-/// (D115).
+/// (D115). What is left of the burst is read by the gatherers' hold (<see cref="IRequestPressure"/>, PLAN.md slice 6.41, D125).
 /// </remarks>
-public sealed class RequestBudget
+public sealed class RequestBudget : IRequestPressure
 {
     public const int PerSecond = 2;
     public const int Burst = 30;
@@ -151,6 +153,9 @@ public sealed class RequestBudget
             return untilPerSecond < untilBurst ? untilPerSecond : untilBurst;
         }
     }
+
+    /// <inheritdoc />
+    public int BurstSize => Burst;
 
     /// <summary>The burst requests still available at <paramref name="now"/>.</summary>
     public int BurstRemaining(DateTimeOffset now)

@@ -108,19 +108,22 @@ public sealed class GameLoopService(
             }
         }
 
+        // D125: the gatherers (mining, siphoning, surveying) step last, after the market refresh: they earn least, and the rest
+        // of the tick shouldn't wait for them.
+        var gatherers = new List<string>();
         await using (var scope = serviceScopeFactory.CreateAsyncScope())
         {
             var ships = await scope.ServiceProvider.GetRequiredService<IShipRepository>().GetAllAsync(cancellationToken);
+            var goals = scope.ServiceProvider.GetRequiredService<IShipGoalRepository>();
             foreach (var ship in ships)
             {
-                await RunStepAsync(
-                    new Dictionary<string, object> { ["ShipSymbol"] = ship.Symbol },
-                    async services =>
-                    {
-                        await services.GetRequiredService<IShipGoalExecutorService>().ExecuteAsync(ship.Symbol, cancellationToken);
-                    },
-                    exception => logger.LogError(exception, "GameLoopService: the goal step for ship {ShipSymbol} failed; the rest of the tick carries on.", ship.Symbol),
-                    cancellationToken);
+                if (GatheringHold.IsGathering(await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken)))
+                {
+                    gatherers.Add(ship.Symbol);
+                    continue;
+                }
+
+                await StepShipAsync(ship.Symbol, cancellationToken);
             }
         }
 
@@ -129,14 +132,29 @@ public sealed class GameLoopService(
             await RunContractAssignmentsAsync(cancellationToken);
         }
 
-        // Last, and one market a tick: a refresh is a read, which can go later without loss, while a
-        // move or a trade can't (D19, 6.5).
+        // One market a tick, after the other ships: a refresh is a read, which can go later without
+        // loss, while a move or a trade can't (D19, 6.5). Only the gatherers come after it (D125).
         await RunStepAsync(
             [],
             services => services.GetRequiredService<IMarketWatchService>().RefreshDueMarketAsync(cancellationToken),
             exception => logger.LogError(exception, "GameLoopService: refreshing a market where a ship is failed; the next tick tries again."),
             cancellationToken);
+
+        foreach (var gatherer in gatherers)
+        {
+            await StepShipAsync(gatherer, cancellationToken);
+        }
     }
+
+    private Task StepShipAsync(string shipSymbol, CancellationToken cancellationToken)
+        => RunStepAsync(
+            new Dictionary<string, object> { ["ShipSymbol"] = shipSymbol },
+            async services =>
+            {
+                await services.GetRequiredService<IShipGoalExecutorService>().ExecuteAsync(shipSymbol, cancellationToken);
+            },
+            exception => logger.LogError(exception, "GameLoopService: the goal step for ship {ShipSymbol} failed; the rest of the tick carries on.", shipSymbol),
+            cancellationToken);
 
     /// <summary>
     /// Runs one step of the tick in its own scope and try/catch, so that a step that throws, or

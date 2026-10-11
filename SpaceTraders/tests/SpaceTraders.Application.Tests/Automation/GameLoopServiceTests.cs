@@ -15,6 +15,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -35,6 +36,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly ISpareTimePlanService _spareTimePlan = Substitute.For<ISpareTimePlanService>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
+    private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
     private readonly IMarketWatchService _marketWatch = Substitute.For<IMarketWatchService>();
     private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
@@ -55,6 +57,7 @@ public sealed class GameLoopServiceTests : IDisposable
             .AddSingleton(_spareTimePlan)
             .AddSingleton(_assignments)
             .AddSingleton(_ships)
+            .AddSingleton(_goals)
             .AddSingleton(_goalExecutor)
             .AddSingleton(_marketWatch)
             .BuildServiceProvider();
@@ -131,6 +134,30 @@ public sealed class GameLoopServiceTests : IDisposable
         await TickAsync();
 
         steps.Should().Equal("plan", "ship", "ship", "contract", "market");
+    }
+
+    [Fact]
+    public async Task Tick_StepsTheGatherersLast_AfterTheMarketRefresh()
+    {
+        // Slice 6.41 (D125), asked on 2026-10-11: "I'd rather have miners wait but have up to date markets and exploring than
+        // working miners but needing to wait for the explore."
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.Contract.Enabled");
+        _goals.GetActiveGoalAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>())
+            .Returns(new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-PT96-AST", SellWaypointSymbol = "X1-PT96-H53" });
+        var steps = new List<string>();
+        _tradingPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "plan"));
+        _goalExecutor.ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                steps.Add(call.Arg<string>());
+                return Task.FromResult<GoalExecutionResult?>(null);
+            });
+        _bus.InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "contract"));
+        _marketWatch.RefreshDueMarketAsync(Arg.Any<CancellationToken>()).Returns(_ => Record(steps, "market"));
+
+        await TickAsync();
+
+        steps.Should().Equal("plan", "SPECTER-DEBUG-5", "contract", "market", "SPECTER-DEBUG-3");
     }
 
     [Fact]

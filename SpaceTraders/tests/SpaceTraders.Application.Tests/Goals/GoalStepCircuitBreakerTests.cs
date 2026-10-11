@@ -155,6 +155,7 @@ public sealed class GoalStepCircuitBreakerTests
             _metrics,
             Substitute.For<ITripBook>(),
             new LostArrivals(Substitute.For<IShipEventScheduler>()),
+            new GatheringHold(Substitute.For<IRequestPressure>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
     /// <summary>

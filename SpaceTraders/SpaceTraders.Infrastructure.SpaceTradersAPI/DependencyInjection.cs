@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddSingleton<IApiAvailabilityState>(sp => sp.GetRequiredService<ApiAvailabilityState>());
         // B59: the server still counts what the process before this one sent in the last minute.
         services.AddSingleton(_ => RequestBudget.ForANewProcess(TimeProvider.System.GetUtcNow()));
+        services.AddSingleton<IRequestPressure>(sp => sp.GetRequiredService<RequestBudget>());
         services.AddTransient<ApiRequestInitiatedHandler>();
         services.AddTransient<RateLimitingHandler>();
         services.AddTransient<RateLimitResponseHandler>();

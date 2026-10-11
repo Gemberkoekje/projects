@@ -148,6 +148,7 @@ public sealed class AlreadyAtDestinationLoopTests
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
             new LostArrivals(Substitute.For<IShipEventScheduler>()),
+            new GatheringHold(Substitute.For<IRequestPressure>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         var navigateHandler = new NavigateToWaypointHandler(

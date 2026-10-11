@@ -215,19 +215,25 @@ lines carry the ships' names from the start.
 - Each tick:
   1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Explore, Roles (the
      role board), Contract, ProbeDeployment, Survey, Mining, Siphon, Construction, Trading and SpareTime.
-  2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`).
+  2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`) but the gatherers: a ship whose goal is
+     the mining, siphon or survey plan's steps in step 5 (slice 6.41, D125).
   3. If the contract plan is switched on, for every active `Contract` assignment:
      `FulfillContractDeliveryCommand` once the ship holds a whole trip (what the contract still
      needs, at most a full hold; with nothing left to deliver, that command fulfils the contract),
      otherwise `MineResourceVolumeCommand` (B8, fixed), with the best survey for the contract's ore
      when there is one (slice 6.4). Every miner on the contract has such an assignment (D23).
-  4. Refresh one market where a ship is, when one is due (the market watch, below): last, because
-     a refresh is a read, which can go later without loss, while moves and trades can't (D19).
-  5. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
+  4. Refresh one market where a ship is, when one is due (the market watch, below): after the
+     other ships, because a refresh is a read, which can go later without loss, while moves and
+     trades can't (D19).
+  5. One goal step for each gatherer (D125): mining "only gives a tiny amount of the total profits", so the rest of the tick
+     doesn't wait for it. A gatherer's step, here or after an arrival, is held back while fewer than half the burst of the
+     rate limit is left (`GatheringHold`, read from `RequestBudget` through `IRequestPressure`); the next tick tries again.
+     `ShipStuck` starts a held ship's clock no earlier than its last hold.
+  6. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
      it (`ApiUnavailable`, `ApiAvailable`). Nothing handles the events.
 
   With `Automation.Enabled` off, or while API calls are paused after a 502, it skips steps 1
-  to 4.
+  to 5.
 - Each plan bootstrap, each ship's goal step, each contract assignment and the market watch runs
   in its own DI scope and try/catch. A failure is logged at Error with the plan or the ship, and the rest of the
   tick carries on. Its own scope means a step can't leave a broken DbContext to the steps after

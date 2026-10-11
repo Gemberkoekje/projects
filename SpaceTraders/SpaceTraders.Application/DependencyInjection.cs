@@ -165,6 +165,7 @@ public static class DependencyInjection
 
         // B70: an arrival that was never handled is scheduled again from the ship's next goal step.
         services.AddSingleton<LostArrivals>();
+        services.AddSingleton<GatheringHold>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {

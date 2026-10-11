@@ -1,4 +1,5 @@
 using System.Globalization;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 
 namespace SpaceTraders.Application.Health;
@@ -17,12 +18,13 @@ namespace SpaceTraders.Application.Health;
 /// waiting, or whose step fails before it acts, isn't updated at all.
 /// </para>
 /// <para>
-/// The clock starts no earlier than the ship's arrival, than its goal's start (B80) and than the
-/// monitor saw its plan working (automation and the plan on, API calls not paused), and the ship
-/// has to look stuck at two evaluations in a row. A goal the circuit breaker blocked is <c>CircuitBreakerTripped</c>'s.
+/// The clock starts no earlier than the ship's arrival, than its goal's start (B80), than its step was
+/// last held back while the requests were busy (slice 6.41, D125) and than the monitor saw its plan
+/// working (automation and the plan on, API calls not paused), and the ship has to look stuck at two
+/// evaluations in a row. A goal the circuit breaker blocked is <c>CircuitBreakerTripped</c>'s.
 /// </para>
 /// </remarks>
-public sealed class ShipStuckRule(HealthFleet fleet, ISettingsRepository settings) : IHealthRule
+public sealed class ShipStuckRule(HealthFleet fleet, ISettingsRepository settings, GatheringHold gatheringHold) : IHealthRule
 {
     /// <summary>The setting that holds the minutes a working ship may go without an update.</summary>
     public const string Setting = "Health.Ship.MaxMinutesWithoutChange";
@@ -53,6 +55,7 @@ public sealed class ShipStuckRule(HealthFleet fleet, ISettingsRepository setting
                 ship.Ship.LastSyncedAt,
                 ship.Ship.ArrivesAt ?? DateTimeOffset.MinValue,
                 ship.Goal?.StartedAt ?? DateTimeOffset.MinValue,
+                gatheringHold.LastHeldAt(ship.Symbol),
                 plans.Min(context.WorkingSince));
             var unchanged = context.Elapsed(since);
 

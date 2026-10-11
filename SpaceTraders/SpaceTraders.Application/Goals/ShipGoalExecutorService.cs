@@ -20,6 +20,7 @@ public sealed class ShipGoalExecutorService(
     IAutomationMetrics metrics,
     ITripBook trips,
     LostArrivals lostArrivals,
+    GatheringHold gatheringHold,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
     private const string MaxGoalStepsPerMinuteSetting = "Automation.CircuitBreaker.MaxGoalStepsPerMinute";
@@ -115,6 +116,16 @@ public sealed class ShipGoalExecutorService(
                 shipSymbol,
                 ship.WaypointSymbol,
                 ship.ArrivesAt);
+        }
+
+        // D125: a gatherer waits while the requests are busy; the next tick tries again, the gatherers last.
+        if (gatheringHold.TryHold(shipSymbol, activeGoal, TimeProvider.System.GetUtcNow()))
+        {
+            logger.LogDebug(
+                "ShipGoalExecutorService: the requests are busy; the {GoalKind} step of ship {ShipSymbol} waits for a later tick.",
+                activeGoal.Kind,
+                shipSymbol);
+            return null;
         }
 
         var maxStepsPerMinute = await GetMaxGoalStepsPerMinuteAsync(ct);

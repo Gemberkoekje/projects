@@ -21,11 +21,38 @@ public sealed class ShipStuckRuleTests
     private readonly FleetFixture _fleet = new();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly RuleHarness _harness = new();
+    private readonly IRequestPressure _pressure = Substitute.For<IRequestPressure>();
+    private readonly GatheringHold _hold;
     private readonly ShipStuckRule _rule;
 
     public ShipStuckRuleTests()
     {
-        _rule = new ShipStuckRule(_fleet.Fleet, _settings);
+        _hold = new GatheringHold(_pressure);
+        _rule = new ShipStuckRule(_fleet.Fleet, _settings, _hold);
+    }
+
+    [Fact]
+    public async Task AGathererHeldBackWhileTheRequestsAreBusy_IsNotStuck_UntilTheLimitAfterItsLastHold()
+    {
+        // Slice 6.41 (D125): a miner waits on purpose while the requests are busy; its next step comes in a later tick.
+        var mining = new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-A1", StartedAt = Start.AddHours(-1) };
+        _fleet.Have(FleetFixture.Drone("SHIP-1", Start.AddHours(-1)));
+        _fleet.Give("SHIP-1", mining);
+        await _harness.EvaluateAsync(_rule, Start.AddHours(-1));
+
+        _pressure.BurstSize.Returns(30);
+        _pressure.BurstRemaining(Arg.Any<DateTimeOffset>()).Returns(3);
+        _hold.TryHold("SHIP-1", mining, Start.AddMinutes(20)).Should().BeTrue();
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(21))).Should().BeEmpty();
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(22))).Should().BeEmpty();
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(50))).Should().BeEmpty();
+
+        await _harness.EvaluateAsync(_rule, Start.AddMinutes(51));
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(52));
+
+        violations.Should().ContainSingle().Which.Details.Should().StartWith(
+            "the bot hasn't updated the ship (nav, cargo, fuel or cooldown) for 32 minutes, since 2026-10-01 12:20:00Z, though it has a MineAndSell goal");
     }
 
     [Fact]
