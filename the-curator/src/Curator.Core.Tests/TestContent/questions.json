@@ -1,0 +1,51 @@
+{
+  "standard": [
+    {
+      "id": "purpose",
+      "text": "What do you need it for?",
+      "textTopic": "What do you need it for?"
+    },
+    {
+      "id": "knowledge",
+      "text": "Do you know what else is in that book?",
+      "textTopic": "Do you know which spell you're after?"
+    },
+    {
+      "id": "source",
+      "text": "How did you hear about this book?",
+      "textTopic": "Who sent you to us?"
+    },
+    {
+      "id": "experience",
+      "text": "Have you worked spells like this before?",
+      "textTopic": "Have you worked spells like this before?"
+    }
+  ],
+  "deflections": {
+    "0": [
+      "I'd rather keep that to myself.",
+      "Does it matter?"
+    ],
+    "1": [
+      "Oh — nothing interesting.",
+      "This and that, really."
+    ],
+    "2": [
+      "It's for something at home. Nothing grand."
+    ],
+    "3": [
+      "I'll tell you another time. I promise."
+    ]
+  },
+  "genericLines": {
+    "lent": "Thank you.",
+    "alternative": "This will do. Thank you.",
+    "offerRefused": "That's not what I asked for.",
+    "declined": "I see.",
+    "walkedOut": "They leave without another word.",
+    "impatient": "They glance at the door.",
+    "bookOut": "That one's out on loan, I'm afraid.",
+    "noThoughts": "Nothing comes to the surface."
+  },
+  "placeholder": true
+}

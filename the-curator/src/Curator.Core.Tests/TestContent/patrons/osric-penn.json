@@ -1,0 +1,24 @@
+{
+  "id": "osric-penn",
+  "name": "Osric Penn",
+  "description": "Black armband. Careful hands.",
+  "role": "filler",
+  "fillerOrder": 3,
+  "visits": [
+    {
+      "id": "osric-penn-1",
+      "step": 1,
+      "patience": 2,
+      "greeting": "I hope I'm not intruding.",
+      "request": { "topic": "preservation", "text": "A preservation spell. For roses." },
+      "goal": { "tags": ["preservation"], "minPower": 1 },
+      "temptations": [{ "tag": "stasis", "use": "accident" }],
+      "readThoughts": { "default": "Her roses. Every one of them." },
+      "decisions": { "walkedOut": { "line": "I'm sorry. I shouldn't have come.", "setFlags": ["osric-penn:gone"] } },
+      "outcomes": {
+        "good": { "channel": "letter", "from": "O. Penn", "text": "The roses keep beautifully." }
+      }
+    }
+  ],
+  "placeholder": true
+}

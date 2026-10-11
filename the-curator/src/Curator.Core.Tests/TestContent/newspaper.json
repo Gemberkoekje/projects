@@ -1,0 +1,18 @@
+{
+  "masthead": "The Lantern Street Gazette",
+  "flavour": {
+    "1": ["Bridge toll to rise by a penny", "Lost: one grey goose, answers to nothing"],
+    "2": ["Market moves to Thursday"],
+    "3": ["Rain expected"],
+    "4": ["Choir seeks tenors"],
+    "5": ["Mill wheel repaired"],
+    "6": ["Fog on the river"],
+    "7": ["Fair next week"]
+  },
+  "toneLines": {
+    "wary": ["Some say the library lends too freely these days."],
+    "neutral": ["The library keeps its usual hours."],
+    "warm": ["The library is spoken of kindly."]
+  },
+  "placeholder": true
+}

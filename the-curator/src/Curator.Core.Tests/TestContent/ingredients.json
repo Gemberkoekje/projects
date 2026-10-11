@@ -1,0 +1,27 @@
+{
+  "ingredients": [
+    { "id": "eye-of-newt", "name": "Eye of Newt", "known": true },
+    { "id": "salt", "name": "Salt", "known": true },
+    { "id": "beeswax", "name": "Beeswax", "known": true },
+    { "id": "rainwater", "name": "Rainwater", "known": true },
+    { "id": "cedar-shavings", "name": "Cedar shavings", "known": true },
+    { "id": "river-stone", "name": "A river stone", "known": true },
+    { "id": "ash", "name": "Ash", "known": true },
+    { "id": "chalk", "name": "Chalk", "known": true },
+    { "id": "iron-filings", "name": "Iron filings", "known": true },
+    { "id": "honey", "name": "Honey", "known": true },
+    { "id": "candle-stub", "name": "A candle stub", "known": true },
+    { "id": "red-thread", "name": "Red thread", "known": true },
+    { "id": "willow-bark", "name": "Willow bark", "known": true },
+    { "id": "lemon-rind", "name": "Lemon rind", "known": true },
+    { "id": "hufeykrey", "name": "Hufeykrey", "known": false },
+    { "id": "garble-blar", "name": "Garble blar", "known": false },
+    { "id": "whicker-flick", "name": "Whicker flick", "known": false },
+    { "id": "oskeling", "name": "Oskeling", "known": false },
+    { "id": "brannowort", "name": "Brannowort", "known": false },
+    { "id": "tessel-dust", "name": "Tessel dust", "known": false },
+    { "id": "vellin-sap", "name": "Vellin sap", "known": false },
+    { "id": "karrowseed", "name": "Karrowseed", "known": false }
+  ],
+  "placeholder": true
+}

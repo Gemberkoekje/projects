@@ -1,0 +1,47 @@
+{
+  "id": "board-clerk",
+  "name": "M. Varn",
+  "description": "A clerk of the Board. Grey gloves, kept on.",
+  "role": "tutorial",
+  "startTrust": 0,
+  "visits": [
+    {
+      "id": "board-clerk-1",
+      "step": 1,
+      "earliestDay": 1,
+      "forced": true,
+      "patience": 3,
+      "greeting": "Good morning, curator. A writ from the Board.",
+      "request": {
+        "bookId": "common-wards",
+        "topic": "warding",
+        "text": "Common Wards and Small Mendings. Today, if you please."
+      },
+      "goal": { "tags": ["opening"], "minPower": 1 },
+      "temptations": [],
+      "readThoughts": { "default": "Back by the noon bell. Don't read it on the way." },
+      "answers": {
+        "purpose": { "0": "The writ is all the explanation required." },
+        "knowledge": { "0": "More than you, I expect. No offence meant." },
+        "source": { "0": "The Board keeps a catalogue of its own." },
+        "experience": { "0": "I'm a clerk, curator. I carry things." }
+      },
+      "decisions": {
+        "lent": { "line": "The Board thanks you. It will be returned." }
+      },
+      "loanDays": 5,
+      "overrides": {
+        "common-wards": {
+          "category": "good",
+          "channel": "letter",
+          "delayDays": 5,
+          "from": "The Board",
+          "text": "Returned, with the Board's thanks.",
+          "onReturn": { "removePage": "common-wards-7" },
+          "setFlags": ["board-clerk:took-common-wards"]
+        }
+      }
+    }
+  ],
+  "placeholder": true
+}

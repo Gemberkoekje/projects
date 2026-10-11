@@ -1,0 +1,22 @@
+{
+  "id": "nell-hart",
+  "name": "Nell Hart",
+  "description": "Pins in her lapel.",
+  "role": "filler",
+  "fillerOrder": 2,
+  "visits": [
+    {
+      "id": "nell-hart-1",
+      "step": 1,
+      "greeting": "Hello! I'm told you have a book with Stitch-Fast in it.",
+      "request": { "bookId": "common-wards", "topic": "domestic", "text": "Common Wards, for the mending charm." },
+      "goal": { "tags": ["mending"], "minPower": 1 },
+      "readThoughts": { "default": "Forty hems by Thursday." },
+      "outcomes": {
+        "unhelpful": { "channel": "letter", "from": "N. Hart", "text": "Not quite what I needed, but kind of you." },
+        "declined": { "channel": "gossip", "delayDays": 1, "text": "Did you hear? The seamstress on Pin Lane is sewing by candle till dawn." }
+      }
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,20 @@
+{
+  "id": "lysander-quill",
+  "name": "Lysander Quill",
+  "description": "Ink on every finger.",
+  "role": "filler",
+  "fillerOrder": 4,
+  "warded": true,
+  "visits": [
+    {
+      "id": "lysander-quill-1",
+      "step": 1,
+      "greeting": "A scholar's request, curator.",
+      "request": { "bookId": "household-arts-3", "topic": "domestic", "text": "Household Arts, the third volume. For research." },
+      "goal": { "tags": ["preservation"], "minPower": 1 },
+      "readThoughts": { "default": "You will find nothing here." },
+      "outcomes": { "good": { "channel": "none" } }
+    }
+  ],
+  "placeholder": true
+}
