@@ -1,0 +1,30 @@
+{
+  "masthead": "The Lantern Street Gazette",
+  "flavour": {
+    "1": ["Bridge toll to rise by a penny", "Lost: one grey goose, answers to nothing"],
+    "2": ["Market moves to Thursday while the square is repaved", "Choir seeks tenors; basses need not apply", "Lamplighter reports the Board's windows lit past midnight"],
+    "3": ["Mill wheel stops for an afternoon; the miller blames eels", "The reading of the Ollery will is postponed again"],
+    "4": ["Fog on the river; the ferry runs late", "Academy examinations begin this week", "The Board thanks residents for their patience during inspections"],
+    "5": ["Harvest fair committee meets, and disagrees", "A stray dog has adopted the town hall steps", "Found in the canal: an iron key, very old. Claim at the constable's."],
+    "6": ["Rain at last; farmers relieved", "The Hollin road reopens after repairs", "Night watch reports a light moving in the library's upper rooms"],
+    "7": ["Harvest fair next week, weather permitting", "Bell-ringers practise on Thursdays; residents are warned", "Obituary: Miss Ivy Ollery, ninety-one, the last of her line"]
+  },
+  "toneLines": {
+    "wary": [
+      "Some say the library lends too freely these days.",
+      "Questions are being asked about what leaves the library's shelves.",
+      "A reader writes: does anyone check what those library books contain?"
+    ],
+    "neutral": [
+      "The library on Lantern Street keeps its usual hours.",
+      "The library reminds borrowers that books are due back on time.",
+      "All quiet at the library this week."
+    ],
+    "warm": [
+      "The library on Lantern Street is spoken of warmly in the market.",
+      "A reader writes to praise the patience of the library's staff.",
+      "They say the library always has the right book, if you ask the right way."
+    ]
+  },
+  "placeholder": true
+}

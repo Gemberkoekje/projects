@@ -1,0 +1,204 @@
+{
+  "id": "hennie-dorrow",
+  "name": "Hennie Dorrow",
+  "description": "Broad as a door, mud to the knee. A laugh you can hear from the street.",
+  "role": "story",
+  "startTrust": 1,
+  "visits": [
+    {
+      "id": "hennie-dorrow-1",
+      "step": 1,
+      "earliestDay": 3,
+      "greeting": "Morning, morning! Don't mind the boots. The boots don't mind me.",
+      "request": {
+        "bookId": "field-and-furrow",
+        "topic": "botanical",
+        "text": "Field and Furrow, if you'd be so kind. Better yields, that's all. My father swore by it."
+      },
+      "goal": { "tags": ["growth"], "minPower": 1 },
+      "temptations": [
+        { "tag": "blight", "use": "misuse" },
+        { "tag": "decay", "use": "misuse" }
+      ],
+      "readThoughts": {
+        "default": "Kessel's fence. A foot onto my land. A whole foot.",
+        "byTrust": { "2": "Kessel's fence, a foot over. His barley right up against it." },
+        "unlocks": ["hennie-dorrow-1-kessel"]
+      },
+      "answers": {
+        "purpose": {
+          "1": "Beans, barley, the usual. A man likes a bit more than last year.",
+          "2": "Yields. And — well. There's a neighbour. But mostly yields."
+        },
+        "knowledge": {
+          "1": "Growing things! It's a farming book. What else would be in it, recipes?",
+          "2": "Growing, mostly. There's a page my father wouldn't let me read. Rust, he said. Never on your own land."
+        },
+        "source": {
+          "1": "My father. Swore by it. Swore at it, too, the year the beans failed."
+        },
+        "experience": {
+          "1": "I've grown a marrow the size of a calf. With my own hands, mind. No charms."
+        }
+      },
+      "questions": [
+        {
+          "id": "hennie-dorrow-1-kessel",
+          "text": "Who's Kessel?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "0": "Nobody. Who told you that name?",
+            "1": "Kessel? Neighbour. Fine fellow. Fine. Moved his fence, that's all.",
+            "2": "Kessel moved his fence a foot onto my land and laughed when I said so. A whole foot. You'd mind too."
+          },
+          "setFlags": ["hennie-dorrow:mentioned-kessel"]
+        },
+        {
+          "id": "hennie-dorrow-1-rust",
+          "text": "One page in there calls rust down on a field. Have you any use for that?",
+          "unlockedBy": "identifiedPage:field-and-furrow-4",
+          "answers": {
+            "0": "Rust? Never heard of it.",
+            "1": "Ha! What farmer wants rust? Not on my land, thank you.",
+            "2": "Not on my land. No. Not on mine."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "There's a good curator. Beans like boulders, you'll see!" },
+        "alternative": { "line": "A primer? Like a schoolboy? Ha! All right, all right. I'll try it." },
+        "offerRefused": { "line": "Ah, now, that's not a farming book, is it? Try again." },
+        "declined": { "line": "No? Well. I'll grow them the hard way, then. Always have." },
+        "walkedOut": { "line": "I've a field waiting. Good day to you." }
+      },
+      "outcomes": {
+        "mixedMisuse": {
+          "channel": "newspaper",
+          "delayDays": 1,
+          "headline": "Rust strikes a single barley field",
+          "text": "Red rust destroyed a barley field on the Hollin road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
+          "setFlags": ["hennie-dorrow:kessel-rust"]
+        },
+        "good": {
+          "channel": "letter",
+          "from": "H. Dorrow",
+          "text": "Best beans in years! The wife says I'm unbearable. Primer for schoolboys, my eye. — H."
+        },
+        "unhelpful": { "channel": "none" },
+        "harmMisuse": {
+          "channel": "gossip",
+          "text": "Did you hear? Old Kessel's hedge rotted to black overnight. Every leaf. He's not saying who he thinks did it, but he's thinking it loud."
+        }
+      }
+    },
+    {
+      "id": "hennie-dorrow-2-candid",
+      "step": 2,
+      "earliestDay": 5,
+      "when": { "minTrust": 2 },
+      "greeting": [
+        { "when": { "previousOutcomeIn": ["good"] }, "text": "Ha! The beans! You've ruined me, curator. Every neighbour wants my secret." },
+        { "text": "Curator! A word, if you've a minute. Between friends." }
+      ],
+      "request": {
+        "bookId": "field-and-furrow",
+        "topic": "botanical",
+        "text": "I'll be plain with you. The rust spell in Field and Furrow. Just to give Kessel a fright. One field. His."
+      },
+      "goal": { "tags": ["blight"], "minPower": 1 },
+      "temptations": [{ "tag": "blight", "use": "misuse" }],
+      "readThoughts": {
+        "default": "His face when he sees it. Just his face.",
+        "unlocks": ["hennie-dorrow-2-candid-face"]
+      },
+      "answers": {
+        "purpose": { "2": "A fright. Kessel needs a fright. One field won't ruin him. He's got four." },
+        "knowledge": { "2": "I know what's on that page. My father told me. That's why I'm asking you, not reading it in a ditch." },
+        "experience": { "2": "Not with rust. With beans, as you know!" }
+      },
+      "questions": [
+        {
+          "id": "hennie-dorrow-2-candid-face",
+          "text": "And when he sees it — what then?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "2": "Then he moves his fence back. Or — ach. Then he hates me, I suppose. He does already.",
+            "3": "Then I've a neighbour who hates me for good instead of for a foot of ground. Put like that."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "There. Between friends. One field." },
+        "alternative": { "line": "Beans again? You're a hard one. Fine." },
+        "offerRefused": { "line": "No, no. The rust. That's what I came for." },
+        "declined": { "line": "Aye. You're right. I'd have regretted it.", "trust": 0 }
+      },
+      "outcomes": {
+        "mixedMisuse": {
+          "channel": "newspaper",
+          "delayDays": 1,
+          "headline": "Rust strikes a single barley field",
+          "text": "Red rust destroyed a barley field on the Hollin road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
+          "setFlags": ["hennie-dorrow:kessel-rust"]
+        },
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harmMisuse": {
+          "channel": "gossip",
+          "text": "Did you hear? Old Kessel's hedge rotted to black overnight. Every leaf. He's not saying who he thinks did it, but he's thinking it loud."
+        }
+      }
+    },
+    {
+      "id": "hennie-dorrow-2-jovial",
+      "step": 2,
+      "earliestDay": 5,
+      "when": { "previousDecisionIn": ["lent"] },
+      "greeting": [
+        { "when": { "flagsAll": ["hennie-dorrow:kessel-rust"] }, "text": "Morning! Grand morning. Read the paper? Terrible business, rust. Terrible." },
+        { "text": "Morning! Back again, like a bad penny." }
+      ],
+      "request": {
+        "bookId": "primer-green",
+        "topic": "botanical",
+        "text": "A Primer of Green Things, if you would. For the beans this time. Just the beans."
+      },
+      "goal": { "tags": ["growth"], "minPower": 1 },
+      "readThoughts": {
+        "default": "Red barley right up to the fence. Not a stalk over.",
+        "unlocks": ["hennie-dorrow-2-jovial-barley"]
+      },
+      "answers": {
+        "purpose": { "1": "Beans. The barley's in. The beans want help." },
+        "knowledge": { "1": "It's for schoolboys, they tell me. I'm a schoolboy at heart." }
+      },
+      "questions": [
+        {
+          "id": "hennie-dorrow-2-jovial-barley",
+          "text": "How is your neighbour's barley?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "1": "Kessel's? Rusted, I hear. Shame. Shame for him.",
+            "2": "Gone. Every stalk, right up to the fence and not a stalk over. I'd swear to that."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Champion. Beans like boulders!" },
+        "alternative": { "line": "That'll grow beans, will it? On your head be it." },
+        "offerRefused": { "line": "For beans, curator. Beans." },
+        "declined": { "line": "Ha! No? Suit yourself." }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "letter",
+          "from": "H. Dorrow",
+          "text": "Beans like boulders, as promised. The wife has stopped speaking to me, which is restful. — H."
+        },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

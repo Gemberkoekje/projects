@@ -1,0 +1,43 @@
+{
+  "id": "abel-wyke",
+  "name": "Councillor Abel Wyke",
+  "description": "Chain of office tucked inside his coat. Smells of pipe smoke and certainty.",
+  "role": "filler",
+  "fillerOrder": 7,
+  "visits": [
+    {
+      "id": "abel-wyke-1",
+      "step": 1,
+      "greeting": "Curator. Councillor Wyke. You'll know the name.",
+      "request": {
+        "bookId": "weatherwright",
+        "topic": "weather",
+        "text": "The Weatherwright's Ledger. The Council needs a reliable forecast for the harvest fair, and I'm told yours is the only copy."
+      },
+      "goal": { "tags": ["weather-reading"], "minPower": 2 },
+      "temptations": [{ "tag": "weather-storm", "use": "misuse" }],
+      "readThoughts": { "default": "Rain on the Oxley road the day of their market. Only theirs." },
+      "answers": {
+        "purpose": {
+          "0": "Council business.",
+          "1": "The fair. Forecasts. Planning, curator. You'd be amazed what a dry Saturday is worth."
+        },
+        "knowledge": { "0": "Weather. It says so on the spine." }
+      },
+      "decisions": {
+        "lent": { "line": "The Council is obliged." },
+        "alternative": { "line": "This will do, I suppose." },
+        "offerRefused": { "line": "I asked for the Ledger." },
+        "declined": { "line": "The Council will remember this." }
+      },
+      "outcomes": {
+        "mixedMisuse": { "channel": "none" },
+        "harmMisuse": { "channel": "none" },
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "declined": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,43 @@
+{
+  "id": "nell-hart",
+  "name": "Nell Hart",
+  "description": "A pincushion strapped to her wrist. Talks with her hands.",
+  "role": "filler",
+  "fillerOrder": 2,
+  "visits": [
+    {
+      "id": "nell-hart-1",
+      "step": 1,
+      "greeting": "Hello! I'm told you've a book with a mending charm in it. Stitch-something.",
+      "request": {
+        "bookId": "common-wards",
+        "topic": "domestic",
+        "text": "Common Wards and Small Mendings? For Stitch-Fast. I've forty hems to finish by Thursday."
+      },
+      "goal": { "tags": ["mending"], "minPower": 1 },
+      "readThoughts": { "default": "Forty hems. Thursday. The Ashby wedding." },
+      "answers": {
+        "purpose": { "0": "Sewing.", "1": "Hems. A whole wedding party, all in one week." },
+        "experience": { "1": "A needle-threading charm. Nothing grand." }
+      },
+      "decisions": {
+        "alternative": { "line": "This one? Well — it's kind of you. I'll see." },
+        "offerRefused": { "line": "Oh, I don't think that one's for sewing." },
+        "declined": { "line": "Never mind. My thumbs will manage." }
+      },
+      "outcomes": {
+        "unhelpful": {
+          "channel": "letter",
+          "from": "N. Hart",
+          "text": "No mending charm in it, sadly, but thank you for trying. The hems got done, by thumb. — Nell"
+        },
+        "declined": {
+          "channel": "gossip",
+          "delayDays": 1,
+          "text": "Did you hear? The seamstress on Pin Lane sewed the whole Ashby wedding by candlelight. Four nights."
+        }
+      }
+    }
+  ],
+  "placeholder": true
+}

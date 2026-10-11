@@ -1,0 +1,47 @@
+{
+  "mana": {
+    "basePerDay": 6,
+    "readThoughtsCost": 2,
+    "identifyCost": 1,
+    "rolloverCap": 2,
+    "attentiveBonusCap": 2,
+    "goodOutcomeBonus": 1,
+    "totalBonusCap": 3
+  },
+  "money": {
+    "start": 10,
+    "upkeepPerDay": 5,
+    "feeByRarity": { "common": 2, "uncommon": 4, "rare": 7, "singular": 12 }
+  },
+  "patience": {
+    "default": 4,
+    "questionCost": 1,
+    "identifyCost": 1,
+    "refusedOfferCost": 1,
+    "readThoughtsCost": 0
+  },
+  "trust": {
+    "strangerStart": 0,
+    "alternativeAccepted": 1,
+    "declined": -1,
+    "pastPatience": -1,
+    "wardedNoticed": -2
+  },
+  "reputation": {
+    "start": 0,
+    "goodPublic": 1,
+    "harmPublic": -2,
+    "unexplainedDecline": -1,
+    "walkedOut": -1,
+    "warmThreshold": 3,
+    "waryThreshold": -3,
+    "warmStrangerTrust": 1
+  },
+  "alternatives": { "acceptSameTopic": true, "minTrustForAny": 2 },
+  "loans": { "defaultDays": 5 },
+  "outcomes": {
+    "defaultDelayDays": { "good": 2, "unhelpful": 2, "harm": 1, "mixed": 2, "declined": 0, "walkedOut": 0 }
+  },
+  "week": { "days": 7 },
+  "placeholder": true
+}

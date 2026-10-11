@@ -1,0 +1,56 @@
+{
+  "id": "sleep-neighbours",
+  "title": "Sleep & Its Neighbours",
+  "spineTag": "memory",
+  "rarity": "uncommon",
+  "summary": "Gentle and sound. We keep a copy on every ward. — Sister M., Alder Infirmary",
+  "pages": [
+    {
+      "id": "sleep-neighbours-1",
+      "spellName": "Lavender Pillow",
+      "tags": ["sleep"],
+      "power": 1,
+      "danger": 0,
+      "text": "Stitch the lavender {~into the corner~} where the head turns {~in the night~}. Replace it {~when it stops smelling of anything~}.",
+      "ingredients": ["lavender", "red-thread"]
+    },
+    {
+      "id": "sleep-neighbours-2",
+      "spellName": "Waking Clear",
+      "tags": ["memory-aid"],
+      "power": 1,
+      "danger": 0,
+      "text": "To wake {~with the night's thinking intact~}: a cup of cold water by the bed, {~drunk before speaking~}.",
+      "ingredients": ["rainwater", "rosemary"]
+    },
+    {
+      "id": "sleep-neighbours-3",
+      "spellName": "Counting Down",
+      "tags": ["sleep"],
+      "power": 1,
+      "danger": 0,
+      "text": "Count backward from a hundred {~in a language you do not speak~}. Few reach sixty.",
+      "ingredients": ["chamomile", "whicker-flick"]
+    },
+    {
+      "id": "sleep-neighbours-4",
+      "spellName": "Dream{~less~}",
+      "tags": ["sleep-deep"],
+      "power": 2,
+      "danger": 2,
+      "text": "A sleep {~without floor~}. The sleeper will not wake for {~bell, voice or hand~} until {~the candle is out~}. {~Use a short candle.~}",
+      "ingredients": ["chamomile", "oskeling", "pellicand"],
+      "authorNote": "Outlier. Legible: \"The sleeper will not wake for ... until\". Jory's accident at step 2."
+    },
+    {
+      "id": "sleep-neighbours-5",
+      "spellName": "The Watcher's Nap",
+      "tags": ["sleep"],
+      "power": 1,
+      "danger": 0,
+      "text": "An hour's sleep {~that does the work of six~}. Not twice in a day.",
+      "ingredients": ["candle-stub", "chamomile"]
+    }
+  ],
+  "placeholder": true
+}

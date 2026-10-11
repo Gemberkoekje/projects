@@ -1,0 +1,204 @@
+{
+  "id": "wren-hale",
+  "name": "Wren Hale",
+  "description": "Oilskin coat, salt-stained. Chapped hands kept in her pockets.",
+  "role": "story",
+  "startTrust": 0,
+  "visits": [
+    {
+      "id": "wren-hale-1",
+      "step": 1,
+      "earliestDay": 3,
+      "greeting": "Morning. Won't keep you.",
+      "request": {
+        "bookId": "lanterns",
+        "topic": "domestic",
+        "text": "Lanterns and Lesser Fires. Something to dry linen quick — my washing never dries in this damp."
+      },
+      "goal": { "tags": ["fire-destructive"], "minPower": 2 },
+      "temptations": [{ "tag": "fire-destructive", "use": "accident" }],
+      "readThoughts": {
+        "default": "Twelve paces of bare earth. Twelve at least.",
+        "byTrust": { "2": "Twelve paces of bare earth, right round the village. Before the dry." },
+        "unlocks": ["wren-hale-1-paces"]
+      },
+      "answers": {
+        "purpose": {
+          "0": "Washing. I said.",
+          "1": "Linen, mostly. And a bit of clearing out back.",
+          "2": "Clearing. A strip of ground round Lower Hollis. Linen's the least of it."
+        },
+        "knowledge": {
+          "0": "Lamps and that. Isn't it?",
+          "1": "Heard there's a drying charm in it. Heard there's more."
+        },
+        "source": {
+          "0": "Someone at the market.",
+          "1": "Fella at the market. Said it'd do what I need."
+        },
+        "experience": {
+          "0": "Candles. Same as anyone.",
+          "1": "Never cast anything bigger than a candle. Doesn't mean I can't."
+        }
+      },
+      "questions": [
+        {
+          "id": "wren-hale-1-paces",
+          "text": "What needs twelve paces of bare earth?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "0": "Nothing you'd know about.",
+            "1": "A firebreak. Round Lower Hollis. Council won't pay for diggers.",
+            "2": "A firebreak. The gorse goes up like paper when the dry comes, and the Council won't pay for diggers."
+          },
+          "setFlags": ["wren-hale:told-firebreak"]
+        },
+        {
+          "id": "wren-hale-1-burn",
+          "text": "One page in that book is about fire that burns things to the ground. Is that the one you're after?",
+          "unlockedBy": "identifiedPage:lanterns-4",
+          "answers": {
+            "0": "I'm after dry washing.",
+            "1": "Wouldn't say after. Wouldn't say not.",
+            "2": "Yes. Not for harm. For a firebreak, before the dry."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Right. Ta." },
+        "alternative": { "line": "It'll dry linen, will it? Fine." },
+        "offerRefused": { "line": "Not that. The one I asked for." },
+        "declined": { "line": "Suit yourself." },
+        "walkedOut": { "line": "Got better things to do than stand here." }
+      },
+      "outcomes": {
+        "mixedAccident": {
+          "channel": "return",
+          "text": "Your book works. Too well. A hayrick went up and took the fence with it. Nobody hurt, bar my hands.",
+          "setFlags": ["wren-hale:hayrick"]
+        },
+        "good": {
+          "channel": "newspaper",
+          "headline": "Lower Hollis clears its own firebreak",
+          "text": "Residents of Lower Hollis have cleared a firebreak round the village without the Council's diggers. The method was not disclosed."
+        },
+        "unhelpful": { "channel": "none" },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Gorse caught out past Lower Hollis. Burned to the stream before it stopped. Nobody hurt, somehow."
+        },
+        "declined": {
+          "channel": "gossip",
+          "delayDays": 3,
+          "text": "Did you hear? The Hales dug a firebreak round Lower Hollis by hand. Took the whole family four days."
+        }
+      }
+    },
+    {
+      "id": "wren-hale-2-candid",
+      "step": 2,
+      "earliestDay": 5,
+      "when": { "previousDecisionIn": ["alternative"] },
+      "greeting": "Your linen charm works. I lied about what I wanted.",
+      "request": {
+        "bookId": "lanterns",
+        "topic": "fire",
+        "text": "Lanterns, then. Straight this time. It's for a firebreak round Lower Hollis, before the dry season."
+      },
+      "goal": { "tags": ["fire-destructive"], "minPower": 2 },
+      "temptations": [{ "tag": "fire-destructive", "use": "benign" }],
+      "readThoughts": {
+        "default": "Small fires all week. Little ones first. Then bigger.",
+        "unlocks": ["wren-hale-2-candid-practised"]
+      },
+      "answers": {
+        "purpose": { "1": "Firebreak. Twelve paces of bare earth all round the village, or the gorse takes us." },
+        "knowledge": { "1": "Drying, warming, kindling. And the big one. That's the one I need." },
+        "source": { "1": "Fella at the market. Said his gran cleared her fields with it." },
+        "experience": { "1": "Been practising all week. Candles, then kindling. Haven't singed myself yet." }
+      },
+      "questions": [
+        {
+          "id": "wren-hale-2-candid-practised",
+          "text": "Little ones first — what have you been practising on?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "1": "Kindling in the yard. Bucket by me every time.",
+            "2": "Kindling, then a pile of brash in the lane. Bucket by me every time. I'm not daft."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Ta. I'll be careful. I've been careful all week." },
+        "alternative": { "line": "That won't clear gorse. But all right." },
+        "offerRefused": { "line": "No. That one. I've told you why." },
+        "declined": { "line": "Told you the truth and you still won't. Right." }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "newspaper",
+          "headline": "Lower Hollis firebreak holds",
+          "text": "A grass fire on the heath turned back at a firebreak cleared by Lower Hollis residents. No property was lost."
+        },
+        "unhelpful": { "channel": "none" },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Wren Hale burned half the heath trying to clear it. Lucky the wind turned."
+        },
+        "declined": {
+          "channel": "gossip",
+          "delayDays": 1,
+          "text": "Did you hear? The Hales are digging a firebreak round Lower Hollis by hand. Four days, it's taking them."
+        }
+      }
+    },
+    {
+      "id": "wren-hale-2-subdued",
+      "step": 2,
+      "earliestDay": 5,
+      "when": { "previousDecisionIn": ["lent"] },
+      "greeting": [
+        { "when": { "flagsAll": ["wren-hale:hayrick"] }, "text": "You'll have heard. Or you have now." },
+        { "text": "Morning." }
+      ],
+      "request": {
+        "bookId": "small-comforts",
+        "topic": "healing",
+        "text": "Small Comforts, if you've got it. For burns."
+      },
+      "goal": { "tags": ["healing-minor"], "minPower": 1 },
+      "readThoughts": {
+        "default": "Don't look at the hands. Don't let her look.",
+        "unlocks": ["wren-hale-2-subdued-hands"]
+      },
+      "answers": {
+        "purpose": { "0": "Burns.", "1": "My hands. The hayrick." },
+        "experience": { "0": "Not with salves.", "1": "Not with salves. Not with much, it turns out." }
+      },
+      "questions": [
+        {
+          "id": "wren-hale-2-subdued-hands",
+          "text": "May I see your hands?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "0": "No.",
+            "1": "They're fine. They'll be fine."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Ta." },
+        "alternative": { "line": "That'll do." },
+        "offerRefused": { "line": "For burns, I said." },
+        "declined": { "line": "Right. I'll manage." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": { "channel": "none" },
+        "declined": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

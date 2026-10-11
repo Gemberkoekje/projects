@@ -1,0 +1,26 @@
+{
+  "id": "ada-marsh",
+  "name": "Ada Marsh",
+  "description": "Grey shawl. Always the same chair.",
+  "role": "filler",
+  "startTrust": 2,
+  "fillerOrder": 1,
+  "preGameLoans": [
+    { "bookId": "hearth-and-kettle", "borrowedDay": -40, "returnedDay": -33 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -25, "returnedDay": -20 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -12, "returnedDay": -7 },
+    { "bookId": "hearth-and-kettle", "borrowedDay": -5, "returnedDay": -1 }
+  ],
+  "visits": [
+    {
+      "id": "ada-marsh-1",
+      "step": 1,
+      "greeting": "Good morning, dear.",
+      "request": { "bookId": "hearth-and-kettle", "topic": "domestic", "text": "The usual, please." },
+      "goal": { "tags": ["warmth"], "minPower": 1 },
+      "readThoughts": { "default": "Banked coals. The cat on the hearth." },
+      "outcomes": { "good": { "channel": "none" } }
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,56 @@
+{
+  "id": "patient-mind",
+  "title": "The Patient Mind",
+  "spineTag": "memory",
+  "rarity": "uncommon",
+  "summary": "Excellent for students. It got me through my finals. — a grateful examinee",
+  "pages": [
+    {
+      "id": "patient-mind-1",
+      "spellName": "The Long Room",
+      "tags": ["memory-aid"],
+      "power": 2,
+      "danger": 0,
+      "text": "Imagine a room {~you know well~} and set each fact {~on a shelf in it~}. Walk the room before you sleep, {~and again on waking~}.",
+      "ingredients": ["rosemary", "chalk"]
+    },
+    {
+      "id": "patient-mind-2",
+      "spellName": "Ink of Reminding",
+      "tags": ["memory-aid"],
+      "power": 1,
+      "danger": 0,
+      "text": "Write the thing once in this ink {~and say it as you write~}. You will not need to write it twice.",
+      "ingredients": ["black-ink", "rosemary", "quillith"]
+    },
+    {
+      "id": "patient-mind-3",
+      "spellName": "Steady Recall",
+      "tags": ["memory-aid"],
+      "power": 2,
+      "danger": 0,
+      "text": "For the examination hall: a sprig {~in the pocket~}, {~a breath held for the count of seven~}. What you knew {~comes when called~}.",
+      "ingredients": ["rosemary", "river-stone"]
+    },
+    {
+      "id": "patient-mind-4",
+      "spellName": "{~Un~}learning",
+      "tags": ["memory-erasure"],
+      "power": 3,
+      "danger": 3,
+      "text": "{~To take back what was learned~}, speak the subject's name {~into running water~}, then {~the thing itself~}. It does not come back. {~Never on oneself.~}",
+      "ingredients": ["rainwater", "morrow-ash", "oskeling"],
+      "authorNote": "Outlier. Legible: \"speak the subject's name ... then ... It does not come back.\" Jory's temptation."
+    },
+    {
+      "id": "patient-mind-5",
+      "spellName": "A Name on the Tongue",
+      "tags": ["memory-aid"],
+      "power": 1,
+      "danger": 0,
+      "text": "For names forgotten at the door. Touch the lintel {~with a chalked thumb~} and the name comes.",
+      "ingredients": ["chalk", "honey"]
+    }
+  ],
+  "placeholder": true
+}

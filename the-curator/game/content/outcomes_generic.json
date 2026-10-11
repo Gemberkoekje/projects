@@ -1,0 +1,30 @@
+{
+  "good": [
+    { "channel": "none" },
+    { "channel": "letter", "from": "{name}", "text": "{book} did just what I needed. Thank you kindly." },
+    { "channel": "gossip", "text": "Did you hear? {name} has been singing the library's praises all over the market." }
+  ],
+  "unhelpful": [
+    { "channel": "none" },
+    { "channel": "gossip", "text": "Did you hear? {name} says the library's books are all charm and no use." }
+  ],
+  "harmMisuse": [
+    { "channel": "none" },
+    { "channel": "newspaper", "headline": "Damage reported on the Hollin road", "text": "Damage was reported overnight on the Hollin road. The constable has questions and few answers." },
+    { "channel": "gossip", "text": "Did you hear? Something nasty happened out by {name}'s place. Nobody's saying what." }
+  ],
+  "harmAccident": [
+    { "channel": "none" },
+    { "channel": "gossip", "text": "Did you hear? {name} had an accident with a charm. Lost a shed. Nobody hurt." },
+    { "channel": "letter", "from": "{name}", "text": "Something in {book} went wrong. I'd rather not say what. I'll bring it back." }
+  ],
+  "mixedMisuse": [
+    { "channel": "none" },
+    { "channel": "newspaper", "headline": "Odd doings on Lantern Street", "text": "Neighbours report an unusual week on Lantern Street, though none will say quite what they mean." }
+  ],
+  "mixedAccident": [
+    { "channel": "none" },
+    { "channel": "letter", "from": "{name}", "text": "{book} worked — mostly. I'd rather not talk about the rest." }
+  ],
+  "placeholder": true
+}

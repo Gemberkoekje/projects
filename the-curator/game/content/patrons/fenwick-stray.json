@@ -1,0 +1,41 @@
+{
+  "id": "fenwick-stray",
+  "name": "Fenwick Stray",
+  "description": "A pack of tin goods on his back that rattles when he moves. Very white teeth.",
+  "role": "filler",
+  "fillerOrder": 10,
+  "visits": [
+    {
+      "id": "fenwick-stray-1",
+      "step": 1,
+      "greeting": "Good day, good day! Lovely establishment. Lovely.",
+      "request": {
+        "bookId": "clerks-companion",
+        "topic": "domestic",
+        "text": "The Clerk's Companion, if it's in. For copying receipts. A man in trade has receipts coming out of his ears."
+      },
+      "goal": { "tags": ["clerical"], "minPower": 1 },
+      "temptations": [{ "tag": "forgery", "use": "misuse" }],
+      "readThoughts": { "default": "The magistrate's seal. Wax, three lines, sign." },
+      "answers": {
+        "purpose": { "0": "Receipts! Copying! Very dull.", "1": "Duplicates. The market inspector does love a duplicate." },
+        "source": { "0": "A clerk I know. Former clerk." }
+      },
+      "decisions": {
+        "lent": { "line": "Much obliged. Much obliged indeed." },
+        "alternative": { "line": "Not quite the article, but I'm a flexible man." },
+        "declined": { "line": "No offence taken. None at all." }
+      },
+      "outcomes": {
+        "mixedMisuse": {
+          "channel": "newspaper",
+          "headline": "Forged receipts seized at market",
+          "text": "Market inspectors have seized a quantity of receipts bearing a forged magistrate's seal. A tin-goods seller is sought to answer questions."
+        },
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

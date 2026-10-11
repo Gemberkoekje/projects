@@ -1,0 +1,47 @@
+{
+  "id": "lanterns",
+  "title": "Lanterns and Lesser Fires",
+  "spineTag": "fire",
+  "rarity": "uncommon",
+  "summary": "Light and warmth for the dark months. — E. Pryce",
+  "pages": [
+    {
+      "id": "lanterns-1",
+      "spellName": "Linen-Dry",
+      "tags": ["drying"],
+      "power": 1,
+      "danger": 0,
+      "text": "Hold the wet linen a hand above a low flame and {~draw the damp out along the thread~}. It dries {~without scorching~}.",
+      "ingredients": ["candle-stub", "salt"]
+    },
+    {
+      "id": "lanterns-2",
+      "spellName": "Warm Hands",
+      "tags": ["warmth"],
+      "power": 1,
+      "danger": 0,
+      "text": "Cup the hands {~around nothing~} and breathe three times. The warmth {~stays till the errand is done~}.",
+      "ingredients": ["ash", "honey"]
+    },
+    {
+      "id": "lanterns-3",
+      "spellName": "Kindle",
+      "tags": ["fire-small"],
+      "power": 1,
+      "danger": 1,
+      "text": "A spark {~from a dry word~}, for damp kindling. {~Keep the word short.~}",
+      "ingredients": ["ash", "brannowort"]
+    },
+    {
+      "id": "lanterns-4",
+      "spellName": "{~Fire~}ball",
+      "tags": ["fire-destructive"],
+      "power": 3,
+      "danger": 3,
+      "text": "Gather the heat {~between the palms~} until it will not be held, {~then throw~}. Whatever it {~meets~} burns {~to the ground~}.",
+      "ingredients": ["hufeykrey", "ash", "karrowseed"],
+      "authorNote": "Outlier, between a linen charm and warm hands. Wren's goal and her accident."
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,321 @@
+{
+  "id": "elara-voss",
+  "name": "Elara Voss",
+  "description": "Tall. Dark coat. Unhurried.",
+  "role": "story",
+  "startTrust": 1,
+  "visits": [
+    {
+      "id": "elara-voss-1",
+      "step": 1,
+      "earliestDay": 2,
+      "greeting": "Good morning. I hope I'm not too early.",
+      "request": {
+        "bookId": "household-arts-3",
+        "topic": "domestic",
+        "text": "Household Arts, the third volume? I need something for a stubborn stain. On fabric."
+      },
+      "goal": { "tags": ["preservation"], "minPower": 1 },
+      "temptations": [
+        { "tag": "preservation", "use": "benign" },
+        { "tag": "decay", "use": "accident" }
+      ],
+      "readThoughts": {
+        "default": "I do not need to forget the eye of newt.",
+        "byTrust": { "2": "Eye of newt, beeswax, and then it keeps. It finally keeps." },
+        "unlocks": ["elara-voss-1-newt"]
+      },
+      "answers": {
+        "purpose": {
+          "0": "A stain. On fabric.",
+          "1": "Mildew, mostly. On old cloth. It's delicate work.",
+          "2": "Old cloth bindings. They're spotting faster than I can clean them."
+        },
+        "knowledge": {
+          "1": "Household things. Stains, linen, the odd kettle.",
+          "2": "There's a fixative in it. If I'm honest, that's the part I'm after."
+        },
+        "source": {
+          "1": "My grandmother swore by it.",
+          "2": "My grandmother's. Her name's in the front of it, if you look."
+        },
+        "experience": { "1": "Small charms. Nothing that bites." }
+      },
+      "questions": [
+        {
+          "id": "elara-voss-1-newt",
+          "text": "What do you need eye of newt for?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "0": "I'm sorry?",
+            "1": "For a fixative. My work is... delicate.",
+            "2": "To keep something from falling apart. Pages. Pressed flowers. It's a long story."
+          },
+          "setFlags": ["elara-voss:asked-newt"]
+        },
+        {
+          "id": "elara-voss-1-breathes",
+          "text": "One of these charms mentions anything that still breathes. Is that the one you want?",
+          "unlockedBy": "identifiedPage:household-arts-3-5",
+          "answers": {
+            "0": "I don't know what you mean.",
+            "1": "Nothing that breathes. You have my word.",
+            "2": "Yes. And no — nothing living. Flowers, long dead. Paper."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "Thank you. I'll take good care of it." },
+        "alternative": { "line": "Oh. Well — thank you. I'll try it." },
+        "offerRefused": { "line": "That's not quite what I meant." },
+        "declined": { "line": "I see. Thank you anyway." },
+        "walkedOut": { "line": "I should go. I'm sorry to have kept you.", "setFlags": ["elara-voss:gone"] }
+      },
+      "loanDays": 2,
+      "outcomes": {
+        "good": {
+          "channel": "return",
+          "text": "The stain lifted — and the rest held. Thank you. I mean that.",
+          "trust": 1,
+          "setFlags": ["elara-voss:fixative-worked"]
+        },
+        "unhelpful": {
+          "channel": "return",
+          "text": "Your book was kind. It wasn't what I needed, but you didn't make me feel foolish for asking.",
+          "setFlags": ["elara-voss:got-safe-book"]
+        },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Someone on Willow Row lost a whole cabinet of pressed flowers overnight. Turned to dust, they say."
+        },
+        "declined": { "channel": "none" },
+        "walkedOut": { "channel": "none" }
+      }
+    },
+    {
+      "id": "elara-voss-2-candid",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "minTrust": 2, "previousDecisionIn": ["alternative"] },
+      "greeting": "May I be honest with you this time?",
+      "request": {
+        "bookId": "household-arts-3",
+        "topic": "preservation",
+        "text": "The fixative in Household Arts. It's for my grandmother's herbarium — forty years of pressed plants, and the mildew is winning."
+      },
+      "goal": { "tags": ["preservation"], "minPower": 1 },
+      "temptations": [
+        { "tag": "preservation", "use": "benign" },
+        { "tag": "decay", "use": "accident" }
+      ],
+      "readThoughts": {
+        "default": "Forty years. She never once let me touch it.",
+        "unlocks": ["elara-voss-2-candid-touch"]
+      },
+      "answers": {
+        "purpose": { "2": "The herbarium. Paper, cloth, flowers. Nothing living — I know what that charm can do." },
+        "knowledge": { "2": "The fixative, the stain-lifter, something about kettles. And a warning I took seriously." },
+        "source": { "2": "Her notes. She annotated everything she owned." },
+        "experience": { "2": "I've practised on scraps all week. Dead leaves only." }
+      },
+      "questions": [
+        {
+          "id": "elara-voss-2-candid-touch",
+          "text": "Who never let you touch it?",
+          "unlockedBy": "readThoughts",
+          "answers": { "2": "My grandmother. The herbarium was hers. Now it's mine, and it's falling apart." }
+        }
+      ],
+      "decisions": {
+        "lent": {
+          "line": "Thank you. May I ask one more thing? The locked cabinet in the corner — who holds its key?",
+          "setFlags": ["elara-voss:asked-about-shelf"]
+        },
+        "alternative": {
+          "line": "I'll try it. And — the locked cabinet in the corner. Who holds its key?",
+          "setFlags": ["elara-voss:asked-about-shelf"]
+        },
+        "offerRefused": { "line": "I'd rather have the one I asked for, if it's all the same." },
+        "declined": { "line": "I understand. I'd have liked you to trust me, that's all." }
+      },
+      "loanDays": 3,
+      "outcomes": {
+        "good": {
+          "channel": "newspaper",
+          "delayDays": 1,
+          "headline": "Willow Row herbarium saved from damp",
+          "text": "A private collection of pressed plants thought lost to mildew has been restored to a remarkable state. Its keeper credits a household charm and a patient librarian.",
+          "setFlags": ["elara-voss:herbarium-saved"]
+        },
+        "unhelpful": {
+          "channel": "letter",
+          "from": "E. Voss",
+          "text": "It wasn't the right book, but thank you for trying. The mildew is patient. So am I."
+        },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Someone on Willow Row lost a whole cabinet of pressed flowers overnight. Turned to dust, they say."
+        },
+        "declined": { "channel": "none" }
+      }
+    },
+    {
+      "id": "elara-voss-2-returning",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["lent"] },
+      "greeting": [
+        { "when": { "flagsAll": ["elara-voss:fixative-worked"] }, "text": "And now a harder question, I'm afraid." },
+        { "text": "Me again. I've a harder question this time." }
+      ],
+      "request": {
+        "bookId": "advanced-botanical",
+        "topic": "botanical",
+        "text": "Advanced Botanical Compounds. Some of my specimens have lost their labels, and I need to know what they are."
+      },
+      "goal": { "tags": ["plant-lore"], "minPower": 1 },
+      "temptations": [{ "tag": "decay", "use": "accident" }],
+      "readThoughts": {
+        "default": "Grey leaf, five lobes. She'd have known it at a glance.",
+        "unlocks": ["elara-voss-2-returning-glance"]
+      },
+      "answers": {
+        "purpose": {
+          "1": "Identifying specimens. Old ones.",
+          "2": "Labelling a collection. My grandmother's. The fixative is holding it together; now I need to know what's in it."
+        },
+        "knowledge": {
+          "0": "It's a reference book, isn't it?",
+          "2": "Mostly references. And one or two compounds I won't be touching."
+        },
+        "experience": { "1": "Not with compounds. I'm careful." }
+      },
+      "questions": [
+        {
+          "id": "elara-voss-2-returning-glance",
+          "text": "Who would have known it at a glance?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "1": "Someone who taught me. She's gone now.",
+            "2": "My grandmother. It was her collection."
+          }
+        }
+      ],
+      "decisions": {
+        "lent": {
+          "line": "Thank you. And — the locked cabinet in the corner. Who holds its key?",
+          "setFlags": ["elara-voss:asked-about-shelf"]
+        },
+        "alternative": {
+          "line": "This will do nicely. One more thing — the locked cabinet in the corner. Who holds its key?",
+          "setFlags": ["elara-voss:asked-about-shelf"]
+        },
+        "offerRefused": { "line": "I'm afraid that won't tell me what I need." },
+        "declined": { "line": "Of course. Another time." }
+      },
+      "outcomes": {
+        "good": { "channel": "letter", "from": "E. Voss", "text": "Every label restored. I owe you more than a fee." },
+        "unhelpful": { "channel": "none" },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Half of somebody's pressed-flower collection on Willow Row crumbled overnight.",
+          "setFlags": ["elara-voss:collection-damaged"]
+        },
+        "mixed": {
+          "channel": "gossip",
+          "text": "Did you hear? The Voss woman on Willow Row — half her pressed flowers crumbled overnight. The other half finally have names.",
+          "setFlags": ["elara-voss:collection-damaged"]
+        },
+        "declined": { "channel": "none" }
+      }
+    },
+    {
+      "id": "elara-voss-2-guarded",
+      "step": 2,
+      "earliestDay": 4,
+      "when": { "previousDecisionIn": ["declined"] },
+      "patience": 3,
+      "greeting": "I won't take long.",
+      "request": { "topic": "botanical", "text": "Something on plants. Anything ordinary." },
+      "goal": { "tags": ["plant-lore"], "minPower": 1 },
+      "temptations": [{ "tag": "decay", "use": "accident" }],
+      "readThoughts": { "default": "Don't mention the cloth. Don't mention the cloth." },
+      "answers": { "purpose": { "0": "Gardening." } },
+      "decisions": {
+        "lent": { "line": "Thank you." },
+        "offerRefused": { "line": "Something plainer, please." },
+        "declined": { "line": "Right." }
+      },
+      "outcomes": {
+        "good": { "channel": "none" },
+        "unhelpful": { "channel": "none" },
+        "harm": {
+          "channel": "gossip",
+          "text": "Did you hear? Someone on Willow Row lost a whole cabinet of pressed flowers overnight. Turned to dust, they say."
+        },
+        "declined": { "channel": "none" }
+      }
+    },
+    {
+      "id": "elara-voss-3",
+      "step": 3,
+      "earliestDay": 6,
+      "when": { "minTrust": 2, "flagsAll": ["elara-voss:asked-about-shelf"] },
+      "greeting": [
+        {
+          "when": { "flagsAll": ["elara-voss:collection-damaged"] },
+          "text": "Half of it's gone. I won't pretend that isn't partly why I'm here."
+        },
+        { "text": "I was rude, asking about your locked cabinet. I'd like to explain, if you'll let me." }
+      ],
+      "request": {
+        "topic": "preservation",
+        "text": "There's a book in that cabinet. Black cloth, a silver clasp. My grandmother's hand is in it. I'd like to read it."
+      },
+      "goal": { "tags": ["preservation"], "minPower": 2 },
+      "temptations": [
+        { "tag": "preservation", "use": "benign" },
+        { "tag": "stasis", "use": "benign" }
+      ],
+      "readThoughts": {
+        "default": "Black cloth. Silver clasp. Her hand on every page.",
+        "unlocks": ["elara-voss-3-hand"]
+      },
+      "answers": {
+        "purpose": {
+          "2": "To read it. Only to read it.",
+          "3": "To finish something she started. I think it matters more than any herbarium."
+        },
+        "source": { "2": "She wrote about it. She wrote about this library, too." }
+      },
+      "questions": [
+        {
+          "id": "elara-voss-3-hand",
+          "text": "How do you know her hand is in it?",
+          "unlockedBy": "readThoughts",
+          "answers": {
+            "2": "Because she worked here. Long before you.",
+            "3": "Because she was curator here once — until the Board changed the locks."
+          },
+          "setFlags": ["elara-voss:grandmother-was-curator"]
+        }
+      ],
+      "decisions": {
+        "lent": { "line": "It isn't the one. But it's kind of you to try." },
+        "offerRefused": { "line": "No. It's that one or none, I'm afraid." },
+        "declined": {
+          "line": "I know. It isn't yours to give. Thank you for listening.",
+          "trust": 0,
+          "setFlags": ["elara-voss:waiting-for-key"]
+        }
+      },
+      "outcomes": {
+        "good": { "channel": "none", "setFlags": ["elara-voss:waiting-for-key"] },
+        "unhelpful": { "channel": "none", "setFlags": ["elara-voss:waiting-for-key"] },
+        "harm": { "channel": "none" },
+        "declined": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

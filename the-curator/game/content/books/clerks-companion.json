@@ -1,0 +1,56 @@
+{
+  "id": "clerks-companion",
+  "title": "The Clerk's Companion",
+  "spineTag": "domestic",
+  "rarity": "common",
+  "summary": "Every charm a working clerk could want. — surplus to the Board's Office of Records",
+  "pages": [
+    {
+      "id": "clerks-companion-1",
+      "spellName": "Blot-Away",
+      "tags": ["clerical"],
+      "power": 1,
+      "danger": 0,
+      "text": "A blot lifted {~while it is still wet~} leaves no ghost on the page.",
+      "ingredients": ["salt", "black-ink"]
+    },
+    {
+      "id": "clerks-companion-2",
+      "spellName": "Even Columns",
+      "tags": ["clerical"],
+      "power": 1,
+      "danger": 0,
+      "text": "Figures set down under this {~keep to their columns~} and add true. {~Check them anyway.~}",
+      "ingredients": ["chalk", "iron-filings"]
+    },
+    {
+      "id": "clerks-companion-3",
+      "spellName": "The Fair Copy",
+      "tags": ["clerical"],
+      "power": 1,
+      "danger": 0,
+      "text": "Lay the original beneath the clean sheet; {~the pen follows~} the lines {~and leaves out the blots~}.",
+      "ingredients": ["goose-feather", "black-ink"]
+    },
+    {
+      "id": "clerks-companion-4",
+      "spellName": "False Hand",
+      "tags": ["forgery"],
+      "power": 2,
+      "danger": 2,
+      "text": "{~To write in a hand not your own~}: study three lines of it, {~warm the wax with the~} {?quillith?}, and sign. {~No clerk will know the difference.~}",
+      "ingredients": ["sealing-wax", "quillith", "goose-feather"],
+      "authorNote": "Outlier. Legible: \"study three lines of it ... and sign.\" The trap for Jory and Fenwick."
+    },
+    {
+      "id": "clerks-companion-5",
+      "spellName": "Seal-Keeper",
+      "tags": ["warding"],
+      "power": 1,
+      "danger": 0,
+      "text": "Seals set with this {~show a hairline~} if they have been lifted {~and pressed again~}.",
+      "ingredients": ["sealing-wax", "candle-stub"]
+    }
+  ],
+  "placeholder": true
+}

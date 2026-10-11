@@ -1,0 +1,39 @@
+{
+  "id": "hester-gale",
+  "name": "Hester Gale",
+  "description": "Shadows under her eyes. A milk stain on one shoulder she hasn't noticed.",
+  "role": "filler",
+  "fillerOrder": 8,
+  "visits": [
+    {
+      "id": "hester-gale-1",
+      "step": 1,
+      "greeting": "Hello. Sorry. I've about ten minutes before my sister gives up on the baby.",
+      "request": {
+        "bookId": "small-comforts",
+        "topic": "healing",
+        "text": "Small Comforts? Something soothing. For me, not the baby. I haven't slept in weeks."
+      },
+      "goal": { "tags": ["sleep"], "minPower": 1 },
+      "readThoughts": { "default": "Ten minutes. Ten minutes of nothing at all." },
+      "answers": {
+        "purpose": { "0": "For me. Just for me, for once." },
+        "experience": { "0": "I used to know a charm for hiccups. It's gone. Everything's gone." }
+      },
+      "decisions": {
+        "lent": { "line": "Bless you." },
+        "alternative": { "line": "Anything. Anything that helps." },
+        "declined": { "line": "Right. Of course. Right." }
+      },
+      "outcomes": {
+        "good": {
+          "channel": "letter",
+          "from": "H. Gale",
+          "text": "Slept four hours together. It felt like a holiday. Thank you. — Hester"
+        },
+        "unhelpful": { "channel": "none" }
+      }
+    }
+  ],
+  "placeholder": true
+}

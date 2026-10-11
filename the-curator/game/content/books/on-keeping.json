@@ -1,0 +1,56 @@
+{
+  "id": "on-keeping",
+  "title": "On Keeping",
+  "spineTag": "preservation",
+  "rarity": "rare",
+  "summary": "On the keeping of things. — from the Ollery bequest",
+  "pages": [
+    {
+      "id": "on-keeping-1",
+      "spellName": "The Cut Flower Kept",
+      "tags": ["preservation"],
+      "power": 2,
+      "danger": 0,
+      "text": "Cut on the slant, dip in the wax {~and speak the date~}. The bloom keeps {~a season~}, colour and all.",
+      "ingredients": ["beeswax", "rose-petals", "honey"]
+    },
+    {
+      "id": "on-keeping-2",
+      "spellName": "Paper Against Damp",
+      "tags": ["preservation"],
+      "power": 2,
+      "danger": 0,
+      "text": "For books and letters: a breath of {?tessel-dust?} {~between the leaves~}, and the damp {~turns away~}.",
+      "ingredients": ["tessel-dust", "cedar-shavings"]
+    },
+    {
+      "id": "on-keeping-3",
+      "spellName": "Larder Long",
+      "tags": ["preservation"],
+      "power": 1,
+      "danger": 0,
+      "text": "Bread, cheese and apples keep {~past their season~} under a cloth so charmed.",
+      "ingredients": ["salt", "cedar-shavings"]
+    },
+    {
+      "id": "on-keeping-4",
+      "spellName": "Still{~ness~}",
+      "tags": ["stasis"],
+      "power": 3,
+      "danger": 3,
+      "text": "What this touches stops. {~Not sleeps; stops.~} {~It does not ask~} whether {~a thing~} is living.",
+      "ingredients": ["beeswax", "morrow-ash", "eye-of-newt", "hufeykrey"],
+      "authorNote": "Outlier. Shares eye of newt and beeswax with Hold Fast. Osric's accident."
+    },
+    {
+      "id": "on-keeping-5",
+      "spellName": "The Keeping Case",
+      "tags": ["preservation"],
+      "power": 2,
+      "danger": 1,
+      "text": "A case so lined keeps what is in it {~as it was put in~}. {~Lock it.~}",
+      "ingredients": ["cedar-shavings", "sealing-wax"]
+    }
+  ],
+  "placeholder": true
+}

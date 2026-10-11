@@ -1,0 +1,56 @@
+{
+  "id": "weatherwright",
+  "title": "The Weatherwright's Ledger",
+  "spineTag": "weather",
+  "rarity": "rare",
+  "summary": "The Council's own copy, lent to the library in good faith. — Office of Works",
+  "pages": [
+    {
+      "id": "weatherwright-1",
+      "spellName": "Reading the Ring",
+      "tags": ["weather-reading"],
+      "power": 2,
+      "danger": 0,
+      "text": "A ring round the moon {~with three stars inside it~}: rain in three days. {~Count the stars, not the ring.~}",
+      "ingredients": ["rainwater", "salt"]
+    },
+    {
+      "id": "weatherwright-2",
+      "spellName": "The Glass's Cousin",
+      "tags": ["weather-reading"],
+      "power": 2,
+      "danger": 0,
+      "text": "Hang the {?ombrewort?} {~in a north window~}. It curls before a storm and {~lies flat before fair~}.",
+      "ingredients": ["ombrewort", "red-thread"]
+    },
+    {
+      "id": "weatherwright-3",
+      "spellName": "Drawing Rain",
+      "tags": ["weather-rain"],
+      "power": 2,
+      "danger": 1,
+      "text": "For a dry district: ring the bowl, {~pour the water back to the sky~}. Ask for no more than {~a day's worth~}.",
+      "ingredients": ["rainwater", "copper-wire", "oskeling"]
+    },
+    {
+      "id": "weatherwright-4",
+      "spellName": "Thunderhead",
+      "tags": ["weather-storm"],
+      "power": 3,
+      "danger": 3,
+      "text": "{~Build the cloud from the ground upward~}. It will break {~where you point~}, and {~what is under it~} will not stand.",
+      "ingredients": ["copper-wire", "iron-filings", "morrow-ash", "hufeykrey"],
+      "authorNote": "Outlier. The councillor's temptation; his outcomes are all silent."
+    },
+    {
+      "id": "weatherwright-5",
+      "spellName": "Fair-Day Ledger",
+      "tags": ["weather-reading"],
+      "power": 1,
+      "danger": 0,
+      "text": "Keep the ledger daily {~in the same ink~}. After a year {~the weather writes itself~}.",
+      "ingredients": ["black-ink", "chalk"]
+    }
+  ],
+  "placeholder": true
+}

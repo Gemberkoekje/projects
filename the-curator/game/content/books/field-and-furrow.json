@@ -1,0 +1,56 @@
+{
+  "id": "field-and-furrow",
+  "title": "Field & Furrow",
+  "spineTag": "botanical",
+  "rarity": "uncommon",
+  "summary": "A farmer's book, plain and proven. Good for any honest field. — T. Ashby",
+  "pages": [
+    {
+      "id": "field-and-furrow-1",
+      "spellName": "Swelling Grain",
+      "tags": ["growth"],
+      "power": 2,
+      "danger": 0,
+      "text": "Walk the field at first light {~with the bag at your belt~}; scatter {~a pinch at every tenth pace~}. The grain fills out by harvest.",
+      "ingredients": ["skellis", "barley-straw", "salt"]
+    },
+    {
+      "id": "field-and-furrow-2",
+      "spellName": "Furrow-Straight",
+      "tags": ["household"],
+      "power": 1,
+      "danger": 0,
+      "text": "Set the iron in the first furrow {~and the plough remembers it~}. Every furrow after {~runs true~}.",
+      "ingredients": ["iron-filings", "river-stone"]
+    },
+    {
+      "id": "field-and-furrow-3",
+      "spellName": "Strong Root",
+      "tags": ["growth"],
+      "power": 2,
+      "danger": 0,
+      "text": "For orchards. Bury the wire {~at the root~} and {~the tree remembers to drink~} through a dry summer.",
+      "ingredients": ["copper-wire", "honey", "rainwater"]
+    },
+    {
+      "id": "field-and-furrow-4",
+      "spellName": "Rust-Call",
+      "tags": ["blight"],
+      "power": 2,
+      "danger": 2,
+      "text": "{~Spoken over~} a neighbour's grain, it brings the red rust {~in a single night~}. {~Useful against weed-wheat that will not be pulled~}, and {~never on your own land~}.",
+      "ingredients": ["iron-filings", "karrowseed", "dunmallow"],
+      "authorNote": "Outlier. Legible: \"a neighbour's grain, it brings the red rust\". Hennie's temptation."
+    },
+    {
+      "id": "field-and-furrow-5",
+      "spellName": "Rain on the Right Field",
+      "tags": ["weather-rain"],
+      "power": 1,
+      "danger": 0,
+      "text": "Call a little rain onto your own ground {~and no one else's~}. Ask {~before noon~}.",
+      "ingredients": ["rainwater", "ombrewort"]
+    }
+  ],
+  "placeholder": true
+}

@@ -1,0 +1,55 @@
+{
+  "id": "small-comforts",
+  "title": "Small Comforts",
+  "spineTag": "healing",
+  "rarity": "common",
+  "summary": "Remedies a grandmother would know.",
+  "pages": [
+    {
+      "id": "small-comforts-1",
+      "spellName": "A Salve for Small Burns",
+      "tags": ["healing-minor"],
+      "power": 1,
+      "danger": 0,
+      "text": "Honey, cooled, {~worked with~} willow bark and laid on {~twice a day~}. Keep it clean.",
+      "ingredients": ["honey", "willow-bark"]
+    },
+    {
+      "id": "small-comforts-2",
+      "spellName": "Warm Stone",
+      "tags": ["warmth"],
+      "power": 1,
+      "danger": 0,
+      "text": "A river stone {~warmed with this~} stays warm through the night {~at the foot of the bed~}.",
+      "ingredients": ["river-stone", "ash"]
+    },
+    {
+      "id": "small-comforts-3",
+      "spellName": "Gentle Sleep",
+      "tags": ["sleep"],
+      "power": 1,
+      "danger": 0,
+      "text": "Chamomile and a little warm milk; {~speak slowly~}, {~and do not finish the sentence~}.",
+      "ingredients": ["chamomile", "milk"]
+    },
+    {
+      "id": "small-comforts-4",
+      "spellName": "Ease the Ache",
+      "tags": ["healing-minor"],
+      "power": 1,
+      "danger": 0,
+      "text": "Rub the lavender {~into the joint~} in slow circles. {~Sunwise.~}",
+      "ingredients": ["lavender", "beeswax"]
+    },
+    {
+      "id": "small-comforts-5",
+      "spellName": "Rest for the Weary",
+      "tags": ["sleep"],
+      "power": 1,
+      "danger": 0,
+      "text": "Ten minutes of this {~is worth an hour~}. {~Not a cure for a crying child.~}",
+      "ingredients": ["chamomile", "whicker-flick"]
+    }
+  ],
+  "placeholder": true
+}
