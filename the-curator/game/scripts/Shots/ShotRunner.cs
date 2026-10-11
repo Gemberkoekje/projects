@@ -100,6 +100,8 @@ public partial class ShotRunner : Node
 
         Game.Open(DeskDocument.Notebook);
         await Shoot("day1_notebook");
+        Game.ShowIngredientLog();
+        await Shoot("day1_ingredients");
         Game.Open(DeskDocument.None);
         Game.RequestClose();
         await Seconds(1.8);

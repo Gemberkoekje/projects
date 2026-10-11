@@ -96,6 +96,14 @@ public partial class ClickTest : Node
         await Tap(Key.C, 'c');
         Check("and C again puts it away", Game.CaptureDesk().Document == DeskDocument.None);
 
+        // The notebook's first tab is the ingredient log: what the identified page listed is in it.
+        await Tap(Key.N, 'n');
+        await Click("Ingredients");
+        var logged = Game.Session.Views.IngredientLog();
+        Check("the Ingredients tab turns to the log", Game.CaptureDesk().NotebookIngredients && logged.Count > 0
+            && Visible<RichTextLabel>().Any(r => r.Text.Contains(logged[0].Name, StringComparison.Ordinal)));
+        await Tap(Key.N, 'n');
+
         await Click("Close for the day");
         await Seconds(0.5);
         Check("closing ends the day", Game.Session.State.Day == 2 && Game.Modal);

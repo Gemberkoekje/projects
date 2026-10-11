@@ -356,6 +356,60 @@ public sealed class Projector
             .Select(p => new NotebookEntry(p.Id, Content.Patron(p.Id).Name))
             .ToList();
 
+    /// <summary>
+    /// The ingredient log (GDD §13, a nice-to-have): every ingredient on a page the curator has identified,
+    /// with the pages it appears on. It holds only what the pages show, so the patterns are still the
+    /// player's to find. A torn-out page leaves the log as it leaves the book.
+    /// </summary>
+    /// <returns>The ingredients, by name, filed as a person would: "A candle stub" under C.</returns>
+    public IReadOnlyList<IngredientLogEntry> IngredientLog()
+    {
+        var seen = new Dictionary<string, List<IngredientSighting>>(StringComparer.Ordinal);
+        foreach (var book in Content.Books)
+        {
+            var bookState = State.Book(book.Id);
+            for (var index = 0; index < book.Pages.Count; index++)
+            {
+                var page = book.Pages[index];
+                if (!bookState.Identified.Contains(page.Id) || bookState.Removed.Contains(page.Id))
+                {
+                    continue;
+                }
+
+                var sighting = new IngredientSighting(book.Id, book.Title, index + 1, PageMarkup.Parse(page.SpellName));
+                foreach (var ingredientId in page.Ingredients.Distinct(StringComparer.Ordinal))
+                {
+                    if (!seen.TryGetValue(ingredientId, out var pages))
+                    {
+                        pages = [];
+                        seen[ingredientId] = pages;
+                    }
+
+                    pages.Add(sighting);
+                }
+            }
+        }
+
+        return seen
+            .Select(pair => (Ingredient: Content.Ingredient(pair.Key), Pages: pair.Value))
+            .OrderBy(entry => FilingName(entry.Ingredient.Name), StringComparer.OrdinalIgnoreCase)
+            .Select(entry => new IngredientLogEntry(entry.Ingredient.Name, entry.Ingredient.Known, entry.Pages))
+            .ToList();
+    }
+
+    private static string FilingName(string name)
+    {
+        foreach (var article in new[] { "A ", "An ", "The " })
+        {
+            if (name.StartsWith(article, StringComparison.OrdinalIgnoreCase))
+            {
+                return name[article.Length..];
+            }
+        }
+
+        return name;
+    }
+
     /// <summary>The curator's notebook page for a patron.</summary>
     /// <param name="patronId">The patron.</param>
     /// <returns>The view.</returns>

@@ -63,8 +63,11 @@ public partial class NotebookPanel : Control, IGameView
         ArgumentNullException.ThrowIfNull(snapshot);
         var notebook = snapshot.Notebook;
         var culture = CultureInfo.InvariantCulture;
-        var key = notebook is null
-            ? "none"
+        var log = snapshot.IngredientLog;
+        var key = snapshot.NotebookShowsIngredients
+            ? string.Create(culture, $"ingredients|{log.Count}|{log.Sum(e => e.Seen.Count)}|{snapshot.NotebookIndex.Count}|{UiTheme.TextScale}")
+            : notebook is null
+            ? string.Create(culture, $"none|{snapshot.NotebookIndex.Count}|{UiTheme.TextScale}")
             : string.Create(culture, $"{notebook.PatronId}|{notebook.VisitCount}|{notebook.Trust}|{string.Join(",", notebook.Ledger.Select(l => l.LoanId + l.ReturnedDate))}|{notebook.Thoughts.Count}|{snapshot.NotebookIndex.Count}|{UiTheme.TextScale}");
         if (key == shownKey)
         {
@@ -77,23 +80,23 @@ public partial class NotebookPanel : Control, IGameView
             child.QueueFree();
         }
 
+        // The ingredient log comes first, then a page per patron.
+        tabs.AddChild(Tab(UiText.Ingredients, snapshot.NotebookShowsIngredients, Game.ShowIngredientLog));
         foreach (var entry in snapshot.NotebookIndex)
         {
-            var tab = UiTheme.Button(entry.Name, () => Game.ShowNotebookPage(entry.PatronId));
-            tab.Alignment = HorizontalAlignment.Left;
-            tab.AddThemeFontOverride("font", UiTheme.Hand);
-            tab.AddThemeFontSizeOverride("font_size", UiTheme.Size(24));
-            if (notebook is not null && entry.PatronId == notebook.PatronId)
-            {
-                tab.AddThemeStyleboxOverride("normal", UiTheme.Box(UiTheme.PaperColor(UiTheme.PaperNotebook), new Color("f6d48a"), 2, 4, new Vector4(10, 2, 10, 2)));
-            }
-
-            tabs.AddChild(tab);
+            var showing = !snapshot.NotebookShowsIngredients && notebook is not null && entry.PatronId == notebook.PatronId;
+            tabs.AddChild(Tab(entry.Name, showing, () => Game.ShowNotebookPage(entry.PatronId)));
         }
 
         foreach (var child in page.GetChildren())
         {
             child.QueueFree();
+        }
+
+        if (snapshot.NotebookShowsIngredients)
+        {
+            RenderIngredients(log);
+            return;
         }
 
         if (notebook is null)
@@ -106,6 +109,45 @@ public partial class NotebookPanel : Control, IGameView
     }
 
     private static Label Hand(string text, int size, Color color) => UiTheme.Text(text, UiTheme.Hand, size, color);
+
+    private static Button Tab(string name, bool showing, Action pressed)
+    {
+        var tab = UiTheme.Button(name, pressed);
+        tab.Alignment = HorizontalAlignment.Left;
+        tab.AddThemeFontOverride("font", UiTheme.Hand);
+        tab.AddThemeFontSizeOverride("font_size", UiTheme.Size(24));
+        if (showing)
+        {
+            tab.AddThemeStyleboxOverride("normal", UiTheme.Box(UiTheme.PaperColor(UiTheme.PaperNotebook), new Color("f6d48a"), 2, 4, new Vector4(10, 2, 10, 2)));
+        }
+
+        return tab;
+    }
+
+    // Every ingredient on a page read so far, as the pages write it, with the pages it was seen on.
+    private void RenderIngredients(IReadOnlyList<IngredientLogEntry> log)
+    {
+        var culture = CultureInfo.InvariantCulture;
+        page.AddChild(Hand(UiText.Ingredients, 40, UiTheme.Ink));
+        page.AddChild(HandPara(UiText.IngredientLogHint, 24, UiTheme.Faint));
+        page.AddChild(Rule());
+        if (log.Count == 0)
+        {
+            page.AddChild(Hand("—", 24, UiTheme.Faint));
+            return;
+        }
+
+        foreach (var entry in log)
+        {
+            var name = UiTheme.Rich(24);
+            name.Text = PageText.Ingredients([new IngredientView(entry.Name, entry.Known)]);
+            page.AddChild(name);
+            var seen = UiTheme.Rich(19);
+            seen.Text = string.Join("\n", entry.Seen.Select(s =>
+                string.Create(culture, $"    [color=#{UiTheme.Faint.ToHtml(false)}]{PageText.Escape(s.BookTitle)}, page {s.PageNumber}:[/color] {PageText.Bbcode(s.SpellName)}")));
+            page.AddChild(seen);
+        }
+    }
 
     private static Label HandPara(string text, int size, Color color) => UiTheme.Para(text, UiTheme.Hand, size, color);
 

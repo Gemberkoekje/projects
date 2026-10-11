@@ -28,6 +28,7 @@ public partial class GameController : Node, ICommandSender
     private readonly List<CanvasItem> documents = [];
     private string openBookId = "";
     private string notebookPatronId = "";
+    private bool notebookIngredients;
     private string patronVisitId = "";
     private DeskDocument document;
     private DayPhase shownPhase;
@@ -167,7 +168,7 @@ public partial class GameController : Node, ICommandSender
 
     /// <summary>What the desk looks like now, to carry over when the views are rebuilt.</summary>
     /// <returns>The state.</returns>
-    public DeskState CaptureDesk() => new(Screen.World.Camera.LookingUp, document, openBookId, notebookPatronId, [.. shelved], trayDay, lettersReadDay);
+    public DeskState CaptureDesk() => new(Screen.World.Camera.LookingUp, document, openBookId, notebookPatronId, [.. shelved], trayDay, lettersReadDay, notebookIngredients);
 
     /// <summary>Puts the desk back as it was before the views were rebuilt.</summary>
     /// <param name="state">The state captured from the old controller.</param>
@@ -177,6 +178,7 @@ public partial class GameController : Node, ICommandSender
         document = state.Document;
         openBookId = state.OpenBookId;
         notebookPatronId = state.NotebookPatronId;
+        notebookIngredients = state.NotebookIngredients;
         trayDay = state.TrayDay;
         lettersReadDay = state.LettersReadDay;
         shelved.Clear();
@@ -244,6 +246,16 @@ public partial class GameController : Node, ICommandSender
     {
         ReleaseFocus();
         notebookPatronId = patronId;
+        notebookIngredients = false;
+        document = DeskDocument.Notebook;
+        Refresh();
+    }
+
+    /// <summary>Turns the notebook to the ingredient log.</summary>
+    public void ShowIngredientLog()
+    {
+        ReleaseFocus();
+        notebookIngredients = true;
         document = DeskDocument.Notebook;
         Refresh();
     }
@@ -281,6 +293,7 @@ public partial class GameController : Node, ICommandSender
         if (visit.Present && visit.VisitId != patronVisitId && !visit.Decided)
         {
             notebookPatronId = visit.PatronId;
+            notebookIngredients = false;
         }
 
         var index = projector.NotebookIndex();
@@ -302,7 +315,9 @@ public partial class GameController : Node, ICommandSender
             shelved,
             Screen.World.Camera.LookingUp,
             summaryOpen || weekOpen,
-            lettersReadDay == hud.Day);
+            lettersReadDay == hud.Day,
+            projector.IngredientLog(),
+            notebookIngredients);
         UpdateWorld(hud, visit);
         foreach (var view in views)
         {

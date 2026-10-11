@@ -51,6 +51,7 @@ public static class UiText
     public const string FreeNotes = "Notes";
     public const string FreeNotesHint = "Whatever you like. The Board doesn't read it.";
     public const string LedgerNoteHint = "a note…";
+    public const string IngredientLogHint = "Every ingredient on the pages you've read, and where it turned up.";
     public const string Visits = "Visits";
     public const string Trust = "Trust";
     public const string NoPaper = "No paper today.";

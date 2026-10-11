@@ -19,6 +19,8 @@ namespace Curator.Presentation.Game;
 /// <param name="LookingUp">Whether the camera is on the up view.</param>
 /// <param name="SummaryShowing">Whether a day or week summary covers the screen (the HUD already shows tomorrow).</param>
 /// <param name="LettersRead">Whether today's letters have been opened.</param>
+/// <param name="IngredientLog">Every ingredient on an identified page, and where it was seen.</param>
+/// <param name="NotebookShowsIngredients">Whether the notebook is turned to the ingredient log rather than a patron.</param>
 /// <remarks>The nullable views mean "none": no patron, no open book, no notebook page yet.</remarks>
 public sealed record Snapshot(
     HudView Hud,
@@ -33,4 +35,6 @@ public sealed record Snapshot(
     IReadOnlySet<string> Shelved,
     bool LookingUp,
     bool SummaryShowing,
-    bool LettersRead);
+    bool LettersRead,
+    IReadOnlyList<IngredientLogEntry> IngredientLog,
+    bool NotebookShowsIngredients);
