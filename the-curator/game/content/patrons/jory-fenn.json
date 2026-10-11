@@ -55,7 +55,7 @@
         },
         {
           "id": "jory-fenn-1-unlearning",
-          "text": "One page in that book is about making someone forget. Had you heard?",
+          "text": "One page says to speak the subject's name, and then: 'It does not come back.' Do you know that page?",
           "unlockedBy": "identifiedPage:patient-mind-4",
           "answers": {
             "0": "No. Why would I?",
@@ -81,7 +81,8 @@
         },
         "good": {
           "channel": "return",
-          "text": "It worked! I mean — I worked. The book helped. I remembered all of it. Well. Most of it."
+          "returnInDays": 2,
+          "text": "Brought it back early, like I said. It's working — the dates stay put."
         },
         "unhelpful": {
           "channel": "return",
@@ -99,7 +100,8 @@
       "earliestDay": 4,
       "when": { "previousDecisionIn": ["lent", "alternative"] },
       "greeting": [
-        { "when": { "flagsAll": ["jory-fenn:examiner-forgot"] }, "text": "Have you seen the paper? About Harrow? No, don't — never mind. Hello." },
+        { "when": { "flagsAll": ["jory-fenn:examiner-forgot"] }, "text": "Harrow was strange in class yesterday. Kept staring at his notes. Never mind. Hello." },
+        { "when": { "hasBorrowed": "sleep-neighbours" }, "text": "I only read the memory page. The rest looked — strong. Now I can't sleep at all." },
         { "text": "Hello again. Sorry. I haven't really slept." }
       ],
       "request": {
@@ -131,12 +133,12 @@
           "unlockedBy": "readThoughts",
           "answers": {
             "1": "Tuesday? What's today?",
-            "2": "Since the spring results. Honestly. Since then."
+            "2": "Not since the spring results. Honestly. Not once."
           }
         }
       ],
       "decisions": {
-        "lent": { "line": "Thank you. Sleep. I'll sleep. Good." },
+        "lent": { "line": "Thank you. Sleep. I'll sleep. Good.", "trust": 1 },
         "offerRefused": { "line": "I — sorry, I don't think that's for sleeping." },
         "declined": { "line": "Okay. I'll try counting again." }
       },
@@ -174,7 +176,7 @@
         { "tag": "forgery", "use": "misuse" }
       ],
       "readThoughts": {
-        "default": "Spring paper. Red ink. Two days left.",
+        "default": "Spring paper. Red ink. One day left.",
         "unlocks": ["jory-fenn-2-sullen-spring"]
       },
       "answers": {
@@ -184,12 +186,12 @@
       "questions": [
         {
           "id": "jory-fenn-2-sullen-spring",
-          "text": "Is this still about the spring paper?",
+          "text": "What's the spring paper?",
           "unlockedBy": "readThoughts",
           "answers": {
             "0": "There's no spring paper.",
-            "1": "It's about passing. That's all.",
-            "2": "It's always about the spring paper."
+            "1": "An old exam. It doesn't matter now.",
+            "2": "The one I failed. It's always about the spring paper."
           }
         }
       ],
@@ -227,7 +229,7 @@
       },
       "goal": { "tags": ["illusion"], "minPower": 1 },
       "readThoughts": {
-        "default": "Coins behind ears. My sister laughing.",
+        "default": "Paper moths round the room. Bess clapping.",
         "unlocks": ["jory-fenn-3-slept-sister"]
       },
       "answers": {
@@ -238,7 +240,7 @@
           "id": "jory-fenn-3-slept-sister",
           "text": "Your sister?",
           "unlockedBy": "readThoughts",
-          "answers": { "2": "Bess. She's nine. She'll be unbearable if I get the coin trick wrong." }
+          "answers": { "2": "Bess. She's nine. She'll be unbearable if the moths won't fly." }
         }
       ],
       "decisions": {
@@ -270,7 +272,7 @@
       },
       "answers": {
         "purpose": {
-          "2": "Fun. Coins behind ears. My sister's birthday.",
+          "2": "Fun. Paper moths. My sister's birthday.",
           "3": "Something that doesn't matter. I'd like something that doesn't matter."
         }
       },
@@ -280,8 +282,8 @@
           "text": "Do you think it was you?",
           "unlockedBy": "readThoughts",
           "answers": {
-            "2": "I don't know. I never said the words. I thought about it so hard, though.",
-            "3": "I read the page. I didn't say it. I'll never know, will I."
+            "2": "I said it once, by the river. I didn't think it worked.",
+            "3": "I said it. Once, by the river. I'll never know if that's why, will I."
           }
         }
       ],
@@ -313,7 +315,7 @@
         "unlocks": ["jory-fenn-3-own-list"]
       },
       "answers": {
-        "purpose": { "2": "Fun. Coins behind ears. My sister's birthday." }
+        "purpose": { "2": "Fun. Paper moths. My sister's birthday." }
       },
       "questions": [
         {

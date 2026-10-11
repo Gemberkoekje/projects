@@ -30,7 +30,7 @@
       "power": 2,
       "danger": 0,
       "text": "For orchards. Bury the wire {~at the root~} and {~the tree remembers to drink~} through a dry summer.",
-      "ingredients": ["copper-wire", "honey", "rainwater"]
+      "ingredients": ["copper-wire", "honey", "rainwater", "karrowseed"]
     },
     {
       "id": "field-and-furrow-4",
@@ -38,9 +38,9 @@
       "tags": ["blight"],
       "power": 2,
       "danger": 2,
-      "text": "{~Spoken over~} a neighbour's grain, it brings the red rust {~in a single night~}. {~Useful against weed-wheat that will not be pulled~}, and {~never on your own land~}.",
+      "text": "{~Spoken over a neighbour's~} grain, it brings the red rust {~in a single night~}. {~Useful against weed-wheat that will not be pulled~}, and {~never on your own land~}.",
       "ingredients": ["iron-filings", "karrowseed", "dunmallow"],
-      "authorNote": "Outlier. Legible: \"a neighbour's grain, it brings the red rust\". Hennie's temptation."
+      "authorNote": "Outlier. Legible: \"grain, it brings the red rust\". Hennie's temptation."
     },
     {
       "id": "field-and-furrow-5",

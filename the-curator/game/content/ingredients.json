@@ -23,7 +23,7 @@
     { "id": "barley-straw", "name": "Barley straw", "known": true },
     { "id": "copper-wire", "name": "Copper wire", "known": true },
     { "id": "rose-petals", "name": "Dried rose petals", "known": true },
-    { "id": "milk", "name": "Warm milk", "known": true },
+    { "id": "milk", "name": "Milk", "known": true },
     { "id": "nettle", "name": "Nettle", "known": true },
     { "id": "hufeykrey", "name": "Hufeykrey", "known": false },
     { "id": "garble-blar", "name": "Garble blar", "known": false },

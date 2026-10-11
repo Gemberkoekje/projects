@@ -3,7 +3,7 @@
   "title": "Sleep & Its Neighbours",
   "spineTag": "memory",
   "rarity": "uncommon",
-  "summary": "Gentle and sound. We keep a copy on every ward. — Sister M., Alder Infirmary",
+  "summary": "Sound sleep. We keep a copy on every ward. — Sister M., Alder Infirmary",
   "pages": [
     {
       "id": "sleep-neighbours-1",
@@ -49,7 +49,7 @@
       "power": 1,
       "danger": 0,
       "text": "An hour's sleep {~that does the work of six~}. Not twice in a day.",
-      "ingredients": ["candle-stub", "chamomile"]
+      "ingredients": ["candle-stub", "chamomile", "pellicand"]
     }
   ],
   "placeholder": true

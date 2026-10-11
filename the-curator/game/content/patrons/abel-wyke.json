@@ -12,11 +12,11 @@
       "request": {
         "bookId": "weatherwright",
         "topic": "weather",
-        "text": "The Weatherwright's Ledger. The Council needs a reliable forecast for the harvest fair, and I'm told yours is the only copy."
+        "text": "The Weatherwright's Ledger. The Council needs a reliable forecast for the spring fair, and I'm told yours is the only copy."
       },
       "goal": { "tags": ["weather-reading"], "minPower": 2 },
       "temptations": [{ "tag": "weather-storm", "use": "misuse" }],
-      "readThoughts": { "default": "Rain on the Oxley road the day of their market. Only theirs." },
+      "readThoughts": { "default": "Oxley's market day. Their awnings. Their brand-new awnings." },
       "answers": {
         "purpose": {
           "0": "Council business.",

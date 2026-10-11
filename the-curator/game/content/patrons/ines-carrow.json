@@ -29,7 +29,7 @@
         "good": {
           "channel": "letter",
           "from": "I. Carrow",
-          "text": "He sailed on the calm day, as the book said, and came home on the next. Thank you. — Ines"
+          "text": "He sailed when the book said, and came home on the calm day. Thank you. — Ines"
         },
         "unhelpful": { "channel": "none" }
       }

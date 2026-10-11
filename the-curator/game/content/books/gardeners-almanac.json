@@ -7,12 +7,12 @@
   "pages": [
     {
       "id": "gardeners-almanac-1",
-      "spellName": "Red Sky, Read Right",
+      "spellName": "The Evening Sky",
       "tags": ["weather-reading"],
       "power": 1,
       "danger": 0,
       "text": "Red at evening means fair {~only if the swallows fly high~}. Low swallows, {~close the shutters~}.",
-      "ingredients": ["goose-feather", "salt"]
+      "ingredients": ["goose-feather", "salt", "ombrewort"]
     },
     {
       "id": "gardeners-almanac-2",

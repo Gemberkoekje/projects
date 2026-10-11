@@ -11,7 +11,7 @@
       "tags": ["illusion"],
       "power": 1,
       "danger": 0,
-      "text": "Close the hand {~around the coin~} and open it on the word; the coin is behind the ear of {~whoever laughs first~}.",
+      "text": "Close the hand {~around the coin~} and open it {~on the word~}; the coin is behind the ear of {~whoever laughs first~}.",
       "ingredients": ["river-stone", "whicker-flick"]
     },
     {
@@ -49,7 +49,7 @@
       "power": 1,
       "danger": 0,
       "text": "A pinch in the candle {~gives green, then blue~}, then {~a colour nobody has a name for~}.",
-      "ingredients": ["candle-stub", "copper-wire"]
+      "ingredients": ["candle-stub", "copper-wire", "brannowort"]
     }
   ],
   "placeholder": true

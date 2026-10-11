@@ -55,8 +55,8 @@
         },
         {
           "id": "wren-hale-1-burn",
-          "text": "One page in that book is about fire that burns things to the ground. Is that the one you're after?",
-          "unlockedBy": "identifiedPage:lanterns-4",
+          "text": "One page says whatever it … burns. Is that the one you're after?",
+          "unlockedBy": "identifiedPage:lanterns-2",
           "answers": {
             "0": "I'm after dry washing.",
             "1": "Wouldn't say after. Wouldn't say not.",
@@ -99,7 +99,10 @@
       "step": 2,
       "earliestDay": 5,
       "when": { "previousDecisionIn": ["alternative"] },
-      "greeting": "Your linen charm works. I lied about what I wanted.",
+      "greeting": [
+        { "when": { "hasBorrowed": "clerks-companion" }, "text": "That book was no use for washing. Doesn't matter. I lied about what I wanted." },
+        { "text": "Your linen charm works. I lied about what I wanted." }
+      ],
       "request": {
         "bookId": "lanterns",
         "topic": "fire",
@@ -168,7 +171,7 @@
       },
       "goal": { "tags": ["healing-minor"], "minPower": 1 },
       "readThoughts": {
-        "default": "Don't look at the hands. Don't let her look.",
+        "default": "Don't look at the hands. Keep them in the pockets.",
         "unlocks": ["wren-hale-2-subdued-hands"]
       },
       "answers": {

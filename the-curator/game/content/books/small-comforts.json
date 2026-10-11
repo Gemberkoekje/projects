@@ -30,7 +30,7 @@
       "power": 1,
       "danger": 0,
       "text": "Chamomile and a little warm milk; {~speak slowly~}, {~and do not finish the sentence~}.",
-      "ingredients": ["chamomile", "milk"]
+      "ingredients": ["chamomile", "milk", "pellicand"]
     },
     {
       "id": "small-comforts-4",

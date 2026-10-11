@@ -12,7 +12,7 @@
       "request": {
         "bookId": "common-wards",
         "topic": "domestic",
-        "text": "Common Wards and Small Mendings? For Stitch-Fast. I've forty hems to finish by Thursday."
+        "text": "Common Wards and Small Mendings? For the Stitch-something charm. I've forty hems to finish by Thursday."
       },
       "goal": { "tags": ["mending"], "minPower": 1 },
       "readThoughts": { "default": "Forty hems. Thursday. The Ashby wedding." },

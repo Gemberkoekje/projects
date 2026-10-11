@@ -49,7 +49,7 @@
       "power": 1,
       "danger": 0,
       "text": "Keep the ledger daily {~in the same ink~}. After a year {~the weather writes itself~}.",
-      "ingredients": ["black-ink", "chalk"]
+      "ingredients": ["black-ink", "chalk", "morrow-ash"]
     }
   ],
   "placeholder": true

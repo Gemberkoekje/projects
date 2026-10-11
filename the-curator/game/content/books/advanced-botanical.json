@@ -20,7 +20,7 @@
       "tags": ["plant-lore"],
       "power": 2,
       "danger": 0,
-      "text": "Scrape a little rind into the bowl. Root, stem and leaf {~each keep~} the {?ombrewort?}-memory of their soil, which this {~draws out as colour~}.",
+      "text": "Scrape a little rind {~into the bowl~}. Root, stem and leaf {~each keep~} the {?ombrewort?}-memory of their soil, which this {~draws out as colour~}.",
       "ingredients": ["willow-bark", "ombrewort", "rainwater"]
     },
     {
@@ -38,7 +38,7 @@
       "tags": ["decay"],
       "power": 2,
       "danger": 2,
-      "text": "What grows {~may be asked to stop~}, and what has stopped {~may be asked to go back into the ground~}. {~Small quantities only.~} It does not know {~where to end~}.",
+      "text": "What grows {~may be asked to stop~}, and what has stopped {~may be asked to go back into the ground~}. {~Small quantities only.~} It does not know where to end.",
       "ingredients": ["karrowseed", "ash", "dunmallow"],
       "authorNote": "Outlier. Elara's accident and Hennie's misuse. Legible: \"It does not know ... where to end\"."
     }

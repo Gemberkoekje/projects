@@ -29,7 +29,7 @@
       "tags": ["plant-lore"],
       "power": 1,
       "danger": 0,
-      "text": "Pull one of each and lay them in a row on the path. {~The ones that wilt first~} were never yours to keep.",
+      "text": "Pull one of each and lay them {~in a row on the path~}. {~The ones that wilt first~} were never yours to keep.",
       "ingredients": ["salt", "nettle"]
     },
     {
@@ -39,7 +39,7 @@
       "power": 1,
       "danger": 0,
       "text": "Prop a slate {~against the south wind~} and say {~the seedling's name~} each morning. It grows {~straighter for being known~}.",
-      "ingredients": ["river-stone", "willow-bark"]
+      "ingredients": ["river-stone", "willow-bark", "dunmallow"]
     },
     {
       "id": "primer-green-5",

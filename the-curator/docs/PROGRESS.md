@@ -65,7 +65,7 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
   - `ingredients.json` now holds the new books' ingredients; `questions.json` has the two generic lines from Q17.
 - The gold files are untouched. Validation found no schema errors in them.
 - `out/content-report.md`, written by the tests, is the designer's reading copy. For each patron it lists every visit with its greeting, request, needs and temptations, Read Thoughts fragments, questions and what they unlock, outcomes and overrides, then a lend matrix: for each relevant book, the outcome category, channel and outcome it leads to.
-- The guardrails (§8.4) are enforced on the real content by `BalanceTests`, over 10 seeds. Five of the six hold on every seed. The sixth, careful causes at most 1 harm or mixed outcome, can't hold with the bot as specified (Q25). The test checks a stand-in instead: careful causes fewer than lend-all on every seed, and at least 2 fewer on average. The report still shows the original line as failing.
+- The guardrails (§8.4) are enforced on the real content by `BalanceTests`, over 10 seeds. Five of the six hold on every seed. The sixth, careful causes at most 1 harm or mixed outcome, can't hold with the bot as specified (Q25). The test checks a stand-in instead: careful never causes more than lend-all in any seed, and at least a quarter fewer on average. The report still shows the original line as failing.
 - `out/balance-report.md` gained a guardrail table and a silence section. About a third of outcomes should never surface (CONTENT_GUIDE §7): lend-all 37%, careful 43%.
 - `RealContentTests`: no validation errors or warnings, the whole catalogue is present, and the content report covers every visit.
 
@@ -75,7 +75,19 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - The careful-bot guardrail is relaxed (Q25).
 - Jory's results visit has a third variant (Q26).
 
-**Open**: Q25 and Q26. Review pass 2 is running; its fixes come in the next commit.
+- **Review pass 2** (a fresh agent given only the docs and the content) found 37 issues. Fixed:
+  - Three of Jory's branches couldn't play: his "Harrow forgot" results visit (no path left him Candid), the Sleep & Its Neighbours override and the "slept through" results visit (the book was still on loan to him). Lending at his brittle visit now raises trust, and Sleep & Its Neighbours comes back after 2 days ("I always bring things back early"). Each results variant was checked by playing its path.
+  - Timeline slips: a day-4 greeting about a day-5 newspaper story, a post-exam line before the exam, "two days left" with one left, and an answer that contradicted the misuse outcome.
+  - Lines that assumed the wrong book: Wren's "your linen charm works" after the Clerk's Companion, and Hennie's primer jokes on the Advanced Botanical path.
+  - Wren's fragment gave the curator a gender. Four descriptions showed faces. Hennie's "Hollin road" read as Wren's "Lower Hollis" and is now the Bracken road.
+  - The week's season was muddled. It's Seedmonth, so the harvest fair is now a spring fair, day 6 brings a drying wind, not relief from drought, and Bram's ovens go cold on damp nights, not in winter. The Ollery obituary came after the reading of her will; the obituary is now someone else's.
+  - Books: Rust-Call stated its danger plainly; five pages were more legible than any gold page; a page and an ingredient name didn't match their ids or use; *Lanterns*' Fireball moved to page 2, between Linen-Dry and Warm Hands, as its note and the GDD's founding example have it.
+  - Four unknown ingredients appeared only on dangerous pages, which gave the danger away. Each is now on ordinary pages too, and 38 of the 58 new pages have an unknown ingredient (was 27).
+  - Tilly's cheerful gossip cost reputation (now 0), and she returns *Tricks for the Parlour* the next day so Jory can borrow it on day 7. Jory now wants it for paper moths, not the coin trick Tilly wants.
+  - Generic outcomes named particular places; Ines's letter now matches the guide; long flavour items were trimmed.
+- The stand-in guardrail asked careful to beat lend-all on every seed. That fails by chance whenever careful misses every outlier in some seed, and the content fixes made it fail. It now asks for never more than lend-all in any seed, and a quarter fewer on average (Q25).
+
+**Open**: Q25–Q30. The validator's trust check can't see dead ends that depend on the path taken (it adds each step's best trust gain across all variants), which is how Jory's dead branches got past it.
 
 ## M3 — Scene, camera, light
 

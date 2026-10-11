@@ -55,18 +55,18 @@
         },
         {
           "id": "hennie-dorrow-1-rust",
-          "text": "One page in there calls rust down on a field. Have you any use for that?",
+          "text": "One page in there calls rust down on a field. Did your father ever use it?",
           "unlockedBy": "identifiedPage:field-and-furrow-4",
           "answers": {
             "0": "Rust? Never heard of it.",
             "1": "Ha! What farmer wants rust? Not on my land, thank you.",
-            "2": "Not on my land. No. Not on mine."
+            "2": "Never. Never on your own land, he used to say."
           }
         }
       ],
       "decisions": {
         "lent": { "line": "There's a good curator. Beans like boulders, you'll see!" },
-        "alternative": { "line": "A primer? Like a schoolboy? Ha! All right, all right. I'll try it." },
+        "alternative": { "line": "Not my father's book? Well — you know your shelves. I'll give it a go." },
         "offerRefused": { "line": "Ah, now, that's not a farming book, is it? Try again." },
         "declined": { "line": "No? Well. I'll grow them the hard way, then. Always have." },
         "walkedOut": { "line": "I've a field waiting. Good day to you." }
@@ -76,7 +76,7 @@
           "channel": "newspaper",
           "delayDays": 1,
           "headline": "Rust strikes a single barley field",
-          "text": "Red rust destroyed a barley field on the Hollin road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
+          "text": "Red rust destroyed a barley field on the Bracken road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
           "setFlags": ["hennie-dorrow:kessel-rust"]
         },
         "good": {
@@ -114,7 +114,7 @@
       "answers": {
         "purpose": { "2": "A fright. Kessel needs a fright. One field won't ruin him. He's got four." },
         "knowledge": { "2": "I know what's on that page. My father told me. That's why I'm asking you, not reading it in a ditch." },
-        "experience": { "2": "Not with rust. With beans, as you know!" }
+        "experience": { "2": "Not with rust. Never with rust. That's rather the point." }
       },
       "questions": [
         {
@@ -129,7 +129,7 @@
       ],
       "decisions": {
         "lent": { "line": "There. Between friends. One field." },
-        "alternative": { "line": "Beans again? You're a hard one. Fine." },
+        "alternative": { "line": "Not the rust? You're a hard one. Fine." },
         "offerRefused": { "line": "No, no. The rust. That's what I came for." },
         "declined": { "line": "Aye. You're right. I'd have regretted it.", "trust": 0 }
       },
@@ -138,7 +138,7 @@
           "channel": "newspaper",
           "delayDays": 1,
           "headline": "Rust strikes a single barley field",
-          "text": "Red rust destroyed a barley field on the Hollin road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
+          "text": "Red rust destroyed a barley field on the Bracken road overnight. The neighbouring fields are untouched, and growers can offer no explanation.",
           "setFlags": ["hennie-dorrow:kessel-rust"]
         },
         "good": { "channel": "none" },

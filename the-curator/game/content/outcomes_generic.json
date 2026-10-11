@@ -10,17 +10,17 @@
   ],
   "harmMisuse": [
     { "channel": "none" },
-    { "channel": "newspaper", "headline": "Damage reported on the Hollin road", "text": "Damage was reported overnight on the Hollin road. The constable has questions and few answers." },
+    { "channel": "newspaper", "headline": "Damage reported overnight; constable puzzled", "text": "Damage was reported overnight on the edge of town. The constable has questions and few answers." },
     { "channel": "gossip", "text": "Did you hear? Something nasty happened out by {name}'s place. Nobody's saying what." }
   ],
   "harmAccident": [
     { "channel": "none" },
-    { "channel": "gossip", "text": "Did you hear? {name} had an accident with a charm. Lost a shed. Nobody hurt." },
+    { "channel": "gossip", "text": "Did you hear? {name} had an accident with a charm. Nobody hurt, thank goodness, but what a mess." },
     { "channel": "letter", "from": "{name}", "text": "Something in {book} went wrong. I'd rather not say what. I'll bring it back." }
   ],
   "mixedMisuse": [
     { "channel": "none" },
-    { "channel": "newspaper", "headline": "Odd doings on Lantern Street", "text": "Neighbours report an unusual week on Lantern Street, though none will say quite what they mean." }
+    { "channel": "newspaper", "headline": "Odd doings reported about town", "text": "Neighbours report an unusual week, though none will say quite what they mean." }
   ],
   "mixedAccident": [
     { "channel": "none" },

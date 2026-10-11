@@ -30,7 +30,7 @@
       "power": 2,
       "danger": 0,
       "text": "For the examination hall: a sprig {~in the pocket~}, {~a breath held for the count of seven~}. What you knew {~comes when called~}.",
-      "ingredients": ["rosemary", "river-stone"]
+      "ingredients": ["rosemary", "river-stone", "morrow-ash"]
     },
     {
       "id": "patient-mind-4",
@@ -48,7 +48,7 @@
       "tags": ["memory-aid"],
       "power": 1,
       "danger": 0,
-      "text": "For names forgotten at the door. Touch the lintel {~with a chalked thumb~} and the name comes.",
+      "text": "For names forgotten {~at the door~}. Touch the lintel {~with a chalked thumb~} and the name comes.",
       "ingredients": ["chalk", "honey"]
     }
   ],

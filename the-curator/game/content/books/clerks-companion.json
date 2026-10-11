@@ -30,7 +30,7 @@
       "power": 1,
       "danger": 0,
       "text": "Lay the original beneath the clean sheet; {~the pen follows~} the lines {~and leaves out the blots~}.",
-      "ingredients": ["goose-feather", "black-ink"]
+      "ingredients": ["goose-feather", "black-ink", "quillith"]
     },
     {
       "id": "clerks-companion-4",

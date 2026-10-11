@@ -20,7 +20,7 @@
       "tags": ["preservation"],
       "power": 2,
       "danger": 0,
-      "text": "For books and letters: a breath of {?tessel-dust?} {~between the leaves~}, and the damp {~turns away~}.",
+      "text": "For books and letters: a breath of {?tessel dust?} {~between the leaves~}, and the damp {~turns away~}.",
       "ingredients": ["tessel-dust", "cedar-shavings"]
     },
     {
@@ -29,8 +29,8 @@
       "tags": ["preservation"],
       "power": 1,
       "danger": 0,
-      "text": "Bread, cheese and apples keep {~past their season~} under a cloth so charmed.",
-      "ingredients": ["salt", "cedar-shavings"]
+      "text": "Bread, cheese and apples keep {~past their season~} under a cloth {~so charmed~}.",
+      "ingredients": ["salt", "cedar-shavings", "tessel-dust"]
     },
     {
       "id": "on-keeping-4",
