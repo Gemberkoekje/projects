@@ -222,6 +222,13 @@ public sealed class GameState
             case BookLent lent:
                 ApplyLent(lent);
                 break;
+            case SpellsTried tried:
+                Patron(tried.PatronId).LastTried = new TriedSpells(tried.BookId, tried.PageIds);
+                Loan(tried.LoanId).TriedPageIds = [.. Loan(tried.LoanId).TriedPageIds.Union(tried.PageIds, StringComparer.Ordinal)];
+                break;
+            case LoanKept kept:
+                ApplyKept(kept);
+                break;
             case OutcomeResolved resolved:
                 ApplyResolved(resolved);
                 break;
@@ -364,6 +371,20 @@ public sealed class GameState
         {
             Visit.LoanId = loan.LoanId;
         }
+    }
+
+    private void ApplyKept(LoanKept kept)
+    {
+        var loan = Loan(kept.LoanId);
+        loan.DueDay = kept.DueDay;
+        loan.Returns = kept.Returns;
+        loan.KeptForVisitIds = [.. loan.KeptForVisitIds, kept.VisitId];
+        if (!kept.Returns)
+        {
+            WritableBook(kept.BookId).Status = BookStatus.Gone;
+        }
+
+        Patron(kept.PatronId).UseVisit(kept.VisitId, kept.Step);
     }
 
     private void ApplyResolved(OutcomeResolved resolved)

@@ -9,6 +9,7 @@ namespace Curator.Presentation.Game;
 /// <param name="TrayDay">The day the tray belongs to.</param>
 /// <param name="LettersReadDay">The last day whose letters were opened.</param>
 /// <param name="NotebookIngredients">Whether the notebook is turned to the ingredient log.</param>
+/// <param name="PaperDay">The last day whose paper was opened on the desk by itself.</param>
 public sealed record DeskState(
     bool LookingUp,
     DeskDocument Document,
@@ -17,4 +18,5 @@ public sealed record DeskState(
     IReadOnlyList<string> Shelved,
     int TrayDay,
     int LettersReadDay,
-    bool NotebookIngredients);
+    bool NotebookIngredients,
+    int PaperDay);

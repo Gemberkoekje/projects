@@ -898,6 +898,11 @@ public static class ContentValidator
             {
                 BookExists(file, $"{path}.hasBorrowed", when.HasBorrowed);
             }
+
+            for (var t = 0; t < when.TriedTagsAny.Count; t++)
+            {
+                GoalTag(file, $"{path}.triedTagsAny[{t}]", when.TriedTagsAny[t]);
+            }
         }
 
         private void Generic()

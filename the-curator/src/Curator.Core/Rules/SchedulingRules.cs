@@ -72,6 +72,31 @@ public static class SchedulingRules
         return "";
     }
 
+    /// <summary>
+    /// The visit a patron would come for next, whatever the day: their lowest step with no used visit,
+    /// and the first of its visits whose condition holds now. Used to see whether a book they're
+    /// bringing back already holds what they'd ask for.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="state">The state.</param>
+    /// <param name="patron">The patron.</param>
+    /// <returns>The visit id, or empty when no visit qualifies.</returns>
+    public static string UpcomingVisit(ContentSet content, GameState state, Patron patron)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(patron);
+        IReadOnlySet<int> used = state.HasMet(patron.Id) ? state.Patron(patron.Id).UsedSteps : new HashSet<int>();
+        var open = patron.Visits.Select(v => v.Step).Where(s => !used.Contains(s)).Order().ToList();
+        if (open.Count == 0)
+        {
+            return "";
+        }
+
+        var facts = ConditionRules.FactsFor(content, state, patron.Id);
+        return patron.Visits.FirstOrDefault(v => v.Step == open[0] && ConditionRules.Holds(v.When, facts))?.Id ?? "";
+    }
+
     /// <summary>The next unused one-off visitor, by fillerOrder, whose visit qualifies today.</summary>
     /// <param name="content">The content.</param>
     /// <param name="state">The state.</param>

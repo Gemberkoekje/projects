@@ -16,6 +16,8 @@ internal sealed class CommandProcessor
     private const int SaltResistance = 1;
     private const int SaltPage = 2;
     private const int SaltGeneric = 3;
+    private const int SaltSpell = 4;
+    private const int SaltTemptation = 5;
 
     private readonly ContentSet content;
     private readonly GameState state;
@@ -394,6 +396,12 @@ internal sealed class CommandProcessor
 
         foreach (var loan in state.Loans.Where(l => l.Returns && !l.Returned && l.DueDay <= day).ToList())
         {
+            if (KeptFor(loan) is { } next)
+            {
+                Keep(loan, next);
+                continue;
+            }
+
             emit.Emit(new BookReturned(loan.LoanId, loan.BookId, loan.PatronId));
             if (state.Resolutions.FirstOrDefault(r => r.LoanId == loan.LoanId) is { RemovePageOnReturn.Length: > 0 } resolution &&
                 content.Book(loan.BookId).Pages.Any(p => p.Id == resolution.RemovePageOnReturn) &&
@@ -444,6 +452,44 @@ internal sealed class CommandProcessor
 
         var grant = ManaRules.MorningGrant(content, state, day);
         emit.Emit(new ManaGranted(grant.Total, grant.Base, grant.AttentiveBonus, grant.GoodBonus, grant.Rollover, grant.Fixed));
+    }
+
+    // The visit a borrower would come for next, when the book they're due to bring back already
+    // holds a spell for it: they keep the book instead of returning it to ask for it again.
+    private VisitRef? KeptFor(Loan loan)
+    {
+        var visitId = SchedulingRules.UpcomingVisit(content, state, content.Patron(loan.PatronId));
+        if (visitId.Length == 0)
+        {
+            return null;
+        }
+
+        var next = content.Visit(visitId);
+        var removed = state.Book(loan.BookId).Removed;
+        var holds = content.Book(loan.BookId).Pages.Any(p => !removed.Contains(p.Id) && OutcomeRules.Meets(p, next.Visit.Goal));
+        return holds && !next.Visit.Forced ? next : null;
+    }
+
+    // The kept book counts as lent to the skipped visit: its spells are tried and its outcome settled now.
+    private void Keep(Loan loan, VisitRef next)
+    {
+        var visit = next.Visit;
+        var removed = state.Book(loan.BookId).Removed;
+        var pages = content.Book(loan.BookId).Pages.Where(p => !removed.Contains(p.Id)).ToList();
+        var evaluation = OutcomeRules.Evaluate(pages, visit.Goal, visit.Temptations);
+        var choice = OutcomeRules.ForLend(content, visit, loan.BookId, evaluation, n => Draw(n, SaltGeneric));
+        var dueDay = state.Day + (choice.Outcome.ReturnInDays ?? visit.LoanDays ?? Balance.Loans.DefaultDays);
+        emit.Emit(new LoanKept(loan.LoanId, loan.BookId, loan.PatronId, visit.Id, visit.Step, dueDay, choice.Outcome.BookReturns));
+        SetFlags(visit.Decisions.Lent.SetFlags);
+        TrySpells(next, loan.BookId, loan.LoanId, pages, evaluation);
+        Resolve(next, choice, loan.BookId, loan.LoanId, currentSlot: -1);
+    }
+
+    private void TrySpells(VisitRef visitRef, string bookId, string loanId, IEnumerable<Page> pages, OutcomeEvaluation evaluation)
+    {
+        var visit = visitRef.Visit;
+        var tried = OutcomeRules.SpellsTried(pages, visit.Goal, visit.Temptations, evaluation.Cause, n => Draw(n, SaltSpell), n => Draw(n, SaltTemptation));
+        emit.Emit(new SpellsTried(visitRef.Patron.Id, visit.Id, loanId, bookId, tried));
     }
 
     private void Surface(Resolution resolution, OutcomeChannel channel)
@@ -595,7 +641,7 @@ internal sealed class CommandProcessor
             ChangeReputation(Balance.Reputation.WalkedOut, "walkedOut");
         }
 
-        Resolve(visitRef, OutcomeRules.ForNonLend(visitRef.Visit, OutcomeCategory.WalkedOut), "", "");
+        Resolve(visitRef, OutcomeRules.ForNonLend(visitRef.Visit, OutcomeCategory.WalkedOut), "", "", state.Visit.SlotIndex);
         EndVisit(DecisionKind.WalkedOut, Line(decision, Generic.WalkedOut));
     }
 
@@ -713,7 +759,8 @@ internal sealed class CommandProcessor
         var (patron, visit) = (visitRef.Patron, visitRef.Visit);
         var book = content.Book(bookId);
         var removed = state.Book(bookId).Removed;
-        var evaluation = OutcomeRules.Evaluate(book.Pages.Where(p => !removed.Contains(p.Id)), visit.Goal, visit.Temptations);
+        var pages = book.Pages.Where(p => !removed.Contains(p.Id)).ToList();
+        var evaluation = OutcomeRules.Evaluate(pages, visit.Goal, visit.Temptations);
         var choice = OutcomeRules.ForLend(content, visit, bookId, evaluation, n => Draw(n, SaltGeneric));
 
         var fee = content.FeeFor(book);
@@ -733,11 +780,12 @@ internal sealed class CommandProcessor
         }
 
         SetFlags(line.SetFlags);
-        Resolve(visitRef, choice, bookId, loanId);
+        TrySpells(visitRef, bookId, loanId, pages, evaluation);
+        Resolve(visitRef, choice, bookId, loanId, state.Visit.SlotIndex);
         EndVisit(decision, Line(line, decision == DecisionKind.Alternative ? Generic.Alternative : Generic.Lent));
     }
 
-    private void Resolve(VisitRef visitRef, OutcomeChoice choice, string bookId, string loanId)
+    private void Resolve(VisitRef visitRef, OutcomeChoice choice, string bookId, string loanId, int currentSlot)
     {
         var (patron, visit) = (visitRef.Patron, visitRef.Visit);
         var outcome = choice.Outcome;
@@ -764,7 +812,7 @@ internal sealed class CommandProcessor
             outcome.OnReturn.RemovePage));
         SetFlags(outcome.SetFlags);
         if (outcome.Channel == OutcomeChannel.Return &&
-            !SchedulingRules.HasSlotAhead(content, patron.Id, state.Day, state.Visit.SlotIndex, surfaceDay))
+            !SchedulingRules.HasSlotAhead(content, patron.Id, state.Day, currentSlot, surfaceDay))
         {
             emit.Emit(new OutcomeRedirected(resolutionId, OutcomeChannel.Letter, surfaceDay + 1));
         }
@@ -793,7 +841,7 @@ internal sealed class CommandProcessor
             ChangeReputation(Balance.Reputation.UnexplainedDecline, "unexplainedDecline");
         }
 
-        Resolve(visitRef, OutcomeRules.ForNonLend(visitRef.Visit, OutcomeCategory.Declined), "", "");
+        Resolve(visitRef, OutcomeRules.ForNonLend(visitRef.Visit, OutcomeCategory.Declined), "", "", state.Visit.SlotIndex);
         EndVisit(DecisionKind.Declined, Line(decision, Generic.Declined));
     }
 

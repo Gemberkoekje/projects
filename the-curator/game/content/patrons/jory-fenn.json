@@ -82,7 +82,7 @@
         "good": {
           "channel": "return",
           "returnInDays": 2,
-          "text": "Brought it back early, like I said. It's working — the dates stay put."
+          "text": "It's working — the dates stay put. I didn't think anything would."
         },
         "unhelpful": {
           "channel": "return",
@@ -101,7 +101,8 @@
       "when": { "previousDecisionIn": ["lent", "alternative"] },
       "greeting": [
         { "when": { "flagsAll": ["jory-fenn:examiner-forgot"] }, "text": "Harrow was strange in class yesterday. Kept staring at his notes. Never mind. Hello." },
-        { "when": { "hasBorrowed": "sleep-neighbours" }, "text": "I only read the memory page. The rest looked — strong. Now I can't sleep at all." },
+        { "when": { "triedTagsAny": ["memory-aid"] }, "text": "The dates stay put now. It's sleep that won't." },
+        { "when": { "previousOutcomeIn": ["unhelpful"] }, "text": "The book didn't help. Now I can't sleep either. Sorry. Hello." },
         { "text": "Hello again. Sorry. I haven't really slept." }
       ],
       "request": {

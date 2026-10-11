@@ -34,6 +34,7 @@ public partial class GameController : Node, ICommandSender
     private DayPhase shownPhase;
     private bool tintedLamp;
     private int lettersReadDay;
+    private int paperDay;
     private int trayDay;
     private bool summaryOpen;
     private bool weekOpen;
@@ -168,7 +169,7 @@ public partial class GameController : Node, ICommandSender
 
     /// <summary>What the desk looks like now, to carry over when the views are rebuilt.</summary>
     /// <returns>The state.</returns>
-    public DeskState CaptureDesk() => new(Screen.World.Camera.LookingUp, document, openBookId, notebookPatronId, [.. shelved], trayDay, lettersReadDay, notebookIngredients);
+    public DeskState CaptureDesk() => new(Screen.World.Camera.LookingUp, document, openBookId, notebookPatronId, [.. shelved], trayDay, lettersReadDay, notebookIngredients, paperDay);
 
     /// <summary>Puts the desk back as it was before the views were rebuilt.</summary>
     /// <param name="state">The state captured from the old controller.</param>
@@ -181,6 +182,7 @@ public partial class GameController : Node, ICommandSender
         notebookIngredients = state.NotebookIngredients;
         trayDay = state.TrayDay;
         lettersReadDay = state.LettersReadDay;
+        paperDay = state.PaperDay;
         shelved.Clear();
         shelved.UnionWith(state.Shelved);
         if (state.LookingUp)
@@ -284,6 +286,12 @@ public partial class GameController : Node, ICommandSender
         var projector = Session.Views;
         var hud = projector.Hud();
         var visit = projector.Visit();
+        if (OpenMorningPaper(hud, visit))
+        {
+            // Looking down at the paper refreshed everything already.
+            return;
+        }
+
         if (hud.Day != trayDay)
         {
             shelved.Clear();
@@ -411,6 +419,27 @@ public partial class GameController : Node, ICommandSender
     {
         ReleaseFocus();
         Refresh();
+    }
+
+    // Each morning the paper lies open on the desk, once, before the first patron; the camera looks
+    // down at it. Returns true when the camera's move has already refreshed the views.
+    private bool OpenMorningPaper(HudView hud, VisitView visit)
+    {
+        if (paperDay == hud.Day || hud.Day <= 0 || hud.Phase != DayPhase.Morning || visit.Present ||
+            summaryOpen || weekOpen || Session.State.Status != DayStatus.Open)
+        {
+            return false;
+        }
+
+        paperDay = hud.Day;
+        document = DeskDocument.Newspaper;
+        if (!Screen.World.Camera.LookingUp)
+        {
+            return false;
+        }
+
+        Screen.World.Camera.LookDown();
+        return true;
     }
 
     private void MarkRead(DeskDocument opened)

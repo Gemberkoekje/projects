@@ -30,6 +30,12 @@ public sealed class Loan
 
     public bool AsAlternative { get; internal set; }
 
+    /// <summary>The pages the borrower tried, across every visit the loan served.</summary>
+    public IReadOnlyList<string> TriedPageIds { get; internal set; } = [];
+
+    /// <summary>Visits the borrower skipped because they kept the book instead of returning it.</summary>
+    public IReadOnlyList<string> KeptForVisitIds { get; internal set; } = [];
+
     public bool Returned { get; internal set; }
 
     public int ReturnedDay { get; internal set; }

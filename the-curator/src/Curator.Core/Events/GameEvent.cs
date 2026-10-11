@@ -33,6 +33,8 @@ namespace Curator.Core.Events;
 [JsonDerivedType(typeof(BookLent), "bookLent")]
 [JsonDerivedType(typeof(VisitDeclined), "visitDeclined")]
 [JsonDerivedType(typeof(PatronWalkedOut), "patronWalkedOut")]
+[JsonDerivedType(typeof(SpellsTried), "spellsTried")]
+[JsonDerivedType(typeof(LoanKept), "loanKept")]
 [JsonDerivedType(typeof(OutcomeResolved), "outcomeResolved")]
 [JsonDerivedType(typeof(FlagSet), "flagSet")]
 [JsonDerivedType(typeof(ReputationChanged), "reputationChanged")]

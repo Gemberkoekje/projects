@@ -31,6 +31,9 @@ public sealed class PatronState
     /// <summary>The true outcome category of this patron's last lend.</summary>
     public OutcomeCategory LastLendCategory { get; internal set; }
 
+    /// <summary>The spells they tried from their last lend.</summary>
+    public TriedSpells LastTried { get; internal set; } = TriedSpells.None;
+
     public IReadOnlySet<string> UsedVisits => usedVisits;
 
     public IReadOnlySet<int> UsedSteps => usedSteps;

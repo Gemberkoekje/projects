@@ -25,8 +25,11 @@ public sealed record Condition
     /// <summary>This patron must have borrowed this book (card history included), or empty.</summary>
     public string HasBorrowed { get; init; } = "";
 
+    /// <summary>A spell this patron tried from their last lend must carry one of these effect tags.</summary>
+    public IReadOnlyList<string> TriedTagsAny { get; init; } = [];
+
     /// <summary>Whether no field is set.</summary>
     public bool IsAlways =>
         MinTrust is null && MaxTrust is null && FlagsAll.Count == 0 && FlagsNone.Count == 0 &&
-        PreviousDecisionIn.Count == 0 && PreviousOutcomeIn.Count == 0 && HasBorrowed.Length == 0;
+        PreviousDecisionIn.Count == 0 && PreviousOutcomeIn.Count == 0 && HasBorrowed.Length == 0 && TriedTagsAny.Count == 0;
 }

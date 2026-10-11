@@ -39,6 +39,11 @@ public static class ConditionRules
             return false;
         }
 
+        if (when.TriedTagsAny.Count > 0 && !when.TriedTagsAny.Any(facts.TriedTags.Contains))
+        {
+            return false;
+        }
+
         return when.HasBorrowed.Length == 0 || facts.Borrowed.Contains(when.HasBorrowed);
     }
 
@@ -57,7 +62,27 @@ public static class ConditionRules
             state.Flags,
             met ? state.Patron(patronId).LastDecision : DecisionKind.None,
             met ? state.Patron(patronId).LastLendCategory : OutcomeCategory.None,
-            BorrowedBooks(content, state, patronId));
+            BorrowedBooks(content, state, patronId),
+            TriedTags(content, state, patronId));
+    }
+
+    /// <summary>The effect tags of the spells a patron tried from their last lend.</summary>
+    /// <param name="content">The content.</param>
+    /// <param name="state">The state.</param>
+    /// <param name="patronId">The patron.</param>
+    /// <returns>The tags; empty before their first lend.</returns>
+    public static IReadOnlySet<string> TriedTags(ContentSet content, GameState state, string patronId)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(state);
+        var tags = new HashSet<string>(StringComparer.Ordinal);
+        if (state.HasMet(patronId) && state.Patron(patronId).LastTried is { BookId.Length: > 0 } tried)
+        {
+            var pages = content.Book(tried.BookId).Pages;
+            tags.UnionWith(pages.Where(p => tried.PageIds.Contains(p.Id)).SelectMany(p => p.Tags));
+        }
+
+        return tags;
     }
 
     /// <summary>Every book a patron has borrowed: pre-game card history and in-game loans.</summary>

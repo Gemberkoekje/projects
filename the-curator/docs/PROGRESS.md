@@ -294,3 +294,24 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - A Linux export through the same pipeline played the whole week headless: careful and lend-all, with the same numbers as the editor. It also rendered the screenshot set, fonts and paintings included. That shows the exported pack, content and .NET runtime work outside the editor.
 
 **Not verified**: the Windows build running on Windows (Q5).
+
+## After M6 — Morning paper, spells tried, kept books
+
+From the designer's playtest: the paper should open by itself each morning, and Jory was lent the sleep book for his exam, brought it back, then asked for a sleep book.
+
+**Built**
+- **The morning paper opens by itself** (Q34). Once each morning, before the first patron, the camera looks down and the paper lies open on the desk. Putting it away keeps it away for the day; a text-size rebuild doesn't reopen it (`DeskState.PaperDay`). Presentation only: `GameController.OpenMorningPaper`.
+- **Spells tried** (Q35). At each lend the patron tries one spell drawn among the pages that meet their goal, plus one they'd misuse or botch if the book holds one. A book with neither gets one page drawn from it all. The draw is seeded and stored in a new event, `SpellsTried`, so replays roll no dice. The outcome category still follows the §5.11 table, so every written mixed outcome is reached as before.
+- **`triedTagsAny`**, a new `when` field: holds when a spell the patron tried from their last lend carries one of the tags. Validated against the effect tags and described in the content report.
+- **Kept books** (Q35). On the morning a loan is due, if the patron's next visit wants something the book already holds, they keep it (`LoanKept`). That visit is skipped and counts as lent the book: spells tried, outcome resolved (overrides included), the `lent` line's flags set, a new due date. For Jory, the sleep book lent for his exam now stays with him; his sleep visit is skipped and the book's Dreamless page has him sleep through the exam (the existing override), which leads to his "slept" results visit on day 7.
+- **Jory's content** follows (Q37): the brittle visit greets by what he tried or by an unhelpful loan, and his step-1 good outcome no longer says he brought the book back.
+
+**Differs from the brief**: §5.11 gains the spells tried and kept books, and §5.12 gains `triedTagsAny`. The brief and the content guide weren't edited (Q35, Q37).
+
+**Verified**
+- `dotnet test` is green (239 tests). New: `SpellsTriedTests` covers the draw rules, the spells recorded at a lend, the reported Jory case (kept, brittle visit skipped, `slept-through` set, no return) and a book that doesn't cover the next visit coming back. `ConditionTests` covers `triedTagsAny`.
+- `--clicktest` passes 45 checks, two new: the paper is open on day 1 and day 2.
+- The three bots play the week with no errors. The careful bot hits the reported case itself: on day 2 it lends Jory the sleep book. Careful's money falls to 18.9 on average (10 to 26, was 17 to 28), because Jory's day-4 visit and its fee are skipped and the one-off visitors shift. It now causes one harm in 4 seeds of 10 (`docs/BALANCE_REPORT.md`, Q33). Lend-all and decline-all are unchanged.
+- `--shots`: 24 images; the day-1 desk now shows the paper open.
+
+**Open**: a kept book gives no sign on the desk (Q36).
