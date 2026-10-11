@@ -13,9 +13,10 @@ python ../tools/easel/counter.py 99             # counter.png
 python ../tools/easel/shelves.py left 99        # shelf_left.png (and `right` for shelf_right.png)
 python ../tools/easel/locked_shelf.py 99        # locked_shelf.png
 python ../tools/easel/doorway_wall.py 99 && python ../tools/easel/cut_arch.py doorway_wall_rgb.png doorway_wall.png
-python ../tools/easel/patron_default.py 99 && python ../tools/easel/cut_patron.py patron_rgb.png outline.json patron_default.png
+python ../tools/easel/patron_default.py 99 && python ../tools/easel/cut_outline.py patron_rgb.png outline.json patron_default.png
+python ../tools/easel/candle.py 99 && python ../tools/easel/cut_outline.py candle_rgb.png outline.json candle.png
 ```
 
-The two `cut_` scripts give the wall a see-through arch and the patron a transparent surround, using the same outlines the paintings were laid in. Copy the PNGs into `game/art/easel/`, then run Godot's `--import` once.
+The two `cut_` scripts give the wall a see-through arch, and the patron and the candle transparent surrounds, using the same outlines the paintings were laid in. The candle keeps the placeholder's geometry, so the flame, drawn in code at the layout's flame point, still sits on its wick. Copy the PNGs into `game/art/easel/`, then run Godot's `--import` once.
 
-Not painted: the candle and its flame (still drawn in code), the paper textures (`paper_card`, `paper_notebook`, `paper_page`, `newspaper`; the documents use the layout's paper colours), and per-patron silhouettes (`patron_<id>`; everyone uses `patron_default`).
+Not painted: the candle's flame (still drawn in code), the paper textures (`paper_card`, `paper_notebook`, `paper_page`, `newspaper`; the documents use the layout's paper colours), and per-patron silhouettes (`patron_<id>`; everyone uses `patron_default`).

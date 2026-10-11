@@ -224,7 +224,7 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 ## Interim art — painted in Easel
 
 **Built**
-- Eight art slots painted stroke by stroke with Easel (`easel-paint` 0.8.0), as the designer asked: `beyond_doorway`, `doorway_wall`, `shelf_left`, `shelf_right`, `locked_shelf`, `counter`, `desk` and `patron_default`. Together they make the whole up view and the desk; only the candle is still drawn in code.
+- Eight art slots painted stroke by stroke with Easel (`easel-paint` 0.8.0), as the designer asked: `beyond_doorway`, `doorway_wall`, `shelf_left`, `shelf_right`, `locked_shelf`, `counter`, `desk` and `patron_default`. Together they make the whole up view and the desk; only the candle is still drawn in code. *(M6 painted the candle too; only its flame is drawn in code.)*
 - Each painting started from a written plan of values and a light, was checked against Easel's value readouts and checklist as it went, and is signed small in a shaded corner.
 - The wall's arch is see-through and the patron's surround transparent. Both are cut out after painting, along the same outlines the paint was laid in (`tools/easel/cut_arch.py`, `cut_patron.py`).
 - The scripts are in `tools/easel/`, one per painting, with a README. They're seeded, and each was re-run to confirm it writes the shipped PNG pixel for pixel.
@@ -244,6 +244,7 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
   - **Ingredient log.** It's the notebook's first tab. It lists every ingredient on a page the curator has identified, as the page writes it, with the book, page and spell where it turned up. Ingredients are filed by name, ignoring a leading article. Core's `Projector.IngredientLog()` has tests.
   - **Parallax on the pan** (§7.2). The layers behind the counter travel a little less than the camera: 0.9, and 0.85 for the room beyond the arch. It's set per slot by `"parallax"` in `layout.json`. The up view is exactly as laid out.
   - **Warded patrons** were already in the rules, with Lysander warded. M5 added the tell.
+- **The candle is painted** in Easel as well (`tools/easel/candle.py`). It keeps the placeholder's geometry, so the flame, still drawn in code, sits on its wick. `cut_patron.py` became `cut_outline.py`, which cuts out any painting from its outline; the patron re-runs pixel for pixel through it.
   - **Resistant books** are built and tested (`identifyResistance`, unidentifiable pages) but no book resists. Giving one resistance would make careful play miss even more (Q25).
 
 **Final review** (a fresh agent with the docs and the repository). Fixed:

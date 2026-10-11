@@ -47,7 +47,7 @@ The notebook keeps a page per patron and, on its first tab, an ingredient log: e
 - **Careful play still causes about 4 mixed outcomes a week**, against the brief's "at most 1" (Q25). See `docs/BALANCE_REPORT.md` for why and what would change it.
 - **Outright harm never happens if you lend what's asked for.** Every tempting request is for a book that also does what the patron wants, so the worst result is mixed (Q33).
 - **Some written branches can't be reached**: Jory's Clerk's Companion branch (Q27), answers at trust levels no visit reaches, and Lysander's fragment (Q30).
-- **Placeholders**: the candle is still drawn in code, documents use flat paper colours, and every patron shares one silhouette. There's no sound; the GDD leaves audio out of the prototype.
+- **Placeholders**: the candle's flame is still drawn in code, documents use flat paper colours, and every patron shares one silhouette. There's no sound; the GDD leaves audio out of the prototype.
 - **Leaving mid-day loses that day**: the game saves only in the evening (§7.12).
 - **Resistant books** are built but unused: a book can resist Identify (`identifyResistance`) and a page can refuse to come into focus, but no book resists yet. Giving one resistance would make careful play miss even more (Q25).
 
