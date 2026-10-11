@@ -76,3 +76,30 @@ Milestone log (BUILD_BRIEF §9). Per milestone: what was built, what differs fro
 - Jory's results visit has a third variant (Q26).
 
 **Open**: Q25 and Q26. Review pass 2 is running; its fixes come in the next commit.
+
+## M3 — Scene, camera, light
+
+**Built**
+- `game/art/layout.json` holds the §7.3 slots (rect, z, light mask, placeholder style, fallback colour), the candle flame's position and frames, fallback colours for covers and paper, and the lighting for each phase.
+- The scene tree of §7.1: `World` (Layers built from the layout, Patron, Desk, Lights, Camera2D), `Ui` and `Debug`.
+- Each slot shows `art/painted/<id>.png` if it exists, scaled to its rect, then `art/easel/<id>.png` (Q6), else a flat procedural placeholder: wall with an open arch, stone beyond it, shelves of books (spine colours and heights drawn from a hash of the slot id, so they're the same every run), the barred cabinet, counter and desk planks, the candle and a hooded silhouette. A PNG dropped in shows up on the next run, even before the editor has imported it.
+- The camera pans between the up view (y 0–1080) and the down view (y 720–1800) in 0.45 s with sine easing, on W/S, ↑/↓ and the mouse wheel.
+- Lighting:
+  - A `CanvasModulate` tints each phase.
+  - The candle is a warm `PointLight2D` over the counter and desk. It flickers by `FastNoiseLite` sampled over time, with ±1 px of jitter.
+  - The flame has four frames on irregular timing. It sits on its own canvas layer so the night tint doesn't darken it.
+  - The archway light sits behind the patron; the window light falls from the left across the far layers.
+  - Light masks keep each light on its own layers. Phases blend over 1.5 s.
+- Screenshot mode, first part: `--shots <dir>` saves the up and down views at morning, dusk and night, then prints where each slot's art came from. The full §7.11 sequence comes in M5.
+- Command-line parsing for `--seed`, `--new`, `--shots`, `--autoplay` and `--days`.
+
+**Verified**
+- The screenshots (1920×1080) pass §8.6 for what's on screen so far. The silhouette reads against the lit archway in every phase. The candle is visibly warm, most of all at night. Both views are framed as in §7.2, with the counter band in both.
+- The painted override: a dummy `art/painted/counter.png` replaced the counter's placeholder, scaled to the slot's rect and lit by the candle, and the run reported `counter=painted`. Then it was deleted.
+
+**Differs from the brief**
+- The screenshots also cover dusk.
+- The pan tabs at the top and bottom edge are UI, so they come with the HUD in M4.
+- No Easel paintings yet. The playable week (M4–M5) comes first, then the interim Easel art, so the art can't hold up the game. Until then every slot shows its flat placeholder.
+
+**Open**: nothing new.

@@ -1,0 +1,218 @@
+{
+  "about": "Art slots (BUILD_BRIEF §7.3). Rects are x, y, w, h on the 1920x1800 canvas; the up view shows y 0-1080, the down view y 720-1800. Each slot shows art/painted/<id>.png if present, else art/easel/<id>.png, else a flat placeholder. Light masks: 1 everything, 2 far layers (window light), 4 the archway and patron (archway light), 8 counter and desk (candle light). Tune rects here, not in code.",
+  "canvas": [
+    1920,
+    1800
+  ],
+  "slots": [
+    {
+      "id": "beyond_doorway",
+      "rect": [
+        680,
+        120,
+        560,
+        600
+      ],
+      "z": -40,
+      "lightMask": 7,
+      "placeholder": "stone",
+      "color": "#6e6a66"
+    },
+    {
+      "id": "doorway_wall",
+      "rect": [
+        0,
+        0,
+        1920,
+        720
+      ],
+      "z": -30,
+      "lightMask": 3,
+      "placeholder": "wallArch",
+      "color": "#4a3a2e",
+      "arch": [
+        700,
+        140,
+        520,
+        580
+      ]
+    },
+    {
+      "id": "patron_default",
+      "rect": [
+        760,
+        240,
+        400,
+        620
+      ],
+      "z": -20,
+      "lightMask": 5,
+      "placeholder": "silhouette",
+      "color": "#16110f"
+    },
+    {
+      "id": "shelf_left",
+      "rect": [
+        0,
+        0,
+        640,
+        720
+      ],
+      "z": -10,
+      "lightMask": 3,
+      "placeholder": "shelf",
+      "color": "#5a3c24"
+    },
+    {
+      "id": "shelf_right",
+      "rect": [
+        1280,
+        0,
+        640,
+        720
+      ],
+      "z": -10,
+      "lightMask": 3,
+      "placeholder": "shelf",
+      "color": "#5a3c24"
+    },
+    {
+      "id": "locked_shelf",
+      "rect": [
+        1500,
+        260,
+        300,
+        460
+      ],
+      "z": -9,
+      "lightMask": 3,
+      "placeholder": "cabinet",
+      "color": "#2b2622"
+    },
+    {
+      "id": "counter",
+      "rect": [
+        0,
+        720,
+        1920,
+        360
+      ],
+      "z": 0,
+      "lightMask": 9,
+      "placeholder": "woodDark",
+      "color": "#3b2618"
+    },
+    {
+      "id": "desk",
+      "rect": [
+        0,
+        1080,
+        1920,
+        720
+      ],
+      "z": 10,
+      "lightMask": 9,
+      "placeholder": "woodLight",
+      "color": "#7a5634"
+    },
+    {
+      "id": "candle",
+      "rect": [
+        1700,
+        1180,
+        120,
+        300
+      ],
+      "z": 20,
+      "lightMask": 9,
+      "placeholder": "candle",
+      "color": "#e9dcc0"
+    }
+  ],
+  "flame": {
+    "x": 1760,
+    "y": 1196,
+    "frames": [
+      "candle_flame_0",
+      "candle_flame_1",
+      "candle_flame_2",
+      "candle_flame_3"
+    ]
+  },
+  "bookCoverFallback": {
+    "domestic": "#7b5a3a",
+    "warding": "#3f4f5f",
+    "botanical": "#4f6a3a",
+    "memory": "#5a4a6e",
+    "fire": "#8a3f2a",
+    "illusion": "#6a3f6a",
+    "weather": "#3f5f6e",
+    "preservation": "#6e5f3a",
+    "healing": "#3f6e5a"
+  },
+  "paperFallback": {
+    "paper_card": "#efe4cc",
+    "paper_notebook": "#e8dcc0",
+    "paper_page": "#ece0c6",
+    "newspaper": "#e4dccb"
+  },
+  "lighting": {
+    "about": "Ambient tint (CanvasModulate) and light energies per time of day; blends over blendSeconds. Documents sit on their own layer and keep readable contrast.",
+    "blendSeconds": 1.5,
+    "phases": {
+      "morning": {
+        "ambient": "#efe7da",
+        "window": "#fff1d8",
+        "windowEnergy": 0.55,
+        "candleEnergy": 0.35,
+        "archwayEnergy": 0.7
+      },
+      "midday": {
+        "ambient": "#f8f4ec",
+        "window": "#ffffff",
+        "windowEnergy": 0.6,
+        "candleEnergy": 0.3,
+        "archwayEnergy": 0.6
+      },
+      "afternoon": {
+        "ambient": "#e6d6bd",
+        "window": "#ffdcaa",
+        "windowEnergy": 0.55,
+        "candleEnergy": 0.45,
+        "archwayEnergy": 0.75
+      },
+      "dusk": {
+        "ambient": "#a68677",
+        "window": "#ff955a",
+        "windowEnergy": 0.5,
+        "candleEnergy": 0.9,
+        "archwayEnergy": 0.95
+      },
+      "night": {
+        "ambient": "#3e4060",
+        "window": "#9eb4ff",
+        "windowEnergy": 0.35,
+        "candleEnergy": 1.35,
+        "archwayEnergy": 1.0
+      }
+    },
+    "candle": {
+      "color": "#ffb45e",
+      "radius": 1000,
+      "flickerAmplitude": 0.1,
+      "flickerHz": 3.0,
+      "jitterPixels": 1.0
+    },
+    "archway": {
+      "color": "#ffc888",
+      "x": 960,
+      "y": 470,
+      "radius": 560
+    },
+    "window": {
+      "x": -260,
+      "y": 260,
+      "radius": 1700
+    }
+  }
+}
