@@ -105,6 +105,7 @@ public sealed class CommandShipAfterScoutingTests
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
             new LostArrivals(Substitute.For<IShipEventScheduler>()),
+            new GatheringHold(Substitute.For<IRequestPressure>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         for (var tick = 0; tick < TicksPerMinute; tick++)

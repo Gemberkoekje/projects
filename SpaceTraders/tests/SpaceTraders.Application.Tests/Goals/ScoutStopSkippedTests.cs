@@ -163,6 +163,7 @@ public sealed class ScoutStopSkippedTests
             Substitute.For<IAutomationMetrics>(),
             Substitute.For<ITripBook>(),
             new LostArrivals(Substitute.For<IShipEventScheduler>()),
+            new GatheringHold(Substitute.For<IRequestPressure>()),
             NullLogger<ShipGoalExecutorService>.Instance);
 
         await sut.ExecuteAsync(ShipSymbol, CancellationToken.None);

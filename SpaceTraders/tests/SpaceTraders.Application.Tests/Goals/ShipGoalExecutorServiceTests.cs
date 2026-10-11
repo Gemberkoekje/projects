@@ -24,6 +24,8 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly ShipGoalStepGuard _stepGuard = new();
     private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
     private readonly LostArrivals _lostArrivals;
+    private readonly IRequestPressure _pressure = Substitute.For<IRequestPressure>();
+    private readonly GatheringHold _hold;
     private readonly LogRecorder _log = new();
 
     private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
@@ -34,6 +36,11 @@ public sealed class ShipGoalExecutorServiceTests
         // Automation and every plan switched on, unless a test says otherwise.
         _settings.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
         _lostArrivals = new LostArrivals(_scheduler);
+
+        // The requests aren't busy, unless a test says otherwise: the whole burst is left.
+        _pressure.BurstSize.Returns(30);
+        _pressure.BurstRemaining(Arg.Any<DateTimeOffset>()).Returns(30);
+        _hold = new GatheringHold(_pressure);
     }
 
     private ShipGoalExecutorService CreateService() =>
@@ -48,7 +55,67 @@ public sealed class ShipGoalExecutorServiceTests
             _metrics,
             _trips,
             _lostArrivals,
+            _hold,
             _log.For<ShipGoalExecutorService>());
+
+    [Theory]
+    [InlineData(14, false)]
+    [InlineData(15, true)]
+    public async Task ExecuteAsync_AMinersStep_IsHeldBack_WhileFewerThanHalfTheBurstIsLeft(int burstLeft, bool steps)
+    {
+        // Slice 6.41 (D125), asked on 2026-10-11: "I'd rather have miners wait but have up to date markets and exploring than
+        // working miners but needing to wait for the explore."
+        var mining = new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-001" };
+        _pressure.BurstRemaining(Arg.Any<DateTimeOffset>()).Returns(burstLeft);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(mining);
+        _executor.CanExecute(mining).Returns(true);
+        _executor.ExecuteStepAsync(FullFuelShip, mining, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Progressing("Extracting."));
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _executor.Received(steps ? 1 : 0).ExecuteStepAsync(FullFuelShip, mining, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+        (result is null).Should().Be(!steps);
+        (_hold.LastHeldAt("SHIP-1") > DateTimeOffset.MinValue).Should().Be(!steps, "a held ship waits on purpose (ShipStuck)");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ASiphonersAndASurveyorsStep_AreHeldBackToo_ButNotATradersOrAnExplorers()
+    {
+        _pressure.BurstRemaining(Arg.Any<DateTimeOffset>()).Returns(0);
+        ShipGoal[] held =
+        [
+            new SiphonAndSellGoal { TradeSymbol = "LIQUID_NITROGEN", SourceWaypointSymbol = "X1-AB-045", SellWaypointSymbol = "X1-AB-051" },
+            new SurveyWaypointGoal { TargetWaypointSymbol = "X1-AB-AST", TargetDepositSymbol = "IRON_ORE" },
+            new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-AST", SellWaypointSymbol = "X1-AB-001" },
+        ];
+        ShipGoal[] stepped =
+        [
+            new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-K85", SellWaypointSymbol = "X1-AB-A1" },
+            new JumpGoal { GateWaypointSymbol = "X1-AB-I1", DestinationGateWaypointSymbol = "X1-CD-I1" },
+        ];
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _executor.CanExecute(Arg.Any<ShipGoal>()).Returns(true);
+        _executor.ExecuteStepAsync(FullFuelShip, Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Progressing("Stepped."));
+
+        foreach (var goal in held.Concat(stepped))
+        {
+            _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(goal);
+            await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        }
+
+        foreach (var goal in held)
+        {
+            await _executor.DidNotReceive().ExecuteStepAsync(FullFuelShip, goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+        }
+
+        foreach (var goal in stepped)
+        {
+            await _executor.Received(1).ExecuteStepAsync(FullFuelShip, goal, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>());
+        }
+    }
 
     [Fact]
     public async Task ExecuteAsync_AShipStoredInTransitLongPastItsArrival_HasItsArrivalScheduledAgain_OnceAMargin()
@@ -254,6 +321,7 @@ public sealed class ShipGoalExecutorServiceTests
             Substitute.For<IAutomationMetrics>(),
             _trips,
             _lostArrivals,
+            _hold,
             log.For<ShipGoalExecutorService>());
 
         for (var tick = 0; tick < 12; tick++)
