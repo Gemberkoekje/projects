@@ -8,9 +8,11 @@ namespace Curator.Core.Rules;
 /// <param name="LastDecision">How their last visit ended, or None.</param>
 /// <param name="LastLendCategory">The true outcome of their last lend, or None.</param>
 /// <param name="Borrowed">Every book they have borrowed, card history included.</param>
+/// <param name="TriedTags">The effect tags of the spells they tried from their last lend.</param>
 public sealed record ConditionFacts(
     int Trust,
     IReadOnlySet<string> Flags,
     DecisionKind LastDecision,
     OutcomeCategory LastLendCategory,
-    IReadOnlySet<string> Borrowed);
+    IReadOnlySet<string> Borrowed,
+    IReadOnlySet<string> TriedTags);

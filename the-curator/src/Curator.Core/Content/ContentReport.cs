@@ -292,6 +292,11 @@ public static class ContentReport
             parts.Add($"has borrowed `{when.HasBorrowed}`");
         }
 
+        if (when.TriedTagsAny.Count > 0)
+        {
+            parts.Add($"tried a {string.Join(" or ", when.TriedTagsAny.Select(t => $"`{t}`"))} spell");
+        }
+
         return string.Join(" and ", parts);
     }
 

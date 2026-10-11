@@ -10,7 +10,8 @@ public sealed class ConditionTests
         new HashSet<string>(StringComparer.Ordinal) { "elara-voss:asked-newt" },
         DecisionKind.Alternative,
         OutcomeCategory.Unhelpful,
-        new HashSet<string>(StringComparer.Ordinal) { "hearth-and-kettle" });
+        new HashSet<string>(StringComparer.Ordinal) { "hearth-and-kettle" },
+        new HashSet<string>(StringComparer.Ordinal) { "warmth", "cooking" });
 
     [Fact]
     public void TheEmptyConditionAlwaysHolds() => Assert.True(ConditionRules.Holds(Condition.Always, Facts));
@@ -46,6 +47,13 @@ public sealed class ConditionTests
     {
         Assert.True(ConditionRules.Holds(new Condition { PreviousOutcomeIn = [OutcomeCategory.Unhelpful] }, Facts));
         Assert.False(ConditionRules.Holds(new Condition { PreviousOutcomeIn = [OutcomeCategory.Good, OutcomeCategory.Harm] }, Facts));
+    }
+
+    [Fact]
+    public void TriedTagsAny()
+    {
+        Assert.True(ConditionRules.Holds(new Condition { TriedTagsAny = ["sleep", "warmth"] }, Facts));
+        Assert.False(ConditionRules.Holds(new Condition { TriedTagsAny = ["sleep"] }, Facts));
     }
 
     [Fact]

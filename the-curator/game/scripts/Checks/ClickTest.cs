@@ -45,6 +45,9 @@ public partial class ClickTest : Node
         await Tap(Key.Escape);
         Check("Esc again resumes", !GetTree().Paused && FindButton("Resume") is null);
 
+        Check("the morning paper lies open on the desk", Game.CaptureDesk().Document == DeskDocument.Newspaper && !Game.World.Camera.LookingUp);
+        await Click("Look up at the counter");
+        await Seconds(0.7);
         await Click("Ring the bell");
         await Seconds(1.0);
         Check("the bell brings the clerk", views.Visit().Present && Game.World.Camera.LookingUp);
@@ -138,6 +141,7 @@ public partial class ClickTest : Node
         await Click("Next morning");
         await Seconds(0.3);
         Check("the summary gives way to the morning", !Game.Modal);
+        Check("day 2's paper opens by itself", Game.CaptureDesk().Document == DeskDocument.Newspaper && !Game.World.Camera.LookingUp);
 
         // Day 2: three patrons, each asked a question, then lent to, turned away, lent to.
         for (var visit = 0; visit < 3; visit++)
