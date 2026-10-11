@@ -17,9 +17,9 @@ namespace SpaceTraders.Application.Health;
 /// waiting, or whose step fails before it acts, isn't updated at all.
 /// </para>
 /// <para>
-/// The clock starts no earlier than the ship's arrival and than the monitor saw its plan working
-/// (automation and the plan on, API calls not paused), and the ship has to look stuck at two
-/// evaluations in a row. A goal the circuit breaker blocked is <c>CircuitBreakerTripped</c>'s.
+/// The clock starts no earlier than the ship's arrival, than its goal's start (B80) and than the
+/// monitor saw its plan working (automation and the plan on, API calls not paused), and the ship
+/// has to look stuck at two evaluations in a row. A goal the circuit breaker blocked is <c>CircuitBreakerTripped</c>'s.
 /// </para>
 /// </remarks>
 public sealed class ShipStuckRule(HealthFleet fleet, ISettingsRepository settings) : IHealthRule
@@ -47,9 +47,12 @@ public sealed class ShipStuckRule(HealthFleet fleet, ISettingsRepository setting
                 continue;
             }
 
+            // B80: a goal given after a long wait without one (the explorers waiting for the explore plan's looks) has had
+            // no time yet to change the ship: its clock starts with the goal.
             var since = HealthCheckContext.Latest(
                 ship.Ship.LastSyncedAt,
                 ship.Ship.ArrivesAt ?? DateTimeOffset.MinValue,
+                ship.Goal?.StartedAt ?? DateTimeOffset.MinValue,
                 plans.Min(context.WorkingSince));
             var unchanged = context.Elapsed(since);
 

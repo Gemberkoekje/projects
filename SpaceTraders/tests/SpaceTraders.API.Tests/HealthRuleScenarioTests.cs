@@ -71,7 +71,7 @@ public sealed class HealthRuleScenarioTests
     {
         await using var host = new HealthScenarioHost();
         host.ShipsAre(Drone("SHIP-1", lastSyncedAt: Start.AddHours(-1)));
-        host.GoalIs("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        host.GoalIs("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
 
         await host.EvaluateAsync(Start);
         await host.EvaluateAsync(Start.AddMinutes(31));

@@ -32,7 +32,7 @@ public sealed class ShipStuckRuleTests
     public async Task AShipWithAGoal_ThatTheBotDoesntUpdateFor30Minutes_IsStuck()
     {
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start.AddMinutes(-5)));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
 
         (await _harness.EvaluateAsync(_rule, Start)).Should().BeEmpty();
         (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
@@ -52,7 +52,7 @@ public sealed class ShipStuckRuleTests
     {
         // The fleet is loaded with arrivals dead-reckoned, which drops the arrival time: for a moment
         // a ship that arrived from a 44-minute trip looks unchanged since it left.
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start, arrivesAt: Start.AddMinutes(45)));
         await _harness.EvaluateAsync(_rule, Start);
 
@@ -93,7 +93,7 @@ public sealed class ShipStuckRuleTests
     public async Task AShipInTransit_IsNotStuck()
     {
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start, arrivesAt: Start.AddHours(2)));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
 
         await _harness.EvaluateAsync(_rule, Start);
 
@@ -105,11 +105,34 @@ public sealed class ShipStuckRuleTests
     {
         // The bot last updated the ship when it left; the arrival handler docks it a moment after.
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start, arrivesAt: Start.AddMinutes(40)));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
 
         await _harness.EvaluateAsync(_rule, Start);
 
         (await _harness.EvaluateAsync(_rule, Start.AddMinutes(41))).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AGoalGivenAfterALongWait_IsNotStuck_UntilItHadTheLimit()
+    {
+        // B80: on 2026-10-10 the explorers waited without a goal for the explore plan's looks, from 04:28 to 05:42Z, then got
+        // their Jump goals together, and ShipStuck raised at once for 40 to 76 minutes "though it has a Jump goal"; each cleared
+        // a minute or two later, when the goal's first step flew the ship. The clock counted the wait before the goal.
+        _fleet.Have(FleetFixture.Drone("SHIP-1", Start.AddMinutes(-75)));
+        _fleet.Give("SHIP-1", new JumpGoal { GateWaypointSymbol = "X1-AB-I1", DestinationGateWaypointSymbol = "X1-CD-I1", StartedAt = Start });
+
+        // The monitor has seen the explore plan working all along.
+        await _harness.EvaluateAsync(_rule, Start.AddMinutes(-80));
+
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(1))).Should().BeEmpty();
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(2))).Should().BeEmpty();
+        (await _harness.EvaluateAsync(_rule, Start.AddMinutes(30))).Should().BeEmpty();
+
+        await _harness.EvaluateAsync(_rule, Start.AddMinutes(31));
+        var violations = await _harness.EvaluateAsync(_rule, Start.AddMinutes(32));
+
+        violations.Should().ContainSingle().Which.Details.Should().StartWith(
+            "the bot hasn't updated the ship (nav, cargo, fuel or cooldown) for 32 minutes, since 2026-10-01 12:00:00Z, though it has a Jump goal");
     }
 
     [Fact]
@@ -139,7 +162,7 @@ public sealed class ShipStuckRuleTests
     public async Task ABlockedGoal_IsTheCircuitBreakersRule()
     {
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", Status = GoalStatus.Blocked, StatusReason = "runaway" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1), Status = GoalStatus.Blocked, StatusReason = "runaway" });
 
         await _harness.EvaluateAsync(_rule, Start);
 
@@ -150,7 +173,7 @@ public sealed class ShipStuckRuleTests
     public async Task AShipWhosePlanIsOff_Waits_OnPurpose()
     {
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
         _harness.PlansOn.Remove(AutomationPlan.Scout);
 
         await _harness.EvaluateAsync(_rule, Start);
@@ -163,7 +186,7 @@ public sealed class ShipStuckRuleTests
     {
         _settings.GetAsync<int>(ShipStuckRule.Setting, Arg.Any<CancellationToken>()).Returns(5);
         _fleet.Have(FleetFixture.Drone("SHIP-1", Start));
-        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2" });
+        _fleet.Give("SHIP-1", new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-B2", StartedAt = Start.AddHours(-1) });
 
         await _harness.EvaluateAsync(_rule, Start);
         await _harness.EvaluateAsync(_rule, Start.AddMinutes(6));
