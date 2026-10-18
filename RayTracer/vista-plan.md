@@ -473,7 +473,7 @@ too much between views (a forest floor vs. open sky):
 
 - **time ≈ pixels × spp × rays per sample ÷ rays per second**, where rays per sample
   and rays per second are **measured** for this scene and this camera.
-- The pre-render measures them at preview detail. For the final, the estimator renders a
+- The preview measures them at preview detail. For the final, the estimator renders a
   handful of random crops at the **true final resolution and detail level** for a few
   seconds and extrapolates. It shows a range, not a single number.
 - **Fixed spp** gives a predictable time; a **noise target** gives an estimate from the
