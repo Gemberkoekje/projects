@@ -106,7 +106,7 @@ public static class PreviewPipeline
             DefaultCamera = request.CameraPath is null,
             Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name),
             World = new WorldInfo(
-                TerrainProfile.For(recipe.Terrain).Name,
+                TerrainProfile.For(recipe.SetPieces).Name,
                 terrain.Size,
                 terrain.CellSize,
                 terrain.ContentHash().ToString("x16", CultureInfo.InvariantCulture),

@@ -3,10 +3,11 @@ using Vista.Recipes;
 namespace Vista.World;
 
 /// <summary>
-/// The base terrain shape a recipe asks for (vista-plan §4.3): fractal noise parameters in metres. M0 ships
-/// two shapes — ridged mountains and soft hills — with no erosion yet (M1's "realism lever"). When a recipe
-/// combines blocks, mountains win: placing hills, coast and forest <i>around</i> a mountain backdrop is the
-/// shot-first layout's job (§4.2), not M0's. Coast and forest use the hills shape until their milestones.
+/// The base terrain shape a recipe's set pieces ask for (vista-plan §4.3): fractal noise parameters in metres.
+/// M0 ships two shapes — ridged mountains and soft hills — with no erosion yet (M1's "realism lever"). When
+/// pieces combine, mountains win: placing hills, coast and forest <i>around</i> a mountain backdrop is the
+/// shot-first layout's job (§4.2), not M0's. Every other set — no pieces, or only hills, coast, forest and
+/// water — gets the hills shape as plain base ground until those pieces' milestones.
 /// </summary>
 /// <param name="Name">Stable profile key, recorded in the sidecar.</param>
 /// <param name="ReliefMetres">Height range from the lowest to the highest possible point.</param>
@@ -33,9 +34,9 @@ public sealed record TerrainProfile(
     /// <summary>Gentle relief for rolling hills (and, until their milestones, coast and forest).</summary>
     public static TerrainProfile Hills { get; } = new("hills", 220.0, 2500.0, 7, 0.5, Ridged: false);
 
-    /// <summary>The profile for a recipe's terrain blocks.</summary>
-    public static TerrainProfile For(IEnumerable<TerrainBlock> blocks) =>
-        blocks.Any(b => b is TerrainBlock.SnowCappedMountains or TerrainBlock.AlpineRange) ? Mountains : Hills;
+    /// <summary>The profile for a recipe's set pieces (order-independent).</summary>
+    public static TerrainProfile For(IEnumerable<SetPiece> pieces) =>
+        pieces.Any(p => p is SetPiece.SnowCappedMountains or SetPiece.AlpineRange) ? Mountains : Hills;
 
     /// <summary>
     /// Terrain height in metres, in [0, <see cref="ReliefMetres"/>], at world <c>(x, z)</c> — a pure function

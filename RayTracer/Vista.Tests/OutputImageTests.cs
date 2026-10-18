@@ -93,7 +93,7 @@ public sealed class OutputImageTests
     [TestMethod]
     public void HeightMap_MarksTheCamera()
     {
-        HeightField field = TerrainGenerator.Generate(new Recipe { Terrain = [TerrainBlock.RollingHills] }, 2, new WorldGrid(65, 32.0));
+        HeightField field = TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.RollingHills] }, 2, new WorldGrid(65, 32.0));
         CameraSpec camera = DefaultCamera.For(field);
         (byte[] rgb, int size) = DebugImages.HeightMap(field, camera);
         Assert.AreEqual(65, size);

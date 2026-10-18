@@ -22,7 +22,7 @@ public sealed class PreviewPipelineTests
     {
         _dir = Path.Combine(Path.GetTempPath(), "vista-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dir);
-        File.WriteAllText(Path.Combine(_dir, "r.json"), """{ "terrain": ["alpineRange"], "time": "goldenHour" }""");
+        File.WriteAllText(Path.Combine(_dir, "r.json"), """{ "setPieces": ["alpineRange"], "time": "goldenHour" }""");
     }
 
     [TestCleanup]

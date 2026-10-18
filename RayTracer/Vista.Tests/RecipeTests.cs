@@ -4,19 +4,18 @@ using Vista.Recipes;
 namespace Vista.Tests;
 
 /// <summary>
-/// The recipe file (vista-plan §3.2 / §7.4): it round-trips, and the strict JSON dialect rejects what a
-/// hand- or LLM-edited file gets wrong instead of silently ignoring it.
+/// The recipe file (vista-plan §3.2 / §7.4): a set of set pieces plus time and season. It round-trips, and
+/// the strict JSON dialect rejects what a hand- or LLM-edited file gets wrong instead of silently ignoring it.
 /// </summary>
 [TestClass]
 public sealed class RecipeTests
 {
-    private const string AlpineJson = """
+    private const string AutumnLakeJson = """
         {
           "schema": 1,
-          "name": "alpine range at golden hour",
-          "terrain": ["alpineRange", "forest"],
-          "water": ["lake"],
-          "time": "goldenHour",
+          "name": "autumn lake, dawn",
+          "setPieces": ["snowCappedMountains", "forest", "lake"],
+          "time": "dawn",
           "season": "autumn"
         }
         """;
@@ -24,49 +23,96 @@ public sealed class RecipeTests
     [TestMethod]
     public void Parse_ReadsEveryField()
     {
-        Recipe recipe = VistaJson.ParseRecipe(AlpineJson);
-        Assert.AreEqual("alpine range at golden hour", recipe.Name);
-        CollectionAssert.AreEqual(new[] { TerrainBlock.AlpineRange, TerrainBlock.Forest }, recipe.Terrain.ToArray());
-        CollectionAssert.AreEqual(new[] { WaterBlock.Lake }, recipe.Water.ToArray());
-        Assert.AreEqual(TimeOfDay.GoldenHour, recipe.Time);
+        Recipe recipe = VistaJson.ParseRecipe(AutumnLakeJson);
+        Assert.AreEqual("autumn lake, dawn", recipe.Name);
+        CollectionAssert.AreEqual(new[] { SetPiece.SnowCappedMountains, SetPiece.Forest, SetPiece.Lake }, recipe.SetPieces.ToArray());
+        Assert.AreEqual(TimeOfDay.Dawn, recipe.Time);
         Assert.AreEqual(Season.Autumn, recipe.Season);
     }
 
     [TestMethod]
     public void Serialize_RoundTripsByContent()
     {
-        Recipe recipe = VistaJson.ParseRecipe(AlpineJson);
+        Recipe recipe = VistaJson.ParseRecipe(AutumnLakeJson);
         string json = VistaJson.Serialize(recipe);
         Assert.IsTrue(recipe.ContentEquals(VistaJson.ParseRecipe(json)));
-        StringAssert.Contains(json, "\"goldenHour\"");
-        StringAssert.Contains(json, "\"alpineRange\"");
+        StringAssert.Contains(json, "\"setPieces\"");
+        StringAssert.Contains(json, "\"snowCappedMountains\"");
     }
 
     [TestMethod]
     public void Defaults_FillOptionalFields()
     {
-        Recipe recipe = VistaJson.ParseRecipe("""{ "terrain": ["rollingHills"] }""");
+        Recipe recipe = VistaJson.ParseRecipe("{}");
         Assert.AreEqual(Recipe.CurrentSchema, recipe.Schema);
-        Assert.AreEqual(0, recipe.Water.Count);
+        Assert.AreEqual(0, recipe.SetPieces.Count, "no pieces = plain base ground");
         Assert.AreEqual(TimeOfDay.Day, recipe.Time);
         Assert.AreEqual(Season.Summer, recipe.Season);
         Assert.IsNull(recipe.Name);
     }
 
     [TestMethod]
-    [DataRow("""{ "terrain": ["rollingHills"], "tme": "dawn" }""", DisplayName = "unknown property (typo)")]
-    [DataRow("""{ "terrain": ["rollingHills"], "time": "midnight" }""", DisplayName = "unknown enum value")]
-    [DataRow("""{ "terrain": ["rollingHills"], "time": 2 }""", DisplayName = "enum as integer")]
-    [DataRow("""{ "water": [] }""", DisplayName = "missing terrain")]
-    [DataRow("""{ "terrain": null }""", DisplayName = "null terrain")]
+    public void With_AddsOnce_Without_Removes()
+    {
+        Recipe mountains = new() { SetPieces = [SetPiece.SnowCappedMountains] };
+        Recipe all = mountains.With(SetPiece.Lake).With(SetPiece.Forest).With(SetPiece.Lake);
+        CollectionAssert.AreEquivalent(new[] { SetPiece.SnowCappedMountains, SetPiece.Forest, SetPiece.Lake }, all.SetPieces.ToArray());
+
+        Recipe noForest = all.Without(SetPiece.Forest);
+        CollectionAssert.AreEquivalent(new[] { SetPiece.SnowCappedMountains, SetPiece.Lake }, noForest.SetPieces.ToArray());
+        Assert.AreSame(noForest, noForest.Without(SetPiece.Forest), "removing an absent piece changes nothing");
+        Assert.AreEqual(0, noForest.Without(SetPiece.Lake).Without(SetPiece.SnowCappedMountains).Validate().Count, "an empty set is valid");
+        CollectionAssert.AreEqual(new[] { SetPiece.SnowCappedMountains }, mountains.SetPieces.ToArray(), "recipes are immutable");
+    }
+
+    [TestMethod]
+    public void AddingAConflictingPiece_SwapsItIn()
+    {
+        Recipe withLake = new Recipe { SetPieces = [SetPiece.SnowCappedMountains] }.With(SetPiece.Lake);
+        Recipe frozen = withLake.With(SetPiece.FrozenLake);
+        CollectionAssert.AreEquivalent(new[] { SetPiece.SnowCappedMountains, SetPiece.FrozenLake }, frozen.SetPieces.ToArray());
+        CollectionAssert.AreEquivalent(new[] { SetPiece.SnowCappedMountains, SetPiece.Lake }, frozen.With(SetPiece.Lake).SetPieces.ToArray());
+        Assert.AreEqual(0, frozen.Validate().Count);
+    }
+
+    [TestMethod]
+    public void Conflicts_AreSymmetricAndNeverSelf()
+    {
+        foreach (SetPiece a in Enum.GetValues<SetPiece>())
+        {
+            Assert.IsFalse(SetPieceConflicts.Between(a, a), $"{a} conflicts with itself");
+            foreach (SetPiece b in Enum.GetValues<SetPiece>())
+                Assert.AreEqual(SetPieceConflicts.Between(a, b), SetPieceConflicts.Between(b, a), $"{a}/{b}");
+            CollectionAssert.AreEquivalent(
+                Enum.GetValues<SetPiece>().Where(b => SetPieceConflicts.Between(a, b)).ToArray(),
+                SetPieceConflicts.Of(a).ToArray());
+        }
+        Assert.IsTrue(SetPieceConflicts.Between(SetPiece.FrozenLake, SetPiece.Lake));
+    }
+
+    [TestMethod]
+    public void ContentEquals_IgnoresSetPieceOrder()
+    {
+        Recipe a = new() { SetPieces = [SetPiece.Lake, SetPiece.Forest] };
+        Recipe b = new() { SetPieces = [SetPiece.Forest, SetPiece.Lake] };
+        Assert.IsTrue(a.ContentEquals(b));
+        Assert.IsFalse(a.ContentEquals(b.Without(SetPiece.Lake)));
+    }
+
+    [TestMethod]
+    [DataRow("""{ "setPieces": ["forest"], "tme": "dawn" }""", DisplayName = "unknown property (typo)")]
+    [DataRow("""{ "setPieces": ["forrest"] }""", DisplayName = "unknown set piece")]
+    [DataRow("""{ "setPieces": ["forest"], "time": "midnight" }""", DisplayName = "unknown enum value")]
+    [DataRow("""{ "setPieces": ["forest"], "time": 2 }""", DisplayName = "enum as integer")]
+    [DataRow("""{ "setPieces": null }""", DisplayName = "null set pieces")]
+    [DataRow("""{ "terrain": ["alpineRange"] }""", DisplayName = "the old terrain/water shape")]
     public void Parse_RejectsMalformedJson(string json) =>
         Assert.ThrowsExactly<JsonException>(() => VistaJson.ParseRecipe(json));
 
     [TestMethod]
-    [DataRow("""{ "schema": 2, "terrain": ["rollingHills"] }""", "schema", DisplayName = "future schema")]
-    [DataRow("""{ "terrain": [] }""", "at least one terrain", DisplayName = "empty terrain")]
-    [DataRow("""{ "terrain": ["coast", "coast"] }""", "must not repeat", DisplayName = "repeated terrain")]
-    [DataRow("""{ "terrain": ["coast"], "water": ["sea", "sea"] }""", "must not repeat", DisplayName = "repeated water")]
+    [DataRow("""{ "schema": 2 }""", "schema", DisplayName = "future schema")]
+    [DataRow("""{ "setPieces": ["coast", "coast"] }""", "listed twice", DisplayName = "repeated set piece")]
+    [DataRow("""{ "setPieces": ["frozenLake", "forest", "lake"] }""", "Lake and FrozenLake conflict", DisplayName = "conflicting set pieces")]
     public void Parse_RejectsInvalidRecipes(string json, string expected)
     {
         var e = Assert.ThrowsExactly<InvalidDataException>(() => VistaJson.ParseRecipe(json));
@@ -76,8 +122,8 @@ public sealed class RecipeTests
     [TestMethod]
     public void Contradictions_AreAllowed()
     {
-        // vista-plan §3.4: a frozen lake in summer at noon is implausible, not invalid.
-        Recipe recipe = VistaJson.ParseRecipe("""{ "terrain": ["coast"], "water": ["frozenLake"], "season": "summer" }""");
+        // vista-plan §3.4: a frozen lake next to the sea in summer is implausible, not invalid.
+        Recipe recipe = VistaJson.ParseRecipe("""{ "setPieces": ["sea", "frozenLake"], "season": "summer" }""");
         Assert.AreEqual(0, recipe.Validate().Count);
     }
 }

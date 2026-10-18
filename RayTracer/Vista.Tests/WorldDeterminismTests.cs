@@ -13,8 +13,8 @@ public sealed class WorldDeterminismTests
 {
     private static readonly WorldGrid SmallGrid = new(65, 32.0);
 
-    private static Recipe Mountains(TimeOfDay time = TimeOfDay.Day, Season season = Season.Summer, params WaterBlock[] water) =>
-        new() { Terrain = [TerrainBlock.AlpineRange], Time = time, Season = season, Water = water };
+    private static Recipe Mountains(TimeOfDay time = TimeOfDay.Day, Season season = Season.Summer) =>
+        new() { SetPieces = [SetPiece.AlpineRange], Time = time, Season = season };
 
     [TestMethod]
     public void StableHash_MatchesReferenceVectors()
@@ -74,29 +74,48 @@ public sealed class WorldDeterminismTests
     public void Terrain_IsPinned()
     {
         Assert.AreEqual(PinnedMountainHash, TerrainGenerator.Generate(Mountains(), 42, SmallGrid).ContentHash());
-        Assert.AreEqual(PinnedHillsHash, TerrainGenerator.Generate(new Recipe { Terrain = [TerrainBlock.RollingHills] }, 42, SmallGrid).ContentHash());
+        Assert.AreEqual(PinnedHillsHash, TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.RollingHills] }, 42, SmallGrid).ContentHash());
     }
 
     private const ulong PinnedMountainHash = 0x2e210d0a143d0cb6ul;
     private const ulong PinnedHillsHash = 0xcd6ee97d0e940547ul;
 
     [TestMethod]
-    public void Terrain_DoesNotMoveWithTimeSeasonOrWater()
+    public void Terrain_DoesNotMoveWithTimeSeasonOrName()
     {
         // vista-plan §3.4: changing the light or the season must never reshuffle the mountains.
         ulong reference = TerrainGenerator.Generate(Mountains(), 42, SmallGrid).ContentHash();
         Assert.AreEqual(reference, TerrainGenerator.Generate(Mountains(TimeOfDay.Dusk), 42, SmallGrid).ContentHash());
         Assert.AreEqual(reference, TerrainGenerator.Generate(Mountains(season: Season.Winter), 42, SmallGrid).ContentHash());
-        Assert.AreEqual(reference, TerrainGenerator.Generate(Mountains(water: WaterBlock.Lake), 42, SmallGrid).ContentHash());
         Assert.AreEqual(reference, TerrainGenerator.Generate(Mountains() with { Name = "renamed" }, 42, SmallGrid).ContentHash());
     }
 
     [TestMethod]
-    public void Terrain_ChangesWithSeedAndTerrainBlocks()
+    public void SetPieceOrder_DoesNotMatter()
+    {
+        // The set pieces are a set. (Adding or removing a piece starts a new scene — vista-plan §3.4 — so no
+        // stability is asserted there; once lakes carve basins in M3 it would not hold anyway.)
+        ulong reference = TerrainGenerator.Generate(
+            new Recipe { SetPieces = [SetPiece.SnowCappedMountains, SetPiece.Forest, SetPiece.Lake] }, 42, SmallGrid).ContentHash();
+        Assert.AreEqual(reference, TerrainGenerator.Generate(
+            new Recipe { SetPieces = [SetPiece.Lake, SetPiece.Forest, SetPiece.SnowCappedMountains] }, 42, SmallGrid).ContentHash());
+        Assert.AreEqual(reference, TerrainGenerator.Generate(
+            new Recipe { SetPieces = [SetPiece.Forest, SetPiece.SnowCappedMountains, SetPiece.Lake] }, 42, SmallGrid).ContentHash());
+    }
+
+    [TestMethod]
+    public void EmptySet_IsPlainBaseGround()
+    {
+        ulong hills = TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.RollingHills] }, 42, SmallGrid).ContentHash();
+        Assert.AreEqual(hills, TerrainGenerator.Generate(new Recipe(), 42, SmallGrid).ContentHash());
+    }
+
+    [TestMethod]
+    public void Terrain_ChangesWithSeedAndTerrainShapingPieces()
     {
         ulong reference = TerrainGenerator.Generate(Mountains(), 42, SmallGrid).ContentHash();
         Assert.AreNotEqual(reference, TerrainGenerator.Generate(Mountains(), 43, SmallGrid).ContentHash());
-        Assert.AreNotEqual(reference, TerrainGenerator.Generate(new Recipe { Terrain = [TerrainBlock.RollingHills] }, 42, SmallGrid).ContentHash());
+        Assert.AreNotEqual(reference, TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.RollingHills] }, 42, SmallGrid).ContentHash());
     }
 
     [TestMethod]
@@ -148,9 +167,10 @@ public sealed class WorldDeterminismTests
     }
 
     [TestMethod]
-    public void TerrainProfile_MountainsWinOverLowerBlocks()
+    public void TerrainProfile_MountainsWinOverLowerPieces()
     {
-        Assert.AreSame(TerrainProfile.Mountains, TerrainProfile.For([TerrainBlock.Forest, TerrainBlock.SnowCappedMountains]));
-        Assert.AreSame(TerrainProfile.Hills, TerrainProfile.For([TerrainBlock.Coast, TerrainBlock.Forest]));
+        Assert.AreSame(TerrainProfile.Mountains, TerrainProfile.For([SetPiece.Forest, SetPiece.SnowCappedMountains]));
+        Assert.AreSame(TerrainProfile.Hills, TerrainProfile.For([SetPiece.Coast, SetPiece.Forest]));
+        Assert.AreSame(TerrainProfile.Hills, TerrainProfile.For([]));
     }
 }

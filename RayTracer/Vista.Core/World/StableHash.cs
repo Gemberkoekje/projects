@@ -54,7 +54,8 @@ public static class StableHash
 /// Derives independent sub-seeds per world-generation stage from the user's seed (vista-plan §4.1). Keying
 /// on the <i>stage</i> — not on the whole recipe — is what keeps the world still when an unrelated control
 /// changes: switching dawn to dusk re-lights the scene but never reshuffles the terrain, and adding a new
-/// stage later does not perturb the streams of the existing ones.
+/// stage later does not perturb the streams of the existing ones. (Changing the set pieces starts a new
+/// scene, so no stability is promised there — vista-plan §3.4.)
 /// </summary>
 public static class SeedDerivation
 {

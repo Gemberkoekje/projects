@@ -107,7 +107,7 @@ public sealed class CameraTests
     [TestMethod]
     public void DefaultCamera_StandsAtEyeHeightLookingNorth()
     {
-        HeightField field = TerrainGenerator.Generate(new Recipe { Terrain = [TerrainBlock.AlpineRange] }, 4, new WorldGrid(65, 32.0));
+        HeightField field = TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.AlpineRange] }, 4, new WorldGrid(65, 32.0));
         CameraSpec c = DefaultCamera.For(field);
         Assert.AreEqual(0, c.Validate().Count);
         Assert.AreEqual(field.HeightAt(c.Position.X, c.Position.Z) + DefaultCamera.EyeHeightMetres, c.Position.Y, 1e-9);

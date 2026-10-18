@@ -51,7 +51,7 @@ public sealed class TerrainMeshTests
     [TestMethod]
     public void Mesh_PositionsSitOnTheHeightField()
     {
-        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { Terrain = [Recipes.TerrainBlock.AlpineRange] }, 3, new WorldGrid(33, 25.0));
+        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { SetPieces = [Recipes.SetPiece.AlpineRange] }, 3, new WorldGrid(33, 25.0));
         TerrainMesh mesh = HeightFieldMesher.Build(field);
         for (int j = 0; j < field.Size; j++)
         {
@@ -69,7 +69,7 @@ public sealed class TerrainMeshTests
     public void Mesh_EveryTriangleFacesUp()
     {
         // The documented winding: (v1 − v0) × (v2 − v0) points to +Y, on rough terrain too.
-        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { Terrain = [Recipes.TerrainBlock.AlpineRange] }, 5, new WorldGrid(33, 25.0));
+        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { SetPieces = [Recipes.SetPiece.AlpineRange] }, 5, new WorldGrid(33, 25.0));
         TerrainMesh mesh = HeightFieldMesher.Build(field);
         for (int t = 0; t < mesh.TriangleCount; t++)
         {
@@ -97,7 +97,7 @@ public sealed class TerrainMeshTests
     [TestMethod]
     public void Mesh_IsDeterministic()
     {
-        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { Terrain = [Recipes.TerrainBlock.RollingHills] }, 8, new WorldGrid(33, 25.0));
+        HeightField field = TerrainGenerator.Generate(new Recipes.Recipe { SetPieces = [Recipes.SetPiece.RollingHills] }, 8, new WorldGrid(33, 25.0));
         TerrainMesh a = HeightFieldMesher.Build(field);
         TerrainMesh b = HeightFieldMesher.Build(field);
         CollectionAssert.AreEqual(a.Positions, b.Positions);

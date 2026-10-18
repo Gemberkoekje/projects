@@ -102,12 +102,16 @@ or inside a tree.
 
 ### 3.2 Basic controls
 
-- **Building blocks**, combined freely — e.g. "frozen lake + snow-capped mountains +
-  dawn":
-  - *terrain*: snow-capped mountains, alpine range, rolling hills, coast, forest;
-  - *water*: lake, frozen lake, river, waterfall, sea, none;
-  - *time*: dawn, day, golden hour, dusk, night;
-  - *season*.
+- **Set pieces**: one open-ended catalogue (eventually long) of things a wallpaper can
+  contain — today snow-capped mountains, alpine range, rolling hills, coast, forest,
+  lake, frozen lake, river, waterfall, sea. The recipe holds the set currently chosen:
+  add a piece to get it, remove it to drop it. "Mountains + forest + lake" is three
+  pieces; removing forest leaves mountains + lake. Set pieces are chosen **before**
+  anything renders, and changing the set starts a **new scene** (§3.4). Order never
+  matters, and an empty set is plain base ground. Some pieces **conflict** (lake and
+  frozen lake): a recipe never holds both, and adding one swaps the other out.
+- **Time of day** (dawn, day, golden hour, dusk, night) and **season**: one value each,
+  beside the set, e.g. "frozen lake + snow-capped mountains" at dawn.
 - **Sliders:** season, time of day, snow, fog.
 - **Seed** (plus "new seed").
 - **Camera:** auto camera, nudges, focal length.
@@ -133,8 +137,11 @@ One generic mechanism, not special cases:
   below zero; picking "dawn" sets time of day.
 - **Contradictions are allowed.** A pinned 25 °C next to a frozen lake renders as asked
   (it's the user's picture) with a small "implausible" hint, never a block.
-- **Two speeds.** Time of day, fog, exposure and camera changes only restart the
-  preview. Snow and season (snow depth near the camera, snow on branches, bare
+- **Changing the set pieces starts a new scene.** The world, the planted viewpoint and
+  the auto camera are regenerated; nothing is promised to stay where it was. (Set pieces
+  are picked before the first render, §3.2.)
+- **Two speeds** within a scene. Time of day, fog, exposure and camera changes only
+  restart the preview. Snow and season (snow depth near the camera, snow on branches, bare
   deciduous trees) change near-camera geometry and rebuild part of the scene — seconds,
   not instant — still deterministic from seed + slider, so nothing moves.
 
@@ -648,7 +655,7 @@ sidecar reports timings; recipe / seed determinism tests green in CI; maze golde
 unmoved.
 
 **M0 status (2026-10-18).** The work that needs no GPU is done and unit-tested
-(`Vista.Tests`, 107 tests, net10.0, so it runs in hosted CI). Everything that needs the RTX
+(`Vista.Tests`, 113 tests, net10.0, so it runs in hosted CI). Everything that needs the RTX
 3070 is still open and marked **[needs 3070]**. No file in `RayTracer.Core`, `RayTracer.Gpu`
 or the maze changed.
 
@@ -657,10 +664,10 @@ or the maze changed.
 | M0 deliverable | Where | Notes |
 |---|---|---|
 | `Vista.Core` / `Vista.App` / `Vista.Tests` in `RayTracer.slnx` | | Vista.App is the CLI front end only; no UI yet |
-| Recipe + seed model with serialization | `Vista.Core/Recipes` | Strict JSON: unknown fields, integer enums and future schemas are errors, so typos fail loudly |
+| Recipe + seed model with serialization | `Vista.Core/Recipes` | A set of set pieces + time + season. Strict JSON: unknown fields, integer enums and future schemas are errors, so typos fail loudly |
 | Camera file | `Scene/CameraSpec.cs` | Engine axes (+X east, +Y up, +Z north); yaw = compass heading; `ToEngineRotation()` tested against the engine's ray convention |
 | Height field → mesh | `Vista.Core/World` | Seeded ridged / fBm terrain with domain warp on a fixed 1025² × 16 m grid (16.4 km); uniform mesh, 2.1 M triangles, 50 MB; winding and normals tested |
-| Recipe / seed determinism tests | `WorldDeterminismTests` | Pinned noise and terrain hashes; terrain provably unmoved by time, season, water or name |
+| Recipe / seed determinism tests | `WorldDeterminismTests` | Pinned noise and terrain hashes; terrain provably unmoved by time, season, name or set-piece order |
 | TDR-safe sample batches, the planning half | `Rendering/BatchPlanner.cs` | Row bands × sample ranges; every (pixel, sample) issued once; reacts to slowdowns at once |
 | Ray counter, the bookkeeping half | `RenderStats` | Rays per sample and per second go into the sidecar |
 | EXR + PNG writers | `Vista.Core/Output` | Dependency-free; checked bit-exact against OpenEXR 3.5 and Pillow outside CI |
@@ -702,14 +709,20 @@ or the maze changed.
 
 *M0 decisions taken in code (revisit freely):*
 
-- **Terrain and water are sets** in a recipe ("snow-capped mountains + forest"); time of
-  day and season are single values. **To confirm.**
-- **Sub-seeds are keyed by stage name** (`SeedDerivation`), not by the whole recipe, so
-  changing time, season or water never reshuffles the terrain, and new stages don't
-  perturb existing ones.
-- **Mountains win** when blocks combine; placing hills, coast and forest *around* them is
-  the shot-first layout's job (§4.2). Coast and forest use the hills shape until their
-  milestones.
+- **A recipe is a set of set pieces** (one `SetPiece` catalogue, §3.2; confirmed
+  2026-10-18) plus a single time of day and season. `Recipe.With` / `Without` add and
+  remove pieces; the JSON is `"setPieces": [...]`. The catalogue is an enum for now, and
+  files store its camelCase names, so moving to a registry as it grows changes no files.
+  Changing the set starts a new scene, so nothing promises the other pieces stay put.
+  Conflicts are a symmetric table (`SetPieceConflicts`, today only lake ↔ frozen lake):
+  `With` swaps the conflicting piece out, and a recipe file listing both is rejected. A UI
+  could grey them out instead; it reads the same table.
+- **Sub-seeds are keyed by stage name** (`SeedDerivation`), not by the whole recipe. So
+  changing time or season never reshuffles the terrain, and new stages don't perturb
+  existing ones. Tests pin this, and that set order doesn't matter.
+- **Mountains win** when pieces combine; placing hills, coast and forest *around* them is
+  the shot-first layout's job (§4.2). Every other set, including the empty one, gets the
+  hills shape as plain base ground until those pieces' milestones.
 - **Placeholders, to be replaced in M1:** the sun follows the maze's `DayNightCycle`.
   Dawn and dusk sit about 3° *above* the horizon, because the single-scattering sky
   cannot do twilight. The PNG display transform is exposure + Narkowicz ACES + sRGB,
@@ -846,9 +859,6 @@ balance, lens CA), estimator accuracy.
   outputs cover that (§7.4).
 
 **Product.**
-- **Recipe shape:** M0 models terrain and water as sets of blocks, and time and season as
-  single values. Confirm that this matches "combined freely" (§3.2) before M1 builds the
-  linked sliders on top of it.
 - **Location list and climate data**: which places, and from which public normals.
 - **HDR wallpaper support** on Windows is unverified (M11).
 
@@ -865,6 +875,7 @@ balance, lens CA), estimator accuracy.
 | Spectral data | Measured where available; models (PROSPECT-D) where not; downloaded locally / on the fly with a built-in fallback; nothing restricted committed |
 | "Require measured data" | Off by default |
 | User control | Recipe building blocks + seed; auto camera; small camera tweaks; no scenery editing |
+| Set pieces (2026-10-18) | One open-ended catalogue; a recipe is the set currently chosen (add / remove), plus one time of day and one season; order-free; empty = plain base ground; chosen before rendering, and changing the set starts a new scene; conflicting pieces (lake / frozen lake) never coexist, adding one swaps the other out |
 | Generation | Shot first |
 | Basic sliders | Season, time of day, snow, fog |
 | Advanced controls | Location / latitude, altitude, date, temperature (°C with °C/°F toggle), humidity |

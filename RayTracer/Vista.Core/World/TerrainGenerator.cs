@@ -13,8 +13,9 @@ public sealed record WorldGrid(int Size = 1025, double CellSize = 16.0)
 
 /// <summary>
 /// Generates the M0 terrain: the recipe's <see cref="TerrainProfile"/> evaluated on the global grid under
-/// the seed's <see cref="SeedDerivation.TerrainBase"/> stream. A pure function of (terrain blocks, seed,
-/// grid): time of day, season and water never touch it. Erosion, hydrology and snow layer on in M1+.
+/// the seed's <see cref="SeedDerivation.TerrainBase"/> stream. A pure function of (set pieces, seed, grid),
+/// independent of the pieces' order: time of day and season never touch it. Erosion, hydrology (lakes
+/// carving basins) and snow layer on in M1+.
 /// </summary>
 public static class TerrainGenerator
 {
@@ -23,7 +24,7 @@ public static class TerrainGenerator
     {
         ArgumentNullException.ThrowIfNull(recipe);
         grid ??= WorldGrid.Default;
-        TerrainProfile profile = TerrainProfile.For(recipe.Terrain);
+        TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
         ulong terrainSeed = SeedDerivation.Derive(seed, SeedDerivation.TerrainBase);
 
         int size = grid.Size;
