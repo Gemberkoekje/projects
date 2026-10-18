@@ -85,7 +85,7 @@ peaks catching alpenglow behind. Milestones M1–M5 (§10) build toward it.
 Recipe (building blocks + basic sliders) + seed
   → world generation   terrain, erosion, hydrology, snow, ecosystem, props (cached per seed)
   → auto camera        score a few hundred candidate views near the planted viewpoint
-  → quick pre-render   ~512 px, few spp, denoised, a few seconds
+  → preview render     ~320 px wide, same quality settings as the final (§7.4)
   → tweak loop         nudge / pan / tilt / focal length / focus / exposure / sliders;
                        the progressive preview restarts and refines after each change
   → estimate           time + VRAM for the chosen target, resolution and detail level
@@ -192,7 +192,7 @@ location + season/date + time of day
 
 - All scenery is a pure function of the recipe and seed. The camera decides **how much**
   of the world is evaluated and at **what detail**, never what is there.
-- Consequences: the 512 px pre-render and the 16K final show the same world at
+- Consequences: the 320 px preview and the 16K final show the same world at
   different detail; moving the camera never reshuffles anything; a recipe + seed +
   camera file reproduces the image.
 - **Erosion is the exception to "pure function of position"** — it is a global
@@ -487,6 +487,38 @@ too much between views (a forest floor vs. open sky):
 - Large targets render in tiles with their own buffers; tiles are written to disk as
   they finish, so a render can resume after a crash or reboot.
 
+### 7.4 Preview renders & the agent iteration loop
+
+A final render can take an hour or more. Nobody, human or LLM, can iterate on look-dev
+at that pace, so a small preview render is a first-class mode from M0:
+
+- **Size:** ~320 px wide at the target's aspect ratio (320×180 for 16:9, 320×240 for
+  4:3), so the composition matches the final. Configurable.
+- **Same quality settings as the final:** bounces, spp, volumes, data tiers. Only the
+  pixel count changes. That is ~100–150× fewer pixels than 4K, so a 90-minute 4K
+  render becomes well under a minute of tracing at the same quality.
+- **Headless CLI:** e.g. `Vista.App --preview --recipe r.json --seed N --camera c.json
+  --out p.png` writes the PNG plus its sidecar (timings, rays traced, data tiers). An
+  LLM or a script can render, look at the PNG, change one parameter, and render again.
+- **Watch mode:** a long-running process keeps the device, compiled shaders, world and
+  acceleration structures alive and re-renders whenever the recipe, camera or slider
+  file changes. Only the stages a change touches rebuild (the two speeds of §3.4), so
+  the loop isn't dominated by setup.
+- **Loupe (crops at final detail):** a 320 px preview hides fine detail: leaf geometry,
+  snow edges, aliasing, fireflies. A loupe renders a small window of the
+  final-resolution image at final geometric detail, so detail can be checked without
+  rendering the whole frame.
+- **Contact sheets:** several variants (seeds, slider values, before/after) rendered
+  into one labelled grid image, so one look compares them.
+- **Debug outputs at preview size:** albedo, normals, depth, material ids, a data-tier
+  map, a sample/variance heatmap, and raw plus denoised beauty, for diagnosing rather
+  than guessing.
+- **Cheap goldens:** regression goldens at preview size keep the golden suite fast.
+- **First calibration:** preview measurements feed the render-time estimate (§7.2).
+- **Needs the GPU:** rendering requires the RTX 3070, so the agent loop works in a local
+  session on the dev box; cloud sessions and CI can build and unit-test but not render
+  (§11).
+
 ---
 
 ## 8. Engine reuse & project structure
@@ -554,6 +586,8 @@ Vista inherits some of the engine's disciplines and deliberately drops one:
 8. **Measure before deciding.** Mesh LOD vs. height-field intersection, leaf geometry vs.
    alpha cards, forest impostors vs. volumes: each is decided by a measurement on the
    3070, recorded in this file.
+9. **Look-dev in previews.** Visual changes are iterated with preview renders, loupes
+   and contact sheets (§7.4); a final render confirms, it is not an iteration step.
 
 ---
 
@@ -567,9 +601,11 @@ Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Cor
 `Vista.App` / `Vista.Tests` in `RayTracer.slnx`; confirm which `RayTracer.Gpu` pieces
 serve an offline integrator (§8.1); recipe + seed model with serialization; a
 height field → mesh; integrator v0 (multi-bounce, sun + the existing Rayleigh `Sky`
-placeholder); TDR-safe sample batches; ray counter; EXR + PNG writer; sidecar. Verify:
-the same recipe + seed + camera renders bit-identically twice on the 3070; recipe /
-seed determinism tests green in CI; maze goldens unmoved.
+placeholder); TDR-safe sample batches; ray counter; EXR + PNG writer; sidecar; the
+headless preview CLI with debug outputs (§7.4). Verify: the same recipe + seed + camera
+renders bit-identically twice on the 3070; a 320 px preview renders headless and its
+sidecar reports timings; recipe / seed determinism tests green in CI; maze goldens
+unmoved.
 
 **M1 — Proof of concept: "alpine range at golden hour" (3840×2160).**
 Goal: Terragen-class mountain vistas, no vegetation yet. Deliverable: GPU hydraulic +
@@ -580,8 +616,9 @@ full atmosphere (Rayleigh + Mie + ozone, multiple scattering, aerial perspective
 altitude); sun / sky importance sampling; astronomy (latitude, date, local solar time,
 location dropdown with climate normals); the linked-slider framework (basic: season,
 time of day, snow, fog/haze; advanced: location, altitude, date, temperature with °C/°F,
-humidity); OIDN; auto camera v1 for the mountain building blocks; pre-render + tweak
-window; time + VRAM estimate. Verify: alpenglow appears at dawn/dusk without any
+humidity); OIDN; auto camera v1 for the mountain building blocks; preview + tweak
+window; preview watch mode, loupe and contact sheets (§7.4); time + VRAM estimate.
+Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
@@ -686,6 +723,13 @@ balance, lens CA), estimator accuracy.
   real leaf geometry costs memory.
 - **GPU determinism across driver updates** is not guaranteed; goldens may need
   re-baselining.
+- **The agent loop needs the GPU.** Only the local RTX 3070 can render, so LLM look-dev
+  iteration (§7.4) works only in a local session on the dev box. A CPU preview
+  renderer would lift that, but contradicts the no-CPU-port decision (§9); revisit
+  only if iterating from cloud sessions matters.
+- **Small previews hide detail.** A 320 px preview cannot show leaf-level or
+  edge-level problems, and denoising can hide noise; loupes and raw (undenoised)
+  outputs cover that (§7.4).
 
 **Product.**
 - **Location list and climate data**: which places, and from which public normals.
@@ -711,6 +755,7 @@ balance, lens CA), estimator accuracy.
 | Snow | Own slider, default from season (+ freezing level), overridable; glaciers recipe-owned; snow-capped mountains from M1 |
 | Astronomy | Real sun / moon / stars from latitude, date, local solar time; location dropdown of iconic places |
 | Targets | All eventually; PoC at 3840×2160; time + VRAM estimate per scene and view |
+| Preview | ~320 px preview at final quality settings, headless and scriptable, so people and LLMs can iterate in seconds instead of hours |
 | Hardware | RTX 3070, 8 GB |
 | Scope | Stills only |
 | Style | Photoreal target; anything else via filters / camera settings |
