@@ -19,4 +19,7 @@
   <Project Path="RayTracer.Maze/RayTracer.Maze.csproj" />
   <Project Path="RayTracer.Tests/RayTracer.Tests.csproj" />
   <Project Path="tools/DatBlueprint/DatBlueprint.csproj" />
+  <Project Path="Vista.App/Vista.App.csproj" />
+  <Project Path="Vista.Core/Vista.Core.csproj" />
+  <Project Path="Vista.Tests/Vista.Tests.csproj" />
 </Solution>

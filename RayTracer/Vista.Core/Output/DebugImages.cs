@@ -1,0 +1,223 @@
+using Vista.Scene;
+using Vista.World;
+
+namespace Vista.Output;
+
+/// <summary>
+/// Turns the renderer's auxiliary buffers into 8-bit RGB images a person or an LLM can read at a glance
+/// (vista-plan §7.4 "debug outputs at preview size"). Every function returns tightly packed RGB rows,
+/// top row first, ready for <see cref="PngEncoder"/>. Sky pixels get a fixed, distinct colour.
+/// </summary>
+public static class DebugImages
+{
+    /// <summary>Sky colour in the depth image (dark blue — never produced by a terrain depth).</summary>
+    public static readonly (byte R, byte G, byte B) DepthSky = (0, 0, 96);
+
+    private static readonly (byte R, byte G, byte B) Black = (0, 0, 0);
+
+    /// <summary>Albedo (linear RGB) through the plain sRGB transfer — no exposure, no tone curve.</summary>
+    public static byte[] Albedo(ReadOnlySpan<float> rgb)
+    {
+        var bytes = new byte[rgb.Length];
+        for (int i = 0; i < rgb.Length; i++)
+            bytes[i] = DisplayTransform.EncodeSrgb(rgb[i]);
+        return bytes;
+    }
+
+    /// <summary>World normals mapped <c>[−1, 1] → [0, 255]</c> per axis (up = +Y shows green).</summary>
+    public static byte[] Normal(ReadOnlySpan<float> normals)
+    {
+        var bytes = new byte[normals.Length];
+        for (int i = 0; i < normals.Length; i++)
+            bytes[i] = normals[i] is var n && float.IsFinite(n) ? (byte)Math.Clamp((n * 0.5f + 0.5f) * 255f + 0.5f, 0f, 255f) : (byte)0;
+        return bytes;
+    }
+
+    /// <summary>
+    /// Depth on a log scale between the nearest and farthest terrain hit in the frame: near is white, far
+    /// is dark grey (never black), sky is <see cref="DepthSky"/>.
+    /// </summary>
+    public static byte[] Depth(ReadOnlySpan<float> depth)
+    {
+        double min = double.MaxValue, max = 0.0;
+        foreach (float d in depth)
+        {
+            if (IsHit(d))
+            {
+                min = Math.Min(min, d);
+                max = Math.Max(max, d);
+            }
+        }
+        double logMin = Math.Log(Math.Max(min, 1e-3));
+        double range = Math.Max(Math.Log(Math.Max(max, 1e-3)) - logMin, 1e-9);
+
+        var bytes = new byte[depth.Length * 3];
+        for (int p = 0; p < depth.Length; p++)
+        {
+            float d = depth[p];
+            if (!IsHit(d))
+            {
+                Put(bytes, p, DepthSky);
+                continue;
+            }
+            double t = (Math.Log(Math.Max(d, 1e-3)) - logMin) / range; // 0 near … 1 far
+            byte g = (byte)Math.Round(255.0 - t * (255.0 - 32.0));
+            Put(bytes, p, (g, g, g));
+        }
+        return bytes;
+    }
+
+    /// <summary>One stable colour per material id; sky (negative id) is black.</summary>
+    public static byte[] Material(ReadOnlySpan<float> materialIds)
+    {
+        var bytes = new byte[materialIds.Length * 3];
+        for (int p = 0; p < materialIds.Length; p++)
+        {
+            float id = materialIds[p];
+            Put(bytes, p, id >= 0f && float.IsFinite(id) ? PaletteColor((int)id) : Black);
+        }
+        return bytes;
+    }
+
+    /// <summary>
+    /// The data tier of each pixel's material (vista-plan §6.2): measured tiers in greens, the model tier
+    /// yellow, built-in orange, sky black.
+    /// </summary>
+    public static byte[] Tier(ReadOnlySpan<float> materialIds, IReadOnlyList<VistaMaterial> materials)
+    {
+        ArgumentNullException.ThrowIfNull(materials);
+        var bytes = new byte[materialIds.Length * 3];
+        for (int p = 0; p < materialIds.Length; p++)
+        {
+            float id = materialIds[p];
+            int index = id >= 0f && float.IsFinite(id) ? (int)id : -1;
+            Put(bytes, p, index >= 0 && index < materials.Count ? TierColor(materials[index].Tier) : Black);
+        }
+        return bytes;
+    }
+
+    /// <summary>Legend colour of a data tier.</summary>
+    public static (byte R, byte G, byte B) TierColor(DataTier tier) => tier switch
+    {
+        DataTier.LocalCache => (0, 160, 60),
+        DataTier.Download => (60, 200, 90),
+        DataTier.ManualImport => (140, 230, 140),
+        DataTier.Model => (240, 220, 40),
+        _ => (240, 130, 20),
+    };
+
+    /// <summary>
+    /// Variance as a log-scale heat map spanning four decades below the frame's maximum: black (converged)
+    /// through red and yellow to white (noisiest).
+    /// </summary>
+    public static byte[] Variance(ReadOnlySpan<float> variance)
+    {
+        double max = 0.0;
+        foreach (float v in variance)
+        {
+            if (float.IsFinite(v))
+                max = Math.Max(max, v);
+        }
+        var bytes = new byte[variance.Length * 3];
+        if (max <= 0.0)
+            return bytes;
+        double logMax = Math.Log10(max);
+        for (int p = 0; p < variance.Length; p++)
+        {
+            float v = variance[p];
+            double t = v > 0f && float.IsFinite(v) ? Math.Clamp((Math.Log10(v) - logMax + 4.0) / 4.0, 0.0, 1.0) : 0.0;
+            Put(bytes, p, Heat(t));
+        }
+        return bytes;
+    }
+
+    /// <summary>
+    /// A top-down shaded map of the height field, north up, at most <paramref name="maxSize"/> pixels per
+    /// side, with the camera marked in red and its heading drawn — the dry run's only image, so world
+    /// generation can be inspected without a GPU.
+    /// </summary>
+    public static (byte[] Rgb, int Size) HeightMap(HeightField field, CameraSpec? camera, int maxSize = 512)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        int size = Math.Min(field.Size, maxSize);
+        double step = (field.Size - 1) / (double)Math.Max(size - 1, 1);
+        float min = field.MinHeight;
+        float range = Math.Max(field.MaxHeight - min, 1e-3f);
+        var bytes = new byte[size * size * 3];
+        for (int row = 0; row < size; row++)
+        {
+            int j = (int)Math.Round((size - 1 - row) * step); // north (high j) at the top
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, field.Size - 1);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, field.Size - 1);
+                // Lambert hillshade under a light from the north-west, tinted by elevation.
+                double dhdx = (field[i1, j] - field[i0, j]) / ((i1 - i0) * field.CellSize);
+                double dhdz = (field[i, j1] - field[i, j0]) / ((j1 - j0) * field.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double e = (field[i, j] - min) / range;
+                double light = 0.35 + 0.65 * shade;
+                Put(bytes, row * size + col, (
+                    (byte)Math.Round(light * (90 + 140 * e)),
+                    (byte)Math.Round(light * (110 + 120 * e)),
+                    (byte)Math.Round(light * (80 + 150 * e))));
+            }
+        }
+
+        if (camera is not null)
+            MarkCamera(bytes, size, field, camera);
+        return (bytes, size);
+    }
+
+    private static void MarkCamera(byte[] bytes, int size, HeightField field, CameraSpec camera)
+    {
+        double ToCol(double x) => (x - field.OriginX) / field.Extent * (size - 1);
+        double ToRow(double z) => (size - 1) - (z - field.OriginZ) / field.Extent * (size - 1);
+        void Dot(double col, double row)
+        {
+            int c = (int)Math.Round(col), r = (int)Math.Round(row);
+            if (c >= 0 && c < size && r >= 0 && r < size)
+                Put(bytes, r * size + c, (255, 0, 0));
+        }
+
+        double c0 = ToCol(camera.Position.X), r0 = ToRow(camera.Position.Z);
+        Vector3D f = camera.Forward();
+        double flat = Math.Sqrt(f.X * f.X + f.Z * f.Z);
+        int length = Math.Max(size / 12, 4);
+        if (flat > 1e-9)
+        {
+            for (int s = 0; s <= length; s++)
+                Dot(c0 + f.X / flat * s, r0 - f.Z / flat * s);
+        }
+        for (int dr = -1; dr <= 1; dr++)
+        {
+            for (int dc = -1; dc <= 1; dc++)
+                Dot(c0 + dc, r0 + dr);
+        }
+    }
+
+    private static (byte R, byte G, byte B) PaletteColor(int id)
+    {
+        ulong h = StableHash.Mix((ulong)id);
+        return ((byte)(64 + (h & 0xBF)), (byte)(64 + ((h >> 8) & 0xBF)), (byte)(64 + ((h >> 16) & 0xBF)));
+    }
+
+    private static (byte R, byte G, byte B) Heat(double t)
+    {
+        // black → red → yellow → white
+        double r = Math.Clamp(t * 3.0, 0.0, 1.0);
+        double g = Math.Clamp(t * 3.0 - 1.0, 0.0, 1.0);
+        double b = Math.Clamp(t * 3.0 - 2.0, 0.0, 1.0);
+        return ((byte)Math.Round(r * 255), (byte)Math.Round(g * 255), (byte)Math.Round(b * 255));
+    }
+
+    private static bool IsHit(float depth) => depth > 0f && float.IsFinite(depth);
+
+    private static void Put(byte[] bytes, int pixel, (byte R, byte G, byte B) c)
+    {
+        bytes[pixel * 3] = c.R;
+        bytes[pixel * 3 + 1] = c.G;
+        bytes[pixel * 3 + 2] = c.B;
+    }
+}

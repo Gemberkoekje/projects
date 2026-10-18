@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vista.Core (vista-plan §8.3): the pure, testable half of the landscape wallpaper generator — recipes,
+       seeded world generation, the camera model, render planning (batches, stats), the sidecar, the
+       headless-CLI request model and the EXR / PNG encoders. No GPU, no WinForms: a plain net10.0 library
+       so Vista.Tests runs in hosted CI, mirroring the Pinball.Core / Pinball.App split. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <RootNamespace>Vista</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vista.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RayTracer.Core/RayTracer.csproj" />
+  </ItemGroup>
+
+</Project>

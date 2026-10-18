@@ -1,10 +1,11 @@
 # Vista — a Spectral Path-Traced Landscape Wallpaper Generator
 
-The single source of truth for the landscape-wallpaper effort. This is a **planning
-document** — no code yet. It sits alongside the engine's own `plan.md` (the RayTracer
-remaining-work tracker) and `pinball-plan.md`, reuses the same engine foundation, but
-deliberately departs from the engine's CPU-parity convention (§9). "Vista" is a working
-name.
+The single source of truth for the landscape-wallpaper effort. Code has started: the
+GPU-free half of M0 lives in `Vista.Core` / `Vista.App` / `Vista.Tests` (see **M0
+status** in §10; work that needs the RTX 3070 is marked **[needs 3070]**). It sits
+alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
+`pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
+engine's CPU-parity convention (§9). "Vista" is a working name.
 
 Everything below was settled in a brainstorm on 2026-10-17/18; the decisions are
 collected in the appendix so they don't have to be re-litigated.
@@ -517,7 +518,9 @@ at that pace, so a small preview render is a first-class mode from M0:
 - **First calibration:** preview measurements feed the render-time estimate (§7.2).
 - **Needs the GPU:** rendering requires the RTX 3070, so the agent loop works in a local
   session on the dev box; cloud sessions and CI can build and unit-test but not render
-  (§11).
+  (§11). What they *can* run is `--dry-run`: world generation, mesh, sidecar and a
+  top-down height map with the camera marked, so the world side can be iterated
+  anywhere.
 
 ---
 
@@ -535,6 +538,38 @@ sits on the same seam as `RayTracer.Maze` and `Pinball.App`:
   `ShaderCompiler`, acceleration-structure building, readback. Exactly which pieces can
   serve an offline integrator (rather than `Phase6Renderer`'s real-time loop) is
   **to be confirmed in M0**; anything Vista needs changed lands additively.
+
+**M0 reuse assessment (2026-10-18, by reading the code — runtime confirmation is
+[needs 3070], with integrator v0):**
+
+- **Reusable as is:** `ShaderCompiler.CompileCompute` (DXC, SM 6.5). It is `internal`, so
+  `RayTracer.Gpu.csproj` needs one additive `InternalsVisibleTo Include="Vista.App"`, as
+  it already has for the maze and pinball apps.
+- **Not callable, by design:** device creation, the RT-tier check, command objects, the
+  fence wait, upload/UAV buffer helpers, BLAS/TLAS building and readback are private
+  methods copied into each `PhaseNRenderer` ("the D3D12 scaffolding is intentionally
+  duplicated rather than refactoring the earlier (separately dev-box-validated)
+  hosts").
+- **`Phase6Renderer` does not fit an offline integrator:** its BLAS assumes quads
+  (`StaticQuadCount × 4` vertices, `× 6` indices) from `PackedScene`, its cbuffers are the
+  maze's, it owns a swap chain and the TAA real-time loop, and `ReadbackOutput` returns
+  RGBA8 only. Vista needs a triangle-mesh BLAS (`TerrainMesh`), float readback of XYZ and
+  the AOVs, and dispatches driven by `BatchPlanner`.
+- **Recommendation:** follow the engine's own convention: Vista.App gets its own D3D12
+  host with the scaffolding copied from `Phase6Renderer`, and `RayTracer.Gpu` changes by
+  the one `InternalsVisibleTo` line only. That keeps "don't move the maze" (§9.2) trivially
+  true. A shared helper extracted from the phase renderers would touch validated maze
+  code, so it is not worth it for one more host.
+- **Shaders:** `RayTracer.Gpu` loads HLSL from `AppContext.BaseDirectory/Shaders`; Vista.App
+  links its own shader folder the way `Pinball.App` links the engine's.
+- **HLSL compile checks still need Windows:** `Vortice.Dxc.Native` ships a linux-x64
+  `libdxcompiler.so`, but in a cloud container it returns "Internal Compiler error" even
+  for an empty compute shader (2026-10-18). A standalone Linux DXC build is untested.
+- **From `RayTracer.Core`, already in use by `Vista.Core`:** `DayNightCycle` / `SunState`
+  (the M0 sun), `JobSystem.ToSRGB` (XYZ → linear sRGB, so Vista and the maze agree on
+  colour), and `LensOptions`' focal-length convention (pinned by a test). Integrator v0
+  will add `WavelengthLookup` / `SpectralResources` (hero wavelengths, `DeterXYZ`), a port of
+  `Sky.DomeRadiance`, and `RgbToReflectanceBasis` for built-in-tier materials.
 
 ### 8.2 New
 
@@ -554,6 +589,11 @@ defaults; auto camera; estimator; tiling; OIDN; EXR output; the Vista app UI.
 All three join `RayTracer.slnx`, so `ci-raytracer.yml` builds and tests them with no
 workflow change. `Vista.Core` / `Vista.Tests` stay plain net10.0 so tests don't drag in
 WinForms or DXR.
+
+One deliberate shift from the table, made in M0: the **EXR / PNG encoders, the debug-image
+encoders and the headless preview pipeline live in `Vista.Core`**, not `Vista.App`. None of
+them needs a GPU, and in `Vista.Core` they are unit-tested in CI. `Vista.App` only parses the
+command line and will supply the D3D12 renderer behind the `IVistaRenderer` seam.
 
 ---
 
@@ -606,6 +646,78 @@ headless preview CLI with debug outputs (§7.4). Verify: the same recipe + seed 
 renders bit-identically twice on the 3070; a 320 px preview renders headless and its
 sidecar reports timings; recipe / seed determinism tests green in CI; maze goldens
 unmoved.
+
+**M0 status (2026-10-18).** The work that needs no GPU is done and unit-tested
+(`Vista.Tests`, 107 tests, net10.0, so it runs in hosted CI). Everything that needs the RTX
+3070 is still open and marked **[needs 3070]**. No file in `RayTracer.Core`, `RayTracer.Gpu`
+or the maze changed.
+
+*Done, no GPU needed:*
+
+| M0 deliverable | Where | Notes |
+|---|---|---|
+| `Vista.Core` / `Vista.App` / `Vista.Tests` in `RayTracer.slnx` | | Vista.App is the CLI front end only; no UI yet |
+| Recipe + seed model with serialization | `Vista.Core/Recipes` | Strict JSON: unknown fields, integer enums and future schemas are errors, so typos fail loudly |
+| Camera file | `Scene/CameraSpec.cs` | Engine axes (+X east, +Y up, +Z north); yaw = compass heading; `ToEngineRotation()` tested against the engine's ray convention |
+| Height field → mesh | `Vista.Core/World` | Seeded ridged / fBm terrain with domain warp on a fixed 1025² × 16 m grid (16.4 km); uniform mesh, 2.1 M triangles, 50 MB; winding and normals tested |
+| Recipe / seed determinism tests | `WorldDeterminismTests` | Pinned noise and terrain hashes; terrain provably unmoved by time, season, water or name |
+| TDR-safe sample batches, the planning half | `Rendering/BatchPlanner.cs` | Row bands × sample ranges; every (pixel, sample) issued once; reacts to slowdowns at once |
+| Ray counter, the bookkeeping half | `RenderStats` | Rays per sample and per second go into the sidecar |
+| EXR + PNG writers | `Vista.Core/Output` | Dependency-free; checked bit-exact against OpenEXR 3.5 and Pillow outside CI |
+| Sidecar | `Output/Sidecar.cs` | Recipe, seed, camera, data tiers, height-field hash, engine version with commit, timings |
+| Headless preview CLI with debug outputs | `Vista.Core/Cli`, `Vista.App` | `--dry-run` works anywhere; the renderer plugs in behind `IVistaRenderer`; debug encoders for albedo, normal, depth, material, tier and variance |
+| Which `RayTracer.Gpu` pieces serve an offline integrator | §8.1 | Assessed by reading the code |
+
+*Open: needs the RTX 3070:*
+
+1. **[needs 3070]** **Offline integrator v0** (new HLSL): multi-bounce path tracing,
+   next-event estimation on the sun, the Rayleigh `Sky` dome (port `Sky.DomeRadiance`), hero-
+   wavelength spectral sampling. Sample streams must be keyed by `(pixel, sample index)`
+   only, never by dispatch. It writes the `Aov` buffers in the layouts `RenderTypes.cs`
+   documents.
+2. **[needs 3070]** **D3D12 host** in `Vista.App` implementing `IVistaRenderer`: device,
+   BLAS from `TerrainMesh` (32-bit indices; the winding `TerrainMesh` documents), TLAS,
+   float readback of XYZ and the AOVs, and a dispatch loop driven by `BatchPlanner`
+   (`Next` → dispatch → `Complete` with GPU time). Add `InternalsVisibleTo Vista.App` to
+   `RayTracer.Gpu` for `ShaderCompiler` (§8.1).
+3. **[needs 3070]** **Ray counter in the shader** (a 64-bit count of camera, bounce and
+   shadow rays; per-group reduction before the atomic is the likely shape) feeding
+   `RenderStats.RaysTraced`.
+4. **[needs 3070]** **Measure the batch defaults**: `BatchPlannerOptions` ships 250 ms per
+   dispatch and a pessimistic 2 µs per pixel-sample for the first dispatch. Both are guesses.
+   Measure them on real scenes and confirm that a 4K render never trips the TDR.
+5. **[needs 3070]** **Confirm the §8.1 reuse assessment** at runtime.
+
+*Open checks: need the RTX 3070:*
+
+- **[needs 3070]** The same recipe + seed + camera renders bit-identically twice.
+- **[needs 3070]** The image is bit-identical under two different dispatch budgets (the
+  batch partition must not change the image).
+- **[needs 3070]** A 320 px preview renders headless, and its sidecar reports timings and
+  rays.
+- **[needs 3070]** Maze goldens unmoved: `--phase6-selftest` 700/700 and `--phase6-regress`
+  19/19 bit-exact. No engine file changed so far, but run it anyway.
+- Recipe / seed determinism tests green in CI: no GPU needed, runs on every push via
+  `ci-raytracer.yml`.
+
+*M0 decisions taken in code (revisit freely):*
+
+- **Terrain and water are sets** in a recipe ("snow-capped mountains + forest"); time of
+  day and season are single values. **To confirm.**
+- **Sub-seeds are keyed by stage name** (`SeedDerivation`), not by the whole recipe, so
+  changing time, season or water never reshuffles the terrain, and new stages don't
+  perturb existing ones.
+- **Mountains win** when blocks combine; placing hills, coast and forest *around* them is
+  the shot-first layout's job (§4.2). Coast and forest use the hills shape until their
+  milestones.
+- **Placeholders, to be replaced in M1:** the sun follows the maze's `DayNightCycle`.
+  Dawn and dusk sit about 3° *above* the horizon, because the single-scattering sky
+  cannot do twilight. The PNG display transform is exposure + Narkowicz ACES + sRGB,
+  the same curve as the engine's `Filmic`. Without a camera file, the default camera
+  stands at eye height on the south side looking north.
+- **Gradient noise has no axis-aligned gradients, and the terrain is domain-warped.**
+  Without both, ridged noise drew a ruler-straight crest along every coarse lattice line.
+  A regression test now guards this.
 
 **M1 — Proof of concept: "alpine range at golden hour" (3840×2160).**
 Goal: Terragen-class mountain vistas, no vegetation yet. Deliverable: GPU hydraulic +
@@ -717,7 +829,9 @@ balance, lens CA), estimator accuracy.
   which the sidecar records.
 
 **Engine.**
-- **Which `RayTracer.Gpu` pieces serve an offline integrator** is unconfirmed (M0).
+- **Which `RayTracer.Gpu` pieces serve an offline integrator** has been assessed by reading
+  the code (§8.1: only `ShaderCompiler` is reusable as is). Runtime confirmation comes with
+  integrator v0 on the 3070 (M0, **[needs 3070]**).
 - **Mass TLAS instancing** is new; today's TLAS holds a handful of instances.
 - **Leaf alpha** needs non-opaque candidates in the inline ray query loop, slow on Ampere;
   real leaf geometry costs memory.
@@ -732,6 +846,9 @@ balance, lens CA), estimator accuracy.
   outputs cover that (§7.4).
 
 **Product.**
+- **Recipe shape:** M0 models terrain and water as sets of blocks, and time and season as
+  single values. Confirm that this matches "combined freely" (§3.2) before M1 builds the
+  linked sliders on top of it.
 - **Location list and climate data**: which places, and from which public normals.
 - **HDR wallpaper support** on Windows is unverified (M11).
 
