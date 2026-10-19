@@ -55,6 +55,22 @@ public sealed record PreviewRequest
 
     /// <summary>Run everything up to the GPU (world, mesh, sidecar, height map) and render nothing.</summary>
     public bool DryRun { get; init; }
+
+    /// <summary>
+    /// The loupe (vista-plan §7.4): render only this window of the <see cref="Width"/>×<see cref="Height"/>
+    /// frame, with the frame's camera rays and random keys, so the image is exactly a crop of the full render.
+    /// Empty (the default) renders the whole frame.
+    /// </summary>
+    public PixelWindow Loupe { get; init; }
+
+    /// <summary>
+    /// Recipe fields to override before the strict parse, as dotted camelCase path → JSON value (see
+    /// <see cref="Recipes.JsonOverrides"/>). A contact sheet varies a recipe field through these.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> RecipeOverrides { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>Camera fields to override, applied to the supplied or the default camera.</summary>
+    public IReadOnlyDictionary<string, string> CameraOverrides { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>
@@ -62,10 +78,10 @@ public sealed record PreviewRequest
 /// <code>
 /// Vista.App --preview --recipe r.json --seed N [--camera c.json] --out p.png
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
-///           [--debug all | albedo,normal,depth,material,tier,variance] [--dry-run]
+///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
-/// ratio (320×180 for 16:9).
+/// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -82,10 +98,11 @@ public static class PreviewCommandLine
     public const string Usage =
         "Usage: Vista.App --preview --recipe <recipe.json> --seed <n> [--camera <camera.json>] --out <preview.png>\n" +
         "                 [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]\n" +
-        "                 [--debug all|albedo,normal,depth,material,tier,variance] [--dry-run]\n" +
+        "                 [--debug all|albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]\n" +
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
-        "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.";
+        "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
+        "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.";
 
     /// <summary>Parses <paramref name="args"/>. Returns false with every problem listed in <paramref name="errors"/>.</summary>
     public static bool TryParse(IReadOnlyList<string> args, out PreviewRequest? request, out IReadOnlyList<string> errors)
@@ -97,13 +114,34 @@ public static class PreviewCommandLine
 
         if (args.Count == 0 || args[0] != "--preview")
         {
-            problems.Add("The first argument must be --preview (the only mode in M0).");
+            problems.Add("The first argument must be --preview.");
             return false;
         }
 
+        (Dictionary<string, string> values, bool dryRun) = SplitOptions(args, 1, ValueOptions, problems);
+        PreviewRequest? parsed = Build(values, dryRun, recipeRequired: true, seedRequired: true, problems);
+        if (problems.Count > 0)
+            return false;
+        request = parsed;
+        return true;
+    }
+
+    /// <summary>The options that take a value.</summary>
+    internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
+    };
+
+    /// <summary>
+    /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the
+    /// <c>--dry-run</c> flag, reporting unknown, valueless and repeated options.
+    /// </summary>
+    internal static (Dictionary<string, string> Values, bool DryRun) SplitOptions(
+        IReadOnlyList<string> args, int start, IReadOnlySet<string> valueOptions, List<string> problems)
+    {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         bool dryRun = false;
-        int k = 1;
+        int k = start;
         while (k < args.Count)
         {
             string arg = args[k++];
@@ -111,7 +149,7 @@ public static class PreviewCommandLine
             {
                 dryRun = true;
             }
-            else if (!ValueOptions.Contains(arg))
+            else if (!valueOptions.Contains(arg))
             {
                 problems.Add($"Unknown argument '{arg}'.");
             }
@@ -124,9 +162,20 @@ public static class PreviewCommandLine
                 problems.Add($"{arg} is given more than once.");
             }
         }
+        return (values, dryRun);
+    }
 
-        string? recipe = Required(values, "--recipe", problems);
-        string? seedText = Required(values, "--seed", problems);
+    /// <summary>
+    /// Builds a request from split options, adding every problem to <paramref name="problems"/>. A contact
+    /// sheet whose axis supplies the recipe or the seed passes false for that requirement; the field is then
+    /// empty or 0 until the axis fills it in.
+    /// </summary>
+    internal static PreviewRequest? Build(
+        Dictionary<string, string> values, bool dryRun, bool recipeRequired, bool seedRequired, List<string> problems)
+    {
+        int before = problems.Count;
+        string? recipe = recipeRequired ? Required(values, "--recipe", problems) : values.GetValueOrDefault("--recipe", string.Empty);
+        string? seedText = seedRequired ? Required(values, "--seed", problems) : values.GetValueOrDefault("--seed");
         string? outPath = Required(values, "--out", problems);
         ulong seed = 0;
         if (seedText is not null && !ulong.TryParse(seedText, NumberStyles.None, CultureInfo.InvariantCulture, out seed))
@@ -147,10 +196,11 @@ public static class PreviewCommandLine
                 problems.Add($"Width {width} at aspect {aw}:{ah} gives an unusable height of {height}.");
         }
         HashSet<DebugOutput> debug = DebugSet(values.GetValueOrDefault("--debug"), problems);
+        PixelWindow loupe = Loupe(values.GetValueOrDefault("--loupe"), width, height, problems);
 
-        if (problems.Count > 0)
-            return false;
-        request = new PreviewRequest
+        if (problems.Count > before)
+            return null;
+        return new PreviewRequest
         {
             RecipePath = recipe!,
             Seed = seed,
@@ -163,14 +213,23 @@ public static class PreviewCommandLine
             Debug = debug,
             DispatchBudgetMs = dispatchMs,
             DryRun = dryRun,
+            Loupe = loupe,
         };
-        return true;
     }
 
-    private static readonly HashSet<string> ValueOptions = new(StringComparer.Ordinal)
+    private static PixelWindow Loupe(string? text, int width, int height, List<string> problems)
     {
-        "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms",
-    };
+        if (text is null)
+            return default;
+        if (!PixelWindow.TryParse(text, out PixelWindow window))
+        {
+            problems.Add($"--loupe must look like x,y,width,height (pixels, positive size), got '{text}'.");
+            return default;
+        }
+        if (!window.FitsIn(width, height))
+            problems.Add($"--loupe {window} does not fit the {width}×{height} frame.");
+        return window;
+    }
 
     private static string? Required(Dictionary<string, string> values, string name, List<string> problems)
     {

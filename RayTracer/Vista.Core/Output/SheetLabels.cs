@@ -1,0 +1,228 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Vista.Output;
+
+/// <summary>
+/// Labels and titles for contact sheets, read from sidecars (vista-plan §7.4). A sidecar holds both what an
+/// image <i>is</i> (recipe, seed, camera, size, quality, build) and what it cost (timings, rays); only the
+/// former labels it. A sheet's labels are the identity fields that differ between its cells — two renders
+/// of the same view from two builds are labelled by build — and its title is the fields they share.
+///
+/// <para>Sidecars are read as plain JSON, not as <see cref="Sidecar"/>, so a sheet can tile renders made by
+/// older or newer builds whose sidecars no longer match this one's schema.</para>
+/// </summary>
+public static class SheetLabels
+{
+    // Reading order for titles, and the short names labels use. Keys not listed sort after these.
+    private static readonly (string Key, string Short)[] Known =
+    [
+        ("recipe.name", "name"),
+        ("recipe.setPieces", "setPieces"),
+        ("recipe.time", "time"),
+        ("recipe.season", "season"),
+        ("seed", "seed"),
+        ("camera", "camera"),
+        ("camera.position", "position"),
+        ("camera.yawDegrees", "yaw"),
+        ("camera.pitchDegrees", "pitch"),
+        ("camera.rollDegrees", "roll"),
+        ("camera.focalLengthMm", "focal"),
+        ("camera.sensorHeightMm", "sensor"),
+        ("camera.fStop", "fStop"),
+        ("camera.focusDistanceMetres", "focus"),
+        ("camera.exposureEv", "exposure"),
+        ("image.size", "size"),
+        ("image.window", "loupe"),
+        ("image.samplesPerPixel", "spp"),
+        ("image.maxBounces", "bounces"),
+        ("image.displayTransform", "display"),
+        ("build", "build"),
+    ];
+
+    /// <summary>
+    /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, <c>seed</c>, the
+    /// camera (just <c>camera = default</c> for the default camera, whose pose follows the terrain),
+    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality, and the build's commit.
+    /// </summary>
+    public static SortedDictionary<string, string> Identity(JsonNode? sidecar)
+    {
+        var fields = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        if (sidecar is not JsonObject root)
+            return fields;
+
+        if (root["recipe"] is JsonObject recipe)
+            Flatten("recipe", recipe, fields);
+        if (root["seed"] is JsonValue seed)
+            fields["seed"] = Display(seed);
+
+        if (root["defaultCamera"] is JsonValue isDefault && isDefault.GetValueKind() == JsonValueKind.True)
+        {
+            fields["camera"] = "default";
+        }
+        else if (root["camera"] is JsonObject camera)
+        {
+            Flatten("camera", camera, fields);
+            if (camera["position"] is JsonObject p)
+            {
+                foreach (string axis in new[] { "x", "y", "z" })
+                    fields.Remove("camera.position." + axis);
+                fields["camera.position"] = $"{Display(p["x"])},{Display(p["y"])},{Display(p["z"])}";
+            }
+        }
+
+        if (root["image"] is JsonObject image)
+        {
+            int width = Int(image["width"]);
+            int height = Int(image["height"]);
+            fields["image.size"] = string.Create(CultureInfo.InvariantCulture, $"{width}×{height}");
+            if (image["window"] is JsonObject w
+                && !(Int(w["x"]) == 0 && Int(w["y"]) == 0 && Int(w["width"]) == width && Int(w["height"]) == height))
+                fields["image.window"] = string.Create(CultureInfo.InvariantCulture, $"{Int(w["x"])},{Int(w["y"])},{Int(w["width"])},{Int(w["height"])}");
+            foreach (string key in new[] { "samplesPerPixel", "maxBounces", "displayTransform" })
+            {
+                if (image[key] is JsonValue v)
+                    fields["image." + key] = Display(v);
+            }
+        }
+
+        if (root["engine"]?["vistaVersion"] is JsonValue version)
+            fields["build"] = Build(version.ToString());
+        return fields;
+    }
+
+    /// <summary>
+    /// One label per cell: the identity fields that are not the same in every cell, as <c>short=value</c> in
+    /// reading order. A field a cell lacks counts as different. Empty labels mean the cells are identical.
+    /// </summary>
+    public static IReadOnlyList<string> Differences(IReadOnlyList<IReadOnlyDictionary<string, string>> identities)
+    {
+        ArgumentNullException.ThrowIfNull(identities);
+        List<string> differing = Ordered(identities.SelectMany(i => i.Keys).Distinct())
+            .Where(key => identities.Select(i => i.GetValueOrDefault(key)).Distinct().Count() > 1)
+            .ToList();
+        return identities
+            .Select(i => string.Join(" ", differing.Select(key => $"{Short(key)}={i.GetValueOrDefault(key, "-")}")))
+            .ToList();
+    }
+
+    /// <summary>
+    /// A sheet title from the identity fields every cell shares, in reading order, joined by <c>" · "</c>,
+    /// e.g. <c>alpine range, golden hour · snowCappedMountains · goldenHour · summer · seed 42 · default camera ·
+    /// 320×180 · 64 spp · 6 bounces · build 566b68d</c>. Empty when nothing is shared.
+    /// </summary>
+    public static string Title(IReadOnlyList<IReadOnlyDictionary<string, string>> identities)
+    {
+        ArgumentNullException.ThrowIfNull(identities);
+        if (identities.Count == 0)
+            return string.Empty;
+        IEnumerable<string> shared = identities[0].Keys
+            .Where(key => identities.All(i => i.TryGetValue(key, out string? v) && v == identities[0][key]));
+        var parts = new List<string>();
+        foreach (string key in Ordered(shared))
+        {
+            string value = identities[0][key];
+            string? part = key switch
+            {
+                "recipe.name" or "recipe.time" or "recipe.season" or "image.size" => value,
+                "recipe.setPieces" => value.Length == 0 ? "no set pieces" : value,
+                "seed" => $"seed {value}",
+                "camera" => $"{value} camera",
+                "camera.position" => $"camera at {value}",
+                "camera.yawDegrees" => $"yaw {value}°",
+                "camera.pitchDegrees" => $"pitch {value}°",
+                "camera.rollDegrees" => value == "0" ? null : $"roll {value}°",
+                "camera.focalLengthMm" => $"{value} mm",
+                "camera.exposureEv" => value == "0" ? null : $"{value} EV",
+                "camera.sensorHeightMm" or "camera.fStop" or "camera.focusDistanceMetres" or "image.displayTransform" => null,
+                "image.window" => $"loupe {value}",
+                "image.samplesPerPixel" => $"{value} spp",
+                "image.maxBounces" => $"{value} bounces",
+                "build" => $"build {value}",
+                _ => $"{Short(key)} {value}",
+            };
+            if (part is not null)
+                parts.Add(part);
+        }
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>
+    /// The sidecar of an image: <c>a.png</c> → <c>a.json</c>, <c>a.normal.png</c> → <c>a.normal.json</c>, then
+    /// <c>a.json</c> (dropping one dotted part at a time). Null when there is none.
+    /// </summary>
+    public static string? SidecarPathFor(string imagePath)
+    {
+        ArgumentNullException.ThrowIfNull(imagePath);
+        string directory = Path.GetDirectoryName(Path.GetFullPath(imagePath))!;
+        string name = Path.GetFileNameWithoutExtension(imagePath);
+        while (true)
+        {
+            string candidate = Path.Combine(directory, name + ".json");
+            if (File.Exists(candidate))
+                return candidate;
+            int dot = name.LastIndexOf('.');
+            if (dot <= 0)
+                return null;
+            name = name[..dot];
+        }
+    }
+
+    private static void Flatten(string prefix, JsonObject obj, SortedDictionary<string, string> fields)
+    {
+        foreach ((string name, JsonNode? value) in obj)
+        {
+            string key = prefix + "." + name;
+            switch (value)
+            {
+                case null:
+                    break;
+                case JsonObject child:
+                    Flatten(key, child, fields);
+                    break;
+                case JsonArray array:
+                    fields[key] = string.Join("+", array.Select(Display));
+                    break;
+                default:
+                    if (name != "schema")
+                        fields[key] = Display(value);
+                    break;
+            }
+        }
+    }
+
+    private static string Display(JsonNode? node) => node switch
+    {
+        null => "null",
+        JsonValue v when v.GetValueKind() == JsonValueKind.Number && v.TryGetValue(out double d) =>
+            d.ToString("G6", CultureInfo.InvariantCulture),
+        JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>(),
+        _ => node.ToJsonString(),
+    };
+
+    private static int Int(JsonNode? node) => node is JsonValue v && v.TryGetValue(out int i) ? i : 0;
+
+    private static string Build(string version)
+    {
+        int plus = version.IndexOf('+', StringComparison.Ordinal);
+        if (plus < 0)
+            return version;
+        string commit = version[(plus + 1)..];
+        return commit.Length > 7 ? commit[..7] : commit;
+    }
+
+    private static string Short(string key)
+    {
+        foreach ((string k, string s) in Known)
+        {
+            if (k == key)
+                return s;
+        }
+        return key[(key.LastIndexOf('.') + 1)..];
+    }
+
+    private static IEnumerable<string> Ordered(IEnumerable<string> keys) =>
+        keys.OrderBy(k => Array.FindIndex(Known, x => x.Key == k) is var i && i >= 0 ? i : Known.Length)
+            .ThenBy(k => k, StringComparer.Ordinal);
+}

@@ -87,6 +87,24 @@ public sealed class PreviewCommandLineTests
     }
 
     [TestMethod]
+    public void Loupe_IsAWindowOfTheFrame()
+    {
+        PreviewRequest r = Parse("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--width", "3840", "--loupe", "1700, 800,320,180");
+        Assert.AreEqual(new PixelWindow(1700, 800, 320, 180), r.Loupe);
+        Assert.AreEqual((3840, 2160), (r.Width, r.Height), "the frame stays the full size");
+        Assert.IsTrue(Parse("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png").Loupe.IsEmpty);
+    }
+
+    [TestMethod]
+    [DataRow("10,10,64", "x,y,width,height")]
+    [DataRow("10,10,0,64", "x,y,width,height")]
+    [DataRow("-1,10,64,64", "x,y,width,height")]
+    [DataRow("300,0,64,64", "does not fit the 320×180 frame")]
+    [DataRow("0,170,64,11", "does not fit")]
+    public void Loupe_MustBeAWindowInsideTheFrame(string loupe, string message) =>
+        StringAssert.Contains(string.Join("\n", Errors("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--loupe", loupe)), message);
+
+    [TestMethod]
     public void ModeAndValues_AreChecked()
     {
         StringAssert.Contains(Errors("--recipe", "r")[0], "--preview");

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "position": {
+    "x": 0,
+    "y": 1712,
+    "z": -5734.4
+  },
+  "yawDegrees": 0,
+  "pitchDegrees": 45,
+  "rollDegrees": 0,
+  "focalLengthMm": 35,
+  "sensorHeightMm": 24,
+  "fStop": 0,
+  "focusDistanceMetres": 1000,
+  "exposureEv": 0
+}

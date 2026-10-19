@@ -9,12 +9,14 @@ namespace Vista.Output;
 /// The JSON file written next to every image (vista-plan §5.7 / §7.4): everything needed to reproduce it
 /// — recipe, seed, camera, data tier per material, engine version — plus what it cost (rays, samples,
 /// timings), which is what the preview's first calibration of the estimate reads back (§7.2).
-/// M0 has no sliders yet; they join under a new <see cref="Schema"/> with M1.
+/// The linked sliders join under a new <see cref="Schema"/> later in M1.
+///
+/// <para>Schema 2 (M1.1) added <see cref="ImageInfo.Window"/>, the part of the frame the image shows.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 1;
+    public const int CurrentSchema = 2;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -79,12 +81,16 @@ public sealed record EngineInfo(string VistaVersion, string Runtime, string? Dev
 }
 
 /// <summary>Image size and quality settings.</summary>
-/// <param name="Width">Width in pixels.</param>
-/// <param name="Height">Height in pixels.</param>
+/// <param name="Width">Frame width in pixels (the camera's image).</param>
+/// <param name="Height">Frame height in pixels.</param>
 /// <param name="SamplesPerPixel">Samples per pixel.</param>
 /// <param name="MaxBounces">Maximum bounces.</param>
 /// <param name="DisplayTransform">How the PNG was display-encoded.</param>
-public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int MaxBounces, string DisplayTransform);
+/// <param name="Window">
+/// The part of the frame the image files show, in frame pixels: the whole frame, or a loupe window (vista-plan
+/// §7.4) whose pixels are exactly those of the full render.
+/// </param>
+public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int MaxBounces, string DisplayTransform, PixelWindow Window);
 
 /// <summary>World generation facts.</summary>
 /// <param name="TerrainProfile">Terrain profile key.</param>

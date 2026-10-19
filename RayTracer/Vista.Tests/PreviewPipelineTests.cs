@@ -150,77 +150,99 @@ public sealed class PreviewPipelineTests
     }
 
     [TestMethod]
+    public void FullFrame_RecordsTheWholeFrameAsItsWindow()
+    {
+        Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: false), new FakeRenderer());
+        Assert.AreEqual(PixelWindow.Full(32, 18), sidecar.Image.Window);
+        Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_dir, "p.json")));
+        JsonElement window = doc.RootElement.GetProperty("image").GetProperty("window");
+        CollectionAssert.AreEqual(new[] { "x", "y", "width", "height" }, window.EnumerateObject().Select(p => p.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void Loupe_RendersOnlyItsWindowOfTheFrame()
+    {
+        var renderer = new FakeRenderer();
+        var loupe = new PixelWindow(5, 3, 8, 6);
+        Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: false, DebugOutput.Depth) with { Loupe = loupe }, renderer);
+
+        Assert.AreEqual((32, 18), (renderer.Settings!.Width, renderer.Settings.Height), "the camera keeps the full frame");
+        Assert.AreEqual(loupe, renderer.Settings.Rendered);
+        Assert.AreEqual(8 * 6 * 4L, sidecar.Render!.Stats.PixelSamples);
+        Assert.AreEqual(loupe, sidecar.Image.Window);
+        Assert.AreEqual((32, 18), (sidecar.Image.Width, sidecar.Image.Height));
+        foreach (string file in new[] { "p.png", "p.depth.png" })
+        {
+            PngImage image = PngDecoder.Read(Path.Combine(_dir, file));
+            Assert.AreEqual((8, 6), (image.Width, image.Height), file);
+        }
+    }
+
+    [TestMethod]
+    public void Loupe_IsTheSamePixelsAsTheFullFrame()
+    {
+        PreviewPipeline.Run(Request(dryRun: false) with { OutPath = Path.Combine(_dir, "full.png") }, new FakeRenderer());
+        var loupe = new PixelWindow(5, 3, 8, 6);
+        PreviewPipeline.Run(Request(dryRun: false) with { OutPath = Path.Combine(_dir, "loupe.png"), Loupe = loupe }, new FakeRenderer());
+
+        PngImage full = PngDecoder.Read(Path.Combine(_dir, "full.png"));
+        PngImage window = PngDecoder.Read(Path.Combine(_dir, "loupe.png"));
+        for (int y = 0; y < loupe.Height; y++)
+        {
+            for (int x = 0; x < loupe.Width * 3; x++)
+                Assert.AreEqual(full.Pixels[((loupe.Y + y) * 32 + loupe.X) * 3 + x], window.Pixels[y * loupe.Width * 3 + x]);
+        }
+    }
+
+    [TestMethod]
+    public void Loupe_OutsideTheFrame_IsRejected() =>
+        Assert.ThrowsExactly<ArgumentException>(() =>
+            PreviewPipeline.Run(Request(dryRun: false) with { Loupe = new PixelWindow(30, 0, 8, 6) }, new FakeRenderer()));
+
+    [TestMethod]
+    public void RecipeOverrides_ChangeTheRecipeBeforeTheStrictParse()
+    {
+        var renderer = new FakeRenderer();
+        Sidecar sidecar = PreviewPipeline.Run(
+            Request(dryRun: false) with { RecipeOverrides = new Dictionary<string, string> { ["time"] = "\"dawn\"" } }, renderer);
+        Assert.AreEqual(TimeOfDay.Dawn, sidecar.Recipe.Time);
+        Assert.AreEqual(TimeOfDay.Dawn, renderer.Scene!.Recipe.Time);
+        CollectionAssert.AreEqual(new[] { SetPiece.AlpineRange }, sidecar.Recipe.SetPieces.ToArray(), "the rest of the file is kept");
+
+        Assert.ThrowsExactly<JsonException>(() => PreviewPipeline.Run(
+            Request(dryRun: true) with { RecipeOverrides = new Dictionary<string, string> { ["tme"] = "\"dawn\"" } }, renderer: null));
+    }
+
+    [TestMethod]
+    public void CameraOverrides_ApplyToTheDefaultCamera()
+    {
+        Sidecar plain = PreviewPipeline.Run(Request(dryRun: true), renderer: null);
+        Sidecar turned = PreviewPipeline.Run(
+            Request(dryRun: true) with { CameraOverrides = new Dictionary<string, string> { ["yawDegrees"] = "90" } }, renderer: null);
+        Assert.AreEqual(90.0, turned.Camera.YawDegrees);
+        Assert.AreEqual(plain.Camera.Position, turned.Camera.Position, "the default pose is kept");
+        Assert.IsFalse(turned.DefaultCamera, "an overridden camera is no longer the default one");
+    }
+
+    [TestMethod]
+    public void WorldCache_IsReusedAcrossTimeOfDay()
+    {
+        var renderer = new FakeRenderer();
+        var worlds = new World.WorldCache();
+        PreviewPipeline.Run(Request(dryRun: false), renderer, worlds: worlds);
+        PreviewPipeline.Run(Request(dryRun: false) with { RecipeOverrides = new Dictionary<string, string> { ["time"] = "\"dusk\"" } },
+            renderer, worlds: worlds);
+        Assert.AreSame(renderer.Scenes[0].Mesh, renderer.Scenes[1].Mesh);
+        Assert.AreSame(renderer.Scenes[0].Terrain, renderer.Scenes[1].Terrain);
+    }
+
+    [TestMethod]
     public void NoRenderer_RequiresADryRun() =>
         Assert.ThrowsExactly<InvalidOperationException>(() => PreviewPipeline.Run(Request(dryRun: false), renderer: null));
 
     private sealed class FixedTime(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
-    }
-
-    /// <summary>A stand-in for the GPU: drives the planner like the real host must, returns synthetic buffers.</summary>
-    private sealed class FakeRenderer : IVistaRenderer
-    {
-        public const string Name = "Fake GPU";
-
-        public Aov? Skip { get; init; }
-
-        public BatchPlanner? Planner { get; private set; }
-
-        public IReadOnlySet<Aov>? Requested { get; private set; }
-
-        public VistaScene? Scene { get; private set; }
-
-        public RenderSettings? Settings { get; private set; }
-
-        public string DeviceName => Name;
-
-        public RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner)
-        {
-            Scene = scene;
-            Settings = settings;
-            Planner = planner;
-            Requested = aovs;
-            int dispatches = 0;
-            while (planner.HasNext)
-            {
-                SampleBatch batch = planner.Next();
-                planner.Complete(batch, TimeSpan.FromMilliseconds(1));
-                dispatches++;
-            }
-
-            int pixels = settings.Width * settings.Height;
-            var xyz = new float[pixels * 3];
-            for (int p = 0; p < pixels; p++)
-            {
-                float t = p / (float)pixels;
-                xyz[p * 3] = 0.95f * t;
-                xyz[p * 3 + 1] = t;
-                xyz[p * 3 + 2] = 1.09f * t;
-            }
-            var buffers = new Dictionary<Aov, float[]>();
-            foreach (Aov aov in aovs.Where(a => a != Skip))
-            {
-                var data = new float[pixels * AovLayout.Channels(aov)];
-                for (int i = 0; i < data.Length; i++)
-                    data[i] = (i % 7) * 0.1f + 0.05f;
-                if (aov == Aov.MaterialId)
-                {
-                    for (int i = 1; i < data.Length; i += 2)
-                        data[i] = -1f; // every other pixel is sky
-                    for (int i = 0; i < data.Length; i += 2)
-                        data[i] = 0f;  // the rest is terrain
-                }
-                buffers[aov] = data;
-            }
-            long pixelSamples = (long)pixels * settings.SamplesPerPixel;
-            return new RenderOutput(settings.Width, settings.Height, xyz, buffers, new RenderStats
-            {
-                RaysTraced = (ulong)(pixelSamples * 3),
-                PixelSamples = pixelSamples,
-                Dispatches = dispatches,
-                TraceSeconds = dispatches * 0.001,
-            });
-        }
     }
 }

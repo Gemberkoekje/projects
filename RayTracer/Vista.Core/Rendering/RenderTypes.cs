@@ -8,11 +8,21 @@ namespace Vista.Rendering;
 /// <summary>Quality and size of one render. A preview differs from a final only in its pixel count (vista-plan §7.4).</summary>
 public sealed record RenderSettings
 {
-    /// <summary>Image width in pixels.</summary>
+    /// <summary>Frame width in pixels: the camera's image, of which <see cref="Window"/> may render only a part.</summary>
     public required int Width { get; init; }
 
-    /// <summary>Image height in pixels.</summary>
+    /// <summary>Frame height in pixels.</summary>
     public required int Height { get; init; }
+
+    /// <summary>
+    /// The loupe (vista-plan §7.4): the part of the frame to render, in frame pixels. Each pixel keeps the
+    /// frame's camera ray and random keys, so a window is exactly a crop of the full render. Empty (the
+    /// default) renders the whole frame.
+    /// </summary>
+    public PixelWindow Window { get; init; }
+
+    /// <summary>The pixels actually rendered: <see cref="Window"/>, or the whole frame when it is empty.</summary>
+    public PixelWindow Rendered => Window.IsEmpty ? PixelWindow.Full(Width, Height) : Window;
 
     /// <summary>Samples per pixel (fixed in M0; a noise target comes with adaptive sampling).</summary>
     public int SamplesPerPixel { get; init; } = 64;
@@ -67,10 +77,10 @@ public sealed record VistaScene(
     SunState Sun,
     IReadOnlyList<VistaMaterial> Materials);
 
-/// <summary>What a renderer returns.</summary>
-/// <param name="Width">Image width.</param>
-/// <param name="Height">Image height.</param>
-/// <param name="Xyz">Mean CIE XYZ per pixel, 3 floats per pixel, row 0 at the top.</param>
+/// <summary>What a renderer returns: the <see cref="RenderSettings.Rendered"/> window of the frame.</summary>
+/// <param name="Width">Width of the rendered window.</param>
+/// <param name="Height">Height of the rendered window.</param>
+/// <param name="Xyz">Mean CIE XYZ per pixel, 3 floats per pixel, the window's top row first.</param>
 /// <param name="Aovs">The requested auxiliary buffers (see <see cref="Aov"/> for each layout).</param>
 /// <param name="Stats">Ray counts and timings.</param>
 public sealed record RenderOutput(
@@ -90,7 +100,8 @@ public interface IVistaRenderer
     string DeviceName { get; }
 
     /// <summary>
-    /// Renders <paramref name="scene"/>, issuing dispatches from <paramref name="planner"/> and reporting
+    /// Renders the <see cref="RenderSettings.Rendered"/> window of <paramref name="scene"/>, issuing dispatches
+    /// from <paramref name="planner"/> (made for that window's size; its rows are window rows) and reporting
     /// each one's GPU time back to it, and returns the requested <paramref name="aovs"/>.
     /// </summary>
     RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner);

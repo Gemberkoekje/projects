@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "snow-capped mountains, day",
+  "setPieces": [
+    "snowCappedMountains"
+  ],
+  "time": "day",
+  "season": "summer"
+}

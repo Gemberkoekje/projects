@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using Vista.App.Gpu;
 using Vista.Cli;
 using Vista.Output;
@@ -8,7 +10,8 @@ namespace Vista.App;
 
 /// <summary>
 /// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through offline
-/// integrator v0, or without a GPU with <c>--dry-run</c> — and the dev-box checks with <c>--gpu-selftest</c>.
+/// integrator v0, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
+/// <c>--sheet-from</c> tiles existing images), and the dev-box checks with <c>--gpu-selftest</c>.
 /// </summary>
 internal static class Program
 {
@@ -16,17 +19,31 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        Console.OutputEncoding = Encoding.UTF8; // sizes print as 640×360
         if (args is [SelfTestFlag])
             return RunGpu(() => GpuSelfTest.Run(Console.Out));
 
-        if (!PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors))
+        try
         {
-            foreach (string error in errors)
-                Console.Error.WriteLine(error);
-            Console.Error.WriteLine(PreviewCommandLine.Usage);
-            Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism checks on the GPU)");
+            return args.FirstOrDefault() switch
+            {
+                "--sheet" => Sheet(args),
+                "--sheet-from" => SheetFrom(args),
+                _ => Preview(args),
+            };
+        }
+        catch (Exception e) when (e is InvalidDataException or JsonException or IOException or UnauthorizedAccessException)
+        {
+            // A bad or missing input file: the message says which and why; a stack trace would only bury it.
+            Console.Error.WriteLine($"error: {e.Message}");
             return 1;
         }
+    }
+
+    private static int Preview(string[] args)
+    {
+        if (!PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors))
+            return Usage(errors);
 
         if (request!.DryRun)
             return Report(PreviewPipeline.Run(request, renderer: null));
@@ -36,6 +53,38 @@ internal static class Program
             using var renderer = new D3D12VistaRenderer();
             return Report(PreviewPipeline.Run(request, renderer));
         });
+    }
+
+    private static int Sheet(string[] args)
+    {
+        if (!SheetCommandLine.TryParse(args, out SheetRequest? request, out IReadOnlyList<string> errors))
+            return Usage(errors);
+
+        if (request!.Base.DryRun)
+            return Report(SheetPipeline.Render(request, renderer: null));
+
+        return RunGpu(() =>
+        {
+            using var renderer = new D3D12VistaRenderer();
+            return Report(SheetPipeline.Render(request, renderer));
+        });
+    }
+
+    private static int SheetFrom(string[] args)
+    {
+        if (!SheetCommandLine.TryParseFrom(args, out SheetFromRequest? request, out IReadOnlyList<string> errors))
+            return Usage(errors);
+        return Report(SheetPipeline.FromFiles(request!));
+    }
+
+    private static int Usage(IReadOnlyList<string> errors)
+    {
+        foreach (string error in errors)
+            Console.Error.WriteLine(error);
+        Console.Error.WriteLine(PreviewCommandLine.Usage);
+        Console.Error.WriteLine(SheetCommandLine.Usage);
+        Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism checks on the GPU)");
+        return 1;
     }
 
     private static int RunGpu(Func<int> run)
@@ -64,6 +113,18 @@ internal static class Program
                 $"longest dispatch {s.LongestDispatchSeconds * 1e3:0.0} ms"));
         }
         foreach (string warning in sidecar.Warnings)
+            Console.Error.WriteLine($"warning: {warning}");
+        return 0;
+    }
+
+    private static int Report(SheetSidecar sheet)
+    {
+        foreach ((string role, string file) in sheet.Outputs)
+            Console.WriteLine($"{role}: {file}");
+        Console.WriteLine($"{sheet.Cells.Count} cells, {sheet.Columns}×{sheet.Rows}, {sheet.Width}×{sheet.Height} px");
+        foreach (SheetCellInfo cell in sheet.Cells)
+            Console.WriteLine($"  {cell.Index}: {cell.Label} ({cell.Source})");
+        foreach (string warning in sheet.Warnings)
             Console.Error.WriteLine($"warning: {warning}");
         return 0;
     }

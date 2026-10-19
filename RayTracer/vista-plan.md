@@ -3,7 +3,7 @@
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
 through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
-seventeen slices in §10 (**M1 plan**), M1.1 first. It sits
+seventeen slices in §10 (**M1 plan**); M1.1 (contact sheets and the loupe) is done, M1.2 is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -883,11 +883,16 @@ Work stops after each PR for review.
 - It ends with its status, decisions and gotchas written into this section.
 
 *M1 cost ledger:* ns per pixel-sample (mean over dispatches) on the four M0 measurement views at
-3840×2160, 64 spp, seed 42. M1.1 commits their camera files.
+3840×2160, 64 spp, seed 42. The views are committed in `vista-views/` (M1.1);
+`powershell -ExecutionPolicy Bypass -File vista-views/measure.ps1` renders them and prints the row.
 
 | After | Sky only | Aerial, day | Default camera, day | Down a slope, golden hour |
 |---|---|---|---|---|
 | M0 | 0.24 | 0.70 | 0.88 | 1.32 |
+| M1.1 | 0.24 | 0.73 | 0.87 | 1.31 |
+
+M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
+so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -902,6 +907,103 @@ Work stops after each PR for review.
 - *Verify:* `--gpu-selftest` adds a loupe check: a 64×64 window of a 640×360 frame is bit-identical
   to the same window cut from the full render. A four-seed sheet and a time-of-day sheet render
   headless on the 3070. CI: sheet layout, labels and the sheet sidecar.
+
+*M1.1 status (2026-10-19): done.* Every deliverable and check is met; nothing in `RayTracer.Core` /
+`RayTracer.Gpu` changed. `Vista.Tests` has 271 tests (130 new).
+
+*Checks (on the RTX 3070 unless noted):*
+
+- **Loupe = crop:** `--gpu-selftest` renders the self-test scene at 640×360, then the 64×64 window at
+  (291, 137), off the 8-pixel thread-group grid and straddling the central peak and the sky. Beauty and
+  every debug buffer equal that window of the full frame bit for bit; so does the window rendered again
+  under the 0.05 ms budget (87 dispatches against 1). A Debug build (GPU-based validation) reports nothing.
+- **Full frames unchanged:** four previews (default, aerial, down-slope, a 640×360 golden-hour view with
+  every debug output) are byte-identical to the M0 build's PNGs and EXRs, and the ledger views trace the
+  same rays per sample as M0.
+- **Sheets headless:** a four-seed sheet (2.7 s wall, four worlds) and a five-cell time-of-day sheet with
+  a normal-map sheet (2.0 s wall, one world) rendered from one `Vista.App` call each. A 4K loupe of a peak
+  (320×180 out of 3840×2160) takes 1.4 s wall, almost all of it world generation.
+- **CI:** layout geometry, the font, label and title derivation, the sheet sidecar (written and read
+  back), the axis parser, `--sheet-from` labelling, the PNG decoder (every filter type), JSON overrides,
+  the world cache, loupe requests and the committed view files.
+
+*M1.1 decisions taken in code (revisit freely):*
+
+- **A loupe keys pixels by their place in the frame.** The shader's pixel hash and camera ray use
+  `(WindowX + x, WindowY + y)` and the frame size; buffers, dispatches and the batch planner are
+  window-sized. A full render is the window at (0, 0) of its own size, which is why every M0 value is
+  unchanged. `RenderSettings.Width/Height` stay the frame; `Window` is empty for the whole frame and
+  `Rendered` resolves it, so host code sizes buffers from `Rendered`, never from `Width × Height`.
+- **Sidecar schema 2** adds `image.window`, always present (the whole frame when there is no loupe).
+  `image.width/height` remain the frame, so a loupe's sidecar still says which final it is a piece of.
+- **A sheet axis is `key=v1,v2,…`:** `seed`, `recipe` (files), `camera` (files or `default`), `spp`,
+  `bounces`, `camera.<field>`, or any recipe field by dotted path. Field values are written loosely
+  (`time=dawn,dusk`, `setPieces=[snowCappedMountains],[snowCappedMountains, lake]`) and applied as JSON
+  overrides *before* the strict parser, so a misspelt field still fails, and every cell is checked before
+  the first renders. The linked sliders (M1.11) become recipe fields, so they get sheets for free.
+- **Each cell is a complete preview** under `<sheet>.cells/` (PNG, EXR, sidecar, debug images), and the
+  sheet tiles the written PNGs. Each requested debug output gets its own sheet (`<sheet>.normal.png`); a
+  `--dry-run` sheet tiles the cells' height maps, so world variants can be compared without a GPU.
+- **Labels:** `--sheet` labels cells `key=value`. `--sheet-from` labels each image by the identity fields
+  of its sidecar that differ from the others' (recipe, seed, camera, size, loupe, spp, bounces, display
+  transform, build commit — never timings or ray counts), so a main-vs-branch pair is labelled by build;
+  `--labels` overrides. The title is the fields every cell shares. Sidecars are read as plain JSON, not as
+  `Sidecar`, so renders from older and newer schemas tile together. The default camera is compared as
+  "default", not by its pose, which follows the terrain (else a seed sheet would label every cell with a
+  camera height).
+- **Font:** 5×7 glyphs on a 9-row cell (two rows of descenders), printable ASCII plus `°×·−…`, drawn at
+  one scale per 320 px of cell width (at most 4). An unknown character draws a hollow box. Long labels are
+  cut with `…`; titles wrap at `" · "`.
+- **One-world cache:** the cells of a sheet share a `WorldCache` keyed by what `TerrainGenerator` reads
+  (terrain profile and seed). A time-of-day sheet generates and meshes once, and the same mesh instance
+  lets the renderer keep its BLAS. Watch mode (M1.8) replaces it with a cache per stage.
+- **The measurement views are files** in `vista-views/`: two recipes and four cameras.
+  `default.camera.json` pins M0's default camera for seed 42 (y = 1692.21 m), so terrain changes cannot move
+  the view; a test keeps every camera above the seed-42 ground, which will flag it if erosion buries one.
+- **CLI:** a missing or invalid input file prints one `error:` line and exits 1 instead of a stack trace;
+  console output is UTF-8 so sizes print as `640×360`.
+
+*M1.1 gotchas:*
+
+- **This machine's locale writes decimal commas.** An interpolated `double` in JSON or in a script's
+  printout came out as `1692,21`; anything machine-read uses the invariant culture.
+- **`--sheet-from` labels builds by the commit in `engine.vistaVersion`, which is `HEAD`'s.** An
+  uncommitted branch build labels itself with its base commit, so commit before rendering the "after".
+- **The sheet's PNGs are read back with a small decoder** (`PngDecoder`): 8-bit, non-interlaced grey, RGB
+  or RGBA only, CRCs unchecked. That covers every file Vista writes, not arbitrary PNGs.
+
+**M1.1 hand-off.** To understand M1.1, start by reading `Vista.Core/Cli/SheetPipeline.cs` (both sheet
+flows), then `Vista.Core/Output/SheetLabels.cs` (how cells are labelled), then the `WindowX` / `FrameWidth`
+lines of `Vista.App/Shaders/VistaIntegrator.hlsl` (the loupe).
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --width 3840 --loupe 1700,800,320,180 --out l.png
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --vary time=dawn,day,goldenHour,dusk --out s.png
+    [--columns N] [--title text] [--debug normal] [--loupe x,y,w,h] [any --preview option] [--dry-run]
+dotnet run --project Vista.App -c Release -- --sheet-from main.png branch.png --out before-after.png [--labels before,after]
+powershell -ExecutionPolicy Bypass -File vista-views/measure.ps1
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/Rendering/PixelWindow.cs`, `RenderTypes.cs` | The loupe window; `RenderSettings.Window` / `Rendered` |
+| `Vista.App/Shaders/VistaIntegrator.hlsl`, `Gpu/D3D12VistaRenderer.cs` | Window-sized buffers, frame-keyed pixels |
+| `Vista.App/Gpu/GpuSelfTest.cs` | The three loupe checks |
+| `Vista.Core/Cli/PreviewCommandLine.cs`, `PreviewPipeline.cs` | `--loupe`, recipe / camera overrides, the world cache; options shared with `--sheet` |
+| `Vista.Core/Cli/SheetAxis.cs`, `SheetCommandLine.cs`, `SheetPipeline.cs` | `--sheet` and `--sheet-from` |
+| `Vista.Core/Output/BitmapFont.cs`, `ContactSheet.cs`, `SheetLabels.cs`, `SheetSidecar.cs`, `PngDecoder.cs` | Font, layout and compositing, labels, the sheet sidecar, reading PNGs back |
+| `Vista.Core/Output/Sidecar.cs` | Schema 2: `image.window` |
+| `Vista.Core/Recipes/JsonOverrides.cs`, `Vista.Core/World/WorldCache.cs` | Field overrides and loose values; the one-world cache |
+| `Vista.App/Program.cs` | The two sheet modes, one-line input errors, UTF-8 console |
+| `vista-views/` | The four measurement views, their recipes, `measure.ps1`, a README |
+| `Vista.Tests/*` | `PixelWindow`, `JsonOverrides`, `WorldCache`, `BitmapFont`, `ContactSheet`, `PngDecoder`, `SheetLabels`, `SheetCommandLine`, `SheetPipeline`, `MeasurementView` tests; loupe and override cases in the preview tests; the fake renderer is shared and window-aware |
+
+**Next: M1.2** (astronomy and place). From here on, a look-changing PR attaches a `--sheet-from`
+before/after of the measurement views and adds a ledger row.
 
 **M1.2 — Astronomy & place.**
 - *Goal:* the real sun for a place, a date and a local solar time, with dawn and dusk below the

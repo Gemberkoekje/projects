@@ -22,6 +22,10 @@ namespace Vista.App.Gpu;
 /// <c>Next</c> → dispatch → <c>Complete</c> with the GPU time from timestamp queries — then reads the float
 /// sums back and converts them with <see cref="IntegratorReadback"/>.
 ///
+/// <para>A render covers <see cref="RenderSettings.Rendered"/>: the whole frame, or a loupe window of it
+/// (vista-plan §7.4). Buffers and dispatches are window-sized; the shader keys each pixel's camera ray and
+/// random numbers by its place in the full frame, so a window is exactly a crop of the full render.</para>
+///
 /// <para>Following the engine's convention (vista-plan §8.1), the D3D12 scaffolding — device creation, the
 /// RT-tier check, command objects, the fence wait, buffer helpers, BLAS/TLAS building — is copied from the
 /// <c>PhaseNRenderer</c> hosts rather than shared; only <see cref="ShaderCompiler"/> is reused from
@@ -115,8 +119,9 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public float ForwardX, ForwardY, ForwardZ, SkyStrength;
         public float ToSunX, ToSunY, ToSunZ, SunOneMinusCosMax;
         public float RayleighDepth; public uint SunUp, MaxBounces, AovMask;
-        public uint Width, Height, RowStart, RowCount;
+        public uint Width, Height, RowStart, RowCount;            // the rendered window; rows within it
         public uint FirstSample, SampleCount, TerrainMaterial, Pad0;
+        public uint WindowX, WindowY, FrameWidth, FrameHeight;    // the window's place in the full frame
     }
 
     /// <inheritdoc />
@@ -126,7 +131,10 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(aovs);
         ArgumentNullException.ThrowIfNull(planner);
-        if (planner.Width != settings.Width || planner.Height != settings.Height || planner.SamplesPerPixel != settings.SamplesPerPixel)
+        PixelWindow window = settings.Rendered;
+        if (!window.FitsIn(settings.Width, settings.Height))
+            throw new ArgumentException($"Window {window} does not fit the {settings.Width}×{settings.Height} frame.", nameof(settings));
+        if (planner.Width != window.Width || planner.Height != window.Height || planner.SamplesPerPixel != settings.SamplesPerPixel)
             throw new ArgumentException("The planner was made for a different image.", nameof(planner));
         if (planner.Dispatches != 0)
             throw new ArgumentException("The planner has already issued dispatches.", nameof(planner));
@@ -150,7 +158,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         IntegratorTables tables = IntegratorTables.Build(scene.Materials, light);
         UploadTables(tables);
         uint mask = MaskFor(aovs);
-        EnsureImageBuffers(settings.Width, settings.Height, mask);
+        EnsureImageBuffers(window.Width, window.Height, mask);
         ResetRayCounter();
         stages["setup"] = Lap(stopwatch);
 
@@ -165,15 +173,15 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             constants.RowCount = (uint)batch.RowCount;
             constants.FirstSample = (uint)batch.FirstSample;
             constants.SampleCount = (uint)batch.SampleCount;
-            double seconds = Dispatch(constants, settings.Width, batch.RowCount);
+            double seconds = Dispatch(constants, window.Width, batch.RowCount);
             planner.Complete(batch, TimeSpan.FromSeconds(seconds));
             traceSeconds += seconds;
             longest = Math.Max(longest, seconds);
-            maxCostNs = Math.Max(maxCostNs, seconds * 1e9 / batch.PixelSamples(settings.Width));
+            maxCostNs = Math.Max(maxCostNs, seconds * 1e9 / batch.PixelSamples(window.Width));
         }
         stages["trace"] = Lap(stopwatch);
 
-        int pixels = settings.Width * settings.Height;
+        int pixels = window.Pixels;
         float[] xyz = IntegratorReadback.MeanXyz(ReadFloats(_xyzSum!, pixels * IntegratorReadback.XyzSumStride), pixels, settings.SamplesPerPixel);
         var buffers = new Dictionary<Aov, float[]>();
         if (aovs.Contains(Aov.Albedo))
@@ -203,7 +211,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             MaxCostNsPerPixelSample = maxCostNs,
             StageSeconds = stages,
         };
-        return new RenderOutput(settings.Width, settings.Height, xyz, buffers, stats);
+        return new RenderOutput(window.Width, window.Height, xyz, buffers, stats);
     }
 
     private static uint MaskFor(IReadOnlySet<Aov> aovs)
@@ -243,9 +251,13 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             SunUp = light.SunUp ? 1u : 0u,
             MaxBounces = (uint)settings.MaxBounces,
             AovMask = mask,
-            Width = (uint)settings.Width,
-            Height = (uint)settings.Height,
+            Width = (uint)settings.Rendered.Width,
+            Height = (uint)settings.Rendered.Height,
             TerrainMaterial = (uint)MaterialCatalog.Terrain.Id,
+            WindowX = (uint)settings.Rendered.X,
+            WindowY = (uint)settings.Rendered.Y,
+            FrameWidth = (uint)settings.Width,
+            FrameHeight = (uint)settings.Height,
         };
     }
 

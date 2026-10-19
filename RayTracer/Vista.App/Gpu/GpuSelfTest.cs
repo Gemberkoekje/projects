@@ -19,6 +19,9 @@ namespace Vista.App.Gpu;
 ///   same ray count (the batch partition must not change the image);</item>
 ///   <item>with no debug outputs — the beauty is bit-identical (asking for debug images never changes it).</item>
 /// </list>
+/// Then the loupe (M1.1): a 640×360 frame, a 64×64 window of it straddling a peak and the sky, and that window
+/// again under the 0.05 ms budget. The window must equal the same pixels cut from the frame, bit for bit in
+/// the beauty and every debug output, however it is split into dispatches.
 /// </summary>
 internal static class GpuSelfTest
 {
@@ -58,6 +61,16 @@ internal static class GpuSelfTest
                 : $"{reference.Stats.Dispatches} and {split.Stats.Dispatches} dispatches for {settings.SamplesPerPixel} samples");
         pass &= Check(log, "0.05 ms budget is bit-identical", Same(reference, split, compareAovs: true));
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
+
+        // The loupe: off the 8-pixel thread-group grid, with the central peak and sky in it.
+        var frame = settings with { Width = 640, Height = 360 };
+        var window = new PixelWindow(291, 137, 64, 64);
+        RenderOutput full = Render(renderer, scene, frame, allAovs, new BatchPlannerOptions(), log, "640×360 frame");
+        RenderOutput loupe = Render(renderer, scene, frame with { Window = window }, allAovs, new BatchPlannerOptions(), log, $"loupe {window}");
+        RenderOutput loupeSplit = Render(renderer, scene, frame with { Window = window }, allAovs, tight, log, $"loupe {window}, 0.05 ms budget");
+        pass &= Check(log, "the loupe sees both sky and terrain", Mixed(loupe));
+        pass &= Check(log, "the loupe is that window of the full frame, bit for bit", SameAsCrop(full, loupe, window));
+        pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
         log.WriteLine(pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
     }
@@ -65,7 +78,7 @@ internal static class GpuSelfTest
     private static RenderOutput Render(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings,
         IReadOnlySet<Aov> aovs, BatchPlannerOptions batching, TextWriter log, string label)
     {
-        var planner = new BatchPlanner(settings.Width, settings.Height, settings.SamplesPerPixel, batching);
+        var planner = new BatchPlanner(settings.Rendered.Width, settings.Rendered.Height, settings.SamplesPerPixel, batching);
         RenderOutput output = renderer.Render(scene, settings with { Batching = batching }, aovs, planner);
         RenderStats s = output.Stats;
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
@@ -100,6 +113,27 @@ internal static class GpuSelfTest
             return $"{output.Stats.PixelSamples} pixel-samples traced, expected {pixelSamples}";
         if (output.Stats.RaysTraced <= (ulong)pixelSamples)
             return $"{output.Stats.RaysTraced} rays for {pixelSamples} pixel-samples; the ray counter is not counting";
+        return null;
+    }
+
+    private static string? Mixed(RenderOutput output)
+    {
+        float[] ids = output.Aovs[Aov.MaterialId];
+        int sky = ids.Count(id => id < 0f);
+        return sky > 0 && sky < ids.Length ? null : $"{sky} of {ids.Length} pixels see sky; move the window onto the horizon";
+    }
+
+    private static string? SameAsCrop(RenderOutput frame, RenderOutput loupe, PixelWindow window)
+    {
+        if (loupe.Width != window.Width || loupe.Height != window.Height)
+            return $"the loupe is {loupe.Width}×{loupe.Height}, expected {window.Width}×{window.Height}";
+        if (Differs(window.Crop(frame.Xyz, frame.Width, 3), loupe.Xyz) is { } xyz)
+            return $"XYZ {xyz}";
+        foreach ((Aov aov, float[] data) in frame.Aovs)
+        {
+            if (Differs(window.Crop(data, frame.Width, AovLayout.Channels(aov)), loupe.Aovs[aov]) is { } diff)
+                return $"{aov} {diff}";
+        }
         return null;
     }
 

@@ -10,7 +10,12 @@
 // index) alone — never from the dispatch — and a pixel's samples are always added in sample-index order,
 // starting from zero at sample 0. So the image is the same however the render is split into dispatches.
 //
-// One thread per pixel of a row band; it traces samples [FirstSample, FirstSample + SampleCount).
+// The loupe (vista-plan §7.4, M1.1): a render may cover only a window of the frame. The output buffers are
+// window-sized, but the camera ray and the random keys belong to the pixel's place in the full frame, so a
+// window is bit for bit the same pixels as the full render. A full render is the window at (0, 0) of its own
+// size, which leaves every value as M0 computed it.
+//
+// One thread per pixel of a row band of the window; it traces samples [FirstSample, FirstSample + SampleCount).
 
 #define HERO_COUNT        50u
 #define COMPANIONS        4u
@@ -51,8 +56,9 @@ cbuffer Constants : register(b0)
     float3 CamForward;  float SkyStrength;
     float3 ToSun;       float SunOneMinusCosMax;   // 1 − cos(sun angular radius), computed in double on the CPU
     float  RayleighDepth; uint SunUp;      uint MaxBounces; uint AovMask;
-    uint   Width;         uint Height;     uint RowStart;   uint RowCount;
+    uint   Width;         uint Height;     uint RowStart;   uint RowCount;     // the rendered window; rows within it
     uint   FirstSample;   uint SampleCount; uint TerrainMaterial; uint _pad0;
+    uint   WindowX;       uint WindowY;    uint FrameWidth; uint FrameHeight;  // the window's place in the full frame
 };
 
 // ── Random numbers: a stream per (pixel, sample index) ────────────────────────────────────────────
@@ -210,6 +216,7 @@ struct SampleResult
     uint   Rays;
 };
 
+// (x, y) are full-frame pixel coordinates.
 SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 {
     SampleResult result = (SampleResult)0;
@@ -229,8 +236,8 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
     // Box-filtered camera ray through a random point of the pixel.
     float jx = NextFloat(rng);
     float jy = NextFloat(rng);
-    float px = (2.0 * ((float(x) + jx) / float(Width)) - 1.0) * TanHalfFovY * Aspect;
-    float py = (1.0 - 2.0 * ((float(y) + jy) / float(Height))) * TanHalfFovY;
+    float px = (2.0 * ((float(x) + jx) / float(FrameWidth)) - 1.0) * TanHalfFovY * Aspect;
+    float py = (1.0 - 2.0 * ((float(y) + jy) / float(FrameHeight))) * TanHalfFovY;
     float3 dir = normalize(CamForward + px * CamRight + py * CamUp);
     float3 origin = CamPos;
 
@@ -315,8 +322,10 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     {
         uint x = tid.x;
         uint y = RowStart + tid.y;
-        uint pixel = y * Width + x;
-        uint pixelHash = PcgHash(pixel);
+        uint pixel = y * Width + x;                     // index into this render's (window-sized) buffers
+        uint fx = WindowX + x;                          // the same pixel in the full frame
+        uint fy = WindowY + y;
+        uint pixelHash = PcgHash(fy * FrameWidth + fx); // keyed by the frame pixel, so a loupe is exactly a crop
         bool first = FirstSample == 0u;
 
         float4 xyzSum = first ? float4(0.0, 0.0, 0.0, 0.0) : XyzSum[pixel];
@@ -332,7 +341,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
 
         for (uint s = FirstSample; s < FirstSample + SampleCount; s++)
         {
-            SampleResult r = TraceSample(x, y, pixelHash, s);
+            SampleResult r = TraceSample(fx, fy, pixelHash, s);
             rays += r.Rays;
             xyzSum.xyz += r.Xyz;
 

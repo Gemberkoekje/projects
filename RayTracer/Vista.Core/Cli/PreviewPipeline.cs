@@ -14,12 +14,16 @@ namespace Vista.Cli;
 /// generate the world, mesh it, hand the scene to an <see cref="IVistaRenderer"/>, and write the beauty
 /// (PNG + EXR), the requested debug images and the sidecar. With no renderer (<c>--dry-run</c>) it stops
 /// before the GPU and writes the sidecar plus a top-down height map, so the world side can be inspected
-/// from any machine.
+/// from any machine. A loupe request renders only its window of the frame; the files are window-sized and the
+/// sidecar records the window.
 /// </summary>
 public static class PreviewPipeline
 {
-    /// <summary>Runs <paramref name="request"/>; returns the sidecar that was written.</summary>
-    public static Sidecar Run(PreviewRequest request, IVistaRenderer? renderer, TimeProvider? time = null)
+    /// <summary>
+    /// Runs <paramref name="request"/>; returns the sidecar that was written. Renders that share a world (the
+    /// cells of a contact sheet) pass one <paramref name="worlds"/> cache so it is generated and meshed once.
+    /// </summary>
+    public static Sidecar Run(PreviewRequest request, IVistaRenderer? renderer, TimeProvider? time = null, WorldCache? worlds = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (renderer is null && !request.DryRun)
@@ -31,16 +35,18 @@ public static class PreviewPipeline
         var warnings = new List<string>();
         var stopwatch = Stopwatch.StartNew();
 
-        Recipe recipe = VistaJson.ParseRecipe(File.ReadAllText(request.RecipePath));
-        HeightField terrain = TerrainGenerator.Generate(recipe, request.Seed);
+        Recipe recipe = VistaJson.ParseRecipe(JsonOverrides.Apply(File.ReadAllText(request.RecipePath), request.RecipeOverrides));
+        HeightField terrain = worlds?.Terrain(recipe, request.Seed) ?? TerrainGenerator.Generate(recipe, request.Seed);
         timings["worldGen"] = Lap(stopwatch);
 
-        TerrainMesh mesh = HeightFieldMesher.Build(terrain);
+        TerrainMesh mesh = worlds?.Mesh(terrain) ?? HeightFieldMesher.Build(terrain);
         timings["mesh"] = Lap(stopwatch);
 
         CameraSpec camera = request.CameraPath is null
             ? DefaultCamera.For(terrain)
             : VistaJson.ParseCamera(File.ReadAllText(request.CameraPath));
+        if (request.CameraOverrides.Count > 0)
+            camera = VistaJson.ParseCamera(JsonOverrides.Apply(VistaJson.Serialize(camera), request.CameraOverrides));
         if (DefaultCamera.GroundWarning(camera, terrain) is { } groundWarning)
             warnings.Add(groundWarning);
 
@@ -53,7 +59,11 @@ public static class PreviewPipeline
             SamplesPerPixel = request.SamplesPerPixel,
             MaxBounces = request.MaxBounces,
             Batching = new BatchPlannerOptions { DispatchBudgetMs = request.DispatchBudgetMs },
+            Window = request.Loupe,
         };
+        PixelWindow window = settings.Rendered;
+        if (!window.FitsIn(settings.Width, settings.Height))
+            throw new ArgumentException($"Loupe {window} does not fit the {settings.Width}×{settings.Height} frame.", nameof(request));
 
         string directory = Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!;
         string baseName = Path.GetFileNameWithoutExtension(request.OutPath);
@@ -71,25 +81,25 @@ public static class PreviewPipeline
         else
         {
             var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, sun, materials);
-            var planner = new BatchPlanner(settings.Width, settings.Height, settings.SamplesPerPixel, settings.Batching);
+            var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
             RenderOutput output = renderer.Render(scene, settings, AovsFor(request.Debug), planner);
-            if (output.Width != settings.Width || output.Height != settings.Height)
-                throw new InvalidOperationException($"Renderer returned {output.Width}×{output.Height}, expected {settings.Width}×{settings.Height}.");
-            if (output.Xyz.Length != settings.Width * settings.Height * 3)
-                throw new InvalidOperationException($"Renderer returned {output.Xyz.Length} XYZ floats, expected {settings.Width * settings.Height * 3}.");
+            if (output.Width != window.Width || output.Height != window.Height)
+                throw new InvalidOperationException($"Renderer returned {output.Width}×{output.Height}, expected {window.Width}×{window.Height}.");
+            if (output.Xyz.Length != window.Pixels * 3)
+                throw new InvalidOperationException($"Renderer returned {output.Xyz.Length} XYZ floats, expected {window.Pixels * 3}.");
             timings["render"] = Lap(stopwatch);
             renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, camera.ExposureEv), settings.Width, settings.Height, PngColor.Rgb);
+            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, camera.ExposureEv), window.Width, window.Height, PngColor.Rgb);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
-            ExrEncoder.WriteRgb(Sibling(".exr"), linear, settings.Width, settings.Height);
+            ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
             outputs["beautyExr"] = baseName + ".exr";
             foreach (DebugOutput debug in request.Debug.OrderBy(d => d))
             {
                 string role = debug.ToString().ToLowerInvariant();
                 byte[] rgb = DebugImage(debug, output, materials);
-                PngEncoder.Write(Sibling($".{role}.png"), rgb, settings.Width, settings.Height, PngColor.Rgb);
+                PngEncoder.Write(Sibling($".{role}.png"), rgb, window.Width, window.Height, PngColor.Rgb);
                 outputs[role] = $"{baseName}.{role}.png";
             }
             timings["write"] = Lap(stopwatch);
@@ -104,8 +114,8 @@ public static class PreviewPipeline
             Recipe = recipe,
             Seed = request.Seed,
             Camera = camera,
-            DefaultCamera = request.CameraPath is null,
-            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name),
+            DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0,
+            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name, window),
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,
                 terrain.Size,
