@@ -15,6 +15,10 @@ every slice measures the same pixels. They are the views M0's batch defaults wer
 ground there). It is a file now so later terrain changes do not move the view; if erosion (M1.7) lifts the
 ground above it, the preview warns and the view needs a new height.
 
+Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
+defaults change (M1.11 lets set pieces push them): day is solar noon, 65.5° up due south, and golden hour
+sunset − 60 min, 8.5° up at azimuth 292°.
+
 Measure (from `RayTracer/`, after `dotnet build Vista.App -c Release`):
 
 ```

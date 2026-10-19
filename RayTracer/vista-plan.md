@@ -890,9 +890,12 @@ Work stops after each PR for review.
 |---|---|---|---|---|
 | M0 | 0.24 | 0.70 | 0.88 | 1.32 |
 | M1.1 | 0.24 | 0.73 | 0.87 | 1.31 |
+| M1.2 | 0.24 | 0.68 | 0.83 | 1.26 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
+M1.2 moves the sun but adds no work: a second run gave 0.24, 0.69, 0.84, 1.28, and the views trace 1.00,
+2.42, 2.29 and 3.23 rays per sample (the low sun now casts other shadows on the down-slope view).
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -1025,6 +1028,123 @@ before/after of the measurement views and adds a ledger row.
 - *Verify:* CI: sun positions against NOAA calculator values (both hemispheres, equinoxes and
   solstices, polar day and night) within 0.05°; season/date tests. 3070: a time-of-day sheet at
   Zermatt in October; the self-test passes.
+
+*M1.2 status (2026-10-19): done.* Every deliverable and check is met; nothing in `RayTracer.Core` /
+`RayTracer.Gpu` changed. `Vista.Tests` has 388 tests (272 before).
+
+*Checks (on the RTX 3070 unless noted):*
+
+- **CI, against NOAA:** 33 sun positions (Greenwich, Zermatt, Torres del Paine, Cape Town and the equator
+  at both solstices and equinoxes; Svalbard and McMurdo in midnight sun and polar night; Zermatt's sunset
+  into twilight) and 7 sunrise / sunset pairs. The expected values come from NOAA's own code: the solar
+  calculator's `calcAzEl` and `calcSunriseSet` (gml.noaa.gov/grad/solcalc/main.js), run in a browser at
+  longitude 0 and time zone 0, where universal time plus NOAA's equation of time is exactly Vista's local
+  solar time. The tests hold the plan's 0.05° and 15 s; the actual agreement is within 0.0002° and 1.2 s
+  (probed by tightening them). Eight polar day / night cases, the season ↔ date tests, the presets and the
+  polar fallbacks are CI too.
+- **A time-of-day sheet at Zermatt in October** (a plain `season: autumn, location: zermatt` recipe, seed 42,
+  640×360, 64 spp, default camera), one `Vista.App --sheet` call:
+
+  | Preset | Local solar time | Azimuth | Elevation |
+  |---|---|---|---|
+  | dawn (sunrise − 20 min) | 06:10:53 | 97.9° | −4.17° |
+  | day (solar noon) | 12:00:00 | 180.0° | 35.38° |
+  | golden hour (sunset − 60 min) | 16:28:23 | 247.3° | 9.21° |
+  | dusk (sunset + 20 min) | 17:48:23 | 261.9° | −4.18° |
+  | night (solar midnight) | 00:00:00 | 0.0° | −52.41° |
+
+  Sunrise 06:30:53 and sunset 17:28:23 solar on 2026-10-15 are NOAA's to the second. Dawn, dusk and night
+  render dark, as planned: the M0 dome has no twilight until M1.3. A solar-time sweep (07:00 to 17:00 from
+  the aerial view) shows the sun crossing east, south and west; a golden-hour sheet over four places on the
+  same October date shows the sun at 4.3° at Lofoten against 10.7° at Yosemite (8.1° at Torres del Paine in
+  April, its autumn).
+- **Self-test:** `--gpu-selftest` passes (the self-test scene now has Zermatt's July golden-hour sun).
+- **Before/after:** the four measurement views, `main` (370690d) against this slice, tiled with
+  `--sheet-from`. The views now pin Zermatt on 2026-07-15. The noon sun stands due south at 65.5°, behind the
+  north-facing cameras, so the range is front-lit and flatter than under M0's sun, which stood high in the
+  north and back-lit it. The down-slope view's golden hour moves to azimuth 292°, 8.5° up.
+
+*M1.2 decisions taken in code (revisit freely):*
+
+- **Local solar time is apparent (sundial) time:** noon is 12:00 and the hour angle 15° per hour, so no
+  longitude or time zone. The instant that sets the declination is taken on the prime meridian (universal
+  time = solar time − equation of time). At a real longitude λ the true instant is λ/15 hours away, which
+  moves the declination by at most 0.2° (λ = ±180° at an equinox) and sunrise by under a minute.
+- **The rendered sun is the apparent one**, lifted by NOAA's refraction fit (0.48° at the horizon), so the
+  disk sits where a camera sees it. Sunrise and sunset are NOAA's: the centre 0.833° below the geometric
+  horizon. The sidecar records both elevations.
+- **Presets:** dawn = sunrise − 20 min, golden hour = sunset − 60 min (never before noon), dusk = sunset +
+  20 min, day = solar noon, night = solar midnight. Golden hour is the last hour before sunset, not a sun
+  elevation, so high latitudes get a lower, redder sun, as they do. In polar day the low-sun presets take
+  the lowest sun (midnight) and in polar night the daytime ones the highest (noon); each says so in the
+  sidecar's warnings, which the CLI prints.
+- **Seasons are meteorological** (whole months; spring is March to May in the north). A season's date is the
+  15th of its middle month in 2026 (`SeasonCalendar.ReferenceYear`, fixed so a recipe always gives the same
+  sun), six months later south of the equator; the equator counts as north.
+- **Overrides:** a recipe `date` replaces the season (the sidecar records the season of that date), and a
+  `solarTime` replaces the preset. Sheet labels leave out the field an override replaced, and a location of
+  "none".
+- **Places:** the `Place` enum holds the eleven §3.5 places, each with a latitude and a typical valley
+  altitude (source per place in `Places.cs`), plus `None` for "no place named". A recipe with neither a
+  location nor a `latitude` is at Zermatt (`Places.Default`); a `latitude` is a custom latitude, at sea level
+  until the altitude control (M1.4); giving both is an error.
+- **Recipe schema 2** adds `location`, `latitude`, `date` (yyyy-MM-dd) and `solarTime` (HH:mm); schema 1
+  files still read. **Sidecar schema 3** adds `place` and a fuller `sun` (date, solar time, sunrise,
+  sunset, azimuth, apparent and true elevation, declination, each with where it came from).
+- **CLI place options are recipe overrides:** `--location` (clears a latitude), `--latitude` (clears a
+  location), `--date`, and `--time` (a preset, which clears a solar time, or `hh:mm`). A sheet refuses an
+  axis over a field a place option already decides (`--date` with `--vary season=…`).
+- **The M0 light keeps its curves.** `SkyLight.ForSunDirection` makes brightness and colour from the sun's
+  height exactly as `DayNightCycle` did (a test pins it against `DayNightCycle.At` over the whole cycle), so
+  only the direction is new. `SunPlaceholder` is gone and Vista no longer calls `DayNightCycle`.
+
+*M1.2 gotchas:*
+
+- **NOAA's refraction fit is weak below −0.575°:** at the sunrise depression (true −0.833°) it gives only
+  0.40°, not the 0.57° the 0.833 assumes, so at "sunrise" the rendered centre is at −0.44° and the disk is
+  just hidden. Harmless now; a refraction-aware sunrise is not worth the inconsistency with NOAA.
+- **The effective polar circle is about 65.7°, not 66.6°:** refraction and the sun's radius keep the June
+  midnight sun up at latitude 66.0. NOAA's calculator also finds no sunset there, but its fallback branch
+  then guesses polar *night* from a 66.4° rule; `SolarPosition.DaylightOn` classifies from the hour angle.
+- **`System.Text.Json` reads `TimeOnly` as `17:30` or `17:30:00` and writes `17:30:00`;** `DateOnly` must be
+  exactly `yyyy-MM-dd`.
+- **Sidecar text has non-ASCII** (`−`, `°`): a Python script printing it on this machine needs
+  `PYTHONIOENCODING=utf-8`.
+
+**M1.2 hand-off.** To understand M1.2, start by reading `Vista.Core/Astronomy/Almanac.cs` (recipe → sun, the
+presets), then `Vista.Core/Astronomy/SolarPosition.cs` (the NOAA algorithm and its instant), then the `Sun`
+and `Place` lines of `Vista.Core/Cli/PreviewPipeline.cs` and `SkyLight.ForSunDirection`.
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png
+    [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --location zermatt --date 2026-10-15
+    --vary time=dawn,day,goldenHour,dusk,night --out times.png
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --time goldenHour
+    --vary location=zermatt,torresDelPaine,lofoten,yosemite --out places.png
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/Astronomy/SolarPosition.cs` | NOAA solar position, sunrise / sunset, polar day and night, refraction |
+| `Vista.Core/Astronomy/Places.cs` | The location dropdown: latitude, valley altitude, source |
+| `Vista.Core/Astronomy/SeasonCalendar.cs` | Season ↔ date by hemisphere |
+| `Vista.Core/Astronomy/Almanac.cs` | A recipe resolved to place, date, solar time and sun; the presets and polar hints |
+| `Vista.Core/Recipes/Recipe.cs` | Schema 2: `location`, `latitude`, `date`, `solarTime` |
+| `Vista.Core/Rendering/SkyLight.cs`, `RenderTypes.cs` | The M0 light from a sun direction; `VistaScene.Sun` is a `SunPosition` |
+| `Vista.Core/Output/Sidecar.cs` | Schema 3: `place` and the astronomy in `sun` |
+| `Vista.Core/Output/SheetLabels.cs` | Leaves out overridden recipe fields |
+| `Vista.Core/Cli/PreviewCommandLine.cs`, `PreviewPipeline.cs`, `SheetCommandLine.cs` | Place options; the almanac in the pipeline; sheet conflicts |
+| `Vista.App/Program.cs`, `Gpu/GpuSelfTest.cs` | A `sun:` line after each preview; the self-test's sun |
+| `Vista.Core/Scene/SunPlaceholder.cs`, `Vista.Tests/SunPlaceholderTests.cs` | Removed |
+| `vista-views/*.recipe.json` | Schema 2, pinned to Zermatt on 2026-07-15 |
+| `Vista.Tests/*` | `SolarPosition`, `SeasonCalendar` and `Almanac` tests; place cases in the recipe, CLI, sheet, pipeline, label and measurement-view tests; `SkyLight` against `DayNightCycle` |
+
+**Next: M1.3** (spectral atmosphere: sky and sunlight), which makes dawn and dusk more than black.
 
 **M1.3 — Spectral atmosphere: sky & sunlight.**
 - *Goal:* replace the single-scattering Rayleigh dome with a spectral atmosphere on a spherical
