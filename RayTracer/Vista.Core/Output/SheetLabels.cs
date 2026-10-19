@@ -22,6 +22,10 @@ public static class SheetLabels
         ("recipe.setPieces", "setPieces"),
         ("recipe.time", "time"),
         ("recipe.season", "season"),
+        ("recipe.location", "location"),
+        ("recipe.latitude", "latitude"),
+        ("recipe.date", "date"),
+        ("recipe.solarTime", "solarTime"),
         ("seed", "seed"),
         ("camera", "camera"),
         ("camera.position", "position"),
@@ -44,7 +48,9 @@ public static class SheetLabels
     /// <summary>
     /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, <c>seed</c>, the
     /// camera (just <c>camera = default</c> for the default camera, whose pose follows the terrain),
-    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality, and the build's commit.
+    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality, and the build's commit. A recipe field
+    /// that another overrides says nothing about the image and is left out: the season under a date, the time
+    /// of day under a solar time, and a location of "none" (no place named).
     /// </summary>
     public static SortedDictionary<string, string> Identity(JsonNode? sidecar)
     {
@@ -53,7 +59,15 @@ public static class SheetLabels
             return fields;
 
         if (root["recipe"] is JsonObject recipe)
+        {
             Flatten("recipe", recipe, fields);
+            if (fields.ContainsKey("recipe.date"))
+                fields.Remove("recipe.season");
+            if (fields.ContainsKey("recipe.solarTime"))
+                fields.Remove("recipe.time");
+            if (fields.GetValueOrDefault("recipe.location") == "none")
+                fields.Remove("recipe.location");
+        }
         if (root["seed"] is JsonValue seed)
             fields["seed"] = Display(seed);
 
@@ -129,7 +143,9 @@ public static class SheetLabels
             string value = identities[0][key];
             string? part = key switch
             {
-                "recipe.name" or "recipe.time" or "recipe.season" or "image.size" => value,
+                "recipe.name" or "recipe.time" or "recipe.season" or "recipe.location" or "recipe.date" or "image.size" => value,
+                "recipe.solarTime" => $"{value} solar",
+                "recipe.latitude" => $"latitude {value}°",
                 "recipe.setPieces" => value.Length == 0 ? "no set pieces" : value,
                 "seed" => $"seed {value}",
                 "camera" => $"{value} camera",

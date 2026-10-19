@@ -88,6 +88,25 @@ public sealed class SheetLabelsTests
     }
 
     [TestMethod]
+    public void Identity_LeavesOutRecipeFieldsThatAnOverrideReplaced()
+    {
+        JsonNode sidecar = Sidecar();
+        JsonObject recipe = sidecar["recipe"]!.AsObject();
+        recipe["location"] = "none";
+        recipe["latitude"] = null;
+        Assert.IsFalse(Id(sidecar).ContainsKey("recipe.location"), "no place named");
+        Assert.IsFalse(Id(sidecar).ContainsKey("recipe.latitude"));
+
+        recipe["location"] = "zermatt";
+        recipe["date"] = "2026-10-15";
+        recipe["solarTime"] = "17:30:00";
+        IReadOnlyDictionary<string, string> id = Id(sidecar);
+        Assert.IsFalse(id.ContainsKey("recipe.season"), "the date replaced the season");
+        Assert.IsFalse(id.ContainsKey("recipe.time"), "the solar time replaced the time of day");
+        StringAssert.Contains(SheetLabels.Title([id]), "alpine range · snowCappedMountains · zermatt · 2026-10-15 · 17:30:00 solar · seed 42");
+    }
+
+    [TestMethod]
     public void Title_ListsWhatEveryCellShares()
     {
         string title = SheetLabels.Title([Id(Sidecar(seed: "1")), Id(Sidecar(seed: "2"))]);
