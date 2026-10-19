@@ -52,6 +52,7 @@ public static class PreviewPipeline
             Height = request.Height,
             SamplesPerPixel = request.SamplesPerPixel,
             MaxBounces = request.MaxBounces,
+            Batching = new BatchPlannerOptions { DispatchBudgetMs = request.DispatchBudgetMs },
         };
 
         string directory = Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!;
@@ -77,7 +78,7 @@ public static class PreviewPipeline
             if (output.Xyz.Length != settings.Width * settings.Height * 3)
                 throw new InvalidOperationException($"Renderer returned {output.Xyz.Length} XYZ floats, expected {settings.Width * settings.Height * 3}.");
             timings["render"] = Lap(stopwatch);
-            renderInfo = RenderInfo.From(output.Stats);
+            renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
             PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, camera.ExposureEv), settings.Width, settings.Height, PngColor.Rgb);

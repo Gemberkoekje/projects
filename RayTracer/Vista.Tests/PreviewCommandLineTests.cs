@@ -1,4 +1,5 @@
 using Vista.Cli;
+using Vista.Rendering;
 
 namespace Vista.Tests;
 
@@ -31,6 +32,7 @@ public sealed class PreviewCommandLineTests
         Assert.AreEqual(64, r.SamplesPerPixel);
         Assert.AreEqual(6, r.MaxBounces);
         Assert.AreEqual(0, r.Debug.Count);
+        Assert.AreEqual(new BatchPlannerOptions().DispatchBudgetMs, r.DispatchBudgetMs);
         Assert.IsFalse(r.DryRun);
     }
 
@@ -38,13 +40,15 @@ public sealed class PreviewCommandLineTests
     public void Everything_IsParsed()
     {
         PreviewRequest r = Parse("--preview", "--dry-run", "--recipe", "r.json", "--seed", "18446744073709551615", "--camera", "c.json",
-            "--out", "out/p.PNG", "--width", "640", "--aspect", "4:3", "--spp", "16", "--bounces", "3", "--debug", "depth, tier");
+            "--out", "out/p.PNG", "--width", "640", "--aspect", "4:3", "--spp", "16", "--bounces", "3", "--debug", "depth, tier",
+            "--dispatch-ms", "12.5");
         Assert.AreEqual(ulong.MaxValue, r.Seed);
         Assert.AreEqual("c.json", r.CameraPath);
         Assert.AreEqual((640, 480), (r.Width, r.Height));
         Assert.AreEqual(16, r.SamplesPerPixel);
         Assert.AreEqual(3, r.MaxBounces);
         CollectionAssert.AreEquivalent(new[] { DebugOutput.Depth, DebugOutput.Tier }, r.Debug.ToArray());
+        Assert.AreEqual(12.5, r.DispatchBudgetMs);
         Assert.IsTrue(r.DryRun);
     }
 
@@ -60,6 +64,14 @@ public sealed class PreviewCommandLineTests
         else
             Assert.AreEqual(height, Parse(args).Height);
     }
+
+    [TestMethod]
+    [DataRow("0")]
+    [DataRow("1000.5")]
+    [DataRow("-5")]
+    [DataRow("fast")]
+    public void DispatchBudget_MustFitUnderTheTdr(string value) =>
+        StringAssert.Contains(Errors("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--dispatch-ms", value)[0], "--dispatch-ms");
 
     [TestMethod]
     public void DebugAll_SelectsEveryOutput() =>

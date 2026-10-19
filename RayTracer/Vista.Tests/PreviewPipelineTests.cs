@@ -111,6 +111,15 @@ public sealed class PreviewPipelineTests
     }
 
     [TestMethod]
+    public void DispatchBudget_ReachesThePlannerAndTheSidecar()
+    {
+        var renderer = new FakeRenderer();
+        Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: false) with { DispatchBudgetMs = 40 }, renderer);
+        Assert.AreEqual(40.0, renderer.Settings!.Batching.DispatchBudgetMs);
+        Assert.AreEqual(40.0, sidecar.Render!.DispatchBudgetMs);
+    }
+
+    [TestMethod]
     public void Render_PassesTheSuppliedCamera()
     {
         string cameraPath = Path.Combine(_dir, "c.json");
@@ -162,11 +171,14 @@ public sealed class PreviewPipelineTests
 
         public VistaScene? Scene { get; private set; }
 
+        public RenderSettings? Settings { get; private set; }
+
         public string DeviceName => Name;
 
         public RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner)
         {
             Scene = scene;
+            Settings = settings;
             Planner = planner;
             Requested = aovs;
             int dispatches = 0;

@@ -24,18 +24,22 @@ public sealed record RenderSettings
     public BatchPlannerOptions Batching { get; init; } = new();
 }
 
-/// <summary>Per-pixel auxiliary outputs the renderer can produce for the debug images (vista-plan §7.4).</summary>
+/// <summary>
+/// Per-pixel auxiliary outputs the renderer can produce for the debug images (vista-plan §7.4). Albedo and
+/// normal average over every sample of the pixel (what a denoiser wants); depth and material id cannot be
+/// averaged, so they come from the pixel's sample 0.
+/// </summary>
 public enum Aov
 {
-    /// <summary>Linear-sRGB albedo of the first hit, 3 floats per pixel; 0 for sky.</summary>
+    /// <summary>Linear-sRGB albedo of the first hit averaged over the pixel's samples, 3 floats per pixel; sky samples count as 0.</summary>
     Albedo,
-    /// <summary>World-space unit normal of the first hit, 3 floats per pixel; 0 for sky.</summary>
+    /// <summary>World-space first-hit normal averaged over the pixel's samples and renormalised, 3 floats per pixel; 0 where every sample saw sky.</summary>
     Normal,
-    /// <summary>Distance along the primary ray in metres, 1 float per pixel; +∞ for sky.</summary>
+    /// <summary>Distance along sample 0's primary ray in metres, 1 float per pixel; +∞ for sky.</summary>
     Depth,
-    /// <summary><see cref="VistaMaterial.Id"/> of the first hit as a float, 1 per pixel; −1 for sky.</summary>
+    /// <summary><see cref="VistaMaterial.Id"/> of sample 0's first hit as a float, 1 per pixel; −1 for sky.</summary>
     MaterialId,
-    /// <summary>Variance of the pixel's luminance estimate, 1 float per pixel.</summary>
+    /// <summary>Variance of the pixel's mean luminance (sample variance ÷ samples), 1 float per pixel.</summary>
     Variance,
 }
 
@@ -77,8 +81,8 @@ public sealed record RenderOutput(
     RenderStats Stats);
 
 /// <summary>
-/// The seam between the pure pipeline and a GPU backend. The D3D12 implementation (offline integrator v0
-/// on the RTX 3070) is open M0 work; tests drive the pipeline with a fake.
+/// The seam between the pure pipeline and a GPU backend: <c>D3D12VistaRenderer</c> in Vista.App (offline
+/// integrator v0 on the RTX 3070); tests drive the pipeline with a fake.
 /// </summary>
 public interface IVistaRenderer
 {
@@ -110,6 +114,12 @@ public sealed record RenderStats
 
     /// <summary>GPU time spent tracing, in seconds.</summary>
     public double TraceSeconds { get; init; }
+
+    /// <summary>GPU time of the longest single dispatch, in seconds — the number to hold against the TDR.</summary>
+    public double LongestDispatchSeconds { get; init; }
+
+    /// <summary>The highest cost any dispatch measured, in nanoseconds per pixel-sample.</summary>
+    public double MaxCostNsPerPixelSample { get; init; }
 
     /// <summary>Renderer stages (e.g. device init, acceleration build, readback) in seconds.</summary>
     public SortedDictionary<string, double> StageSeconds { get; init; } = new(StringComparer.Ordinal);

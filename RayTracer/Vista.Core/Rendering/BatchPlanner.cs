@@ -1,9 +1,11 @@
 namespace Vista.Rendering;
 
 /// <summary>
-/// Tuning for <see cref="BatchPlanner"/>. The defaults are <b>guesses until measured on the RTX 3070</b>
-/// (vista-plan §10 M0): a 250 ms dispatch is far below Windows' ~2 s TDR, and the pessimistic initial cost
-/// keeps the very first dispatch small on any scene, before anything has been measured.
+/// Tuning for <see cref="BatchPlanner"/>. The defaults were measured on the RTX 3070 with integrator v0 and
+/// kept (vista-plan §10, "M0 batch defaults, measured"): a 250 ms dispatch is far below Windows' ~2 s TDR (the
+/// longest of a 4K render was 246 ms), and the initial cost of 2 µs per pixel-sample — about 1,400× the M0
+/// terrain's measured worst — keeps the very first dispatch small on any scene the later milestones bring,
+/// at the price of a ramp of about ten small dispatches.
 /// </summary>
 public sealed record BatchPlannerOptions
 {

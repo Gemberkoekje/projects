@@ -1,4 +1,5 @@
 using System.Globalization;
+using Vista.Rendering;
 
 namespace Vista.Cli;
 
@@ -49,6 +50,9 @@ public sealed record PreviewRequest
     /// <summary>Debug images to write.</summary>
     public IReadOnlySet<DebugOutput> Debug { get; init; } = new HashSet<DebugOutput>();
 
+    /// <summary>Target GPU time per dispatch in milliseconds (<see cref="BatchPlannerOptions.DispatchBudgetMs"/>); never changes the image.</summary>
+    public double DispatchBudgetMs { get; init; } = new BatchPlannerOptions().DispatchBudgetMs;
+
     /// <summary>Run everything up to the GPU (world, mesh, sidecar, height map) and render nothing.</summary>
     public bool DryRun { get; init; }
 }
@@ -57,7 +61,7 @@ public sealed record PreviewRequest
 /// Parses the headless preview CLI (vista-plan §7.4):
 /// <code>
 /// Vista.App --preview --recipe r.json --seed N [--camera c.json] --out p.png
-///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6]
+///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--dry-run]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
@@ -77,10 +81,11 @@ public static class PreviewCommandLine
     /// <summary>Usage text.</summary>
     public const string Usage =
         "Usage: Vista.App --preview --recipe <recipe.json> --seed <n> [--camera <camera.json>] --out <preview.png>\n" +
-        "                 [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6]\n" +
+        "                 [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]\n" +
         "                 [--debug all|albedo,normal,depth,material,tier,variance] [--dry-run]\n" +
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
-        "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.";
+        "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
+        "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.";
 
     /// <summary>Parses <paramref name="args"/>. Returns false with every problem listed in <paramref name="errors"/>.</summary>
     public static bool TryParse(IReadOnlyList<string> args, out PreviewRequest? request, out IReadOnlyList<string> errors)
@@ -132,6 +137,7 @@ public static class PreviewCommandLine
         int width = Int(values, "--width", DefaultWidth, 1, MaxDimension, problems);
         int spp = Int(values, "--spp", 64, 1, 1 << 20, problems);
         int bounces = Int(values, "--bounces", 6, 0, 64, problems);
+        double dispatchMs = DispatchBudget(values.GetValueOrDefault("--dispatch-ms"), problems);
         int height = DefaultHeight;
         (int aw, int ah) = Aspect(values.GetValueOrDefault("--aspect", "16:9"), problems);
         if (aw > 0)
@@ -155,6 +161,7 @@ public static class PreviewCommandLine
             SamplesPerPixel = spp,
             MaxBounces = bounces,
             Debug = debug,
+            DispatchBudgetMs = dispatchMs,
             DryRun = dryRun,
         };
         return true;
@@ -162,7 +169,7 @@ public static class PreviewCommandLine
 
     private static readonly HashSet<string> ValueOptions = new(StringComparer.Ordinal)
     {
-        "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug",
+        "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms",
     };
 
     private static string? Required(Dictionary<string, string> values, string name, List<string> problems)
@@ -180,6 +187,18 @@ public static class PreviewCommandLine
         if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int value) && value >= min && value <= max)
             return value;
         problems.Add($"{name} must be an integer in [{min}, {max}], got '{text}'.");
+        return fallback;
+    }
+
+    private static double DispatchBudget(string? text, List<string> problems)
+    {
+        double fallback = new BatchPlannerOptions().DispatchBudgetMs;
+        if (text is null)
+            return fallback;
+        if (double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double ms)
+            && ms > 0.0 && ms <= BatchPlannerOptions.MaxDispatchBudgetMs)
+            return ms;
+        problems.Add($"--dispatch-ms must be a number in (0, {BatchPlannerOptions.MaxDispatchBudgetMs}], got '{text}'.");
         return fallback;
     }
 

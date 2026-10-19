@@ -20,6 +20,8 @@
          same internal backend (Phase6Renderer et al.). -->
     <InternalsVisibleTo Include="RayTracer.Maze" />
     <InternalsVisibleTo Include="Pinball.App" />
+    <!-- Vista's offline integrator host reuses ShaderCompiler only (vista-plan §8.1). -->
+    <InternalsVisibleTo Include="Vista.App" />
   </ItemGroup>
 
   <ItemGroup>

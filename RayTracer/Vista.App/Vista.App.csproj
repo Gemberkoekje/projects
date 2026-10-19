@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Vista.App (vista-plan §8.3): the Vista host on the reusable RayTracer.Gpu DXR backend — the same seam
-       RayTracer.Maze and Pinball.App sit on. M0 ships the headless preview CLI front end (argument parsing,
-       world generation, mesh build, batch plan, sidecar); the offline integrator, its D3D12 host and the
-       GPU readback still need the RTX 3070 (vista-plan §10, M0 "needs the 3070"). Settings mirror
-       Pinball.App so the shared backend compiles unchanged. -->
+       RayTracer.Maze and Pinball.App sit on. M0 ships the headless preview CLI front end and offline
+       integrator v0 (Shaders/VistaIntegrator.hlsl) with its own D3D12 host (Gpu/D3D12VistaRenderer.cs); from
+       RayTracer.Gpu it uses only ShaderCompiler (vista-plan §8.1). Settings mirror Pinball.App so the shared
+       backend compiles unchanged. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -16,6 +16,13 @@
     <RootNamespace>Vista.App</RootNamespace>
     <AssemblyName>Vista.App</AssemblyName>
   </PropertyGroup>
+
+  <!-- ShaderCompiler loads HLSL from AppContext.BaseDirectory/Shaders/, so the integrator ships next to the .exe. -->
+  <ItemGroup>
+    <None Update="Shaders\VistaIntegrator.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../RayTracer.Core/RayTracer.csproj" />

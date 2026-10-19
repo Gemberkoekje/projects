@@ -116,12 +116,13 @@ public sealed record SunInfo(string Source, WorldPoint Direction, double Elevati
 /// <param name="Stats">Raw counts and timings.</param>
 /// <param name="RaysPerSample">Mean rays per pixel-sample.</param>
 /// <param name="RaysPerSecond">Rays per second of trace time.</param>
-public sealed record RenderInfo(RenderStats Stats, double RaysPerSample, double RaysPerSecond)
+/// <param name="DispatchBudgetMs">The GPU time per dispatch the batch planner aimed for (never changes the image).</param>
+public sealed record RenderInfo(RenderStats Stats, double RaysPerSample, double RaysPerSecond, double DispatchBudgetMs)
 {
-    /// <summary>Wraps <paramref name="stats"/> with its derived rates.</summary>
-    public static RenderInfo From(RenderStats stats)
+    /// <summary>Wraps <paramref name="stats"/> with its derived rates and the planner's <paramref name="dispatchBudgetMs"/>.</summary>
+    public static RenderInfo From(RenderStats stats, double dispatchBudgetMs)
     {
         ArgumentNullException.ThrowIfNull(stats);
-        return new RenderInfo(stats, stats.RaysPerSample(), stats.RaysPerSecond());
+        return new RenderInfo(stats, stats.RaysPerSample(), stats.RaysPerSecond(), dispatchBudgetMs);
     }
 }

@@ -1,8 +1,8 @@
 # Vista — a Spectral Path-Traced Landscape Wallpaper Generator
 
-The single source of truth for the landscape-wallpaper effort. Code has started: the
-GPU-free half of M0 lives in `Vista.Core` / `Vista.App` / `Vista.Tests` (see **M0
-status** in §10; work that needs the RTX 3070 is marked **[needs 3070]**). It sits
+The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
+`Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
+through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -546,8 +546,8 @@ sits on the same seam as `RayTracer.Maze` and `Pinball.App`:
   serve an offline integrator (rather than `Phase6Renderer`'s real-time loop) is
   **to be confirmed in M0**; anything Vista needs changed lands additively.
 
-**M0 reuse assessment (2026-10-18, by reading the code — runtime confirmation is
-[needs 3070], with integrator v0):**
+**M0 reuse assessment (2026-10-18, by reading the code; confirmed at runtime 2026-10-19 with
+integrator v0, see the end of this list):**
 
 - **Reusable as is:** `ShaderCompiler.CompileCompute` (DXC, SM 6.5). It is `internal`, so
   `RayTracer.Gpu.csproj` needs one additive `InternalsVisibleTo Include="Vista.App"`, as
@@ -575,8 +575,18 @@ sits on the same seam as `RayTracer.Maze` and `Pinball.App`:
 - **From `RayTracer.Core`, already in use by `Vista.Core`:** `DayNightCycle` / `SunState`
   (the M0 sun), `JobSystem.ToSRGB` (XYZ → linear sRGB, so Vista and the maze agree on
   colour), and `LensOptions`' focal-length convention (pinned by a test). Integrator v0
-  will add `WavelengthLookup` / `SpectralResources` (hero wavelengths, `DeterXYZ`), a port of
+  added `WavelengthLookup` / `SpectralResources` (hero wavelengths, `DeterXYZ`), a port of
   `Sky.DomeRadiance`, and `RgbToReflectanceBasis` for built-in-tier materials.
+
+**Confirmed at runtime (2026-10-19).** The assessment held with no surprises: `ShaderCompiler`
+compiles `VistaIntegrator.hlsl` (SM 6.5, inline `RayQuery`, wave intrinsics) unchanged, behind the
+one `InternalsVisibleTo Include="Vista.App"` line, which is the only change to `RayTracer.Gpu`.
+Everything else in `D3D12VistaRenderer` is copied scaffolding (device, RT-tier check, command
+objects, fence wait, BLAS/TLAS build, buffer helpers), plus two things no phase renderer had:
+default-heap upload of the mesh (the shader reads normals and indices on every hit, so they must
+not sit in an upload heap across PCIe) and timestamp queries for per-dispatch GPU time. The engine's
+shaders also land in `Vista.App`'s output through the project reference; harmless, and Vista
+never loads them.
 
 ### 8.2 New
 
@@ -654,58 +664,75 @@ renders bit-identically twice on the 3070; a 320 px preview renders headless and
 sidecar reports timings; recipe / seed determinism tests green in CI; maze goldens
 unmoved.
 
-**M0 status (2026-10-18).** The work that needs no GPU is done and unit-tested
-(`Vista.Tests`, 113 tests, net10.0, so it runs in hosted CI). Everything that needs the RTX
-3070 is still open and marked **[needs 3070]**. No file in `RayTracer.Core`, `RayTracer.Gpu`
-or the maze changed.
-
-*Done, no GPU needed:*
+**M0 status (2026-10-19): done.** Every M0 deliverable and check is met. The GPU-free half
+landed on 2026-10-18; integrator v0, its D3D12 host, the shader's ray counter and the batch
+measurements followed on 2026-10-19 on the RTX 3070. `Vista.Tests` has 141 tests (net10.0, so
+they run in hosted CI). The only engine change is one `InternalsVisibleTo` line in
+`RayTracer.Gpu.csproj` (§8.1).
 
 | M0 deliverable | Where | Notes |
 |---|---|---|
-| `Vista.Core` / `Vista.App` / `Vista.Tests` in `RayTracer.slnx` | | Vista.App is the CLI front end only; no UI yet |
+| `Vista.Core` / `Vista.App` / `Vista.Tests` in `RayTracer.slnx` | | Vista.App is the CLI front end plus the GPU host; no UI yet |
 | Recipe + seed model with serialization | `Vista.Core/Recipes` | A set of set pieces + time + season. Strict JSON: unknown fields, integer enums and future schemas are errors, so typos fail loudly |
 | Camera file | `Scene/CameraSpec.cs` | Engine axes (+X east, +Y up, +Z north); yaw = compass heading; `ToEngineRotation()` tested against the engine's ray convention |
 | Height field → mesh | `Vista.Core/World` | Seeded ridged / fBm terrain with domain warp on a fixed 1025² × 16 m grid (16.4 km); uniform mesh, 2.1 M triangles, 50 MB; winding and normals tested |
 | Recipe / seed determinism tests | `WorldDeterminismTests` | Pinned noise and terrain hashes; terrain provably unmoved by time, season, name or set-piece order |
-| TDR-safe sample batches, the planning half | `Rendering/BatchPlanner.cs` | Row bands × sample ranges; every (pixel, sample) issued once; reacts to slowdowns at once |
-| Ray counter, the bookkeeping half | `RenderStats` | Rays per sample and per second go into the sidecar |
+| Integrator v0 | `Vista.App/Shaders/VistaIntegrator.hlsl` | Multi-bounce Lambertian path tracing, Russian roulette after bounce 3, next-event estimation on a real-size sun disk, the engine's Rayleigh dome (port of `Sky.DomeRadiance`, parity-tested), a hero plus three companion wavelengths over the engine's 50-wavelength cycle; every random number keyed by (pixel, sample index) |
+| Its light model and tables, in C# | `Rendering/SkyLight.cs`, `Rendering/IntegratorTables.cs` | The reference for the shader's light maths (vista-plan §9), unit-tested |
+| D3D12 host | `Vista.App/Gpu/D3D12VistaRenderer.cs` | Mesh in default-heap buffers, BLAS (32-bit indices) + one-instance TLAS, `BatchPlanner`-driven dispatches timed by timestamp queries, float readback (`Rendering/IntegratorReadback.cs`); device, pipeline and BLAS survive re-renders of the same mesh |
+| TDR-safe sample batches | `Rendering/BatchPlanner.cs` + the host | Row bands × sample ranges; every (pixel, sample) issued once; defaults measured below |
+| Ray counter | shader + `RenderStats.RaysTraced` | `WaveActiveSum`, then one 32-bit atomic per wave with a carry into a high word: an exact 64-bit count on SM 6.5. A 4K, 1024 spp render counted 27.8 G rays (six carries) |
 | EXR + PNG writers | `Vista.Core/Output` | Dependency-free; checked bit-exact against OpenEXR 3.5 and Pillow outside CI |
-| Sidecar | `Output/Sidecar.cs` | Recipe, seed, camera, data tiers, height-field hash, engine version with commit, timings |
-| Headless preview CLI with debug outputs | `Vista.Core/Cli`, `Vista.App` | `--dry-run` works anywhere; the renderer plugs in behind `IVistaRenderer`; debug encoders for albedo, normal, depth, material, tier and variance |
-| Which `RayTracer.Gpu` pieces serve an offline integrator | §8.1 | Assessed by reading the code |
+| Sidecar | `Output/Sidecar.cs` | Recipe, seed, camera, data tiers, height-field hash, engine version with commit, device; stage timings, rays traced / per sample / per second, dispatches, longest dispatch, the dispatch budget |
+| Headless preview CLI with debug outputs | `Vista.Core/Cli`, `Vista.App` | Renders on the 3070, or `--dry-run` anywhere; albedo, normal, depth, material, tier and variance images; `--dispatch-ms` |
+| Which `RayTracer.Gpu` pieces serve an offline integrator | §8.1 | Assessed by reading the code, confirmed at runtime |
 
-*Open: needs the RTX 3070:*
+*Checks (all on the RTX 3070 unless noted):*
 
-1. **[needs 3070]** **Offline integrator v0** (new HLSL): multi-bounce path tracing,
-   next-event estimation on the sun, the Rayleigh `Sky` dome (port `Sky.DomeRadiance`), hero-
-   wavelength spectral sampling. Sample streams must be keyed by `(pixel, sample index)`
-   only, never by dispatch. It writes the `Aov` buffers in the layouts `RenderTypes.cs`
-   documents.
-2. **[needs 3070]** **D3D12 host** in `Vista.App` implementing `IVistaRenderer`: device,
-   BLAS from `TerrainMesh` (32-bit indices; the winding `TerrainMesh` documents), TLAS,
-   float readback of XYZ and the AOVs, and a dispatch loop driven by `BatchPlanner`
-   (`Next` → dispatch → `Complete` with GPU time). Add `InternalsVisibleTo Vista.App` to
-   `RayTracer.Gpu` for `ShaderCompiler` (§8.1).
-3. **[needs 3070]** **Ray counter in the shader** (a 64-bit count of camera, bounce and
-   shadow rays; per-group reduction before the atomic is the likely shape) feeding
-   `RenderStats.RaysTraced`.
-4. **[needs 3070]** **Measure the batch defaults**: `BatchPlannerOptions` ships 250 ms per
-   dispatch and a pessimistic 2 µs per pixel-sample for the first dispatch. Both are guesses.
-   Measure them on real scenes and confirm that a 4K render never trips the TDR.
-5. **[needs 3070]** **Confirm the §8.1 reuse assessment** at runtime.
+- **Same recipe + seed + camera renders bit-identically twice:** `Vista.App --gpu-selftest`
+  (snow-capped mountains, golden hour, seed 42, 320×180, 16 spp, every debug output): XYZ and every
+  debug buffer identical bit for bit, same ray count.
+- **Bit-identical under two dispatch budgets:** the same self-test renders at the default budget
+  (4 dispatches, full-frame passes of several samples) and at 0.05 ms with a 20 µs first guess
+  (97 dispatches, row bands of one sample). Identical, same ray count. A fourth render without
+  debug outputs gives the same beauty, so asking for debug images never changes the picture.
+- **A 320 px preview renders headless** and its sidecar reports timings (device init, shader
+  compile, mesh upload, BLAS build, trace, readback) and rays (traced, per sample, per second).
+- **Maze unmoved:** `--phase6-selftest` PASS (700/700 within 8/255), `--phase6-regress` 19/19 PASS.
+  Not bit-exact against the committed goldens: 12 of the 19 views show a maximum channel Δ of
+  1/255. Unmodified `origin/main` shows exactly the same 12 views, so this is the goldens against
+  today's driver, not Vista (§11 already expects re-baselining after driver updates).
+- **CI:** recipe / seed determinism and every other `Vista.Tests` test is green (141).
+- **D3D12 debug layer with GPU-based validation** (a Debug build) reports nothing for the self-test
+  or for previews with each mix of debug outputs.
 
-*Open checks: need the RTX 3070:*
+**M0 batch defaults, measured (2026-10-19, RTX 3070, M0 terrain, 3840×2160, seed 42):**
 
-- **[needs 3070]** The same recipe + seed + camera renders bit-identically twice.
-- **[needs 3070]** The image is bit-identical under two different dispatch budgets (the
-  batch partition must not change the image).
-- **[needs 3070]** A 320 px preview renders headless, and its sidecar reports timings and
-  rays.
-- **[needs 3070]** Maze goldens unmoved: `--phase6-selftest` 700/700 and `--phase6-regress`
-  19/19 bit-exact. No engine file changed so far, but run it anyway.
-- Recipe / seed determinism tests green in CI: no GPU needed, runs on every push via
-  `ci-raytracer.yml`.
+| View | Rays per sample | ns per pixel-sample (mean / worst dispatch) | Rays per second |
+|---|---|---|---|
+| Sky only (pitch +45°) | 1.00 | 0.24 / — | 4.2 G |
+| Aerial over the range, day | 2.42 | 0.70 / 1.00 | 3.4 G |
+| Default camera, day | 2.29 | 0.88 / 1.24 | 2.6 G |
+| Down a slope, golden hour (every pixel terrain) | 3.27 | 1.32 / 1.39 | 2.5 G |
+
+- A 4K render at 64 spp takes 0.4–0.7 s of GPU time. 1024 spp on the costliest view took 10.9 s
+  in 56 dispatches; the longest was 245.6 ms against the 250 ms budget. At the 1000 ms cap the
+  longest was 644 ms, because the 64-samples-per-dispatch cap binds first. Nothing came near the
+  ~2 s TDR. The host adds about 1 ms per dispatch (wall time against GPU time).
+- **250 ms kept:** the per-dispatch overhead stays under 0.5%, the ETA updates four times a second,
+  and the TDR is 8× away.
+- **2 µs initial cost kept:** about 1,400× the worst M0 cost, so the first dispatches are tiny and
+  the estimate ramps down over about ten dispatches (≈ 10 ms at 4K). That is cheap insurance:
+  atmosphere, volumes and forests (M1–M5) will raise the per-sample cost by orders of magnitude,
+  and the first dispatch is the only one planned without a measurement.
+- **Russian roulette** (after bounce 3; survival = the largest throughput, at least 5%) ends nearly
+  every path by bounce 5 on the M0 albedo (≈ 0.17): 6 and 64 maximum bounces trace the same rays.
+  Bright snow (M1) will lengthen paths; measure again then.
+- **Risk for M11:** row-band mode plans each band from the previous band's cost, and bands exist
+  only when one full-frame sample exceeds the budget: never at 4K on M0 terrain (≈ 2–12 ms per
+  sample) but always at 16K. Sky rows cost about 6× less than terrain rows, so a band planned on
+  sky could overrun by that factor on the terrain below it (250 ms → ~1.5 s). M11's tiling should
+  plan bands with a safety factor or a per-row cost history.
 
 *M0 decisions taken in code (revisit freely):*
 
@@ -731,6 +758,67 @@ or the maze changed.
 - **Gradient noise has no axis-aligned gradients, and the terrain is domain-warped.**
   Without both, ridged noise drew a ruler-straight crest along every coarse lattice line.
   A regression test now guards this.
+- **Debug outputs:** albedo and normal average over every sample of a pixel (what OIDN wants in
+  M1). Depth and material id cannot be averaged, so they come from the pixel's sample 0. Variance
+  is the variance of the pixel's mean luminance (sample variance ÷ samples), from a Welford update.
+- **Accumulation is a plain float sum in sample order, starting from zero at sample 0** (no
+  clear pass), divided once on the CPU. Bit-exactness under any batch partition rests on that order
+  plus keying every random number by (pixel, sample index). The 3070 needs no `precise`; the
+  self-test would catch a compiler that reorders the sum.
+- **The M0 sun** has the real angular radius (0.2666°; the maze uses 0.04 rad) and an irradiance of
+  `4.5 × SunLightLevel × solar shape` at normal incidence (`SkyLight.PlaceholderSunIrradiance`):
+  about five times the dome's irradiance on level ground at the "day" sun, the clear-sky ratio of
+  direct to diffuse daylight. Camera rays see a disk of the matching radiance, so the EXR is
+  consistent; bounce rays see the dome only, because the sun is next-event estimation's job.
+- **Built-in reflectance** is `RgbToReflectanceBasis` applied to the material's linear-sRGB albedo,
+  clamped to [0, 1]. The M0 terrain needs no clamping, and a test pins its round trip.
+- **Surfaces are two-sided** with smooth shading normals; new rays leave along the geometric normal,
+  offset by 1 mm + 4·10⁻⁶ × the coordinate size (float spacing at 8 km is 1 mm). A bounce sampled
+  under the true surface ends the path.
+
+**M0 hand-off.** To understand M0, start by reading `Vista.Core/Cli/PreviewPipeline.cs` (the whole
+flow), then `Vista.App/Gpu/D3D12VistaRenderer.cs` and `Vista.App/Shaders/VistaIntegrator.hlsl`
+(the GPU half), then `Vista.Core/Rendering/BatchPlanner.cs` (the determinism contract).
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --gpu-selftest
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png --debug all
+    [--camera c.json] [--width 3840] [--spp 64] [--bounces 6] [--dispatch-ms 250] [--dry-run]
+```
+
+*Files added or changed on 2026-10-19:*
+
+| File | What |
+|---|---|
+| `Vista.App/Shaders/VistaIntegrator.hlsl` | Integrator v0 |
+| `Vista.App/Gpu/D3D12VistaRenderer.cs` | The D3D12 `IVistaRenderer` |
+| `Vista.App/Gpu/GpuSelfTest.cs` | `--gpu-selftest` |
+| `Vista.App/Program.cs`, `Vista.App.csproj` | Preview on the GPU, the self-test, the shader copied next to the .exe |
+| `Vista.Core/Rendering/SkyLight.cs` | The M0 sun and dome; C# reference of the shader's light |
+| `Vista.Core/Rendering/IntegratorTables.cs` | Spectral tables uploaded per render |
+| `Vista.Core/Rendering/IntegratorReadback.cs` | Raw GPU sums → the `Aov` layouts |
+| `Vista.Core/Rendering/RenderTypes.cs`, `Output/Sidecar.cs`, `Cli/PreviewCommandLine.cs`, `Cli/PreviewPipeline.cs` | `Aov` semantics, longest-dispatch and worst-cost stats, the budget in the sidecar, `--dispatch-ms` |
+| `RayTracer.Gpu/RayTracer.Gpu.csproj` | `InternalsVisibleTo Vista.App` |
+| `Vista.Tests/SkyLightTests.cs`, `IntegratorTablesTests.cs`, `IntegratorReadbackTests.cs` (+ CLI and pipeline additions) | 28 new tests |
+
+*Gotchas:*
+
+- **`1 − cos θ` of the sun loses 0.2% in float** (θ ≈ 0.0047 rad). Compute it as `2·sin²(θ/2)` in
+  double (`SkyLight.SunOneMinusCosMax`); a test caught this.
+- **Root UAVs have no bounds checking.** An output nobody asked for binds a 16-byte dummy, which is
+  safe only because the shader never writes a buffer whose `AovMask` bit is off. Keep it that way.
+- **Buffers are always created in COMMON**, whatever the initial state says. Every command list here
+  is its own submission, so buffers decay back to COMMON between them and promote implicitly; the
+  only explicit barrier moves an uploaded copy to the shader-resource state the BLAS build needs.
+- **Debug builds** run the D3D12 debug layer with GPU-based validation and print its messages to
+  stderr. The engine's hosts never read the info queue, so their Debug runs are silent.
+- **A preview's cost is tiny for now** (a 320×180, 64 spp preview traces in about 4 ms), so the
+  wall time is world generation, mesh and file writing. M1's watch mode (§7.4) is where that matters.
+
+**Next: M1.** Its first measured decisions are the view-dependent mesh against height-field
+intersection (§4.3) and sun / sky importance sampling. The M0 placeholders to replace are listed above.
 
 **M1 — Proof of concept: "alpine range at golden hour" (3840×2160).**
 Goal: Terragen-class mountain vistas, no vegetation yet. Deliverable: GPU hydraulic +
@@ -825,7 +913,9 @@ balance, lens CA), estimator accuracy.
 **Performance & memory.**
 - **8 GB VRAM** limits forest density; instancing, procedural materials and measured LOD
   decisions are the levers.
-- **Render times are unknown** until M0/M1 measure them; the §7.1 numbers are guesses.
+- **Render times are unknown beyond M0.** Bare M0 terrain costs 0.24–1.4 ns per pixel-sample
+  on the 3070 (§10, "M0 batch defaults, measured"); M1–M5 add the expensive parts, and the
+  §7.1 numbers are still guesses.
 - **Moon glitter** and caustic-like paths are noisy; MIS quality decides whether they
   converge in reasonable time.
 - **View-dependent LOD** must stay conservative for shadow and reflection rays that see
@@ -842,9 +932,10 @@ balance, lens CA), estimator accuracy.
   which the sidecar records.
 
 **Engine.**
-- **Which `RayTracer.Gpu` pieces serve an offline integrator** has been assessed by reading
-  the code (§8.1: only `ShaderCompiler` is reusable as is). Runtime confirmation comes with
-  integrator v0 on the 3070 (M0, **[needs 3070]**).
+- **Which `RayTracer.Gpu` pieces serve an offline integrator** is settled (§8.1): only
+  `ShaderCompiler` is reused, confirmed at runtime with integrator v0 on 2026-10-19.
+- **Row-band dispatches at 16K** can overrun their budget by the sky-to-terrain cost ratio
+  (~6× on M0 terrain); M11 must plan bands defensively (§10, "M0 batch defaults, measured").
 - **Mass TLAS instancing** is new; today's TLAS holds a handful of instances.
 - **Leaf alpha** needs non-opaque candidates in the inline ray query loop, slow on Ampere;
   real leaf geometry costs memory.
