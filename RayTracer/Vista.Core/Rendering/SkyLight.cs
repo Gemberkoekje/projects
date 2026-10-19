@@ -1,20 +1,24 @@
 using System.Numerics;
 using RayTracer;
+using Vista.Astronomy;
 
 namespace Vista.Rendering;
 
 /// <summary>
-/// The M0 light: the engine's single-scattering Rayleigh <see cref="Sky"/> dome plus a directional sun, both
-/// driven by the placeholder <see cref="SunState"/> (vista-plan §8.1, §10 M0). This is integrator v0's whole
-/// light model and the C# reference for its HLSL (vista-plan §9: a small reference and a parity test for
-/// shared shader maths only). The full atmosphere and real astronomy replace it in M1.
+/// The M0 light: the engine's single-scattering Rayleigh <see cref="Sky"/> dome plus a directional sun
+/// (vista-plan §8.1, §10 M0). This is integrator v0's whole light model and the C# reference for its HLSL
+/// (vista-plan §9: a small reference and a parity test for shared shader maths only). Since M1.2 the sun
+/// stands where the real one does (<see cref="SolarPosition"/>); how bright and warm the light is still
+/// follows the sun's height on the curves of the engine's <c>DayNightCycle</c>
+/// (<see cref="ForSunDirection"/>), which cannot do twilight, so a sun below the horizon renders dark until
+/// the spectral atmosphere replaces this dome in M1.3.
 ///
 /// <para><b>Dome:</b> <see cref="DomeRadiance"/> is <see cref="Sky.DomeRadiance"/> with the solar shape
 /// luma-normalised over the hero set (the <see cref="Sky"/> constructor given a <see cref="WavelengthLookup"/>,
 /// as the maze's shader does), so a test pins the two together.</para>
 ///
 /// <para><b>Sun:</b> a disk of the real sun's angular radius with spectral irradiance
-/// <c>PlaceholderSunIrradiance · SunLightLevel · solarShape(λ)</c> at normal incidence. The integrator reaches
+/// <c>PlaceholderSunIrradiance · daylight(h) · solarShape(λ)</c> at normal incidence. The integrator reaches
 /// it only through next-event estimation; bounce rays that escape see <see cref="DomeRadiance"/> without the
 /// disk (the engine's realism finding §5), so the sun is never counted twice. Camera rays that hit the disk
 /// see <see cref="SunDiskRadiance"/>, the radiance whose irradiance over the disk is that same value.
@@ -45,7 +49,7 @@ public sealed record SkyLight
     /// <summary>Unit vector toward the sun.</summary>
     public required Vector3 ToSun { get; init; }
 
-    /// <summary>Overall brightness of the dome (<see cref="SunState.SkyStrength"/>).</summary>
+    /// <summary>Overall brightness of the dome.</summary>
     public required float SkyStrength { get; init; }
 
     /// <summary>Rayleigh optical depth toward the zenith at 550 nm.</summary>
@@ -80,16 +84,32 @@ public sealed record SkyLight
     /// <summary>Solid angle of the sun disk in steradians.</summary>
     public float SunSolidAngle => (float)(2.0 * Math.PI * SunOneMinusCosMax);
 
-    /// <summary>The M0 light for <paramref name="sun"/> (the <see cref="DayNightCycle"/> placeholder).</summary>
-    public static SkyLight For(SunState sun)
+    /// <summary>Starlit floor of the dome's brightness, with the sun down.</summary>
+    public const float NightSkyStrength = 0.015f;
+
+    /// <summary>Full daylight brightness of the dome.</summary>
+    public const float DaySkyStrength = 0.7f;
+
+    /// <summary>The M0 light with the sun at <paramref name="sun"/>'s apparent position.</summary>
+    public static SkyLight For(SunPosition sun) => ForSunDirection(sun.ToSun);
+
+    /// <summary>
+    /// The M0 light with the sun toward <paramref name="toSun"/>. Brightness and colour follow the sun's height
+    /// <c>h = toSun.y</c> as in the engine's <c>DayNightCycle</c> (whose phase-to-direction circle Vista no
+    /// longer uses): daylight ramps in over <c>h</c> ∈ [0, 0.2], the temperature runs from 2400 K at the
+    /// horizon to 5800 K by <c>h</c> = 0.45, and the dome fades to a starlit floor with the sun down.
+    /// </summary>
+    public static SkyLight ForSunDirection(Vector3 toSun)
     {
-        Vector3 toSun = sun.Direction.LengthSquared() > 1e-12f ? -Vector3.Normalize(sun.Direction) : Vector3.UnitY;
+        Vector3 to = toSun.LengthSquared() > 1e-12f ? Vector3.Normalize(toSun) : Vector3.UnitY;
+        float height = to.Y;
+        float day = SmoothStep(0f, 0.20f, height);
         return new SkyLight
         {
-            ToSun = toSun,
-            SkyStrength = sun.SkyStrength,
-            SunTempK = MathF.Max(1f, sun.TempK),
-            SunIrradiance = toSun.Y > 0f ? PlaceholderSunIrradiance * Math.Clamp(sun.SunLightLevel, 0f, 1f) : 0f,
+            ToSun = to,
+            SkyStrength = float.Lerp(NightSkyStrength, DaySkyStrength, day),
+            SunTempK = float.Lerp(2400f, 5800f, SmoothStep(0f, 0.45f, height)),
+            SunIrradiance = height > 0f ? PlaceholderSunIrradiance * day : 0f,
         };
     }
 
@@ -138,6 +158,12 @@ public sealed record SkyLight
     /// radiance whose irradiance over <see cref="SunSolidAngle"/> is <see cref="SunSpectralIrradiance"/>.
     /// </summary>
     public float SunDiskRadiance(float solarShape) => SunSpectralIrradiance(solarShape) / SunSolidAngle;
+
+    private static float SmoothStep(float edge0, float edge1, float x)
+    {
+        float t = Math.Clamp((x - edge0) / (edge1 - edge0), 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
 
     private static float BlackbodyShape(float wavelengthNm, float tempK)
     {

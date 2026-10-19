@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
-using RayTracer;
+using Vista.Astronomy;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
@@ -50,7 +50,8 @@ public static class PreviewPipeline
         if (DefaultCamera.GroundWarning(camera, terrain) is { } groundWarning)
             warnings.Add(groundWarning);
 
-        SunState sun = SunPlaceholder.For(recipe.Time);
+        Almanac almanac = Almanac.For(recipe);
+        warnings.AddRange(almanac.Hints);
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
         var settings = new RenderSettings
         {
@@ -80,7 +81,7 @@ public static class PreviewPipeline
         }
         else
         {
-            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, sun, materials);
+            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials);
             var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
             RenderOutput output = renderer.Render(scene, settings, AovsFor(request.Debug), planner);
             if (output.Width != window.Width || output.Height != window.Height)
@@ -125,11 +126,8 @@ public static class PreviewPipeline
                 terrain.MaxHeight,
                 mesh.TriangleCount,
                 mesh.ByteSize),
-            Sun = new SunInfo(
-                SunPlaceholder.Source,
-                new WorldPoint(sun.Direction.X, sun.Direction.Y, sun.Direction.Z),
-                SunPlaceholder.ElevationDegrees(sun),
-                sun.TempK),
+            Place = almanac.Place,
+            Sun = SunInfo.From(almanac, SkyLight.For(almanac.Sun)),
             DataTiers = MaterialCatalog.TiersOf(materials),
             Render = renderInfo,
             TimingsSeconds = timings,

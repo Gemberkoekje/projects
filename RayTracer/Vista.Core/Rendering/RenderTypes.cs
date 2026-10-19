@@ -1,4 +1,5 @@
 using RayTracer;
+using Vista.Astronomy;
 using Vista.Recipes;
 using Vista.Scene;
 using Vista.World;
@@ -66,7 +67,7 @@ public static class AovLayout
 /// <param name="Camera">The view.</param>
 /// <param name="Terrain">The terrain height field (for collision checks and future height-field tracing).</param>
 /// <param name="Mesh">The terrain mesh to build the acceleration structure from.</param>
-/// <param name="Sun">The M0 sun; the sky is the engine's Rayleigh <c>Sky</c> built from it.</param>
+/// <param name="Sun">Where the sun is (<see cref="Astronomy.Almanac"/>); the M0 light is built from it (<see cref="SkyLight.For(SunPosition)"/>).</param>
 /// <param name="Materials">The material table; ids index it.</param>
 public sealed record VistaScene(
     Recipe Recipe,
@@ -74,7 +75,7 @@ public sealed record VistaScene(
     CameraSpec Camera,
     HeightField Terrain,
     TerrainMesh Mesh,
-    SunState Sun,
+    SunPosition Sun,
     IReadOnlyList<VistaMaterial> Materials);
 
 /// <summary>What a renderer returns: the <see cref="RenderSettings.Rendered"/> window of the frame.</summary>

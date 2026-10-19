@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using Vista.Astronomy;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
@@ -37,7 +38,7 @@ internal static class GpuSelfTest
         const ulong seed = 42;
         HeightField terrain = TerrainGenerator.Generate(recipe, seed);
         TerrainMesh mesh = HeightFieldMesher.Build(terrain);
-        var scene = new VistaScene(recipe, seed, DefaultCamera.For(terrain), terrain, mesh, SunPlaceholder.For(recipe.Time), MaterialCatalog.M0);
+        var scene = new VistaScene(recipe, seed, DefaultCamera.For(terrain), terrain, mesh, Almanac.For(recipe).Sun, MaterialCatalog.M0);
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
 

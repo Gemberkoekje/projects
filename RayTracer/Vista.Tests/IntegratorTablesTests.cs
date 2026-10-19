@@ -1,5 +1,6 @@
 using System.Numerics;
 using RayTracer;
+using Vista.Astronomy;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
@@ -10,7 +11,7 @@ namespace Vista.Tests;
 [TestClass]
 public sealed class IntegratorTablesTests
 {
-    private static readonly SkyLight Light = SkyLight.For(SunPlaceholder.For(TimeOfDay.GoldenHour));
+    private static readonly SkyLight Light = SkyLight.For(Almanac.For(new Recipe { Time = TimeOfDay.GoldenHour }).Sun);
 
     [TestMethod]
     public void Layout_IsTheEnginesHeroCycle()

@@ -1,9 +1,11 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "alpine range, golden hour",
   "setPieces": [
     "snowCappedMountains"
   ],
   "time": "goldenHour",
-  "season": "summer"
+  "season": "summer",
+  "location": "zermatt",
+  "date": "2026-07-15"
 }

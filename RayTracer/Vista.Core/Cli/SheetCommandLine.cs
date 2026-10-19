@@ -95,6 +95,11 @@ public static class SheetCommandLine
                 problems.Add("--seed and --vary seed=… both choose the seed; give one.");
             if (axis.SuppliesCamera && values.ContainsKey("--camera"))
                 problems.Add("--camera and --vary camera=… both choose the camera; give one.");
+            foreach ((string option, IReadOnlyList<string> fields) in PreviewCommandLine.PlaceOptionFields)
+            {
+                if (values.ContainsKey(option) && fields.Contains(axis.Key, StringComparer.Ordinal))
+                    problems.Add($"{option} and --vary {axis.Key}=… both decide {axis.Key}; give one.");
+            }
             if (columns > axis.Values.Count)
                 problems.Add($"--columns must be at most the number of cells ({axis.Values.Count}).");
         }

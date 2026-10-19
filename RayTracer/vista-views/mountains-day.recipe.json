@@ -1,9 +1,11 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "snow-capped mountains, day",
   "setPieces": [
     "snowCappedMountains"
   ],
   "time": "day",
-  "season": "summer"
+  "season": "summer",
+  "location": "zermatt",
+  "date": "2026-07-15"
 }

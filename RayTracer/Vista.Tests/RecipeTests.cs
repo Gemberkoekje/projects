@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Vista.Astronomy;
 using Vista.Recipes;
 
 namespace Vista.Tests;
@@ -49,6 +50,48 @@ public sealed class RecipeTests
         Assert.AreEqual(TimeOfDay.Day, recipe.Time);
         Assert.AreEqual(Season.Summer, recipe.Season);
         Assert.IsNull(recipe.Name);
+        Assert.AreEqual(Place.None, recipe.Location, "no place named: the default place");
+        Assert.IsNull(recipe.Latitude);
+        Assert.IsNull(recipe.Date);
+        Assert.IsNull(recipe.SolarTime);
+    }
+
+    [TestMethod]
+    public void SchemaOne_StillReads()
+    {
+        Recipe recipe = VistaJson.ParseRecipe(AutumnLakeJson);
+        Assert.AreEqual(1, recipe.Schema);
+        Assert.AreEqual(Place.None, recipe.Location);
+    }
+
+    [TestMethod]
+    public void PlaceFields_ParseAndRoundTrip()
+    {
+        Recipe recipe = VistaJson.ParseRecipe(
+            "{ \"schema\": 2, \"location\": \"torresDelPaine\", \"date\": \"2026-04-15\", \"solarTime\": \"17:30\", \"time\": \"dusk\" }");
+        Assert.AreEqual(Place.TorresDelPaine, recipe.Location);
+        Assert.AreEqual(new DateOnly(2026, 4, 15), recipe.Date);
+        Assert.AreEqual(new TimeOnly(17, 30), recipe.SolarTime);
+        string json = VistaJson.Serialize(recipe);
+        StringAssert.Contains(json, "\"location\": \"torresDelPaine\"");
+        StringAssert.Contains(json, "\"date\": \"2026-04-15\"");
+        Assert.IsTrue(recipe.ContentEquals(VistaJson.ParseRecipe(json)));
+
+        Recipe custom = VistaJson.ParseRecipe("{ \"latitude\": -33.9, \"solarTime\": \"06:05:30\" }");
+        Assert.AreEqual(-33.9, custom.Latitude);
+        Assert.AreEqual(new TimeOnly(6, 5, 30), custom.SolarTime);
+        Assert.IsTrue(custom.ContentEquals(VistaJson.ParseRecipe(VistaJson.Serialize(custom))));
+    }
+
+    [TestMethod]
+    public void ContentEquals_SeesThePlaceFields()
+    {
+        var recipe = new Recipe();
+        Assert.IsFalse(recipe.ContentEquals(recipe with { Location = Place.Banff }));
+        Assert.IsFalse(recipe.ContentEquals(recipe with { Latitude = 10.0 }));
+        Assert.IsFalse(recipe.ContentEquals(recipe with { Date = new DateOnly(2026, 1, 1) }));
+        Assert.IsFalse(recipe.ContentEquals(recipe with { SolarTime = new TimeOnly(9, 0) }));
+        Assert.IsTrue((recipe with { Latitude = 10.0 }).ContentEquals(recipe with { Latitude = 10.0 }));
     }
 
     [TestMethod]
@@ -106,11 +149,19 @@ public sealed class RecipeTests
     [DataRow("""{ "setPieces": ["forest"], "time": 2 }""", DisplayName = "enum as integer")]
     [DataRow("""{ "setPieces": null }""", DisplayName = "null set pieces")]
     [DataRow("""{ "terrain": ["alpineRange"] }""", DisplayName = "the old terrain/water shape")]
+    [DataRow("""{ "location": "atlantis" }""", DisplayName = "unknown location")]
+    [DataRow("""{ "location": 7 }""", DisplayName = "location as integer")]
+    [DataRow("""{ "date": "2026-10-5" }""", DisplayName = "date not yyyy-MM-dd")]
+    [DataRow("""{ "solarTime": "25:00" }""", DisplayName = "solar time past midnight")]
+    [DataRow("""{ "latitude": "north" }""", DisplayName = "latitude not a number")]
     public void Parse_RejectsMalformedJson(string json) =>
         Assert.ThrowsExactly<JsonException>(() => VistaJson.ParseRecipe(json));
 
     [TestMethod]
-    [DataRow("""{ "schema": 2 }""", "schema", DisplayName = "future schema")]
+    [DataRow("""{ "schema": 3 }""", "schema", DisplayName = "future schema")]
+    [DataRow("""{ "schema": 0 }""", "schema", DisplayName = "schema zero")]
+    [DataRow("""{ "location": "zermatt", "latitude": 46 }""", "not both", DisplayName = "place and custom latitude")]
+    [DataRow("""{ "latitude": 91 }""", "Latitude must be in [-90, 90]", DisplayName = "latitude past the pole")]
     [DataRow("""{ "setPieces": ["coast", "coast"] }""", "listed twice", DisplayName = "repeated set piece")]
     [DataRow("""{ "setPieces": ["frozenLake", "forest", "lake"] }""", "Lake and FrozenLake conflict", DisplayName = "conflicting set pieces")]
     public void Parse_RejectsInvalidRecipes(string json, string expected)

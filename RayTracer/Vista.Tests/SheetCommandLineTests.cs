@@ -58,6 +58,26 @@ public sealed class SheetCommandLineTests
     }
 
     [TestMethod]
+    [DataRow("--location", "zermatt", "latitude=0,45")]
+    [DataRow("--latitude", "10", "location=zermatt,banff")]
+    [DataRow("--time", "17:30", "time=dawn,dusk")]
+    [DataRow("--time", "dawn", "solarTime=06:00,07:00")]
+    [DataRow("--date", "2026-10-15", "season=spring,autumn")]
+    public void Sheet_PlaceOptionAndAxisOverTheSameField_Conflict(string option, string value, string vary) =>
+        StringAssert.Contains(SheetErrors("--sheet", "--recipe", "r.json", "--seed", "1", "--out", "s.png", option, value, "--vary", vary), "give one");
+
+    [TestMethod]
+    public void Sheet_PlaceOptionsCarryIntoEveryCell()
+    {
+        SheetRequest r = Sheet("--sheet", "--recipe", "r.json", "--seed", "1", "--out", "s.png", "--location", "zermatt",
+            "--date", "2026-10-15", "--vary", "time=dawn,day,goldenHour,dusk");
+        PreviewRequest dusk = r.Axis.Apply(r.Base, 3);
+        Assert.AreEqual("\"zermatt\"", dusk.RecipeOverrides["location"]);
+        Assert.AreEqual("\"2026-10-15\"", dusk.RecipeOverrides["date"]);
+        Assert.AreEqual("\"dusk\"", dusk.RecipeOverrides["time"]);
+    }
+
+    [TestMethod]
     public void Sheet_ProblemsAreReportedTogether()
     {
         string all = SheetErrors("--sheet", "--recipe", "r", "--seed", "1", "--out", "s.jpg", "--columns", "0", "--bogus", "x");

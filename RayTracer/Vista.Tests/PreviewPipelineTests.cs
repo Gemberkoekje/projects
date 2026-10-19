@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Vista.Astronomy;
 using Vista.Cli;
 using Vista.Output;
 using Vista.Recipes;
@@ -235,6 +236,51 @@ public sealed class PreviewPipelineTests
             renderer, worlds: worlds);
         Assert.AreSame(renderer.Scenes[0].Mesh, renderer.Scenes[1].Mesh);
         Assert.AreSame(renderer.Scenes[0].Terrain, renderer.Scenes[1].Terrain);
+    }
+
+    [TestMethod]
+    public void Sidecar_RecordsThePlaceAndTheSun()
+    {
+        var renderer = new FakeRenderer();
+        Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: false), renderer);
+
+        Assert.AreEqual(Place.Zermatt, sidecar.Place.Place, "the default place");
+        Assert.AreEqual(new DateOnly(SeasonCalendar.ReferenceYear, 7, 15), sidecar.Sun.Date);
+        Assert.AreEqual("season summer", sidecar.Sun.DateFrom);
+        Assert.AreEqual("goldenHour: sunset − 60 min", sidecar.Sun.SolarTimeFrom);
+        Assert.AreEqual(DaylightKind.RisesAndSets, sidecar.Sun.Daylight);
+        Almanac almanac = Almanac.For(VistaJson.ParseRecipe(File.ReadAllText(Path.Combine(_dir, "r.json"))));
+        Assert.AreEqual(almanac.Sun, renderer.Scene!.Sun, "the renderer gets the almanac's sun");
+        Assert.AreEqual(almanac.Sun.AzimuthDegrees, sidecar.Sun.AzimuthDegrees);
+        Assert.AreEqual(almanac.Sun.ElevationDegrees, sidecar.Sun.ElevationDegrees);
+        Assert.AreEqual(Almanac.FormatHours(almanac.Daylight.SunsetHours - 1.0), sidecar.Sun.SolarTime);
+        Assert.AreEqual(Almanac.FormatHours(almanac.Daylight.SunsetHours), sidecar.Sun.Sunset);
+        Assert.AreEqual(-almanac.Sun.ToSun.Y, sidecar.Sun.Direction.Y, 1e-6, "the direction is the sunlight's travel");
+
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_dir, "p.json")));
+        JsonElement place = doc.RootElement.GetProperty("place");
+        Assert.AreEqual("zermatt", place.GetProperty("place").GetString());
+        Assert.IsFalse(place.TryGetProperty("isCustom", out _), "derived flags stay out of the file");
+        Assert.AreEqual("2026-07-15", doc.RootElement.GetProperty("sun").GetProperty("date").GetString());
+        Sidecar back = VistaJson.Deserialize<Sidecar>(File.ReadAllText(Path.Combine(_dir, "p.json")));
+        Assert.AreEqual(sidecar.Place, back.Place, "the place reads back");
+        Assert.AreEqual(sidecar.Sun, back.Sun, "the sun reads back");
+    }
+
+    [TestMethod]
+    public void PlaceOverrides_ReachTheSun_AndPolarDayHints()
+    {
+        var overrides = new Dictionary<string, string>
+        {
+            ["location"] = "\"lofoten\"", ["date"] = "\"2026-06-21\"", ["time"] = "\"dusk\"",
+        };
+        Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: true) with { RecipeOverrides = overrides }, renderer: null);
+        Assert.AreEqual(Place.Lofoten, sidecar.Place.Place);
+        Assert.AreEqual("recipe date", sidecar.Sun.DateFrom);
+        Assert.AreEqual(DaylightKind.PolarDay, sidecar.Sun.Daylight);
+        Assert.IsNull(sidecar.Sun.Sunrise);
+        Assert.AreEqual("00:00:00", sidecar.Sun.SolarTime);
+        StringAssert.Contains(sidecar.Warnings.Single(), "Polar day at Lofoten");
     }
 
     [TestMethod]

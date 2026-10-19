@@ -1,3 +1,4 @@
+using Vista.Astronomy;
 using Vista.Cli;
 using Vista.Rendering;
 
@@ -18,6 +19,52 @@ public sealed class PreviewCommandLineTests
         Assert.IsFalse(PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors));
         Assert.IsNull(request);
         return errors;
+    }
+
+    [TestMethod]
+    public void PlaceOptions_BecomeRecipeOverrides()
+    {
+        PreviewRequest r = Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png",
+            "--location", "TorresDelPaine", "--date", "2026-04-15", "--time", "17:30");
+        Assert.AreEqual("\"torresDelPaine\"", r.RecipeOverrides["location"]);
+        Assert.AreEqual("null", r.RecipeOverrides["latitude"], "a place clears a custom latitude");
+        Assert.AreEqual("\"2026-04-15\"", r.RecipeOverrides["date"]);
+        Assert.AreEqual("\"17:30:00\"", r.RecipeOverrides["solarTime"]);
+        Assert.IsFalse(r.RecipeOverrides.ContainsKey("time"));
+
+        PreviewRequest custom = Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png", "--latitude", "-33.9", "--time", "goldenhour");
+        Assert.AreEqual("-33.9", custom.RecipeOverrides["latitude"]);
+        Assert.AreEqual("\"none\"", custom.RecipeOverrides["location"]);
+        Assert.AreEqual("\"goldenHour\"", custom.RecipeOverrides["time"]);
+        Assert.AreEqual("null", custom.RecipeOverrides["solarTime"], "a preset clears the recipe's solar time");
+
+        Assert.AreEqual(0, Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png").RecipeOverrides.Count);
+    }
+
+    [TestMethod]
+    [DataRow("--location", "atlantis", "Unknown --location 'atlantis'")]
+    [DataRow("--location", "none", "Unknown --location")]
+    [DataRow("--location", "3", "Unknown --location")]
+    [DataRow("--latitude", "91", "--latitude must be")]
+    [DataRow("--latitude", "46,5", "--latitude must be")]
+    [DataRow("--date", "15-10-2026", "--date must look like")]
+    [DataRow("--date", "2026-02-30", "--date must look like")]
+    [DataRow("--time", "noon", "--time must be")]
+    [DataRow("--time", "24:00", "--time must be")]
+    public void PlaceOptions_AreChecked(string option, string value, string message) =>
+        StringAssert.Contains(string.Join(" | ", Errors("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png", option, value)), message);
+
+    [TestMethod]
+    public void LocationAndLatitude_AreExclusive() =>
+        StringAssert.Contains(
+            string.Join(" | ", Errors("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png", "--location", "banff", "--latitude", "50")),
+            "give one");
+
+    [TestMethod]
+    public void Usage_ListsEveryPlace()
+    {
+        foreach (PlaceInfo place in Places.All)
+            StringAssert.Contains(PreviewCommandLine.Usage, System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(place.Place.ToString()));
     }
 
     [TestMethod]

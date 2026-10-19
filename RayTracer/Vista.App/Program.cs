@@ -104,6 +104,11 @@ internal static class Program
     {
         foreach ((string role, string file) in sidecar.Outputs)
             Console.WriteLine($"{role}: {file}");
+        SunInfo sun = sidecar.Sun;
+        string daylight = sun.Sunrise is null ? sun.Daylight.ToString() : $"sunrise {sun.Sunrise}, sunset {sun.Sunset}";
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"sun: {sidecar.Place.Name} ({sidecar.Place.LatitudeDegrees:0.00}°), {sun.Date:yyyy-MM-dd} ({sun.DateFrom}), " +
+            $"{sun.SolarTime} solar ({sun.SolarTimeFrom}); azimuth {sun.AzimuthDegrees:0.0}°, elevation {sun.ElevationDegrees:0.00}°; {daylight}"));
         if (sidecar.Render is { } render)
         {
             RenderStats s = render.Stats;

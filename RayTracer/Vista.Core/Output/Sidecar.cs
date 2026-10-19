@@ -1,4 +1,5 @@
 using System.Reflection;
+using Vista.Astronomy;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
@@ -11,12 +12,14 @@ namespace Vista.Output;
 /// timings), which is what the preview's first calibration of the estimate reads back (§7.2).
 /// The linked sliders join under a new <see cref="Schema"/> later in M1.
 ///
-/// <para>Schema 2 (M1.1) added <see cref="ImageInfo.Window"/>, the part of the frame the image shows.</para>
+/// <para>Schema 2 (M1.1) added <see cref="ImageInfo.Window"/>, the part of the frame the image shows. Schema 3
+/// (M1.2) added <see cref="Place"/> and the astronomy in <see cref="Sun"/>: date, local solar time, sunrise,
+/// sunset, azimuth and elevation, each with where it came from.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 2;
+    public const int CurrentSchema = 3;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -47,6 +50,9 @@ public sealed record Sidecar
 
     /// <summary>World generation facts.</summary>
     public required WorldInfo World { get; init; }
+
+    /// <summary>The place the sky was computed for: the recipe's location or custom latitude, or the default place.</summary>
+    public required PlaceInfo Place { get; init; }
 
     /// <summary>The sun the image was lit by.</summary>
     public required SunInfo Sun { get; init; }
@@ -111,12 +117,67 @@ public sealed record WorldInfo(
     long Triangles,
     long MeshBytes);
 
-/// <summary>The sun.</summary>
-/// <param name="Source">Where the sun came from (the M0 placeholder, later real astronomy).</param>
-/// <param name="Direction">Sunlight travel direction (the sun is toward its negation).</param>
-/// <param name="ElevationDegrees">Elevation above the horizon.</param>
-/// <param name="TemperatureK">Blackbody colour temperature.</param>
-public sealed record SunInfo(string Source, WorldPoint Direction, double ElevationDegrees, double TemperatureK);
+/// <summary>The sun (vista-plan §3.5): when, where in the sky, and the light the M0 dome made of it.</summary>
+/// <param name="Source">How the position was computed.</param>
+/// <param name="Date">The date.</param>
+/// <param name="DateFrom">"season &lt;name&gt;" when the season chose the date for the hemisphere, "recipe date" for an override.</param>
+/// <param name="Season">The season (the date's, when the recipe gives a date).</param>
+/// <param name="SolarTime">The local solar time rendered, <c>HH:mm:ss</c> (12:00:00 is solar noon).</param>
+/// <param name="SolarTimeFrom">How the time was chosen, e.g. "dawn: sunrise − 20 min" or "recipe solarTime".</param>
+/// <param name="Daylight">Whether the sun rises and sets on the date.</param>
+/// <param name="Sunrise">Sunrise in local solar time; null in polar day or night.</param>
+/// <param name="Sunset">Sunset in local solar time; null in polar day or night.</param>
+/// <param name="AzimuthDegrees">Compass bearing of the sun (0 north, 90 east).</param>
+/// <param name="ElevationDegrees">Apparent elevation (with refraction), as rendered.</param>
+/// <param name="TrueElevationDegrees">Geometric elevation, without refraction.</param>
+/// <param name="DeclinationDegrees">The sun's declination.</param>
+/// <param name="Direction">Sunlight travel direction in engine axes (the sun is toward its negation).</param>
+/// <param name="TemperatureK">Blackbody colour temperature of the M0 light.</param>
+public sealed record SunInfo(
+    string Source,
+    DateOnly Date,
+    string DateFrom,
+    Season Season,
+    string SolarTime,
+    string SolarTimeFrom,
+    DaylightKind Daylight,
+    string? Sunrise,
+    string? Sunset,
+    double AzimuthDegrees,
+    double ElevationDegrees,
+    double TrueElevationDegrees,
+    double DeclinationDegrees,
+    WorldPoint Direction,
+    double TemperatureK)
+{
+    /// <summary>Recorded in <see cref="Source"/>.</summary>
+    public const string NoaaSource = "NOAA solar calculator (Meeus), local solar time";
+
+    /// <summary>The record of <paramref name="almanac"/> lit by <paramref name="light"/>.</summary>
+    public static SunInfo From(Almanac almanac, SkyLight light)
+    {
+        ArgumentNullException.ThrowIfNull(almanac);
+        ArgumentNullException.ThrowIfNull(light);
+        Daylight daylight = almanac.Daylight;
+        SunPosition sun = almanac.Sun;
+        return new SunInfo(
+            NoaaSource,
+            almanac.Date,
+            almanac.DateFromSeason ? "season " + System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(almanac.Season.ToString()) : "recipe date",
+            almanac.Season,
+            Almanac.FormatHours(almanac.SolarHours),
+            almanac.SolarTimeFrom,
+            daylight.Kind,
+            daylight.HasSunriseAndSunset ? Almanac.FormatHours(daylight.SunriseHours) : null,
+            daylight.HasSunriseAndSunset ? Almanac.FormatHours(daylight.SunsetHours) : null,
+            sun.AzimuthDegrees,
+            sun.ElevationDegrees,
+            sun.TrueElevationDegrees,
+            sun.DeclinationDegrees,
+            new WorldPoint(-light.ToSun.X, -light.ToSun.Y, -light.ToSun.Z),
+            light.SunTempK);
+    }
+}
 
 /// <summary>Renderer statistics as written to the sidecar.</summary>
 /// <param name="Stats">Raw counts and timings.</param>

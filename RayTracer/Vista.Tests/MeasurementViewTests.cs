@@ -1,3 +1,4 @@
+using Vista.Astronomy;
 using Vista.Recipes;
 using Vista.Scene;
 using Vista.World;
@@ -36,6 +37,11 @@ public sealed class MeasurementViewTests
         Recipe golden = VistaJson.ParseRecipe(Read("mountains-golden.recipe.json"));
         Assert.AreEqual((TimeOfDay.Day, TimeOfDay.GoldenHour), (day.Time, golden.Time));
         CollectionAssert.AreEqual(new[] { SetPiece.SnowCappedMountains }, day.SetPieces.ToArray());
+        foreach (Recipe recipe in new[] { day, golden })
+        {
+            Assert.AreEqual((Place.Zermatt, new DateOnly(2026, 7, 15)), (recipe.Location, recipe.Date), "place and date are pinned (M1.2)");
+            Assert.IsNull(recipe.SolarTime);
+        }
         Assert.AreEqual(45.0, VistaJson.ParseCamera(Read("sky.camera.json")).PitchDegrees);
         Assert.AreEqual(-30.0, VistaJson.ParseCamera(Read("down-slope.camera.json")).PitchDegrees);
         Assert.AreEqual(4200.0, VistaJson.ParseCamera(Read("aerial.camera.json")).Position.Y);

@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Text.Json;
+using Vista.Astronomy;
+using Vista.Recipes;
 using Vista.Rendering;
 
 namespace Vista.Cli;
@@ -79,9 +82,13 @@ public sealed record PreviewRequest
 /// Vista.App --preview --recipe r.json --seed N [--camera c.json] --out p.png
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
+///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
-/// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail.
+/// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
+/// options override the recipe's fields (vista-plan §3.5): <c>--location</c> or <c>--latitude</c> picks the
+/// place (and clears the other), <c>--date</c> overrides the season, and <c>--time</c> takes a time-of-day
+/// preset (clearing the recipe's solar time) or a local solar time.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -102,7 +109,24 @@ public static class PreviewCommandLine
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
-        "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.";
+        "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
+        "Place overrides: [--location <place> | --latitude <degrees>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
+        "  places: yellowstone, banff, yosemite, lofoten, iceland, scottishHighlands, zermatt (default), dolomites,\n" +
+        "          torresDelPaine, fiordland, hokkaido\n" +
+        "  presets: dawn (sunrise − 20 min), day (solar noon), goldenHour (sunset − 60 min), dusk (sunset + 20 min), night;\n" +
+        "  hh:mm is local solar time (12:00 is solar noon). A date overrides the recipe's season.";
+
+    /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
+    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["--location"] = ["location", "latitude"],
+            ["--latitude"] = ["location", "latitude"],
+            ["--date"] = ["date", "season"],
+            ["--time"] = ["time", "solarTime"],
+        };
+
+    private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
 
     /// <summary>Parses <paramref name="args"/>. Returns false with every problem listed in <paramref name="errors"/>.</summary>
     public static bool TryParse(IReadOnlyList<string> args, out PreviewRequest? request, out IReadOnlyList<string> errors)
@@ -130,6 +154,7 @@ public static class PreviewCommandLine
     internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
+        "--location", "--latitude", "--date", "--time",
     };
 
     /// <summary>
@@ -197,6 +222,7 @@ public static class PreviewCommandLine
         }
         HashSet<DebugOutput> debug = DebugSet(values.GetValueOrDefault("--debug"), problems);
         PixelWindow loupe = Loupe(values.GetValueOrDefault("--loupe"), width, height, problems);
+        Dictionary<string, string> recipeOverrides = PlaceOverrides(values, problems);
 
         if (problems.Count > before)
             return null;
@@ -214,8 +240,70 @@ public static class PreviewCommandLine
             DispatchBudgetMs = dispatchMs,
             DryRun = dryRun,
             Loupe = loupe,
+            RecipeOverrides = recipeOverrides,
         };
     }
+
+    /// <summary>The recipe overrides of the place options (JSON values by field), checked here so a typo is one CLI error.</summary>
+    private static Dictionary<string, string> PlaceOverrides(Dictionary<string, string> values, List<string> problems)
+    {
+        var overrides = new Dictionary<string, string>(StringComparer.Ordinal);
+        bool hasLocation = values.TryGetValue("--location", out string? location);
+        bool hasLatitude = values.TryGetValue("--latitude", out string? latitudeText);
+        if (hasLocation && hasLatitude)
+            problems.Add("--location and --latitude both choose the place; give one.");
+        if (hasLocation)
+        {
+            if (Enum.TryParse(location, ignoreCase: true, out Place place) && Enum.IsDefined(place) && place != Place.None && !int.TryParse(location, out _))
+            {
+                overrides["location"] = JsonSerializer.Serialize(JsonName(place.ToString()));
+                overrides["latitude"] = "null";
+            }
+            else
+            {
+                problems.Add($"Unknown --location '{location}'; one of: {PlaceList}.");
+            }
+        }
+        if (hasLatitude)
+        {
+            if (double.TryParse(latitudeText, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double latitude)
+                && latitude is >= -90.0 and <= 90.0)
+            {
+                overrides["latitude"] = latitude.ToString("R", CultureInfo.InvariantCulture);
+                overrides["location"] = "\"none\"";
+            }
+            else
+            {
+                problems.Add($"--latitude must be a number of degrees in [-90, 90] (north positive), got '{latitudeText}'.");
+            }
+        }
+        if (values.TryGetValue("--date", out string? dateText))
+        {
+            if (DateOnly.TryParseExact(dateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date))
+                overrides["date"] = JsonSerializer.Serialize(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            else
+                problems.Add($"--date must look like 2026-10-15, got '{dateText}'.");
+        }
+        if (values.TryGetValue("--time", out string? timeText))
+        {
+            if (Enum.TryParse(timeText, ignoreCase: true, out TimeOfDay preset) && Enum.IsDefined(preset) && !int.TryParse(timeText, out _))
+            {
+                overrides["time"] = JsonSerializer.Serialize(JsonName(preset.ToString()));
+                overrides["solarTime"] = "null";
+            }
+            else if (TimeOnly.TryParseExact(timeText, ["H:mm", "H:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out TimeOnly time))
+            {
+                overrides["solarTime"] = JsonSerializer.Serialize(time.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                problems.Add($"--time must be dawn, day, goldenHour, dusk, night or a local solar time like 17:30, got '{timeText}'.");
+            }
+        }
+        return overrides;
+    }
+
+    private static string JsonName(string name) => JsonNamingPolicy.CamelCase.ConvertName(name);
 
     private static PixelWindow Loupe(string? text, int width, int height, List<string> problems)
     {

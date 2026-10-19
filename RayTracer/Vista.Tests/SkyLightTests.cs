@@ -1,14 +1,14 @@
 using System.Numerics;
 using RayTracer;
-using Vista.Recipes;
+using Vista.Astronomy;
 using Vista.Rendering;
-using Vista.Scene;
 
 namespace Vista.Tests;
 
 /// <summary>
 /// The M0 light model of integrator v0 (vista-plan §9: a C# reference and a parity test for shared shader
-/// maths only). The shader's dome must be the engine's <see cref="Sky.DomeRadiance"/>, and the sun disk must
+/// maths only). The shader's dome must be the engine's <see cref="Sky.DomeRadiance"/>, the light's level and
+/// colour must follow the sun's height as the engine's <see cref="DayNightCycle"/> did, and the sun disk must
 /// agree with the irradiance next-event estimation uses.
 /// </summary>
 [TestClass]
@@ -16,18 +16,26 @@ public sealed class SkyLightTests
 {
     private static WavelengthLookup Lookup => IntegratorTables.Wavelengths;
 
-    public static IEnumerable<object[]> Times => Enum.GetValues<TimeOfDay>().Select(t => new object[] { t });
+    /// <summary>The M0 day/night cycle's noon sun: high, tilted a little north.</summary>
+    private static readonly Vector3 HighSun = Vector3.Normalize(new Vector3(0f, 1f, 0.3f));
+
+    private static SkyLight AtElevation(double azimuth, double elevation) =>
+        SkyLight.For(new SunPosition(azimuth, elevation, elevation, 0.0, 0.0));
 
     [TestMethod]
-    [DynamicData(nameof(Times))]
-    public void DomeRadiance_MatchesTheEngineSky(TimeOfDay time)
+    [DataRow(-10.0)]
+    [DataRow(-2.0)]
+    [DataRow(3.0)]
+    [DataRow(9.0)]
+    [DataRow(30.0)]
+    [DataRow(70.0)]
+    public void DomeRadiance_MatchesTheEngineSky(double elevation)
     {
-        SunState sun = SunPlaceholder.For(time);
-        SkyLight light = SkyLight.For(sun);
-        var engine = new Sky(sun.Direction, skyStrength: sun.SkyStrength, sunTempK: sun.TempK, spectral: Lookup);
+        SkyLight light = AtElevation(250.0, elevation);
+        var engine = new Sky(-light.ToSun, skyStrength: light.SkyStrength, sunTempK: light.SunTempK, spectral: Lookup);
         Vector3[] directions =
         [
-            Vector3.UnitY, new(0.3f, 0.4f, 0.8f), new(-0.9f, 0.05f, 0.1f), new(0.2f, -0.5f, 0.6f), -sun.Direction + new Vector3(0f, 0.2f, 0f),
+            Vector3.UnitY, new(0.3f, 0.4f, 0.8f), new(-0.9f, 0.05f, 0.1f), new(0.2f, -0.5f, 0.6f), light.ToSun + new Vector3(0f, 0.2f, 0f),
         ];
 
         for (int i = 0; i < Lookup.DeterministicCount; i++)
@@ -38,28 +46,42 @@ public sealed class SkyLightTests
             {
                 float expected = engine.DomeRadiance(dir, nm);
                 float actual = light.DomeRadiance(dir, shape, SkyLight.RayleighRelative(nm));
-                Assert.AreEqual(expected, actual, 1e-5f * Math.Max(1f, expected), $"{time}, {nm} nm, {dir}");
+                Assert.AreEqual(expected, actual, 1e-5f * Math.Max(1f, expected), $"{elevation}°, {nm} nm, {dir}");
             }
         }
     }
 
     [TestMethod]
-    public void For_FollowsTheSunState()
+    public void LightLevelAndColour_FollowTheSunsHeightLikeTheEnginesDayNightCycle()
     {
-        SunState day = SunPlaceholder.For(TimeOfDay.Day);
-        SkyLight light = SkyLight.For(day);
-        Assert.AreEqual(1f, light.ToSun.Length(), 1e-6f);
-        Assert.AreEqual(-Vector3.Normalize(day.Direction), light.ToSun);
-        Assert.AreEqual(day.SkyStrength, light.SkyStrength);
-        Assert.AreEqual(day.TempK, light.SunTempK);
-        Assert.AreEqual(SkyLight.PlaceholderSunIrradiance * day.SunLightLevel, light.SunIrradiance, 1e-6f);
+        // Vista no longer uses the cycle's circle, only its curves of height; this keeps them identical, so M0
+        // and M1.2 light a sun at the same height the same way.
+        for (int i = 0; i < 200; i++)
+        {
+            SunState cycle = DayNightCycle.At(i / 200f);
+            SkyLight light = SkyLight.ForSunDirection(-cycle.Direction);
+            Assert.AreEqual(1f, light.ToSun.Length(), 1e-6f);
+            Assert.AreEqual(cycle.SkyStrength, light.SkyStrength, 1e-6f, $"phase {i / 200f}");
+            Assert.AreEqual(cycle.TempK, light.SunTempK, 1e-3f, $"phase {i / 200f}");
+            float irradiance = -cycle.Direction.Y > 0f ? SkyLight.PlaceholderSunIrradiance * cycle.SunLightLevel : 0f;
+            Assert.AreEqual(irradiance, light.SunIrradiance, 1e-6f, $"phase {i / 200f}");
+        }
+    }
+
+    [TestMethod]
+    public void For_PutsTheSunWhereTheAstronomySays()
+    {
+        var sun = new SunPosition(250.0, 9.0, 8.9, 0.0, 0.0);
+        SkyLight light = SkyLight.For(sun);
+        Assert.AreEqual(sun.ToSun, light.ToSun);
         Assert.IsTrue(light.SunUp);
+        Assert.IsTrue(light.SunTempK < 4000f, "a low sun is warm");
     }
 
     [TestMethod]
     public void Night_HasNoSun()
     {
-        SkyLight night = SkyLight.For(SunPlaceholder.For(TimeOfDay.Night));
+        SkyLight night = AtElevation(0.0, -30.0);
         Assert.IsFalse(night.SunUp);
         Assert.AreEqual(0f, night.SunIrradiance);
         Assert.IsTrue(night.SkyStrength > 0f, "the starlit floor of the dome stays");
@@ -68,7 +90,7 @@ public sealed class SkyLightTests
     [TestMethod]
     public void SunDisk_RadiatesTheIrradianceNextEventEstimationUses()
     {
-        SkyLight light = SkyLight.For(SunPlaceholder.For(TimeOfDay.GoldenHour));
+        SkyLight light = AtElevation(260.0, 9.0);
         float shape = light.SolarShape(550f, Lookup);
         Assert.AreEqual(light.SunSpectralIrradiance(shape), light.SunDiskRadiance(shape) * light.SunSolidAngle, 1e-3f);
         Assert.AreEqual(Math.PI * SkyLight.SunAngularRadiusRadians * SkyLight.SunAngularRadiusRadians, light.SunSolidAngle, 1e-9);
@@ -77,7 +99,7 @@ public sealed class SkyLightTests
     [TestMethod]
     public void DaySun_IsAboutFiveTimesTheDomeOnLevelGround()
     {
-        SkyLight light = SkyLight.For(SunPlaceholder.For(TimeOfDay.Day));
+        SkyLight light = SkyLight.ForSunDirection(HighSun);
         float shape = light.SolarShape(550f, Lookup);
         float rayleigh = SkyLight.RayleighRelative(550f);
 
