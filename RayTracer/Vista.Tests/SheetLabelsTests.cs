@@ -76,6 +76,14 @@ public sealed class SheetLabelsTests
             SheetLabels.Differences([Id(Sidecar(seed: "1", time: "dawn")), Id(Sidecar(seed: "2", time: "dusk"))]).ToArray(),
             "in reading order");
         CollectionAssert.AreEqual(new[] { "", "" }, SheetLabels.Differences([Id(Sidecar()), Id(Sidecar())]).ToArray());
+        CollectionAssert.AreEqual(new[] { "seed=1 build=566b68d", "seed=1 build=abcdef0", "seed=2 build=566b68d", "seed=2 build=abcdef0" },
+            SheetLabels.Differences([Id(Sidecar(seed: "1")), Id(Sidecar(seed: "1", version: "1.0.0+abcdef0")),
+                Id(Sidecar(seed: "2")), Id(Sidecar(seed: "2", version: "1.0.0+abcdef0"))]).ToArray(),
+            "with equally many values, reading order");
+        CollectionAssert.AreEqual(new[] { "build=566b68d seed=1", "build=abcdef0 seed=1", "build=566b68d seed=2", "build=abcdef0 seed=3" },
+            SheetLabels.Differences([Id(Sidecar(seed: "1")), Id(Sidecar(seed: "1", version: "1.0.0+abcdef0")),
+                Id(Sidecar(seed: "2")), Id(Sidecar(seed: "3", version: "1.0.0+abcdef0"))]).ToArray(),
+            "the field with the fewest values leads, so a before/after keeps its build in view");
         StringAssert.Contains(SheetLabels.Differences([Id(Sidecar()), new Dictionary<string, string>()])[1], "seed=-");
     }
 

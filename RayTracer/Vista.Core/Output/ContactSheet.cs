@@ -13,13 +13,14 @@ public sealed record SheetText(int X, int Y, string Text);
 /// <param name="Y">Top edge of the image in sheet pixels.</param>
 /// <param name="Width">Image width.</param>
 /// <param name="Height">Image height.</param>
-/// <param name="Label">The label under the image's cell, cut to the cell width.</param>
-public sealed record SheetPlacement(int Column, int Row, int X, int Y, int Width, int Height, SheetText Label);
+/// <param name="Label">The label under the image's cell: up to <see cref="ContactSheet.MaxLabelLines"/> lines, wrapped and cut to the cell width.</param>
+public sealed record SheetPlacement(int Column, int Row, int X, int Y, int Width, int Height, IReadOnlyList<SheetText> Label);
 
 /// <summary>
 /// The geometry of a contact sheet: a title block on top, then a grid of equal cells filled row by row, each an
-/// image (top-left in its cell) over a one-line label. Every length scales with <see cref="Scale"/>, which
-/// grows with the cell width so labels stay readable on large tiles.
+/// image (top-left in its cell) over its label. Labels wrap; every cell's label strip is as tall as the
+/// longest label needs. Every length scales with <see cref="Scale"/>, which grows with the cell width so
+/// labels stay readable on large tiles.
 /// </summary>
 /// <param name="Width">Sheet width in pixels.</param>
 /// <param name="Height">Sheet height in pixels.</param>
@@ -59,6 +60,9 @@ public static class ContactSheet
     /// <summary>Most tiles one sheet takes.</summary>
     public const int MaxTiles = 64;
 
+    /// <summary>Most lines a label wraps onto; the last is cut with an ellipsis when more remains.</summary>
+    public const int MaxLabelLines = 3;
+
     /// <summary>Columns when none are asked for: a row for up to three tiles, otherwise a near-square grid.</summary>
     public static int DefaultColumns(int count)
     {
@@ -97,8 +101,9 @@ public static class ContactSheet
         int margin = 6 * scale;
         int gap = 6 * scale;
         int lineHeight = BitmapFont.LineHeight * scale;
-        int labelStrip = 2 * scale + lineHeight;
         int width = 2 * margin + columns * cellWidth + (columns - 1) * gap;
+        var labelLines = labels.Select(label => LabelLines(label, cellWidth, scale)).ToList();
+        int labelStrip = 2 * scale + labelLines.Max(lines => lines.Count) * lineHeight;
 
         IReadOnlyList<string> titleLines = title.Length == 0 ? [] : BitmapFont.Wrap(title, width - 2 * margin, scale);
         var titleTexts = titleLines.Select((line, i) => new SheetText(margin, margin + i * lineHeight, line)).ToList();
@@ -112,7 +117,7 @@ public static class ContactSheet
             int row = i / columns;
             int x = margin + column * (cellWidth + gap);
             int y = gridTop + row * (cellHeight + labelStrip + gap);
-            var label = new SheetText(x, y + cellHeight + 2 * scale, BitmapFont.Fit(labels[i], cellWidth, scale));
+            var label = labelLines[i].Select((line, k) => new SheetText(x, y + cellHeight + 2 * scale + k * lineHeight, line)).ToList();
             cells.Add(new SheetPlacement(column, row, x, y, sizes[i].Width, sizes[i].Height, label));
         }
         return new SheetLayout(width, height, columns, rows, cellWidth, cellHeight, scale, titleTexts, cells);
@@ -146,8 +151,18 @@ public static class ContactSheet
             {
                 Array.Copy(tiles[i], row * rowBytes, sheet, ((cell.Y + row) * layout.Width + cell.X) * 3, rowBytes);
             }
-            BitmapFont.Draw(sheet, layout.Width, cell.Label.X, cell.Label.Y, cell.Label.Text, layout.Scale, LabelColor);
+            foreach (SheetText line in cell.Label)
+                BitmapFont.Draw(sheet, layout.Width, line.X, line.Y, line.Text, layout.Scale, LabelColor);
         }
         return sheet;
+    }
+
+    private static IReadOnlyList<string> LabelLines(string label, int width, int scale)
+    {
+        IReadOnlyList<string> lines = BitmapFont.Wrap(label, width, scale, " ");
+        if (lines.Count <= MaxLabelLines)
+            return lines;
+        string rest = string.Join(" ", lines.Skip(MaxLabelLines - 1));
+        return [.. lines.Take(MaxLabelLines - 1), BitmapFont.Fit(rest, width, scale)];
     }
 }

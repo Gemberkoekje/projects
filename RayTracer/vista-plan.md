@@ -909,7 +909,7 @@ so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences small
   headless on the 3070. CI: sheet layout, labels and the sheet sidecar.
 
 *M1.1 status (2026-10-19): done.* Every deliverable and check is met; nothing in `RayTracer.Core` /
-`RayTracer.Gpu` changed. `Vista.Tests` has 271 tests (130 new).
+`RayTracer.Gpu` changed. `Vista.Tests` has 272 tests (131 new).
 
 *Checks (on the RTX 3070 unless noted):*
 
@@ -920,6 +920,8 @@ so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences small
 - **Full frames unchanged:** four previews (default, aerial, down-slope, a 640×360 golden-hour view with
   every debug output) are byte-identical to the M0 build's PNGs and EXRs, and the ledger views trace the
   same rays per sample as M0.
+- **Before/after, the PR way:** the four measurement views rendered by a `main` build (11e489b) and by
+  this branch are byte-identical pair by pair; `--sheet-from` tiles the eight and labels each pair by build.
 - **Sheets headless:** a four-seed sheet (2.7 s wall, four worlds) and a five-cell time-of-day sheet with
   a normal-map sheet (2.0 s wall, one world) rendered from one `Vista.App` call each. A 4K loupe of a peak
   (320×180 out of 3840×2160) takes 1.4 s wall, almost all of it world generation.
@@ -947,13 +949,16 @@ so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences small
 - **Labels:** `--sheet` labels cells `key=value`. `--sheet-from` labels each image by the identity fields
   of its sidecar that differ from the others' (recipe, seed, camera, size, loupe, spp, bounces, display
   transform, build commit — never timings or ray counts), so a main-vs-branch pair is labelled by build;
-  `--labels` overrides. The title is the fields every cell shares. Sidecars are read as plain JSON, not as
+  `--labels` overrides. Fields with the fewest distinct values come first (ties in reading order), so in a
+  before/after of the four measurement views the build is never the part that gets cut. The title is the
+  fields every cell shares. Sidecars are read as plain JSON, not as
   `Sidecar`, so renders from older and newer schemas tile together. The default camera is compared as
   "default", not by its pose, which follows the terrain (else a seed sheet would label every cell with a
   camera height).
 - **Font:** 5×7 glyphs on a 9-row cell (two rows of descenders), printable ASCII plus `°×·−…`, drawn at
-  one scale per 320 px of cell width (at most 4). An unknown character draws a hollow box. Long labels are
-  cut with `…`; titles wrap at `" · "`.
+  one scale per 320 px of cell width (at most 4). An unknown character draws a hollow box. Labels wrap at
+  spaces onto up to three lines (every label strip as tall as the longest label), the third cut with `…`;
+  titles wrap at `" · "`.
 - **One-world cache:** the cells of a sheet share a `WorldCache` keyed by what `TerrainGenerator` reads
   (terrain profile and seed). A time-of-day sheet generates and meshes once, and the same mesh instance
   lets the renderer keep its BLAS. Watch mode (M1.8) replaces it with a cache per stage.

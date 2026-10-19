@@ -93,14 +93,18 @@ public static class SheetLabels
     }
 
     /// <summary>
-    /// One label per cell: the identity fields that are not the same in every cell, as <c>short=value</c> in
-    /// reading order. A field a cell lacks counts as different. Empty labels mean the cells are identical.
+    /// One label per cell: the identity fields that are not the same in every cell, as <c>short=value</c>. A
+    /// field a cell lacks counts as different. Fields with the fewest distinct values come first, then reading
+    /// order: in a before/after of several views, <c>build=</c> (two values) leads every label, so it survives
+    /// when a long label is cut. Empty labels mean the cells are identical.
     /// </summary>
     public static IReadOnlyList<string> Differences(IReadOnlyList<IReadOnlyDictionary<string, string>> identities)
     {
         ArgumentNullException.ThrowIfNull(identities);
+        int Distinct(string key) => identities.Select(i => i.GetValueOrDefault(key)).Distinct().Count();
         List<string> differing = Ordered(identities.SelectMany(i => i.Keys).Distinct())
-            .Where(key => identities.Select(i => i.GetValueOrDefault(key)).Distinct().Count() > 1)
+            .Where(key => Distinct(key) > 1)
+            .OrderBy(Distinct)
             .ToList();
         return identities
             .Select(i => string.Join(" ", differing.Select(key => $"{Short(key)}={i.GetValueOrDefault(key, "-")}")))

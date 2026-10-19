@@ -40,7 +40,7 @@ public sealed class ContactSheetTests
         Assert.AreEqual(new SheetText(6, 6, "alpine range · seed 42"), layout.Title.Single());
         SheetPlacement fourth = layout.Cells[3];
         Assert.AreEqual((1, 1, 332, 222, 320, 180), (fourth.Column, fourth.Row, fourth.X, fourth.Y, fourth.Width, fourth.Height));
-        Assert.AreEqual(new SheetText(332, 222 + 180 + 2, "seed=4"), fourth.Label);
+        Assert.AreEqual(new SheetText(332, 222 + 180 + 2, "seed=4"), fourth.Label.Single());
     }
 
     [TestMethod]
@@ -58,7 +58,7 @@ public sealed class ContactSheetTests
         SheetLayout layout = ContactSheet.Layout([(320, 180), (64, 64), (100, 200)], ["a", "b", "c"], 2, "");
         Assert.AreEqual((320, 200), (layout.CellWidth, layout.CellHeight));
         Assert.AreEqual((64, 64), (layout.Cells[1].Width, layout.Cells[1].Height));
-        Assert.AreEqual(layout.Cells[0].Label.Y, layout.Cells[1].Label.Y, "labels line up along a row");
+        Assert.AreEqual(layout.Cells[0].Label[0].Y, layout.Cells[1].Label[0].Y, "labels line up along a row");
         Assert.AreEqual((0, 1), (layout.Cells[2].Column, layout.Cells[2].Row));
     }
 
@@ -67,10 +67,24 @@ public sealed class ContactSheetTests
     {
         SheetLayout layout = ContactSheet.Layout([(64, 36), (64, 36)], ["camera=vista-views/down-slope.camera.json", "b"], 0,
             "snow-capped mountains, day · snowCappedMountains · summer · seed 42");
-        Assert.IsTrue(layout.Cells.All(c => BitmapFont.Measure(c.Label.Text, layout.Scale) <= layout.CellWidth));
-        StringAssert.EndsWith(layout.Cells[0].Label.Text, BitmapFont.Ellipsis);
+        Assert.IsTrue(layout.Cells.SelectMany(c => c.Label).All(l => BitmapFont.Measure(l.Text, layout.Scale) <= layout.CellWidth));
+        StringAssert.EndsWith(layout.Cells[0].Label.Single().Text, BitmapFont.Ellipsis, "one word too long for the cell is cut");
         Assert.IsTrue(layout.Title.Count > 1, "the title wraps");
         Assert.IsTrue(layout.Title.All(t => BitmapFont.Measure(t.Text, layout.Scale) <= layout.Width - 12));
+    }
+
+    [TestMethod]
+    public void LongLabels_WrapOntoUpToThreeLines()
+    {
+        // 10 characters fit a 64 px cell at scale 1.
+        SheetLayout layout = ContactSheet.Layout([(64, 36), (64, 36), (64, 36)],
+            ["build=11e489b seed=1", "build=b1df1da seed=1 time=dawn season=winter", "x"], 0, "");
+        CollectionAssert.AreEqual(new[] { "build=11e…", "seed=1" }, layout.Cells[0].Label.Select(l => l.Text).ToArray());
+        CollectionAssert.AreEqual(new[] { "build=b1d…", "seed=1", "time=dawn…" }, layout.Cells[1].Label.Select(l => l.Text).ToArray(),
+            "the third line carries the rest, cut");
+        Assert.AreEqual(1, layout.Cells[2].Label.Count);
+        Assert.AreEqual(36 + 2 + 11, layout.Cells[0].Label[1].Y - layout.Cells[0].Y, "lines are a line height apart");
+        Assert.AreEqual(6 + 36 + 2 + 3 * 11 + 6, layout.Height, "every label strip is as tall as the longest label");
     }
 
     [TestMethod]
@@ -100,7 +114,7 @@ public sealed class ContactSheetTests
         Assert.AreEqual((0, 0, 255), Pixel(sheet, layout.Width, second.X, second.Y));
         Assert.AreEqual((24, 24, 24), Pixel(sheet, layout.Width, first.X + 10, first.Y), "the gap between cells");
         // 'A' has ink in its top row's middle column; 'T' in its whole top row.
-        Assert.AreEqual((200, 200, 200), Pixel(sheet, layout.Width, first.Label.X + 2, first.Label.Y));
+        Assert.AreEqual((200, 200, 200), Pixel(sheet, layout.Width, first.Label[0].X + 2, first.Label[0].Y));
         Assert.AreEqual((240, 240, 240), Pixel(sheet, layout.Width, layout.Title[0].X, layout.Title[0].Y));
     }
 
