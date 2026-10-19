@@ -2,7 +2,8 @@
 
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
-through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is next. It sits
+through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
+seventeen slices in §10 (**M1 plan**), M1.1 first. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -231,7 +232,8 @@ change.
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
   shadows or appears in reflections. Alternative for far terrain: a custom height-field
-  intersection (min/max quadtree) in the inline ray query loop. Decide in M1 by measuring.
+  intersection (min/max quadtree) in the inline ray query loop. Decide in M1 by measuring
+  (M1.9, M1.10).
 - **Materials by rule:** rock strata, scree, soil, grass, moss, snow, wet vs. dry —
   placed by slope, altitude, aspect, erosion flow and moisture.
 
@@ -527,7 +529,8 @@ at that pace, so a small preview render is a first-class mode from M0:
   session on the dev box; cloud sessions and CI can build and unit-test but not render
   (§11). What they *can* run is `--dry-run`: world generation, mesh, sidecar and a
   top-down height map with the camera marked, so the world side can be iterated
-  anywhere.
+  anywhere. Once erosion runs on the GPU (M1.7), `--dry-run` uses a cached eroded field when
+  there is one and the un-eroded terrain otherwise (§10, M1 decisions).
 
 ---
 
@@ -817,8 +820,9 @@ dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42
 - **A preview's cost is tiny for now** (a 320×180, 64 spp preview traces in about 4 ms), so the
   wall time is world generation, mesh and file writing. M1's watch mode (§7.4) is where that matters.
 
-**Next: M1.** Its first measured decisions are the view-dependent mesh against height-field
-intersection (§4.3) and sun / sky importance sampling. The M0 placeholders to replace are listed above.
+**Next: M1**, planned below as seventeen slices, starting with M1.1 (contact sheets and loupe). Its
+measured decisions, the view-dependent mesh against height-field intersection (§4.3) and sun / sky
+importance sampling, are M1.9–M1.10 and M1.5. The M0 placeholders to replace are listed above.
 
 **M1 — Proof of concept: "alpine range at golden hour" (3840×2160).**
 Goal: Terragen-class mountain vistas, no vegetation yet. Deliverable: GPU hydraulic +
@@ -834,6 +838,276 @@ window; preview watch mode, loupe and contact sheets (§7.4); time + VRAM estima
 Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
+
+**M1 plan (agreed with the user 2026-10-19).** Seventeen slices, one PR each, in the order below.
+Work stops after each PR for review.
+
+*Strategy decisions (the user's answers, 2026-10-19):*
+
+| Question | Decision |
+|---|---|
+| How much of the sky lands before the terrain work? | **All of it.** Astronomy, the spectral atmosphere with multiple scattering, aerial perspective and sun / sky importance sampling come before erosion. Rock and snow are then tuned once, under the final light, and twilight exists before the snow slice that checks alpenglow. |
+| When do the iteration tools arrive? | **Contact sheets and loupe first, tweak window last.** Sheets and loupe are M1.1, so every later look PR carries a before/after sheet. Watch mode follows erosion, when world generation stops being free. The window comes last, once the sliders, auto camera and estimate exist to go in it. |
+| Where does erosion run? | **On the GPU, as planned (§4.3).** Gather-only compute passes (each cell writes only itself, no float atomics), so erosion is deterministic on one driver. The eroded field is cached per (recipe, seed) and its hash goes in the sidecar, so a driver update that changes the world shows up instead of passing silently. A C# reference of each pass is unit-tested in CI on small grids; HLSL-against-C# parity runs in `--gpu-selftest`. CI and `--dry-run` use the cached field when there is one, else the un-eroded terrain with a warning. |
+| Where do the location dropdown's climate normals come from in M1? | **A hand-entered table:** monthly mean daily lows and highs for each dropdown place, with a source per place, treated as constants like the CIE tables. M2 may replace them through the manifest (§6.2). |
+
+*Decisions that follow (proposed with this plan; revisit freely):*
+
+- **Ozone cross-sections** are entered the same way as the climate normals: a few numbers at the
+  engine's wavelengths, source cited, tier 5 until M2. The extraterrestrial sun keeps the engine's
+  5778 K Planck shape; the atmosphere does the reddening.
+- **The atmosphere is LUTs, validated against a brute-force reference** (§5.2). The reference mode
+  ships in the same slice as the LUTs, so every later atmosphere change can be checked against it.
+- **Light gets physical units in M1.3.** Day and twilight differ by about 10⁴ in the real atmosphere,
+  so the PNG gets auto exposure (log-average luminance plus EV compensation, recorded in the sidecar).
+  The EXR stays scene-referred.
+- **Linked sliders land before materials and snow**, so snow reads its freezing level from the
+  weather chain instead of a stub that gets rewired later.
+- **The view-dependent mesh comes first, height-field intersection second** (M1.9, M1.10). The mesh
+  rides the 3070's hardware triangle path, so it is the default; the height-field path is built only
+  far enough to measure it against the mesh on the same views.
+- **The estimate comes before the window**, so the window can show it.
+- **Vista goldens arrive at the sign-off (M1.17).** Every look slice moves every image, so earlier
+  goldens would only be re-baselined each time. Until then the self-test's bit-identity checks guard
+  determinism and contact sheets show the look.
+
+*Every slice:*
+
+- One PR, then stop for review. The PR says what was measured and with which commands.
+- `Vista.Tests` green in CI; `Vista.App --gpu-selftest` passes on the RTX 3070 and grows with the
+  slice where noted.
+- A slice that changes the look attaches a before/after contact sheet (from M1.1 on) and adds a row
+  to the cost ledger below.
+- No engine change is planned. A slice that does touch `RayTracer.Core` / `RayTracer.Gpu` also runs
+  `--phase6-selftest` and `--phase6-regress` (§9.2).
+- It ends with its status, decisions and gotchas written into this section.
+
+*M1 cost ledger:* ns per pixel-sample (mean over dispatches) on the four M0 measurement views at
+3840×2160, 64 spp, seed 42. M1.1 commits their camera files.
+
+| After | Sky only | Aerial, day | Default camera, day | Down a slope, golden hour |
+|---|---|---|---|---|
+| M0 | 0.24 | 0.70 | 0.88 | 1.32 |
+
+**M1.1 — Contact sheets & loupe.**
+- *Goal:* compare variants in one look, and check final-resolution detail without rendering the
+  whole frame (§7.4).
+- *Deliverable:* `--sheet` renders variants along one axis (e.g. `seed=1,2,3,4`, time of day, any
+  recipe field; sliders once they exist) as previews and tiles them into one labelled PNG, with one
+  sidecar listing every cell. `--sheet-from a.png b.png …` tiles existing renders, labelled from
+  their sidecars, which builds a PR's before/after from a render on `main` and one on the branch.
+  Labels use a small built-in bitmap font (procedural purity). `--loupe x,y,w,h` renders only that
+  window of the full-resolution frame, with the full frame's pixel coordinates and random keys, so a
+  loupe is exactly a crop of the final. The four M0 measurement views are committed as camera files.
+- *Verify:* `--gpu-selftest` adds a loupe check: a 64×64 window of a 640×360 frame is bit-identical
+  to the same window cut from the full render. A four-seed sheet and a time-of-day sheet render
+  headless on the 3070. CI: sheet layout, labels and the sheet sidecar.
+
+**M1.2 — Astronomy & place.**
+- *Goal:* the real sun for a place, a date and a local solar time, with dawn and dusk below the
+  horizon (§3.5).
+- *Deliverable:* solar position in `Vista.Core` (NOAA / Meeus: declination from the date, hour
+  angle from local solar time, so longitude and time zone drop out) with sunrise and sunset. The
+  time-of-day presets are defined relative to sunrise and sunset ("dawn" = sunrise − ~20 min), with
+  a hint when polar day or night has none. Season ↔ date by hemisphere (autumn at Torres del Paine
+  is April), with a date override. The location list: the §3.5 places plus custom latitude, each
+  with a latitude and a typical valley altitude. Recipe and CLI gain location, latitude, date and
+  time overrides; the sidecar records them plus the sun's azimuth and elevation. `DayNightCycle` and
+  `SunPlaceholder` retire. The M0 dome stays until M1.3, so a sun below the horizon renders dark for
+  one slice.
+- *Verify:* CI: sun positions against NOAA calculator values (both hemispheres, equinoxes and
+  solstices, polar day and night) within 0.05°; season/date tests. 3070: a time-of-day sheet at
+  Zermatt in October; the self-test passes.
+
+**M1.3 — Spectral atmosphere: sky & sunlight.**
+- *Goal:* replace the single-scattering Rayleigh dome with a spectral atmosphere on a spherical
+  Earth, so the reddened low sun, twilight, the Earth's shadow and the Belt of Venus emerge (§5.2).
+- *Deliverable:* Rayleigh, Mie haze (Henyey–Greenstein for now; spectral Mie is M4) and ozone
+  absorption, with altitude profiles. Per-wavelength LUTs for the engine's 50 wavelengths in the
+  style of Hillaire 2020 (transmittance, multiple scattering, and a sky-view LUT per render's sun),
+  built by compute shaders, with a C# reference of each integrand. Sun next-event estimation goes
+  through the transmittance from the shading point, the planet's shadow included; escaping rays
+  read the sky-view LUT. The scene's base altitude becomes an input. `--atmosphere reference`
+  path-traces the air as a medium (delta tracking, next-event estimation to the sun): the slow,
+  unbiased check. Physical units and PNG auto exposure (decision above).
+- *Verify:* CI: zenith optical depths against published values (Rayleigh ≈ 0.097 at 550 nm, ozone's
+  Chappuis peak near 600 nm) and the LUT integrands. 3070: the LUT sky against the reference mode at
+  sun elevations +30°, +5°, −2° and −6°, with the error per wavelength band recorded (target: a few
+  percent). A sun-elevation sheet from −6° to +10° shows the red sun, the Earth's shadow and the
+  Belt of Venus. Peaks stay lit red after the valley floor's sunset, from transmittance alone. The
+  self-test covers the LUT build.
+
+**M1.4 — Aerial perspective & altitude.**
+- *Goal:* the layered, receding blue ridges: every segment, camera and bounce, carries the air
+  between its ends.
+- *Deliverable:* transmittance and in-scattered light along each finite segment from the LUTs,
+  either as the sky-view difference (L(p) − T·L(q)) or as a short march through the transmittance and
+  multiple-scattering LUTs, chosen by error against the reference mode and by cost. The terrain's
+  altitude for the air includes the Earth's curvature drop (≈ 200 m at 50 km). The altitude control
+  (§3.6) goes in. A known limit, measured here: air in a mountain's shadow is still lit (no
+  crepuscular rays); fog volumes revisit it in M4.
+- *Verify:* 3070: the error against the reference on a layered-ridges view and on a shadowed valley
+  at golden hour; a sea-level against 3000 m sheet shows the deeper blue and thinner haze; the cost
+  ledger records the first real cost jump since M0.
+
+**M1.5 — Sun & sky importance sampling.**
+- *Goal:* converge golden hour and twilight, where the sky carries most of the fill light.
+- *Deliverable:* a sky distribution per render (a piecewise-constant 2D CDF over the sky-view LUT,
+  luminance-weighted over the wavelengths), the sun disk as its own light, and multiple importance
+  sampling (power heuristic) between BSDF, sky and sun sampling. Bounce rays that hit the sun disk
+  now count, with their MIS weight. Russian roulette is re-measured.
+- *Verify:* 3070: unbiased, because at 4096 spp the new estimator matches the old one within the
+  per-pixel standard error (variance image); variance at equal spp on dawn, golden-hour and day
+  views drops by a measured factor, with the time per sample recorded; the self-test passes.
+
+**M1.6 — OIDN.**
+- *Goal:* clean previews at low spp, and a clean final (§5.7).
+- *Deliverable:* Intel Open Image Denoise through its C API (P/Invoke) behind a `Vista.Core` seam,
+  fed the beauty plus the averaged albedo and normal. `--denoise` writes the denoised PNG/EXR beside
+  the raw one; raw is always written (§11). A script fetches a pinned OIDN release into a git-ignored
+  folder and checks its checksum: never committed, never run in CI. Without it a render warns and
+  writes raw only. CPU device first; OIDN's GPU device is measured as an option. The sidecar records
+  the OIDN version, device and filter.
+- *Verify:* 3070: a raw | denoised | reference sheet (16 spp denoised against 4096 spp), with the
+  error recorded; denoising the same input twice is bit-identical on the chosen device, or this file
+  records that it is not. CI: the seam, with a fake denoiser.
+
+**M1.7 — GPU erosion.**
+- *Goal:* the realism lever (§4.3): valleys, ridges, talus and fans that read as weathered rock.
+- *Deliverable:* hydraulic erosion on the grid (virtual-pipe water flow with sediment transport and
+  deposition; droplet erosion is out, because its scattered writes need atomics) plus thermal
+  erosion to a talus angle, as gather-only compute passes, with parameters per terrain profile. The
+  grid's resolution and extent are chosen by measurement (target around 4097²; what lies beyond it
+  for 50 km sight lines is part of that measurement). The world stage now runs on the device, before
+  the mesh. Its outputs are reused later: flow accumulation, deposition, wetness and curvature. The
+  C# reference, the cache and the sidecar hash as decided above.
+- *Verify:* 3070: the eroded field is bit-identical across two runs and across a cache round trip;
+  HLSL against the C# reference on a 65² grid within tolerance, in `--gpu-selftest`; a before/after
+  sheet over four seeds; erosion time and VRAM per seed recorded. CI: the C# reference conserves
+  water and sediment within tolerance, never yields NaN, and has a pinned hash.
+
+**M1.8 — Watch mode.**
+- *Goal:* keep the expensive state alive between previews, now that erosion costs seconds (§7.4).
+- *Deliverable:* `--watch` keeps the device, compiled shaders, the eroded world, the mesh and its
+  acceleration structures, and the atmosphere LUTs alive. It watches the recipe, camera and slider
+  files and rebuilds only the stages a change touches (world ← set + seed; LUTs ← sun, date,
+  altitude, haze; mesh ← world + camera; render ← everything). Each re-render writes the preview and
+  a sidecar that says which stages were reused. The window drives this same session in M1.16.
+- *Verify:* 3070: a scripted change sequence (exposure → time of day → camera → seed) rebuilds
+  exactly the expected stages, and each watch render is bit-identical to a cold CLI render of the
+  same files; the wall time per change is recorded.
+
+**M1.9 — View-dependent terrain mesh.**
+- *Goal:* final-resolution terrain detail inside the VRAM budget (§4.3, §7.1).
+- *Deliverable:* a mesh per camera from the eroded field to a screen-space error in pixels at the
+  output resolution, plus near-camera detail from position-only seeded noise (§4.1), crack-free. It
+  stays conservative off screen, where geometry still casts shadows and shows in reflections.
+  Whether the geometry bends with the Earth is settled here. Triangles, VRAM, build time and ns per
+  pixel-sample are measured on fixed test views at 320 px and 4K.
+- *Verify:* 3070: the measurement table goes into §4.3; a 4K loupe near the camera shows no facets
+  beyond the error target; a view with the sun behind an off-screen peak keeps its shadow; a
+  downsampled 4K render and the preview of the same camera show the same world (sheet); the
+  self-test passes.
+
+**M1.10 — Height-field intersection: the measured decision.**
+- *Goal:* decide mesh against height-field intersection for far terrain, by measurement (§4.3,
+  §9.8).
+- *Deliverable:* a min/max quadtree height-field traversal for terrain beyond some distance
+  (procedural tiles in the inline ray query loop, or a traversal of its own), measured against M1.9
+  on the same views: VRAM, build time, ns per pixel-sample, and the image difference (the two must
+  agree before their costs mean anything). The decision and its numbers go into §4.3. If the height
+  field wins, it ships as the far-terrain path; if not, the PR carries only the numbers and the
+  prototype stays on its branch.
+- *Verify:* 3070: the numbers table and difference images; the self-test passes on whatever ships.
+
+**M1.11 — Linked sliders & the weather chain.**
+- *Goal:* one auto/pinned mechanism, with plausible defaults from the place and the season (§3.4,
+  §3.6).
+- *Deliverable:* the linked-slider model in `Vista.Core`: every slider is auto or pinned, reset
+  re-links, pinning stops only that slider, set pieces push defaults, and contradictions give an
+  "implausible" hint, never a block. Basic: season, time of day, snow, fog/haze. Advanced: location,
+  altitude, date, temperature (°C, with °F on request), humidity. The weather chain: climate normals
+  (decision above) → valley temperature with a daily curve (minimum near sunrise, maximum
+  mid-afternoon) → humidity → freezing level (6.5 °C per 1000 m) → the snow default, with the season;
+  haze density from humidity and the fog/haze slider (fog itself is M4). Custom latitude falls back
+  to a latitude model. A slider file holds the pinned values; the sidecar records every slider's
+  value and whether it was auto or pinned.
+- *Verify:* CI: the chain (pinning temperature still lets snow follow; reset re-links; a set piece
+  pushes its default; the implausible hint; autumn at Torres del Paine is April; Lofoten milder than
+  its latitude model). 3070: a month sheet at one place changes sun and haze from the defaults alone.
+
+**M1.12 — Materials by rule.**
+- *Goal:* rock that reads as rock: strata, scree, soil, alpine grass and wet ground where nature
+  puts them (§4.3).
+- *Deliverable:* materials chosen and blended in the shader per hit, from slope, altitude, aspect
+  and the erosion maps (flow, deposition, wetness), all procedural: rock strata as warped altitude
+  bands, scree on deposition under steep faces, soil, grass as a material (its geometry is M5), and
+  wet darkening. Built-in-tier spectra (tier 5, recorded per material). Rough-diffuse rock
+  (Oren–Nayar-style) is measured against Lambert in a sheet, because backscatter from a low sun is
+  the golden-hour look. The rules live in `Vista.Core`, with tests.
+- *Verify:* CI: rule tests (steep → rock, deposition below a steep face → scree, …). 3070:
+  material-id and tier previews over four seeds; a before/after beauty sheet; a cost-ledger row.
+
+**M1.13 — Snow & glaciers.**
+- *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
+- *Deliverable:* snow cover from slope (shed above ~35–40°), aspect (poleward faces keep more,
+  hemisphere from the latitude), wind and curvature (ridges scoured and hollows filled, from the
+  erosion curvature), and altitude against the freezing level and the snow slider (M1.11).
+  Recipe-owned glaciers and permanent snowfields for the mountain set pieces, carved at the world
+  stage, so snow at zero leaves them. A dry / wet / melting state by altitude against the freezing
+  level. A built-in snow spectrum from ice absorption and grain size (tier 5). Russian roulette is
+  re-measured on bright snow (M0 note). Close-up snow stays in M7.
+- *Verify:* CI: the placement rules. 3070: **bare steep faces**, because on the test views the snow
+  fraction on faces steeper than 40° (read from the material-id output) stays under a threshold
+  recorded here while ledges and gullies hold snow. **Alpenglow**, because a dawn sheet from −4° to
+  +4° shows the peaks pink and red while the valley is in shadow, with no code that knows about
+  alpenglow. A season sheet moves the snowline from the defaults alone.
+
+**M1.14 — Auto camera v1.**
+- *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
+  §4.8).
+- *Deliverable:* shot-first planting for snow-capped mountains and alpine range: a viewpoint and
+  heading toward the main range, chosen with the sun's azimuth for side or back light. A few hundred
+  candidates around it are scored from low-resolution G-buffer renders (depth, normal, material id)
+  on: horizon near a third, foreground / midground / background layering, sun angle, sky fraction,
+  the peaks in frame, nothing blocking the lens. Camera collision. `--auto-camera` in the CLI; the
+  scores and the winner go in the sidecar.
+- *Verify:* CI: scoring tests on synthetic G-buffers. 3070: an auto-camera sheet over eight seeds ×
+  both set pieces against the default camera; the same pick twice; the scoring time recorded.
+
+**M1.15 — Time & VRAM estimate.**
+- *Goal:* honest estimates before a final render (pillar 7, §7.2).
+- *Deliverable:* rays per sample and rays per second measured from the preview and from a handful
+  of random loupe crops at the final resolution and detail. Time as a range, for fixed spp or for a
+  noise target (from the preview's variance). A VRAM estimate from the planned allocations, checked
+  against DXGI's budget, with a warning before a render that won't fit. The live ETA refines per
+  dispatch during the final. `--estimate` in the CLI. The §7.1 table gets measured numbers.
+- *Verify:* 3070: on at least six test views (sky-heavy, terrain-heavy, twilight, snow) the real 4K
+  render time lands inside the estimate's own range, and peak VRAM within its stated margin. CI: the
+  estimator's math.
+
+**M1.16 — Preview & tweak window.**
+- *Goal:* drive all of M1 by hand (§3.1).
+- *Deliverable:* a WinForms window on the watch-mode session: a progressive preview that restarts
+  and refines after each change; the set-piece picker (a new scene); seed and new seed; the basic
+  sliders and the advanced panel (location dropdown, custom latitude, altitude, date, temperature
+  with the °C/°F toggle, humidity), each showing auto/pinned with reset and the implausible hint;
+  camera nudges in metres, pan / tilt / roll, focal length, focus, aperture and exposure, with
+  collision; the auto-camera button; a debug-view picker; the estimate and "render final" (4K EXR +
+  PNG + sidecar, live ETA). Recipe, camera and slider files save and load, so the window and the CLI
+  share them.
+- *Verify:* 3070: a converged window preview is bit-identical to a CLI preview of the files the
+  window saves; the M1 checks walked through in the window, noted in the PR.
+
+**M1.17 — M1 sign-off.**
+- *Goal:* close M1 against its verification.
+- *Deliverable:* the Vista golden suite at preview size (fixed seeds, committed PNG/EXR goldens,
+  `--golden-check` with a tolerance, re-baselined deliberately) covering the M1 checks; the hero
+  render "alpine range at golden hour" at 3840×2160 with its sidecar; the M1 status, decisions,
+  gotchas and hand-off in this section.
+- *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
+  its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
+  `--phase6-regress` 19/19 (maze unmoved).
 
 **M2 — Measured spectra.**
 Goal: "it is spectral" backed by measured data. Deliverable: verify access routes and
@@ -941,6 +1215,9 @@ balance, lens CA), estimator accuracy.
   real leaf geometry costs memory.
 - **GPU determinism across driver updates** is not guaranteed; goldens may need
   re-baselining.
+- **Eroded worlds depend on the GPU driver** (M1 decision: erosion stays on the GPU). The
+  per-seed cache and the sidecar's height-field hash make a change visible, but a fresh machine
+  or driver may erode the same seed slightly differently.
 - **The agent loop needs the GPU.** Only the local RTX 3070 can render, so LLM look-dev
   iteration (§7.4) works only in a local session on the dev box. A CPU preview
   renderer would lift that, but contradicts the no-CPU-port decision (§9); revisit
@@ -950,7 +1227,9 @@ balance, lens CA), estimator accuracy.
   outputs cover that (§7.4).
 
 **Product.**
-- **Location list and climate data**: which places, and from which public normals.
+- **Location list and climate data**: M1 hand-enters monthly normals for each dropdown place,
+  with a source per place (§10, M1 decisions). Which public normals to use, and whether M2's
+  manifest replaces them, is still open.
 - **HDR wallpaper support** on Windows is unverified (M11).
 
 ---
@@ -978,3 +1257,4 @@ balance, lens CA), estimator accuracy.
 | Hardware | RTX 3070, 8 GB |
 | Scope | Stills only |
 | Style | Photoreal target; anything else via filters / camera settings |
+| M1 strategy (2026-10-19) | All of the sky before the terrain; contact sheets + loupe first, tweak window last; erosion on the GPU, cached per seed with its hash in the sidecar; climate normals hand-entered for M1 (§10, M1 plan) |
