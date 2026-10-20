@@ -3,9 +3,9 @@
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
 through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
-seventeen slices in §10 (**M1 plan**); M1.1–M1.8 (iteration tools, astronomy, the spectral atmosphere, aerial
-perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode) are done, M1.9 (the view-dependent
-terrain mesh) is next. It sits
+seventeen slices in §10 (**M1 plan**); M1.1–M1.9 (iteration tools, astronomy, the spectral atmosphere, aerial
+perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh) are
+done, M1.10 (the height-field decision) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -240,6 +240,12 @@ change.
   (M1.9, M1.10). M1.7 measured the stopgap, the uniform mesh of the whole eroded grid:
   33.6 M triangles, 805 MB plus a 2.35 GB BLAS. Beyond the grid, elevated views still see
   9–18% of the frame (§10, M1.7), so the far field belongs to M1.9/M1.10 too.
+  **Built in M1.9** (§10, M1.9 has the table): a 4-8 mesh refined to 1 px of the frame's centre on screen and half the
+  sun's angular radius off screen, over the eroded grid, a far field of base terrain at 32 m and 256 m out past the
+  horizon, and seeded detail below the grid near the camera, crack-free by saturated errors, bent onto the Earth, with
+  normal maps putting the grid's shading back on coarse triangles. At 4K a view takes 6.4–9.8 M triangles and
+  1.0–1.3 GiB for the process (the uniform mesh: 33.6 M and 3.2 GiB); a 320 px preview 0.26–1.5 M. The far field is
+  40–56% of an elevated view's triangles: what M1.10 measures a height-field path against.
 - **Materials by rule:** rock strata, scree, soil, grass, moss, snow, wet vs. dry —
   placed by slope, altitude, aspect, erosion flow and moisture.
 
@@ -481,7 +487,9 @@ Rough budget for a 4K render with forest — **guesses to verify by measurement 
 
 Measured in M1.7: the uniform mesh of the 4097² eroded grid takes 0.8 GB plus a 2.3 GB BLAS
 (3.1 GiB for the process at render), twice the terrain line, until M1.9's view-dependent mesh;
-erosion's own state (1.15 GiB) is freed before the mesh is built.
+erosion's own state (1.15 GiB) is freed before the mesh is built. Measured in M1.9: at 4K and 1 px the
+view-dependent mesh takes 160–240 MiB plus a 430–650 MiB BLAS and 134 MB of normal maps, 1.0–1.3 GiB for the
+process with its image buffers: inside the terrain line. Twice as fine (0.5 px) takes 1.7–2.3 GiB.
 
 One RGBA32F buffer is ~133 MB at 4K, ~531 MB at 8K and ~2.1 GB at 16K, so image buffers
 alone reach ~3 GB at 8K and ~13 GB at 16K: **tiled rendering** arrives with the larger
@@ -908,6 +916,7 @@ Work stops after each PR for review.
 | M1.6 | 0.22 | 2.81 | 2.17 | 3.62 |
 | M1.7 | 0.17 | 3.62 | 2.20 | 3.94 |
 | M1.8 | 0.17 | 3.62 | 2.20 | 3.94 |
+| M1.9 | 0.26 | 4.04 | 2.80 | 5.56 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -939,6 +948,13 @@ grid now, 21.5% before); the down-slope view's +9% the eroded ground under a low
 one camera ray per sample on both builds, and the terrain's height range only picks the sky-view slice; it is 0.06 ns a sample.
 M1.8 changes no pixel and no line of the integrator, so its row is M1.7's: the four ledger views and a golden-hour view with every
 debug output (640 px, 16 spp) rendered by `main` (b96f2e57) and by this slice are byte-identical, PNG and EXR, sixteen files.
+M1.9 changes the geometry (the view-dependent mesh with its far field and detail, bent onto the Earth) and the shading (normal maps).
+Measured as M1.5 and M1.7 were, on a GPU 16–34% busy with other programs: this slice and `main` (04bd3154) rendered alternately, view
+by view, three rounds; median ratios 1.508, 1.117, 1.271 and 1.411 (1.495–1.538, 1.116–1.117, 1.270–1.272, 1.405–1.423). The views trace
+1.00, 3.07, 2.51 and 3.89 rays per sample (M1.8: 1.00, 2.81, 2.47, 3.77): the far field turns rays that left past the grid's edge into
+terrain. The normal maps are 5% of it (the same build with and without them, alternately: 1.00, 1.06, 1.05, 1.05); the rest is the far
+field and, down the slope, the 3.7 M triangles of detail near the camera. The sky view's +0.1 ns is its camera rays crossing a BLAS whose
+root now spans the far field.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -1496,7 +1512,7 @@ below too.
   spherical air would put it. The surface's sun takes its own tilted vertical (its transmittance and the Earth's shadow), as the
   air just above it does; rays that leave the terrain still read the sky view in the camera's frame, which is built for one
   vertical (under 0.1° of tilt across today's tile). `SunReachesScene` counts the terrain's reach from the camera. Whether the
-  geometry itself bends stays M1.9's question.
+  geometry itself bends stays M1.9's question. (It does since M1.9: the mesh is built in the bent frame, `EarthFrame`.)
 - **The 4D tables' view axis is by angle** (C# `TexelToSample`, `CellOf`): split at the ground sphere's horizon, each half
   dense toward it, as the sky view's rows are. Bruneton's map by distance put every texel of the ground half within 0.5° of the
   horizon near the ground (at 10 m: texel 0 straight down, texel 1 1.5° below the horizon) and left the zenith a texel apart
@@ -2268,6 +2284,179 @@ build-time measurement has to keep small.
   downsampled 4K render and the preview of the same camera show the same world (sheet); the
   self-test passes.
 
+*M1.9 status (2026-10-20): done.* Every deliverable and check is met; nothing in `RayTracer.Core` / `RayTracer.Gpu` changed.
+`Vista.Tests` has 596 tests (560 before); `--gpu-selftest` passes with 4 new checks (50 in all). The terrain is now meshed per view:
+a 4-8 mesh refined to an error in pixels over the eroded grid, a far field of base terrain out past the horizon, and seeded detail
+below the grid near the camera, all bent onto the Earth around the camera, with the grid's own shading put back on coarse triangles
+by normal maps. At 4K and 1 px a view takes 6.4–9.8 M triangles and 1.0–1.3 GiB of video memory for the process, against M1.7's
+uniform mesh at 33.6 M and 3.2 GiB, and it builds in about 1.5 s; the preview's takes 0.26–1.5 M and 0.1–0.25 s.
+
+*Checks (on the RTX 3070, driver 32.0.16.1664; `nvidia-smi` read 10–35% from other programs throughout):*
+
+- **The measurement table** (`vista-views/mesh/render.ps1`, `--mesh-measure`, seed 42, golden hour, 16 spp; "VRAM" is the process's,
+  normal maps and image buffers included; the GPU was shared, so read the last column as ratios within a row group):
+
+  | View | Size | Mesh | Triangles (below the grid / far field) | Mesh | BLAS | VRAM | Build: refine + place (CPU), upload + BLAS | ns per pixel-sample |
+  |---|---|---|---|---|---|---|---|---|
+  | default | 320×180 | view 1 px | 0.71 M (0.10 / 0.27) | 18 MiB | 48 MiB | 327 MiB | 0.12 + 0.02 s, 0.05 s | — |
+  | default | 3840×2160 | view 1 px | 9.77 M (2.35 / 3.84) | 242 MiB | 651 MiB | 1282 MiB | 1.14 + 0.31 s, 0.19 s | 3.28 |
+  | aerial | 320×180 | view 1 px | 0.26 M (0 / 0.17) | 6 MiB | 17 MiB | 286 MiB | 0.07 + 0.01 s, 0.04 s | — |
+  | aerial | 3840×2160 | view 1 px | 7.20 M (0 / 4.05) | 179 MiB | 480 MiB | 1046 MiB | 0.77 + 0.24 s, 0.15 s | 4.55 |
+  | down the slope | 320×180 | view 1 px | 0.36 M (0.06 / 0.11) | 9 MiB | 24 MiB | 295 MiB | 0.16 + 0.01 s, 0.04 s | — |
+  | down the slope | 3840×2160 | view 1 px | 6.40 M (3.69 / 1.23) | 159 MiB | 427 MiB | 973 MiB | 0.99 + 0.20 s, 0.12 s | 5.90 |
+  | layered ridges | 320×180 | view 1 px | 1.47 M (0 / 0.83) | 36 MiB | 98 MiB | 396 MiB | 0.19 + 0.05 s, 0.06 s | — |
+  | layered ridges | 3840×2160 | view 1 px | 8.23 M (0.71 / 3.94) | 204 MiB | 549 MiB | 1142 MiB | 0.84 + 0.34 s, 0.13 s | 3.48 |
+  | range | 320×180 | view 1 px | 0.29 M (0 / 0.17) | 7 MiB | 19 MiB | 289 MiB | 0.06 + 0.01 s, 0.04 s | — |
+  | range | 3840×2160 | view 1 px | 7.30 M (0.06 / 4.01) | 181 MiB | 487 MiB | 1056 MiB | 0.80 + 0.24 s, 0.13 s | 3.51 |
+  | each view | either | uniform (M1.7's, bent) | 33.55 M | 768 MiB | 2238 MiB | 3142–3268 MiB | 1.8–2.3 + 0.8–1.4 s, 0.5–0.9 s | 2.52, 4.01, 4.13, 2.95, 3.19 (4K) |
+
+  At 0.5 px the 4K meshes double (14.6–21.1 M, 1.7–2.3 GiB) and at 2 px they shrink by 1.3–2.3× (3.1–6.2 M); the 0.5 px default
+  view's 9.9 M triangles below the grid are where its cost goes. 0.25 px asks for 64 M and is refused (below). Without the detail and
+  the far field ("grid only", the uniform mesh's world) the 1 px 4K meshes are 1.2–2.4 M triangles at 0.5–0.6 GiB and cost 2.88, 3.96,
+  4.54, 2.99, 3.25 ns: the level of detail itself costs about what the uniform mesh did per sample, and the far field (terrain where
+  rays used to escape to the sky) and the detail (more surface near the camera) are what the view mesh adds. The far field is 40–56%
+  of every elevated view's 4K triangles: what M1.10's height-field path would replace. The world's hierarchy takes 2.7–3.2 s, once per
+  world (a watch keeps it).
+- **No facets beyond the target near the camera** (`loupes-sheet.png`, 4K, 960×540 loupes of the default view's foreground ridge and
+  the down-slope view's slope, 64 spp): the grid alone (no detail) shows the 8 m grid's flat triangles as planes with hard edges; the
+  view mesh at 1 px and at 0.5 px (twice the triangles) cannot be told apart, both smooth, with the detail's bumps on the ridge line and
+  in the shadow's edge.
+- **The shadow of a peak off screen** (`vista-views/mesh/offscreen-shadow.camera.json`, 1280 px): 30 m over a valley floor, looking
+  away from the golden-hour sun, the valley lies in the shadow of a ridge about a kilometre behind the camera. `main` (M1.8, the flat
+  8 m mesh), the uniform mesh (everything kept, bent) and the view mesh cast the same shadow, its edge across the valley in the same
+  place.
+- **The same world at every size** (`sizes-sheet.png`, default, aerial and layered ridges, 64 spp): each view at 4K box-filtered to
+  320 px beside its 320 px preview at one exposure: the same ridges, valleys and shadows; mean luminance −1.45%, −0.30% and −0.60%, mean
+  |ΔY| 3.4%, 6.6% and 1.3% of the mean (most of it the preview's noise). Before the normal maps the preview had the same world but
+  lost the eroded fluting the 4K showed (coarse triangles carry their corners' normals only); with them the two match.
+- **Before and after** (`before-after-day.png`, `before-after-golden.png`, 640 px): where M1.8 and M1.9 overlap they match; the far
+  field now fills the aerial, layered-ridges and range views to the horizon where M1.8 showed the bare ground sphere; the ground near
+  the camera is smooth with its detail where M1.8 showed 8 m facets.
+- **`--gpu-selftest`** (50 checks): the self-test world's view mesh built twice is bit-identical, has no crack (no vertex at the
+  midpoint of a triangle's edge), keeps the ground behind the camera and reaches past the grid; every render check, the loupe, the
+  atmosphere parity (now on frame points, with a new 150 km far-field segment) and the watch checks (the base altitude now rebuilds
+  the mesh) pass.
+- **Watch mode** (`vista-views/watch/render.ps1`, 4K and 320 px): every step's files are bit-identical to a cold `--preview`. A turn
+  now rebuilds the mesh and its BLAS (0.79 s at 4K, 0.31 s at 320 px; M1.8 rebuilt only the image) and a move up 0.68 s / 0.30 s;
+  a seed already seen costs its world from the cache plus the hierarchy, 3.4 s / 2.7 s (M1.8: about 2 s).
+- **CI:** 596 tests. The detail (a pure function of position and seed; within its amplitude; the midpoint bound on random segments at
+  every level; the measured envelope on fresh segments, never falling; the noise's bounds); the Earth frame (the camera at its origin;
+  heights kept past the horizon, from floats too; the horizon reach); the hierarchy (levels, split edges joining older vertices,
+  children naming their parent, saturation over every stored vertex, the grid unchanged inside its blend, the far field at its edge,
+  Catmull–Rom on a plane, determinism, the prefiltered octaves keeping their mean); the mesher (no crack from six cameras × seven
+  settings × two sizes, every triangle facing up, every vertex on the world with its detail, the ground covered exactly once,
+  determinism, a finer target meshing more, the uniform mesh, a turn re-meshing but keeping what the air reads, the ground behind the
+  camera); the normal maps; the cache (the mesh follows the view, the hierarchy the world); the options, axes and labels; schema 10.
+
+*M1.9 decisions taken in code (revisit freely):*
+
+- **A 4-8 mesh refined top down to saturated errors** (Lindstrom and Pascucci 2001): a vertex is kept when its error over its
+  distance less its radius is above the target, `e·λ/τ + r > d`, with errors and bounding spheres saturated from the finest level up,
+  so a kept vertex keeps its parents and the mesh never cracks. A test and the self-test look for T-junctions (a vertex at the
+  midpoint of a kept triangle's edge, which any crack would leave); none in thousands of meshes.
+- **Three grids, one hierarchy:** g0 the eroded 4097² × 8 m world grid (32.8 km), g1 the base terrain at 32 m over 131 km, g2 at 256 m
+  over 1049 km, nested on one lattice (sub-units of 1/128 of a g0 cell, 2²⁴ to the root). The coarse grids sample only the octaves they
+  can hold (64 m and 512 m wavelengths and up), each dropped octave replaced by its mean (`TerrainProfile.RidgedOctaveMean` 0.5948), so
+  nothing aliases and the mean height stays. Each grid blends over its outer 256 cells into the next one's linear surface (2 km for the
+  eroded grid, 8 km for g1): the eroded world fades into base terrain with no step. Stores hold heights, errors and radii on each grid's
+  lattice plus margins (16 g0 cells, 16 g1 cells) for the vertices whose descendants reach into a finer grid; every other vertex is
+  analytic (its edge's midpoint, the detail's error bound, a radius from the steepest slope).
+- **The far field reaches the horizon:** triangles wholly beyond the camera's horizon distance plus the highest terrain's (×1.05) are
+  left out: 330–430 km from the committed cameras.
+- **On screen the target is τ pixels of the frame's centre (default 1); off screen it is half the sun's angular radius (2.3 mrad, about
+  7 px at 4K).** Off-screen geometry matters through its shadows, and the sun's disk blurs a shadow's edge over twice its angular
+  radius times the occluder's distance, so an occluder that far off moves the edge by a quarter of its blur. By distance alone (the
+  first build) the far field behind the camera made 23–52 M triangles at 4K. Below the grid the off-screen target is the sun's whole
+  disk. A vertex counts as on screen when its sphere, lowered by the curvature drop and widened by the drop's spread across it, reaches
+  into the frustum (2% wider than the frame's): still monotone. So a camera turn re-meshes; what the air reads (the reach and the
+  height range) depends only on where the camera stands, so a turn rebuilds no sky view.
+- **Below the grid the surface is Catmull–Rom through g0's samples plus seeded detail.** Refined straight through the grid's flat
+  triangles, the mesh's own normals shaded every 8 m triangle flat, with staircase edges (the first renders showed them as dark
+  spikes). The detail is six octaves of gradient noise from 16 m to 0.5 m, each 4% of its wavelength high, turned between octaves
+  like the base terrain's (`TerrainDetail`, sub-seed `terrain.detail`); 4% was chosen from a 2/3/4/5/10% sheet: 2% reads as a fuzz on
+  the shadow's edge, 10% crumples, and the triangles grow with the square. Levels go down to 6.25 cm.
+- **The detail's error bound is measured, not proven:** per octave the curvature bound `C₂t²/8` below a quarter of a lattice unit, above
+  it the worst midpoint deviation over 2 M random segments at nine lengths, ×1.15 (`TerrainDetail.Envelope`). The provable bound from
+  the noise's largest gradient and value was 1.5–1.8× looser near a unit and cost two to three times the triangles below the grid. A
+  test pins the envelope on fresh segments.
+- **On screen, triangles longer than 8 px (`MaxTrianglePixels`) are split too, counting edges only up to a grid cell's diagonal**, so
+  the smooth surface below the grid reads smooth near the camera and the far field is left to the error alone (measured by distance,
+  the size rule over-refined grazing far terrain: 6.7 → 10.5 M triangles).
+- **Normal maps give coarse triangles the grid's shading back** (`NormalMap`, g0 and g1, half-precision x and z per sample, 134 MB on
+  the GPU): a hit adds the map's normal there less its corners' map normals interpolated (`TerrainMesh.MapNormals`, 4 bytes a vertex),
+  which is nothing on a fine triangle; they cost 5% of a terrain view at 4K. Without them a preview lost the eroded fluting a final
+  shows (the same-world sheet). g2 needs none: beyond g1 its 256 m samples are wider than a pixel wherever the mesh reaches them.
+- **The geometry bends with the Earth** (`EarthFrame`): positions are in the frame around the camera, which stands at `(0, h, 0)`;
+  the shader reads heights and verticals from positions (`HeightAbove`, `LocalUp`), a segment is the chord between two points, and
+  the reference atmosphere starts a path from its true place. Past the horizon a flat world would put the far ranges kilometres too
+  high (12.5 km of drop at 400 km). The camera's frame is also why near-camera coordinates keep their precision in float. The mesh is
+  bent onto the scene's ground sphere, so a base-altitude change re-meshes.
+- **The mesh's key** is the camera's pose (position, axes, field of view), the frame's size, the ground sphere and the mesh settings
+  (`MeshView`, `MeshSettings`); the hierarchy's is the world and whether there is detail. Normals are the angle-weighted mean of the
+  faces around a vertex, so shading follows the mesh at its detail. The refinement is depth first and single threaded, so the order
+  of triangles and vertices, and with it the acceleration structure and the image, is the same every time.
+- **The renderer refuses what does not fit** before uploading: more than 48 M triangles in one acceleration structure (a 64 M one
+  hung the GPU in its build) or more memory than the adapter's budget has free; the message says to raise `--mesh-error`. A watch
+  reports it and goes on.
+- **CLI and sidecar:** `--mesh-error <px>`, `--detail off`, `--far-field off`, `--mesh uniform` (every sample of the world grid,
+  nothing else, no detail: M1.7's mesh, bent), as sheet axes too (`meshError`, `detail`, `farField`, `mesh`); `--mesh-measure`;
+  sidecar schema 10 `world.mesh` (settings, triangles below the grid and beyond it, bytes, reach, heights, build times), and the
+  console's `mesh:` line. `world.triangles` and `meshBytes` are the view's mesh now.
+
+*M1.9 gotchas:*
+
+- **Coplanar triangles shade flat:** a mesh refined through a linear surface gets each vertex's normal from coplanar faces, so the
+  coarse triangles' facets show with staircase edges, even though the geometry is right (heights checked to 3 m, coverage exact). It
+  looked like geometry gone wrong.
+- **Saturation needs one bound for all:** radius bounds per region (the steep eroded grid, the gentle far field) did not nest at a
+  region's border, where a gentle vertex has a steep child; the crack test found two T-junctions. One global slope bound, Catmull–Rom's
+  overshoot included (its gradient reaches 1.875 times the steepest step between samples), nests.
+- **An off-screen size rule scaled with 1/τ**, so a coarser target meshed more; the size rule is on screen only.
+- **A 64 M-triangle BLAS build hung the GPU** (`DXGI_ERROR_DEVICE_HUNG`); hence the refusal above. 0.25 px at 4K is out of reach on this
+  card.
+- **The hierarchy costs 2.7–3.2 s a world** (1.2 s sampling the far grids' base terrain, 1.0 s saturating, 0.5 s heights), paid by every
+  cold preview and every new seed in a watch. A cache of the far grids beside the erosion cache would take most of it.
+- **The sky view is read in the camera's frame** for rays leaving the terrain, built for one vertical; across the far field the
+  vertical tilts by up to 4° (s/R at 430 km). Far terrain's sky light is approximate there; its sunlight (through `LocalUp`) is not.
+- **Aerial perspective marches at most 8 steps**, also along a 300 km segment to the far field; the far ranges look plausible, but the
+  reference was never compared that far.
+- **PowerShell:** `$Views` and `$views` are one variable; a function named `Measure` loses to the `Measure-Object` alias.
+
+**M1.9 hand-off.** To understand M1.9, start by reading `Vista.Core/World/TerrainHierarchy.cs` (the lattice, the levels, the three
+grids, saturation), then `Vista.Core/World/ViewMesher.cs` (the refinement, the targets, the vertices and normals), then
+`Vista.Core/World/EarthFrame.cs` with `HeightAbove` and `TraceClosest` in `Vista.App/Shaders/VistaIntegrator.hlsl` (the bent frame
+and the normal maps on the GPU).
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png [--mesh-error 1] [--detail off]
+    [--far-field off] [--mesh uniform]
+dotnet run --project Vista.App -c Release -- --mesh-measure --cameras a.json,b.json [--sizes 320,3840] [--errors 0.5,1,2]
+    [--uniform] [--plain] [--downsample] [--spp 16] [--out dir]
+powershell -ExecutionPolicy Bypass -File vista-views/mesh/render.ps1 [-Before <main's Vista.App.dll>] [-Spp 64] [-Out folder]
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/World/TerrainHierarchy.cs` | The 4-8 lattice, the three grids and their blends, the stores, heights, saturated errors and radii, the smooth surface below the grid |
+| `Vista.Core/World/ViewMesher.cs` | `MeshKind`, `MeshSettings`, `MeshView`, `MeshInfo`; the refinement, the vertices (detail, bend, map normals), the normals, the T-junction check |
+| `Vista.Core/World/TerrainDetail.cs`, `NormalMap.cs`, `EarthFrame.cs` | The detail and its bound; the grids' normal maps; the bent frame |
+| `Vista.Core/World/TerrainMesh.cs`, `WorldCache.cs`, `TerrainProfile.cs`, `StableHash.cs` | The view's mesh (frame, reach, heights, map normals); the hierarchy and mesh kept by view; prefiltered octaves; the detail's sub-seed |
+| `Vista.Core/Atmosphere/AerialPerspective.cs`, `Rendering/RenderTypes.cs` | Segments between frame points; the air's frame from the mesh |
+| `Vista.Core/Cli/*`, `Output/Sidecar.cs`, `Output/SheetLabels.cs` | The mesh options and axes; the session meshes after the camera; schema 10; the mesh in a sheet's labels |
+| `Vista.App/Shaders/VistaIntegrator.hlsl` | The bent frame (`HeightAbove`, `LocalUp`, `SegmentBetween`), the normal maps, the reference from the true place |
+| `Vista.App/Gpu/D3D12VistaRenderer.cs` | The camera in the mesh's frame, the normal maps and map normals bound, the refusal of meshes that do not fit |
+| `Vista.App/Gpu/MeshMeasure.cs`, `GpuSelfTest.cs`, `WatchCheck.cs`, `Program.cs`, `*Compare.cs` | `--mesh-measure`; the mesh checks; the watch's mesh stages; the tools mesh by view |
+| `vista-views/mesh/render.ps1`, `mesh/offscreen-shadow.camera.json`, `vista-views/README.md` | The M1.9 checks |
+| `Vista.Tests/TerrainDetailTests.cs`, `EarthFrameTests.cs`, `TerrainHierarchyTests.cs`, `ViewMesherTests.cs`, `NormalMapTests.cs`, `MeshOptionsTests.cs` (+ updates) | 36 new tests |
+
+**Next: M1.10** (the height-field decision). The far field is 40–56% of an elevated view's 4K triangles and of its acceleration
+structure: a height-field traversal of g1 and g2 beyond some distance would replace that part of the mesh, measured against these
+meshes on the same views, with the same normal maps for its shading.
+
 **M1.10 — Height-field intersection: the measured decision.**
 - *Goal:* decide mesh against height-field intersection for far terrain, by measurement (§4.3,
   §9.8).
@@ -2452,7 +2641,10 @@ balance, lens CA), estimator accuracy.
 - **Moon glitter** and caustic-like paths are noisy; MIS quality decides whether they
   converge in reasonable time.
 - **View-dependent LOD** must stay conservative for shadow and reflection rays that see
-  off-screen geometry.
+  off-screen geometry. Shadows are covered since M1.9 (off screen the mesh keeps half the sun's angular radius, the
+  shadow's own blur); reflections are not yet: water (M3/M4) will need off-screen geometry where its reflected rays go.
+- **A cold preview pays the world's hierarchy** (2.7–3.2 s since M1.9) and a 4K camera move about 1.5 s of meshing;
+  caching the far grids and a parallel refinement are the levers if either starts to matter.
 
 **Data.**
 - **No public measured autumn-leaf spectra found** (2026-10) — PROSPECT-D covers it; revisit
