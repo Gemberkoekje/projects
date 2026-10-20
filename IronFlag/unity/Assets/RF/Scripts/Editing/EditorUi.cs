@@ -78,6 +78,8 @@ namespace IronFlag.Editing
         [Tooltip("The editor these panels drive.")]
         private LevelEditorSession session;
 
+        private readonly List<EditorButton> modeButtons = new List<EditorButton>();
+        private readonly List<EditorMode> modeOrder = new List<EditorMode>();
         private readonly List<EditorButton> toolButtons = new List<EditorButton>();
         private readonly List<EditTool> toolOrder = new List<EditTool>();
         private readonly List<EditorButton> paletteButtons = new List<EditorButton>();
@@ -313,6 +315,11 @@ namespace IronFlag.Editing
                 return;
             }
 
+            for (int slot = 0; slot < modeButtons.Count; slot++)
+            {
+                modeButtons[slot].SetChosen(modeOrder[slot] == session.Mode);
+            }
+
             for (int slot = 0; slot < toolButtons.Count; slot++)
             {
                 toolButtons[slot].SetChosen(toolOrder[slot] == session.Tool);
@@ -502,13 +509,27 @@ namespace IronFlag.Editing
             float inner = LeftWidth - (Margin * 2.0f);
             float top = -Margin;
 
-            top = Heading(column, "TOOLS", top, inner);
+            // The mode goes at the top of the column and above the tools, because it is
+            // the larger of the two questions: which half of the map is being worked on
+            // decides what the mouse can even touch, and the tool only decides what happens
+            // where it touches nothing.
+            top = Heading(column, "MODE  ·  TAB", top, inner);
 
+            float halves = (inner - Gutter) * 0.5f;
+            AddMode(column, EditorMode.Land, "LAND", Margin, top, halves);
+            AddMode(column, EditorMode.Build, "BUILD", Margin + halves + Gutter, top, halves);
+            top -= RowHeight;
+
+            top -= Gutter * 2.0f;
+            top = Heading(column, "BUILD TOOLS", top, inner);
+
+            // No row for the land mode's tool: it has exactly one, so the mode button above
+            // is already the whole of that choice, and a tool button that only ever repeats
+            // what the mode button next to it says is one more thing to read.
             AddTool(column, EditTool.Select, "1  SELECT", ref top, inner);
-            AddTool(column, EditTool.Land, "2  LAND", ref top, inner);
-            AddTool(column, EditTool.Structure, "3  PROP", ref top, inner);
-            AddTool(column, EditTool.Tower, "4  TOWER", ref top, inner);
-            AddTool(column, EditTool.Bunker, "5  BUNKER", ref top, inner);
+            AddTool(column, EditTool.Structure, "2  PROP", ref top, inner);
+            AddTool(column, EditTool.Tower, "3  TOWER", ref top, inner);
+            AddTool(column, EditTool.Bunker, "4  BUNKER", ref top, inner);
 
             top -= Gutter * 2.0f;
             top = Heading(column, "PROPS", top, inner);
@@ -606,8 +627,8 @@ namespace IronFlag.Editing
 
             Text help = EditorTheme.Label("Help", bar, 16, TextAnchor.MiddleRight);
             help.color = EditorTheme.FadedInk;
-            help.text = "RIGHT-DRAG pan · WHEEL zoom · SHIFT force-place · ALT free-move · "
-                + "Q/E turn · DEL remove · CTRL+Z undo · CTRL+S save";
+            help.text = "TAB land/build · RIGHT-DRAG pan · WHEEL zoom · SHIFT force-place · "
+                + "ALT free-move · Q/E turn · DEL remove · CTRL+Z undo · CTRL+S save";
             RectTransform helpRect = help.rectTransform;
             helpRect.anchorMin = new Vector2(1.0f, 0.0f);
             helpRect.anchorMax = new Vector2(1.0f, 1.0f);
@@ -1105,6 +1126,36 @@ namespace IronFlag.Editing
             return step <= 0.0f ? "GRID  OFF" : $"GRID  {step:0.##} m";
         }
 
+        /// <summary>
+        /// Adds one of the two mode buttons to the tool column.
+        /// </summary>
+        /// <param name="column">The panel it goes on.</param>
+        /// <param name="which">The mode it chooses.</param>
+        /// <param name="words">Its caption.</param>
+        /// <param name="left">Distance in from the left of the column, in canvas units.</param>
+        /// <param name="top">Distance down from the top of the column, in canvas units.</param>
+        /// <param name="width">How wide it is, in canvas units.</param>
+        /// <remarks>
+        /// Side by side rather than stacked, and unlike <see cref="AddTool"/> this does not
+        /// advance the running top - two buttons on one row is the point. There being exactly
+        /// two of them is what makes that fit, and is the same fact that makes Tab a toggle.
+        /// </remarks>
+        private void AddMode(
+            RectTransform column,
+            EditorMode which,
+            string words,
+            float left,
+            float top,
+            float width)
+        {
+            EditorButton button = Make(
+                column, $"Mode {which}", words, left, 0.0f, width, () => session.SetMode(which));
+            Hang(button.Rect, left, top, width, RowHeight - Gutter);
+
+            modeButtons.Add(button);
+            modeOrder.Add(which);
+        }
+
         private void AddTool(
             RectTransform column, EditTool which, string words, ref float top, float inner)
         {
@@ -1215,6 +1266,8 @@ namespace IronFlag.Editing
             fileField = null;
             seedField = null;
             makeNote = null;
+            modeButtons.Clear();
+            modeOrder.Clear();
             toolButtons.Clear();
             toolOrder.Clear();
             paletteButtons.Clear();

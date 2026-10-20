@@ -73,6 +73,18 @@ namespace IronFlag.Editing
 
         private LevelDefinition level;
         private EditTool tool = EditTool.Select;
+
+        /// <summary>
+        /// The build tool to come back to when the land mode is left.
+        /// </summary>
+        /// <remarks>
+        /// The land mode has exactly one tool and the build mode has four, so the round trip
+        /// is only lossy in one direction: going to land needs nothing remembered, and coming
+        /// back would otherwise land on whichever tool the mode opens on rather than the one
+        /// that was in hand. Somebody laying a row of walls who reaches for Tab to widen the
+        /// ground beneath them expects the wall to still be in hand when they come back.
+        /// </remarks>
+        private EditTool buildTool = EditTool.Select;
         private EditSelection selection = EditSelection.Nothing;
         private StructureKind paletteKind = StructureKind.Tree;
         private Team paletteSide = Team.Green;
@@ -138,6 +150,15 @@ namespace IronFlag.Editing
 
         /// <summary>What a click on the map does.</summary>
         public EditTool Tool => tool;
+
+        /// <summary>
+        /// Which half of the map the mouse is working on.
+        /// </summary>
+        /// <remarks>
+        /// Read off the tool rather than stored beside it, so there is no second field that
+        /// can come to disagree with the first. See <see cref="EditorModes.Of"/>.
+        /// </remarks>
+        public EditorMode Mode => EditorModes.Of(tool);
 
         /// <summary>What is selected.</summary>
         public EditSelection Selection => selection;
@@ -309,9 +330,12 @@ namespace IronFlag.Editing
             Rebuild();
             Revalidate();
 
+            // The opening sentence teaches the one thing about this editor nobody can guess
+            // at: that there are two modes and which key crosses between them. Naming the
+            // mode it has just opened in is what makes the other one findable.
             note = opened == null
                 ? "There is no map."
-                : $"{opened.Name}. Press 2 and drag to draw land, or 3 to place something.";
+                : $"{opened.Name}. TAB switches between shaping the land and building on it.";
 
             Changed?.Invoke();
         }
@@ -425,6 +449,12 @@ namespace IronFlag.Editing
         /// Chooses what a click on the map does.
         /// </summary>
         /// <param name="wanted">The tool.</param>
+        /// <remarks>
+        /// Also chooses the mode, because a tool belongs to exactly one. A player who picks
+        /// the tower tool while shaping a coastline has said what they want to do next
+        /// clearly enough; making them press Tab first would be an editor refusing an
+        /// instruction it had understood.
+        /// </remarks>
         public void SetTool(EditTool wanted)
         {
             if (wanted == EditTool.None || tool == wanted)
@@ -432,8 +462,71 @@ namespace IronFlag.Editing
                 return;
             }
 
+            EditorMode was = Mode;
             tool = wanted;
+
+            if (Mode == EditorMode.Build)
+            {
+                buildTool = tool;
+            }
+
+            if (Mode != was)
+            {
+                EnterMode();
+            }
+
             Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// Chooses which half of the map the mouse works on.
+        /// </summary>
+        /// <param name="wanted">The mode.</param>
+        /// <remarks>
+        /// The land mode has one tool and is entered on it; the build mode is entered on
+        /// whichever of its four was last in hand.
+        /// </remarks>
+        public void SetMode(EditorMode wanted)
+        {
+            if (wanted == EditorMode.None || Mode == wanted)
+            {
+                return;
+            }
+
+            SetTool(wanted == EditorMode.Build ? buildTool : EditorModes.DefaultToolOf(wanted));
+        }
+
+        /// <summary>
+        /// Settles the editor into the mode the tool has just put it in.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A selection the new mode cannot pick is dropped, and that is the separation doing
+        /// its job rather than tidiness: a mode in which the coastline cannot be clicked must
+        /// not be one in which Delete removes it or Q turns it. Leaving it selected would
+        /// keep every one of those keys pointed at something the mouse can no longer see.
+        /// </para>
+        /// <para>
+        /// Any drag in progress goes with it. Changing mode mid-drag is only reachable from
+        /// the keyboard - the mode buttons are on a panel, and a press on a panel never
+        /// reaches the map - but a half-drawn rectangle finished off in the mode that cannot
+        /// draw one is not something anybody asked for.
+        /// </para>
+        /// </remarks>
+        private void EnterMode()
+        {
+            grab = Grab.None;
+            grip = LandGrip.None;
+            DrawnLand = Rect.zero;
+
+            if (!EditorModes.Reaches(Mode, selection.Target))
+            {
+                selection = EditSelection.Nothing;
+            }
+
+            note = Mode == EditorMode.Land
+                ? "Land: drag out ground, drag its corners to shape it. Props cannot be touched."
+                : "Build: click to place, drag to move. The ground cannot be touched.";
         }
 
         /// <summary>
@@ -441,8 +534,11 @@ namespace IronFlag.Editing
         /// </summary>
         /// <param name="kind">The structure.</param>
         /// <remarks>
-        /// Picking something off the palette also picks up the tool that places it, because
-        /// the alternative is clicking a tree, clicking the map, and having moved a shore.
+        /// Picking something off the palette also picks up the tool that places it - and with
+        /// it the build mode - because the alternative is clicking a tree, clicking the map,
+        /// and having moved a shore. That is what used to happen, and the mode is the half of
+        /// the fix that is about what a click can reach; this is the half that is about what
+        /// the player has just said they are doing.
         /// </remarks>
         public void SetPaletteKind(StructureKind kind)
         {
@@ -452,8 +548,14 @@ namespace IronFlag.Editing
             }
 
             paletteKind = kind;
-            tool = EditTool.Structure;
-            Changed?.Invoke();
+
+            if (tool == EditTool.Structure)
+            {
+                Changed?.Invoke();
+                return;
+            }
+
+            SetTool(EditTool.Structure);
         }
 
         /// <summary>
@@ -562,9 +664,14 @@ namespace IronFlag.Editing
         public bool Redo() => Restore(history.Redo(), "Redone.");
 
         /// <summary>
-        /// Takes whatever is selected off the map.
+        /// Takes whatever is selected off the map, and its opposite number with it.
         /// </summary>
         /// <returns><c>true</c> when something was removed.</returns>
+        /// <remarks>
+        /// A pair goes as one thing - see <see cref="IronFlag.Levels.LevelStructure.Pair"/> -
+        /// and the status line says so, because two props leaving on one keystroke is the one
+        /// thing about pairing somebody could do by accident. Undo puts both back.
+        /// </remarks>
         public bool DeleteSelected()
         {
             if (!LevelEdits.Holds(level, selection))
@@ -573,13 +680,15 @@ namespace IronFlag.Editing
             }
 
             string what = LevelEdits.Describe(level, selection);
+            bool paired = LevelEdits.TwinOf(level, selection).IsSomething;
+
             if (!LevelEdits.Remove(level, selection))
             {
                 return false;
             }
 
             selection = EditSelection.Nothing;
-            Commit($"Deleted {what}.");
+            Commit(paired ? $"Deleted {what} and its opposite number." : $"Deleted {what}.");
             return true;
         }
 
@@ -762,23 +871,28 @@ namespace IronFlag.Editing
                 return;
             }
 
+            // Tab switches which half of the map the mouse is on, and is the whole of the
+            // land mode's keyboard because that mode has one tool. The digits pick among the
+            // build mode's four, and pressing one while shaping land crosses over - the same
+            // rule the palette buttons follow.
+            if (keys.tabKey.wasPressedThisFrame)
+            {
+                SetMode(EditorModes.Other(Mode));
+            }
+
             if (keys.digit1Key.wasPressedThisFrame)
             {
                 SetTool(EditTool.Select);
             }
             else if (keys.digit2Key.wasPressedThisFrame)
             {
-                SetTool(EditTool.Land);
+                SetTool(EditTool.Structure);
             }
             else if (keys.digit3Key.wasPressedThisFrame)
             {
-                SetTool(EditTool.Structure);
-            }
-            else if (keys.digit4Key.wasPressedThisFrame)
-            {
                 SetTool(EditTool.Tower);
             }
-            else if (keys.digit5Key.wasPressedThisFrame)
+            else if (keys.digit4Key.wasPressedThisFrame)
             {
                 SetTool(EditTool.Bunker);
             }
@@ -950,10 +1064,17 @@ namespace IronFlag.Editing
         /// <param name="at">Where on the ground it was pressed.</param>
         /// <remarks>
         /// <para>
-        /// Every tool selects with the same button, and the only difference between them is
-        /// what a press on <em>empty</em> ground does. Holding shift overrides that: it
-        /// always creates, which is the only way to draw a rectangle over land that is already
-        /// there or to put a second tree beside the first.
+        /// The press only ever finds what the <see cref="Mode"/> is working on, and that is
+        /// the whole reason there is a mode. A press that finds nothing runs the tool in
+        /// hand - so in the build mode a click on the shore places a prop <em>on</em> the
+        /// shore, because the shore is not something the build mode can find.
+        /// </para>
+        /// <para>
+        /// Within a mode, every tool still selects with the same button and they differ only
+        /// in what a press on ground with nothing findable on it does. Holding shift
+        /// overrides even that: it always creates, which is still the only way to draw a
+        /// rectangle over land that is already there, or to put a second tree exactly on top
+        /// of the first.
         /// </para>
         /// <para>
         /// Corners are tried before anything else, so a rectangle that is selected can be
@@ -967,7 +1088,7 @@ namespace IronFlag.Editing
             Keyboard keys = Keyboard.current;
             bool forceNew = keys != null && keys.shiftKey.isPressed;
 
-            if (!forceNew && selection.Target == EditTarget.Land
+            if (!forceNew && Mode == EditorMode.Land && selection.Target == EditTarget.Land
                 && LevelEdits.Holds(level, selection))
             {
                 LandGrip held = LevelPick.GripOn(level, selection.Index, at, GripReach());
@@ -981,7 +1102,8 @@ namespace IronFlag.Editing
                 }
             }
 
-            EditSelection under = forceNew ? EditSelection.Nothing : LevelPick.At(level, at);
+            EditSelection under =
+                forceNew ? EditSelection.Nothing : LevelPick.At(level, at, Mode);
 
             if (under.IsSomething)
             {
@@ -1135,6 +1257,18 @@ namespace IronFlag.Editing
                     return;
 
                 case Grab.Drawing:
+                    // A press and release with no drag between them is a click on open
+                    // water, and it clears the selection the way a click on nothing does
+                    // everywhere else. Without this it fell through to AddLand, which
+                    // rejected the rectangle of no size and said so - a complaint about a
+                    // minimum nobody had been trying to reach, on the gesture somebody uses
+                    // to deselect.
+                    if (!moved)
+                    {
+                        Select(EditSelection.Nothing);
+                        return;
+                    }
+
                     int made = LevelEdits.AddLand(
                         level,
                         new Vector3(drawn.xMin, 0.0f, drawn.yMin),

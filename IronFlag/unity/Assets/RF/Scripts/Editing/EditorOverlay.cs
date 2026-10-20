@@ -154,7 +154,8 @@ namespace IronFlag.Editing
             => origin.ShowCross(Screen(view, Vector3.zero), CrossReach, EditorTheme.Origin, 1.0f);
 
         /// <summary>
-        /// Draws a box around what is selected, and a fainter one where its twin would be.
+        /// Draws a box around what is selected, and a second one around its opposite number
+        /// - solid when it has a real one, a hairline where one would stand when it has not.
         /// </summary>
         private void DrawSelection(EditorCameraRig view, LevelDefinition level)
         {
@@ -170,9 +171,22 @@ namespace IronFlag.Editing
             Rect ground = GroundRect(level, picked);
             selection.Show(ToScreen(view, ground), EditorTheme.Selected, BarThickness);
 
-            // Where the same thing would stand on the other side of the map. Nothing is
-            // placed there and nothing is checked against it - it is a ruler, held up next to
-            // whatever is being moved, so a map can be kept symmetrical by eye.
+            // Two boxes that look almost the same and mean opposite things, which is why the
+            // weight of the line differs. A thing with a real opposite number gets that thing
+            // drawn, at the weight of a selection: it is going to move, and the player is
+            // owed the sight of what their drag is about to do at the far end of the map.
+            // Everything else gets the old ruler - a hairline where the same thing *would*
+            // stand - which is a suggestion and moves nothing.
+            EditSelection paired = LevelEdits.TwinOf(level, picked);
+            if (paired.IsSomething)
+            {
+                twin.Show(
+                    ToScreen(view, GroundRect(level, paired)),
+                    EditorTheme.Paired,
+                    BarThickness);
+                return;
+            }
+
             var opposite = new Rect(
                 -ground.xMin - ground.width, -ground.yMin - ground.height, ground.width, ground.height);
             twin.Show(ToScreen(view, opposite), EditorTheme.Twin, 1.0f);

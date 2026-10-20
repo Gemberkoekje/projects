@@ -67,13 +67,14 @@ A sound is an `Event` with a `graph` and not much else:
 
 ```supercollider
 'RF_Sfx_WeaponCannon': (
-    dur: 1.10,           // seconds of audio to render
+    dur: 1.40,           // seconds of audio to render
     channels: 1,         // 1 = mono for SFX, 2 = stereo for music
     note: "loop",        // optional, shown by -List
     graph: {             // returns a signal; the engine adds output and gain
         var snap = ~rfv[\crack].(freq: 1800, dur: 0.09, res: 0.25);
-        var body = ~rfv[\boom].(from: 220, to: 34, dur: 0.75);
-        (snap + body) * 0.42;
+        var slam = ~rfv[\slam].(from: 950, to: 130, dur: 0.30, drive: 5);
+        var body = ~rfv[\boom].(from: 220, to: 30, dur: 0.80, grit: 0.7);
+        (snap + slam + body) * 0.30;
     }
 )
 ```
@@ -98,8 +99,16 @@ uses.
 
 `rf/voices.scd` is the shared DSP vocabulary — the audio equivalent of
 `blender/rf/primitives.py`. Build sounds out of these rather than raw UGens wherever
-you can, so the whole game keeps one character: `crack`, `tick`, `boom`, `shell`,
-`air`, `debris`, `motor`, `rotor`, `brass`, `bass`, `snare`, `ensemble`.
+you can, so the whole game keeps one character: `crack`, `tick`, `boom`, `slam`,
+`shell`, `air`, `tail`, `debris`, `motor`, `rotor`, `brass`, `bass`, `snare`,
+`ensemble`.
+
+The four that shape a gun or an explosion are worth knowing as a set, because they
+divide the spectrum between them and a weapon usually wants all four: `crack` is the
+transient, `slam` the midrange body that carries on a small speaker, `boom` the low
+end, and `tail` the roll of the report across open ground afterwards. `boom`, `slam`
+and `crack` all take a `drive` that saturates them - see AUDIO_NOTES.md part three for
+why that, rather than more level, is what makes them sound heavy.
 
 ---
 

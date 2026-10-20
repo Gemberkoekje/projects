@@ -36,9 +36,16 @@ in the game and you are back in the editor with the same map open.
 
 **That round trip is the milestone.** Everything else is a way of changing what goes into it.
 
+> **Superseded in one place.** The tools below were later split into two modes — one that
+> shapes the island and one that builds on it — because with all five reachable at once, a
+> click meant to place something landed on the ground under it and dragged the coastline
+> instead. See [EDITOR_MODES_NOTES.md](EDITOR_MODES_NOTES.md); everything else here still
+> stands.
+
 | | |
 |---|---|
-| Tools | select, land, prop, tower, bunker — `1`–`5` |
+| Modes | land, build — `Tab` |
+| Build tools | select, prop, tower, bunker — `1`–`4` |
 | Palette | the rows of `StructureTuning.Roster()`, so a seventh prop appears by existing |
 | Editable | every field of `LevelDefinition`: land, props, towers, bunkers, bounds, name, description |
 | Undo | 64 steps, each a whole map |
@@ -82,9 +89,17 @@ comes back belonging to the **other** side, so mirroring green's real tower prod
 real tower. There is a test that builds half a map, mirrors five things and asserts the result
 validates clean.
 
+> Since [PAIRING_NOTES.md](PAIRING_NOTES.md) the two stay linked: mirroring records a **pair**,
+> and from then on moving, turning, resizing or deleting either end does the same to the other.
+> Something that already has an opposite number cannot be mirrored again — which is the fix for
+> the bug this button used to have, where mirroring, moving the original and mirroring again
+> left the first copy behind and added a third prop.
+
 **A ruler for the same rule.** With something selected, a faint box is drawn where its
 opposite number would stand. Nothing is placed there and nothing is checked against it — it is
-held up next to whatever is being dragged so a map can be kept symmetrical by eye.
+held up next to whatever is being dragged so a map can be kept symmetrical by eye. Where there
+*is* a real opposite number the same box is drawn solid, around the thing itself, because that
+one is going to move.
 
 **Which tower is real is a promotion, not a checkbox.** A side must have exactly one real
 tower, and a checkbox on each of four identical pyramids is a way to build a map with two or

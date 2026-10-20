@@ -43,6 +43,17 @@ namespace IronFlag.Levels
         [Tooltip("Which way the tower faces, in degrees.")]
         public float YawDegrees;
 
+        /// <summary>
+        /// Which mirrored pair this belongs to, or zero for a tower that stands on its own.
+        /// </summary>
+        /// <remarks>
+        /// See <see cref="LevelStructure.Pair"/>, which carries the whole explanation. A
+        /// paired tower's opposite number is the other side's, so promoting one to hold the
+        /// flag promotes its twin as well - which is the pairing the shipped map has.
+        /// </remarks>
+        [Tooltip("Which mirrored pair this belongs to. Zero for a tower that stands on its own.")]
+        public int Pair;
+
         /// <summary>The side whose flag this tower is for.</summary>
         public Team Side => LevelNames.ToTeam(Team);
     }

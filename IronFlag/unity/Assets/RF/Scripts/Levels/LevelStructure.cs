@@ -80,6 +80,37 @@ namespace IronFlag.Levels
         [Tooltip("Metres from it a vehicle may be and still be resupplied.")]
         public float SupplyRadius = 7.0f;
 
+        /// <summary>
+        /// Which mirrored pair this belongs to, or zero for a thing that stands on its own.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Two placed things of the same kind carrying the same non-zero number are each
+        /// other's opposite number, and the editor moves, turns, resizes and deletes them
+        /// together - so a symmetrical map stays symmetrical while it is being worked on
+        /// rather than only at the moment somebody last pressed mirror. The generator writes
+        /// these when it turns a half-map into a whole one, and
+        /// <see cref="IronFlag.Editing.LevelEdits.Mirror"/> writes one when a person does the
+        /// same thing by hand.
+        /// </para>
+        /// <para>
+        /// <strong>A number rather than an index.</strong> Indices shift the moment anything
+        /// is deleted, so a pair held as "the thing at slot 14" would have to be rewritten
+        /// across four arrays on every removal, and a file edited by hand would be one
+        /// insertion away from pairing a tree with a bridge. A number that means nothing
+        /// except "the same as that one" survives both. It is an editing annotation and
+        /// nothing else: no rule of play reads it, and a level whose pairs are all wrong is
+        /// still exactly as playable as one with none.
+        /// </para>
+        /// <para>
+        /// Unpairing is per item, which is the point of holding it here rather than as one
+        /// switch on the map: a map can be built in pairs and still have the one causeway
+        /// that is deliberately only on one side.
+        /// </para>
+        /// </remarks>
+        [Tooltip("Which mirrored pair this belongs to. Zero for a prop that stands on its own.")]
+        public int Pair;
+
         /// <summary>What it is.</summary>
         public StructureKind Structure => LevelNames.ToStructure(Kind);
 

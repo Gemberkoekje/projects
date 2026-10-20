@@ -11,14 +11,21 @@
 'RF_Sfx_Explosion': (
     // The full-size detonation: a vehicle dying, a rocket connecting. The
     // loudest thing in the game, and the only one with a real debris tail.
-    dur: 2.20,
+    dur: 2.60,
     channels: 1,
     graph: {
-        var flash = ~rfv[\crack].(freq: 1200, dur: 0.12, res: 0.4);
-        var core = ~rfv[\boom].(from: 300, to: 26, dur: 1.4, curve: -3);
+        var flash = ~rfv[\crack].(freq: 1200, dur: 0.12, res: 0.4, bite: 0.8);
+        // The hardest-driven layer in the game. An explosion is the one event
+        // that has earned the right to sound like it broke something on the way
+        // to the speaker.
+        var slam = ~rfv[\slam].(from: 1100, to: 95, dur: 0.45, drive: 6, level: 0.9);
+        var core = ~rfv[\boom].(from: 300, to: 24, dur: 1.5, curve: -3, grit: 0.85, drive: 5);
         var blast = ~rfv[\air].(from: 4000, to: 120, dur: 1.1, bw: 1.5);
-        var rubble = ~rfv[\debris].(dur: 1.6, density: 90, freq: 2000) * 0.7;
-        ((flash * 0.7) + core + (blast * 0.5) + rubble) * 0.4;
+        var rubble = ~rfv[\debris].(dur: 1.8, density: 90, freq: 2000) * 0.7;
+        // Longest and widest roll in the game: the tail is what says "that was
+        // big and it was over there" rather than "that was loud".
+        var roll = ~rfv[\tail].(dur: 2.1, tone: 950, spread: 0.14, level: 0.5);
+        ((flash * 0.7) + slam + core + (blast * 0.5) + rubble + roll) * 0.30;
     }
 ),
 
@@ -28,10 +35,14 @@
     dur: 0.35,
     channels: 1,
     graph: {
-        var strike = ~rfv[\crack].(freq: 3200, dur: 0.04, res: 0.2);
+        var strike = ~rfv[\crack].(freq: 3200, dur: 0.04, res: 0.2, bite: 0.9);
+        // Without this the whole sound is one 620Hz ring, which is a cartoon
+        // boink. It stays very short: enough to land a hit, not enough to become
+        // another voice in a firefight.
+        var thud = ~rfv[\slam].(from: 900, to: 240, dur: 0.07, drive: 4, level: 0.5);
         var plate = ~rfv[\shell].(freq: 620, dur: 0.22, decay: 0.14);
         var spark = ~rfv[\tick].(freq: 7000, dur: 0.02) * 0.5;
-        ((strike * 0.6) + plate + spark) * 0.5;
+        ((strike * 0.6) + thud + plate + spark) * 0.42;
     }
 ),
 
@@ -45,7 +56,7 @@
         var crunch = ~rfv[\crack].(freq: 500, dur: 0.18, res: 0.8);
         var settle = ~rfv[\boom].(from: 120, to: 40, dur: 0.5, curve: -4) * 0.8;
         var grit = ~rfv[\debris].(dur: 0.7, density: 40, freq: 1400) * 0.6;
-        (crunch + settle + grit) * 0.42;
+        (crunch + settle + grit) * 0.32;
     }
 ),
 
@@ -59,7 +70,7 @@
         var fall = ~rfv[\boom].(from: 90, to: 24, dur: 1.0, curve: -3);
         var collapse = ~rfv[\debris].(dur: 1.7, density: 130, freq: 1100);
         var dust = ~rfv[\air].(from: 1200, to: 200, dur: 1.4, bw: 2.0) * 0.3;
-        (give + fall + collapse + dust) * 0.4;
+        (give + fall + collapse + dust) * 0.28;
     }
 ),
 )

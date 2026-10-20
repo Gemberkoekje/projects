@@ -493,6 +493,76 @@ namespace IronFlag.Tests.PlayMode
         /// Loading the editor scene and letting its first frame run, which is where the map is
         /// built and the session adopts it.
         /// </summary>
+        /// <summary>
+        /// Changing mode lets go of a selection the new mode cannot click on.
+        /// </summary>
+        /// <remarks>
+        /// The separation would be half a separation otherwise. A mouse that cannot reach the
+        /// coastline is no protection at all if the coastline is still selected, because
+        /// Delete, Q, E and every field in the inspector go through the selection rather than
+        /// through the mouse - so the mode would stop somebody dragging a shore by accident
+        /// and leave them able to delete one by accident.
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator ChangingModeLetsGoOfWhatTheNewModeCannotTouch()
+        {
+            yield return OpenTheEditor();
+
+            LevelEditorSession session = Session();
+
+            session.SetMode(EditorMode.Land);
+            session.Select(new EditSelection(EditTarget.Land, 0));
+            Assert.That(session.Selection.Target, Is.EqualTo(EditTarget.Land));
+
+            session.SetMode(EditorMode.Build);
+            Assert.That(
+                session.Selection.IsSomething,
+                Is.False,
+                "a rectangle of land is still selected in the mode that cannot click on one, "
+                + "so Delete would take out a coastline nobody can see they are holding");
+
+            session.Select(new EditSelection(EditTarget.Tower, 0));
+            Assert.That(session.Selection.Target, Is.EqualTo(EditTarget.Tower));
+
+            session.SetMode(EditorMode.Land);
+            Assert.That(
+                session.Selection.IsSomething,
+                Is.False,
+                "a tower is still selected while the coastline is being shaped");
+            Assert.That(
+                session.Tool,
+                Is.EqualTo(EditTool.Land),
+                "the land mode was entered on a tool belonging to the other mode");
+        }
+
+        /// <summary>
+        /// Coming back from shaping land puts the tool that was in hand back in it.
+        /// </summary>
+        /// <remarks>
+        /// Somebody laying a row of walls who reaches for the land mode to widen the ground
+        /// beneath them is doing one job, not two; arriving back on a different tool would
+        /// make the trip cost two clicks instead of none.
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator ComingBackFromTheLandModeFindsTheSameToolInHand()
+        {
+            yield return OpenTheEditor();
+
+            LevelEditorSession session = Session();
+
+            session.SetTool(EditTool.Tower);
+            Assert.That(session.Mode, Is.EqualTo(EditorMode.Build));
+
+            session.SetMode(EditorMode.Land);
+            Assert.That(session.Tool, Is.EqualTo(EditTool.Land));
+
+            session.SetMode(EditorMode.Build);
+            Assert.That(
+                session.Tool,
+                Is.EqualTo(EditTool.Tower),
+                "the build mode came back on its opening tool rather than the one in hand");
+        }
+
         private static IEnumerator OpenTheEditor()
         {
             LevelHandoff.Clear();

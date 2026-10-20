@@ -408,6 +408,33 @@ namespace IronFlag.Editing
             Ground(level, frame, options, dice);
             Furnish(level, frame, options, dice);
 
+            // A map drawn in halves comes out knowing it was, which is the point of
+            // pairing: everything on it that has an opposite number moves, turns, resizes and
+            // is deleted with it from here on, so a generated map somebody opens and edits
+            // stays as symmetrical as it was generated. Read back off the finished map rather
+            // than recorded a shape at a time, because a turned copy is a turned copy however
+            // it got there - the seam props and the pair of crossings, laid before either
+            // half exists and never put through TurnProps, are picked up by the same pass for
+            // free. LevelGeneratorTests asserts it leaves nothing behind.
+            //
+            // Only the ground on a one-player map. Its land is mirrored like anybody's, but
+            // its props are scattered over the whole map from one set of dice and were never
+            // each other's - so pairing those would weld together whatever two trees happened
+            // to land opposite, which is an accident wearing a relationship.
+            //
+            // An asymmetrical map gets none of it, for the same reason and more so.
+            if (options.Symmetry == MapSymmetry.Mirrored)
+            {
+                LevelEdits.PairTheHalves(level, EditTarget.Land);
+
+                if (!options.IsSolo)
+                {
+                    LevelEdits.PairTheHalves(level, EditTarget.Bunker);
+                    LevelEdits.PairTheHalves(level, EditTarget.Tower);
+                    LevelEdits.PairTheHalves(level, EditTarget.Structure);
+                }
+            }
+
             return level;
         }
 

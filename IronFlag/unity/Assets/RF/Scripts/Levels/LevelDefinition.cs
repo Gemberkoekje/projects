@@ -78,6 +78,16 @@ namespace IronFlag.Levels
         /// supply of them, which is not a version of that map - it is a different game with
         /// no losing in it.
         /// </para>
+        /// <para>
+        /// <strong>Mirrored pairs did not earn a bump</strong>, by the same rule as surfaces:
+        /// a build that has never heard of <see cref="LevelStructure.Pair"/> ignores the
+        /// field and builds exactly the same battlefield, because nothing about play reads
+        /// it. It is an editing annotation - which of two props is which one's opposite
+        /// number - and the worst an old build can do with it is lose it on save, leaving a
+        /// map that is still the map and can be paired up again in one press. The bar is
+        /// whether a file means something <em>different</em> when read by an older build,
+        /// not whether the older build reads all of it.
+        /// </para>
         /// </remarks>
         public const int Schema = 4;
 

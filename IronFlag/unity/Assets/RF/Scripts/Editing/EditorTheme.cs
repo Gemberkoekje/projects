@@ -90,6 +90,15 @@ namespace IronFlag.Editing
         /// <summary>Where a selected thing's opposite number would stand.</summary>
         public static readonly Color Twin = new Color(0.55f, 0.85f, 1.0f, 0.45f);
 
+        /// <summary>A selected thing's actual opposite number, which moves with it.</summary>
+        /// <remarks>
+        /// The selection colour cooled and dimmed rather than a fourth hue. A paired thing
+        /// and its twin are one thing placed twice, so the two boxes should read as one
+        /// selection with two ends - and the difference between them still has to be legible
+        /// at a glance, because only one of them is the end the mouse is holding.
+        /// </remarks>
+        public static readonly Color Paired = new Color(1.0f, 0.80f, 0.45f, 0.70f);
+
         /// <summary>
         /// Creates a panel: a plate that swallows the clicks that land on it.
         /// </summary>

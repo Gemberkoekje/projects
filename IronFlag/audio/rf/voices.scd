@@ -17,9 +17,25 @@ var v = ();
 
 // The initial spit of a gun or an impact: noise squeezed through a resonant
 // band so it reads as a pitched crack rather than a hiss.
-v[\crack] = { |freq = 2000, dur = 0.06, res = 0.3|
-    var env = EnvGen.ar(Env.perc(0.0005, dur, curve: -8));
-    BPF.ar(WhiteNoise.ar(1), freq, res) * env * 4;
+//
+// One narrow band on its own is too well behaved to be gunfire. It is a *tuned*
+// crack, and tuned is the first thing that reads as cartoon, so the band is only
+// the centre of this: `bite` opens a broad shoulder around it, and the sum is
+// folded through tanh. That last step is not damage control - it is what a
+// transient loud enough to overload the air on the way to the listener actually
+// does, and it is most of why a real report sounds violent rather than loud.
+//
+// The shoulder is bounded at both ends rather than being a plain high-pass. Left
+// open it runs to Nyquist and the crack turns into a hiss, which is a different
+// wrong sound rather than a better one; a real report has very little above 6kHz
+// and nearly all of what identifies it between 1 and 5kHz.
+v[\crack] = { |freq = 2000, dur = 0.06, res = 0.3, bite = 0.55, drive = 2.5|
+    var env = EnvGen.ar(Env.perc(0.0002, dur, curve: -8));
+    var noise = WhiteNoise.ar(1);
+    var band = BPF.ar(noise, freq, res) * 4;
+    var shoulder = LPF.ar(HPF.ar(noise, (freq * 0.6).max(200)), (freq * 2.2).min(9000)) * 0.9;
+    var sig = (band + (shoulder * bite)) * env;
+    (sig * drive).tanh / drive.tanh;
 };
 
 // A short clicky tick, for mechanical detail: bolt travel, button presses.
@@ -32,10 +48,37 @@ v[\tick] = { |freq = 4000, dur = 0.02|
 
 // The low thump under an explosion or a heavy gun: a sine dropping in pitch,
 // which is the oldest trick in game audio and still the most legible one.
-v[\boom] = { |from = 180, to = 32, dur = 0.7, curve = -4|
-    var env = EnvGen.ar(Env.perc(0.004, dur, curve: curve));
+//
+// On its own it is also the most cartoonish. A bare descending tone is a falling
+// anvil, not a gun, so the sine is only the spine here and two things are built
+// around it. `grit` wraps it in noise tracking the same sweep, because the low
+// end of real ordnance is turbulence rather than a note - that is what stops it
+// reading as pitched. `drive` then folds the sum through tanh, generating the
+// harmonics that carry the weight on a speaker far too small to reproduce the
+// fundamental at all; without them this is inaudible on a laptop.
+//
+// The envelope is applied before the saturation, so the loud front of the hit
+// distorts and the tail comes out clean, the way an overload really behaves.
+v[\boom] = { |from = 180, to = 32, dur = 0.7, curve = -4, grit = 0.55, drive = 3|
+    var env = EnvGen.ar(Env.perc(0.001, dur, curve: curve));
     var freq = XLine.ar(from, to.max(8), dur * 0.9);
-    SinOsc.ar(freq) * env;
+    var core = SinOsc.ar(freq);
+    var rumble = LPF.ar(BPF.ar(BrownNoise.ar(1), freq * 1.6, 0.7), freq * 5) * 6;
+    var sig = (core + (rumble * grit)) * env;
+    LeakDC.ar((sig * drive).tanh) / drive.tanh;
+};
+
+// The midrange body of a heavy hit - the part felt in the chest rather than
+// heard. `boom` sits below what most speakers reproduce and `crack` sits above
+// it; with nothing in between, a gun is a click with a hum underneath. This is
+// the band that survives a laptop speaker, and it is driven hard on purpose:
+// the saturation is the sound of something too loud for the air it is crossing,
+// which is the difference between a big gun and a merely loud one.
+v[\slam] = { |from = 700, to = 140, dur = 0.25, drive = 4, level = 0.7|
+    var env = EnvGen.ar(Env.perc(0.0015, dur, curve: -5));
+    var band = XLine.ar(from, to.max(40), dur * 0.8);
+    var sig = BPF.ar(PinkNoise.ar(1), band, 0.55) * 4;
+    ((sig * env * drive).tanh / drive.tanh) * level;
 };
 
 // Body resonance - the "shell" a sound rings inside. Distinguishes a shot
@@ -51,6 +94,24 @@ v[\shell] = { |freq = 320, dur = 0.25, decay = 0.2|
 v[\air] = { |from = 6000, to = 400, dur = 0.5, bw = 0.5|
     var env = EnvGen.ar(Env.perc(dur * 0.25, dur * 0.75, curve: -2));
     BPF.ar(PinkNoise.ar(1), XLine.ar(from, to, dur), bw) * env * 3;
+};
+
+// What a report does once it has left the barrel: rolls out across open ground
+// and comes back off whatever it met. Nothing in this game is ever heard
+// indoors, so this is a scatter of slapbacks under a long dark decay rather than
+// a room, and it is what separates a gun that sounds big-and-far from one that
+// sounds small-and-close.
+//
+// Deliberately quiet - it should register as size, not as an echo. `spread` is
+// the distance to the nearest thing worth bouncing off, in seconds; the three
+// taps are incommensurate so the returns smear into a roll rather than lining up
+// into a flutter, and all three are far below the 20 Hz at which a comb stops
+// being heard as separate returns and starts being heard as a pitch.
+v[\tail] = { |dur = 1.2, tone = 1400, spread = 0.09, level = 0.3|
+    var env = EnvGen.ar(Env.perc(0.015, dur, curve: -3.5));
+    var sig = LPF.ar(PinkNoise.ar(1), XLine.ar(tone, tone * 0.25, dur));
+    var taps = Mix(CombL.ar(sig, 0.5, [spread, spread * 1.63, spread * 2.41], dur * 0.7));
+    LeakDC.ar((sig + (taps * 0.4)) * env) * level;
 };
 
 // Scattered debris: rubble landing, shell casings, structure collapse. Density

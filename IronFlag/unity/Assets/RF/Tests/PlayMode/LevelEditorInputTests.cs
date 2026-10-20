@@ -226,6 +226,58 @@ namespace IronFlag.Tests.PlayMode
         }
 
         /// <summary>
+        /// Dragging one end of a pair drags the other, through a real mouse on a real map.
+        /// </summary>
+        /// <remarks>
+        /// The arithmetic is checked in <c>LevelEditingTests</c> and was never the doubtful
+        /// part; what this proves is that the drag goes through the one function that mirrors
+        /// - <see cref="LevelEdits.MoveTo"/> - rather than reaching past it to set a position
+        /// of its own. A drag that wrote the position directly would pass every arithmetic
+        /// test in the project and mirror nothing.
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator DraggingSomethingPairedDragsItsOppositeNumber()
+        {
+            yield return OpenTheEditor();
+
+            LevelEditorSession session = Session();
+
+            // Off the origin, or the twin would stand in the same place as the thing being
+            // dragged and the test could not tell a mirrored move from no move at all.
+            int placed = LevelEdits.AddStructure(
+                session.Level, StructureKind.Tree, new Vector3(6.0f, 0.0f, 4.0f));
+            var target = new EditSelection(EditTarget.Structure, placed);
+            EditSelection twin = LevelEdits.Mirror(session.Level, target);
+            Assert.That(twin.IsSomething, Is.True);
+            session.Commit("placed a pair for a test");
+            yield return null;
+
+            Vector3 start = LevelEdits.PositionOf(session.Level, target);
+            Vector3 goal = start + new Vector3(7.0f, 0.0f, -5.0f);
+
+            Hold(At(ScreenPoint(session, start), left: true));
+            yield return Settled();
+            Hold(At(ScreenPoint(session, goal), left: true));
+            yield return Settled();
+            Hold(At(ScreenPoint(session, goal)));
+            yield return Settled();
+
+            Vector3 moved = LevelEdits.PositionOf(session.Level, target);
+            Assert.That(
+                Vector3.Distance(moved, start),
+                Is.GreaterThan(3.0f),
+                "the drag did not move the thing being dragged");
+            Assert.That(
+                LevelEdits.PositionOf(session.Level, twin).x,
+                Is.EqualTo(-moved.x).Within(0.001f),
+                "the opposite number stayed where it was");
+            Assert.That(
+                LevelEdits.PositionOf(session.Level, twin).z,
+                Is.EqualTo(-moved.z).Within(0.001f));
+        }
+
+
+        /// <summary>
         /// A second press of New, made after fresh edits, asks again instead of discarding
         /// them - the fix for a guard that stayed armed forever once pressed the first time.
         /// </summary>
@@ -334,6 +386,78 @@ namespace IronFlag.Tests.PlayMode
         /// batch mode's own frame-timing jitter - a false failure in the test rather than a
         /// real one in the editor, but a real one all the same until it stopped happening.
         /// </summary>
+        /// <summary>
+        /// A click on the ground with a prop in hand puts the prop on the ground.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the gesture the whole mode split exists for. Before there was one, the
+        /// press found the shore under the cursor - because on a finished map there is a
+        /// shore under every point worth building on - selected it, and turned the click into
+        /// a drag of the coastline. The prop tool could only place things out at sea, and the
+        /// only way round it was a shift key nobody could guess at.
+        /// </para>
+        /// <para>
+        /// It goes here rather than beside the arithmetic in <c>LevelEditingTests</c> because
+        /// the arithmetic was never wrong: <see cref="LevelPick"/> answered exactly what it
+        /// was asked. What was wrong was the question <see cref="LevelEditorSession"/> asked
+        /// on a real press, and only a real press proves it is now a different one.
+        /// </para>
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator ClickingTheGroundWithAPropInHandPlacesTheProp()
+        {
+            yield return OpenTheEditor();
+
+            LevelEditorSession session = Session();
+
+            // A patch of dry ground over the middle of the map: land for certain, clear for
+            // certain, and never under a panel at any window size - see PlaceTestTarget.
+            int patch = LevelEdits.AddLand(
+                session.Level,
+                new Vector3(-12.0f, 0.0f, -12.0f),
+                new Vector3(12.0f, 0.0f, 12.0f),
+                "Test Patch");
+            Assert.That(patch, Is.GreaterThanOrEqualTo(0));
+            session.Commit("ground for a test");
+            yield return null;
+
+            Assert.That(
+                LevelPick.At(session.Level, Vector3.zero),
+                Is.EqualTo(new EditSelection(EditTarget.Land, patch)),
+                "the middle of the map is not clear ground, so this proves nothing");
+
+            session.SetPaletteKind(StructureKind.Tree);
+            Assert.That(
+                session.Mode, Is.EqualTo(EditorMode.Build),
+                "picking a prop off the palette did not pick up the mode that places it");
+
+            LevelLand ground = session.Level.Land[patch];
+            var edges = new Vector4(ground.MinX, ground.MaxX, ground.MinZ, ground.MaxZ);
+            int props = session.Level.Structures.Length;
+
+            Vector2 screen = ScreenPoint(session, Vector3.zero);
+            Hold(At(screen, left: true));
+            yield return Settled();
+            Hold(At(screen));
+            yield return Settled();
+
+            Assert.That(
+                session.Level.Structures.Length,
+                Is.EqualTo(props + 1),
+                "a click on the ground with the prop tool in hand placed nothing");
+            Assert.That(
+                session.Selection.Target,
+                Is.EqualTo(EditTarget.Structure),
+                "the click selected something other than the prop it had just placed");
+
+            LevelLand after = session.Level.Land[patch];
+            Assert.That(
+                new Vector4(after.MinX, after.MaxX, after.MinZ, after.MaxZ),
+                Is.EqualTo(edges),
+                "the ground moved under a click that was placing something on it");
+        }
+
         private static IEnumerator Settled()
         {
             yield return null;

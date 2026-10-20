@@ -7,15 +7,17 @@ namespace IronFlag.Editing
     /// </summary>
     /// <remarks>
     /// <para>
-    /// One tool at a time, and every tool selects with the same button, because an editor in
-    /// which selecting is a different gesture per tool is one where the player has to
-    /// remember which mode they are in before they can find out which mode they are in. The
-    /// difference between the tools is only what a click on <em>empty</em> ground does:
-    /// <see cref="Select"/> clears the selection, and every other tool puts something there.
+    /// One tool at a time, and each tool belongs to exactly one <see cref="EditorMode"/> -
+    /// <see cref="Land"/> to the mode that shapes the island, the rest to the mode that
+    /// places things on it. Choosing a tool is therefore also choosing a mode, which is why
+    /// nothing stores the mode separately; see <see cref="EditorModes.Of"/>.
     /// </para>
     /// <para>
-    /// Dragging is the same in all of them too - it moves whatever is under the cursor - so
-    /// a player who never changes tool can still move everything on the map.
+    /// Within a mode every tool still selects with the same button, and they differ only in
+    /// what a click on ground the mode can reach nothing on does: <see cref="Select"/>
+    /// clears the selection and the others put something there. Dragging is the same in all
+    /// of them - it moves whatever is under the cursor - so a player who never changes tool
+    /// can still move everything the mode they are in can see.
     /// </para>
     /// </remarks>
     [Serializable]
@@ -27,7 +29,15 @@ namespace IronFlag.Editing
         /// <summary>Pick things up and move them; a click on nothing selects nothing.</summary>
         Select = 1,
 
-        /// <summary>Drag out a new rectangle of dry ground.</summary>
+        /// <summary>
+        /// Shape the island: drag out new dry ground, and drag a rectangle's corners.
+        /// </summary>
+        /// <remarks>
+        /// The whole of <see cref="EditorMode.Land"/>, and the only tool in it. There is no
+        /// second land tool that merely selects, because the mode already cannot touch
+        /// anything but land - so the one thing a "select" would add is the inability to draw,
+        /// which is the reason for being in this mode at all.
+        /// </remarks>
         Land = 2,
 
         /// <summary>Place whatever the palette is showing.</summary>

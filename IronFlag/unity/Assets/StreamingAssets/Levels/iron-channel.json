@@ -22,7 +22,8 @@
             "MinX": -76.0,
             "MaxX": 76.0,
             "MinZ": -98.0,
-            "MaxZ": -14.0
+            "MaxZ": -14.0,
+            "Pair": 1
         },
         {
             "Name": "West headland (green)",
@@ -31,7 +32,8 @@
             "MinX": -82.0,
             "MaxX": -42.0,
             "MinZ": -56.0,
-            "MaxZ": -11.0
+            "MaxZ": -11.0,
+            "Pair": 2
         },
         {
             "Name": "East headland (green)",
@@ -40,7 +42,8 @@
             "MinX": 42.0,
             "MaxX": 82.0,
             "MinZ": -56.0,
-            "MaxZ": -11.0
+            "MaxZ": -11.0,
+            "Pair": 3
         },
         {
             "Name": "North shore (brown)",
@@ -49,7 +52,8 @@
             "MinX": -76.0,
             "MaxX": 76.0,
             "MinZ": 14.0,
-            "MaxZ": 98.0
+            "MaxZ": 98.0,
+            "Pair": 1
         },
         {
             "Name": "East headland (brown)",
@@ -58,7 +62,8 @@
             "MinX": 42.0,
             "MaxX": 82.0,
             "MinZ": 11.0,
-            "MaxZ": 56.0
+            "MaxZ": 56.0,
+            "Pair": 2
         },
         {
             "Name": "West headland (brown)",
@@ -67,7 +72,8 @@
             "MinX": -82.0,
             "MaxX": -42.0,
             "MinZ": 11.0,
-            "MaxZ": 56.0
+            "MaxZ": 56.0,
+            "Pair": 3
         },
         {
             "Name": "South downs (green)",
@@ -76,7 +82,8 @@
             "MinX": -70.0,
             "MaxX": 70.0,
             "MinZ": -94.0,
-            "MaxZ": -25.0
+            "MaxZ": -25.0,
+            "Pair": 4
         },
         {
             "Name": "West meadow (green)",
@@ -85,7 +92,8 @@
             "MinX": -78.0,
             "MaxX": -54.0,
             "MinZ": -38.0,
-            "MaxZ": -24.0
+            "MaxZ": -24.0,
+            "Pair": 5
         },
         {
             "Name": "East meadow (green)",
@@ -94,7 +102,8 @@
             "MinX": 52.0,
             "MaxX": 76.0,
             "MinZ": -40.0,
-            "MaxZ": -26.0
+            "MaxZ": -26.0,
+            "Pair": 6
         },
         {
             "Name": "Middle green (green)",
@@ -103,7 +112,8 @@
             "MinX": -24.0,
             "MaxX": 16.0,
             "MinZ": -46.0,
-            "MaxZ": -19.0
+            "MaxZ": -19.0,
+            "Pair": 7
         },
         {
             "Name": "East green (green)",
@@ -112,7 +122,8 @@
             "MinX": 40.0,
             "MaxX": 58.0,
             "MinZ": -44.0,
-            "MaxZ": -28.0
+            "MaxZ": -28.0,
+            "Pair": 8
         },
         {
             "Name": "North downs (brown)",
@@ -121,7 +132,8 @@
             "MinX": -70.0,
             "MaxX": 70.0,
             "MinZ": 25.0,
-            "MaxZ": 94.0
+            "MaxZ": 94.0,
+            "Pair": 4
         },
         {
             "Name": "East meadow (brown)",
@@ -130,7 +142,8 @@
             "MinX": 54.0,
             "MaxX": 78.0,
             "MinZ": 24.0,
-            "MaxZ": 38.0
+            "MaxZ": 38.0,
+            "Pair": 5
         },
         {
             "Name": "West meadow (brown)",
@@ -139,7 +152,8 @@
             "MinX": -76.0,
             "MaxX": -52.0,
             "MinZ": 26.0,
-            "MaxZ": 40.0
+            "MaxZ": 40.0,
+            "Pair": 6
         },
         {
             "Name": "Middle green (brown)",
@@ -148,7 +162,8 @@
             "MinX": -16.0,
             "MaxX": 24.0,
             "MinZ": 19.0,
-            "MaxZ": 46.0
+            "MaxZ": 46.0,
+            "Pair": 7
         },
         {
             "Name": "West green (brown)",
@@ -157,7 +172,8 @@
             "MinX": -58.0,
             "MaxX": -40.0,
             "MinZ": 28.0,
-            "MaxZ": 44.0
+            "MaxZ": 44.0,
+            "Pair": 8
         },
         {
             "Name": "West flat (green)",
@@ -166,7 +182,8 @@
             "MinX": -46.0,
             "MaxX": -12.0,
             "MinZ": -54.0,
-            "MaxZ": -28.0
+            "MaxZ": -28.0,
+            "Pair": 9
         },
         {
             "Name": "East flat (green)",
@@ -175,7 +192,8 @@
             "MinX": 12.0,
             "MaxX": 46.0,
             "MinZ": -52.0,
-            "MaxZ": -28.0
+            "MaxZ": -28.0,
+            "Pair": 10
         },
         {
             "Name": "West scuff (green)",
@@ -184,7 +202,8 @@
             "MinX": -60.0,
             "MaxX": -46.0,
             "MinZ": -68.0,
-            "MaxZ": -60.0
+            "MaxZ": -60.0,
+            "Pair": 11
         },
         {
             "Name": "East scuff (green)",
@@ -193,7 +212,8 @@
             "MinX": 14.0,
             "MaxX": 30.0,
             "MinZ": -78.0,
-            "MaxZ": -70.0
+            "MaxZ": -70.0,
+            "Pair": 12
         },
         {
             "Name": "East flat (brown)",
@@ -202,7 +222,8 @@
             "MinX": 12.0,
             "MaxX": 46.0,
             "MinZ": 28.0,
-            "MaxZ": 54.0
+            "MaxZ": 54.0,
+            "Pair": 9
         },
         {
             "Name": "West flat (brown)",
@@ -211,7 +232,8 @@
             "MinX": -46.0,
             "MaxX": -12.0,
             "MinZ": 28.0,
-            "MaxZ": 52.0
+            "MaxZ": 52.0,
+            "Pair": 10
         },
         {
             "Name": "East scuff (brown)",
@@ -220,7 +242,8 @@
             "MinX": 46.0,
             "MaxX": 60.0,
             "MinZ": 60.0,
-            "MaxZ": 68.0
+            "MaxZ": 68.0,
+            "Pair": 11
         },
         {
             "Name": "West scuff (brown)",
@@ -229,135 +252,168 @@
             "MinX": -30.0,
             "MaxX": -14.0,
             "MinZ": 70.0,
-            "MaxZ": 78.0
+            "MaxZ": 78.0,
+            "Pair": 12
         },
         {
             "Name": "West causeway",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -68.0,
             "MaxX": -56.0,
             "MinZ": -15.0,
-            "MaxZ": 15.0
+            "MaxZ": 15.0,
+            "Pair": 13
         },
         {
             "Name": "East causeway",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 56.0,
             "MaxX": 68.0,
             "MinZ": -15.0,
-            "MaxZ": 15.0
+            "MaxZ": 15.0,
+            "Pair": 13
         },
         {
             "Name": "West bridgehead, green",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -36.0,
             "MaxX": -24.0,
             "MinZ": -20.0,
-            "MaxZ": -6.5
+            "MaxZ": -6.5,
+            "Pair": 14
         },
         {
             "Name": "East bridgehead, brown",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 24.0,
             "MaxX": 36.0,
             "MinZ": 6.5,
-            "MaxZ": 20.0
+            "MaxZ": 20.0,
+            "Pair": 14
         },
         {
             "Name": "East bridgehead, green",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 24.0,
             "MaxX": 36.0,
             "MinZ": -20.0,
-            "MaxZ": -6.5
+            "MaxZ": -6.5,
+            "Pair": 15
         },
         {
             "Name": "West bridgehead, brown",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -36.0,
             "MaxX": -24.0,
             "MinZ": 6.5,
-            "MaxZ": 20.0
+            "MaxZ": 20.0,
+            "Pair": 15
         },
         {
             "Name": "Bunker road (green)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -2.5,
             "MaxX": 2.5,
             "MinZ": -58.0,
-            "MaxZ": -31.5
+            "MaxZ": -31.5,
+            "Pair": 16
         },
         {
             "Name": "Depot road (green)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -64.5,
             "MaxX": 40.5,
             "MinZ": -36.5,
-            "MaxZ": -31.5
+            "MaxZ": -31.5,
+            "Pair": 17
         },
         {
             "Name": "West causeway road (green)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -64.5,
             "MaxX": -59.5,
             "MinZ": -36.5,
-            "MaxZ": -15.0
+            "MaxZ": -15.0,
+            "Pair": 18
         },
         {
             "Name": "West bridge road (green)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -32.5,
             "MaxX": -27.5,
             "MinZ": -36.5,
-            "MaxZ": -18.0
+            "MaxZ": -18.0,
+            "Pair": 19
         },
         {
             "Name": "East bridge road (green)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 27.5,
             "MaxX": 32.5,
             "MinZ": -36.5,
-            "MaxZ": -18.0
+            "MaxZ": -18.0,
+            "Pair": 20
         },
         {
             "Name": "Bunker road (brown)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -2.5,
             "MaxX": 2.5,
             "MinZ": 31.5,
-            "MaxZ": 58.0
+            "MaxZ": 58.0,
+            "Pair": 16
         },
         {
             "Name": "Depot road (brown)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -40.5,
             "MaxX": 64.5,
             "MinZ": 31.5,
-            "MaxZ": 36.5
+            "MaxZ": 36.5,
+            "Pair": 17
         },
         {
             "Name": "East causeway road (brown)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 59.5,
             "MaxX": 64.5,
             "MinZ": 15.0,
-            "MaxZ": 36.5
+            "MaxZ": 36.5,
+            "Pair": 18
         },
         {
             "Name": "East bridge road (brown)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": 27.5,
             "MaxX": 32.5,
             "MinZ": 18.0,
-            "MaxZ": 36.5
+            "MaxZ": 36.5,
+            "Pair": 19
         },
         {
             "Name": "West bridge road (brown)",
             "Surface": "Asphalt",
+            "Shape": "Rectangle",
             "MinX": -32.5,
             "MaxX": -27.5,
             "MinZ": 18.0,
-            "MaxZ": 36.5
+            "MaxZ": 36.5,
+            "Pair": 20
         }
     ],
     "Bunkers": [
@@ -370,18 +426,20 @@
             },
             "YawDegrees": 0.0,
             "SupplyRadius": 12.0,
-            "SupplyRate": 0.25
+            "SupplyRate": 0.25,
+            "Pair": 21
         },
         {
             "Team": "Brown",
             "Position": {
-                "x": -0.0,
+                "x": 0.0,
                 "y": 0.0,
                 "z": 70.0
             },
             "YawDegrees": 180.0,
             "SupplyRadius": 12.0,
-            "SupplyRate": 0.25
+            "SupplyRate": 0.25,
+            "Pair": 21
         }
     ],
     "Towers": [
@@ -393,7 +451,8 @@
                 "y": 0.0,
                 "z": -56.0
             },
-            "YawDegrees": 0.0
+            "YawDegrees": 0.0,
+            "Pair": 22
         },
         {
             "Team": "Green",
@@ -403,7 +462,8 @@
                 "y": 0.0,
                 "z": -56.0
             },
-            "YawDegrees": 0.0
+            "YawDegrees": 0.0,
+            "Pair": 23
         },
         {
             "Team": "Brown",
@@ -413,7 +473,8 @@
                 "y": 0.0,
                 "z": 56.0
             },
-            "YawDegrees": 180.0
+            "YawDegrees": 180.0,
+            "Pair": 22
         },
         {
             "Team": "Brown",
@@ -423,7 +484,8 @@
                 "y": 0.0,
                 "z": 56.0
             },
-            "YawDegrees": 180.0
+            "YawDegrees": 180.0,
+            "Pair": 23
         }
     ],
     "Structures": [
@@ -439,7 +501,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 24
         },
         {
             "Kind": "Bridge",
@@ -453,7 +516,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 24
         },
         {
             "Kind": "DepotFuel",
@@ -467,7 +531,8 @@
             "YawDegrees": 20.0,
             "FuelRate": 0.12,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 25
         },
         {
             "Kind": "DepotAmmo",
@@ -481,7 +546,8 @@
             "YawDegrees": -20.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.12,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 26
         },
         {
             "Kind": "DepotFuel",
@@ -495,7 +561,8 @@
             "YawDegrees": 200.0,
             "FuelRate": 0.12,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 25
         },
         {
             "Kind": "DepotAmmo",
@@ -509,7 +576,8 @@
             "YawDegrees": 160.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.12,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 26
         },
         {
             "Kind": "Turret",
@@ -523,7 +591,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 27
         },
         {
             "Kind": "Turret",
@@ -537,7 +606,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 28
         },
         {
             "Kind": "Turret",
@@ -551,7 +621,8 @@
             "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 27
         },
         {
             "Kind": "Turret",
@@ -565,7 +636,8 @@
             "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 28
         },
         {
             "Kind": "Wall",
@@ -579,7 +651,8 @@
             "YawDegrees": 90.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 29
         },
         {
             "Kind": "Door",
@@ -593,7 +666,8 @@
             "YawDegrees": 90.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 30
         },
         {
             "Kind": "Wall",
@@ -607,7 +681,8 @@
             "YawDegrees": 90.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 31
         },
         {
             "Kind": "Door",
@@ -621,7 +696,8 @@
             "YawDegrees": 90.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 32
         },
         {
             "Kind": "Wall",
@@ -635,7 +711,8 @@
             "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 29
         },
         {
             "Kind": "Door",
@@ -649,7 +726,8 @@
             "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 30
         },
         {
             "Kind": "Wall",
@@ -663,7 +741,8 @@
             "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 31
         },
         {
             "Kind": "Door",
@@ -677,7 +756,8 @@
             "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 32
         },
         {
             "Kind": "BuildingA",
@@ -691,7 +771,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 33
         },
         {
             "Kind": "BuildingB",
@@ -705,7 +786,8 @@
             "YawDegrees": 90.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 34
         },
         {
             "Kind": "BuildingA",
@@ -719,7 +801,8 @@
             "YawDegrees": 20.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 35
         },
         {
             "Kind": "BuildingB",
@@ -733,7 +816,8 @@
             "YawDegrees": 290.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 36
         },
         {
             "Kind": "BuildingA",
@@ -747,7 +831,8 @@
             "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 33
         },
         {
             "Kind": "BuildingB",
@@ -761,7 +846,8 @@
             "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 34
         },
         {
             "Kind": "BuildingA",
@@ -775,7 +861,8 @@
             "YawDegrees": 200.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 35
         },
         {
             "Kind": "BuildingB",
@@ -789,7 +876,8 @@
             "YawDegrees": 110.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 36
         },
         {
             "Kind": "Tree",
@@ -803,7 +891,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 37
         },
         {
             "Kind": "Tree",
@@ -817,7 +906,8 @@
             "YawDegrees": 40.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 38
         },
         {
             "Kind": "Tree",
@@ -831,7 +921,8 @@
             "YawDegrees": 80.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 39
         },
         {
             "Kind": "Tree",
@@ -845,7 +936,8 @@
             "YawDegrees": 120.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 40
         },
         {
             "Kind": "Tree",
@@ -859,7 +951,8 @@
             "YawDegrees": 160.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 41
         },
         {
             "Kind": "Tree",
@@ -873,7 +966,8 @@
             "YawDegrees": 200.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 42
         },
         {
             "Kind": "Tree",
@@ -887,7 +981,8 @@
             "YawDegrees": 240.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 43
         },
         {
             "Kind": "Tree",
@@ -901,7 +996,8 @@
             "YawDegrees": 280.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 44
         },
         {
             "Kind": "Tree",
@@ -915,7 +1011,8 @@
             "YawDegrees": 320.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 45
         },
         {
             "Kind": "Tree",
@@ -929,7 +1026,8 @@
             "YawDegrees": 20.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 46
         },
         {
             "Kind": "Tree",
@@ -943,7 +1041,8 @@
             "YawDegrees": 60.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 47
         },
         {
             "Kind": "Tree",
@@ -957,7 +1056,8 @@
             "YawDegrees": 100.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 48
         },
         {
             "Kind": "Tree",
@@ -971,7 +1071,8 @@
             "YawDegrees": 140.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 49
         },
         {
             "Kind": "Tree",
@@ -985,7 +1086,8 @@
             "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 50
         },
         {
             "Kind": "Tree",
@@ -999,7 +1101,8 @@
             "YawDegrees": 220.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 51
         },
         {
             "Kind": "Tree",
@@ -1013,7 +1116,8 @@
             "YawDegrees": 260.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 52
         },
         {
             "Kind": "Tree",
@@ -1027,7 +1131,8 @@
             "YawDegrees": 300.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 53
         },
         {
             "Kind": "Tree",
@@ -1041,7 +1146,8 @@
             "YawDegrees": 340.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 54
         },
         {
             "Kind": "Tree",
@@ -1055,7 +1161,8 @@
             "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 37
         },
         {
             "Kind": "Tree",
@@ -1069,7 +1176,8 @@
             "YawDegrees": 220.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 38
         },
         {
             "Kind": "Tree",
@@ -1083,7 +1191,8 @@
             "YawDegrees": 260.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 39
         },
         {
             "Kind": "Tree",
@@ -1097,7 +1206,8 @@
             "YawDegrees": 300.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 40
         },
         {
             "Kind": "Tree",
@@ -1111,7 +1221,8 @@
             "YawDegrees": 340.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 41
         },
         {
             "Kind": "Tree",
@@ -1125,7 +1236,8 @@
             "YawDegrees": 20.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 42
         },
         {
             "Kind": "Tree",
@@ -1139,7 +1251,8 @@
             "YawDegrees": 60.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 43
         },
         {
             "Kind": "Tree",
@@ -1153,7 +1266,8 @@
             "YawDegrees": 100.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 44
         },
         {
             "Kind": "Tree",
@@ -1167,7 +1281,8 @@
             "YawDegrees": 140.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 45
         },
         {
             "Kind": "Tree",
@@ -1181,7 +1296,8 @@
             "YawDegrees": 200.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 46
         },
         {
             "Kind": "Tree",
@@ -1195,7 +1311,8 @@
             "YawDegrees": 240.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 47
         },
         {
             "Kind": "Tree",
@@ -1209,7 +1326,8 @@
             "YawDegrees": 280.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 48
         },
         {
             "Kind": "Tree",
@@ -1223,7 +1341,8 @@
             "YawDegrees": 320.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 49
         },
         {
             "Kind": "Tree",
@@ -1237,7 +1356,8 @@
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 50
         },
         {
             "Kind": "Tree",
@@ -1251,7 +1371,8 @@
             "YawDegrees": 40.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 51
         },
         {
             "Kind": "Tree",
@@ -1265,7 +1386,8 @@
             "YawDegrees": 80.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 52
         },
         {
             "Kind": "Tree",
@@ -1279,7 +1401,8 @@
             "YawDegrees": 120.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 53
         },
         {
             "Kind": "Tree",
@@ -1293,7 +1416,8 @@
             "YawDegrees": 160.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
+            "SupplyRadius": 7.0,
+            "Pair": 54
         }
     ]
 }

@@ -45,6 +45,17 @@ namespace IronFlag.Levels
         [Tooltip("Fraction of a full fuel and ammunition pool the bunker puts back per second.")]
         public float SupplyRate = 0.25f;
 
+        /// <summary>
+        /// Which mirrored pair this belongs to, or zero for a bunker that stands on its own.
+        /// </summary>
+        /// <remarks>
+        /// See <see cref="LevelStructure.Pair"/>, which carries the whole explanation. There
+        /// are at most two bunkers on a map and a one-player map has one, so this is either
+        /// the pair both of them are in or zero on the single bunker of a solo map.
+        /// </remarks>
+        [Tooltip("Which mirrored pair this belongs to. Zero for a bunker that stands on its own.")]
+        public int Pair;
+
         /// <summary>The side this bunker belongs to.</summary>
         public Team Side => LevelNames.ToTeam(Team);
     }

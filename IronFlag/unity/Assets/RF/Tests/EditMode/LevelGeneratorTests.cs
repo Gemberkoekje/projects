@@ -898,6 +898,151 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
+        /// A mirrored map comes out already paired, which is the point of doing it in the
+        /// generator rather than leaving it to whoever opens the map: everything on it that
+        /// has an opposite number moves, turns and is deleted with it from the first click.
+        /// </summary>
+        /// <remarks>
+        /// The claim is that the pass leaves nothing behind. Running it a second time on a
+        /// finished map has to find no pair at all - so a generator change that stopped
+        /// putting a turned copy where its twin expects it fails here rather than showing up
+        /// as a map somebody could not keep symmetrical.
+        /// </remarks>
+        [Test]
+        public void AMirroredMapComesOutAlreadyPaired()
+        {
+            foreach (MapLayout layout in Layouts())
+            {
+                for (int seed = 1; seed <= Seeds; seed++)
+                {
+                    LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                    {
+                        Seed = seed * 6151,
+                        Layout = layout,
+                        Symmetry = MapSymmetry.Mirrored,
+                    });
+
+                    Assert.That(
+                        LevelEdits.PairTheHalves(map),
+                        Is.Zero,
+                        $"{layout} seed {seed * 6151} came out with unpaired opposite numbers");
+
+                    for (int tower = 0; tower < map.Towers.Length; tower++)
+                    {
+                        Assert.That(
+                            LevelEdits.TwinOf(map, new EditSelection(EditTarget.Tower, tower))
+                                .IsSomething,
+                            Is.True,
+                            $"{layout} seed {seed * 6151}: tower {tower} has no opposite number");
+                    }
+
+                    for (int bunker = 0; bunker < map.Bunkers.Length; bunker++)
+                    {
+                        Assert.That(
+                            LevelEdits.TwinOf(map, new EditSelection(EditTarget.Bunker, bunker))
+                                .IsSomething,
+                            Is.True,
+                            $"{layout} seed {seed * 6151}: bunker {bunker} has no opposite number");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Moving one thing on a generated map moves its opposite number, which is the whole
+        /// of what the pairing buys and the only claim worth making about it end to end.
+        /// </summary>
+        [Test]
+        public void MovingAPropOnAGeneratedMapMovesItsOppositeNumber()
+        {
+            LevelDefinition map = LevelGenerator.Generate(new MapOptions
+            {
+                Seed = 4441,
+                Symmetry = MapSymmetry.Mirrored,
+            });
+
+            var picked = new EditSelection(EditTarget.Tower, 0);
+            EditSelection twin = LevelEdits.TwinOf(map, picked);
+            Assert.That(twin.IsSomething, Is.True);
+
+            var to = new Vector3(7.0f, 0.0f, -21.0f);
+            LevelEdits.MoveTo(map, picked, to);
+
+            Assert.That(map.Towers[twin.Index].Position.x, Is.EqualTo(-7.0f).Within(0.001f));
+            Assert.That(map.Towers[twin.Index].Position.z, Is.EqualTo(21.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// An asymmetrical map gets no pairs at all. Its two halves are drawn from different
+        /// dice, so anything that lined up did so by accident - and an accident is the worst
+        /// possible reason to weld two props together for the rest of the map's life.
+        /// </summary>
+        [Test]
+        public void AnAsymmetricalMapComesOutWithNoPairsAtAll()
+        {
+            for (int seed = 1; seed <= Seeds; seed++)
+            {
+                LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                {
+                    Seed = seed * 6329,
+                    Symmetry = MapSymmetry.Asymmetrical,
+                });
+
+                foreach (LevelLand piece in map.Land)
+                {
+                    Assert.That(piece.Pair, Is.Zero, $"seed {seed * 6329}");
+                }
+
+                foreach (LevelStructure prop in map.Structures)
+                {
+                    Assert.That(prop.Pair, Is.Zero, $"seed {seed * 6329}");
+                }
+
+                foreach (LevelTower tower in map.Towers)
+                {
+                    Assert.That(tower.Pair, Is.Zero, $"seed {seed * 6329}");
+                }
+
+                foreach (LevelBunker bunker in map.Bunkers)
+                {
+                    Assert.That(bunker.Pair, Is.Zero, $"seed {seed * 6329}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// A one-player map's ground is mirrored like anybody else's and everything standing
+        /// on it is not - the props are scattered over the whole map from one set of dice and
+        /// were never each other's. So its land is paired and its props are left alone,
+        /// rather than two trees being welded together because they happened to land
+        /// opposite.
+        /// </summary>
+        [Test]
+        public void AOnePlayerMapPairsItsGroundAndNothingStandingOnIt()
+        {
+            for (int seed = 1; seed <= Seeds; seed++)
+            {
+                LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                {
+                    Seed = seed * 6577,
+                    Players = 1,
+                    Symmetry = MapSymmetry.Mirrored,
+                });
+
+                foreach (LevelStructure prop in map.Structures)
+                {
+                    Assert.That(prop.Pair, Is.Zero, $"solo seed {seed * 6577}");
+                }
+
+                foreach (LevelTower tower in map.Towers)
+                {
+                    Assert.That(tower.Pair, Is.Zero, $"solo seed {seed * 6577}");
+                }
+            }
+        }
+
+
+        /// <summary>
         /// Asking for nothing at all still draws a map, because the generator is also what a
         /// test or a tool reaches for when it just wants somewhere to drive.
         /// </summary>

@@ -230,6 +230,19 @@ namespace IronFlag.Editing
                     () => bounds.SeaThickness = Mathf.Max(0.1f, value), "Changed the sea slab."));
 
             ShowReserve(level);
+
+            // The only way a map written before pairs existed gets any, and the way a
+            // hand-built one does: both shipped maps are drawn exactly in halves, so this
+            // records forty-odd relationships that are visibly there. It moves nothing.
+            Action("Pair up the halves", () =>
+            {
+                int found = LevelEdits.PairTheHalves(level);
+                session.Commit(
+                    found == 0
+                        ? "Nothing left on this map stands opposite one of its own kind."
+                        : $"Paired up {found} {(found == 1 ? "thing" : "things")} "
+                            + "with their opposite numbers.");
+            });
         }
 
         /// <summary>
@@ -299,17 +312,38 @@ namespace IronFlag.Editing
                     break;
             }
 
-            Action("Mirror to the other side", () =>
+            // Two buttons in one slot, because they are the two halves of one question.
+            // Something that already has an opposite number cannot be mirrored again - it
+            // has one - and the button that used to sit here regardless is exactly what made
+            // the second copy: mirror, move the original, mirror again, and the first copy
+            // stayed where it was while a third thing appeared. What a paired thing can do
+            // instead is stop being paired, which is the per-item off switch: a map drawn in
+            // halves is still allowed the one causeway that is deliberately on one side only.
+            if (LevelEdits.TwinOf(level, picked).IsSomething)
             {
-                EditSelection made = LevelEdits.Mirror(level, picked);
-                if (!made.IsSomething)
+                Action("Unpair from its twin", () =>
                 {
-                    return;
-                }
+                    string what = LevelEdits.Describe(level, picked);
+                    if (LevelEdits.Unpair(level, picked))
+                    {
+                        session.Commit($"{what} moves on its own now.");
+                    }
+                });
+            }
+            else
+            {
+                Action("Mirror to the other side", () =>
+                {
+                    EditSelection made = LevelEdits.Mirror(level, picked);
+                    if (!made.IsSomething)
+                    {
+                        return;
+                    }
 
-                session.Select(made);
-                session.Commit("Mirrored to the other side.");
-            });
+                    session.Select(made);
+                    session.Commit("Mirrored to the other side. The two move together now.");
+                });
+            }
 
             Action("Delete", () => session.DeleteSelected());
         }
@@ -336,20 +370,25 @@ namespace IronFlag.Editing
             subtitle.text = "DEPLOYS, REPAIRS, REFUELS AND WINS";
 
             Side(bunker.Side, side => Set(
-                () => bunker.Team = side.ToString(), $"Gave the bunker to {side}."));
+                () => LevelEdits.SetSide(level, picked, side), $"Gave the bunker to {side}."));
             Position(level, picked);
             Heading(level, picked, "Lift bay (°)");
             Number(
                 "Supply radius",
                 bunker.SupplyRadius,
-                value => Set(
-                    () => bunker.SupplyRadius = Mathf.Max(0.0f, value),
+                value => BothBunkers(
+                    level,
+                    picked,
+                    twin => twin.SupplyRadius = Mathf.Max(0.0f, value),
                     "Changed the supply radius."));
             Number(
                 "Supply rate",
                 bunker.SupplyRate,
-                value => Set(
-                    () => bunker.SupplyRate = Mathf.Max(0.0f, value), "Changed the supply rate."));
+                value => BothBunkers(
+                    level,
+                    picked,
+                    twin => twin.SupplyRate = Mathf.Max(0.0f, value),
+                    "Changed the supply rate."));
         }
 
         private void ShowTower(LevelDefinition level, EditSelection picked)
@@ -359,7 +398,7 @@ namespace IronFlag.Editing
             subtitle.text = tower.HoldsTheFlag ? "HOLDS THE FLAG" : "DECOY";
 
             Side(tower.Side, side => Set(
-                () => tower.Team = side.ToString(), $"Gave the tower to {side}."));
+                () => LevelEdits.SetSide(level, picked, side), $"Gave the tower to {side}."));
             Position(level, picked);
             Heading(level, picked, "Facing (°)");
 
@@ -391,7 +430,7 @@ namespace IronFlag.Editing
             {
                 title.color = EditorTheme.For(structure.Team);
                 Side(structure.Team, side => Set(
-                    () => structure.Side = side.ToString(),
+                    () => LevelEdits.SetSide(level, picked, side),
                     $"Gave the {structure.Kind} to {side}."));
             }
 
@@ -404,19 +443,26 @@ namespace IronFlag.Editing
             Number(
                 "Fuel rate",
                 structure.FuelRate,
-                value => Set(
-                    () => structure.FuelRate = Mathf.Max(0.0f, value), "Changed a fuel rate."));
+                value => BothProps(
+                    level,
+                    picked,
+                    twin => twin.FuelRate = Mathf.Max(0.0f, value),
+                    "Changed a fuel rate."));
             Number(
                 "Ammo rate",
                 structure.AmmoRate,
-                value => Set(
-                    () => structure.AmmoRate = Mathf.Max(0.0f, value),
+                value => BothProps(
+                    level,
+                    picked,
+                    twin => twin.AmmoRate = Mathf.Max(0.0f, value),
                     "Changed an ammunition rate."));
             Number(
                 "Supply radius",
                 structure.SupplyRadius,
-                value => Set(
-                    () => structure.SupplyRadius = Mathf.Max(0.0f, value),
+                value => BothProps(
+                    level,
+                    picked,
+                    twin => twin.SupplyRadius = Mathf.Max(0.0f, value),
                     "Changed the supply radius."));
         }
 
@@ -627,6 +673,74 @@ namespace IronFlag.Editing
             change();
             session.Commit(what);
         }
+
+        /// <summary>
+        /// Changes a prop and its opposite number the same way.
+        /// </summary>
+        /// <param name="level">The map being edited.</param>
+        /// <param name="picked">Which prop.</param>
+        /// <param name="change">What to do to each of them.</param>
+        /// <param name="what">What to say happened.</param>
+        /// <remarks>
+        /// <para>
+        /// For the numbers that are balance rather than placement: what a depot hands out and
+        /// how far. Two twins whose rates had drifted apart would be an invisible asymmetry
+        /// of exactly the kind pairing exists to stop - the map looks symmetrical, plays
+        /// lopsided, and nothing in the file says which side is being favoured.
+        /// </para>
+        /// <para>
+        /// Names are deliberately not put through this. The two halves of a pair are supposed
+        /// to be called different things: the generator names each one for its own side, and
+        /// a rename that reached across the map would undo that every time somebody used it.
+        /// </para>
+        /// </remarks>
+        private void BothProps(
+            LevelDefinition level,
+            EditSelection picked,
+            Action<LevelStructure> change,
+            string what)
+            => Set(
+                () =>
+                {
+                    change(level.Structures[picked.Index]);
+
+                    EditSelection twin = LevelEdits.TwinOf(level, picked);
+                    if (twin.IsSomething)
+                    {
+                        change(level.Structures[twin.Index]);
+                    }
+                },
+                what);
+
+        /// <summary>
+        /// Changes a bunker and its opposite number the same way.
+        /// </summary>
+        /// <param name="level">The map being edited.</param>
+        /// <param name="picked">Which bunker.</param>
+        /// <param name="change">What to do to each of them.</param>
+        /// <param name="what">What to say happened.</param>
+        /// <remarks>
+        /// <see cref="BothProps"/>, for the two ends of a map. A bunker is where a side
+        /// deploys, repairs and refuels, so its supply numbers drifting apart is the same
+        /// invisible asymmetry with the whole match riding on it.
+        /// </remarks>
+        private void BothBunkers(
+            LevelDefinition level,
+            EditSelection picked,
+            Action<LevelBunker> change,
+            string what)
+            => Set(
+                () =>
+                {
+                    change(level.Bunkers[picked.Index]);
+
+                    EditSelection twin = LevelEdits.TwinOf(level, picked);
+                    if (twin.IsSomething)
+                    {
+                        change(level.Bunkers[twin.Index]);
+                    }
+                },
+                what);
 
         private static bool HasFocus(InputField field)
         {

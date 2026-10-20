@@ -24,6 +24,7 @@ map, so a seed worth keeping is worth writing down.
 | Layouts | Island · Channel · Lagoon, or ANY to roll one |
 | Sizes | Easy 200 m · Medium 280 m · Hard 360 m across, with turret and prop counts to match |
 | Halves | Mirrored (rotated half a turn) or Asymmetrical |
+| Pairs | a mirrored map comes out paired — move one thing and its opposite number moves; see [PAIRING_NOTES.md](PAIRING_NOTES.md) |
 | Players | 2, or 1 for the solo shape — a bunker against a field of enemy towers |
 | Seed | shown, typeable, re-rollable; written into the level file |
 | Validation | `LevelValidation`, unfiltered, in the editor's existing Problems panel |

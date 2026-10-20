@@ -236,10 +236,16 @@ crossings can all be destroyed — are checked when it loads and warned about by
 
 Open `unity/Assets/RF/Scenes/LevelEditor.unity` and press Play. The map is above you, seen
 straight down: **right-drag** to pan, **wheel** to zoom, click anything to select it and drag it
-to move it. Keys `1`–`5` pick the tool — select, land, prop, tower, bunker — and the panel on
-the left is the palette. Hold **shift** to place something on top of what is already there, hold
-**alt** to ignore the grid, `Q`/`E` to turn what is selected, `Del` to remove it, `Ctrl+Z` to
-undo, `Ctrl+S` to save.
+to move it.
+
+The editor is in one of two modes and **Tab** crosses between them. In **LAND** you shape the
+island — drag out new ground over the water, drag a rectangle's corners to pull its coastline
+about — and nothing standing on the map can be clicked at all. In **BUILD** you place and move
+what stands on it, and the ground cannot be clicked, so a click on the shore puts a prop *on*
+the shore instead of dragging the shore away. Keys `1`–`4` pick the build tool — select, prop,
+tower, bunker — and the panel on the left is the palette. Hold **shift** to place something on
+top of what is already there, hold **alt** to ignore the grid, `Q`/`E` to turn what is selected,
+`Del` to remove it, `Ctrl+Z` to undo, `Ctrl+S` to save.
 
 The panel on the right is the exact numbers behind whatever is selected — the mouse is for
 roughly where a thing goes and that is for exactly where — and with nothing selected it is the
@@ -249,11 +255,20 @@ the map is currently breaking, live, in the same words the game logs. **Mirror t
 side** copies whatever is selected to the far side of the origin, rotated half a turn and
 handed to the other team, which is how every map in this game is laid out.
 
+The two are **paired** from then on: move, turn, resize or delete either end and the other
+follows, so a map drawn in halves stays drawn in halves while you work on it. Generated maps
+and both shipped maps come out already paired, and **Unpair from its twin** turns it off for
+that one prop or that one rectangle — a map built in pairs is still allowed the one causeway
+that is deliberately only on one side. With nothing selected, **Pair up the halves** finds
+every twin on a map that has none yet. Details in
+[PAIRING_NOTES.md](PAIRING_NOTES.md).
+
 Press **PLAY THIS MAP** and you are driving on it; press **F1** in the game and you are back in
 the editor with it still open. Maps you make are saved next to your saves rather than into the
 game, and a map you edit there shadows the shipped one of the same name — so nothing you do can
 damage `iron-channel`, and reverting is deleting one file. Details in
-[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md).
+[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md), and the two modes in
+[EDITOR_MODES_NOTES.md](EDITOR_MODES_NOTES.md).
 
 You do not have to start from an empty island either. **GENERATE** draws a whole map out of a
 seed — the coast, the beaches, the roads, the bunkers, the towers, the depots, the emplacements

@@ -15,6 +15,9 @@ two halves, and this file is written in two halves to match:
   favour of **synthesise**.
 - **The wiring** (2026-08-28) — the clips actually playing. Answers open questions 2 and
   3: **non-positional but attenuated**, and **all of it, engine loops included**.
+- **The grunt pass** (2026-08-31) — weapons and explosions reworked after they were
+  judged too cartoony. No new sounds and no new wiring; two shared voices rebuilt and
+  two added.
 
 | Category | Count | Covers |
 |---|---|---|
@@ -28,6 +31,126 @@ two halves, and this file is written in two halves to match:
 **Hear one**: `./audio/build.ps1 -Listen -Sound Cannon`. **Build them**:
 `./audio/build.ps1`, or `Tools > IronFlag > Rebuild All Audio from SuperCollider`, then
 `Tools > IronFlag > Build Audio Catalog`.
+
+---
+
+# Part three: the grunt pass
+
+**Start with [`audio/rf/voices.scd`](audio/rf/voices.scd) — `crack`, `boom`, `slam` and
+`tail`. The recipes in `sounds/weapons.scd` and `sounds/impacts.scd` only spend what
+those four provide.**
+
+The weapons and explosions sounded cartoony. That turned out to be one specific,
+measurable thing rather than a matter of taste, and it lived in the shared vocabulary,
+not in any individual recipe.
+
+## What was actually wrong: the low end was a *note*
+
+`boom` was a bare `SinOsc` on a downward `XLine`. A pure tone sliding down in pitch is
+the single most recognisable cartoon sound there is — it is the falling-anvil whistle —
+and every weapon and every explosion in the game was built on one.
+
+The measure for this is **spectral flatness of the 30–300 Hz band**: the geometric mean
+of the power spectrum over its arithmetic mean, which is ~0 for a pure tone and
+approaches 1 for noise. The old sounds scored **0.005 to 0.09**. That is not "a bit
+tonal", that is *a note with a click on the front*.
+
+Real ordnance has a low end made of turbulence, not pitch. So `boom` keeps the sine as a
+spine and adds `grit` — a noise band tracking the same sweep — which is what actually
+moves that number:
+
+| | flatness before → after |
+|---|---|
+| Autocannon | 0.005 → 0.291 |
+| Chaingun | 0.035 → 0.352 |
+| Grenade | 0.030 → 0.250 |
+| Cannon | 0.088 → 0.285 |
+| StructureDamaged | 0.001 → 0.192 |
+
+The rocket is the one that barely moved (0.195 → 0.193) and it is the one that was
+already fine — most of it is `air` thrust, which was always noise.
+
+## The other half: saturation, and the band nobody was using
+
+Two more things separate a gun from a beep, and neither was present anywhere.
+
+**Nothing was ever driven.** Real gunfire overloads whatever hears it, and the harmonics
+that overload generates are most of what "loud" sounds like. `boom`, `crack` and the new
+`slam` now all fold through `tanh`, with the envelope applied *before* the saturation so
+the loud front distorts and the tail comes out clean — the way an overload really
+behaves. This is also why the sounds got much denser without getting much peakier:
+saturation raises RMS while holding the peak, which is exactly the trade "more grunt,
+same headroom" describes.
+
+**There was a hole in the middle.** `boom` sits below what most speakers reproduce and
+`crack` sits above it, and nothing occupied the space between. The most striking number
+in the whole pass: of the autocannon's A-weighted energy, **0.1% was above 200 Hz**. On a
+laptop or a phone it was very nearly silent — not quiet, *absent*. `slam` is that missing
+band, and it takes the autocannon to **46.6%**.
+
+## `tail`, and why the chaingun does not get one
+
+A report outdoors does not stop; it rolls out over the ground and comes back off whatever
+it meets. `tail` is that roll — three incommensurate comb taps under a long dark decay,
+deliberately quiet, because it should register as *size* rather than as an echo. It is
+what makes a gun sound big-and-far instead of small-and-close, and it is why the cannon
+and the explosion got longer (1.10 s → 1.40 s, 2.20 s → 2.60 s).
+
+The chaingun and the grenade deliberately have none. The existing comment on the chaingun
+already said why — *"anything with a tail turns into mud at that rate"* — and that was
+still true. The chaingun's grunt has to arrive and leave inside 60 ms, so it is a very
+short `slam` driven hard instead.
+
+## Loudness was rebalanced down, not up
+
+Saturation nearly doubled the perceived level of everything on the first pass. That is
+fine for a tank shell and wrong for a sound the player hears several times a second, so
+the fast-firing weapons were trimmed back afterwards. Final A-weighted punch, measured as
+the loudest 100 ms so a long tail is not credited as loudness:
+
+| | ×  | | × |
+|---|---|---|---|
+| Explosion | 1.69 | Rocket | 1.89 |
+| Cannon | 1.81 | Chaingun | 1.47 |
+| Autocannon | 1.73 | Grenade | 1.38 |
+
+Peaks stayed near where they were (0.46–0.68 before, 0.56–0.74 after) and the ordering
+the mix depends on is intact: the explosion is still the loudest thing in the game and
+the cannon is still the loudest single report.
+
+## Decisions worth knowing
+
+- **The fix belonged in the voices, not the recipes.** `boom` and `crack` were used by
+  exactly two modules — `weapons.scd` and `impacts.scd` — so rebuilding them in place hit
+  every affected sound and nothing else. That was checked before touching them, and it is
+  why the diff is 3 source files and 9 clips with no music, engine or UI clip moved.
+- **The two structure sounds were dragged along, and only trimmed.** They share `boom`,
+  so they got the same grit and saturation for free, and rendered within a hair of full
+  scale (0.96) until their gains came down. They were not otherwise redesigned: a
+  collapsing building is not what was asked about, and their briefs still hold.
+- **Levels are the mix.** There is no `AudioMixer` asset and no limiter anywhere in the
+  project, and `AudioMixdown` only ever attenuates. A clip's rendered level *is* its place
+  in the mix, so headroom had to be left here or nowhere.
+
+## Gotchas
+
+- **Band shares lie when the total moves.** The 1–5 kHz share of the cannon appears to
+  collapse from 20.7% to 1.9%, which reads as "the crack was destroyed". It was not: in
+  absolute A-weighted terms that band went **up 4.2 dB**. The low end simply grew more.
+  Judge these in absolute dB per band, never as percentages of a total that is itself
+  changing.
+- **Raw energy is not audibility.** Un-weighted, all of these look like 90%+ bass, which
+  says nothing about how they sound — the ear weights 1–4 kHz far above 40 Hz. Every
+  number above is A-weighted for that reason. The un-weighted view is what hid the
+  autocannon being inaudible on a small speaker in the first place.
+- **A plain `HPF` shoulder runs to Nyquist.** The first version of the widened `crack`
+  used one, and added up to +11 dB above 6 kHz — a hiss, which is a different wrong sound
+  rather than a better one. It is bounded at both ends now.
+- **`` and `	` are escape characters.** Scripting an edit to these files in Python
+  turns `v[oom]` and `v[	ail]` into a backspace and a tab. Use raw strings.
+- **The determinism promise survived.** Four new noise UGens draw from the same
+  per-sound-seeded RNG, and a rebuild is still byte-identical — verified by re-rendering
+  and comparing hashes, not assumed.
 
 ---
 
@@ -338,7 +461,7 @@ audio/                                          the whole pipeline
   build.scd                                     discover, render, measure, report
   audition.scd                                  play live instead of rendering
   rf/engine.scd                                 recipe -> Score -> scsynth -> .wav
-  rf/voices.scd                                 shared DSP vocabulary (13 voices)
+  rf/voices.scd                                 shared DSP vocabulary (15 voices)
   sounds/*.scd                                  6 modules, 30 sounds
 unity/Assets/RF/Editor/ArtPipeline/
   SuperColliderAudioPipeline.cs                 Tools > IronFlag menu items

@@ -26,7 +26,7 @@ namespace IronFlag.Editing
     /// </remarks>
     /// <example>
     /// <code>
-    /// EditSelection under = LevelPick.At(level, LevelPick.GroundUnder(camera, mouse));
+    /// EditSelection under = LevelPick.At(level, LevelPick.GroundUnder(camera, mouse), mode);
     /// </code>
     /// </example>
     public static class LevelPick
@@ -53,19 +53,71 @@ namespace IronFlag.Editing
         public const float GripReach = 3.0f;
 
         /// <summary>
-        /// Returns what is under a point on the ground plane.
+        /// Returns what is under a point on the ground plane, ignoring nothing.
         /// </summary>
         /// <param name="level">The level to look in.</param>
         /// <param name="at">The point; its height is ignored.</param>
         /// <returns>What was hit, or <see cref="EditSelection.Nothing"/>.</returns>
         /// <remarks>
         /// Everything that stands on the map is tried before the ground it stands on, so a
-        /// depot on a shore selects the depot. Among the things that stand on it, the best
-        /// hit is the one that is furthest inside its <em>own</em> reach rather than the
+        /// depot on a shore selects the depot. The editor itself asks the overload that takes
+        /// an <see cref="EditorMode"/>, because on a real map the ground is under everything,
+        /// and "the prop wins" is no help at all to somebody trying to put a prop where the
+        /// ground already is - see <see cref="At(LevelDefinition, Vector3, EditorMode)"/>.
+        /// </remarks>
+        public static EditSelection At(LevelDefinition level, Vector3 at)
+        {
+            EditSelection standing = StandingAt(level, at);
+            return standing.IsSomething ? standing : LandAt(level, at);
+        }
+
+        /// <summary>
+        /// Returns what is under a point that the mouse, in one mode, is allowed to touch.
+        /// </summary>
+        /// <param name="level">The level to look in.</param>
+        /// <param name="at">The point; its height is ignored.</param>
+        /// <param name="mode">Which half of the map is being worked on.</param>
+        /// <returns>What was hit, or <see cref="EditSelection.Nothing"/>.</returns>
+        /// <remarks>
+        /// <para>
+        /// The whole point of a mode is here. In <see cref="EditorMode.Build"/> the ground is
+        /// not a candidate at all, so a click on the shore hits nothing and the tool in hand
+        /// puts something there; in <see cref="EditorMode.Land"/> the props are not candidates,
+        /// so a coastline can be dragged out from under a row of trees without picking one of
+        /// them up on the way.
+        /// </para>
+        /// <para>
+        /// A filter rather than a re-ordering, and the difference is the whole fix. An order
+        /// can only settle which of two things wins a click both of them are under, and the
+        /// one that loses is then unreachable everywhere the other one is. Taking it out of
+        /// the question entirely is what makes the other one reachable.
+        /// </para>
+        /// </remarks>
+        public static EditSelection At(LevelDefinition level, Vector3 at, EditorMode mode)
+        {
+            switch (mode)
+            {
+                case EditorMode.Land:
+                    return LandAt(level, at);
+                case EditorMode.Build:
+                    return StandingAt(level, at);
+                default:
+                    return At(level, at);
+            }
+        }
+
+        /// <summary>
+        /// Returns the thing standing on the map under a point, ignoring the ground.
+        /// </summary>
+        /// <param name="level">The level to look in.</param>
+        /// <param name="at">The point; its height is ignored.</param>
+        /// <returns>A bunker, tower or structure, or <see cref="EditSelection.Nothing"/>.</returns>
+        /// <remarks>
+        /// The best hit is the one furthest inside its <em>own</em> reach rather than the
         /// nearest in metres: a tree two metres from the cursor beats a bunker four metres
         /// from it, which is what the picture on screen says as well.
         /// </remarks>
-        public static EditSelection At(LevelDefinition level, Vector3 at)
+        public static EditSelection StandingAt(LevelDefinition level, Vector3 at)
         {
             if (level == null)
             {
@@ -108,7 +160,7 @@ namespace IronFlag.Editing
                 }
             }
 
-            return best.IsSomething ? best : LandAt(level, at);
+            return best;
         }
 
         /// <summary>

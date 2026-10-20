@@ -5,6 +5,7 @@ using UnityEngine;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Destruction;
+using IronFlag.Editing;
 using IronFlag.Levels;
 using IronFlag.Objective;
 using IronFlag.Vehicles;
@@ -45,6 +46,60 @@ namespace IronFlag.Tests.EditMode
             Assert.That(
                 LevelFile.TryRead(path, out level, out string problem), Is.True, problem);
         }
+
+        /// <summary>
+        /// Every rectangle and every prop on the shipped map is recorded as half of a
+        /// mirrored pair, so the map can be opened and worked on without going crooked: move
+        /// one end and the other follows.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The claim is that the file leaves nothing out. The tests above walk this map
+        /// checking that it is built exactly in halves, so anything on it standing opposite
+        /// its twin without a pair number is a relationship the file lost rather than a prop
+        /// that legitimately stands alone - and the first thing somebody moved would take the
+        /// map out of the symmetry every other test here insists on.
+        /// </para>
+        /// <para>
+        /// The pair numbers themselves were written by
+        /// <c>ShippedLevelPairing.PairUpShippedMaps</c>, which is the batch twin of the
+        /// editor\'s own button. This is what stops that migration being a thing somebody has
+        /// to remember to re-run after hand-editing the map.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void TheShippedMapKnowsWhichOfItsPropsAreEachOthers()
+        {
+            Assert.That(
+                LevelEdits.PairTheHalves(level),
+                Is.Zero,
+                "the shipped map has opposite numbers that the file does not record as pairs");
+
+            foreach (LevelLand piece in level.Land)
+            {
+                Assert.That(piece.Pair, Is.Not.Zero, $"{piece.Name} is in no pair");
+            }
+
+            foreach (LevelStructure prop in level.Structures)
+            {
+                Assert.That(
+                    prop.Pair,
+                    Is.Not.Zero,
+                    $"the {prop.Kind} at {prop.Position} is in no pair");
+            }
+
+            foreach (LevelTower tower in level.Towers)
+            {
+                Assert.That(
+                    tower.Pair, Is.Not.Zero, $"the {tower.Side} tower at {tower.Position} is in no pair");
+            }
+
+            foreach (LevelBunker bunker in level.Bunkers)
+            {
+                Assert.That(bunker.Pair, Is.Not.Zero, $"the {bunker.Side} bunker is in no pair");
+            }
+        }
+
 
         /// <summary>
         /// The map is playable at all: everything <see cref="LevelValidation"/> insists on.

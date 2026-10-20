@@ -76,6 +76,18 @@ namespace IronFlag.Levels
         [Tooltip("North edge, in metres.")]
         public float MaxZ;
 
+        /// <summary>
+        /// Which mirrored pair this belongs to, or zero for a thing that stands on its own.
+        /// </summary>
+        /// <remarks>
+        /// See <see cref="LevelStructure.Pair"/>, which carries the whole explanation. The
+        /// number means the same thing on all four kinds of placed thing and is drawn from
+        /// one supply across the whole file, so a pair id never appears twice in a level
+        /// meaning two different pairs.
+        /// </remarks>
+        [Tooltip("Which mirrored pair this belongs to. Zero for a piece of land that stands on its own.")]
+        public int Pair;
+
         /// <summary>Width of the rectangle, in metres.</summary>
         public float Width => MaxX - MinX;
 

@@ -113,6 +113,395 @@ namespace IronFlag.Tests.EditMode
             Assert.That(level.Structures[copy.Index].Team, Is.EqualTo(Team.None));
         }
 
+        /// <summary>
+        /// The whole feature, in one test. Mirroring makes a pair, and from then on the two
+        /// move as one thing - so a map drawn in halves stays drawn in halves while somebody
+        /// works on it rather than only at the moment they last pressed mirror.
+        /// </summary>
+        [Test]
+        public void MovingSomethingPairedMovesItsOppositeNumber()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            var picked = new EditSelection(EditTarget.Structure, placed);
+
+            EditSelection twin = LevelEdits.Mirror(level, picked);
+            Assert.That(twin.IsSomething, Is.True);
+
+            LevelEdits.MoveTo(level, picked, new Vector3(30.0f, 0.0f, -5.0f));
+
+            Assert.That(level.Structures[placed].Position.x, Is.EqualTo(30.0f).Within(0.001f));
+            Assert.That(level.Structures[placed].Position.z, Is.EqualTo(-5.0f).Within(0.001f));
+            Assert.That(
+                level.Structures[twin.Index].Position.x,
+                Is.EqualTo(-30.0f).Within(0.001f),
+                "the twin stayed where the first mirror put it");
+            Assert.That(
+                level.Structures[twin.Index].Position.z, Is.EqualTo(5.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// The bug the pairing was built for. Mirror, move the original, press mirror again:
+        /// what used to happen is that the first copy stayed where it was and a third prop
+        /// appeared, so the gesture that looked like "put this back in step" was the one that
+        /// broke the map. There is nothing to press twice now, because it never went out of
+        /// step.
+        /// </summary>
+        [Test]
+        public void MirroringSomethingThatAlreadyHasATwinMakesNothing()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            var picked = new EditSelection(EditTarget.Structure, placed);
+
+            LevelEdits.Mirror(level, picked);
+            LevelEdits.MoveTo(level, picked, new Vector3(30.0f, 0.0f, -5.0f));
+
+            Assert.That(
+                LevelEdits.Mirror(level, picked).IsSomething,
+                Is.False,
+                "mirroring a thing that already has an opposite number made a second one");
+            Assert.That(level.Structures.Length, Is.EqualTo(2));
+        }
+
+        /// <summary>
+        /// A twin faces half a turn round from the thing it belongs to. Two twins on the same
+        /// compass heading would be one facing the field and one facing its own back wall.
+        /// </summary>
+        [Test]
+        public void TurningSomethingPairedTurnsItsTwinTheOtherWayRound()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(10.0f, 0.0f, -20.0f), Team.Green);
+            var picked = new EditSelection(EditTarget.Structure, placed);
+            EditSelection twin = LevelEdits.Mirror(level, picked);
+
+            LevelEdits.SetYaw(level, picked, 30.0f);
+
+            Assert.That(level.Structures[placed].YawDegrees, Is.EqualTo(30.0f).Within(0.001f));
+            Assert.That(
+                level.Structures[twin.Index].YawDegrees, Is.EqualTo(210.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// Land is paired by its four edges rather than by a position, so a coastline pulled
+        /// about on one side is the same coastline on the other. Turning a box about the
+        /// origin turns its west edge into its east one, which is the arithmetic this is
+        /// really checking.
+        /// </summary>
+        [Test]
+        public void ResizingPairedLandResizesItsOppositeNumber()
+        {
+            var level = new LevelDefinition();
+            int drawn = LevelEdits.AddLand(
+                level, new Vector3(10.0f, 0.0f, 10.0f), new Vector3(30.0f, 0.0f, 40.0f), "Shore");
+            EditSelection twin = LevelEdits.Mirror(
+                level, new EditSelection(EditTarget.Land, drawn));
+
+            LevelEdits.SetLandEdges(level, drawn, 10.0f, 50.0f, 10.0f, 40.0f);
+
+            LevelLand across = level.Land[twin.Index];
+            Assert.That(across.MinX, Is.EqualTo(-50.0f).Within(0.001f));
+            Assert.That(across.MaxX, Is.EqualTo(-10.0f).Within(0.001f));
+            Assert.That(across.MinZ, Is.EqualTo(-40.0f).Within(0.001f));
+            Assert.That(across.MaxZ, Is.EqualTo(-10.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// A pair goes as one thing. Deleting only the end that was clicked would leave a map
+        /// that was symmetrical a moment ago with one unanswered prop on it, and nothing
+        /// would complain.
+        /// </summary>
+        [Test]
+        public void DeletingSomethingPairedTakesItsOppositeNumberToo()
+        {
+            var level = new LevelDefinition();
+            LevelEdits.AddStructure(level, StructureKind.BuildingA, new Vector3(1.0f, 0.0f, 1.0f));
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            var picked = new EditSelection(EditTarget.Structure, placed);
+            LevelEdits.Mirror(level, picked);
+            LevelEdits.AddStructure(level, StructureKind.BuildingB, new Vector3(2.0f, 0.0f, 2.0f));
+
+            Assert.That(LevelEdits.Remove(level, picked), Is.True);
+
+            Assert.That(level.Structures.Length, Is.EqualTo(2), "one end of the pair survived");
+            foreach (LevelStructure left in level.Structures)
+            {
+                Assert.That(
+                    left.Structure,
+                    Is.Not.EqualTo(StructureKind.Tree),
+                    "the wrong props were taken off the map");
+            }
+        }
+
+        /// <summary>
+        /// The per-item off switch, which is the reason a pair is held on each thing rather
+        /// than as one setting on the map: a map drawn in halves is still allowed the one
+        /// causeway that is deliberately on one side only.
+        /// </summary>
+        [Test]
+        public void UnpairingLetsBothEndsMoveOnTheirOwn()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            var picked = new EditSelection(EditTarget.Structure, placed);
+            EditSelection twin = LevelEdits.Mirror(level, picked);
+
+            Assert.That(LevelEdits.Unpair(level, picked), Is.True);
+            LevelEdits.MoveTo(level, picked, new Vector3(30.0f, 0.0f, -5.0f));
+
+            Assert.That(
+                level.Structures[twin.Index].Position.x,
+                Is.EqualTo(-10.0f).Within(0.001f),
+                "the twin followed something it had been unpaired from");
+            Assert.That(
+                LevelEdits.PairOf(level, twin),
+                Is.Zero,
+                "the far end still claimed to be in a pair");
+        }
+
+        /// <summary>
+        /// Both ends let go, so mirroring either one afterwards makes a fresh pair rather
+        /// than being refused by a number left behind on the twin.
+        /// </summary>
+        [Test]
+        public void SomethingUnpairedCanBeMirroredAgain()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            var picked = new EditSelection(EditTarget.Structure, placed);
+
+            LevelEdits.Mirror(level, picked);
+            LevelEdits.Unpair(level, picked);
+
+            Assert.That(LevelEdits.Mirror(level, picked).IsSomething, Is.True);
+            Assert.That(level.Structures.Length, Is.EqualTo(3));
+        }
+
+        /// <summary>
+        /// A pair is held as a number and not as an index, and this is the reason: deleting
+        /// anything shifts every index after it, and a stored index would then point at the
+        /// wrong prop with nothing to say so.
+        /// </summary>
+        [Test]
+        public void APairSurvivesTheThingsInFrontOfItBeingDeleted()
+        {
+            var level = new LevelDefinition();
+            int first = LevelEdits.AddStructure(
+                level, StructureKind.BuildingA, new Vector3(1.0f, 0.0f, 1.0f));
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            LevelEdits.Mirror(level, new EditSelection(EditTarget.Structure, placed));
+
+            LevelEdits.Remove(level, new EditSelection(EditTarget.Structure, first));
+
+            var moved = new EditSelection(EditTarget.Structure, placed - 1);
+            LevelEdits.MoveTo(level, moved, new Vector3(30.0f, 0.0f, -5.0f));
+
+            EditSelection twin = LevelEdits.TwinOf(level, moved);
+            Assert.That(twin.IsSomething, Is.True, "the pair was lost with the prop in front of it");
+            Assert.That(
+                level.Structures[twin.Index].Position.x, Is.EqualTo(-30.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// The twin of a green thing is a brown one, by definition of this game's mirror -
+        /// so handing one end of a pair to a side hands the other end to the other side.
+        /// Copying the side across would leave one player holding both emplacements of a
+        /// pair on a map that still looked symmetrical.
+        /// </summary>
+        [Test]
+        public void ChangingAPairedThingsSideGivesItsTwinTheOtherOne()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(10.0f, 0.0f, -20.0f), Team.Green);
+            var picked = new EditSelection(EditTarget.Structure, placed);
+            EditSelection twin = LevelEdits.Mirror(level, picked);
+
+            Assert.That(LevelEdits.SetSide(level, picked, Team.Brown), Is.True);
+
+            Assert.That(level.Structures[placed].Team, Is.EqualTo(Team.Brown));
+            Assert.That(level.Structures[twin.Index].Team, Is.EqualTo(Team.Green));
+        }
+
+        /// <summary>
+        /// A side must have exactly one real tower, and on a map built in pairs the two flags
+        /// belong on towers that are each other's. Promoting one end only leaves the other
+        /// side's flag on a pyramid somewhere else, on a map that still looks symmetrical.
+        /// </summary>
+        [Test]
+        public void PuttingTheFlagOnAPairedTowerPutsTheOtherFlagOnItsTwin()
+        {
+            var level = new LevelDefinition();
+            int real = LevelEdits.AddTower(level, Team.Green, new Vector3(-18.0f, 0.0f, -56.0f));
+            int decoy = LevelEdits.AddTower(level, Team.Green, new Vector3(18.0f, 0.0f, -56.0f));
+            LevelEdits.Mirror(level, new EditSelection(EditTarget.Tower, real));
+            EditSelection twin = LevelEdits.Mirror(
+                level, new EditSelection(EditTarget.Tower, decoy));
+
+            Assert.That(LevelEdits.MakeRealTower(level, decoy), Is.True);
+
+            Assert.That(level.Towers[decoy].HoldsTheFlag, Is.True);
+            Assert.That(
+                level.Towers[twin.Index].HoldsTheFlag,
+                Is.True,
+                "the brown flag stayed on the tower that is no longer green's opposite number");
+            Assert.That(level.Towers[real].HoldsTheFlag, Is.False);
+        }
+
+        /// <summary>
+        /// What a map written before pairs existed needs, and the only way the shipped maps
+        /// get any: everything on them already stands exactly opposite its twin, so this
+        /// records a relationship that is visibly there. It moves nothing.
+        /// </summary>
+        [Test]
+        public void PairingTheHalvesFindsEveryTwinOnASymmetricalMap()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+            foreach (LevelTower tower in level.Towers)
+            {
+                tower.Pair = 0;
+            }
+
+            foreach (LevelBunker bunker in level.Bunkers)
+            {
+                bunker.Pair = 0;
+            }
+
+            Vector3 before = level.Towers[0].Position;
+
+            Assert.That(LevelEdits.PairTheHalves(level), Is.EqualTo(3), "two tower pairs and a bunker pair");
+            Assert.That(level.Towers[0].Position, Is.EqualTo(before), "pairing moved something");
+            Assert.That(
+                LevelEdits.PairTheHalves(level),
+                Is.Zero,
+                "running it twice paired things that were already paired");
+        }
+
+        /// <summary>
+        /// And nothing on a map that is not symmetrical, because a pass that guesses wrong
+        /// welds two props together for the rest of the map's life.
+        /// </summary>
+        [Test]
+        public void PairingTheHalvesLeavesAnUnsymmetricalMapAlone()
+        {
+            var level = new LevelDefinition();
+            LevelEdits.AddStructure(level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            LevelEdits.AddStructure(level, StructureKind.Tree, new Vector3(-4.0f, 0.0f, 33.0f));
+            LevelEdits.AddLand(
+                level, new Vector3(-60.0f, 0.0f, -60.0f), new Vector3(-10.0f, 0.0f, 5.0f), "Shore");
+
+            Assert.That(LevelEdits.PairTheHalves(level), Is.Zero);
+        }
+
+        /// <summary>
+        /// Standing in the right place is not enough. A tree where a turret's opposite number
+        /// would be is not that turret's opposite number, and pairing them would make moving
+        /// the turret move a tree.
+        /// </summary>
+        [Test]
+        public void PairingTheHalvesNeverMarriesTwoDifferentThings()
+        {
+            var level = new LevelDefinition();
+            LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(10.0f, 0.0f, -20.0f), Team.Green);
+            LevelEdits.AddStructure(level, StructureKind.Tree, new Vector3(-10.0f, 0.0f, 20.0f));
+
+            Assert.That(LevelEdits.PairTheHalves(level), Is.Zero);
+        }
+
+        /// <summary>
+        /// Nor is being the same kind in the right place, when both belong to one player: a
+        /// pair is one side's thing and the other side's, and two green emplacements at
+        /// opposite ends of the map are one player with both of them.
+        /// </summary>
+        [Test]
+        public void PairingTheHalvesNeverMarriesTwoThingsBelongingToOneSide()
+        {
+            var level = new LevelDefinition();
+            LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(10.0f, 0.0f, -20.0f), Team.Green);
+            LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(-10.0f, 0.0f, 20.0f), Team.Green);
+
+            Assert.That(LevelEdits.PairTheHalves(level), Is.Zero);
+        }
+
+        /// <summary>
+        /// A new map opens on one that is already paired up, because it is already built in
+        /// pairs - so dragging the green bunker on a map nobody has touched moves brown's.
+        /// The two depots are deliberately not a pair: they stand at opposite points, but one
+        /// is a fuel dump and the other an ammunition dump.
+        /// </summary>
+        [Test]
+        public void ANewMapIsBuiltInPairsAndSaysSo()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+
+            var green = new EditSelection(EditTarget.Bunker, 0);
+            EditSelection brown = LevelEdits.TwinOf(level, green);
+            Assert.That(brown.IsSomething, Is.True, "a new map's two bunkers are not a pair");
+
+            LevelEdits.MoveTo(level, green, new Vector3(6.0f, 0.0f, -40.0f));
+            Assert.That(level.Bunkers[brown.Index].Position.x, Is.EqualTo(-6.0f).Within(0.001f));
+            Assert.That(level.Bunkers[brown.Index].Position.z, Is.EqualTo(40.0f).Within(0.001f));
+
+            for (int tower = 0; tower < level.Towers.Length; tower++)
+            {
+                Assert.That(
+                    LevelEdits.TwinOf(level, new EditSelection(EditTarget.Tower, tower)).IsSomething,
+                    Is.True,
+                    $"tower {tower} has no opposite number");
+            }
+
+            Assert.That(
+                LevelEdits.TwinOf(level, new EditSelection(EditTarget.Structure, 0)).IsSomething,
+                Is.False,
+                "the fuel dump was married to the ammunition dump");
+        }
+
+        /// <summary>
+        /// Pairs are part of the file rather than something the editor holds while it is
+        /// open, so a map saved half-edited comes back knowing which of its props are each
+        /// other's.
+        /// </summary>
+        [Test]
+        public void PairsSurviveBeingWrittenOutAndReadBack()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+            LevelDefinition reread = LevelEdits.Copy(level);
+
+            var green = new EditSelection(EditTarget.Bunker, 0);
+            Assert.That(LevelEdits.PairOf(reread, green), Is.EqualTo(LevelEdits.PairOf(level, green)));
+            Assert.That(LevelEdits.TwinOf(reread, green).IsSomething, Is.True);
+        }
+
+        /// <summary>
+        /// A pair number that ended up on one thing only - a hand-edited file, or half a pair
+        /// dropped by a build that had never heard of them - reads as unpaired rather than as
+        /// a broken map. Pairing is an editing annotation and no rule of play looks at it.
+        /// </summary>
+        [Test]
+        public void HalfAPairIsSimplyNotAPair()
+        {
+            var level = new LevelDefinition();
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(10.0f, 0.0f, -20.0f));
+            level.Structures[placed].Pair = 9;
+            var picked = new EditSelection(EditTarget.Structure, placed);
+
+            Assert.That(LevelEdits.TwinOf(level, picked).IsSomething, Is.False);
+            Assert.That(LevelEdits.Mirror(level, picked).IsSomething, Is.True, "it could not be mirrored");
+        }
+
+
         [Test]
         public void ANewMapIsPlayableBeforeAnybodyTouchesIt()
         {
@@ -215,10 +604,27 @@ namespace IronFlag.Tests.EditMode
             Assert.That(level.Towers[second].HoldsTheFlag, Is.False);
         }
 
+        /// <summary>
+        /// The demotion is scoped to the promoted tower's own side rather than sweeping the
+        /// map, which is what makes a side able to have exactly one real tower without the
+        /// other side losing its flag every time somebody moves theirs.
+        /// </summary>
+        /// <remarks>
+        /// The pairs are dropped first, deliberately. A new map is built in pairs and a
+        /// paired tower's promotion <em>does</em> carry across to its opposite number - that
+        /// is <see cref="PuttingTheFlagOnAPairedTowerPutsTheOtherFlagOnItsTwin"/>, and it is
+        /// what keeps the two flags on towers that are each other's. This is the rule
+        /// underneath it, which four towers answering for themselves is the only way to see.
+        /// </remarks>
         [Test]
         public void MakingATowerRealDemotesTheOthersOnItsSideAndLeavesTheOtherSideAlone()
         {
             LevelDefinition level = LevelEdits.Starter("Test Map");
+            foreach (LevelTower unpaired in level.Towers)
+            {
+                unpaired.Pair = 0;
+            }
+
             List<LevelTower> green = level.TowersFor(Team.Green);
             List<LevelTower> brown = level.TowersFor(Team.Brown);
 
@@ -232,6 +638,31 @@ namespace IronFlag.Tests.EditMode
                 Is.True,
                 "promoting a green tower moved the brown flag");
             Assert.That(LevelValidation.Problems(level), Is.Empty);
+        }
+
+        /// <summary>
+        /// Placing a second bunker for a side is a <em>move</em> of the one it has, so on a
+        /// map built in pairs it moves the other side's too. The bunker tool would otherwise
+        /// be the one gesture on the map that quietly breaks a pair - and on a two-bunker map
+        /// that is the whole symmetry gone in one click.
+        /// </summary>
+        [Test]
+        public void PlacingASecondBunkerForAPairedSideMovesBothOfThem()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+            var green = new EditSelection(EditTarget.Bunker, 0);
+            EditSelection brown = LevelEdits.TwinOf(level, green);
+            Assert.That(brown.IsSomething, Is.True);
+
+            LevelEdits.AddBunker(level, level.Bunkers[0].Side, new Vector3(20.0f, 0.0f, -30.0f));
+
+            Assert.That(
+                level.Bunkers[green.Index].Position,
+                Is.EqualTo(new Vector3(20.0f, 0.0f, -30.0f)));
+            Assert.That(
+                level.Bunkers[brown.Index].Position,
+                Is.EqualTo(new Vector3(-20.0f, 0.0f, 30.0f)),
+                "the other side's bunker stayed where it was");
         }
 
         /// <summary>
@@ -508,6 +939,124 @@ namespace IronFlag.Tests.EditMode
             Assert.That(
                 LevelPick.At(level, new Vector3(far, 0.0f, far)),
                 Is.EqualTo(EditSelection.Nothing));
+        }
+
+        /// <summary>
+        /// The build mode cannot find the ground at all, and that is the whole fix for the
+        /// editor's worst gesture: on a finished map the island covers every point worth
+        /// building on, so an unfiltered pick answered "the shore" to every click meant to
+        /// place something - and the click became a drag of the coastline.
+        /// </summary>
+        /// <remarks>
+        /// A filter rather than a re-ordering, and the difference is the point. Props already
+        /// beat land and it did not help, because an order only settles which of two things
+        /// wins a click both of them are under: the loser is unreachable everywhere the
+        /// winner is, and here the loser was the thing being placed.
+        /// </remarks>
+        [Test]
+        public void TheBuildModeCannotFindTheGround()
+        {
+            var level = new LevelDefinition { Bounds = new LevelBounds() };
+            LevelEdits.AddLand(
+                level, new Vector3(-40.0f, 0.0f, -40.0f), new Vector3(40.0f, 0.0f, 40.0f), "Shore");
+            int tree = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(4.0f, 0.0f, 4.0f));
+
+            var bare = new Vector3(20.0f, 0.0f, 20.0f);
+            Assert.That(
+                LevelPick.At(level, bare).Target,
+                Is.EqualTo(EditTarget.Land),
+                "the shore is not where this test thinks it is");
+            Assert.That(
+                LevelPick.At(level, bare, EditorMode.Build),
+                Is.EqualTo(EditSelection.Nothing),
+                "a click on bare shore found the shore, so it would have dragged it");
+
+            Assert.That(
+                LevelPick.At(level, new Vector3(4.2f, 0.0f, 4.1f), EditorMode.Build),
+                Is.EqualTo(new EditSelection(EditTarget.Structure, tree)),
+                "the build mode stopped finding the things it is for");
+        }
+
+        /// <summary>
+        /// The land mode cannot find what is standing on the ground, so a coastline can be
+        /// dragged out from under a row of trees without picking one of them up on the way.
+        /// </summary>
+        [Test]
+        public void TheLandModeCannotFindWhatIsStandingOnIt()
+        {
+            var level = new LevelDefinition { Bounds = new LevelBounds() };
+            int shore = LevelEdits.AddLand(
+                level, new Vector3(-40.0f, 0.0f, -40.0f), new Vector3(40.0f, 0.0f, 40.0f), "Shore");
+            LevelEdits.AddStructure(level, StructureKind.Tree, new Vector3(4.0f, 0.0f, 4.0f));
+
+            var under = new Vector3(4.2f, 0.0f, 4.1f);
+            Assert.That(
+                LevelPick.At(level, under).Target,
+                Is.EqualTo(EditTarget.Structure),
+                "the tree is not where this test thinks it is");
+
+            Assert.That(
+                LevelPick.At(level, under, EditorMode.Land),
+                Is.EqualTo(new EditSelection(EditTarget.Land, shore)),
+                "the tree was picked up while shaping land");
+        }
+
+        /// <summary>
+        /// Every tool belongs to exactly one mode, and every mode opens on a tool of its own.
+        /// Those two facts together are what let the mode be read off the tool in hand rather
+        /// than stored in a second field that can come to disagree with the first.
+        /// </summary>
+        [Test]
+        public void EveryToolHasAModeAndEveryModeOpensOnOneOfItsOwnTools()
+        {
+            foreach (EditTool tool in System.Enum.GetValues(typeof(EditTool)))
+            {
+                Assert.That(
+                    EditorModes.Of(tool) == EditorMode.None,
+                    Is.EqualTo(tool == EditTool.None),
+                    $"{tool} belongs to no mode, or the empty tool was given one");
+            }
+
+            foreach (EditorMode mode in System.Enum.GetValues(typeof(EditorMode)))
+            {
+                if (mode == EditorMode.None)
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    EditorModes.Of(EditorModes.DefaultToolOf(mode)),
+                    Is.EqualTo(mode),
+                    $"the {mode} mode opens on a tool that belongs to the other one");
+                Assert.That(
+                    EditorModes.Other(mode),
+                    Is.Not.EqualTo(mode),
+                    $"switching away from {mode} arrives back at it");
+            }
+        }
+
+        /// <summary>
+        /// A mode reaches only its own half of the map, and in both directions - which is what
+        /// stops Delete taking out a coastline while turrets are being placed.
+        /// </summary>
+        [Test]
+        public void AModeReachesOnlyItsOwnHalfOfTheMap()
+        {
+            Assert.That(EditorModes.Reaches(EditorMode.Land, EditTarget.Land), Is.True);
+            Assert.That(EditorModes.Reaches(EditorMode.Land, EditTarget.Structure), Is.False);
+            Assert.That(EditorModes.Reaches(EditorMode.Land, EditTarget.Tower), Is.False);
+            Assert.That(EditorModes.Reaches(EditorMode.Land, EditTarget.Bunker), Is.False);
+
+            Assert.That(EditorModes.Reaches(EditorMode.Build, EditTarget.Land), Is.False);
+            Assert.That(EditorModes.Reaches(EditorMode.Build, EditTarget.Structure), Is.True);
+            Assert.That(EditorModes.Reaches(EditorMode.Build, EditTarget.Tower), Is.True);
+            Assert.That(EditorModes.Reaches(EditorMode.Build, EditTarget.Bunker), Is.True);
+
+            // Nothing selected is legal in either, and is the state a mode change leaves
+            // behind when it lets go of a selection the new mode cannot hold.
+            Assert.That(EditorModes.Reaches(EditorMode.Land, EditTarget.None), Is.True);
+            Assert.That(EditorModes.Reaches(EditorMode.Build, EditTarget.None), Is.True);
         }
 
         /// <summary>
