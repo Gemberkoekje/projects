@@ -3,8 +3,9 @@
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
 through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
-seventeen slices in §10 (**M1 plan**); M1.1–M1.7 (iteration tools, astronomy, the spectral atmosphere, aerial
-perspective, sun and sky importance sampling, OIDN denoising, GPU erosion) are done, M1.8 (watch mode) is next. It sits
+seventeen slices in §10 (**M1 plan**); M1.1–M1.8 (iteration tools, astronomy, the spectral atmosphere, aerial
+perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode) are done, M1.9 (the view-dependent
+terrain mesh) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -906,6 +907,7 @@ Work stops after each PR for review.
 | M1.5 | 0.22 | 2.81 | 2.17 | 3.62 |
 | M1.6 | 0.22 | 2.81 | 2.17 | 3.62 |
 | M1.7 | 0.17 | 3.62 | 2.20 | 3.94 |
+| M1.8 | 0.17 | 3.62 | 2.20 | 3.94 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -935,6 +937,8 @@ rendered alternately, view by view, three rounds; median ratios 0.751, 1.288, 1.
 0.980–1.034, 1.022–1.093). The aerial view's +29% is terrain where M1.6 showed the grid's edge (13% of its frame lies beyond the
 grid now, 21.5% before); the down-slope view's +9% the eroded ground under a low sun. The sky view's −25% is not explained: it traces
 one camera ray per sample on both builds, and the terrain's height range only picks the sky-view slice; it is 0.06 ns a sample.
+M1.8 changes no pixel and no line of the integrator, so its row is M1.7's: the four ledger views and a golden-hour view with every
+debug output (640 px, 16 spp) rendered by `main` (b96f2e57) and by this slice are byte-identical, PNG and EXR, sixteen files.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -2108,6 +2112,149 @@ channels are short: 1500 steps do not carry rain across a whole catchment, so M3
 - *Verify:* 3070: a scripted change sequence (exposure → time of day → camera → seed) rebuilds
   exactly the expected stages, and each watch render is bit-identical to a cold CLI render of the
   same files; the wall time per change is recorded.
+
+*M1.8 status (2026-10-20): done.* Every deliverable and check is met; nothing in `RayTracer.Core` / `RayTracer.Gpu` changed, and
+neither did the integrator or any pixel. `Vista.Tests` has 560 tests (533 before); `--gpu-selftest` passes with 3 new checks (46 in
+all, its check of the driver against the default erosion cache included, now that the cache holds seed 42). There
+are no slider files yet (M1.11 makes them): the watch reads the recipe, the camera and an **options file**, a text file of
+`--preview` options through which the seed and everything else outside the recipe and the camera change.
+
+*Checks (on the RTX 3070, driver 32.0.16.1664; `nvidia-smi` read 31–95% from other programs throughout):*
+
+- **The scripted sequence** (`--watch-check`, `vista-views/watch/render.ps1`): a real `--watch` process on copies of the day recipe
+  and the aerial camera, changed as a person or an agent would — the exposure, the time of day, a camera turn, a camera move, the
+  base altitude, the seed (in the options file) and the seed back — each file saved whole and moved over the old one, as editors
+  do. After each render the sidecar must list exactly the stages that change touches, as built, and every other one as reused;
+  then each step is rendered again by a cold `--preview` process of the same files and compared byte for byte. Every step passed
+  in all five runs (three at 640 px with every debug output and the denoised image, 10 files per step bit-identical; two at 320 px,
+  the PNG and the EXR). The wall time per change, from `render.ps1`'s run ("save to files" is from the file's move to the watch's
+  line, so it includes the poll and the settling):
+
+  | Change | Built (the denoised image too at 640 px) | 640 px: run | 640 px: save to files | 320 px: run | 320 px: save to files | Cold `--preview` (640 / 320 px) |
+  |---|---|---|---|---|---|---|
+  | First render | every stage | 28.44 s (seed 42 eroded) | 29.86 s from start | 3.57 s (cached) | 5.33 s from start | 6.03 / 5.46 s |
+  | Exposure +1 EV | nothing | 0.53 s | 0.70 s | 0.06 s | 0.25 s | 5.99 / 5.07 s |
+  | Time of day: goldenHour | skyView, skyDistribution, render, exposureMeter | 0.58 s | 0.76 s | 0.20 s | 0.37 s | 6.24 / 5.10 s |
+  | Camera turn: yaw +20° | render, exposureMeter | 0.48 s | 0.65 s | 0.13 s | 0.31 s | 6.07 / 5.06 s |
+  | Camera move: 500 m up | skyView, skyDistribution, render, exposureMeter | 0.54 s | 0.71 s | 0.16 s | 0.33 s | 6.56 / 5.45 s |
+  | Base altitude: 3000 m | scatteringOrders, skyView, skyDistribution, render, exposureMeter | 1.57 s | 1.74 s | 1.29 s | 1.47 s | 6.23 / 5.21 s |
+  | Seed 42 → 7 (options file) | world, mesh, accelerationStructure, skyView, skyDistribution, render, exposureMeter | 31.46 s (eroded) | 31.63 s | 1.94 s (cached) | 2.12 s | 6.16 / 5.02 s |
+  | Seed 7 → 42 | the same | 3.44 s (cached) | 3.61 s | 1.83 s | 2.02 s | 6.07 / 5.06 s |
+
+  At 640 px every render writes the beauty, the EXR, six debug images and the denoised pair (CUDA); at 320 px the beauty and the
+  EXR. The 640 px run eroded both seeds into a fresh cache; the 320 px run found them there.
+
+  A cold `--preview` takes 5–6 s (process start, device, shaders, the world from the cache, the mesh and its BLAS, the LUTs). In a
+  watch, a new seed costs its world from the cache, its mesh and its BLAS, about 2 s (3.4 s while the GPU was busiest), or, the
+  first time, its erosion too (about 30 s); a change of the base altitude rebuilds the scattering orders (0.95 s of GPU); every
+  other change takes a fraction of a second, most of it writing files at 640 px. An exposure change renders nothing.
+- **Partial rebuilds render as full ones** (`--gpu-selftest`, new): on one renderer, after a change of the time of day, of the
+  camera's height and of the base altitude, the render that rebuilt only the sky view and the sky distribution (and, for the
+  altitude, the scattering orders) is bit-identical to the same view rendered after `ForgetAtmosphere`, and each reports
+  rebuilding exactly those parts.
+- **No pixel moved:** the four ledger views and a golden-hour view with every debug output, rendered by `main` (b96f2e57) and by this
+  slice at 640 px, 16 spp, are byte-identical (16 files). A four-cell sheet varying `camera.exposureEv` renders once and
+  re-exposes three times.
+- **By hand:** `--watch` in a terminal re-renders on a camera save (exposure 0.05 s), an options-file `--time dusk` (0.19 s), and
+  reports a broken recipe with its path and keeps watching.
+- **CI:** 560 tests. The session: one-shot and dry runs build every stage that applies; a sequence of eleven changes in one session
+  rebuilds exactly each change's stages and writes, after each, the same PNG and EXR as a cold render of the same request (the
+  fake renderer's image depends on what the real one reads, so a stale reuse would show); the exposure re-exposes without
+  rendering; fewer debug outputs reuse the render and more render again; the denoised image is reused until the render or the
+  settings change, and a failed one is tried again; a failing request leaves the session as it was; the render key covers every
+  field of `VistaScene` (by reflection); schema 9 reads back. The watch: the first poll renders, a change waits to settle, edits in a
+  row are one render, a save without a change renders nothing, the options file changes the seed and overrides the command line
+  (and a removed line restores it), a broken file is reported once with its path, bad or forbidden options are reported, a missing
+  file is waited for, another camera is watched instead, `Run` stops when cancelled; the field-by-field change list; the command
+  line, the options file's syntax and the merge.
+
+*M1.8 decisions taken in code (revisit freely):*
+
+- **Stages are reused by what they read, not by which file changed.** `PreviewSession` keys each of its stages on its inputs: the
+  world on the terrain profile, seed, grid and erosion (`WorldCache`); the mesh on the world instance (M1.9 adds the camera); the
+  render on everything the renderer reads; the exposure meter on the same at its own size; the denoised image on the render, the
+  settings and the input scale. The renderer keeps the device, the BLAS and the air and reports what it rebuilt
+  (`RenderStageKeys`). So a change rebuilds what it touches in whichever file it arrives, a file saved unchanged (or only
+  reformatted, or only renamed in the recipe) rebuilds nothing, and a sheet's cells share a session and get the same reuse.
+- **The air's three parts are rebuilt and reported separately:** the wavelength tables and the columns LUT follow the model; the
+  scattering orders also the base altitude; the sky view (43 ms GPU) and the sky distribution (6 ms) also the sun, the camera's
+  altitude and the terrain's span. A turn of the camera rebuilds none of them; a move, the time of day or a new seed only the
+  last two.
+- **The exposure is display only.** The render key zeroes the camera's exposure, so changing it re-exposes the kept render and
+  meter. The meter's key leaves out the size and the loupe (it always renders the whole frame at 320 px), so changing them renders
+  the image but not the meter. A render that made more debug outputs than are asked for now is reused (asking for fewer never
+  changes the beauty, M0). The denoiser's input scale is the meter's, not the exposure's, so the denoised image survives an
+  exposure change.
+- **The render key is everything the renderer reads:** the scene without its recipe and seed (the renderer reads them only through
+  the world, the sun, the materials and the base altitude, which are in the key) and with the exposure zeroed, plus the settings.
+  Worlds, meshes and lists compare by instance, so a scene built afresh can cost a render but never reuse a wrong one. A test
+  enumerates `VistaScene`'s fields: a new one (M1.11's sliders, M1.12's materials) must join the key or the excluded list.
+- **One world is kept, not several.** A seed seen before comes back from the erosion cache on disk in about 1.8 s all told (the read,
+  the mesh, the upload and the BLAS); a second full-grid mesh would hold another 805 MB of memory, and the renderer keeps one BLAS
+  anyway.
+- **The files are polled by content** every 50 ms and acted on once they have read the same for 100 ms, rather than with
+  `FileSystemWatcher`: an editor's save in several writes or by rename, and several files saved together, are one render. A missing
+  or locked file is waited for (said after a second); a file that does not parse, or options that do not make a preview, are
+  reported once with the file's path while the watch goes on, and the next render's changes are named against the last image.
+- **The options file** holds `--preview` options as on a command line (`#` comments, double quotes); its values override the command
+  line's, its flags add, and a line taken out gives the command line's value back. The seed lives there, so a script or an agent
+  drives the whole session by editing files; the console only takes `quit` (or Ctrl+C, which stops after the render in progress).
+  `--dry-run` is fixed at the start (a dry-run watch needs no GPU). M1.11's slider file joins the files the request names.
+- **The denoiser keeps the CPU default.** M1.6 suggested CUDA for watch previews, but a watch render must equal a cold `--preview`
+  of the same options; `--denoise-device cuda` in the options file is the way to it.
+- **Sidecar schema 9:** `stages` on every sidecar (the stages built and the stages reused, in pipeline order; a dry run has only the
+  world and the mesh), `watch` on a watch render's (its number, the changes as `camera.exposureEv: 0 → 1` or `--seed: 42 → 7`, the
+  settling wait and the run's wall time). The kind stays `preview`.
+- **A height field computes its range and hash once.** They were recomputed on every access: the lowest and highest point four
+  times a render and a byte-wise hash of 67 MB for the sidecar, about a quarter of a second per watch render on the full grid.
+- **Parse errors name the file**, in `--preview` too: several files are watched, and the parser's message alone does not say which.
+- **A render runs to the end** before the next change is looked at; a preview takes 0.05–2 s. The window's progressive preview
+  (M1.16) will want to cancel between dispatches.
+
+*M1.8 gotchas:*
+
+- **File writing is most of an exposure change** at 640 px with every debug output: eight PNGs at optimal deflate and two EXRs take
+  0.2–0.5 s, though only the beauty and the denoised PNG change. Skipping rewrites of identical files would need the session to
+  trust that nobody touched them; at the default 320 px without debug outputs the write is a few tens of milliseconds.
+- **The default erosion cache was empty** on this machine (M1.7 measured in scratch caches), so the first watch eroded for 19 s.
+  `vista-views/watch/render.ps1` erodes into a cache under `-Out`; `--watch-check` alone uses the user's (its children inherit
+  `VISTA_WORLD_CACHE`).
+- **A worktree of the whole repository under the scratch folder fails** (`Filename too long`, from TheCuratool's vault): build `main`
+  for a comparison in a short path such as `C:\git\projects-vista-main`.
+- **A background reader of the console ends at once when there is no console** (stdin redirected from NUL): that is fine, Ctrl+C
+  and the process's end still stop the watch; it must never be what stops it.
+
+**M1.8 hand-off.** To understand M1.8, start by reading `Vista.Core/Cli/PreviewSession.cs` (the stages and their keys), then
+`Vista.Core/Cli/PreviewWatch.cs` (polling, settling, the change list), then `Vista.App/Gpu/WatchCheck.cs` (the scripted check).
+The M1.16 window drives a `PreviewSession` directly.
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --watch --recipe r.json --camera c.json --out p.png [--options o.txt] [any --preview option]
+dotnet run --project Vista.App -c Release -- --watch-check [--recipe r.json] [--camera c.json] [--seed 42] [--second-seed 7]
+    [--width 640] [--spp 64] [--debug all] [--denoise [--denoise-device cuda]] [--out folder]
+powershell -ExecutionPolicy Bypass -File vista-views/watch/render.ps1 [-Spp 64] [-Out folder]
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/Cli/PreviewSession.cs` | The preview's stages, kept and keyed (the old `PreviewPipeline.Run` body) |
+| `Vista.Core/Cli/PreviewPipeline.cs`, `SheetPipeline.cs` | A one-shot session; a sheet's cells share one |
+| `Vista.Core/Cli/WatchCommandLine.cs`, `PreviewWatch.cs` | `--watch` and its options file; polling, settling, the change list |
+| `Vista.Core/World/WorldCache.cs`, `HeightField.cs` | Says whether it reused; range and hash computed once |
+| `Vista.Core/Rendering/RenderTypes.cs` | `RenderStageKeys`: what a renderer reports it rebuilt |
+| `Vista.Core/Output/Sidecar.cs` | Schema 9: `stages`, `watch` |
+| `Vista.App/Gpu/D3D12VistaRenderer*.cs` | The air's parts reported separately |
+| `Vista.App/Program.cs`, `Gpu/WatchCheck.cs`, `Gpu/GpuSelfTest.cs` | The watch loop, `--watch-check`, the partial-rebuild checks |
+| `vista-views/watch/render.ps1`, `vista-views/README.md` | The M1.8 checks |
+| `Vista.Tests/PreviewSessionTests.cs`, `PreviewWatchTests.cs`, `WatchCommandLineTests.cs`, `FakeRenderer.cs` | 27 new tests; the fake keeps and reports stages and can make its image depend on the scene |
+
+**Next: M1.9** (the view-dependent terrain mesh). Its mesh follows the camera, so the mesh stage's key gains the camera
+(`WorldCache.Mesh`): a camera turn will then rebuild the mesh and the BLAS where M1.8 rebuilds only the render, which is what M1.9's
+build-time measurement has to keep small.
 
 **M1.9 — View-dependent terrain mesh.**
 - *Goal:* final-resolution terrain detail inside the VRAM budget (§4.3, §7.1).
