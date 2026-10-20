@@ -172,8 +172,8 @@ public static class DebugImages
 
     /// <summary>
     /// The erosion maps over a grey hillshade of the eroded surface, top-down with north up like <see cref="HeightMap"/>: loose
-    /// material in tan (full at 30 m and more, on a log scale), the mean discharge in blue (log scale from the grid's median, none, to
-    /// its 99.9th percentile, full), water still standing at the end deeper than 0.5 m in dark blue. At most <paramref name="maxSize"/> pixels a
+    /// material in tan (full at 30 m and more, on a log scale), the mean discharge in blue where it is in the grid's top tenth (log
+    /// scale from the 90th percentile, none, to the 99.9th, full: the channel network), water still standing at the end deeper than 0.5 m in dark blue. At most <paramref name="maxSize"/> pixels a
     /// side (nearest samples).
     /// </summary>
     public static (byte[] Rgb, int Size) ErosionMap(ErosionResult result, CameraSpec? camera, int maxSize = 1024)
@@ -184,7 +184,7 @@ public static class DebugImages
         double step = (field.Size - 1) / (double)Math.Max(size - 1, 1);
         float[] sorted = (float[])result.Discharge.Clone();
         Array.Sort(sorted);
-        double noDischarge = Math.Log(Math.Max(sorted[(sorted.Length - 1) / 2], 1e-6f));
+        double noDischarge = Math.Log(Math.Max(sorted[(int)((sorted.Length - 1) * 0.9)], 1e-6f));
         double fullDischarge = Math.Log(Math.Max(sorted[(int)((sorted.Length - 1) * 0.999)], 2e-6f)) - noDischarge;
         double fullLoose = Math.Log(1.0 + 30.0);
         var bytes = new byte[size * size * 3];

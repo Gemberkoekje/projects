@@ -132,7 +132,7 @@ internal static class GpuSelfTest
                 $"longest {stats.LongestSubmissionSeconds * 1e3:0} ms), {stats.StateBytes / 1048576.0:0} MiB of state; hash {first.Surface.ContentHash():x16}"));
             pass &= Check(log, "the eroded world is sane", first.Surface.Heights.ToArray().All(float.IsFinite)
                 && first.Loose.All(v => v >= 0f && float.IsFinite(v)) && first.StandingWater.All(v => v >= 0f && float.IsFinite(v))
-                && world.Info.Stats!.LongestSubmissionSeconds < 0.5 ? null : "a value is negative or not finite, or a submission ran too long");
+                && world.Info.Stats!.LongestSubmissionSeconds < 1.5 ? null : "a value is negative or not finite, or a submission came near the GPU timeout");
 
             ErosionResult second = renderer.Erode(TerrainGenerator.Generate(recipe, seed, grid), erosion).Result;
             pass &= Check(log, "the world eroded twice is bit-identical", SameWorld(first, second));

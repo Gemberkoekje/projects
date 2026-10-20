@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Reflection;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.World;
@@ -17,7 +16,7 @@ namespace Vista.App.Gpu;
 ///                             [--sight-lines c1.json,c2.json [--sight-grids 1025x16,1025x32]]
 /// </code>
 /// <c>--sight-lines</c> first measures what each camera sees on the base terrain of each grid's extent (<see cref="SightLines"/>):
-/// how much is terrain, sky, or beyond the grid, and how far the terrain is; <c>--seeds ""</c> stops there.
+/// how much is terrain, sky, or beyond the grid, and how far the terrain is, and stops there unless <c>--seeds</c> is given too.
 /// </summary>
 internal static class ErosionMeasure
 {
@@ -35,8 +34,9 @@ internal static class ErosionMeasure
     {
         string? recipePath = null, outDir = null;
         var seeds = new List<ulong> { 42 };
+        bool seedsGiven = false;
         WorldGrid grid = WorldGrid.Default;
-        var overrides = new List<(PropertyInfo Property, string Value)>();
+        var overrides = new List<string>();
         bool parity = false;
         List<string>? sightLines = null;
         var sightGrids = new List<WorldGrid> { new(1025, 16.0), new(1025, 32.0) };
@@ -54,6 +54,7 @@ internal static class ErosionMeasure
                     sightGrids = Next().Split(',').Select(g => g.Split('x')).Select(p => new WorldGrid(int.Parse(p[0], CultureInfo.InvariantCulture), double.Parse(p[1], CultureInfo.InvariantCulture))).ToList();
                     break;
                 case "--seeds":
+                    seedsGiven = true;
                     seeds = Next().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => ulong.Parse(s, CultureInfo.InvariantCulture)).ToList();
                     break;
                 case "--grid":
@@ -61,9 +62,7 @@ internal static class ErosionMeasure
                     grid = new WorldGrid(int.Parse(parts[0], CultureInfo.InvariantCulture), double.Parse(parts[1], CultureInfo.InvariantCulture));
                     break;
                 case "--set":
-                    string[] kv = Next().Split('=', 2);
-                    PropertyInfo property = typeof(ErosionSettings).GetProperty(kv[0]) ?? throw new ArgumentException($"No erosion setting '{kv[0]}'.");
-                    overrides.Add((property, kv[1]));
+                    overrides.Add(Next());
                     break;
                 default:
                     log.WriteLine($"Unknown argument '{arg}'.");
@@ -73,14 +72,8 @@ internal static class ErosionMeasure
         }
         Recipe recipe = recipePath is null ? new Recipe { SetPieces = [SetPiece.AlpineRange] } : VistaJson.ParseRecipe(File.ReadAllText(recipePath));
         ErosionSettings settings = ErosionSettings.For(TerrainProfile.For(recipe.SetPieces));
-        foreach ((PropertyInfo property, string value) in overrides)
-        {
-            ErosionSettings copy = settings with { };
-            property.SetValue(copy, property.PropertyType == typeof(int)
-                ? int.Parse(value, CultureInfo.InvariantCulture)
-                : float.Parse(value, CultureInfo.InvariantCulture));
-            settings = copy;
-        }
+        if (overrides.Count > 0)
+            settings = settings.With(string.Join(';', overrides));
         if (outDir is not null)
             Directory.CreateDirectory(outDir);
 
@@ -99,7 +92,7 @@ internal static class ErosionMeasure
                         $"(median / 90% / 99%), {100 * st.FartherThan(8000):0}% beyond 8 km, {100 * st.FartherThan(16000):0}% beyond 16 km"));
                 }
             }
-            if (seeds.Count == 0)
+            if (!seedsGiven)
                 return 0;
         }
 

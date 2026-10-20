@@ -34,7 +34,7 @@ Run $App @('--erosion-measure', '--parity', '--recipe', $golden, '--seeds', $See
 # What the views see, by the grid's extent.
 $cameras = @('aerial.camera.json', 'default.camera.json', 'down-slope.camera.json', 'aerial\layered-ridges.camera.json',
     'atmosphere\range.camera.json', 'atmosphere\toward-sun.camera.json') | ForEach-Object { Join-Path $views $_ }
-Run $App @('--erosion-measure', '--recipe', $golden, '--sight-lines', ($cameras -join ','), '--sight-grids', '1025x16,1025x32,2049x32', '--seeds', '')
+Run $App @('--erosion-measure', '--recipe', $golden, '--sight-lines', ($cameras -join ','), '--sight-grids', '1025x16,1025x32,2049x32')
 
 # Four seeds from the aerial camera: before (main), not eroded, eroded. Labels hold no commas: --labels is a comma-separated list.
 $tiles = @()
