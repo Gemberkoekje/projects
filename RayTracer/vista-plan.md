@@ -891,11 +891,17 @@ Work stops after each PR for review.
 | M0 | 0.24 | 0.70 | 0.88 | 1.32 |
 | M1.1 | 0.24 | 0.73 | 0.87 | 1.31 |
 | M1.2 | 0.24 | 0.68 | 0.83 | 1.26 |
+| M1.3 | 0.22 | 2.18 | 1.49 | 2.30 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
 M1.2 moves the sun but adds no work: a second run gave 0.24, 0.69, 0.84, 1.28, and the views trace 1.00,
 2.42, 2.29 and 3.23 rays per sample (the low sun now casts other shadows on the down-slope view).
+M1.3 traces the same rays per sample as M1.2 (1.00, 2.42, 2.29, 3.23); a second run gave 0.22, 2.17, 1.42 and
+2.00. The 1.7–3× on terrain is the atmosphere's lookups: every sun shadow ray now reads the columns LUT (four
+float4 loads and four exponentials), and every ray that leaves the terrain after a bounce reads two sky-view slices
+(32 float2 loads for its four wavelengths). Camera rays read one slice, so the sky view got no dearer. The exposure
+meter (a 320 px render, §M1.3 decisions) is not in these numbers; it costs about 1/150 of a 4K frame.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -1163,6 +1169,187 @@ dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 -
   percent). A sun-elevation sheet from −6° to +10° shows the red sun, the Earth's shadow and the
   Belt of Venus. Peaks stay lit red after the valley floor's sunset, from transmittance alone. The
   self-test covers the LUT build.
+
+*M1.3 status (2026-10-20): done.* Every deliverable and check is met; nothing in `RayTracer.Core` /
+`RayTracer.Gpu` changed. `Vista.Tests` has 433 tests (388 before; the M0 `SkyLight` and its tests are gone). One
+deviation from the deliverable as written: the multiple scattering is not Hillaire's. His isotropic Ψ_ms was built,
+measured against the reference and replaced by Bruneton 2017's iterated scattering orders, because it missed the
+target by a factor of two to four (decisions below). Transmittance and sky view stay in Hillaire's style.
+
+*Checks (on the RTX 3070 unless noted):*
+
+- **CI, against published values:** the Rayleigh zenith depth at 550 nm is 0.0969, from the refractive index of
+  air (Peck & Reeder 1972), the King factor (Bates 1984) and the standard atmosphere's column, against the tabulated
+  0.0973 (Bodhaine et al. 1999, Bucholtz 1995); the ozone cross-section on the engine's grid peaks at 606 nm (the
+  Chappuis band), 0.040 at 602 nm for 300 DU. The integrands: zenith columns against the exact integral, sampled
+  transmittance against a 20 000-step integral down to the horizon (0.5%), the single-scattering sky against a
+  brute-force march (1%), the phase functions' integrals, the 4D maps round trip, a uniform field's density (each
+  phase's integral, 1) and a uniform sky's irradiance (π).
+- **Self-test:** the LUT build is bit-identical twice; texels of every GPU kernel (columns, direct and order-1 ground
+  irradiance, 4D single scattering, order-2 density, order-2 radiance, ground irradiance, sky view) are within 2·10⁻³ of
+  their C# reference fed the GPU's own input tables; a twilight render (sun at −4°) is lit by the sky alone; the
+  reference atmosphere is bit-identical twice and under the 0.05 ms budget. The LUTs build in 0.82 s of GPU time.
+- **The LUT sky against the reference** (`--atmosphere-check`): an observer 2 m above Zermatt's valley floor, 54
+  directions (elevations 0.5–75°, 0–180° from the sun), 50 wavelengths, 2²⁰ reference paths per value. Mean |error|
+  and worst error per band:
+
+  | Sun | 400–460 nm | 460–510 nm | 510–560 nm | 560–600 nm | 600–660 nm | Luminance |
+  |---|---|---|---|---|---|---|
+  | +30° | 1.4% (−3.3) | 1.0% (−3.1) | 0.8% (−3.1) | 0.8% (−3.1) | 0.7% (−3.0) | 0.8% (−3.1) |
+  | +5° | 1.1% (+2.4) | 0.9% (+2.0) | 0.8% (+1.5) | 0.7% (−1.2) | 0.6% (−1.2) | 0.8% (+1.3) |
+  | −2° | 0.8% (−1.7) | 0.6% (−1.3) | 0.7% (−1.9) | 0.7% (+2.7) | 0.8% (+3.3) | 0.7% (−2.1) |
+  | −6° | 1.4% (−4.2) | 1.5% (−5.0) | 1.8% (+6.1) | 2.4% (+10.1) | 2.5% (+9.5) | 1.5% (+6.2) |
+
+  The reference's own noise is 0.03–0.2% by day and 1.1–1.4% at −6°. The worst errors sit at 0.5° above the horizon:
+  toward the sun by day (the haze's lobe over the horizon), and in the dark anti-solar sky at −6°, the Earth's shadow.
+- **Below the horizon** (`--below-horizon`, an observer 4.2 km up, where rays reach the land beyond the tile through a
+  long path of air): mean luminance error 1.5% (+5°), 2.7% (−2°), 1.5% (−4°), 2.6% (−6°); worst −15%, at −2° just
+  under the dipped horizon toward the sun. The bright twilight lowlands in the anti-solar sheet are therefore physical.
+- **A sun-elevation sheet from −6° to +10°** (`vista-views/atmosphere`, from 4.2 km): toward the sun, the sun reddens
+  and sets into an orange band that fades through twilight; away from it, the dark-blue Earth's shadow rises on the
+  horizon under the pink Belt of Venus at −2° and climbs and fades by −4°. A LUT and a reference render of the anti-solar
+  sky at −4° and +5° (the reference at 16 384 spp) show the same bands.
+- **Peaks stay lit after the valley floor's sunset**, from transmittance alone: from the range camera, at a true sun
+  elevation of −1° only the summits are lit, orange-red, above valleys in shadow, and at −1.5° only the highest. The
+  sun's transmittance at three heights above the ground sphere (Zermatt's floor, 1608 m):
+
+  | True sun elevation | 5 m | 1200 m | 2400 m |
+  |---|---|---|---|
+  | 0° | T₄₅₀ 0.001, T₆₅₀ 0.070 | 0.005, 0.179 | 0.014, 0.272 |
+  | −0.5° | 0.000, 0.033 | 0.002, 0.123 | 0.007, 0.218 |
+  | −1° | Earth's shadow | 0.000, 0.031 | 0.001, 0.107 |
+  | −1.5° | Earth's shadow | Earth's shadow | 0.000, 0.019 |
+  | −2° | Earth's shadow | Earth's shadow | Earth's shadow |
+
+- **Time of day at Zermatt on 2026-10-15:** dawn meters at EV100 6.7, day 14.9, golden hour 14.0, dusk 5.6, and night
+  is black (no light at all, so only the camera's EV is applied). M1.2's dawn and dusk were black.
+- **Before/after:** the four measurement views, `main` (bb26be7) against this slice at 640 px: a deeper blue sky that
+  darkens toward the zenith; a horizon glow and, from the aerial view, the land beyond the tile as a hazy plain; on the
+  down-slope golden hour, blue sky-lit shadows and a pale, warm-white sunlit slope. That slope is right for the light (the
+  8.5° sun reaches the 3.3 km camera with T = 0.36, 0.54, 0.70 at 450, 550, 650 nm: a mild warm cast, because almost no
+  haze is left above 3 km) but over-exposed: the view is mostly shadow, so the meter lifts it 3.9 EV and the ACES curve
+  bleaches the slope. M0's orange came from its 2400–3000 K placeholder. The camera's EV compensation recovers it; a
+  highlight-aware meter is a candidate for the display transform.
+
+*M1.3 decisions taken in code (revisit freely):*
+
+- **Multiple scattering is Bruneton 2017's, measured.** Hillaire's Ψ_ms (64 directions, isotropic second scattering)
+  came out 6.0% (+30°), 9.5% (+5°), 9.7% (−2°) and 12.8% (−6°) dark on average, worst −12% to −29% at the horizon. With
+  the haze off it was still 3.3–4.4% dark, and neither more directions nor a zero ground albedo helped. Its second
+  scattering is isotropic, and the haze's forward lobe picks up the bright horizon. Orders 2–5 in a 4D table
+  (height, view, sun, view-to-sun) fixed it: the table stores the *phase-weighted incident radiance* per species,
+  times the local coefficients at lookup, so it stays smooth where the haze's density falls off over 1.2 km.
+- **The 4D sizes are measured.** 16 heights × 32 + 32 view angles (split at the horizon, never blended across it) × 64
+  sun angles × 8 view-to-sun angles, a 32 × 32 sphere quadrature for the density. On the way: 16 sun angles left the
+  twilight anti-solar sky +30–80% bright (light leaking across the terminator), 32 left −6° at +12–22%, 64 brought it to
+  1.5%; 16 × 16 directions left a wavelength-flat −5% at the horizon (the haze lobe across the sky–ground edge);
+  32 heights bought nothing over 16.
+- **The 4D tables hold 11 of the 50 wavelengths** (every fifth hero and the last), interpolated in wavelength:
+  multiple scattering is smooth in wavelength, and the full 50 took 5.1 s of GPU time and 210 MB for the sum alone.
+  Now the build is 0.82 s, and the sum keeps 46 MB resident (115 MB more during the build).
+- **Transmittance is a wavelength-free columns LUT:** 256 × 256 texels of the three density columns to the top
+  (molecules, haze, ozone) on Bruneton's horizon map, 1024 steps each; `exp(−Σ coefficient · column)` gives any
+  wavelength. One float4 per texel instead of 50 transmittances, and interpolating columns beats interpolating
+  exponentials.
+- **The sky view keeps the haze's phase out.** Each texel holds (Rayleigh with its phase + orders 2–5 + the ground) and
+  the haze's single scattering without its phase; the lookup applies Henyey–Greenstein at the exact angle, so the
+  aureole is sharper than any texel. 64 azimuths × (64 rows above the horizon, dense near it, + 32 below) × 13 slices:
+  slice 0 at the camera's exact altitude for camera rays, 12 over the terrain's altitudes blended for rays that leave
+  the terrain after a bounce.
+- **Marches step quadratically from their dense end** (the start, or the ground for a ray that ends there): uniform steps
+  of 780 m on a vertical ray left the haze's single scattering 1.3% low, and the 40-step 4D tables far worse.
+- **The ground is a sphere at the scene's base altitude,** with the air's densities by altitude above sea level. The
+  valley floor's horizon is then flat and its sunset the almanac's; peaks see the sun longer by their dip (1.6° at
+  2400 m). The ground beyond the tile is Lambertian at a flat albedo of 0.2, lit by the sun and the sky. The base
+  altitude is `VistaScene.GroundAltitudeMetres`, the place's valley floor (a custom latitude: sea level) until M1.4's
+  altitude control.
+- **The air's constants** (tier 5, `AtmosphereModel.Default`): Rayleigh from the refractive index of standard air with
+  the scale height `RT/(Mg)` = 8435 m, so the column is the standard atmosphere's (Bruneton and Hillaire use 8 km and get
+  τ₅₅₀ ≈ 0.108); haze of optical depth 0.1 at 550 nm from sea level, Ångström α 1.3, albedo 0.9, g 0.8, scale height
+  1.2 km, so Zermatt sits above three quarters of it; 300 DU of ozone in Bruneton's 10–40 km tent. The M1.11 haze slider
+  will move the optical depth.
+- **Physical units.** Spectral radiance in W·m⁻²·sr⁻¹·nm⁻¹; Y is the ȳ-weighted mean spectral radiance, and 683 · 106.857
+  times it is luminance in cd/m². The sun above the air is the engine's 5778 K blackbody at its real radius (1368 W/m²),
+  with no limb darkening.
+- **Auto exposure** (`AutoExposure`): the log-average luminance with the brightest and darkest 1% clamped, to 18% grey,
+  plus the camera's EV as compensation; EV100 is recorded (daylight meters at 13–15). It meters a render of its own: the
+  whole frame at 320 px, 16 spp, through the LUT sky, whatever the image's size, window or atmosphere mode. A preview, its
+  4K final and every loupe of it are therefore exposed alike, a loupe stays a crop of the final, and a LUT and a reference
+  render of one view can sit side by side. Night (no light) applies the compensation only.
+- **The reference atmosphere** (`--atmosphere reference`) carries the hero wavelength alone (free paths depend on the
+  wavelength), weighted by the companion count. Delta tracking against a majorant from the segment's lowest point;
+  ratio tracking for every sun ray, the disk sampled; Rayleigh or Henyey–Greenstein phase sampling; a Lambertian ground
+  sphere; Russian roulette after 4 events. Inside the air it ignores the terrain, as the LUTs do: it checks the LUTs'
+  model, not a different one. Terrain segments carry no air in either mode until M1.4.
+- **`sunElevation` (recipe schema 3, `--sun-elevation`)** sets the time by the sun's *geometric* elevation (twilight is
+  defined on it: civil ends at −6°), rising when the time is dawn and setting otherwise; an elevation the sun never
+  reaches that day takes noon or midnight with a hint. Sheets vary it as any recipe field.
+- **Below the 4D tables' lowest sun (30° down) multiple scattering is zero,** not the edge texel's last glimmer, which
+  auto exposure lifted into a blue night sky.
+- **Sidecar schema 4** adds `atmosphere` (mode, model, base and camera altitudes, zenith depths from sea level and from
+  the base, sources), `exposure` (method, compensation, metered luminance and EV100, the applied EV, the meter's size)
+  and `image.units`; `sun` drops the M0 colour temperature for `spectrum`, `inEarthShadowAtCamera` and
+  `transmittanceToCamera` at 450, 550 and 650 nm.
+- **Shader plumbing:** `ShaderSource` inlines `#include` (one level, with `#line`) and prepends defines, since the engine's
+  `ShaderCompiler` takes neither. `VISTA_SHADER_DEFINES=SINGLE_SCATTERING_ONLY` drops multiple scattering from both modes;
+  it isolated Hillaire's error (single scattering agreed to 0.3%). LUT dispatches are cut at 2²⁰ items.
+
+*M1.3 gotchas:*
+
+- **`(1 − e^(−σ·dt))/σ` cancels in float:** at σ·dt = 10⁻⁶ it was 4% off. Below 0.01 it is now its series, in both C# and
+  HLSL; the self-test's parity check found it on a 1 m texel at the ground.
+- **Two tables, two wavelength counts:** the ground irradiance by order holds 11 wavelengths and the sky's ground
+  irradiance 50. Dispatching the second with the first's count left most entries at zero, and the sky-view parity could
+  not see it because its C# side read the same zeros. Only the ground-irradiance parity caught it.
+- **A buffer must never be bound as SRV and UAV in one dispatch:** the LUT builders bind a dedicated dummy SRV to every
+  unused input, never the dummy UAV.
+- **TDR:** at 50 wavelengths each density dispatch took 1.2 s. Dispatches are now capped, and a whole build takes 0.82 s.
+- **The reference at twilight is mostly zeros and rare bright paths:** images need thousands of samples and still
+  speckle, and a 16-sample meter on it blew the exposure out (hence the LUT meter). Compare it in numbers, with
+  `--atmosphere-check`.
+- **A worktree of `main` for the "before" build** failed on Windows path length (the repository's deep Unity folders);
+  `git worktree add --no-checkout` plus `git sparse-checkout set RayTracer` works.
+- **C# local functions cannot capture a `ReadOnlySpan`;** the samplers take spans as parameters.
+
+**M1.3 hand-off.** To understand M1.3, start by reading `Vista.Core/Atmosphere/AtmosphereLuts.cs` (the table sizes, the
+sphere geometry and the sky march), then `Vista.Core/Atmosphere/AtmosphereScattering.cs` (the orders), then
+`Vista.App/Gpu/D3D12VistaRenderer.Atmosphere.cs` (the build order and what each kernel reads), then the `SkyRadiance` and
+`SunTransmittance4` lines of `Vista.App/Shaders/VistaIntegrator.hlsl`.
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png
+    [--sun-elevation -2] [--atmosphere reference]
+dotnet run --project Vista.App -c Release -- --atmosphere-check [--sun-elevations 30,5,-2,-6] [--paths 1048576]
+    [--ground-altitude 1608] [--observer-height 2] [--below-horizon] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--out check.json]
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --vary sunElevation=-6,-4,-2,0,2,4,6,8,10 --out s.png
+powershell -ExecutionPolicy Bypass -File vista-views/atmosphere/render.ps1
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/Atmosphere/AirOptics.cs`, `SolarSpectrum.cs` | Rayleigh, ozone and phase functions; the sun above the air |
+| `Vista.Core/Atmosphere/AtmosphereModel.cs`, `AtmosphereFrame.cs`, `AtmosphereTables.cs` | The air, one render's geometry and slices, the per-wavelength tables |
+| `Vista.Core/Atmosphere/AtmosphereLuts.cs`, `AtmosphereScattering.cs` | C# references: columns, ground irradiance, sky view; the 4D orders |
+| `Vista.Core/Atmosphere/SkyCheck.cs` | The check's directions, bands and aggregation |
+| `Vista.Core/Output/AutoExposure.cs`, `DisplayTransform.cs`, `Sidecar.cs`, `SheetLabels.cs` | Metering; schema 4; `sun` and `atmosphere` labels |
+| `Vista.Core/Rendering/RenderTypes.cs`, `IntegratorTables.cs` | `AtmosphereMode`, the meter flag, the scene's air and base altitude; the M0 light table gone |
+| `Vista.Core/Recipes/Recipe.cs`, `Astronomy/Almanac.cs`, `Astronomy/SolarPosition.cs` | Schema 3: `sunElevation`; `HoursAtElevation` |
+| `Vista.Core/Cli/PreviewCommandLine.cs`, `PreviewPipeline.cs`, `SheetAxis.cs` | `--sun-elevation`, `--atmosphere`, the meter render, the `atmosphere` axis |
+| `Vista.App/Shaders/VistaAtmosphere.hlsli`, `VistaAtmosphereLuts.hlsl` | The shared atmosphere functions; the LUT builders |
+| `Vista.App/Shaders/VistaIntegrator.hlsl` | LUT lookups; the reference atmosphere; `CSSkyCheck` |
+| `Vista.App/Gpu/D3D12VistaRenderer.cs`, `D3D12VistaRenderer.Atmosphere.cs`, `ShaderSource.cs` | New bindings; LUT pipelines, caching and the order iteration; includes and defines |
+| `Vista.App/Gpu/AtmosphereCheck.cs`, `GpuSelfTest.cs`, `Program.cs` | `--atmosphere-check`; the LUT parity, twilight and reference checks |
+| `Vista.Core/Rendering/SkyLight.cs`, `Vista.Tests/SkyLightTests.cs` | Removed |
+| `vista-views/atmosphere/` | The check views and `render.ps1` |
+| `Vista.Tests/*` | `AirOptics`, `AtmosphereLuts`, `AtmosphereScattering`, `AutoExposure`, `SkyCheck`, `SunElevationAndAtmosphere` tests; the check views |
+
+**Next: M1.4** (aerial perspective & altitude). Its short march can read the columns LUT and the summed 4D orders
+directly, and its error against the reference is one more `--atmosphere-check`-style comparison, now along finite
+segments.
 
 **M1.4 — Aerial perspective & altitude.**
 - *Goal:* the layered, receding blue ridges: every segment, camera and bounce, carries the air
