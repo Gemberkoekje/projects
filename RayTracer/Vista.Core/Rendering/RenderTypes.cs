@@ -198,6 +198,10 @@ public sealed record RenderOutput(
 /// <summary>
 /// The seam between the pure pipeline and a GPU backend: <c>D3D12VistaRenderer</c> in Vista.App (the offline
 /// integrator on the RTX 3070); tests drive the pipeline with a fake.
+///
+/// <para>A renderer keeps what it built between renders and rebuilds only what a scene changed (vista-plan §10 M1.8). Each
+/// render reports what it did build in <see cref="RenderStats.StageSeconds"/>, under the <see cref="RenderStageKeys"/>, so a
+/// session can say which stages a watch render reused.</para>
 /// </summary>
 public interface IVistaRenderer
 {
@@ -210,6 +214,40 @@ public interface IVistaRenderer
     /// each one's GPU time back to it, and returns the requested <paramref name="aovs"/>.
     /// </summary>
     RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner);
+}
+
+/// <summary>
+/// The <see cref="RenderStats.StageSeconds"/> keys a renderer writes when a render built that stage, and only then (vista-plan
+/// §10 M1.8): a render that reused the device, the acceleration structure or a table leaves its key out.
+/// </summary>
+public static class RenderStageKeys
+{
+    /// <summary>Creating the device (the first render of a renderer).</summary>
+    public const string DeviceInit = "deviceInit";
+
+    /// <summary>Compiling the shaders the renderer always needs (the first render of a renderer).</summary>
+    public const string ShaderCompile = "shaderCompile";
+
+    /// <summary>Compiling a shader variant on its first use (the reference atmosphere).</summary>
+    public const string ReferenceShaderCompile = "referenceShaderCompile";
+
+    /// <summary>Uploading a new mesh.</summary>
+    public const string MeshUpload = "meshUpload";
+
+    /// <summary>Building the acceleration structures of a new mesh.</summary>
+    public const string AccelerationBuild = "accelBuild";
+
+    /// <summary>GPU seconds building the air model's wavelength tables and the columns LUT (a new model).</summary>
+    public const string AtmosphereTables = "atmosphereTablesGpu";
+
+    /// <summary>GPU seconds building the scattering orders and the sky's ground irradiance (a new model or base altitude).</summary>
+    public const string ScatteringOrders = "scatteringOrdersGpu";
+
+    /// <summary>GPU seconds building the sky-view LUT (a new atmosphere frame: the sun, the camera's altitude, the terrain).</summary>
+    public const string SkyView = "skyViewGpu";
+
+    /// <summary>GPU seconds measuring the sky distribution (a new frame, when the sky is sampled as a light).</summary>
+    public const string SkyDistribution = "skyDistributionGpu";
 }
 
 /// <summary>
@@ -237,7 +275,10 @@ public sealed record RenderStats
     /// <summary>The highest cost any dispatch measured, in nanoseconds per pixel-sample.</summary>
     public double MaxCostNsPerPixelSample { get; init; }
 
-    /// <summary>Renderer stages (e.g. device init, acceleration build, readback) in seconds.</summary>
+    /// <summary>
+    /// Renderer stages (e.g. device init, acceleration build, readback) in seconds. A stage the render reused is absent
+    /// (<see cref="RenderStageKeys"/>).
+    /// </summary>
     public SortedDictionary<string, double> StageSeconds { get; init; } = new(StringComparer.Ordinal);
 
     /// <summary>Bytes the terrain's bottom-level acceleration structure takes on the device (0 when not measured).</summary>

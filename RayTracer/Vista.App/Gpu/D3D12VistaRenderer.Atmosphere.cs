@@ -125,20 +125,30 @@ internal sealed partial class D3D12VistaRenderer
         _skyViewLut = CreateUavBuffer((ulong)AtmosphereLuts.SkyViewFloats * sizeof(float));
     }
 
+    /// <summary>What one <see cref="EnsureAtmosphere"/> built, in GPU seconds; a part it reused is not built and takes 0.</summary>
+    private readonly record struct LutBuild(bool Tables, double TablesSeconds, bool Orders, double OrdersSeconds, bool SkyView, double SkyViewSeconds)
+    {
+        /// <summary>True when any part was built.</summary>
+        public bool Any => Tables || Orders || SkyView;
+
+        /// <summary>GPU seconds of every part built.</summary>
+        public double Seconds => TablesSeconds + OrdersSeconds + SkyViewSeconds;
+    }
+
     /// <summary>
     /// Makes the LUTs match <paramref name="frame"/>, rebuilding only what it changed: the wavelength tables and the
     /// columns LUT follow the model; the scattering orders and the ground irradiance also follow the ground altitude;
-    /// the sky view follows everything (the sun above all). Returns the GPU seconds spent building, 0 when nothing
-    /// was rebuilt. <paramref name="capture"/> receives the first iteration's tables when the orders are rebuilt.
+    /// the sky view follows everything (the sun above all). Returns what was built and its GPU seconds.
+    /// <paramref name="capture"/> receives the first iteration's tables when the orders are rebuilt.
     /// </summary>
-    private double EnsureAtmosphere(AtmosphereFrame frame, Action<ScatteringOrder2>? capture = null)
+    private LutBuild EnsureAtmosphere(AtmosphereFrame frame, Action<ScatteringOrder2>? capture = null)
     {
         IReadOnlyList<string> errors = frame.Validate();
         if (errors.Count > 0)
             throw new ArgumentException("Invalid atmosphere: " + string.Join(" ", errors), nameof(frame));
         WriteAtmosphereConstants(frame);
 
-        double seconds = 0.0;
+        var built = new LutBuild();
         if (!Equals(_tablesModel, frame.Model))
         {
             AtmosphereTables tables = AtmosphereTables.Build(frame.Model);
@@ -146,26 +156,28 @@ internal sealed partial class D3D12VistaRenderer
             _atmSun?.Dispose();
             _atmCoefficients = CreateDefaultBuffer<float>(tables.Coefficients);
             _atmSun = CreateDefaultBuffer<float>(tables.Sun);
-            seconds += BuildLut(_columnsPipeline, AtmosphereLuts.ColumnsMuSize * AtmosphereLuts.ColumnsAltitudeSize, 0, new() { [LutSlot.Output] = _columnsLut });
+            double seconds = BuildLut(_columnsPipeline, AtmosphereLuts.ColumnsMuSize * AtmosphereLuts.ColumnsAltitudeSize, 0, new() { [LutSlot.Output] = _columnsLut });
+            built = built with { Tables = true, TablesSeconds = seconds };
             _tablesModel = frame.Model;
             _ordersKey = null;
             _skyFrame = null;
         }
         if (_ordersKey != (frame.Model, frame.GroundAltitudeMetres))
         {
-            seconds += BuildScatteringOrders(capture);
+            built = built with { Orders = true, OrdersSeconds = BuildScatteringOrders(capture) };
             _ordersKey = (frame.Model, frame.GroundAltitudeMetres);
             _skyFrame = null;
         }
         if (!Equals(_skyFrame, frame))
         {
-            seconds += BuildLut(_skyViewPipeline, AtmosphereLuts.SkyViewFloats / 2, 0, new()
+            double seconds = BuildLut(_skyViewPipeline, AtmosphereLuts.SkyViewFloats / 2, 0, new()
             {
                 [LutSlot.Columns] = _columnsLut, [LutSlot.Weighted] = _scatterSum, [LutSlot.Ground] = _groundLut, [LutSlot.Output] = _skyViewLut,
             });
+            built = built with { SkyView = true, SkyViewSeconds = seconds };
             _skyFrame = frame;
         }
-        return seconds;
+        return built;
     }
 
     /// <summary>
@@ -273,7 +285,7 @@ internal sealed partial class D3D12VistaRenderer
         ScatteringOrder2? order2 = null;
         if (captureOrder2)
             _ordersKey = null;
-        gpuSeconds = EnsureAtmosphere(frame, captureOrder2 ? o => order2 = o : null);
+        gpuSeconds = EnsureAtmosphere(frame, captureOrder2 ? o => order2 = o : null).Seconds;
         return new AtmosphereLutData(
             ReadFloats(_columnsLut, AtmosphereLuts.ColumnsFloats),
             ReadFloats(_scatterSum, AtmosphereScattering.FloatsPerChannel * 2),

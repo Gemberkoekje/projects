@@ -100,3 +100,23 @@ camera: no render of them warns.
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/erosion/render.ps1 [-Before ..\main\Vista.App.dll] [-Seeds 42,7,1234,2026] [-Out folder]
 ```
+
+## Watch mode checks (M1.8)
+
+`watch/render.ps1` reruns every M1.8 check: `--watch-check` starts a `--watch` process on copies of the day recipe and the aerial
+camera, changes them one at a time (the exposure, the time of day, a camera turn, a camera move, the base altitude, the seed through
+the options file, and the seed back), checks that each render rebuilt exactly the stages that change touches, then renders every
+step again with a cold `--preview` process and compares the files byte for byte. It runs at 640 px with every debug output and the
+denoised image (eroding both seeds into a cache under `-Out`: the first-time cost), then at the default 320 px (the worlds now
+cached), and prints the wall time of each change against the cold render's.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/watch/render.ps1 [-Spp 64] [-Out folder]
+```
+
+Watching by hand: the seed and every other option outside the recipe and the camera go in the options file, so editing files
+drives the whole session (type `quit` to stop):
+
+```
+dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --watch --recipe r.json --camera c.json --options o.txt --out p.png
+```

@@ -13,7 +13,8 @@ namespace Vista.App;
 /// <summary>
 /// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through the offline
 /// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
-/// <c>--sheet-from</c> tiles existing images), and the dev-box checks: <c>--gpu-selftest</c> and
+/// <c>--sheet-from</c> tiles existing images), watch mode (<c>--watch</c> renders again whenever its files change, M1.8), and
+/// the dev-box checks: <c>--watch-check</c> (a watch changed step by step against cold renders), <c>--gpu-selftest</c> and
 /// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
 /// <c>--atmosphere-compare</c> (one view rendered with both, by distance), <c>--sampling-compare</c> (one view
 /// rendered with M1.4's estimator and with MIS: agreement, noise and cost), and <c>--denoise-compare</c> (one view at low
@@ -39,12 +40,16 @@ internal static class Program
         if (args.FirstOrDefault() == ErosionMeasure.Flag)
             return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
 
+        if (args.FirstOrDefault() == WatchCheck.Flag)
+            return WatchCheck.Run(args, Console.Out);
+
         try
         {
             return args.FirstOrDefault() switch
             {
                 "--sheet" => Sheet(args),
                 "--sheet-from" => SheetFrom(args),
+                "--watch" => Watch(args),
                 _ => Preview(args),
             };
         }
@@ -88,6 +93,103 @@ internal static class Program
         });
     }
 
+    /// <summary>
+    /// Watch mode (vista-plan §10 M1.8): one renderer, denoiser and session for the life of the process, rendering again whenever
+    /// the inputs change. Typing <c>quit</c> or pressing Ctrl+C stops it after the render in progress (Ctrl+C twice: at once).
+    /// </summary>
+    private static int Watch(string[] args)
+    {
+        if (!WatchCommandLine.TryParse(args, out WatchRequest? request, out IReadOnlyList<string> errors))
+            return Usage(errors);
+
+        using var stop = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            if (stop.IsCancellationRequested)
+                return;
+            e.Cancel = true;
+            stop.Cancel();
+            Console.Error.WriteLine("Stopping after this render (Ctrl+C again stops at once).");
+        };
+        var input = new Thread(() => ReadCommands(stop)) { IsBackground = true, Name = "watch commands" };
+        input.Start();
+
+        if (request!.DryRun)
+            return Watch(new PreviewWatch(request, new PreviewSession(renderer: null, erosionCache: ErosionCache.Default)), stop.Token);
+        return RunGpu(() =>
+        {
+            using var renderer = new D3D12VistaRenderer();
+            using var denoiser = new OidnDenoiser();
+            var session = new PreviewSession(renderer, denoiser, eroder: renderer, erosionCache: ErosionCache.Default);
+            return Watch(new PreviewWatch(request, session), stop.Token);
+        });
+    }
+
+    private static int Watch(PreviewWatch watch, CancellationToken stop)
+    {
+        string watched = string.Empty;
+        watch.Run(step =>
+        {
+            switch (step.Kind)
+            {
+                case WatchEventKind.Rendered:
+                    Report(step.Sidecar!);
+                    Console.WriteLine(WatchLine(step.Sidecar!));
+                    break;
+                case WatchEventKind.Failed:
+                    Console.Error.WriteLine($"error: {step.Message}");
+                    Console.Error.WriteLine("Still watching: fix the file and save it.");
+                    break;
+                default:
+                    Console.Error.WriteLine($"waiting: {step.Message}");
+                    break;
+            }
+            string now = string.Join(", ", watch.Watched.Select(path => Path.GetRelativePath(Environment.CurrentDirectory, path)));
+            if (now != watched)
+            {
+                watched = now;
+                Console.WriteLine($"Watching {now}. Type quit or press Ctrl+C to stop.");
+            }
+        }, stop);
+        Console.WriteLine($"Watch ended after {watch.Renders} render{(watch.Renders == 1 ? "" : "s")}.");
+        return 0;
+    }
+
+    /// <summary>The line that ends each watch render's report: its number, what changed, its wall time and the stages it built and reused.</summary>
+    internal static string WatchLine(Sidecar sidecar)
+    {
+        WatchInfo watch = sidecar.Watch!;
+        static string Names(IReadOnlyList<PreviewStage> stages) => stages.Count == 0
+            ? "nothing"
+            : string.Join(", ", stages.Select(s => JsonNamingPolicy.CamelCase.ConvertName(s.ToString())));
+        string changes = watch.Changes.Count == 0 ? (watch.Render == 1 ? "first render" : "no field changed") : string.Join("; ", watch.Changes);
+        return string.Create(CultureInfo.InvariantCulture,
+            $"watch #{watch.Render}: {changes} | {watch.RunSeconds:0.000} s (+{watch.WaitSeconds:0.000} s settling) | built {Names(sidecar.Stages.Built)} | reused {Names(sidecar.Stages.Reused)}");
+    }
+
+    /// <summary>Reads the watch's commands from the console: <c>quit</c> stops it. A closed input (no console) just ends the reading.</summary>
+    private static void ReadCommands(CancellationTokenSource stop)
+    {
+        try
+        {
+            while (Console.In.ReadLine() is { } line)
+            {
+                string command = line.Trim();
+                if (command is "quit" or "q" or "exit")
+                {
+                    stop.Cancel();
+                    return;
+                }
+                if (command.Length > 0)
+                    Console.Error.WriteLine("Type quit to stop. To render something else, edit the recipe, the camera or the options file.");
+            }
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException or OperationCanceledException)
+        {
+            // No console to read from: Ctrl+C still stops the watch.
+        }
+    }
+
     private static int SheetFrom(string[] args)
     {
         if (!SheetCommandLine.TryParseFrom(args, out SheetFromRequest? request, out IReadOnlyList<string> errors))
@@ -101,6 +203,8 @@ internal static class Program
             Console.Error.WriteLine(error);
         Console.Error.WriteLine(PreviewCommandLine.Usage);
         Console.Error.WriteLine(SheetCommandLine.Usage);
+        Console.Error.WriteLine(WatchCommandLine.Usage);
+        Console.Error.WriteLine(WatchCheck.Usage);
         Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
         Console.Error.WriteLine(AtmosphereCheck.Usage);
         Console.Error.WriteLine(AtmosphereCompare.Usage);

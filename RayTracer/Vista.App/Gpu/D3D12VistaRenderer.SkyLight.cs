@@ -29,16 +29,16 @@ internal sealed partial class D3D12VistaRenderer
     /// <summary>
     /// Makes the sky distribution match <paramref name="frame"/>, whose sky view must be built and whose integrator tables
     /// (the CIE ȳ) uploaded: <c>CSSkyLuminance</c> measures each cell in each terrain slice, the CPU averages the slices and
-    /// builds the CDFs (<see cref="SkyDistribution.Build"/>), and they are uploaded. Returns the GPU seconds of the
-    /// measurement, 0 when the distribution was already this frame's.
+    /// builds the CDFs (<see cref="SkyDistribution.Build"/>), and they are uploaded. Returns false when the distribution was
+    /// already this frame's; <paramref name="seconds"/> is the GPU time of the measurement (0 when there was none).
     /// </summary>
-    private double EnsureSkyLight(AtmosphereFrame frame)
+    private bool EnsureSkyLight(AtmosphereFrame frame, out double seconds)
     {
+        seconds = 0.0;
         if (_skyDistribution is not null && Equals(_skyLightFrame, frame))
-            return 0.0;
+            return false;
         int slices = AtmosphereLuts.SkyTerrainSlices;
         int items = SkyDistribution.Cells * slices;
-        double seconds;
         float[] luminance;
         using (ID3D12Resource output = CreateUavBuffer((ulong)items * sizeof(float)))
         {
@@ -71,7 +71,7 @@ internal sealed partial class D3D12VistaRenderer
         _skyDistribution = CreateDefaultBuffer<float>(distribution.Floats);
         _skyLight = new SkyLightData(luminance, distribution);
         _skyLightFrame = frame;
-        return seconds;
+        return true;
     }
 
     /// <summary>The sky distribution of the last render that sampled the sky (null before one).</summary>

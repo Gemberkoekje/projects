@@ -45,11 +45,13 @@ public static class SheetPipeline
             cells.Add(cell);
         }
 
+        // One session for every cell: cells that share a world build and mesh it once, and a cell that differs from the one before
+        // only in what the renderer never reads (the camera's exposure) is not rendered again.
         Directory.CreateDirectory(cellDirectory);
-        var worlds = new WorldCache();
+        var session = new PreviewSession(renderer, denoiser, eroder, erosionCache, time);
         var sidecars = new List<Sidecar>(count);
         foreach (PreviewRequest cell in cells)
-            sidecars.Add(PreviewPipeline.Run(cell, renderer, time, worlds, denoiser, eroder, erosionCache));
+            sidecars.Add(session.Run(cell));
 
         string beautyRole = renderer is null ? "heightMap" : "beauty";
         var sources = cells.Select((c, i) => Path.Combine(cellDirectory, sidecars[i].Outputs[beautyRole])).ToList();

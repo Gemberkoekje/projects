@@ -118,12 +118,12 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         CreateDeviceAndQueue(debug);
         VerifyRaytracingSupport();
         CreateCommandObjects();
-        _initSeconds["deviceInit"] = Lap(stopwatch);
+        _initSeconds[RenderStageKeys.DeviceInit] = Lap(stopwatch);
         CreatePipeline();
         CreateAtmospherePipelines();
         CreateSkyLightPipelines();
         CreateFixedResources();
-        _initSeconds["shaderCompile"] = Lap(stopwatch);
+        _initSeconds[RenderStageKeys.ShaderCompile] = Lap(stopwatch);
     }
 
     /// <inheritdoc />
@@ -211,18 +211,24 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         if (!ReferenceEquals(scene.Mesh, _mesh))
         {
             UploadMesh(scene.Mesh);
-            stages["meshUpload"] = Lap(stopwatch);
+            stages[RenderStageKeys.MeshUpload] = Lap(stopwatch);
             BuildAccelerationStructures(scene.Mesh);
-            stages["accelBuild"] = Lap(stopwatch);
+            stages[RenderStageKeys.AccelerationBuild] = Lap(stopwatch);
             _mesh = scene.Mesh;
         }
 
+        // Each part of the air is rebuilt only when the frame changed what it depends on (M1.8 reports which).
         AtmosphereFrame frame = scene.AirFrame();
-        double lutGpuSeconds = EnsureAtmosphere(frame);
-        if (lutGpuSeconds > 0.0)
+        LutBuild luts = EnsureAtmosphere(frame);
+        if (luts.Any)
         {
             stages["atmosphereLuts"] = Lap(stopwatch);
-            stages["atmosphereLutsGpu"] = lutGpuSeconds;
+            if (luts.Tables)
+                stages[RenderStageKeys.AtmosphereTables] = luts.TablesSeconds;
+            if (luts.Orders)
+                stages[RenderStageKeys.ScatteringOrders] = luts.OrdersSeconds;
+            if (luts.SkyView)
+                stages[RenderStageKeys.SkyView] = luts.SkyViewSeconds;
         }
 
         IntegratorTables tables = IntegratorTables.Build(scene.Materials);
@@ -236,11 +242,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         bool skySampling = false;
         if (settings.LightSampling == LightSampling.Mis && settings.Atmosphere == AtmosphereMode.Luts)
         {
-            double skyGpuSeconds = EnsureSkyLight(frame);
-            if (skyGpuSeconds > 0.0)
+            if (EnsureSkyLight(frame, out double skyGpuSeconds))
             {
                 stages["skyDistribution"] = Lap(stopwatch);
-                stages["skyDistributionGpu"] = skyGpuSeconds;
+                stages[RenderStageKeys.SkyDistribution] = skyGpuSeconds;
             }
             skySampling = _skyLight!.Distribution.HasLight;
         }
@@ -487,7 +492,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             var stopwatch = Stopwatch.StartNew();
             string source = shadows ? ShaderSource.Load(ShaderFile, ReferenceDefine, TerrainShadowsDefine) : ShaderSource.Load(ShaderFile, ReferenceDefine);
             pipeline = CompilePipeline(_rootSignature, source, "CSMain", ShaderFile);
-            stages["referenceShaderCompile"] = stopwatch.Elapsed.TotalSeconds;
+            stages[RenderStageKeys.ReferenceShaderCompile] = stopwatch.Elapsed.TotalSeconds;
         }
         return pipeline;
     }

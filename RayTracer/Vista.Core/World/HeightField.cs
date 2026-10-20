@@ -7,12 +7,20 @@ namespace Vista.World;
 /// <see cref="CellSize"/> metres apart, centred on the world origin. Sample <c>(i, j)</c> sits at world
 /// <c>x = OriginX + i·CellSize</c>, <c>z = OriginZ + j·CellSize</c> (<c>+X</c> east, <c>+Z</c> north).
 /// The grid never depends on the camera, which is what lets the global erosion of M1 stay deterministic.
+///
+/// <para>A height field never changes once made: its lowest and highest points and its <see cref="ContentHash"/> are worked out
+/// the first time they are asked for and kept, since a watch session (vista-plan §10 M1.8) asks for them on every render of the
+/// same 4097² world.</para>
 /// </summary>
 public sealed class HeightField
 {
     private readonly float[] _heights;
+    private (float Min, float Max)? _range;
+    private ulong? _hash;
 
-    /// <summary>Wraps <paramref name="heights"/> (row-major, <c>j·size + i</c>) without copying.</summary>
+    /// <summary>
+    /// Wraps <paramref name="heights"/> (row-major, <c>j·size + i</c>) without copying; the caller must not change it afterwards.
+    /// </summary>
     public HeightField(int size, double cellSize, float[] heights)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(size, 2);
@@ -47,10 +55,12 @@ public sealed class HeightField
     public ReadOnlySpan<float> Heights => _heights;
 
     /// <summary>Lowest sample in metres.</summary>
-    public float MinHeight => _heights.Min();
+    public float MinHeight => Range.Min;
 
     /// <summary>Highest sample in metres.</summary>
-    public float MaxHeight => _heights.Max();
+    public float MaxHeight => Range.Max;
+
+    private (float Min, float Max) Range => _range ??= (_heights.Min(), _heights.Max());
 
     /// <summary>World x of column <paramref name="i"/>.</summary>
     public double XOf(int i) => OriginX + i * CellSize;
@@ -76,7 +86,9 @@ public sealed class HeightField
     /// A 64-bit fingerprint of the grid and every height's exact bits. Recorded in the sidecar, so two renders
     /// can be checked for "same world" without comparing images, and pinned by the determinism tests.
     /// </summary>
-    public ulong ContentHash()
+    public ulong ContentHash() => _hash ??= Hash();
+
+    private ulong Hash()
     {
         Span<byte> buffer = stackalloc byte[8];
         BinaryPrimitives.WriteInt32LittleEndian(buffer, Size);

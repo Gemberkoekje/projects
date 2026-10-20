@@ -95,7 +95,7 @@ public sealed class LightSamplingTests
         Assert.AreEqual(LightSampling.Mis, renderer.Meters.Single().LightSampling, "the meter renders the same way");
         Assert.AreEqual(LightSampling.Mis, mis.Image.LightSampling);
         Assert.AreEqual(2, mis.Image.RussianRouletteStart);
-        Assert.AreEqual(8, Sidecar.CurrentSchema);
+        Assert.AreEqual(9, Sidecar.CurrentSchema);
         Assert.AreEqual(Sidecar.CurrentSchema, mis.Schema);
 
         Sidecar m14 = PreviewPipeline.Run(Request("--light-sampling", "sunOnly", "--rr-start", "3"), renderer);

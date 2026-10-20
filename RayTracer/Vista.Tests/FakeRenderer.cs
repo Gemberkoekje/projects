@@ -1,17 +1,34 @@
+using Vista.Atmosphere;
 using Vista.Rendering;
+using Vista.World;
 
 namespace Vista.Tests;
 
 /// <summary>
 /// A stand-in for the GPU: drives the planner like the real host must and returns synthetic buffers of the
 /// rendered window's size. A pixel's XYZ is a function of its place in the full frame, so a loupe's pixels
-/// equal the same pixels of a full render, as the real integrator's do.
+/// equal the same pixels of a full render, as the real integrator's do. It keeps its stages the way the D3D12 host does
+/// (the device, the mesh's acceleration structure, the air's tables, orders and sky view, the sky distribution) and reports
+/// those it built under <see cref="RenderStageKeys"/>.
 /// </summary>
 internal sealed class FakeRenderer : IVistaRenderer
 {
     public const string Name = "Fake GPU";
 
+    private bool _initialised;
+    private TerrainMesh? _mesh;
+    private AtmosphereModel? _model;
+    private (AtmosphereModel Model, double Ground)? _orders;
+    private AtmosphereFrame? _skyView;
+    private AtmosphereFrame? _skyLight;
+
     public Aov? Skip { get; init; }
+
+    /// <summary>
+    /// When set, the image also depends on what the real renderer reads of the scene and the settings (the camera without its
+    /// exposure, the sun, the base altitude, the terrain, the samples), so a render reused when it should not have been shows.
+    /// </summary>
+    public bool SceneDependent { get; init; }
 
     public BatchPlanner? Planner { get; private set; }
 
@@ -56,14 +73,15 @@ internal sealed class FakeRenderer : IVistaRenderer
 
         int pixels = window.Pixels;
         var xyz = new float[pixels * 3];
+        float k = SceneDependent ? Signature(scene, settings) : 1f;
         for (int p = 0; p < pixels; p++)
         {
             int frameX = window.X + p % window.Width;
             int frameY = window.Y + p / window.Width;
             float t = (frameY * settings.Width + frameX) / (float)(settings.Width * settings.Height);
-            xyz[p * 3] = 0.95f * t;
-            xyz[p * 3 + 1] = t;
-            xyz[p * 3 + 2] = 1.09f * t;
+            xyz[p * 3] = 0.95f * t * k;
+            xyz[p * 3 + 1] = t * k;
+            xyz[p * 3 + 2] = 1.09f * t * k;
         }
         var buffers = new Dictionary<Aov, float[]>();
         foreach (Aov aov in aovs.Where(a => a != Skip))
@@ -87,6 +105,57 @@ internal sealed class FakeRenderer : IVistaRenderer
             PixelSamples = pixelSamples,
             Dispatches = dispatches,
             TraceSeconds = dispatches * 0.001,
+            StageSeconds = Stages(scene, settings),
         });
+    }
+
+    /// <summary>A brightness in [1, 2) from everything a real render reads.</summary>
+    private static float Signature(VistaScene scene, RenderSettings settings)
+    {
+        double h = scene.Camera.Position.X * 1.3e-4 + scene.Camera.Position.Y * 2.9e-4 + scene.Camera.Position.Z * 3.7e-4
+            + scene.Camera.YawDegrees * 1.1e-2 + scene.Camera.PitchDegrees * 1.7e-2 + scene.Camera.FocalLengthMm * 1.9e-2
+            + scene.Sun.ElevationDegrees * 2.3e-2 + scene.Sun.AzimuthDegrees * 2.9e-3 + scene.GroundAltitudeMetres * 3.1e-5
+            + scene.Terrain.MaxHeight * 4.1e-5 + settings.SamplesPerPixel * 4.3e-3 + settings.MaxBounces * 4.7e-2;
+        return 1f + (float)(h - Math.Floor(h));
+    }
+
+    /// <summary>What a D3D12 host would build for this render, given what it built before.</summary>
+    private SortedDictionary<string, double> Stages(VistaScene scene, RenderSettings settings)
+    {
+        var stages = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        if (!_initialised)
+        {
+            stages[RenderStageKeys.DeviceInit] = 0.1;
+            stages[RenderStageKeys.ShaderCompile] = 0.2;
+            _initialised = true;
+        }
+        if (!ReferenceEquals(scene.Mesh, _mesh))
+        {
+            stages[RenderStageKeys.MeshUpload] = 0.01;
+            stages[RenderStageKeys.AccelerationBuild] = 0.01;
+            _mesh = scene.Mesh;
+        }
+        AtmosphereFrame frame = scene.AirFrame();
+        if (!Equals(_model, frame.Model))
+        {
+            stages[RenderStageKeys.AtmosphereTables] = 0.001;
+            (_model, _orders, _skyView) = (frame.Model, null, null);
+        }
+        if (_orders != (frame.Model, frame.GroundAltitudeMetres))
+        {
+            stages[RenderStageKeys.ScatteringOrders] = 0.01;
+            (_orders, _skyView) = ((frame.Model, frame.GroundAltitudeMetres), null);
+        }
+        if (!Equals(_skyView, frame))
+        {
+            stages[RenderStageKeys.SkyView] = 0.001;
+            _skyView = frame;
+        }
+        if (settings.LightSampling == LightSampling.Mis && settings.Atmosphere == AtmosphereMode.Luts && !Equals(_skyLight, frame))
+        {
+            stages[RenderStageKeys.SkyDistribution] = 0.001;
+            _skyLight = frame;
+        }
+        return stages;
     }
 }

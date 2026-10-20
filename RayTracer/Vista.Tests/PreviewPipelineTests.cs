@@ -229,13 +229,12 @@ public sealed class PreviewPipelineTests
     }
 
     [TestMethod]
-    public void WorldCache_IsReusedAcrossTimeOfDay()
+    public void Session_ReusesTheWorldAcrossTimeOfDay()
     {
         var renderer = new FakeRenderer();
-        var worlds = new World.WorldCache();
-        PreviewPipeline.Run(Request(dryRun: false), renderer, worlds: worlds);
-        PreviewPipeline.Run(Request(dryRun: false) with { RecipeOverrides = new Dictionary<string, string> { ["time"] = "\"dusk\"" } },
-            renderer, worlds: worlds);
+        var session = new PreviewSession(renderer);
+        session.Run(Request(dryRun: false));
+        session.Run(Request(dryRun: false) with { RecipeOverrides = new Dictionary<string, string> { ["time"] = "\"dusk\"" } });
         Assert.AreSame(renderer.Scenes[0].Mesh, renderer.Scenes[1].Mesh);
         Assert.AreSame(renderer.Scenes[0].Terrain, renderer.Scenes[1].Terrain);
     }

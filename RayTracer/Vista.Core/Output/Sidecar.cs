@@ -25,12 +25,14 @@ namespace Vista.Output;
 /// <see cref="Denoise"/>: the settings asked for, and the denoiser's library, version, device and filter, or why it did not
 /// run. Schema 8 (M1.7) added <see cref="WorldInfo.Erosion"/>: where the world's erosion came from (eroded now, the cache, or
 /// none), the settings, the un-eroded field's hash, the device and driver that eroded it, the cache file and the cost; the
-/// <c>heightFieldHash</c> is now the eroded surface's.</para>
+/// <c>heightFieldHash</c> is now the eroded surface's. Schema 9 (M1.8) added <see cref="Stages"/>, which stages of the preview
+/// ran for this image and which it reused from an earlier render in the same process, and <see cref="Watch"/>, what changed
+/// before a watch render.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 8;
+    public const int CurrentSchema = 9;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -82,6 +84,12 @@ public sealed record Sidecar
 
     /// <summary>Renderer statistics; absent for a dry run.</summary>
     public RenderInfo? Render { get; init; }
+
+    /// <summary>Which stages ran for this image and which it reused from an earlier render in the same process (schema 9).</summary>
+    public required StageInfo Stages { get; init; }
+
+    /// <summary>What changed before this render, when a watch session made it (schema 9); absent otherwise.</summary>
+    public WatchInfo? Watch { get; init; }
 
     /// <summary>Pipeline stage timings in seconds (world generation, mesh, render, write).</summary>
     public required SortedDictionary<string, double> TimingsSeconds { get; init; }
@@ -331,4 +339,68 @@ public sealed record RenderInfo(RenderStats Stats, double RaysPerSample, double 
         ArgumentNullException.ThrowIfNull(stats);
         return new RenderInfo(stats, stats.RaysPerSample(), stats.RaysPerSecond(), dispatchBudgetMs);
     }
+}
+
+/// <summary>
+/// A stage of a preview, in pipeline order (vista-plan §7.4, §10 M1.8). What each depends on decides when a session rebuilds it:
+/// the world follows the set pieces and the seed; the mesh the world (and the camera from M1.9); the acceleration structure the
+/// mesh; the air's tables its model, the scattering orders also the base altitude, the sky view and the sky distribution also the
+/// sun, the camera's altitude and the terrain's span; the render everything the renderer reads, the exposure meter the same at
+/// its own size; the denoised image the render and the denoise settings. Writing the files always runs.
+/// </summary>
+public enum PreviewStage
+{
+    /// <summary>Not a stage.</summary>
+    None,
+
+    /// <summary>The GPU device and its compiled shaders.</summary>
+    Device,
+
+    /// <summary>The world: the base terrain and its erosion (eroded, or read from the erosion cache on disk).</summary>
+    World,
+
+    /// <summary>The terrain mesh, on the CPU.</summary>
+    Mesh,
+
+    /// <summary>The mesh on the GPU and its acceleration structures.</summary>
+    AccelerationStructure,
+
+    /// <summary>The air model's wavelength tables and the columns LUT.</summary>
+    AtmosphereTables,
+
+    /// <summary>The air's scattering orders and the sky's irradiance on the ground.</summary>
+    ScatteringOrders,
+
+    /// <summary>The sky-view LUT.</summary>
+    SkyView,
+
+    /// <summary>The sky distribution (the sky sampled as a light).</summary>
+    SkyDistribution,
+
+    /// <summary>The image's render (trace and readback), with its debug outputs.</summary>
+    Render,
+
+    /// <summary>The exposure meter's render.</summary>
+    ExposureMeter,
+
+    /// <summary>The denoised image.</summary>
+    Denoise,
+}
+
+/// <summary>Which stages ran for one image and which it reused (sidecar schema 9, vista-plan §10 M1.8).</summary>
+/// <param name="Built">The stages that ran for this image, in pipeline order.</param>
+/// <param name="Reused">
+/// The stages whose result an earlier render in the same process made and this image used as it was, in pipeline order. A
+/// stage that does not apply (the GPU stages of a dry run, the denoiser when none was asked for) is in neither list.
+/// </param>
+public sealed record StageInfo(IReadOnlyList<PreviewStage> Built, IReadOnlyList<PreviewStage> Reused);
+
+/// <summary>One render of a watch session (sidecar schema 9, vista-plan §10 M1.8).</summary>
+/// <param name="Render">Its number in the session, from 1.</param>
+/// <param name="Changes">What changed since the last render, by input and field (e.g. <c>camera: exposureEv</c>); empty for the first.</param>
+/// <param name="WaitSeconds">Wall time from the change being seen to this render starting: the wait for the file to settle.</param>
+public sealed record WatchInfo(int Render, IReadOnlyList<string> Changes, double WaitSeconds)
+{
+    /// <summary>Wall time of the render itself, from its start to the sidecar (every stage, the files included).</summary>
+    public double RunSeconds { get; init; }
 }

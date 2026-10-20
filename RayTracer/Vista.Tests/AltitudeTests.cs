@@ -98,7 +98,7 @@ public sealed class AltitudeTests
 
         Sidecar valley = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
         Assert.AreEqual("valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
-        Assert.AreEqual(8, valley.Schema);
+        Assert.AreEqual(9, valley.Schema);
     }
 
     [TestMethod]

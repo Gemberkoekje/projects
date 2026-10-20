@@ -39,6 +39,9 @@ namespace Vista.App.Gpu;
 /// sampler and pdf match <see cref="SkyDistribution"/>'s; and MIS and M1.4's estimator agree on the image's mean within its
 /// noise, over independent renders.</para>
 ///
+/// <para>Then what watch mode relies on (M1.8): after a change of the time of day, the camera's height or the base altitude, a
+/// renderer that rebuilt only the part of the air the change touched renders bit-identically to one that rebuilt all of it.</para>
+///
 /// <para>First of all the world (M1.7): the erosion passes against their C# reference on a 65² patch, and the self-test's world
 /// eroded twice and through a cache round trip, bit-identical each time (see <c>ErosionChecks</c>); the scene above renders that
 /// eroded world.</para>
@@ -100,6 +103,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
 
         pass &= AtmosphereChecks(renderer, scene, settings, tight, log);
+        pass &= WatchChecks(renderer, scene, settings with { Width = 160, Height = 90 }, log);
         pass &= DenoiseChecks(reference, log);
         log.WriteLine(pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
@@ -273,6 +277,41 @@ internal static class GpuSelfTest
     }
 
     /// <summary>
+    /// What a watch session relies on (M1.8): a renderer that rebuilds only the part of the air a change touched renders the view
+    /// exactly as one that rebuilds all of it. Three changes in a row on the same renderer — the time of day (the sky view and the sky
+    /// distribution), a camera 400 m higher (the same), the base altitude (the scattering orders too) — each rendered as the watch
+    /// would, then again after <see cref="D3D12VistaRenderer.ForgetAtmosphere"/>; each pair must be bit-identical, and each render
+    /// must report rebuilding only what its change touched.
+    /// </summary>
+    private static bool WatchChecks(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings, TextWriter log)
+    {
+        bool pass = true;
+        var aovs = new HashSet<Aov>();
+        Render(renderer, scene, settings, aovs, new BatchPlannerOptions(), log, "watch: the scene before the changes");
+        VistaScene day = scene with { Sun = Almanac.For(scene.Recipe with { Time = TimeOfDay.Day }).Sun };
+        VistaScene higher = day with { Camera = day.Camera with { Position = day.Camera.Position with { Y = day.Camera.Position.Y + 400.0 } } };
+        VistaScene altitude = higher with { GroundAltitudeMetres = 3000.0 };
+        string[] sky = [RenderStageKeys.SkyView, RenderStageKeys.SkyDistribution];
+        string[] keys = [RenderStageKeys.DeviceInit, RenderStageKeys.AccelerationBuild, RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
+        foreach ((string label, VistaScene view, string[] rebuilds) in new[]
+        {
+            ("time of day", day, sky),
+            ("camera 400 m higher", higher, sky),
+            ("base altitude 3000 m", altitude, [RenderStageKeys.ScatteringOrders, .. sky]),
+        })
+        {
+            RenderOutput warm = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}");
+            string[] built = [.. keys.Where(warm.Stats.StageSeconds.ContainsKey)];
+            renderer.ForgetAtmosphere();
+            RenderOutput cold = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}, every LUT rebuilt");
+            pass &= Check(log, $"watch: after the {label}, the partial rebuild renders as a full one",
+                (built.SequenceEqual(keys.Where(rebuilds.Contains)) ? null : $"rebuilt {string.Join(", ", built)}")
+                ?? Same(warm, cold, compareAovs: false));
+        }
+        return pass;
+    }
+
+    /// <summary>
     /// The GPU's aerial perspective (<c>CSAerialProbe</c>: the world bent around the camera, the chord, the march) against
     /// <see cref="AerialPerspective"/> fed the GPU's own LUTs, on segments like the terrain's: down from the camera, a short
     /// bounce off to the side, a long grazing one across the tile, and one up a slope; at three wavelengths.
@@ -334,7 +373,7 @@ internal static class GpuSelfTest
             Differs(first.Luminance, rebuilt.Luminance) ?? Differs(first.Distribution.Floats, rebuilt.Distribution.Floats)
             ?? (rebuilt.Distribution.HasLight ? null : "the golden-hour sky has no light"));
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"  sky distribution: {again.Stats.StageSeconds.GetValueOrDefault("skyDistributionGpu") * 1e3:0.00} ms GPU, {again.Stats.StageSeconds.GetValueOrDefault("skyDistribution") * 1e3:0.0} ms in all"));
+            $"  sky distribution: {again.Stats.StageSeconds.GetValueOrDefault(RenderStageKeys.SkyDistribution) * 1e3:0.00} ms GPU, {again.Stats.StageSeconds.GetValueOrDefault("skyDistribution") * 1e3:0.0} ms in all"));
 
         AtmosphereTables atmosphere = AtmosphereTables.Build(air.Model);
         IntegratorTables integrator = IntegratorTables.Build(scene.Materials);
