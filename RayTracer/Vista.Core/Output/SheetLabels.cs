@@ -26,6 +26,7 @@ public static class SheetLabels
         ("recipe.latitude", "latitude"),
         ("recipe.date", "date"),
         ("recipe.solarTime", "solarTime"),
+        ("recipe.sunElevation", "sun"),
         ("seed", "seed"),
         ("camera", "camera"),
         ("camera.position", "position"),
@@ -42,15 +43,17 @@ public static class SheetLabels
         ("image.samplesPerPixel", "spp"),
         ("image.maxBounces", "bounces"),
         ("image.displayTransform", "display"),
+        ("atmosphere", "atmosphere"),
         ("build", "build"),
     ];
 
     /// <summary>
     /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, <c>seed</c>, the
     /// camera (just <c>camera = default</c> for the default camera, whose pose follows the terrain),
-    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality, and the build's commit. A recipe field
-    /// that another overrides says nothing about the image and is left out: the season under a date, the time
-    /// of day under a solar time, and a location of "none" (no place named).
+    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality, how the air was evaluated, and the
+    /// build's commit. A recipe field that another overrides says nothing about the image and is left out: the
+    /// season under a date, the time of day under a solar time or under a sun elevation (except dawn, which says the
+    /// sun is rising), and a location of "none" (no place named).
     /// </summary>
     public static SortedDictionary<string, string> Identity(JsonNode? sidecar)
     {
@@ -64,6 +67,8 @@ public static class SheetLabels
             if (fields.ContainsKey("recipe.date"))
                 fields.Remove("recipe.season");
             if (fields.ContainsKey("recipe.solarTime"))
+                fields.Remove("recipe.time");
+            if (fields.ContainsKey("recipe.sunElevation") && fields.GetValueOrDefault("recipe.time") != "dawn")
                 fields.Remove("recipe.time");
             if (fields.GetValueOrDefault("recipe.location") == "none")
                 fields.Remove("recipe.location");
@@ -100,6 +105,9 @@ public static class SheetLabels
                     fields["image." + key] = Display(v);
             }
         }
+
+        if (root["atmosphere"]?["mode"] is JsonValue mode)
+            fields["atmosphere"] = Display(mode);
 
         if (root["engine"]?["vistaVersion"] is JsonValue version)
             fields["build"] = Build(version.ToString());
@@ -145,6 +153,8 @@ public static class SheetLabels
             {
                 "recipe.name" or "recipe.time" or "recipe.season" or "recipe.location" or "recipe.date" or "image.size" => value,
                 "recipe.solarTime" => $"{value} solar",
+                "recipe.sunElevation" => $"sun at {value}°",
+                "atmosphere" => value == "luts" ? null : $"{value} atmosphere",
                 "recipe.latitude" => $"latitude {value}°",
                 "recipe.setPieces" => value.Length == 0 ? "no set pieces" : value,
                 "seed" => $"seed {value}",

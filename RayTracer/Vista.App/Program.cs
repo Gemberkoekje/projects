@@ -9,9 +9,10 @@ using Vista.Rendering;
 namespace Vista.App;
 
 /// <summary>
-/// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through offline
-/// integrator v0, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
-/// <c>--sheet-from</c> tiles existing images), and the dev-box checks with <c>--gpu-selftest</c>.
+/// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through the offline
+/// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
+/// <c>--sheet-from</c> tiles existing images), and the dev-box checks: <c>--gpu-selftest</c> and
+/// <c>--atmosphere-check</c> (the LUT sky against the reference atmosphere).
 /// </summary>
 internal static class Program
 {
@@ -22,6 +23,8 @@ internal static class Program
         Console.OutputEncoding = Encoding.UTF8; // sizes print as 640×360
         if (args is [SelfTestFlag])
             return RunGpu(() => GpuSelfTest.Run(Console.Out));
+        if (args.FirstOrDefault() == AtmosphereCheck.Flag)
+            return RunGpu(() => AtmosphereCheck.Run(args, Console.Out));
 
         try
         {
@@ -83,7 +86,8 @@ internal static class Program
             Console.Error.WriteLine(error);
         Console.Error.WriteLine(PreviewCommandLine.Usage);
         Console.Error.WriteLine(SheetCommandLine.Usage);
-        Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism checks on the GPU)");
+        Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
+        Console.Error.WriteLine(AtmosphereCheck.Usage);
         return 1;
     }
 
@@ -109,6 +113,11 @@ internal static class Program
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"sun: {sidecar.Place.Name} ({sidecar.Place.LatitudeDegrees:0.00}°), {sun.Date:yyyy-MM-dd} ({sun.DateFrom}), " +
             $"{sun.SolarTime} solar ({sun.SolarTimeFrom}); azimuth {sun.AzimuthDegrees:0.0}°, elevation {sun.ElevationDegrees:0.00}°; {daylight}"));
+        if (sidecar.Exposure is { } exposure)
+        {
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"exposure: metered {exposure.LogAverageLuminanceCdM2:G3} cd/m² (EV100 {exposure.Ev100:0.0}), scaled by {exposure.AppliedEv:+0.0;-0.0} EV; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
+        }
         if (sidecar.Render is { } render)
         {
             RenderStats s = render.Stats;

@@ -1,5 +1,6 @@
 using RayTracer;
 using Vista.Astronomy;
+using Vista.Atmosphere;
 using Vista.Recipes;
 using Vista.Scene;
 using Vista.World;
@@ -33,6 +34,26 @@ public sealed record RenderSettings
 
     /// <summary>How the render is split into TDR-safe dispatches.</summary>
     public BatchPlannerOptions Batching { get; init; } = new();
+
+    /// <summary>How the air is evaluated: the LUTs (the default) or the slow, unbiased reference (vista-plan §10 M1.3).</summary>
+    public AtmosphereMode Atmosphere { get; init; } = AtmosphereMode.Luts;
+
+    /// <summary>
+    /// True for the small render the PNG's exposure is metered from (<see cref="Output.AutoExposure"/>), not an image
+    /// anyone sees. A renderer renders it like any other; it only tells the two apart in statistics and tests.
+    /// </summary>
+    public bool ExposureMeter { get; init; }
+}
+
+/// <summary>How the integrator evaluates the atmosphere (vista-plan §10 M1.3).</summary>
+public enum AtmosphereMode
+{
+    /// <summary>Not chosen.</summary>
+    None,
+    /// <summary>Precomputed LUTs (Hillaire 2020): the sky-view LUT for rays that leave the terrain, the columns LUT for the sun's transmittance.</summary>
+    Luts,
+    /// <summary>The air path-traced as a medium (delta tracking, next-event estimation to the sun): slow and unbiased, the check on the LUTs.</summary>
+    Reference,
 }
 
 /// <summary>
@@ -67,8 +88,13 @@ public static class AovLayout
 /// <param name="Camera">The view.</param>
 /// <param name="Terrain">The terrain height field (for collision checks and future height-field tracing).</param>
 /// <param name="Mesh">The terrain mesh to build the acceleration structure from.</param>
-/// <param name="Sun">Where the sun is (<see cref="Astronomy.Almanac"/>); the M0 light is built from it (<see cref="SkyLight.For(SunPosition)"/>).</param>
+/// <param name="Sun">Where the sun is (<see cref="Astronomy.Almanac"/>).</param>
 /// <param name="Materials">The material table; ids index it.</param>
+/// <param name="Air">The atmosphere above the scene.</param>
+/// <param name="GroundAltitudeMetres">
+/// Altitude above sea level of world <c>y = 0</c>: the scene's base altitude, where the ground sphere of the
+/// atmosphere sits (<see cref="AtmosphereFrame"/>). The place's valley floor until M1.4's altitude control.
+/// </param>
 public sealed record VistaScene(
     Recipe Recipe,
     ulong Seed,
@@ -76,7 +102,14 @@ public sealed record VistaScene(
     HeightField Terrain,
     TerrainMesh Mesh,
     SunPosition Sun,
-    IReadOnlyList<VistaMaterial> Materials);
+    IReadOnlyList<VistaMaterial> Materials,
+    AtmosphereModel Air,
+    double GroundAltitudeMetres)
+{
+    /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
+    public AtmosphereFrame AirFrame() =>
+        AtmosphereFrame.For(Air, GroundAltitudeMetres, Sun.ToSun, Camera.Position.Y, Terrain.MinHeight, Terrain.MaxHeight);
+}
 
 /// <summary>What a renderer returns: the <see cref="RenderSettings.Rendered"/> window of the frame.</summary>
 /// <param name="Width">Width of the rendered window.</param>
@@ -92,8 +125,8 @@ public sealed record RenderOutput(
     RenderStats Stats);
 
 /// <summary>
-/// The seam between the pure pipeline and a GPU backend: <c>D3D12VistaRenderer</c> in Vista.App (offline
-/// integrator v0 on the RTX 3070); tests drive the pipeline with a fake.
+/// The seam between the pure pipeline and a GPU backend: <c>D3D12VistaRenderer</c> in Vista.App (the offline
+/// integrator on the RTX 3070); tests drive the pipeline with a fake.
 /// </summary>
 public interface IVistaRenderer
 {

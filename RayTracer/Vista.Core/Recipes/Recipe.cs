@@ -9,8 +9,8 @@ namespace Vista.Recipes;
 /// world is evaluated. The linked sliders (§3.4) arrive in M1.11.
 ///
 /// <para>Schema 2 (M1.2) added <see cref="Location"/>, <see cref="Latitude"/>, <see cref="Date"/> and
-/// <see cref="SolarTime"/>, and made <see cref="Time"/> relative to the real sunrise and sunset. Schema 1 files
-/// still read; they render at the default place.</para>
+/// <see cref="SolarTime"/>, and made <see cref="Time"/> relative to the real sunrise and sunset. Schema 3 (M1.3)
+/// added <see cref="SunElevation"/>. Older files still read; schema 1 files render at the default place.</para>
 ///
 /// <para><see cref="SetPieces"/> is a <b>set</b>: order never matters (the same pieces in any order make
 /// the same world). Set pieces are chosen before anything renders, and changing the set starts a new scene
@@ -20,7 +20,7 @@ namespace Vista.Recipes;
 public sealed record Recipe
 {
     /// <summary>The recipe file format version this build writes; it reads every version from 1 up to this.</summary>
-    public const int CurrentSchema = 2;
+    public const int CurrentSchema = 3;
 
     /// <summary>File format version, from 1 to <see cref="CurrentSchema"/>.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -59,6 +59,13 @@ public sealed record Recipe
     public TimeOnly? SolarTime { get; init; }
 
     /// <summary>
+    /// A geometric sun elevation in degrees overriding <see cref="Time"/>'s preset: the time of day at which the sun
+    /// stands this high, rising when <see cref="Time"/> is dawn and setting otherwise (twilight is defined on the
+    /// geometric elevation: civil twilight ends at −6°). Null for none; not together with <see cref="SolarTime"/>.
+    /// </summary>
+    public double? SunElevation { get; init; }
+
+    /// <summary>
     /// This recipe with <paramref name="piece"/> added (unchanged if it is already there). Any piece it
     /// conflicts with (<see cref="SetPieceConflicts"/>) is swapped out: adding a frozen lake replaces the lake.
     /// </summary>
@@ -86,6 +93,10 @@ public sealed record Recipe
             errors.Add($"Latitude must be in [-90, 90] degrees, got {latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
         if (Latitude is not null && Location != Place.None)
             errors.Add("Give a location or a custom latitude, not both.");
+        if (SunElevation is double elevation && !(elevation is >= -90.0 and <= 90.0))
+            errors.Add($"The sun elevation must be in [-90, 90] degrees, got {elevation.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+        if (SunElevation is not null && SolarTime is not null)
+            errors.Add("Give a solar time or a sun elevation, not both.");
         if (SetPieces is null)
             errors.Add("Set pieces must be a list (empty for plain base ground).");
         else
@@ -116,5 +127,6 @@ public sealed record Recipe
         && Location == other.Location
         && Nullable.Equals(Latitude, other.Latitude)
         && Date == other.Date
-        && SolarTime == other.SolarTime;
+        && SolarTime == other.SolarTime
+        && Nullable.Equals(SunElevation, other.SunElevation);
 }

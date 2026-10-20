@@ -5,25 +5,25 @@ using Vista.Scene;
 namespace Vista.Rendering;
 
 /// <summary>
-/// The spectral tables integrator v0 uploads (vista-plan §5.1 / §6.4), one entry per hero wavelength of the
-/// engine's deterministic cycle (<see cref="WavelengthLookup"/>, 50 wavelengths). The integrator samples
-/// hero wavelengths exactly as the maze does: hero index <c>(pixelHash + sampleIndex) mod 50</c> plus
-/// <see cref="CompanionCount"/> − 1 companions at a stride of <see cref="CompanionStride"/>, so 50 consecutive
-/// samples of a pixel visit every wavelength <see cref="CompanionCount"/> times. Nothing in v0 is dispersive,
-/// so all companions share the hero's path and the throughput is a float4.
+/// The spectral tables the integrator uploads besides the atmosphere's (vista-plan §5.1 / §6.4), one entry per
+/// hero wavelength of the engine's deterministic cycle (<see cref="WavelengthLookup"/>, 50 wavelengths). The
+/// integrator samples hero wavelengths exactly as the maze does: hero index <c>(pixelHash + sampleIndex) mod 50</c>
+/// plus <see cref="CompanionCount"/> − 1 companions at a stride of <see cref="CompanionStride"/>, so 50 consecutive
+/// samples of a pixel visit every wavelength <see cref="CompanionCount"/> times. Surfaces are not dispersive, so
+/// all companions share the hero's path and the throughput is a float4 (the reference atmosphere is the
+/// exception, and carries the hero alone). The light itself is <see cref="Atmosphere.AtmosphereTables"/>.
 ///
 /// <para>Layouts (all <c>float</c>, row-major; the HLSL reads them as <c>StructuredBuffer</c>s):</para>
 /// <list type="bullet">
 ///   <item><see cref="Cie"/>: 4 per entry — the white-balanced CIE x̄ȳz̄ (<see cref="WavelengthLookup.TryGet"/>)
 ///   and the wavelength in nm, the engine's <c>DeterXYZ</c> layout.</item>
-///   <item><see cref="Light"/>: 4 per entry — the solar shape, <c>(550/λ)⁴</c>, the sun's spectral
-///   irradiance at normal incidence, and the sun disk's radiance (<see cref="SkyLight"/>).</item>
 ///   <item><see cref="Reflectance"/>: <c>[material · Count + entry]</c>, the built-in-tier spectrum of each
 ///   material (<see cref="RgbToReflectanceBasis"/> applied to its linear-sRGB albedo).</item>
 ///   <item><see cref="Albedo"/>: 4 per material — its linear-sRGB albedo and 0, for the albedo output.</item>
 /// </list>
 /// A pixel-sample's XYZ is <c>Σₖ Cie[iₖ].xyz · L(λᵢₖ) / CompanionCount · DeterministicCorrection</c>, which
-/// maps a flat spectrum of 1 to luminance 1.
+/// maps a flat spectrum of 1 to luminance 1: Y is the ȳ-weighted mean spectral radiance, in W·m⁻²·sr⁻¹·nm⁻¹, and
+/// <see cref="LuminancePerY"/> times it is luminance in cd/m².
 /// </summary>
 public sealed class IntegratorTables
 {
@@ -32,12 +32,17 @@ public sealed class IntegratorTables
 
     private static readonly Lazy<WavelengthLookup> SharedLookup = new(() => new WavelengthLookup());
 
-    private IntegratorTables(int count, float correction, float[] cie, float[] light, float[] reflectance, float[] albedo)
+    /// <summary>
+    /// Luminance in cd/m² per unit of Y: 683 lm/W times the integral of the CIE 1931 ȳ over 360–830 nm in 1 nm
+    /// steps (106.857 nm, from the engine's own table), since Y is the ȳ-weighted mean spectral radiance.
+    /// </summary>
+    public const double LuminancePerY = 683.0 * 106.857;
+
+    private IntegratorTables(int count, float correction, float[] cie, float[] reflectance, float[] albedo)
     {
         Count = count;
         DeterministicCorrection = correction;
         Cie = cie;
-        Light = light;
         Reflectance = reflectance;
         Albedo = albedo;
     }
@@ -54,9 +59,6 @@ public sealed class IntegratorTables
     /// <summary>White-balanced CIE response and wavelength, 4 floats per entry.</summary>
     public float[] Cie { get; }
 
-    /// <summary>Solar shape, Rayleigh coefficient, sun irradiance and sun disk radiance, 4 floats per entry.</summary>
-    public float[] Light { get; }
-
     /// <summary>Reflectance per material per entry.</summary>
     public float[] Reflectance { get; }
 
@@ -70,14 +72,13 @@ public sealed class IntegratorTables
     public static WavelengthLookup Wavelengths => SharedLookup.Value;
 
     /// <summary>
-    /// Builds the tables for <paramref name="materials"/> (indexed by <see cref="VistaMaterial.Id"/>) lit by
-    /// <paramref name="light"/>. Reflectance is clamped to [0, 1]: the basis is a minimum-norm fit that can
-    /// dip below zero for saturated colours, which a multi-bounce path must never see.
+    /// Builds the tables for <paramref name="materials"/> (indexed by <see cref="VistaMaterial.Id"/>). Reflectance
+    /// is clamped to [0, 1]: the basis is a minimum-norm fit that can dip below zero for saturated colours, which
+    /// a multi-bounce path must never see.
     /// </summary>
-    public static IntegratorTables Build(IReadOnlyList<VistaMaterial> materials, SkyLight light)
+    public static IntegratorTables Build(IReadOnlyList<VistaMaterial> materials)
     {
         ArgumentNullException.ThrowIfNull(materials);
-        ArgumentNullException.ThrowIfNull(light);
         for (int m = 0; m < materials.Count; m++)
         {
             if (materials[m].Id != m)
@@ -90,17 +91,6 @@ public sealed class IntegratorTables
         RgbToReflectanceBasis basis = RgbToReflectanceBasis.Build(spectral);
 
         var cie = (float[])spectral.DeterXYZ.Clone();
-        var table = new float[n * 4];
-        for (int i = 0; i < n; i++)
-        {
-            float nm = cie[i * 4 + 3];
-            float shape = light.SolarShape(nm, lookup);
-            table[i * 4] = shape;
-            table[i * 4 + 1] = SkyLight.RayleighRelative(nm);
-            table[i * 4 + 2] = light.SunSpectralIrradiance(shape);
-            table[i * 4 + 3] = light.SunDiskRadiance(shape);
-        }
-
         var reflectance = new float[materials.Count * n];
         var albedo = new float[materials.Count * 4];
         for (int m = 0; m < materials.Count; m++)
@@ -114,7 +104,7 @@ public sealed class IntegratorTables
             albedo[m * 4 + 2] = b;
         }
 
-        return new IntegratorTables(n, spectral.DeterministicCorrection, cie, table, reflectance, albedo);
+        return new IntegratorTables(n, spectral.DeterministicCorrection, cie, reflectance, albedo);
     }
 
     /// <summary>

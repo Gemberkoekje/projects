@@ -5,15 +5,15 @@ namespace Vista.Output;
 
 /// <summary>
 /// From the integrator's CIE XYZ to files (vista-plan §5.7). XYZ → linear Rec.709 uses the engine's own
-/// matrix (<see cref="JobSystem.ToSRGB"/>), so Vista and the maze agree on colour. The PNG display transform
-/// is an <b>M0 placeholder</b> — exposure, then the Narkowicz ACES curve the engine's <c>Filmic</c> tone map
-/// uses, then the sRGB transfer — until the AgX/ACES-style filmic transform of M1. The EXR stays
-/// scene-referred (no exposure, no curve).
+/// matrix (<see cref="JobSystem.ToSRGB"/>), so Vista and the maze agree on colour. The PNG display transform is
+/// exposure — metered since M1.3 (<see cref="AutoExposure"/>) — then the Narkowicz ACES curve the engine's
+/// <c>Filmic</c> tone map uses (an M0 placeholder until the AgX/ACES-style filmic transform), then the sRGB
+/// transfer. The EXR stays scene-referred (no exposure, no curve), in W·m⁻²·sr⁻¹·nm⁻¹.
 /// </summary>
 public static class DisplayTransform
 {
     /// <summary>Recorded in the sidecar so a PNG says how it was made.</summary>
-    public const string Name = "exposure + ACES (Narkowicz) + sRGB, M0 placeholder";
+    public const string Name = "auto exposure + ACES (Narkowicz, M0 placeholder) + sRGB";
 
     /// <summary>Converts interleaved XYZ to interleaved linear Rec.709 RGB.</summary>
     public static float[] XyzToLinearRec709(ReadOnlySpan<float> xyz)

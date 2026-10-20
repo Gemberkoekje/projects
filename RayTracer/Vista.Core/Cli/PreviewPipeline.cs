@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using Vista.Astronomy;
+using Vista.Atmosphere;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
@@ -16,6 +17,10 @@ namespace Vista.Cli;
 /// before the GPU and writes the sidecar plus a top-down height map, so the world side can be inspected
 /// from any machine. A loupe request renders only its window of the frame; the files are window-sized and the
 /// sidecar records the window.
+///
+/// <para>Since M1.3 the scene sits in a spectral atmosphere at its place's valley altitude
+/// (<see cref="AtmosphereFrame"/>), the EXR is in physical units, and the PNG is metered
+/// (<see cref="AutoExposure"/>, the camera's exposure as compensation).</para>
 /// </summary>
 public static class PreviewPipeline
 {
@@ -53,6 +58,9 @@ public static class PreviewPipeline
         Almanac almanac = Almanac.For(recipe);
         warnings.AddRange(almanac.Hints);
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
+        AtmosphereModel air = AtmosphereModel.Default;
+        double groundAltitude = almanac.Place.ValleyAltitudeMetres;
+        AtmosphereFrame frame = AtmosphereFrame.For(air, groundAltitude, almanac.Sun.ToSun, camera.Position.Y, terrain.MinHeight, terrain.MaxHeight);
         var settings = new RenderSettings
         {
             Width = request.Width,
@@ -61,6 +69,7 @@ public static class PreviewPipeline
             MaxBounces = request.MaxBounces,
             Batching = new BatchPlannerOptions { DispatchBudgetMs = request.DispatchBudgetMs },
             Window = request.Loupe,
+            Atmosphere = request.Atmosphere,
         };
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
@@ -72,6 +81,7 @@ public static class PreviewPipeline
         string Sibling(string suffix) => Path.Combine(directory, baseName + suffix);
 
         RenderInfo? renderInfo = null;
+        ExposureInfo? exposure = null;
         if (renderer is null)
         {
             (byte[] map, int size) = DebugImages.HeightMap(terrain, camera);
@@ -81,7 +91,7 @@ public static class PreviewPipeline
         }
         else
         {
-            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials);
+            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude);
             var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
             RenderOutput output = renderer.Render(scene, settings, AovsFor(request.Debug), planner);
             if (output.Width != window.Width || output.Height != window.Height)
@@ -91,8 +101,19 @@ public static class PreviewPipeline
             timings["render"] = Lap(stopwatch);
             renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
 
+            // The exposure meter: the whole frame at a fixed size, so every size and loupe of this view is exposed alike.
+            RenderSettings meter = AutoExposure.MeterSettings(settings);
+            RenderOutput metered = renderer.Render(scene, meter, new HashSet<Aov>(), new BatchPlanner(meter.Width, meter.Height, meter.SamplesPerPixel, meter.Batching));
+            exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv) with
+            {
+                MeterWidth = meter.Width,
+                MeterHeight = meter.Height,
+                MeterSamplesPerPixel = meter.SamplesPerPixel,
+            };
+            timings["exposureMeter"] = Lap(stopwatch);
+
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, camera.ExposureEv), window.Width, window.Height, PngColor.Rgb);
+            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv), window.Width, window.Height, PngColor.Rgb);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
             ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
             outputs["beautyExr"] = baseName + ".exr";
@@ -127,7 +148,9 @@ public static class PreviewPipeline
                 mesh.TriangleCount,
                 mesh.ByteSize),
             Place = almanac.Place,
-            Sun = SunInfo.From(almanac, SkyLight.For(almanac.Sun)),
+            Sun = SunInfo.From(almanac, frame),
+            Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere),
+            Exposure = exposure,
             DataTiers = MaterialCatalog.TiersOf(materials),
             Render = renderInfo,
             TimingsSeconds = timings,

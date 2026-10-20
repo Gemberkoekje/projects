@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using RayTracer.Gpu;
+using Vista.Atmosphere;
 using Vista.Rendering;
 using Vista.Scene;
 using Vista.World;
@@ -16,25 +17,30 @@ using static Vortice.DXGI.DXGI;
 namespace Vista.App.Gpu;
 
 /// <summary>
-/// The D3D12 host of offline integrator v0 (vista-plan §10 M0): <c>Shaders/VistaIntegrator.hlsl</c> on DXR 1.1
-/// inline ray tracing. It uploads the <see cref="TerrainMesh"/> into default-heap buffers, builds a BLAS
-/// (32-bit indices) and a one-instance TLAS, and runs the dispatches a <see cref="BatchPlanner"/> plans —
-/// <c>Next</c> → dispatch → <c>Complete</c> with the GPU time from timestamp queries — then reads the float
-/// sums back and converts them with <see cref="IntegratorReadback"/>.
+/// The D3D12 host of the offline integrator (vista-plan §10 M0, M1.3): <c>Shaders/VistaIntegrator.hlsl</c> on DXR
+/// 1.1 inline ray tracing. It uploads the <see cref="TerrainMesh"/> into default-heap buffers, builds a BLAS
+/// (32-bit indices) and a one-instance TLAS, builds the atmosphere LUTs a scene needs
+/// (<c>D3D12VistaRenderer.Atmosphere.cs</c>), and runs the dispatches a <see cref="BatchPlanner"/> plans —
+/// <c>Next</c> → dispatch → <c>Complete</c> with the GPU time from timestamp queries — then reads the float sums
+/// back and converts them with <see cref="IntegratorReadback"/>.
 ///
 /// <para>A render covers <see cref="RenderSettings.Rendered"/>: the whole frame, or a loupe window of it
 /// (vista-plan §7.4). Buffers and dispatches are window-sized; the shader keys each pixel's camera ray and
 /// random numbers by its place in the full frame, so a window is exactly a crop of the full render.</para>
 ///
+/// <para><see cref="AtmosphereMode.Reference"/> runs the same shader compiled with <c>ATMOSPHERE_REFERENCE</c>
+/// (compiled on first use): the air path-traced as a medium instead of read from the LUTs.</para>
+///
 /// <para>Following the engine's convention (vista-plan §8.1), the D3D12 scaffolding — device creation, the
 /// RT-tier check, command objects, the fence wait, buffer helpers, BLAS/TLAS building — is copied from the
 /// <c>PhaseNRenderer</c> hosts rather than shared; only <see cref="ShaderCompiler"/> is reused from
-/// RayTracer.Gpu. The device, pipeline and acceleration structure stay alive between renders of the same
-/// mesh, so a re-render (the determinism checks, a watch mode later) only re-runs the dispatches.</para>
+/// RayTracer.Gpu. The device, pipelines, acceleration structure and LUTs stay alive between renders, so a
+/// re-render only rebuilds what changed.</para>
 /// </summary>
-internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
+internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 {
     private const string ShaderFile = "VistaIntegrator.hlsl";
+    private const string ReferenceDefine = "ATMOSPHERE_REFERENCE";
     private const int GroupSize = 8;
     private const int ConstantBufferBytes = 256;
 
@@ -42,6 +48,12 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const uint AovNormal = 2u;
     private const uint AovFirstHit = 4u;
     private const uint AovVariance = 8u;
+
+    // Root parameter slots of the integrator's root signature.
+    private const int SlotTlas = 0, SlotPositions = 1, SlotNormals = 2, SlotIndices = 3, SlotCie = 4, SlotReflectance = 5, SlotAlbedo = 6;
+    private const int SlotAtmCoefficients = 7, SlotAtmSun = 8, SlotColumns = 9, SlotSkyView = 10, SlotCheckDirections = 11;
+    private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
+    private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -60,9 +72,11 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
     private ID3D12RootSignature _rootSignature = null!;
     private ID3D12PipelineState _pipeline = null!;
+    private ID3D12PipelineState? _referencePipeline;
     private ID3D12QueryHeap _timestamps = null!;
     private ID3D12Resource _timestampReadback = null!;
     private ID3D12Resource _constants = null!;
+    private ID3D12Resource _atmosphereConstants = null!;
     private ID3D12Resource _rayCounter = null!;
     private ID3D12Resource _rayCounterZero = null!;
     private ID3D12Resource _rayCounterReadback = null!;
@@ -77,9 +91,8 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12Resource? _tlas;
     private ID3D12Resource? _instance;
 
-    // Spectral tables: rebuilt per render (they depend on the sun), a few kilobytes.
+    // Surface tables: rebuilt per render, a few kilobytes.
     private ID3D12Resource? _cie;
-    private ID3D12Resource? _light;
     private ID3D12Resource? _reflectance;
     private ID3D12Resource? _albedo;
 
@@ -91,9 +104,10 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12Resource? _normalSum;
     private ID3D12Resource? _firstHit;
 
-    /// <summary>Creates the device, the pipeline and the timing queries. Throws when no DXR 1.1 GPU is present.</summary>
+    /// <summary>Creates the device, the pipelines and the timing queries. Throws when no DXR 1.1 GPU is present.</summary>
     public D3D12VistaRenderer()
     {
+        CheckConstantLayouts();
         var stopwatch = Stopwatch.StartNew();
         bool debug = EnableDebugLayer();
         CreateDeviceAndQueue(debug);
@@ -101,6 +115,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         CreateCommandObjects();
         _initSeconds["deviceInit"] = Lap(stopwatch);
         CreatePipeline();
+        CreateAtmospherePipelines();
         CreateFixedResources();
         _initSeconds["shaderCompile"] = Lap(stopwatch);
     }
@@ -108,7 +123,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     /// <inheritdoc />
     public string DeviceName { get; private set; } = "unknown";
 
-    // ── Constant buffer layout (matches VistaIntegrator.hlsl's cbuffer, 16-byte rows) ─────────────────
+    // ── Constant buffer layouts (match the shaders' cbuffers, 16-byte rows) ────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]
     private struct IntegratorConstants
@@ -116,12 +131,39 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public float CamPosX, CamPosY, CamPosZ, TanHalfFovY;
         public float RightX, RightY, RightZ, Aspect;
         public float UpX, UpY, UpZ, DeterministicCorrection;
-        public float ForwardX, ForwardY, ForwardZ, SkyStrength;
-        public float ToSunX, ToSunY, ToSunZ, SunOneMinusCosMax;
-        public float RayleighDepth; public uint SunUp, MaxBounces, AovMask;
+        public float ForwardX, ForwardY, ForwardZ, Pad0;
+        public uint SunUp, MaxBounces, AovMask, TerrainMaterial;
         public uint Width, Height, RowStart, RowCount;            // the rendered window; rows within it
-        public uint FirstSample, SampleCount, TerrainMaterial, Pad0;
+        public uint FirstSample, SampleCount, Pad1, Pad2;
         public uint WindowX, WindowY, FrameWidth, FrameHeight;    // the window's place in the full frame
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AtmosphereConstants
+    {
+        public float SeaRadius, GroundAltitude, TopAltitude, GroundAlbedo;
+        public float RayleighScaleHeight, AerosolScaleHeight, OzonePeak, OzoneHalfWidth;
+        public float ToSunX, ToSunY, ToSunZ, MieG;
+        public float CameraAltitude, TerrainLowAltitude, TerrainHighAltitude, SunOneMinusCos;
+    }
+
+    /// <summary>
+    /// A cbuffer struct larger than its 256-byte upload buffer would silently lose its last fields on the GPU (an
+    /// engine finding), so the layouts are checked once, loudly.
+    /// </summary>
+    private static void CheckConstantLayouts()
+    {
+        foreach ((string name, int size) in new[]
+        {
+            (nameof(IntegratorConstants), Unsafe.SizeOf<IntegratorConstants>()),
+            (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>()),
+            (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>()),
+            (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>()),
+        })
+        {
+            if (size > ConstantBufferBytes || size % 16 != 0)
+                throw new InvalidOperationException($"{name} is {size} bytes; constant buffers here hold {ConstantBufferBytes} in 16-byte rows.");
+        }
     }
 
     /// <inheritdoc />
@@ -140,10 +182,14 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             throw new ArgumentException("The planner has already issued dispatches.", nameof(planner));
         if (scene.Materials.Count == 0)
             throw new ArgumentException("The scene has no materials.", nameof(scene));
+        if (settings.Atmosphere is not (AtmosphereMode.Luts or AtmosphereMode.Reference))
+            throw new ArgumentException($"Unknown atmosphere mode {settings.Atmosphere}.", nameof(settings));
 
         var stages = new SortedDictionary<string, double>(_initSeconds, StringComparer.Ordinal);
         _initSeconds.Clear();
         var stopwatch = Stopwatch.StartNew();
+        ID3D12PipelineState pipeline = settings.Atmosphere == AtmosphereMode.Reference ? ReferencePipeline(stages) : _pipeline;
+        stopwatch.Restart();
 
         if (!ReferenceEquals(scene.Mesh, _mesh))
         {
@@ -154,15 +200,22 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             _mesh = scene.Mesh;
         }
 
-        SkyLight light = SkyLight.For(scene.Sun);
-        IntegratorTables tables = IntegratorTables.Build(scene.Materials, light);
+        AtmosphereFrame frame = scene.AirFrame();
+        double lutGpuSeconds = EnsureAtmosphere(frame);
+        if (lutGpuSeconds > 0.0)
+        {
+            stages["atmosphereLuts"] = Lap(stopwatch);
+            stages["atmosphereLutsGpu"] = lutGpuSeconds;
+        }
+
+        IntegratorTables tables = IntegratorTables.Build(scene.Materials);
         UploadTables(tables);
         uint mask = MaskFor(aovs);
         EnsureImageBuffers(window.Width, window.Height, mask);
         ResetRayCounter();
         stages["setup"] = Lap(stopwatch);
 
-        IntegratorConstants constants = BaseConstants(scene, settings, light, tables, mask);
+        IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask);
         double traceSeconds = 0.0;
         double longest = 0.0;
         double maxCostNs = 0.0;
@@ -173,7 +226,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             constants.RowCount = (uint)batch.RowCount;
             constants.FirstSample = (uint)batch.FirstSample;
             constants.SampleCount = (uint)batch.SampleCount;
-            double seconds = Dispatch(constants, window.Width, batch.RowCount);
+            double seconds = Dispatch(pipeline, constants, window.Width, batch.RowCount);
             planner.Complete(batch, TimeSpan.FromSeconds(seconds));
             traceSeconds += seconds;
             longest = Math.Max(longest, seconds);
@@ -228,7 +281,7 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         return mask;
     }
 
-    private static IntegratorConstants BaseConstants(VistaScene scene, RenderSettings settings, SkyLight light, IntegratorTables tables, uint mask)
+    private static IntegratorConstants BaseConstants(VistaScene scene, RenderSettings settings, AtmosphereFrame frame, IntegratorTables tables, uint mask)
     {
         CameraSpec camera = scene.Camera;
         Vector3D position = new(camera.Position.X, camera.Position.Y, camera.Position.Z);
@@ -244,16 +297,12 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
             UpX = (float)up.X, UpY = (float)up.Y, UpZ = (float)up.Z,
             DeterministicCorrection = tables.DeterministicCorrection,
             ForwardX = (float)forward.X, ForwardY = (float)forward.Y, ForwardZ = (float)forward.Z,
-            SkyStrength = light.SkyStrength,
-            ToSunX = light.ToSun.X, ToSunY = light.ToSun.Y, ToSunZ = light.ToSun.Z,
-            SunOneMinusCosMax = (float)light.SunOneMinusCosMax,
-            RayleighDepth = light.RayleighDepth,
-            SunUp = light.SunUp ? 1u : 0u,
+            SunUp = frame.SunReachesScene ? 1u : 0u,
             MaxBounces = (uint)settings.MaxBounces,
             AovMask = mask,
+            TerrainMaterial = (uint)MaterialCatalog.Terrain.Id,
             Width = (uint)settings.Rendered.Width,
             Height = (uint)settings.Rendered.Height,
-            TerrainMaterial = (uint)MaterialCatalog.Terrain.Id,
             WindowX = (uint)settings.Rendered.X,
             WindowY = (uint)settings.Rendered.Y,
             FrameWidth = (uint)settings.Width,
@@ -355,30 +404,48 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _commandList.Close();
     }
 
+    private static RootParameter1 Srv(uint register) =>
+        new(RootParameterType.ShaderResourceView, new RootDescriptor1(register, 0), ShaderVisibility.All);
+
+    private static RootParameter1 Uav(uint register) =>
+        new(RootParameterType.UnorderedAccessView, new RootDescriptor1(register, 0), ShaderVisibility.All);
+
+    private static RootParameter1 Cbv(uint register) =>
+        new(RootParameterType.ConstantBufferView, new RootDescriptor1(register, 0), ShaderVisibility.All);
+
     private void CreatePipeline()
     {
-        static RootParameter1 Srv(uint register) =>
-            new(RootParameterType.ShaderResourceView, new RootDescriptor1(register, 0), ShaderVisibility.All);
-        static RootParameter1 Uav(uint register) =>
-            new(RootParameterType.UnorderedAccessView, new RootDescriptor1(register, 0), ShaderVisibility.All);
-
         var rootParameters = new[]
         {
-            Srv(0), Srv(1), Srv(2), Srv(3), Srv(4), Srv(5), Srv(6), Srv(7), // 0–7: TLAS, mesh, tables
-            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5),                 // 8–13: sums, first hit, ray counter
-            new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(0, 0), ShaderVisibility.All), // 14
+            Srv(0), Srv(1), Srv(2), Srv(3), Srv(4), Srv(5), Srv(6),   // 0–6: TLAS, mesh, surface tables
+            Srv(8), Srv(9), Srv(10), Srv(17), Srv(14),                // 7–11: atmosphere tables, columns, sky view, check directions
+            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6),   // 12–18: sums, first hit, ray counter, check sums
+            Cbv(0), Cbv(1), Cbv(2),                                   // 19–21: integrator, atmosphere, check constants
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
+        _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
+    }
 
-        string path = Path.Combine(AppContext.BaseDirectory, "Shaders", ShaderFile);
-        if (!File.Exists(path))
-            throw new FileNotFoundException($"Shader not found at '{path}'.");
-        byte[] bytecode = ShaderCompiler.CompileCompute(File.ReadAllText(path), "CSMain", ShaderFile);
-        _pipeline = _device.CreateComputePipelineState(new ComputePipelineStateDescription
+    private ID3D12PipelineState CompilePipeline(ID3D12RootSignature rootSignature, string source, string entry, string name)
+    {
+        byte[] bytecode = ShaderCompiler.CompileCompute(source, entry, name);
+        return _device.CreateComputePipelineState(new ComputePipelineStateDescription
         {
-            RootSignature = _rootSignature,
+            RootSignature = rootSignature,
             ComputeShader = bytecode,
         });
+    }
+
+    /// <summary>The reference-atmosphere integrator, compiled the first time it is asked for.</summary>
+    private ID3D12PipelineState ReferencePipeline(SortedDictionary<string, double> stages)
+    {
+        if (_referencePipeline is null)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _referencePipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine), "CSMain", ShaderFile);
+            stages["referenceShaderCompile"] = stopwatch.Elapsed.TotalSeconds;
+        }
+        return _referencePipeline;
     }
 
     private void CreateFixedResources()
@@ -386,10 +453,12 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _timestamps = _device.CreateQueryHeap<ID3D12QueryHeap>(new QueryHeapDescription(QueryHeapType.Timestamp, 2));
         _timestampReadback = CreateBuffer(HeapType.Readback, 2 * sizeof(ulong), ResourceStates.CopyDest);
         _constants = CreateBuffer(HeapType.Upload, ConstantBufferBytes, ResourceStates.GenericRead);
+        _atmosphereConstants = CreateBuffer(HeapType.Upload, ConstantBufferBytes, ResourceStates.GenericRead);
         _rayCounter = CreateUavBuffer(2 * sizeof(uint));
         _rayCounterZero = CreateUploadBuffer<uint>([0u, 0u]);
         _rayCounterReadback = CreateBuffer(HeapType.Readback, 2 * sizeof(uint), ResourceStates.CopyDest);
         _dummyUav = CreateUavBuffer(16);
+        CreateAtmosphereFixedResources();
     }
 
     // ── Scene ───────────────────────────────────────────────────────────────────────────────────────
@@ -477,7 +546,6 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     {
         DisposeTables();
         _cie = CreateDefaultBuffer<float>(tables.Cie);
-        _light = CreateDefaultBuffer<float>(tables.Light);
         _reflectance = CreateDefaultBuffer<float>(tables.Reflectance);
         _albedo = CreateDefaultBuffer<float>(tables.Albedo);
     }
@@ -510,33 +578,51 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     }
 
     /// <summary>Runs one batch and returns its GPU time in seconds.</summary>
-    private double Dispatch(IntegratorConstants constants, int width, int rows)
+    private double Dispatch(ID3D12PipelineState pipeline, IntegratorConstants constants, int width, int rows)
     {
-        Span<IntegratorConstants> mapped = _constants.Map<IntegratorConstants>(0, 1);
-        mapped[0] = constants;
-        _constants.Unmap(0);
+        Write(_constants, constants);
+        return Timed(pipeline, _rootSignature, list =>
+        {
+            BindIntegrator(list);
+            list.Dispatch((uint)((width + GroupSize - 1) / GroupSize), (uint)((rows + GroupSize - 1) / GroupSize), 1);
+        });
+    }
 
+    /// <summary>Binds every root parameter of the integrator's root signature (unused ones to dummies).</summary>
+    private void BindIntegrator(ID3D12GraphicsCommandList4 list)
+    {
+        list.SetComputeRootShaderResourceView(SlotTlas, (_tlas ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotPositions, (_positions ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotNormals, (_normals ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotIndices, (_indices ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotCie, (_cie ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotReflectance, (_reflectance ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotAlbedo, (_albedo ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotAtmCoefficients, _atmCoefficients!.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotAtmSun, _atmSun!.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotColumns, _columnsLut.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotSkyView, _skyViewLut.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotCheckDirections, (_checkDirections ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotXyz, (_xyzSum ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotLuma, (_lumaStats ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotAlbedoSum, (_albedoSum ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotNormalSum, (_normalSum ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotFirstHit, (_firstHit ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotRayCounter, _rayCounter.GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotCheckSums, (_checkSums ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootConstantBufferView(SlotConstants, _constants.GPUVirtualAddress);
+        list.SetComputeRootConstantBufferView(SlotAtmosphereConstants, _atmosphereConstants.GPUVirtualAddress);
+        list.SetComputeRootConstantBufferView(SlotCheckConstants, _checkConstants.GPUVirtualAddress);
+    }
+
+    /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
+    private double Timed(ID3D12PipelineState pipeline, ID3D12RootSignature rootSignature, Action<ID3D12GraphicsCommandList4> record)
+    {
         _allocator.Reset();
-        _commandList.Reset(_allocator, _pipeline);
-        _commandList.SetComputeRootSignature(_rootSignature);
-        _commandList.SetComputeRootShaderResourceView(0, _tlas!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(1, _positions!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(2, _normals!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(3, _indices!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(4, _cie!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(5, _light!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(6, _reflectance!.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(7, _albedo!.GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(8, _xyzSum!.GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(9, (_lumaStats ?? _dummyUav).GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(10, (_albedoSum ?? _dummyUav).GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(11, (_normalSum ?? _dummyUav).GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(12, (_firstHit ?? _dummyUav).GPUVirtualAddress);
-        _commandList.SetComputeRootUnorderedAccessView(13, _rayCounter.GPUVirtualAddress);
-        _commandList.SetComputeRootConstantBufferView(14, _constants.GPUVirtualAddress);
-
+        _commandList.Reset(_allocator, pipeline);
+        _commandList.SetComputeRootSignature(rootSignature);
         _commandList.EndQuery(_timestamps, QueryType.Timestamp, 0);
-        _commandList.Dispatch((uint)((width + GroupSize - 1) / GroupSize), (uint)((rows + GroupSize - 1) / GroupSize), 1);
+        record(_commandList);
         _commandList.EndQuery(_timestamps, QueryType.Timestamp, 1);
         _commandList.ResolveQueryData(_timestamps, QueryType.Timestamp, 0, 2, _timestampReadback, 0);
         _commandList.Close();
@@ -547,6 +633,13 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         ulong elapsed = ticks[1] - ticks[0];
         _timestampReadback.Unmap(0);
         return (double)elapsed / _timestampFrequency;
+    }
+
+    private static void Write<T>(ID3D12Resource upload, T value) where T : unmanaged
+    {
+        Span<T> mapped = upload.Map<T>(0, 1);
+        mapped[0] = value;
+        upload.Unmap(0);
     }
 
     // ── Readback ────────────────────────────────────────────────────────────────────────────────────
@@ -589,8 +682,8 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     /// <summary>
     /// A default-heap buffer shaders can write. Buffers are created in COMMON whatever the initial state says
     /// (except acceleration structures), and every command list here is its own submission, so buffers decay
-    /// back to COMMON between them and are promoted implicitly to UAV, copy source or copy destination: no
-    /// explicit barriers needed.
+    /// back to COMMON between them and are promoted implicitly to UAV, shader resource, copy source or copy
+    /// destination: no explicit barriers needed.
     /// </summary>
     private ID3D12Resource CreateUavBuffer(ulong bytes, ResourceStates state = ResourceStates.Common) =>
         _device.CreateCommittedResource(
@@ -663,9 +756,8 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
     {
         _albedo?.Dispose();
         _reflectance?.Dispose();
-        _light?.Dispose();
         _cie?.Dispose();
-        (_albedo, _reflectance, _light, _cie) = (null, null, null, null);
+        (_albedo, _reflectance, _cie) = (null, null, null);
     }
 
     private void DisposeImage()
@@ -694,13 +786,16 @@ internal sealed class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeImage();
         DisposeTables();
         DisposeScene();
+        DisposeAtmosphere();
         _dummyUav?.Dispose();
         _rayCounterReadback?.Dispose();
         _rayCounterZero?.Dispose();
         _rayCounter?.Dispose();
+        _atmosphereConstants?.Dispose();
         _constants?.Dispose();
         _timestampReadback?.Dispose();
         _timestamps?.Dispose();
+        _referencePipeline?.Dispose();
         _pipeline?.Dispose();
         _rootSignature?.Dispose();
         _commandList?.Dispose();

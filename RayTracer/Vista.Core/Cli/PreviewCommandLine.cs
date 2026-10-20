@@ -74,6 +74,9 @@ public sealed record PreviewRequest
 
     /// <summary>Camera fields to override, applied to the supplied or the default camera.</summary>
     public IReadOnlyDictionary<string, string> CameraOverrides { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>How the air is evaluated (vista-plan §10 M1.3): the LUTs, or the reference.</summary>
+    public AtmosphereMode Atmosphere { get; init; } = AtmosphereMode.Luts;
 }
 
 /// <summary>
@@ -83,12 +86,15 @@ public sealed record PreviewRequest
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
+///           [--sun-elevation -2] [--atmosphere luts | reference]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
 /// options override the recipe's fields (vista-plan §3.5): <c>--location</c> or <c>--latitude</c> picks the
 /// place (and clears the other), <c>--date</c> overrides the season, and <c>--time</c> takes a time-of-day
-/// preset (clearing the recipe's solar time) or a local solar time.
+/// preset (clearing the recipe's solar time) or a local solar time, and <c>--sun-elevation</c> the time at which the
+/// sun stands that high (rising when the time is dawn). <c>--atmosphere reference</c> renders the slow, unbiased
+/// reference atmosphere instead of the LUTs (vista-plan §10 M1.3).
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -114,7 +120,9 @@ public static class PreviewCommandLine
         "  places: yellowstone, banff, yosemite, lofoten, iceland, scottishHighlands, zermatt (default), dolomites,\n" +
         "          torresDelPaine, fiordland, hokkaido\n" +
         "  presets: dawn (sunrise − 20 min), day (solar noon), goldenHour (sunset − 60 min), dusk (sunset + 20 min), night;\n" +
-        "  hh:mm is local solar time (12:00 is solar noon). A date overrides the recipe's season.";
+        "  hh:mm is local solar time (12:00 is solar noon). A date overrides the recipe's season.\n" +
+        "  --sun-elevation <degrees>: the time the sun stands that high (geometric; rising with --time dawn, else setting).\n" +
+        "--atmosphere luts (default) | reference: the precomputed sky, or the air path-traced as a medium (slow, unbiased).";
 
     /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
@@ -124,6 +132,7 @@ public static class PreviewCommandLine
             ["--latitude"] = ["location", "latitude"],
             ["--date"] = ["date", "season"],
             ["--time"] = ["time", "solarTime"],
+            ["--sun-elevation"] = ["sunElevation", "solarTime"],
         };
 
     private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
@@ -154,7 +163,7 @@ public static class PreviewCommandLine
     internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
-        "--location", "--latitude", "--date", "--time",
+        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--atmosphere",
     };
 
     /// <summary>
@@ -223,6 +232,7 @@ public static class PreviewCommandLine
         HashSet<DebugOutput> debug = DebugSet(values.GetValueOrDefault("--debug"), problems);
         PixelWindow loupe = Loupe(values.GetValueOrDefault("--loupe"), width, height, problems);
         Dictionary<string, string> recipeOverrides = PlaceOverrides(values, problems);
+        AtmosphereMode atmosphere = Atmosphere(values.GetValueOrDefault("--atmosphere"), problems);
 
         if (problems.Count > before)
             return null;
@@ -241,7 +251,22 @@ public static class PreviewCommandLine
             DryRun = dryRun,
             Loupe = loupe,
             RecipeOverrides = recipeOverrides,
+            Atmosphere = atmosphere,
         };
+    }
+
+    /// <summary>Parses an <c>--atmosphere</c> value (<c>luts</c> or <c>reference</c>).</summary>
+    internal static bool TryParseAtmosphere(string text, out AtmosphereMode mode) =>
+        Enum.TryParse(text, ignoreCase: true, out mode) && mode != AtmosphereMode.None && Enum.IsDefined(mode) && !int.TryParse(text, out _);
+
+    private static AtmosphereMode Atmosphere(string? text, List<string> problems)
+    {
+        if (text is null)
+            return AtmosphereMode.Luts;
+        if (TryParseAtmosphere(text, out AtmosphereMode mode))
+            return mode;
+        problems.Add($"--atmosphere must be luts or reference, got '{text}'.");
+        return AtmosphereMode.Luts;
     }
 
     /// <summary>The recipe overrides of the place options (JSON values by field), checked here so a typo is one CLI error.</summary>
@@ -294,10 +319,26 @@ public static class PreviewCommandLine
             else if (TimeOnly.TryParseExact(timeText, ["H:mm", "H:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out TimeOnly time))
             {
                 overrides["solarTime"] = JsonSerializer.Serialize(time.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+                overrides["sunElevation"] = "null";
             }
             else
             {
                 problems.Add($"--time must be dawn, day, goldenHour, dusk, night or a local solar time like 17:30, got '{timeText}'.");
+            }
+        }
+        if (values.TryGetValue("--sun-elevation", out string? elevationText))
+        {
+            if (double.TryParse(elevationText, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double elevation)
+                && elevation is >= -90.0 and <= 90.0)
+            {
+                if (overrides.ContainsKey("solarTime") && values.ContainsKey("--time") && overrides["solarTime"] != "null")
+                    problems.Add("--time hh:mm and --sun-elevation both set the time; give one.");
+                overrides["sunElevation"] = elevation.ToString("R", CultureInfo.InvariantCulture);
+                overrides["solarTime"] = "null";
+            }
+            else
+            {
+                problems.Add($"--sun-elevation must be a number of degrees in [-90, 90], got '{elevationText}'.");
             }
         }
         return overrides;

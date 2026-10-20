@@ -26,13 +26,23 @@ internal sealed class FakeRenderer : IVistaRenderer
 
     public string DeviceName => Name;
 
+    /// <summary>Exposure-meter renders (<see cref="RenderSettings.ExposureMeter"/>), kept apart from the image renders above.</summary>
+    public List<RenderSettings> Meters { get; } = [];
+
     public RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner)
     {
-        Scene = scene;
-        Scenes.Add(scene);
-        Settings = settings;
-        Planner = planner;
-        Requested = aovs;
+        if (settings.ExposureMeter)
+        {
+            Meters.Add(settings);
+        }
+        else
+        {
+            Scene = scene;
+            Scenes.Add(scene);
+            Settings = settings;
+            Planner = planner;
+            Requested = aovs;
+        }
         PixelWindow window = settings.Rendered;
         Assert.AreEqual(window.Width, planner.Width, "the planner is sized to the rendered window");
         Assert.AreEqual(window.Height, planner.Height, "the planner is sized to the rendered window");

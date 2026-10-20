@@ -1,52 +1,49 @@
 using System.Numerics;
 using RayTracer;
-using Vista.Astronomy;
-using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
 
 namespace Vista.Tests;
 
-/// <summary>The spectral tables integrator v0 uploads (vista-plan §5.1, §6.4).</summary>
+/// <summary>The surface tables the integrator uploads (vista-plan §5.1, §6.4); the light's are <c>AtmosphereTables</c>.</summary>
 [TestClass]
 public sealed class IntegratorTablesTests
 {
-    private static readonly SkyLight Light = SkyLight.For(Almanac.For(new Recipe { Time = TimeOfDay.GoldenHour }).Sun);
-
     [TestMethod]
     public void Layout_IsTheEnginesHeroCycle()
     {
-        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, Light);
+        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0);
         SpectralResources engine = SpectralResourceBaker.Bake(IntegratorTables.Wavelengths, []);
 
         Assert.AreEqual(50, tables.Count);
         Assert.AreEqual(12, tables.CompanionStride, "the shader hard-codes COMPANION_STRIDE 12");
         CollectionAssert.AreEqual(engine.DeterXYZ, tables.Cie);
         Assert.AreEqual(engine.DeterministicCorrection, tables.DeterministicCorrection);
-        Assert.AreEqual(tables.Count * 4, tables.Light.Length);
         Assert.AreEqual(MaterialCatalog.M0.Count * tables.Count, tables.Reflectance.Length);
         Assert.AreEqual(MaterialCatalog.M0.Count * 4, tables.Albedo.Length);
     }
 
     [TestMethod]
-    public void LightTable_HoldsTheSkyLightTerms()
+    public void LuminancePerY_IsTheCieYIntegralOfTheEnginesTable()
     {
-        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, Light);
-        for (int i = 0; i < tables.Count; i++)
+        // Y is the ȳ-weighted mean spectral radiance; 683 lm/W times ∫ȳ dλ over the engine's own 1 nm CIE table
+        // turns it into cd/m².
+        using Stream stream = typeof(WavelengthLookup).Assembly.GetManifestResourceStream("RayTracer.Data.CIE_xyz_1931_2deg.csv")!;
+        using var reader = new StreamReader(stream);
+        double integral = 0.0;
+        while (reader.ReadLine() is { } line)
         {
-            float nm = tables.WavelengthNm(i);
-            float shape = Light.SolarShape(nm, IntegratorTables.Wavelengths);
-            Assert.AreEqual(shape, tables.Light[i * 4], 1e-6f);
-            Assert.AreEqual(SkyLight.RayleighRelative(nm), tables.Light[i * 4 + 1], 1e-6f);
-            Assert.AreEqual(Light.SunSpectralIrradiance(shape), tables.Light[i * 4 + 2], 1e-5f);
-            Assert.AreEqual(Light.SunDiskRadiance(shape), tables.Light[i * 4 + 3], tables.Light[i * 4 + 3] * 1e-6f);
+            string[] parts = line.Split(',');
+            if (parts.Length == 4 && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double y))
+                integral += y;
         }
+        Assert.AreEqual(IntegratorTables.LuminancePerY, 683.0 * integral, 683.0 * 1e-3);
     }
 
     [TestMethod]
     public void FlatSpectrum_OverTheWholeCycle_IsLuminanceOne()
     {
-        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, Light);
+        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0);
         Vector3 sum = Vector3.Zero;
         for (int hero = 0; hero < tables.Count; hero++)
             sum += tables.SampleXyz(hero, [1f, 1f, 1f, 1f]);
@@ -57,7 +54,7 @@ public sealed class IntegratorTablesTests
     [TestMethod]
     public void TerrainReflectance_IsPhysicalAndRoundTripsToItsAlbedo()
     {
-        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, Light);
+        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0);
         VistaMaterial terrain = MaterialCatalog.Terrain;
         SpectralResources spectral = SpectralResourceBaker.Bake(IntegratorTables.Wavelengths, []);
         RgbToReflectanceBasis basis = RgbToReflectanceBasis.Build(spectral);
@@ -79,12 +76,12 @@ public sealed class IntegratorTablesTests
     public void SaturatedColour_IsClampedToPhysicalReflectance()
     {
         VistaMaterial[] materials = [new VistaMaterial(0, "saturated", DataTier.BuiltIn, (0.9f, 0.02f, 0.02f))];
-        IntegratorTables tables = IntegratorTables.Build(materials, Light);
+        IntegratorTables tables = IntegratorTables.Build(materials);
         Assert.IsTrue(tables.Reflectance.All(v => v is >= 0f and <= 1f));
     }
 
     [TestMethod]
     public void MaterialIds_MustEqualTheirIndex() =>
         Assert.ThrowsExactly<ArgumentException>(() =>
-            IntegratorTables.Build([new VistaMaterial(3, "misplaced", DataTier.BuiltIn, (0.5f, 0.5f, 0.5f))], Light));
+            IntegratorTables.Build([new VistaMaterial(3, "misplaced", DataTier.BuiltIn, (0.5f, 0.5f, 0.5f))]));
 }

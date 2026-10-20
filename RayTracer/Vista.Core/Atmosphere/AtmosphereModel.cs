@@ -1,0 +1,187 @@
+using System.Globalization;
+
+namespace Vista.Atmosphere;
+
+/// <summary>
+/// The air above a Vista scene (vista-plan §5.2, §10 M1.3): a spherical shell from sea level to
+/// <see cref="TopAltitudeMetres"/> holding three species, each a fixed density profile times its optical
+/// coefficients.
+/// <list type="bullet">
+///   <item><b>Air molecules</b> (Rayleigh scattering): exponential with <see cref="RayleighScaleHeightMetres"/>,
+///   coefficients from <see cref="AirOptics"/>.</item>
+///   <item><b>Aerosol haze</b> (Mie, Henyey–Greenstein until M4): exponential with
+///   <see cref="AerosolScaleHeightMetres"/>; its extinction follows Ångström's law,
+///   <c>τ(λ) = τ₅₅₀·(λ/550)^−α</c>, a fraction <see cref="AerosolSingleScatteringAlbedo"/> of it scattering.</item>
+///   <item><b>Ozone</b> (absorption only): a tent rising linearly from zero at
+///   <see cref="OzonePeakAltitudeMetres"/> − <see cref="OzoneHalfWidthMetres"/> to its peak and back
+///   (Bruneton 2017's approximate profile), holding <see cref="OzoneDobsonUnits"/>.</item>
+/// </list>
+/// Densities are relative: 1 at sea level for molecules and haze, 1 at the peak for ozone, so a coefficient
+/// times a relative density is per metre, and a coefficient times a column of relative density (metres) is
+/// an optical depth.
+///
+/// <para>The defaults are a clear continental day: haze of optical depth 0.1 at 550 nm (Ångström's α = 1.3)
+/// and Bruneton 2017's aerosol albedo 0.9 and asymmetry 0.8; 300 Dobson units of ozone. Because the haze
+/// profile starts at sea level, a scene high in the mountains sits above most of it, as real mountain air
+/// does. M1.11's haze slider will move <see cref="AerosolOpticalDepth550"/>.</para>
+///
+/// <para>The <b>ground</b> is not part of the model: a scene puts it at its base altitude
+/// (<see cref="AtmosphereFrame"/>), a sphere that casts the Earth's shadow and stands in for the land beyond
+/// the terrain tile, with a flat <see cref="GroundAlbedo"/>.</para>
+/// </summary>
+public sealed record AtmosphereModel
+{
+    /// <summary>Radius of the sea-level sphere, m (Bruneton 2017, Hillaire 2020).</summary>
+    public double PlanetRadiusMetres { get; init; } = 6_360_000.0;
+
+    /// <summary>Altitude of the top of the atmosphere above sea level, m (Hillaire 2020).</summary>
+    public double TopAltitudeMetres { get; init; } = 100_000.0;
+
+    /// <summary>Scale height of the air molecules, m (<see cref="AirOptics.RayleighScaleHeightMetres"/>).</summary>
+    public double RayleighScaleHeightMetres { get; init; } = AirOptics.RayleighScaleHeightMetres;
+
+    /// <summary>Vertical optical depth of the haze from sea level at 550 nm.</summary>
+    public double AerosolOpticalDepth550 { get; init; } = 0.1;
+
+    /// <summary>Ångström exponent of the haze's extinction.</summary>
+    public double AngstromExponent { get; init; } = 1.3;
+
+    /// <summary>Fraction of the haze's extinction that is scattering.</summary>
+    public double AerosolSingleScatteringAlbedo { get; init; } = 0.9;
+
+    /// <summary>Henyey–Greenstein asymmetry of the haze.</summary>
+    public double AerosolAsymmetry { get; init; } = 0.8;
+
+    /// <summary>Scale height of the haze, m (Bruneton 2017, Hillaire 2020).</summary>
+    public double AerosolScaleHeightMetres { get; init; } = 1200.0;
+
+    /// <summary>Total ozone column, Dobson units.</summary>
+    public double OzoneDobsonUnits { get; init; } = 300.0;
+
+    /// <summary>Altitude of the ozone peak above sea level, m.</summary>
+    public double OzonePeakAltitudeMetres { get; init; } = 25_000.0;
+
+    /// <summary>Half-width of the ozone tent, m (it is zero below peak − this and above peak + this).</summary>
+    public double OzoneHalfWidthMetres { get; init; } = 15_000.0;
+
+    /// <summary>Lambertian albedo of the ground sphere (the land beyond the terrain tile), flat in wavelength.</summary>
+    public double GroundAlbedo { get; init; } = 0.2;
+
+    /// <summary>The default clear-day atmosphere.</summary>
+    public static AtmosphereModel Default { get; } = new();
+
+    /// <summary>Radius of the top of the atmosphere, m.</summary>
+    public double TopRadiusMetres => PlanetRadiusMetres + TopAltitudeMetres;
+
+    /// <summary>Ozone number density at the peak, 1/m³: the column spread over the tent's area (one half-width).</summary>
+    public double OzonePeakNumberDensity => OzoneDobsonUnits * AirOptics.DobsonUnit / OzoneHalfWidthMetres;
+
+    /// <summary>The optical coefficients at <paramref name="nm"/>, per metre at relative density 1.</summary>
+    public AtmosphereCoefficients CoefficientsAt(double nm)
+    {
+        double rayleigh = AirOptics.RayleighCrossSection(nm) * AirOptics.StandardNumberDensity
+            * (AirOptics.RayleighScaleHeightMetres / RayleighScaleHeightMetres);
+        double aerosolExtinction = AerosolOpticalDepth550 * Math.Pow(nm / 550.0, -AngstromExponent) / AerosolScaleHeightMetres;
+        return new AtmosphereCoefficients(
+            rayleigh,
+            aerosolExtinction * AerosolSingleScatteringAlbedo,
+            aerosolExtinction,
+            AirOptics.OzoneCrossSection(nm) * OzonePeakNumberDensity);
+    }
+
+    /// <summary>Relative density of the air molecules at <paramref name="altitudeMetres"/> above sea level.</summary>
+    public double RayleighDensity(double altitudeMetres) => Math.Exp(-altitudeMetres / RayleighScaleHeightMetres);
+
+    /// <summary>Relative density of the haze at <paramref name="altitudeMetres"/> above sea level.</summary>
+    public double AerosolDensity(double altitudeMetres) => Math.Exp(-altitudeMetres / AerosolScaleHeightMetres);
+
+    /// <summary>Relative density of ozone at <paramref name="altitudeMetres"/> above sea level (the tent).</summary>
+    public double OzoneDensity(double altitudeMetres) =>
+        Math.Max(0.0, 1.0 - Math.Abs(altitudeMetres - OzonePeakAltitudeMetres) / OzoneHalfWidthMetres);
+
+    /// <summary>
+    /// Columns of relative density, m, straight up from <paramref name="altitudeMetres"/> to the top: exact,
+    /// because a vertical ray is radial (the integrals of an exponential and a tent).
+    /// </summary>
+    public DensityColumns ZenithColumns(double altitudeMetres)
+    {
+        double top = TopAltitudeMetres;
+        double h = Math.Clamp(altitudeMetres, 0.0, top);
+        double Exponential(double scale) => scale * (Math.Exp(-h / scale) - Math.Exp(-top / scale));
+        return new DensityColumns(Exponential(RayleighScaleHeightMetres), Exponential(AerosolScaleHeightMetres), OzoneColumnAbove(h));
+    }
+
+    /// <summary>Zenith optical depths from <paramref name="altitudeMetres"/> at <paramref name="nm"/>: (Rayleigh, aerosol, ozone).</summary>
+    public (double Rayleigh, double Aerosol, double Ozone) ZenithOpticalDepths(double nm, double altitudeMetres)
+    {
+        AtmosphereCoefficients k = CoefficientsAt(nm);
+        DensityColumns c = ZenithColumns(altitudeMetres);
+        return (k.Rayleigh * c.Rayleigh, k.AerosolExtinction * c.Aerosol, k.Ozone * c.Ozone);
+    }
+
+    /// <summary>Problems that make this model unusable (empty when it is valid).</summary>
+    public IReadOnlyList<string> Validate()
+    {
+        var errors = new List<string>();
+        void Positive(string name, double value)
+        {
+            if (!(value > 0.0) || !double.IsFinite(value))
+                errors.Add(string.Create(CultureInfo.InvariantCulture, $"{name} must be positive, got {value}."));
+        }
+        Positive(nameof(PlanetRadiusMetres), PlanetRadiusMetres);
+        Positive(nameof(TopAltitudeMetres), TopAltitudeMetres);
+        Positive(nameof(RayleighScaleHeightMetres), RayleighScaleHeightMetres);
+        Positive(nameof(AerosolScaleHeightMetres), AerosolScaleHeightMetres);
+        Positive(nameof(OzoneHalfWidthMetres), OzoneHalfWidthMetres);
+        if (!(AerosolOpticalDepth550 >= 0.0) || !(OzoneDobsonUnits >= 0.0))
+            errors.Add("Haze optical depth and ozone column must not be negative.");
+        if (!(AerosolSingleScatteringAlbedo is >= 0.0 and <= 1.0) || !(GroundAlbedo is >= 0.0 and <= 1.0))
+            errors.Add("Albedos must be in [0, 1].");
+        if (!(AerosolAsymmetry is > -1.0 and < 1.0))
+            errors.Add("The haze asymmetry must be in (−1, 1).");
+        if (OzonePeakAltitudeMetres + OzoneHalfWidthMetres > TopAltitudeMetres || OzonePeakAltitudeMetres - OzoneHalfWidthMetres < 0.0)
+            errors.Add("The ozone layer must lie between sea level and the top of the atmosphere.");
+        return errors;
+    }
+
+    private double OzoneColumnAbove(double h)
+    {
+        double peak = OzonePeakAltitudeMetres;
+        double w = OzoneHalfWidthMetres;
+        // The tent's integral from h upward: its whole area (one half-width) minus the part below h.
+        double below;
+        if (h <= peak - w)
+            below = 0.0;
+        else if (h <= peak)
+        {
+            double rise = h - (peak - w);
+            below = rise * rise / (2.0 * w);
+        }
+        else if (h < peak + w)
+        {
+            double fall = peak + w - h;
+            below = w - fall * fall / (2.0 * w);
+        }
+        else
+            below = w;
+        return w - below;
+    }
+}
+
+/// <summary>Optical coefficients at one wavelength, per metre at relative density 1.</summary>
+/// <param name="Rayleigh">Molecular scattering (no absorption) at sea level.</param>
+/// <param name="AerosolScattering">Haze scattering at sea level.</param>
+/// <param name="AerosolExtinction">Haze extinction (scattering plus absorption) at sea level.</param>
+/// <param name="Ozone">Ozone absorption at the peak.</param>
+public readonly record struct AtmosphereCoefficients(double Rayleigh, double AerosolScattering, double AerosolExtinction, double Ozone)
+{
+    /// <summary>The optical depth of <paramref name="columns"/> at this wavelength.</summary>
+    public double OpticalDepth(DensityColumns columns) =>
+        Rayleigh * columns.Rayleigh + AerosolExtinction * columns.Aerosol + Ozone * columns.Ozone;
+}
+
+/// <summary>Columns of relative density along a path, m: optical depth is each one times its coefficient.</summary>
+/// <param name="Rayleigh">Air molecules.</param>
+/// <param name="Aerosol">Haze.</param>
+/// <param name="Ozone">Ozone.</param>
+public readonly record struct DensityColumns(double Rayleigh, double Aerosol, double Ozone);

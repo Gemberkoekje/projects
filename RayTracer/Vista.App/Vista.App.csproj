@@ -17,9 +17,10 @@
     <AssemblyName>Vista.App</AssemblyName>
   </PropertyGroup>
 
-  <!-- ShaderCompiler loads HLSL from AppContext.BaseDirectory/Shaders/, so the integrator ships next to the .exe. -->
+  <!-- The shaders load from AppContext.BaseDirectory/Shaders/ (Gpu/ShaderSource.cs inlines the .hlsli), so they ship
+       next to the .exe: the integrator, the atmosphere LUT builders and their shared atmosphere include. -->
   <ItemGroup>
-    <None Update="Shaders\VistaIntegrator.hlsl">
+    <None Update="Shaders\VistaIntegrator.hlsl;Shaders\VistaAtmosphereLuts.hlsl;Shaders\VistaAtmosphere.hlsli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

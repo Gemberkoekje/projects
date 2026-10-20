@@ -1,5 +1,6 @@
 using System.Reflection;
 using Vista.Astronomy;
+using Vista.Atmosphere;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
@@ -14,12 +15,15 @@ namespace Vista.Output;
 ///
 /// <para>Schema 2 (M1.1) added <see cref="ImageInfo.Window"/>, the part of the frame the image shows. Schema 3
 /// (M1.2) added <see cref="Place"/> and the astronomy in <see cref="Sun"/>: date, local solar time, sunrise,
-/// sunset, azimuth and elevation, each with where it came from.</para>
+/// sunset, azimuth and elevation, each with where it came from. Schema 4 (M1.3) added <see cref="Atmosphere"/>
+/// (the air model, the scene's base altitude, how the air was evaluated) and <see cref="Exposure"/> (how the PNG
+/// was metered), the radiance units in <see cref="ImageInfo.Units"/>, and in <see cref="Sun"/> the sunlight's
+/// transmittance to the camera in place of the M0 light's colour temperature.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 3;
+    public const int CurrentSchema = 4;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -56,6 +60,12 @@ public sealed record Sidecar
 
     /// <summary>The sun the image was lit by.</summary>
     public required SunInfo Sun { get; init; }
+
+    /// <summary>The air the light came through.</summary>
+    public required AtmosphereInfo Atmosphere { get; init; }
+
+    /// <summary>How the PNG was exposed; absent for a dry run.</summary>
+    public ExposureInfo? Exposure { get; init; }
 
     /// <summary>Data tier per material key (vista-plan §6.2).</summary>
     public required SortedDictionary<string, DataTier> DataTiers { get; init; }
@@ -96,7 +106,14 @@ public sealed record EngineInfo(string VistaVersion, string Runtime, string? Dev
 /// The part of the frame the image files show, in frame pixels: the whole frame, or a loupe window (vista-plan
 /// §7.4) whose pixels are exactly those of the full render.
 /// </param>
-public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int MaxBounces, string DisplayTransform, PixelWindow Window);
+public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int MaxBounces, string DisplayTransform, PixelWindow Window)
+{
+    /// <summary>Recorded in <see cref="Units"/>.</summary>
+    public const string RadianceUnits = "W·m⁻²·sr⁻¹·nm⁻¹: Y is the ȳ-weighted mean spectral radiance; × 72 985 gives cd/m²";
+
+    /// <summary>The units of the EXR's values (the PNG is exposed, see <see cref="Sidecar.Exposure"/>).</summary>
+    public string Units { get; init; } = RadianceUnits;
+}
 
 /// <summary>World generation facts.</summary>
 /// <param name="TerrainProfile">Terrain profile key.</param>
@@ -117,13 +134,13 @@ public sealed record WorldInfo(
     long Triangles,
     long MeshBytes);
 
-/// <summary>The sun (vista-plan §3.5): when, where in the sky, and the light the M0 dome made of it.</summary>
+/// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>
 /// <param name="Source">How the position was computed.</param>
 /// <param name="Date">The date.</param>
 /// <param name="DateFrom">"season &lt;name&gt;" when the season chose the date for the hemisphere, "recipe date" for an override.</param>
 /// <param name="Season">The season (the date's, when the recipe gives a date).</param>
 /// <param name="SolarTime">The local solar time rendered, <c>HH:mm:ss</c> (12:00:00 is solar noon).</param>
-/// <param name="SolarTimeFrom">How the time was chosen, e.g. "dawn: sunrise − 20 min" or "recipe solarTime".</param>
+/// <param name="SolarTimeFrom">How the time was chosen, e.g. "dawn: sunrise − 20 min", "recipe solarTime" or "sunElevation −2°, evening".</param>
 /// <param name="Daylight">Whether the sun rises and sets on the date.</param>
 /// <param name="Sunrise">Sunrise in local solar time; null in polar day or night.</param>
 /// <param name="Sunset">Sunset in local solar time; null in polar day or night.</param>
@@ -132,7 +149,9 @@ public sealed record WorldInfo(
 /// <param name="TrueElevationDegrees">Geometric elevation, without refraction.</param>
 /// <param name="DeclinationDegrees">The sun's declination.</param>
 /// <param name="Direction">Sunlight travel direction in engine axes (the sun is toward its negation).</param>
-/// <param name="TemperatureK">Blackbody colour temperature of the M0 light.</param>
+/// <param name="Spectrum">The light above the atmosphere.</param>
+/// <param name="InEarthShadowAtCamera">True when the ground sphere hides the sun's centre from the camera.</param>
+/// <param name="TransmittanceToCamera">The air's transmittance along the sun's direction to the camera at three wavelengths (0 in the Earth's shadow).</param>
 public sealed record SunInfo(
     string Source,
     DateOnly Date,
@@ -148,18 +167,28 @@ public sealed record SunInfo(
     double TrueElevationDegrees,
     double DeclinationDegrees,
     WorldPoint Direction,
-    double TemperatureK)
+    string Spectrum,
+    bool InEarthShadowAtCamera,
+    ThreeWavelengths TransmittanceToCamera)
 {
     /// <summary>Recorded in <see cref="Source"/>.</summary>
     public const string NoaaSource = "NOAA solar calculator (Meeus), local solar time";
 
-    /// <summary>The record of <paramref name="almanac"/> lit by <paramref name="light"/>.</summary>
-    public static SunInfo From(Almanac almanac, SkyLight light)
+    /// <summary>Recorded in <see cref="Spectrum"/>.</summary>
+    public const string SolarSpectrumName = "blackbody 5778 K, disk radius 0.2666°, physical units (vista-plan §10 M1.3)";
+
+    /// <summary>The record of <paramref name="almanac"/>, its sunlight's transmittance to the camera taken through <paramref name="frame"/>.</summary>
+    public static SunInfo From(Almanac almanac, AtmosphereFrame frame)
     {
         ArgumentNullException.ThrowIfNull(almanac);
-        ArgumentNullException.ThrowIfNull(light);
+        ArgumentNullException.ThrowIfNull(frame);
         Daylight daylight = almanac.Daylight;
         SunPosition sun = almanac.Sun;
+        double altitude = frame.ClampAltitude(frame.CameraAltitudeMetres);
+        double mu = frame.ToSun.Y;
+        bool shadow = AtmosphereLuts.HitsSphere(frame.GroundRadius, altitude - frame.GroundAltitudeMetres, mu);
+        DensityColumns columns = shadow ? default : AtmosphereLuts.ColumnsAlong(frame.Model, altitude, mu, 4096);
+        double At(double nm) => shadow ? 0.0 : Math.Exp(-frame.Model.CoefficientsAt(nm).OpticalDepth(columns));
         return new SunInfo(
             NoaaSource,
             almanac.Date,
@@ -174,8 +203,70 @@ public sealed record SunInfo(
             sun.ElevationDegrees,
             sun.TrueElevationDegrees,
             sun.DeclinationDegrees,
-            new WorldPoint(-light.ToSun.X, -light.ToSun.Y, -light.ToSun.Z),
-            light.SunTempK);
+            new WorldPoint(-frame.ToSun.X, -frame.ToSun.Y, -frame.ToSun.Z),
+            SolarSpectrumName,
+            shadow,
+            new ThreeWavelengths(At(450.0), At(550.0), At(650.0)));
+    }
+}
+
+/// <summary>A quantity at 450, 550 and 650 nm (blue, green, red).</summary>
+/// <param name="At450Nm">At 450 nm.</param>
+/// <param name="At550Nm">At 550 nm.</param>
+/// <param name="At650Nm">At 650 nm.</param>
+public sealed record ThreeWavelengths(double At450Nm, double At550Nm, double At650Nm);
+
+/// <summary>The air of one render (vista-plan §5.2, §10 M1.3).</summary>
+/// <param name="Mode">How the integrator evaluated it: the LUTs or the reference.</param>
+/// <param name="Model">The atmosphere model.</param>
+/// <param name="GroundAltitudeMetres">The scene's base altitude above sea level: world y = 0 and the ground sphere.</param>
+/// <param name="CameraAltitudeMetres">The camera's altitude above sea level.</param>
+/// <param name="ZenithFromSeaLevel">Vertical optical depths from sea level.</param>
+/// <param name="ZenithFromGround">Vertical optical depths from the scene's base altitude.</param>
+/// <param name="Sources">Where the constants come from.</param>
+public sealed record AtmosphereInfo(
+    AtmosphereMode Mode,
+    AtmosphereModel Model,
+    double GroundAltitudeMetres,
+    double CameraAltitudeMetres,
+    OpticalDepths ZenithFromSeaLevel,
+    OpticalDepths ZenithFromGround,
+    string Sources)
+{
+    /// <summary>Recorded in <see cref="Sources"/>.</summary>
+    public const string SourceNotes =
+        "Rayleigh: Peck & Reeder 1972 refractive index, Bates 1984 King factor, US Standard Atmosphere column; " +
+        "ozone: Serdyuchenko et al. 2014 (233 K) in 10 nm bins via Bruneton 2017; haze: Ångström law, Henyey–Greenstein; " +
+        "LUTs after Hillaire 2020; built-in tier 5";
+
+    /// <summary>The record of <paramref name="frame"/> evaluated by <paramref name="mode"/>.</summary>
+    public static AtmosphereInfo From(AtmosphereFrame frame, AtmosphereMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        return new AtmosphereInfo(
+            mode,
+            frame.Model,
+            frame.GroundAltitudeMetres,
+            frame.CameraAltitudeMetres,
+            OpticalDepths.Of(frame.Model, 0.0),
+            OpticalDepths.Of(frame.Model, frame.GroundAltitudeMetres),
+            SourceNotes);
+    }
+}
+
+/// <summary>Vertical optical depths: molecules and haze at 550 nm, ozone at 602 nm (the Chappuis band's peak on the engine's grid).</summary>
+/// <param name="Rayleigh550">Molecular scattering at 550 nm.</param>
+/// <param name="Aerosol550">Haze extinction at 550 nm.</param>
+/// <param name="Ozone602">Ozone absorption at 602 nm.</param>
+public sealed record OpticalDepths(double Rayleigh550, double Aerosol550, double Ozone602)
+{
+    /// <summary>The depths of <paramref name="model"/> from <paramref name="altitude"/> above sea level to the top.</summary>
+    public static OpticalDepths Of(AtmosphereModel model, double altitude)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        (double rayleigh, double aerosol, _) = model.ZenithOpticalDepths(550.0, altitude);
+        (_, _, double ozone) = model.ZenithOpticalDepths(602.0, altitude);
+        return new OpticalDepths(rayleigh, aerosol, ozone);
     }
 }
 

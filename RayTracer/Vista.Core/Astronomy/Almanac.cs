@@ -8,6 +8,10 @@ namespace Vista.Astronomy;
 /// location or custom latitude, its date or its season's date for that hemisphere, and its local solar time
 /// or its time-of-day preset relative to that day's sunrise and sunset.
 ///
+/// <para>A recipe's <c>sunElevation</c> replaces the preset with the time the sun stands that high, rising for dawn
+/// and setting otherwise (<see cref="SolarPosition.HoursAtElevation"/>); an elevation the sun never reaches that
+/// day takes noon or midnight, with a hint.</para>
+///
 /// <para><b>Presets</b> (<see cref="SolarHoursFor"/>): dawn is sunrise − 20 min and dusk sunset + 20 min,
 /// so both are in twilight with the sun a few degrees below the horizon; golden hour is sunset − 60 min (the
 /// last hour before sunset, never before noon); day is solar noon and night solar midnight. When the sun
@@ -62,6 +66,16 @@ public sealed record Almanac(
         {
             hours = time.ToTimeSpan().TotalHours;
             from = "recipe solarTime";
+        }
+        else if (recipe.SunElevation is double elevation)
+        {
+            bool morning = recipe.Time == TimeOfDay.Dawn;
+            (hours, bool reachable) = SolarPosition.HoursAtElevation(place.LatitudeDegrees, date, elevation, morning);
+            string side = morning ? "rising" : "setting";
+            from = string.Create(CultureInfo.InvariantCulture, $"sunElevation {elevation:0.##}°, {side}");
+            if (!reachable)
+                hints.Add(string.Create(CultureInfo.InvariantCulture,
+                    $"The sun never stands at {elevation:0.##}° at {place.Name} on {date:yyyy-MM-dd}, so the {side} sun uses {(hours is > 6.0 and < 18.0 ? "solar noon, its highest" : "solar midnight, its lowest")}."));
         }
         else
         {

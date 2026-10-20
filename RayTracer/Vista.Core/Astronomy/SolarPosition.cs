@@ -142,6 +142,37 @@ public static class SolarPosition
     }
 
     /// <summary>
+    /// The local solar time on <paramref name="date"/> at which the sun's geometric elevation is
+    /// <paramref name="trueElevationDegrees"/>, rising (<paramref name="morning"/>) or setting, at
+    /// <paramref name="latitudeDegrees"/>. The declination is taken at the answer's own instant (iterated, as for
+    /// sunrise). When the sun never stands that high the answer is solar noon, and when it never sinks that low
+    /// solar midnight; <c>Reachable</c> says which happened.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The latitude is outside [−90, 90] or the elevation outside [−90, 90].</exception>
+    public static (double Hours, bool Reachable) HoursAtElevation(double latitudeDegrees, DateOnly date, double trueElevationDegrees, bool morning)
+    {
+        CheckLatitude(latitudeDegrees);
+        if (!(trueElevationDegrees is >= -90.0 and <= 90.0))
+            throw new ArgumentOutOfRangeException(nameof(trueElevationDegrees), trueElevationDegrees, "Elevation must be in [−90, 90] degrees.");
+        double phi = latitudeDegrees * Radians;
+        double sinElevation = Math.Sin(trueElevationDegrees * Radians);
+        double hours = morning ? 6.0 : 18.0;
+        bool reachable = true;
+        for (int i = 0; i < 5; i++)
+        {
+            double delta = SunAt(date, hours).Declination * Radians;
+            double denominator = Math.Cos(phi) * Math.Cos(delta);
+            double cosine = Math.Abs(denominator) < 1e-12
+                ? (sinElevation <= Math.Sin(phi) * Math.Sin(delta) ? -2.0 : 2.0)
+                : (sinElevation - Math.Sin(phi) * Math.Sin(delta)) / denominator;
+            reachable = cosine is >= -1.0 and <= 1.0;
+            double hourAngle = Math.Acos(Math.Clamp(cosine, -1.0, 1.0)) / Radians;
+            hours = morning ? 12.0 - hourAngle / 15.0 : 12.0 + hourAngle / 15.0;
+        }
+        return (hours, reachable);
+    }
+
+    /// <summary>
     /// Atmospheric refraction in degrees for a geometric elevation, NOAA's piecewise fit (Saemundsson-style
     /// above 5°, a polynomial down to −0.575°, a small tail below it, and nothing above 85°).
     /// </summary>
