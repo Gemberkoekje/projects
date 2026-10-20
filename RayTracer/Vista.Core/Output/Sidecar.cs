@@ -27,12 +27,14 @@ namespace Vista.Output;
 /// none), the settings, the un-eroded field's hash, the device and driver that eroded it, the cache file and the cost; the
 /// <c>heightFieldHash</c> is now the eroded surface's. Schema 9 (M1.8) added <see cref="Stages"/>, which stages of the preview
 /// ran for this image and which it reused from an earlier render in the same process, and <see cref="Watch"/>, what changed
-/// before a watch render.</para>
+/// before a watch render. Schema 10 (M1.9) added <see cref="WorldInfo.Mesh"/>: the view-dependent mesh's settings, its
+/// triangles (those below the world grid and beyond it apart), its reach and what it cost; <c>triangles</c> and
+/// <c>meshBytes</c> are the view's mesh now, not the world grid's.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 9;
+    public const int CurrentSchema = 10;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -170,6 +172,9 @@ public sealed record WorldInfo(
 {
     /// <summary>The world's erosion (schema 8): from the cache, eroded now, or not at all, and why.</summary>
     public ErosionInfo? Erosion { get; init; }
+
+    /// <summary>The view's terrain mesh (schema 10): how it was refined, how big it is, how far it reaches, what it cost.</summary>
+    public MeshInfo? Mesh { get; init; }
 }
 
 /// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>

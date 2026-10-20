@@ -98,7 +98,7 @@ public sealed class AltitudeTests
 
         Sidecar valley = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
         Assert.AreEqual("valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
-        Assert.AreEqual(9, valley.Schema);
+        Assert.AreEqual(10, valley.Schema);
     }
 
     [TestMethod]
@@ -111,13 +111,24 @@ public sealed class AltitudeTests
     }
 
     [TestMethod]
-    public void Frame_ReachesTheTerrainsFarthestCorner()
+    public void Frame_ReachesAsFarAsTheMesh()
     {
-        var terrain = new HeightField(3, 1000.0, new float[9]); // a 2 km tile centred on the origin
+        // Without the far field the mesh reaches the world grid's farthest corner (M1.4's reach); with it, past the horizon (M1.9).
+        var flat = new HeightField(9, 250.0, new float[81]); // a 2 km tile centred on the origin
         var camera = new CameraSpec { Position = new WorldPoint(300.0, 50.0, -400.0) };
         var sun = new SunPosition(0.0, 10.0, 10.0, 0.0, 0.0);
-        AtmosphereFrame frame = VistaScene.FrameFor(AtmosphereModel.Default, 1000.0, sun, camera, terrain);
+        double radius = AtmosphereModel.Default.PlanetRadiusMetres + 1000.0;
+        TerrainHierarchy hierarchy = TerrainHierarchy.Build(flat, TerrainProfile.Hills, 1, TerrainDetail.None);
+        TerrainMesh tile = ViewMesher.Build(hierarchy, MeshView.For(camera, 320, 180, radius), new MeshSettings { FarField = false });
+        AtmosphereFrame frame = VistaScene.FrameFor(AtmosphereModel.Default, 1000.0, sun, camera, tile);
         Assert.AreEqual(Math.Sqrt(1300.0 * 1300.0 + 1400.0 * 1400.0), frame.TerrainReachMetres, 1e-9);
+        Assert.AreEqual(1000.0, frame.TerrainLowAltitudeMetres, 1e-9);
+
+        TerrainMesh far = ViewMesher.Build(hierarchy, MeshView.For(camera, 320, 180, radius), new MeshSettings());
+        AtmosphereFrame beyond = VistaScene.FrameFor(AtmosphereModel.Default, 1000.0, sun, camera, far);
+        Assert.AreEqual(far.ReachMetres, beyond.TerrainReachMetres);
+        Assert.IsTrue(beyond.TerrainReachMetres > 50_000.0, "the hills' horizon, past the tile");
+        Assert.AreEqual(1000.0 + far.MaxHeight, beyond.TerrainHighAltitudeMetres, 1e-9, "the far field's hills, higher than the flat tile");
     }
 
     [TestMethod]

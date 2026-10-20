@@ -120,3 +120,25 @@ drives the whole session (type `quit` to stop):
 ```
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --watch --recipe r.json --camera c.json --options o.txt --out p.png
 ```
+
+## View-dependent mesh checks (M1.9)
+
+`mesh/render.ps1` reruns every M1.9 check: `--mesh-measure` on the five views (default, aerial, down the slope, layered ridges,
+range) at 320 px and 4K, for the uniform mesh of the world grid (M1.7's, now bent onto the Earth) and the view-dependent mesh at
+0.5, 1 and 2 px, with and without the detail below the grid and the far field beyond it — triangles, memory, build time and GPU
+cost per pixel-sample, as a table; the same world at every size (three views at 4K box-filtered down to 320 px beside their 320 px
+previews, one exposure per pair); 4K loupes near the camera (the grid alone, 1 px, 0.25 px); and the shadow of a peak off screen:
+`mesh/offscreen-shadow.camera.json` stands 30 m above a valley floor and looks away from the golden-hour sun, across the valley in
+the shadow of a ridge about a kilometre behind it, rendered with the uniform mesh (everything kept) and the view-dependent one. With
+`-Before`, before/after sheets of the five views on both recipes.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/mesh/render.ps1 [-Before ..\main\Vista.App.dll] [-Spp 64] [-Out folder]
+```
+
+One view's mesh by hand (the sidecar's `world.mesh` and the console's `mesh:` line say what it is and what it cost):
+
+```
+dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --preview --recipe vista-views/mountains-golden.recipe.json --seed 42 \
+    --camera vista-views/aerial.camera.json --width 3840 --mesh-error 1 [--detail off] [--far-field off] [--mesh uniform] --out p.png
+```

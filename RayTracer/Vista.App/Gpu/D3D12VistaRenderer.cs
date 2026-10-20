@@ -45,6 +45,12 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int GroupSize = 8;
     private const int ConstantBufferBytes = 256;
 
+    /// <summary>
+    /// The most triangles one acceleration structure is built from (vista-plan §10 M1.9): the build is one submission, and it must
+    /// stay well inside the Windows GPU timeout (33.6 M build in about a second on the 3070; a mesh of 70 M or so hung it).
+    /// </summary>
+    private const long MaxTriangles = 48_000_000;
+
     private const uint AovAlbedo = 1u;
     private const uint AovNormal = 2u;
     private const uint AovFirstHit = 4u;
@@ -55,7 +61,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotAtmCoefficients = 7, SlotAtmSun = 8, SlotColumns = 9, SlotSkyView = 10, SlotCheckDirections = 11;
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
     private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
-    private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24;
+    private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24, SlotMapNormals = 25, SlotNormalMap0 = 26, SlotNormalMap1 = 27;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -94,7 +100,12 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12Resource? _blas;
     private ID3D12Resource? _tlas;
     private ID3D12Resource? _instance;
+    private ID3D12Resource? _mapNormals;
     private long _blasBytes;
+
+    // The world's normal maps (M1.9): kept while the meshes rendered share them, as every mesh of one world does.
+    private IReadOnlyList<NormalMap>? _normalMaps;
+    private ID3D12Resource?[] _mapBuffers = [];
 
     // Surface tables: rebuilt per render, a few kilobytes.
     private ID3D12Resource? _cie;
@@ -143,6 +154,12 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public uint FirstSample, SampleCount, Pad1, Pad2;
         public uint WindowX, WindowY, FrameWidth, FrameHeight;    // the window's place in the full frame
         public uint LightSampling, SkySampling, RandomStream, RrStartBounce;
+        public float CamWorldX, CamWorldZ;                        // the mesh's tangent point: the frame's (0, 0, 0) in the world
+        public uint MapCount, Pad3;
+        public float Map0OriginX, Map0OriginZ, Map0Cell;           // the world grid's normal map (M1.9)
+        public uint Map0Size;
+        public float Map1OriginX, Map1OriginZ, Map1Cell;           // the 32 m far grid's
+        public uint Map1Size;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -190,6 +207,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             throw new ArgumentException("The planner has already issued dispatches.", nameof(planner));
         if (scene.Materials.Count == 0)
             throw new ArgumentException("The scene has no materials.", nameof(scene));
+        if (Math.Abs(scene.Mesh.Frame.GroundRadius - scene.AirFrame().GroundRadius) > 1e-3)
+            throw new ArgumentException("The mesh is bent onto another ground sphere than the scene's atmosphere: mesh it for this base altitude.", nameof(scene));
         if (settings.Atmosphere is not (AtmosphereMode.Luts or AtmosphereMode.Reference or AtmosphereMode.ReferenceShadowed))
             throw new ArgumentException($"Unknown atmosphere mode {settings.Atmosphere}.", nameof(settings));
         if (settings.LightSampling is not (LightSampling.Mis or LightSampling.SunOnly))
@@ -210,7 +229,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
         if (!ReferenceEquals(scene.Mesh, _mesh))
         {
+            DisposeScene();
+            CheckFits(scene.Mesh);
             UploadMesh(scene.Mesh);
+            EnsureNormalMaps(scene.Mesh.NormalMaps);
             stages[RenderStageKeys.MeshUpload] = Lap(stopwatch);
             BuildAccelerationStructures(scene.Mesh);
             stages[RenderStageKeys.AccelerationBuild] = Lap(stopwatch);
@@ -322,7 +344,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         bool skySampling)
     {
         CameraSpec camera = scene.Camera;
-        Vector3D position = new(camera.Position.X, camera.Position.Y, camera.Position.Z);
+        // The camera in the mesh's frame (vista-plan §10 M1.9): (0, height, 0) when the mesh was built for it.
+        Vector3D position = scene.Mesh.Frame.ToFrame(camera.Position.X, camera.Position.Y, camera.Position.Z);
         Vector3D right = camera.Right();
         Vector3D up = camera.Up();
         Vector3D forward = camera.Forward();
@@ -349,8 +372,20 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             SkySampling = skySampling ? 1u : 0u,
             RandomStream = settings.RandomStream,
             RrStartBounce = (uint)settings.RussianRouletteStart,
+            CamWorldX = (float)scene.Mesh.Frame.TangentX,
+            CamWorldZ = (float)scene.Mesh.Frame.TangentZ,
+            MapCount = (uint)Math.Min(scene.Mesh.NormalMaps.Count, 2),
+            Map0OriginX = Map(scene, 0).OriginX, Map0OriginZ = Map(scene, 0).OriginZ, Map0Cell = Map(scene, 0).Cell, Map0Size = Map(scene, 0).Size,
+            Map1OriginX = Map(scene, 1).OriginX, Map1OriginZ = Map(scene, 1).OriginZ, Map1Cell = Map(scene, 1).Cell, Map1Size = Map(scene, 1).Size,
         };
     }
+
+    /// <summary>Normal map <paramref name="index"/> of the scene's mesh for the constants, or zeros when it has none.</summary>
+    private static (float OriginX, float OriginZ, float Cell, uint Size) Map(VistaScene scene, int index) =>
+        index < scene.Mesh.NormalMaps.Count
+            ? ((float)scene.Mesh.NormalMaps[index].OriginX, (float)scene.Mesh.NormalMaps[index].OriginZ, (float)scene.Mesh.NormalMaps[index].Cell,
+                (uint)scene.Mesh.NormalMaps[index].Size)
+            : (0f, 0f, 0f, 0u);
 
     // ── Device ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -468,6 +503,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Cbv(0), Cbv(1), Cbv(2),                                   // 19–21: integrator, atmosphere, check constants
             Srv(13),                                                  // 22: the summed scattering orders (aerial perspective)
             Srv(18), Uav(7),                                          // 23–24: the sky distribution, its measurement (M1.5)
+            Srv(19), Srv(20), Srv(21),                                // 25–27: the vertices' map normals, the two normal maps (M1.9)
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -518,33 +554,75 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _positions = CreateDefaultBuffer<float>(mesh.Positions);
         _normals = CreateDefaultBuffer<float>(mesh.Normals);
         _indices = CreateDefaultBuffer<uint>(mesh.Indices);
+        _mapNormals = mesh.MapNormals.Length > 0 ? CreateDefaultBuffer<uint>(mesh.MapNormals) : null;
     }
+
+    /// <summary>Uploads the world's normal maps when the mesh's are not the ones already on the GPU (M1.9).</summary>
+    private void EnsureNormalMaps(IReadOnlyList<NormalMap> maps)
+    {
+        if (ReferenceEquals(maps, _normalMaps))
+            return;
+        DisposeNormalMaps();
+        _mapBuffers = [.. maps.Take(2).Select(m => (ID3D12Resource?)CreateDefaultBuffer<uint>(m.Packed))];
+        _normalMaps = maps;
+    }
+
+    /// <summary>
+    /// Refuses a mesh this GPU cannot take, before anything is uploaded (vista-plan §10 M1.9): more triangles than one build may
+    /// hold, or more memory — the mesh's buffers, its acceleration structure and the build's scratch — than the adapter's budget has
+    /// free. Either way the view's error target is too fine for this frame; the message says so.
+    /// </summary>
+    private void CheckFits(TerrainMesh mesh)
+    {
+        if (mesh.TriangleCount > MaxTriangles)
+        {
+            throw new InsufficientMemoryException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"The terrain mesh has {mesh.TriangleCount:N0} triangles; one acceleration structure takes at most {MaxTriangles:N0} here. Raise --mesh-error."));
+        }
+        if (_adapter is null)
+            return;
+        RaytracingAccelerationStructurePrebuildInfo info = _device.GetRaytracingAccelerationStructurePrebuildInfo(BlasInputs(mesh, 0, 0));
+        long need = mesh.ByteSize + (long)info.ResultDataMaxSizeInBytes + (long)info.ScratchDataSizeInBytes;
+        QueryVideoMemoryInfo memory = _adapter.QueryVideoMemoryInfo(0, MemorySegmentGroup.Local);
+        long free = (long)memory.Budget - (long)memory.CurrentUsage;
+        if (need > free)
+        {
+            throw new InsufficientMemoryException(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"The terrain mesh ({mesh.TriangleCount:N0} triangles) needs {need / 1048576.0:N0} MiB of video memory with its acceleration structure; " +
+                $"{free / 1048576.0:N0} MiB is free. Raise --mesh-error, or free the GPU."));
+        }
+    }
+
+    /// <summary>The bottom-level build of <paramref name="mesh"/> from buffers at these addresses (zero for a size query).</summary>
+    private static BuildRaytracingAccelerationStructureInputs BlasInputs(TerrainMesh mesh, ulong positions, ulong indices) => new()
+    {
+        Type = RaytracingAccelerationStructureType.BottomLevel,
+        Layout = ElementsLayout.Array,
+        Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
+        DescriptorsCount = 1,
+        GeometryDescriptions =
+        [
+            new RaytracingGeometryDescription
+            {
+                Type = RaytracingGeometryType.Triangles,
+                Flags = RaytracingGeometryFlags.Opaque,
+                Triangles = new RaytracingGeometryTrianglesDescription
+                {
+                    VertexBuffer = new GpuVirtualAddressAndStride(positions, 3 * sizeof(float)),
+                    VertexCount = (uint)mesh.VertexCount,
+                    VertexFormat = Format.R32G32B32_Float,
+                    IndexBuffer = indices,
+                    IndexCount = (uint)mesh.Indices.Length,
+                    IndexFormat = Format.R32_UInt,
+                    Transform3x4 = 0,
+                },
+            },
+        ],
+    };
 
     private void BuildAccelerationStructures(TerrainMesh mesh)
     {
-        var geometry = new RaytracingGeometryDescription
-        {
-            Type = RaytracingGeometryType.Triangles,
-            Flags = RaytracingGeometryFlags.Opaque,
-            Triangles = new RaytracingGeometryTrianglesDescription
-            {
-                VertexBuffer = new GpuVirtualAddressAndStride(_positions!.GPUVirtualAddress, 3 * sizeof(float)),
-                VertexCount = (uint)mesh.VertexCount,
-                VertexFormat = Format.R32G32B32_Float,
-                IndexBuffer = _indices!.GPUVirtualAddress,
-                IndexCount = (uint)mesh.Indices.Length,
-                IndexFormat = Format.R32_UInt,
-                Transform3x4 = 0,
-            },
-        };
-        var blasInputs = new BuildRaytracingAccelerationStructureInputs
-        {
-            Type = RaytracingAccelerationStructureType.BottomLevel,
-            Layout = ElementsLayout.Array,
-            Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
-            DescriptorsCount = 1,
-            GeometryDescriptions = [geometry],
-        };
+        BuildRaytracingAccelerationStructureInputs blasInputs = BlasInputs(mesh, _positions!.GPUVirtualAddress, _indices!.GPUVirtualAddress);
         RaytracingAccelerationStructurePrebuildInfo blasInfo = _device.GetRaytracingAccelerationStructurePrebuildInfo(blasInputs);
         using ID3D12Resource blasScratch = CreateUavBuffer(blasInfo.ScratchDataSizeInBytes);
         _blas = CreateUavBuffer(blasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
@@ -666,6 +744,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootShaderResourceView(SlotScatterSum, _scatterSum.GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotSkyDistribution, (_skyDistribution ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootUnorderedAccessView(SlotSkyLuminance, (_skyLuminance ?? _dummyUav).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotMapNormals, (_mapNormals ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotNormalMap0, (_mapBuffers.ElementAtOrDefault(0) ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotNormalMap1, (_mapBuffers.ElementAtOrDefault(1) ?? _dummySrv).GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -752,7 +833,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     }
 
     /// <summary>A default-heap copy of <paramref name="data"/> in the shader-resource state (also the state BLAS inputs need).</summary>
-    private ID3D12Resource CreateDefaultBuffer<T>(T[] data) where T : unmanaged
+    private ID3D12Resource CreateDefaultBuffer<T>(ReadOnlySpan<T> data) where T : unmanaged
     {
         ulong bytes = (ulong)data.Length * (ulong)Unsafe.SizeOf<T>();
         using ID3D12Resource staging = CreateUploadBuffer<T>(data);
@@ -794,8 +875,17 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
     // ── Disposal ────────────────────────────────────────────────────────────────────────────────────
 
+    private void DisposeNormalMaps()
+    {
+        foreach (ID3D12Resource? buffer in _mapBuffers)
+            buffer?.Dispose();
+        (_mapBuffers, _normalMaps) = ([], null);
+    }
+
     private void DisposeScene()
     {
+        _mapNormals?.Dispose();
+        _mapNormals = null;
         _instance?.Dispose();
         _tlas?.Dispose();
         _blas?.Dispose();
@@ -839,6 +929,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeImage();
         DisposeTables();
         DisposeScene();
+        DisposeNormalMaps();
         DisposeSkyLight();
         DisposeAtmosphere();
         DisposeErosion();

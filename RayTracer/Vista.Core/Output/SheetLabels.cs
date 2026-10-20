@@ -46,6 +46,7 @@ public static class SheetLabels
         ("image.lightSampling", "lights"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
+        ("mesh", "mesh"),
         ("build", "build"),
     ];
 
@@ -110,6 +111,21 @@ public static class SheetLabels
 
         if (root["atmosphere"]?["mode"] is JsonValue mode)
             fields["atmosphere"] = Display(mode);
+
+        // How the terrain was meshed (schema 10): "view 1 px", or "uniform", with what was left out.
+        if (root["world"]?["mesh"] is JsonObject mesh && mesh["kind"] is JsonValue kind)
+        {
+            string text = Display(kind);
+            if (text == "view")
+            {
+                text += string.Create(CultureInfo.InvariantCulture, $" {Display(mesh["errorPixels"])} px");
+                if (mesh["detail"] is JsonValue d && d.GetValueKind() == JsonValueKind.False)
+                    text += ", no detail";
+                if (mesh["farField"] is JsonValue f && f.GetValueKind() == JsonValueKind.False)
+                    text += ", no far field";
+            }
+            fields["mesh"] = text;
+        }
 
         if (root["engine"]?["vistaVersion"] is JsonValue version)
             fields["build"] = Build(version.ToString());
@@ -199,6 +215,7 @@ public static class SheetLabels
                 "image.samplesPerPixel" => $"{value} spp",
                 "image.maxBounces" => $"{value} bounces",
                 "build" => $"build {value}",
+                "mesh" => $"{value} mesh",
                 _ => $"{Short(key)} {value}",
             };
             if (part is not null)

@@ -89,11 +89,12 @@ internal static class DenoiseCompare
         }
 
         Recipe recipe = VistaJson.ParseRecipe(File.ReadAllText(values["--recipe"]));
-        HeightField terrain = TerrainGenerator.Generate(recipe, seed);
-        TerrainMesh mesh = HeightFieldMesher.Build(terrain);
+        var worlds = new WorldCache();
+        HeightField terrain = worlds.World(recipe, seed, WorldGrid.Default, erode: false).Surface;
         CameraSpec camera = values.TryGetValue("--camera", out string? cameraPath) ? VistaJson.ParseCamera(File.ReadAllText(cameraPath)) : DefaultCamera.For(terrain);
         Almanac almanac = Almanac.For(recipe);
         (double ground, string groundFrom) = Places.BaseAltitude(recipe, almanac.Place);
+        TerrainMesh mesh = worlds.Mesh(MeshView.For(camera, width, height, AtmosphereModel.Default.PlanetRadiusMetres + ground), new MeshSettings());
         var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.M0, AtmosphereModel.Default, ground);
 
         using var renderer = new D3D12VistaRenderer();

@@ -3,17 +3,21 @@ using Vista.Recipes;
 namespace Vista.World;
 
 /// <summary>
-/// The world and mesh stages of a <see cref="Cli.PreviewSession"/> (vista-plan §7.4, §10 M1.8): keeps the most recent world and
-/// its mesh, so renders that share one — a contact sheet across time of day or cameras, or a watch session whose camera moved —
-/// build and mesh it once. The key is what the world stage reads: the recipe's <see cref="TerrainProfile"/>, the seed, the grid,
-/// and whether it is eroded (and could be); time, season, name and camera never move the world. The same mesh instance also lets
-/// a renderer keep its acceleration structure. One world is kept, not several: a seed the session saw before comes back from the
-/// erosion cache on disk in about a second, and a second mesh of the full grid would hold most of another gigabyte.
+/// The world and mesh stages of a <see cref="Cli.PreviewSession"/> (vista-plan §7.4, §10 M1.8, M1.9): keeps the most recent
+/// world, its <see cref="TerrainHierarchy"/> and its last mesh, so renders that share them — a contact sheet across time of day
+/// or cameras, or a watch session whose camera turned — build and mesh the world once. The world's key is what the world stage
+/// reads: the recipe's <see cref="TerrainProfile"/>, the seed, the grid, and whether it is eroded (and could be); time, season,
+/// name and camera never move the world. The hierarchy follows the world and the detail; the mesh follows the hierarchy, the
+/// camera's position, the frame's pixels per radian, the ground sphere and the mesh settings, never the camera's heading
+/// (<see cref="ViewMesher"/>). The same mesh instance also lets a renderer keep its acceleration structure. One world is kept,
+/// not several: a seed the session saw before comes back from the erosion cache on disk in about a second.
 /// </summary>
 public sealed class WorldCache
 {
     private (TerrainProfile Profile, ulong Seed, WorldGrid Grid, bool Erode, bool CanErode)? _key;
     private TerrainWorld? _world;
+    private TerrainHierarchy? _hierarchy;
+    private (MeshView View, MeshSettings Settings)? _meshKey;
     private TerrainMesh? _mesh;
 
     /// <summary>
@@ -34,23 +38,46 @@ public sealed class WorldCache
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
             _key = key;
-            _mesh = null;
+            (_hierarchy, _meshKey, _mesh) = (null, null, null);
         }
         return _world!;
     }
 
-    /// <summary>The mesh of <paramref name="terrain"/>, reused when it is the cached world's surface.</summary>
-    public TerrainMesh Mesh(HeightField terrain) => Mesh(terrain, out _);
+    /// <summary>The mesh of the cached world for <paramref name="view"/> under <paramref name="settings"/>; reused when the last one was built for the same.</summary>
+    public TerrainMesh Mesh(MeshView view, MeshSettings settings) => Mesh(view, settings, out _);
 
-    /// <summary>As <see cref="Mesh(HeightField)"/>; <paramref name="reused"/> says whether it was already built.</summary>
-    public TerrainMesh Mesh(HeightField terrain, out bool reused)
+    /// <summary>
+    /// As <see cref="Mesh(MeshView, MeshSettings)"/>; <paramref name="reused"/> says whether it was the last one. The world must
+    /// have been asked for first.
+    /// </summary>
+    public TerrainMesh Mesh(MeshView view, MeshSettings settings, out bool reused)
     {
-        // M1.9's view-dependent mesh will key this on the camera too.
-        ArgumentNullException.ThrowIfNull(terrain);
-        reused = false;
-        if (!ReferenceEquals(terrain, _world?.Surface))
-            return HeightFieldMesher.Build(terrain);
-        reused = _mesh is not null;
-        return _mesh ??= HeightFieldMesher.Build(terrain);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_world is null || _key is null)
+            throw new InvalidOperationException("Ask for the world before its mesh.");
+        reused = _mesh is not null && _meshKey == (view, settings);
+        if (reused)
+            return _mesh!;
+
+        double hierarchySeconds = 0.0;
+        TerrainHierarchy hierarchy = Hierarchy(settings, ref hierarchySeconds);
+        TerrainMesh mesh = ViewMesher.Build(hierarchy, view, settings);
+        mesh.Info = mesh.Info with { HierarchySeconds = hierarchySeconds };
+        (_mesh, _meshKey) = (mesh, (view, settings));
+        return mesh;
+    }
+
+    /// <summary>The cached world's hierarchy with the detail <paramref name="settings"/> ask for, built when it is missing.</summary>
+    private TerrainHierarchy Hierarchy(MeshSettings settings, ref double seconds)
+    {
+        (TerrainProfile profile, ulong seed, _, _, _) = _key!.Value;
+        bool detail = settings.Kind == MeshKind.View && settings.Detail;
+        if (_hierarchy is null || _hierarchy.Detail.IsNone == detail)
+        {
+            TerrainDetail wanted = detail ? new TerrainDetail(seed, _world!.Surface.CellSize) : TerrainDetail.None;
+            _hierarchy = TerrainHierarchy.Build(_world!.Surface, profile, seed, wanted);
+            seconds = _hierarchy.BuildSeconds;
+        }
+        return _hierarchy;
     }
 }

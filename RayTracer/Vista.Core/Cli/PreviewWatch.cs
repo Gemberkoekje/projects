@@ -158,8 +158,10 @@ public sealed class PreviewWatch
             _rendered = snapshot;
             return new WatchEvent(WatchEventKind.Rendered) { Sidecar = sidecar };
         }
-        catch (Exception e) when (e is InvalidDataException or JsonException or IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception e) when (e is InvalidDataException or JsonException or IOException or UnauthorizedAccessException or ArgumentException
+            or InsufficientMemoryException)
         {
+            // A mesh too fine for the GPU (M1.9) is reported like a bad file: the next change may make one that fits.
             return new WatchEvent(WatchEventKind.Failed) { Message = e.Message };
         }
     }

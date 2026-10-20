@@ -66,7 +66,9 @@ public sealed class PreviewPipelineTests
     {
         Sidecar a = PreviewPipeline.Run(Request(dryRun: true), renderer: null);
         Sidecar b = PreviewPipeline.Run(Request(dryRun: true), renderer: null);
-        Assert.AreEqual(a.World, b.World);
+        // The same world and mesh; only what building them took may differ.
+        static WorldInfo Untimed(WorldInfo world) => world with { Mesh = world.Mesh! with { RefineSeconds = 0, VertexSeconds = 0, HierarchySeconds = 0 } };
+        Assert.AreEqual(Untimed(a.World), Untimed(b.World));
         Assert.AreEqual(a.Camera, b.Camera);
         CollectionAssert.AreEqual(File.ReadAllBytes(Path.Combine(_dir, "p.heightmap.png")), PngEncoder.Encode(
             DebugImages.HeightMap(World.TerrainGenerator.Generate(a.Recipe, 7, TestWorlds.Grid), a.Camera).Rgb, TestWorlds.Grid.Size, TestWorlds.Grid.Size, PngColor.Rgb));

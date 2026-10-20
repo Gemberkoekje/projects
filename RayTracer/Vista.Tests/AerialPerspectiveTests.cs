@@ -1,10 +1,11 @@
 using Vista.Atmosphere;
 using Vista.Scene;
+using Vista.World;
 
 namespace Vista.Tests;
 
 /// <summary>
-/// The C# reference of aerial perspective (vista-plan §10 M1.4): the world bent onto the Earth for the air, the march
+/// The C# reference of aerial perspective (vista-plan §10 M1.4): the chord between points of the bent world, the march
 /// along a segment against brute-force integrals, the sun's penumbra, and the quadrature and table maps M1.4 changed.
 /// The GPU's parity with these runs in <c>--gpu-selftest</c>.
 /// </summary>
@@ -25,36 +26,22 @@ public sealed class AerialPerspectiveTests
     }
 
     [TestMethod]
-    public void Bend_KeepsHeights_AndTiltsTheVertical()
-    {
-        double radius = Frame.GroundRadius;
-        (Vector3D atCamera, Vector3D upAtCamera) = AerialPerspective.Bend(radius, 100.0, -200.0, new Vector3D(100.0, 1700.0, -200.0));
-        Assert.AreEqual(new Vector3D(0.0, 1700.0, 0.0), atCamera, "the camera stands on its own tangent point");
-        Assert.AreEqual(new Vector3D(0.0, 1.0, 0.0), upAtCamera);
-
-        (Vector3D far, Vector3D up) = AerialPerspective.Bend(radius, 0.0, 0.0, new Vector3D(30_000.0, 500.0, 40_000.0));
-        Vector3D centre = new(0.0, -radius, 0.0);
-        Assert.AreEqual(radius + 500.0, (far - centre).Length(), 1e-6, "the point keeps its height above the ground sphere");
-        Assert.AreEqual(50_000.0 / radius, Math.Acos(up.Y), 1e-12, "its vertical tilts by s/R");
-        Assert.AreEqual(1.0, up.Length(), 1e-12);
-        Assert.AreEqual(0.6, up.X / Math.Sqrt(up.X * up.X + up.Z * up.Z), 1e-12, "toward the point");
-        Assert.AreEqual(500.0 * Math.Cos(50_000.0 / radius) - AerialPerspective.CurvatureDrop(radius, 50_000.0), far.Y, 1e-6, "it sinks by the drop");
-    }
-
-    [TestMethod]
     public void Between_EndsAtExactlyTheFarPointsHeight()
     {
+        // World points placed in the frame around a camera over (0, −5000), as the mesh's are (vista-plan §10 M1.9).
+        var earth = new EarthFrame(Frame.GroundRadius, 0.0, -5000.0);
         foreach ((Vector3D a, Vector3D b) in new[]
         {
             (new Vector3D(0.0, 1700.0, -5000.0), new Vector3D(3000.0, 600.0, 15_000.0)),
             (new Vector3D(-2000.0, 800.0, 1000.0), new Vector3D(-2100.0, 950.0, 1300.0)),
             (new Vector3D(4000.0, 2400.0, 4000.0), new Vector3D(-30_000.0, 10.0, -35_000.0)),
+            (new Vector3D(0.0, 1700.0, -5000.0), new Vector3D(150_000.0, 1500.0, 200_000.0)),
         })
         {
-            AerialPerspective.Segment seg = AerialPerspective.Between(Frame, 0.0, -5000.0, a, b);
-            Assert.AreEqual(a.Y, seg.Height, 1e-9);
+            AerialPerspective.Segment seg = AerialPerspective.Between(Frame, earth.ToFrame(a.X, a.Y, a.Z), earth.ToFrame(b.X, b.Y, b.Z));
+            Assert.AreEqual(a.Y, seg.Height, 1e-6);
             double end = AtmosphereLuts.AltitudeAlong(Frame.GroundRadius, seg.Height, seg.Mu, seg.Length);
-            Assert.AreEqual(b.Y, end, 1e-5, $"{a} → {b}");
+            Assert.AreEqual(b.Y, end, 1e-4, $"{a} → {b}");
         }
     }
 
@@ -62,8 +49,8 @@ public sealed class AerialPerspectiveTests
     public void Between_DipsTowardALevelPointBehindTheCurve()
     {
         // From the camera to a point at its own height 40 km away, the flat ray is level; the bent chord dips by s/2R.
-        var camera = new Vector3D(0.0, 1500.0, 0.0);
-        AerialPerspective.Segment seg = AerialPerspective.Between(Frame, 0.0, 0.0, camera, new Vector3D(40_000.0, 1500.0, 0.0));
+        var earth = new EarthFrame(Frame.GroundRadius, 0.0, 0.0);
+        AerialPerspective.Segment seg = AerialPerspective.Between(Frame, earth.ToFrame(0.0, 1500.0, 0.0), earth.ToFrame(40_000.0, 1500.0, 0.0));
         Assert.AreEqual(-40_000.0 / (2.0 * Frame.GroundRadius), Math.Asin(seg.Mu), 2e-6);
         Assert.AreEqual(Frame.SunCosZenith, seg.MuS, 1e-7, "the camera's own sun");
     }

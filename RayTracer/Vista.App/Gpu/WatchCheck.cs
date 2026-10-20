@@ -80,15 +80,17 @@ internal static class WatchCheck
 
         PreviewStage[] lit = [PreviewStage.SkyView, PreviewStage.SkyDistribution];
         PreviewStage[] image = denoise ? [PreviewStage.Render, PreviewStage.ExposureMeter, PreviewStage.Denoise] : [PreviewStage.Render, PreviewStage.ExposureMeter];
-        PreviewStage[] world = [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure];
+        PreviewStage[] mesh = [PreviewStage.Mesh, PreviewStage.AccelerationStructure];
+        PreviewStage[] world = [PreviewStage.World, .. mesh];
         var steps = new List<Step>
         {
             new("first render", _ => { }, [PreviewStage.Device, .. world, PreviewStage.AtmosphereTables, PreviewStage.ScatteringOrders, .. lit, .. image]),
             new("exposure +1 EV", f => EditJson(f.Camera, j => j["exposureEv"] = Number(j["exposureEv"]) + 1.0), []),
             new("time of day: goldenHour", f => EditJson(f.Recipe, j => j["time"] = "goldenHour"), [.. lit, .. image]),
-            new("camera turn: yaw +20°", f => EditJson(f.Camera, j => j["yawDegrees"] = Number(j["yawDegrees"]) + 20.0), image),
-            new("camera move: 500 m up", f => EditJson(f.Camera, j => j["position"]!["y"] = Number(j["position"]!["y"]) + 500.0), [.. lit, .. image]),
-            new("base altitude: 3000 m", f => EditJson(f.Recipe, j => j["altitude"] = 3000.0), [PreviewStage.ScatteringOrders, .. lit, .. image]),
+            // Since M1.9 the mesh follows the camera's frustum and place, and the ground sphere it is bent onto.
+            new("camera turn: yaw +20°", f => EditJson(f.Camera, j => j["yawDegrees"] = Number(j["yawDegrees"]) + 20.0), [.. mesh, .. image]),
+            new("camera move: 500 m up", f => EditJson(f.Camera, j => j["position"]!["y"] = Number(j["position"]!["y"]) + 500.0), [.. mesh, .. lit, .. image]),
+            new("base altitude: 3000 m", f => EditJson(f.Recipe, j => j["altitude"] = 3000.0), [.. mesh, PreviewStage.ScatteringOrders, .. lit, .. image]),
             new($"seed {secondSeed}", f => { f.Seed = secondSeed; WriteOptions(f); }, [.. world, .. lit, .. image]),
             new($"seed {seed} again", f => { f.Seed = seed; WriteOptions(f); }, [.. world, .. lit, .. image]),
         };

@@ -100,6 +100,9 @@ public sealed record PreviewRequest
 
     /// <summary>Erode the world (vista-plan §10 M1.7); false renders the un-eroded terrain.</summary>
     public bool Erosion { get; init; } = true;
+
+    /// <summary>How the terrain is meshed (vista-plan §10 M1.9): the view-dependent mesh by default.</summary>
+    public MeshSettings Mesh { get; init; } = new();
 }
 
 /// <summary>
@@ -111,7 +114,7 @@ public sealed record PreviewRequest
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
 ///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
-///           [--erosion on | off] [--grid 4097x8]
+///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
@@ -125,7 +128,9 @@ public sealed record PreviewRequest
 /// with <c>--rr-start 3</c>, M1.4's Russian roulette as well, it renders M1.4's images bit for bit. <c>--denoise</c> also writes
 /// the beauty denoised by Intel Open Image Denoise (M1.6) beside the raw one, on the CPU or, with <c>--denoise-device cuda</c>,
 /// the GPU. <c>--erosion off</c> renders the world un-eroded (M1.7), and <c>--grid</c> makes the world on another grid (samples per
-/// side × metres between them): another world, for measurements.
+/// side × metres between them): another world, for measurements. <c>--mesh-error</c> sets the view-dependent mesh's error target in
+/// pixels (M1.9), <c>--detail off</c> leaves out the detail below the world grid, <c>--far-field off</c> the terrain beyond it, and
+/// <c>--mesh uniform</c> meshes every sample of the world grid and nothing else (M1.7's mesh, bent onto the Earth), for comparisons.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -146,6 +151,8 @@ public static class PreviewCommandLine
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
         "--erosion off renders the world un-eroded; --grid SIZExCELL makes it on another grid (another world, for measurements).\n" +
+        "--mesh-error <px>: the view-dependent mesh's error target (default 1); --detail off leaves out the detail below the grid,\n" +
+        "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "Place overrides: [--location <place> | --latitude <degrees>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
@@ -204,7 +211,7 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
-        "--rr-start", "--denoise-device", "--erosion", "--grid",
+        "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -284,6 +291,7 @@ public static class PreviewCommandLine
         int rrStart = Int(values, "--rr-start", RenderSettings.DefaultRussianRouletteStart, 0, RenderSettings.MaxRussianRouletteStart, problems);
         bool erosion = Erosion(values.GetValueOrDefault("--erosion"), problems);
         WorldGrid grid = Grid(values.GetValueOrDefault("--grid"), problems);
+        MeshSettings mesh = Mesh(values, problems);
 
         if (problems.Count > before)
             return null;
@@ -308,6 +316,7 @@ public static class PreviewCommandLine
             Denoise = denoise,
             Erosion = erosion,
             Grid = grid,
+            Mesh = mesh,
         };
     }
 
@@ -375,6 +384,56 @@ public static class PreviewCommandLine
             return mode;
         problems.Add($"--atmosphere must be luts, reference or referenceShadowed, got '{text}'.");
         return AtmosphereMode.Luts;
+    }
+
+    /// <summary>Parses a <c>--mesh</c> value (<c>view</c> or <c>uniform</c>).</summary>
+    internal static bool TryParseMeshKind(string text, out MeshKind kind) =>
+        Enum.TryParse(text, ignoreCase: true, out kind) && kind != MeshKind.None && Enum.IsDefined(kind) && !int.TryParse(text, out _);
+
+    /// <summary>Parses a <c>--mesh-error</c> value: pixels between 0.01 and 1000.</summary>
+    internal static bool TryParseMeshError(string text, out double pixels) =>
+        double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out pixels) && pixels is >= 0.01 and <= 1000.0;
+
+    /// <summary>The mesh settings of <c>--mesh</c>, <c>--mesh-error</c>, <c>--detail</c> and <c>--far-field</c> (vista-plan §10 M1.9).</summary>
+    private static MeshSettings Mesh(Dictionary<string, string> values, List<string> problems)
+    {
+        var settings = new MeshSettings();
+        if (values.TryGetValue("--mesh", out string? kindText))
+        {
+            if (TryParseMeshKind(kindText, out MeshKind kind))
+                settings = settings with { Kind = kind };
+            else
+                problems.Add($"--mesh must be view or uniform, got '{kindText}'.");
+        }
+        if (values.TryGetValue("--mesh-error", out string? errorText))
+        {
+            if (TryParseMeshError(errorText, out double pixels))
+                settings = settings with { ErrorPixels = pixels };
+            else
+                problems.Add($"--mesh-error must be a number of pixels between 0.01 and 1000, got '{errorText}'.");
+        }
+        foreach ((string option, Func<MeshSettings, bool, MeshSettings> set) in new (string, Func<MeshSettings, bool, MeshSettings>)[]
+        {
+            ("--detail", (s, on) => s with { Detail = on }),
+            ("--far-field", (s, on) => s with { FarField = on }),
+        })
+        {
+            switch (values.GetValueOrDefault(option))
+            {
+                case null:
+                    break;
+                case "on":
+                    settings = set(settings, true);
+                    break;
+                case "off":
+                    settings = set(settings, false);
+                    break;
+                case string other:
+                    problems.Add($"{option} must be on or off, got '{other}'.");
+                    break;
+            }
+        }
+        return settings;
     }
 
     /// <summary>Parses a <c>--light-sampling</c> value (<c>mis</c> or <c>sunOnly</c>).</summary>

@@ -96,10 +96,6 @@ public sealed class PreviewSession
         HeightField terrain = world.Surface;
         timings["worldGen"] = Lap(stopwatch);
 
-        TerrainMesh mesh = _worlds.Mesh(terrain, out bool meshReused);
-        stages[PreviewStage.Mesh] = meshReused;
-        timings["mesh"] = Lap(stopwatch);
-
         CameraSpec camera = request.CameraPath is null
             ? DefaultCamera.For(terrain)
             : ReadInput(request.CameraPath, VistaJson.ParseCamera);
@@ -113,7 +109,14 @@ public sealed class PreviewSession
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
         AtmosphereModel air = AtmosphereModel.Default;
         (double groundAltitude, string altitudeFrom) = Places.BaseAltitude(recipe, almanac.Place);
-        AtmosphereFrame frame = VistaScene.FrameFor(air, groundAltitude, almanac.Sun, camera, terrain);
+
+        // The mesh follows the camera's position and the frame (vista-plan §10 M1.9), never the loupe: a loupe is a crop of the
+        // frame's own render.
+        var meshView = MeshView.For(camera, request.Width, request.Height, air.PlanetRadiusMetres + groundAltitude);
+        TerrainMesh mesh = _worlds.Mesh(meshView, request.Mesh, out bool meshReused);
+        stages[PreviewStage.Mesh] = meshReused;
+        timings["mesh"] = Lap(stopwatch);
+        AtmosphereFrame frame = VistaScene.FrameFor(air, groundAltitude, almanac.Sun, camera, mesh);
         var settings = new RenderSettings
         {
             Width = request.Width,
@@ -289,6 +292,7 @@ public sealed class PreviewSession
                 mesh.ByteSize)
             {
                 Erosion = world.Info,
+                Mesh = mesh.Info,
             },
             Place = almanac.Place,
             Sun = SunInfo.From(almanac, frame),

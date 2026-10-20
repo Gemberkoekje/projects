@@ -144,7 +144,10 @@ public static class AovLayout
 /// <param name="Seed">The world seed.</param>
 /// <param name="Camera">The view.</param>
 /// <param name="Terrain">The terrain height field (for collision checks and future height-field tracing).</param>
-/// <param name="Mesh">The terrain mesh to build the acceleration structure from.</param>
+/// <param name="Mesh">
+/// The terrain mesh to build the acceleration structure from: since M1.9 the view's own (<see cref="ViewMesher"/>), in the frame
+/// bent onto the Earth around the camera, which stands at <c>(0, height, 0)</c> in it.
+/// </param>
 /// <param name="Sun">Where the sun is (<see cref="Astronomy.Almanac"/>).</param>
 /// <param name="Materials">The material table; ids index it.</param>
 /// <param name="Air">The atmosphere above the scene.</param>
@@ -165,20 +168,19 @@ public sealed record VistaScene(
     double GroundAltitudeMetres)
 {
     /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
-    public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Terrain);
+    public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Mesh);
 
     /// <summary>
-    /// The atmosphere frame of a view of <paramref name="terrain"/> from <paramref name="camera"/>: the camera's altitude and
-    /// the terrain's span set the sky-view slices, and the terrain's farthest corner from the camera its reach.
+    /// The atmosphere frame of a view of <paramref name="mesh"/> from <paramref name="camera"/>: the camera's altitude and the
+    /// mesh's heights above the ground sphere set the sky-view slices, and its farthest vertex from the camera its reach (since
+    /// M1.9 the far field's, out past the horizon).
     /// </summary>
-    public static AtmosphereFrame FrameFor(AtmosphereModel air, double groundAltitude, SunPosition sun, CameraSpec camera, HeightField terrain)
+    public static AtmosphereFrame FrameFor(AtmosphereModel air, double groundAltitude, SunPosition sun, CameraSpec camera, TerrainMesh mesh)
     {
         ArgumentNullException.ThrowIfNull(air);
         ArgumentNullException.ThrowIfNull(camera);
-        ArgumentNullException.ThrowIfNull(terrain);
-        double reachX = Math.Max(Math.Abs(terrain.OriginX - camera.Position.X), Math.Abs(terrain.OriginX + terrain.Extent - camera.Position.X));
-        double reachZ = Math.Max(Math.Abs(terrain.OriginZ - camera.Position.Z), Math.Abs(terrain.OriginZ + terrain.Extent - camera.Position.Z));
-        return AtmosphereFrame.For(air, groundAltitude, sun.ToSun, camera.Position.Y, terrain.MinHeight, terrain.MaxHeight, Math.Sqrt(reachX * reachX + reachZ * reachZ));
+        ArgumentNullException.ThrowIfNull(mesh);
+        return AtmosphereFrame.For(air, groundAltitude, sun.ToSun, camera.Position.Y, mesh.MinHeight, mesh.MaxHeight, mesh.ReachMetres);
     }
 }
 

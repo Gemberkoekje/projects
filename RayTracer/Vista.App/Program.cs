@@ -18,7 +18,8 @@ namespace Vista.App;
 /// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
 /// <c>--atmosphere-compare</c> (one view rendered with both, by distance), <c>--sampling-compare</c> (one view
 /// rendered with M1.4's estimator and with MIS: agreement, noise and cost), and <c>--denoise-compare</c> (one view at low
-/// samples denoised every way, against a reference: error, cost and determinism).
+/// samples denoised every way, against a reference: error, cost and determinism), and <c>--mesh-measure</c> (the terrain mesh of
+/// fixed views: triangles, memory, build time and cost, M1.9).
 /// </summary>
 internal static class Program
 {
@@ -39,6 +40,8 @@ internal static class Program
             return RunGpu(() => DenoiseCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == ErosionMeasure.Flag)
             return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
+        if (args.FirstOrDefault() == MeshMeasure.Flag)
+            return RunGpu(() => MeshMeasure.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -211,6 +214,7 @@ internal static class Program
         Console.Error.WriteLine(SamplingCompare.Usage);
         Console.Error.WriteLine(DenoiseCompare.Usage);
         Console.Error.WriteLine(ErosionMeasure.Usage);
+        Console.Error.WriteLine(MeshMeasure.Usage);
         return 1;
     }
 
@@ -223,6 +227,11 @@ internal static class Program
         catch (PlatformNotSupportedException e)
         {
             Console.Error.WriteLine($"Rendering needs a DXR 1.1 GPU: {e.Message} Use --dry-run to generate the world without one.");
+            return 2;
+        }
+        catch (InsufficientMemoryException e)
+        {
+            Console.Error.WriteLine($"error: {e.Message}");
             return 2;
         }
     }
@@ -253,6 +262,16 @@ internal static class Program
             };
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"world: {sidecar.World.TerrainProfile}, {sidecar.World.GridSize}² × {sidecar.World.CellSizeMetres} m, {how}; hash {sidecar.World.HeightFieldHash}"));
+        }
+        if (sidecar.World.Mesh is { } mesh)
+        {
+            string kind = mesh.Kind == MeshKind.View ? string.Create(CultureInfo.InvariantCulture, $"view-dependent at {mesh.ErrorPixels:0.##} px") : "uniform";
+            string hierarchy = mesh.HierarchySeconds > 0.0
+                ? string.Create(CultureInfo.InvariantCulture, $" (and {mesh.HierarchySeconds:0.00} s for the world's hierarchy)")
+                : string.Empty;
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"mesh: {kind}, {mesh.Triangles:N0} triangles ({mesh.DetailTriangles:N0} below the grid, {mesh.FarTriangles:N0} beyond it), " +
+                $"{mesh.Bytes / 1048576.0:0.0} MiB, reach {mesh.ReachMetres / 1000.0:0} km; {mesh.RefineSeconds + mesh.VertexSeconds:0.00} s{hierarchy}"));
         }
         if (sidecar.Render is { } render)
         {

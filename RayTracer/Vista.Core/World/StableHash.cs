@@ -62,6 +62,9 @@ public static class SeedDerivation
     /// <summary>Stage key for the base terrain shape.</summary>
     public const string TerrainBase = "terrain.base";
 
+    /// <summary>Stage key for the terrain's detail below the world grid (vista-plan §10 M1.9).</summary>
+    public const string TerrainDetail = "terrain.detail";
+
     /// <summary>The sub-seed for <paramref name="stage"/> under the user seed <paramref name="seed"/>.</summary>
     public static ulong Derive(ulong seed, string stage) => StableHash.Combine(seed, StableHash.Of(stage));
 }

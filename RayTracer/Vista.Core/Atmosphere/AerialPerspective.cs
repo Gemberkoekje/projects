@@ -5,14 +5,15 @@ namespace Vista.Atmosphere;
 /// <summary>
 /// Aerial perspective (vista-plan §5.2, §10 M1.4): every segment of a path that ends on the terrain, camera or bounce,
 /// carries the air between its ends — the layered, receding blue ridges. This is the C# reference of the shader's
-/// <c>Bend</c> and <c>SegmentBetween</c> (<c>VistaIntegrator.hlsl</c>) and <c>AerialSegment</c>
-/// (<c>VistaAtmosphere.hlsli</c>); <c>--gpu-selftest</c> probes the GPU's against it.
+/// <c>SegmentBetween</c> (<c>VistaIntegrator.hlsl</c>) and <c>AerialSegment</c> (<c>VistaAtmosphere.hlsli</c>);
+/// <c>--gpu-selftest</c> probes the GPU's against it.
 ///
-/// <para><b>The world bent onto the Earth, for the air.</b> The terrain is traced flat, but for the air a world point
-/// keeps its height above the ground sphere and sits on the sphere around the camera's tangent point: at a horizontal
-/// distance <c>s</c> from the camera it has sunk by the curvature drop <c>2R·sin²(s/2R)</c> (≈ 200 m at 50 km) and its
-/// vertical is tilted by <c>s/R</c>. A segment is the straight chord between the bent places of its ends, so the far end
-/// sits at exactly its own height — not 200 m higher, where a flat ray through spherical air would put it.</para>
+/// <para><b>The world bent onto the Earth.</b> A world point keeps its height above the ground sphere and sits on the
+/// sphere around the camera's tangent point: at a horizontal distance <c>s</c> from the camera it has sunk by the curvature
+/// drop <c>2R·sin²(s/2R)</c> (≈ 200 m at 50 km) and its vertical is tilted by <c>s/R</c> (<see cref="World.EarthFrame"/>). A
+/// segment is the straight chord between two points of that frame, so the far end sits at exactly its own height — not 200 m
+/// higher, where a flat ray through spherical air would put it. M1.4 bent the world for the air alone; since M1.9 the mesh
+/// is built in the frame, so a segment's ends are frame points already.</para>
 ///
 /// <para><b>The march</b> (chosen over the sky view's difference <c>L(a) − T·L(b)</c> by error and by cost; the numbers
 /// are in the plan): 2 steps plus one per <see cref="StepLengthMetres"/>, at most <see cref="MaxSteps"/>, dense at the
@@ -52,38 +53,21 @@ public static class AerialPerspective
     }
 
     /// <summary>
-    /// The bent place of world point <paramref name="p"/> around the tangent point (<paramref name="tangentX"/>,
-    /// <paramref name="tangentZ"/>): its offset from the tangent point on the ground sphere (planet axes, +Y up at the
-    /// tangent point) and its local vertical. Heights below the ground sphere count as on it.
+    /// The air between frame points <paramref name="a"/> and <paramref name="b"/> (<see cref="World.EarthFrame"/> on
+    /// <paramref name="frame"/>'s ground sphere): the chord seen from <paramref name="a"/>, its height taken from its distance to
+    /// the planet's centre (below the ground sphere counts as on it) and its vertical pointing away from it.
     /// </summary>
-    public static (Vector3D Offset, Vector3D Up) Bend(double groundRadius, double tangentX, double tangentZ, Vector3D p)
-    {
-        double dx = p.X - tangentX, dz = p.Z - tangentZ;
-        double s = Math.Sqrt(dx * dx + dz * dz);
-        double theta = s / groundRadius;
-        (double ux, double uz) = s > 0.0 ? (dx / s, dz / s) : (0.0, 0.0);
-        double sinT = Math.Sin(theta), cosT = Math.Cos(theta);
-        double h = Math.Max(p.Y, 0.0);
-        double horizontal = (groundRadius + h) * sinT;
-        var offset = new Vector3D(ux * horizontal, h * cosT - CurvatureDrop(groundRadius, s), uz * horizontal);
-        return (offset, new Vector3D(ux * sinT, cosT, uz * sinT));
-    }
-
-    /// <summary>
-    /// The air between world points <paramref name="a"/> and <paramref name="b"/> of <paramref name="frame"/>'s scene, the
-    /// world bent around a camera standing over (<paramref name="tangentX"/>, <paramref name="tangentZ"/>): the chord seen
-    /// from <paramref name="a"/>.
-    /// </summary>
-    public static Segment Between(AtmosphereFrame frame, double tangentX, double tangentZ, Vector3D a, Vector3D b)
+    public static Segment Between(AtmosphereFrame frame, Vector3D a, Vector3D b)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        (Vector3D start, Vector3D up) = Bend(frame.GroundRadius, tangentX, tangentZ, a);
-        Vector3D chord = Bend(frame.GroundRadius, tangentX, tangentZ, b).Offset - start;
+        var earth = new World.EarthFrame(frame.GroundRadius, 0.0, 0.0);
+        Vector3D up = earth.LocalUp(a);
+        Vector3D chord = b - a;
         double length = chord.Length();
         Vector3D dir = length > 0.0 ? chord * (1.0 / length) : up;
         var sun = new Vector3D(frame.ToSun.X, frame.ToSun.Y, frame.ToSun.Z);
         return new Segment(
-            Math.Max(a.Y, 0.0),
+            Math.Max(earth.HeightAbove(a), 0.0),
             Math.Clamp(Vector3D.Dot(dir, up), -1.0, 1.0),
             Math.Clamp(Vector3D.Dot(sun, up), -1.0, 1.0),
             Math.Clamp(Vector3D.Dot(dir, sun), -1.0, 1.0),

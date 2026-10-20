@@ -67,11 +67,14 @@ internal static class GpuSelfTest
         using var renderer = new D3D12VistaRenderer();
         log.WriteLine($"Device: {renderer.DeviceName}, driver {renderer.DriverVersion}");
         bool pass = ErosionChecks(renderer, recipe, seed, log, out HeightField terrain);
-        TerrainMesh mesh = HeightFieldMesher.Build(terrain);
         Almanac almanac = Almanac.For(recipe);
-        var scene = new VistaScene(recipe, seed, DefaultCamera.For(terrain), terrain, mesh, almanac.Sun, MaterialCatalog.M0,
-            AtmosphereModel.Default, Places.BaseAltitude(recipe, almanac.Place).Metres);
+        double ground = Places.BaseAltitude(recipe, almanac.Place).Metres;
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
+        CameraSpec camera = DefaultCamera.For(terrain);
+        TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new TerrainDetail(seed, terrain.CellSize));
+        TerrainMesh mesh = MeshFor(hierarchy, camera, settings, ground);
+        var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.M0, AtmosphereModel.Default, ground);
+        pass &= MeshChecks(hierarchy, scene, settings, log);
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
 
         RenderOutput reference = Render(renderer, scene, settings, allAovs, new BatchPlannerOptions(), log, "reference");
@@ -103,7 +106,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
 
         pass &= AtmosphereChecks(renderer, scene, settings, tight, log);
-        pass &= WatchChecks(renderer, scene, settings with { Width = 160, Height = 90 }, log);
+        pass &= WatchChecks(renderer, hierarchy, scene, settings with { Width = 160, Height = 90 }, log);
         pass &= DenoiseChecks(reference, log);
         log.WriteLine(pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
@@ -279,25 +282,26 @@ internal static class GpuSelfTest
     /// <summary>
     /// What a watch session relies on (M1.8): a renderer that rebuilds only the part of the air a change touched renders the view
     /// exactly as one that rebuilds all of it. Three changes in a row on the same renderer — the time of day (the sky view and the sky
-    /// distribution), a camera 400 m higher (the same), the base altitude (the scattering orders too) — each rendered as the watch
-    /// would, then again after <see cref="D3D12VistaRenderer.ForgetAtmosphere"/>; each pair must be bit-identical, and each render
-    /// must report rebuilding only what its change touched.
+    /// distribution), a camera 400 m higher (the same; the mesh kept, as the LUTs are all this checks), the base altitude (the
+    /// scattering orders too, and since M1.9 the mesh, bent onto the new ground sphere) — each rendered as the watch would, then again
+    /// after <see cref="D3D12VistaRenderer.ForgetAtmosphere"/>; each pair must be bit-identical, and each render must report rebuilding
+    /// only what its change touched.
     /// </summary>
-    private static bool WatchChecks(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings, TextWriter log)
+    private static bool WatchChecks(D3D12VistaRenderer renderer, TerrainHierarchy hierarchy, VistaScene scene, RenderSettings settings, TextWriter log)
     {
         bool pass = true;
         var aovs = new HashSet<Aov>();
         Render(renderer, scene, settings, aovs, new BatchPlannerOptions(), log, "watch: the scene before the changes");
         VistaScene day = scene with { Sun = Almanac.For(scene.Recipe with { Time = TimeOfDay.Day }).Sun };
         VistaScene higher = day with { Camera = day.Camera with { Position = day.Camera.Position with { Y = day.Camera.Position.Y + 400.0 } } };
-        VistaScene altitude = higher with { GroundAltitudeMetres = 3000.0 };
+        VistaScene altitude = higher with { GroundAltitudeMetres = 3000.0, Mesh = MeshFor(hierarchy, scene.Camera, settings, 3000.0) };
         string[] sky = [RenderStageKeys.SkyView, RenderStageKeys.SkyDistribution];
         string[] keys = [RenderStageKeys.DeviceInit, RenderStageKeys.AccelerationBuild, RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
         foreach ((string label, VistaScene view, string[] rebuilds) in new[]
         {
             ("time of day", day, sky),
             ("camera 400 m higher", higher, sky),
-            ("base altitude 3000 m", altitude, [RenderStageKeys.ScatteringOrders, .. sky]),
+            ("base altitude 3000 m", altitude, [RenderStageKeys.AccelerationBuild, RenderStageKeys.ScatteringOrders, .. sky]),
         })
         {
             RenderOutput warm = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}");
@@ -311,10 +315,48 @@ internal static class GpuSelfTest
         return pass;
     }
 
+    /// <summary>The view-dependent mesh (M1.9) of <paramref name="camera"/> on <paramref name="settings"/>' frame, bent onto the ground sphere at <paramref name="ground"/>.</summary>
+    private static TerrainMesh MeshFor(TerrainHierarchy hierarchy, CameraSpec camera, RenderSettings settings, double ground) =>
+        ViewMesher.Build(hierarchy, MeshView.For(camera, settings.Width, settings.Height, AtmosphereModel.Default.PlanetRadiusMetres + ground), new MeshSettings());
+
     /// <summary>
-    /// The GPU's aerial perspective (<c>CSAerialProbe</c>: the world bent around the camera, the chord, the march) against
-    /// <see cref="AerialPerspective"/> fed the GPU's own LUTs, on segments like the terrain's: down from the camera, a short
-    /// bounce off to the side, a long grazing one across the tile, and one up a slope; at three wavelengths.
+    /// The view-dependent mesh (M1.9) of the self-test's real world, on the CPU: built twice, the same bits; no crack (no vertex of
+    /// the mesh at the midpoint of a triangle's edge, where a T-junction would open one); geometry behind the camera kept (shadows
+    /// from off screen); and the far field there, past the world grid.
+    /// </summary>
+    private static bool MeshChecks(TerrainHierarchy hierarchy, VistaScene scene, RenderSettings settings, TextWriter log)
+    {
+        TerrainMesh mesh = scene.Mesh;
+        MeshInfo info = mesh.Info;
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  hierarchy {hierarchy.BuildSeconds:0.00} s; mesh of {info.Triangles:N0} triangles ({info.FarTriangles:N0} far, {info.DetailTriangles:N0} detail), " +
+            $"{info.Vertices:N0} vertices, {info.Bytes / 1048576.0:0.0} MiB, reach {info.ReachMetres / 1000.0:0} km, {info.RefineSeconds + info.VertexSeconds:0.00} s"));
+        TerrainMesh again = MeshFor(hierarchy, scene.Camera, settings, scene.GroundAltitudeMetres);
+        bool pass = Check(log, "the mesh built twice is bit-identical",
+            mesh.Positions.AsSpan().SequenceEqual(again.Positions) && mesh.Normals.AsSpan().SequenceEqual(again.Normals) && mesh.Indices.AsSpan().SequenceEqual(again.Indices)
+                ? null : "the two builds differ");
+        var view = MeshView.For(scene.Camera, settings.Width, settings.Height, AtmosphereModel.Default.PlanetRadiusMetres + scene.GroundAltitudeMetres);
+        int cracks = ViewMesher.TJunctions(hierarchy, view, new MeshSettings());
+        pass &= Check(log, "the mesh has no crack (no vertex on another triangle's edge)", cracks == 0 ? null : $"{cracks} vertices sit on another triangle's edge");
+        Vector3D forward = scene.Camera.Forward();
+        int behind = 0;
+        for (int t = 0; t < mesh.TriangleCount; t++)
+        {
+            uint v = mesh.Indices[3 * t];
+            if (forward.X * mesh.Positions[3 * v] + forward.Z * mesh.Positions[3 * v + 2] < -1000.0)
+                behind++;
+        }
+        pass &= Check(log, "the mesh keeps the ground behind the camera", behind > 0 ? null : "no triangle more than a kilometre behind the camera");
+        pass &= Check(log, "the far field reaches past the world grid", info.FarTriangles > 0 && info.ReachMetres > 100_000.0 ? null
+            : $"{info.FarTriangles} far triangles, reach {info.ReachMetres:0} m");
+        return pass;
+    }
+
+    /// <summary>
+    /// The GPU's aerial perspective (<c>CSAerialProbe</c>: the chord between frame points, its heights and verticals, the march)
+    /// against <see cref="AerialPerspective"/> fed the GPU's own LUTs, on segments like the terrain's: down from the camera, a short
+    /// bounce off to the side, a long grazing one across the world grid, one up a slope, and since M1.9 one to the far field 150 km
+    /// away; at three wavelengths. The ends are world points placed in the camera's <see cref="EarthFrame"/>, as the mesh's are.
     /// </summary>
     private static string? AerialParity(D3D12VistaRenderer renderer, VistaScene scene, AtmosphereFrame air, AtmosphereLutData luts, AtmosphereTables tables)
     {
@@ -326,20 +368,27 @@ internal static class GpuSelfTest
             (new Vector3D(c.X - 4000.0, 800.0, c.Z + 6000.0), new Vector3D(c.X - 3800.0, 950.0, c.Z + 6300.0)),
             (new Vector3D(c.X + 4000.0, 2400.0, c.Z + 4000.0), new Vector3D(c.X - 20_000.0, 10.0, c.Z + 20_000.0)),
             (new Vector3D(c.X, 520.0, c.Z + 2000.0), new Vector3D(c.X + 500.0, 2300.0, c.Z + 5000.0)),
+            (c, new Vector3D(c.X + 120_000.0, 1800.0, c.Z + 90_000.0)),
         };
+        var earth = new EarthFrame(air.GroundRadius, c.X, c.Z);
+        Vector3 InFrame(Vector3D p)
+        {
+            Vector3D f = earth.ToFrame(p.X, p.Y, p.Z);
+            return new Vector3((float)f.X, (float)f.Y, (float)f.Z);
+        }
         var probes = new List<(Vector3 Start, Vector3 End, int Lambda)>();
         foreach ((Vector3D a, Vector3D b) in segments)
         {
             foreach (int lambda in ParityWavelengths)
-                probes.Add((new Vector3((float)a.X, (float)a.Y, (float)a.Z), new Vector3((float)b.X, (float)b.Y, (float)b.Z), lambda));
+                probes.Add((InFrame(a), InFrame(b), lambda));
         }
-        float[] gpu = renderer.RunAerialProbe(air, new Vector3((float)c.X, (float)c.Y, (float)c.Z), probes);
+        float[] gpu = renderer.RunAerialProbe(air, InFrame(c), probes);
         var worst = new Worst();
         var geometry = new Worst();
         for (int i = 0; i < probes.Count; i++)
         {
             (Vector3 a, Vector3 b, int lambda) = probes[i];
-            AerialPerspective.Segment seg = AerialPerspective.Between(air, (float)c.X, (float)c.Z, new Vector3D(a.X, a.Y, a.Z), new Vector3D(b.X, b.Y, b.Z));
+            AerialPerspective.Segment seg = AerialPerspective.Between(air, new Vector3D(a.X, a.Y, a.Z), new Vector3D(b.X, b.Y, b.Z));
             (double t, double s) = AerialPerspective.Integrate(luts.Columns, luts.Orders, air, tables.AsUploaded(lambda), tables.Sun[lambda * 4 + 3], seg);
             string where = string.Create(CultureInfo.InvariantCulture, $"segment {i / ParityWavelengths.Length} λ{lambda}");
             worst.Add($"{where} transmittance", gpu[i * 8], t, 1e-6);

@@ -6,17 +6,23 @@ namespace Vista.World;
 /// <b>Winding:</b> for every triangle <c>(v0, v1, v2)</c> the component cross product
 /// <c>(v1 − v0) × (v2 − v0)</c> points up (+Y) — the same formula the integrator must use if it derives
 /// geometric normals, so front faces face the sky.
+///
+/// <para>Since M1.9 a mesh belongs to a view (<see cref="ViewMesher"/>): its positions are in the <see cref="Frame"/> bent onto
+/// the Earth around the camera, which stands at <c>(0, height, 0)</c> in it, and it knows how high its vertices reach above the
+/// ground sphere and how far from the camera — what the atmosphere's sky-view slices and the sun's reach are built for.</para>
 /// </summary>
 public sealed class TerrainMesh
 {
-    internal TerrainMesh(float[] positions, float[] normals, uint[] indices)
+    internal TerrainMesh(float[] positions, float[] normals, uint[] indices, uint[]? mapNormals = null, IReadOnlyList<NormalMap>? normalMaps = null)
     {
         Positions = positions;
         Normals = normals;
         Indices = indices;
+        MapNormals = mapNormals ?? [];
+        NormalMaps = normalMaps ?? [];
     }
 
-    /// <summary>Vertex positions, three floats (x, y, z) per vertex.</summary>
+    /// <summary>Vertex positions, three floats (x, y, z) per vertex, in <see cref="Frame"/>.</summary>
     public float[] Positions { get; }
 
     /// <summary>Unit vertex normals, three floats per vertex.</summary>
@@ -25,77 +31,41 @@ public sealed class TerrainMesh
     /// <summary>Triangle indices, three per triangle.</summary>
     public uint[] Indices { get; }
 
+    /// <summary>
+    /// Per vertex, the <see cref="NormalMaps"/>' normal at the vertex's world place (x and z as two halves, x low): what the shading
+    /// subtracts from the map's normal at a hit, so it adds only what the triangle's corners cannot carry (vista-plan §10 M1.9).
+    /// Empty when the mesh has no maps (the uniform mesh, every sample of which is a vertex).
+    /// </summary>
+    public uint[] MapNormals { get; }
+
+    /// <summary>The smooth normals of the world's grids, finest first (shared by every mesh of the world); empty for none.</summary>
+    public IReadOnlyList<NormalMap> NormalMaps { get; }
+
     /// <summary>Number of vertices.</summary>
     public int VertexCount => Positions.Length / 3;
 
     /// <summary>Number of triangles.</summary>
     public int TriangleCount => Indices.Length / 3;
 
-    /// <summary>Upload size in bytes of the three buffers (before the acceleration structure).</summary>
-    public long ByteSize => (long)Positions.Length * sizeof(float) + (long)Normals.Length * sizeof(float) + (long)Indices.Length * sizeof(uint);
-}
+    /// <summary>Upload size in bytes of the vertex and index buffers (before the acceleration structure and the normal maps).</summary>
+    public long ByteSize => (long)Positions.Length * sizeof(float) + (long)Normals.Length * sizeof(float) + (long)Indices.Length * sizeof(uint)
+        + (long)MapNormals.Length * sizeof(uint);
 
-/// <summary>
-/// Turns a <see cref="HeightField"/> into a <see cref="TerrainMesh"/> (vista-plan §10 M0 "height field →
-/// mesh"): one vertex per sample, two triangles per cell, smooth normals from central differences. M0
-/// meshes the whole grid uniformly; the view-dependent mesh to a screen-space error (§4.3) replaces this in
-/// M1 — or a height-field intersection does, whichever the 3070 measurements favour.
-/// </summary>
-public static class HeightFieldMesher
-{
-    /// <summary>Meshes the whole height field.</summary>
-    public static TerrainMesh Build(HeightField field)
-    {
-        ArgumentNullException.ThrowIfNull(field);
-        int n = field.Size;
-        long vertexCount = (long)n * n;
-        long indexCount = (long)(n - 1) * (n - 1) * 6;
-        if (vertexCount * 3 > Array.MaxLength || indexCount > Array.MaxLength)
-            throw new ArgumentException($"A {n}² height field is too large to mesh in one piece.", nameof(field));
+    /// <summary>The frame the positions are in: the world bent onto the ground sphere around the camera.</summary>
+    public EarthFrame Frame { get; init; }
 
-        var positions = new float[vertexCount * 3];
-        var normals = new float[vertexCount * 3];
-        var indices = new uint[indexCount];
-        double cell = field.CellSize;
+    /// <summary>The lowest the meshed world can reach above the ground sphere, m (its grids' lowest, less the detail's amplitude).</summary>
+    public double MinHeight { get; init; }
 
-        Parallel.For(0, n, j =>
-        {
-            for (int i = 0; i < n; i++)
-            {
-                int v = (j * n + i) * 3;
-                positions[v] = (float)field.XOf(i);
-                positions[v + 1] = field[i, j];
-                positions[v + 2] = (float)field.ZOf(j);
+    /// <summary>The highest the meshed world can reach above the ground sphere, m.</summary>
+    public double MaxHeight { get; init; }
 
-                // Central differences inside the grid, one-sided at its edges: exact for planar terrain.
-                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1);
-                int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
-                double dhdx = (field[i1, j] - field[i0, j]) / ((i1 - i0) * cell);
-                double dhdz = (field[i, j1] - field[i, j0]) / ((j1 - j0) * cell);
-                double inv = 1.0 / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz);
-                normals[v] = (float)(-dhdx * inv);
-                normals[v + 1] = (float)inv;
-                normals[v + 2] = (float)(-dhdz * inv);
-            }
+    /// <summary>
+    /// How far the mesh reaches from the camera, m: the far field's horizon reach, else the world grid's farthest corner. Like the
+    /// heights it depends on where the camera stands, never on where it looks, so a turn rebuilds no part of the air.
+    /// </summary>
+    public double ReachMetres { get; init; }
 
-            if (j == n - 1)
-                return;
-            long t = (long)j * (n - 1) * 6;
-            for (int i = 0; i < n - 1; i++, t += 6)
-            {
-                uint v00 = (uint)(j * n + i);
-                uint v10 = v00 + 1;
-                uint v01 = v00 + (uint)n;
-                uint v11 = v01 + 1;
-                // (v00, v01, v10) and (v10, v01, v11): both have an upward (v1 − v0) × (v2 − v0).
-                indices[t] = v00;
-                indices[t + 1] = v01;
-                indices[t + 2] = v10;
-                indices[t + 3] = v10;
-                indices[t + 4] = v01;
-                indices[t + 5] = v11;
-            }
-        });
-        return new TerrainMesh(positions, normals, indices);
-    }
+    /// <summary>What the mesh is and what it cost.</summary>
+    public MeshInfo Info { get; internal set; } = new() { Kind = MeshKind.None };
 }

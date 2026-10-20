@@ -16,6 +16,7 @@ public sealed class PreviewSessionTests
 {
     private static readonly PreviewStage[] Sky = [PreviewStage.SkyView, PreviewStage.SkyDistribution];
     private static readonly PreviewStage[] Image = [PreviewStage.Render, PreviewStage.ExposureMeter];
+    private static readonly PreviewStage[] Mesh = [PreviewStage.Mesh, PreviewStage.AccelerationStructure];
     private static readonly PreviewStage[] Everything =
     [
         PreviewStage.Device, PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, PreviewStage.AtmosphereTables,
@@ -84,12 +85,12 @@ public sealed class PreviewSessionTests
             ("the same again", r => r, []),
             ("exposure +1 EV", r => Camera(r, "exposureEv", "1"), []),
             ("time of day", r => Recipe(r, "time", "\"goldenHour\""), [.. Sky, .. Image]),
-            ("camera turn", r => Camera(r, "yawDegrees", "20"), Image),
-            ("camera move", r => Camera(r, "position.y", "3000"), [.. Sky, .. Image]),
-            ("base altitude", r => Recipe(r, "altitude", "3000"), [PreviewStage.ScatteringOrders, .. Sky, .. Image]),
+            ("camera turn", r => Camera(r, "yawDegrees", "20"), [.. Mesh, .. Image]),
+            ("camera move", r => Camera(r, "position.y", "3000"), [.. Mesh, .. Sky, .. Image]),
+            ("base altitude", r => Recipe(r, "altitude", "3000"), [.. Mesh, PreviewStage.ScatteringOrders, .. Sky, .. Image]),
             ("seed", r => r with { Seed = 8 }, [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, .. Sky, .. Image]),
-            ("width", r => r with { Width = 48, Height = 27 }, [PreviewStage.Render]),
-            ("width back", r => r with { Width = 32, Height = 18 }, [PreviewStage.Render]),
+            ("width", r => r with { Width = 48, Height = 27 }, [.. Mesh, .. Image]),
+            ("width back", r => r with { Width = 32, Height = 18 }, [.. Mesh, .. Image]),
             ("exposure back", r => Camera(r, "exposureEv", "0"), []),
         };
 
@@ -105,7 +106,7 @@ public sealed class PreviewSessionTests
                 CollectionAssert.AreEqual(File.ReadAllBytes(P("cold" + suffix)), File.ReadAllBytes(P("p" + suffix)), $"{name}: {suffix} as a cold render");
         }
         Assert.AreEqual(8, renderer.Scenes.Count, "the first, time, turn, move, altitude, seed and both widths; never for the exposure");
-        Assert.AreEqual(6, renderer.Meters.Count, "the meter ignores the width");
+        Assert.AreEqual(8, renderer.Meters.Count, "the meter renders the image's mesh, which follows the frame (M1.9)");
     }
 
     [TestMethod]
@@ -221,6 +222,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(9, back.Schema);
+        Assert.AreEqual(10, back.Schema);
     }
 }

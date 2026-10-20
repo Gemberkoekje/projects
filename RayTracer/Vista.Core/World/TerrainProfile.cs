@@ -38,12 +38,24 @@ public sealed record TerrainProfile(
     public static TerrainProfile For(IEnumerable<SetPiece> pieces) =>
         pieces.Any(p => p is SetPiece.SnowCappedMountains or SetPiece.AlpineRange) ? Mountains : Hills;
 
+    /// <summary>The mean of one ridged octave, <c>E[(1 − |n|)²]</c> of <see cref="GradientNoise"/> (measured over 32 M points).</summary>
+    public const double RidgedOctaveMean = 0.5948;
+
     /// <summary>
     /// Terrain height in metres, in [0, <see cref="ReliefMetres"/>], at world <c>(x, z)</c> — a pure function
     /// of the position and <paramref name="seed"/>.
     /// </summary>
-    public double Height(ulong seed, double x, double z)
+    public double Height(ulong seed, double x, double z) => Height(seed, x, z, Octaves);
+
+    /// <summary>
+    /// The terrain with only its first <paramref name="octaves"/> octaves (vista-plan §10 M1.9): the far field's coarse grids
+    /// sample it, since finer octaves would alias there. Each octave left out is replaced by its mean, so the ground keeps its
+    /// mean height; with every octave this is <see cref="Height(ulong, double, double)"/> bit for bit.
+    /// </summary>
+    public double Height(ulong seed, double x, double z, int octaves)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(octaves);
+        octaves = Math.Min(octaves, Octaves);
         // Domain warp (§4.3): displace the sample point by two low-frequency noise fields, so the lattice
         // lines of every octave bend instead of running ruler-straight across the world.
         double wf = 1.0 / (WavelengthMetres * WarpWavelengthFactor);
@@ -58,6 +70,14 @@ public sealed record TerrainProfile(
         double norm = 0.0;
         for (int octave = 0; octave < Octaves; octave++)
         {
+            if (octave >= octaves)
+            {
+                // Left out: its mean instead (the shared tail of the loop keeps the norm and the amplitudes the same).
+                sum += (Ridged ? RidgedOctaveMean : 0.5) * amplitude;
+                norm += amplitude;
+                amplitude *= Persistence;
+                continue;
+            }
             double n = GradientNoise.Sample(StableHash.Combine(seed, (ulong)octave), px * frequency, pz * frequency);
             if (Ridged)
             {
@@ -77,6 +97,22 @@ public sealed record TerrainProfile(
             (px, pz) = (0.8 * px - 0.6 * pz, 0.6 * px + 0.8 * pz);
         }
         return Math.Clamp(sum / norm, 0.0, 1.0) * ReliefMetres;
+    }
+
+    /// <summary>
+    /// The number of octaves a grid of <paramref name="cellSize"/> metres can hold: those whose wavelength is at least two
+    /// cells (at least one).
+    /// </summary>
+    public int OctavesFor(double cellSize)
+    {
+        int octaves = 1;
+        double wavelength = WavelengthMetres * 0.5;
+        while (octaves < Octaves && wavelength >= 2.0 * cellSize)
+        {
+            octaves++;
+            wavelength *= 0.5;
+        }
+        return octaves;
     }
 
     // Sub-stream key for the warp fields, distinct from every octave index.
