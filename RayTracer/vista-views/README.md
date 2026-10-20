@@ -85,3 +85,18 @@ timings the CPU, so read `nvidia-smi` first and build nothing meanwhile.
 powershell -ExecutionPolicy Bypass -File tools/fetch-oidn.ps1
 powershell -ExecutionPolicy Bypass -File vista-views/denoise/render.ps1 [-Spp 16] [-ReferenceSpp 4096] [-TimingWidth 3840] [-Out folder]
 ```
+
+## Erosion checks (M1.7)
+
+`erosion/render.ps1` reruns every M1.7 check: the GPU's erosion passes against their C# reference and the erosion of four
+seeds on the world grid (`--erosion-measure --parity`: GPU time, memory, top-down maps), what six views see on grids of 16.4,
+32.8 and 65.5 km (`--sight-lines`, the measurement behind the grid's extent), and three sheets: the four seeds from the aerial
+camera (with `-Before`, a `main` build's image first, then this build un-eroded, then eroded), the seed-42 views the same way,
+and the seeds' erosion maps from dry runs. The worlds it erodes are cached in a folder under `-Out`, not in the user's cache.
+
+`default.camera.json` still stands above the eroded seed-42 ground (erosion lowered it there), and so does every other committed
+camera: no render of them warns.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/erosion/render.ps1 [-Before ..\main\Vista.App.dll] [-Seeds 42,7,1234,2026] [-Out folder]
+```

@@ -81,5 +81,5 @@ foreach ($seed in $seedList) {
     $tiles += Join-Path $Out "maps\seed$seed.erosion.png"
 }
 Run $App (@('--sheet-from') + $tiles + @('--labels', (($seedList | ForEach-Object { "seed $_" }) -join ','),
-    '--title', 'M1.7 erosion maps · loose material tan · discharge blue · standing water dark blue · north up · the camera red', '--out', (Join-Path $Out 'maps-sheet.png')))
+    '--title', 'M1.7 erosion maps · loose material tan · the top tenth of the discharge blue · standing water dark blue · north up · the camera red', '--out', (Join-Path $Out 'maps-sheet.png')))
 Write-Output "Sheets: $(Join-Path $Out 'seeds-sheet.png'), $(Join-Path $Out 'views-sheet.png'), $(Join-Path $Out 'maps-sheet.png')"

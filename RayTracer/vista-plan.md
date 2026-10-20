@@ -3,8 +3,8 @@
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
 through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
-seventeen slices in §10 (**M1 plan**); M1.1–M1.6 (iteration tools, astronomy, the spectral atmosphere, aerial
-perspective, sun and sky importance sampling, OIDN denoising) are done, M1.7 (GPU erosion) is next. It sits
+seventeen slices in §10 (**M1 plan**); M1.1–M1.7 (iteration tools, astronomy, the spectral atmosphere, aerial
+perspective, sun and sky importance sampling, OIDN denoising, GPU erosion) are done, M1.8 (watch mode) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -228,13 +228,17 @@ change.
   styles (glacial U-valley, alpine range, rolling hills, coastal cliffs).
 - **Erosion is the realism lever:** hydraulic (droplet or grid-based) and thermal
   erosion as GPU compute shaders, producing the height field plus flow, deposition and
-  wetness maps that later stages reuse (rivers, lakes, snow, vegetation).
+  wetness maps that later stages reuse (rivers, lakes, snow, vegetation). Built in M1.7 (§10):
+  virtual-pipe water and thermal erosion over bedrock and loose material, on a 4097² × 8 m
+  grid (32.8 km), cached per seed.
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
   shadows or appears in reflections. Alternative for far terrain: a custom height-field
   intersection (min/max quadtree) in the inline ray query loop. Decide in M1 by measuring
-  (M1.9, M1.10).
+  (M1.9, M1.10). M1.7 measured the stopgap, the uniform mesh of the whole eroded grid:
+  33.6 M triangles, 805 MB plus a 2.35 GB BLAS. Beyond the grid, elevated views still see
+  9–18% of the frame (§10, M1.7), so the far field belongs to M1.9/M1.10 too.
 - **Materials by rule:** rock strata, scree, soil, grass, moss, snow, wet vs. dry —
   placed by slope, altitude, aspect, erosion flow and moisture.
 
@@ -474,6 +478,10 @@ Rough budget for a 4K render with forest — **guesses to verify by measurement 
 | Textures | ~0 (procedural, evaluated in the shader) |
 | OS, desktop, headroom | ~1–1.5 GB |
 
+Measured in M1.7: the uniform mesh of the 4097² eroded grid takes 0.8 GB plus a 2.3 GB BLAS
+(3.1 GiB for the process at render), twice the terrain line, until M1.9's view-dependent mesh;
+erosion's own state (1.15 GiB) is freed before the mesh is built.
+
 One RGBA32F buffer is ~133 MB at 4K, ~531 MB at 8K and ~2.1 GB at 16K, so image buffers
 alone reach ~3 GB at 8K and ~13 GB at 16K: **tiled rendering** arrives with the larger
 targets (M11).
@@ -531,8 +539,8 @@ at that pace, so a small preview render is a first-class mode from M0:
   session on the dev box; cloud sessions and CI can build and unit-test but not render
   (§11). What they *can* run is `--dry-run`: world generation, mesh, sidecar and a
   top-down height map with the camera marked, so the world side can be iterated
-  anywhere. Once erosion runs on the GPU (M1.7), `--dry-run` uses a cached eroded field when
-  there is one and the un-eroded terrain otherwise (§10, M1 decisions).
+  anywhere. Since erosion runs on the GPU (M1.7), `--dry-run` uses the cached eroded world when
+  there is one and the un-eroded terrain otherwise, with a warning (§10, M1 decisions).
 
 ---
 
@@ -897,6 +905,7 @@ Work stops after each PR for review.
 | M1.4 | 0.22 | 2.63 | 2.10 | 3.40 |
 | M1.5 | 0.22 | 2.81 | 2.17 | 3.62 |
 | M1.6 | 0.22 | 2.81 | 2.17 | 3.62 |
+| M1.7 | 0.17 | 3.62 | 2.20 | 3.94 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -920,6 +929,12 @@ For timings on a shared GPU, `measure.ps1` alone is no longer enough: alternate 
 M1.6 changes no pixel of the raw image and no line of the integrator or its host, so its row is M1.5's: five views (the four
 ledger views and dawn, 640 px, 16 spp) rendered by `main` (b1dac45) and by this slice are byte-identical, PNG and EXR. Denoising
 is a separate cost after the render, in M1.6's checks: 7.1 s on the CPU and 0.39 s on CUDA for a 4K frame.
+M1.7 changes the world (eroded, and 32.8 km instead of 16.4), so the views trace other rays: 1.00, 2.81, 2.47 and 3.77 per sample
+(M1.6: 1.00, 2.63, 2.49, 3.77). Measured as M1.5 was, on a GPU 37–40% busy with other programs: this slice and `main` (45109372)
+rendered alternately, view by view, three rounds; median ratios 0.751, 1.288, 1.015 and 1.089 (0.745–0.870, 1.263–1.318,
+0.980–1.034, 1.022–1.093). The aerial view's +29% is terrain where M1.6 showed the grid's edge (13% of its frame lies beyond the
+grid now, 21.5% before); the down-slope view's +9% the eroded ground under a low sun. The sky view's −25% is not explained: it traces
+one camera ray per sample on both builds, and the terrain's height range only picks the sky-view slice; it is 0.06 ns a sample.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -1918,6 +1933,171 @@ softens the faintest texture, which is what erosion adds. Watch mode (M1.8) shou
   sheet over four seeds; erosion time and VRAM per seed recorded. CI: the C# reference conserves
   water and sediment within tolerance, never yields NaN, and has a pinned hash.
 
+*M1.7 status (2026-10-20): done.* Every deliverable and check is met; nothing in `RayTracer.Core` / `RayTracer.Gpu` changed, and
+neither did the integrator. `Vista.Tests` has 533 tests (508 before). The world grid is now **4097² samples 8 m apart (32.8 km)**,
+eroded on the GPU in 19 s per seed and cached on disk; every render, sheet and dry run reads the eroded world. One deliverable is
+weaker than planned: the flow map is the simulation's mean discharge, whose channels are short, not a full flow accumulation (see
+**Next**).
+
+*Checks (on the RTX 3070, driver 32.0.16.1664, unless noted; `nvidia-smi` read 37–40% from other programs throughout):*
+
+- **HLSL against the C# reference** (`--gpu-selftest`, `--erosion-measure --parity`): a 65² patch of the alpine range at the world's
+  8 m, warmed up by 40 reference steps so it holds water, sediment, flux and loose material. Each pass run once on both sides from
+  that state differs by at most 3.3·10⁻⁵ of its largest output (the flux: its damped sum cancels, so a fused multiply-add on the GPU
+  shows), 1.0·10⁻⁷ for the water pass, 8·10⁻⁸ for the transport, 0 for the thermal moves and 8·10⁻¹⁰ for their application. 200 steps
+  from the bare ground on both sides leave the surfaces 6–9 mm apart at most and 0.08 mm on average, against 12.7 m of mean ground
+  movement and 632 m of relief. Tolerances: 10⁻⁴ per pass, 10⁻³ of the relief for the run.
+- **Bit-identical twice and through the cache:** the self-test erodes its world (seed 42, the full grid), stores it in a fresh cache,
+  erodes it again and reads it back: surface, maps and hash identical every time. When the default cache holds the world, the
+  self-test also checks that this GPU and driver still erode it to the cached bits (it passed against the world the sheets had
+  cached); a driver that moves the world fails there instead of passing silently. A Debug build (GPU-based validation) reports
+  nothing for the parity checks and an erosion.
+- **Time and memory per seed** (`--erosion-measure`, the alpine range, four seeds):
+
+  | Seed | GPU time | Per step | Wall | Submissions (longest) | Ground moved, mean (cut / filled at most) | Loose material, mean (cells over 1 m) | Spikes over 5 m: base → eroded |
+  |---|---|---|---|---|---|---|---|
+  | 42 | 18.85 s | 12.6 ms | 19.5 s | 202 (106 ms) | 29.4 m (305 / 256 m) | 16.4 m (55%) | 1421 → 184 |
+  | 7 | 19.09 s | 12.7 ms | 19.6 s | 204 (286 ms) | 29.6 m (317 / 269 m) | 16.5 m (55%) | 1438 → 183 |
+  | 1234 | 19.00 s | 12.7 ms | 19.5 s | 204 (135 ms) | 29.5 m (273 / 255 m) | 16.5 m (55%) | 1336 → 163 |
+  | 2026 | 19.02 s | 12.7 ms | 19.6 s | 203 (148 ms) | 29.4 m (268 / 242 m) | 16.4 m (54%) | 1306 → 189 |
+
+  1500 steps of five passes each. The state takes 1153 MiB; the process used 1242 MiB of video memory while it existed (89 MiB
+  before). The buffers are freed before the mesh is built, so the erosion's memory does not add to the render's. The base terrain
+  takes 0.4–0.9 s on the CPU, the upload, readback and maps about 0.6 s.
+- **The grid, measured** (the aerial view rendered at 640 px on each grid, all 32.8 km; the erosion settings are tuned for 8 m, so
+  only the costs compare, not the looks; 4097² × 4 m costs exactly what 4097² × 8 m does):
+
+  | Grid | Erosion, GPU | State | Mesh triangles | Mesh | BLAS | Process VRAM at render | Mesh (CPU) / upload / BLAS build |
+  |---|---|---|---|---|---|---|---|
+  | 1025² × 32 m | 1.28 s | 72 MiB | 2.1 M | 50 MB | 146 MB | 325 MiB | 0.08 / 0.03 / 0.08 s |
+  | 2049² × 16 m | 5.02 s | 288 MiB | 8.4 M | 201 MB | 586 MB | 888 MiB | 0.16 / 0.08 / 0.14 s |
+  | **4097² × 8 m** | **19.2 s** | **1152 MiB** | **33.6 M** | **805 MB** | **2346 MB** | **3144 MiB** | **0.27 / 0.33 / 0.30 s** |
+
+  8193² would need 4.5 GiB of erosion state alone, and its uniform mesh would not fit: 4097² is the largest grid this card takes.
+- **What the views see beyond the grid** (`--sight-lines`: each pixel's ray of six views marched over the base terrain, 320×180;
+  "beyond" is a ray that leaves the grid's footprint below its highest point, where a render shows the planet's bare ground sphere):
+
+  | View | 16.4 km: beyond the grid | 32.8 km | 65.5 km | Terrain hits at 32.8 km: median / 90% / 99% |
+  |---|---|---|---|---|
+  | Aerial (4.2 km up) | 21.5% | 13.0% | 7.3% | 7.7 / 18.0 / 23.7 km |
+  | Default camera | 1.1% | 0.2% | 0.0% | 3.3 / 5.6 / 7.6 km |
+  | Down a slope | 0.0% | 0.0% | 0.0% | 0.1 / 2.7 / 4.1 km |
+  | Layered ridges (3 km up) | 18.9% | 12.9% | 7.1% | 9.3 / 17.4 / 23.6 km |
+  | Range (3.4 km up) | 15.0% | 8.7% | 4.8% | 7.4 / 15.9 / 23.7 km |
+  | Toward the sun (4.2 km up) | 37.8% | 18.2% | 7.8% | 10.6 / 17.1 / 22.6 km |
+
+  From the ground nothing lies beyond 32.8 km; from 3–4 km up, 9–18% of the frame still does, and doubling the extent again only
+  halves it. So the eroded grid stays at 32.8 km, and the far field (base terrain beyond the grid, a pure function of position)
+  belongs to the view-dependent mesh (M1.9) or the height-field path (M1.10), with the eroded edge blended into it there.
+- **Before/after sheets** (`vista-views/erosion/render.ps1 -Before <main's Vista.App.dll>`, 640 px, 64 spp, raw): the four seeds from
+  the aerial camera and the seed-42 views (default, down a slope, layered ridges, range), each as `main` (M1.6: 16.4 km at 16 m) |
+  this build un-eroded (32.8 km at 8 m) | eroded, plus the four seeds' erosion maps. Eroded faces are fluted with gullies from crest
+  to foot and the crests stay sharp; loose aprons and flat sediment floors fill the valleys; the far range is now terrain where M1.6
+  showed the grid's edge. What still looks wrong: some loose valley fills read as a field of low hummocks ("dunes") under a low sun,
+  and the 8 m facets near a camera on the ground are as plain as M1.6's 16 m ones (M1.9's near-camera detail).
+- **Cache:** a world is 201 MB on disk (the surface in float, four maps in half precision). A render that finds it spends 0.85 s on
+  the world stage instead of 22 s; a dry run of the full grid takes 3.1 s with it.
+- **Every committed camera stands above the eroded seed-42 ground.** Under `default.camera.json` the ground dropped from 1692.0 m
+  (the un-eroded 8 m grid, 0.2 m below the camera; M0's 16 m grid had it at 1690.5 m) to 1684.0 m, so the default view now stands
+  8.2 m up; the down-slope and sky views 28 m.
+- **CI:** 533 tests. The reference: water balanced step by step (rain in, the edges' outflow and evaporation out, to 10⁻⁵ of the
+  total), material balanced (bedrock + loose + suspended, but for the sediment carried over the edges, to 10⁻⁶), the thermal passes
+  conserving the ground while a loose cone settles to 35° and a 70° rock wall to 50° (and a 40° rock slope stands), water running
+  downhill and draining over the low edge, no NaN or negative water, sediment or loose material on flat, spiked, cliffed, noisy and
+  pitted fields under three settings, deterministic and pinned (surface and full hashes), loose material deeper in hollows than on
+  ridges, half-precision maps, the Laplacian; the settings (validation, hash, overrides) and the cbuffer's 96 bytes; the cache (round
+  trip bit for bit, the key and its independence from the culture, a damaged file is a miss with a reason, trimming keeps the
+  newest); the builder (erode and store, then read; un-eroded with a warning; off; erode again after damage); the pipeline (the eroded
+  world rendered and its hash in the sidecar, a dry run reading it from the cache with its map, a dry run without warning and showing
+  the base); `--erosion`, `--grid`, `--vary erosion`; sight lines; the maps image. The pipeline tests run on a 65² world
+  (`TestWorlds`), since the real one takes a second to make and most of a gigabyte to mesh.
+
+*M1.7 decisions taken in code (revisit freely):*
+
+- **Two layers, bedrock and loose material.** 62% of the base terrain is steeper than 30°, so one talus angle would have flattened
+  the range. Loose material (sediment, scree, collapsed rock) rests at 35°; bedrock stands to 50° and collapses into loose material
+  beyond. Water picks up loose material first and rock at a tenth of the rate. The loose depth is the deposition map M1.12 reads.
+- **Capacity from discharge, not speed:** `C = K·sin α·q` with `q` the net flow per metre of width (`DischargeExponent` 1; ½ is the
+  geomorphologists' usual m/n and was measured too). Mei et al.'s `K·sin α·|v|` eroded every wet slope alike, since the pipe model's
+  water moves at the grid's speed limit wherever it flows, and melted the range into smooth sand-like slopes.
+- **Sediment moves with the water's own fractions** (each cell sends the share of its sediment its water sent), not semi-Lagrangian
+  advection: gather-only, and conserving.
+- **Limiters, all local:** the flux keeps 20% of its last value per step (`FluxDamping` 0.8; undamped water sloshed uphill and piled
+  sediment 2 km high), and in one step a cell never cuts below its lowest edge neighbour nor fills above its highest. Without them
+  the valley floors filled with single-cell needles (33 000 cells over 5 m above all eight neighbours, against 1 400 in the base
+  terrain; now under 200). The pick-up and drop-off rates are 0.1 per step: faster ones left a washboard ripple on loose slopes.
+- **Open edges:** past the grid the ground continues at the edge's slope, dry, so water and its sediment leave where the land falls
+  away; the thermal passes see no neighbour there. The balance tests account for both.
+- **Parameters by sheet, per profile:** the mountains' were chosen from nine sheets of the four views (`ErosionSettings.Mountains`); the
+  hills share them with half the capacity and rock to 45°, and change only gently. `VISTA_EROSION_SETTINGS` overrides any of them for
+  tuning (the settings are in the cache key and the sidecar).
+- **The grid is 4097² × 8 m (32.8 km), not 4 m (16.4 km):** the same cost, twice the reach (the sight lines above), and at 8 m a
+  gully is a few pixels wide on a 4K frame of the range 5–10 km away. Detail finer than 8 m near the camera is M1.9's position-only
+  noise.
+- **The uniform mesh of the full grid stays until M1.9**, at 3.1 GiB of video memory with its BLAS, twice §7.1's terrain budget: the
+  eroded detail must be seen to be judged, and it fits beside what else runs on this card today (2.7 GiB). M1.9's view-dependent mesh
+  has to bring it under budget.
+- **The cache** is `%LOCALAPPDATA%\Vista\worlds` (`VISTA_WORLD_CACHE` moves it), one file per (profile, seed, grid, settings, pass
+  version, terrain version), checked against its hash on every read, written through a temporary file, trimmed to 8 GB oldest first.
+  Bump `ErosionCache.PassesVersion` with any change to what the passes compute (the reference's pinned hash flags one).
+- **Maps:** the loose depth, the mean discharge and mean water depth over the second half of the steps (the flow and wetness maps),
+  and the water standing at the end; rounded to half precision when made, so a fresh world and a cached one are the same bits.
+  Curvature (`TerrainMaps.Curvature`) is computed from the surface when wanted. The suspended sediment is set down where it is at the
+  end. `--dry-run` writes `<out>.erosion.png` (loose tan, the top tenth of the discharge blue, standing water dark blue).
+- **Sidecar schema 8:** `world.erosion` records the source (eroded, cache, uneroded, off), the settings and their hash, the base
+  field's hash, the device and driver, when, the cache file and the cost; `world.heightFieldHash` is the eroded surface's. A render's
+  stats also record the BLAS bytes and the process's video memory (for M1.15).
+- **CLI:** `--erosion off` and `--vary erosion=off,on` render the un-eroded world on the same grid (the cleanest before/after);
+  `--grid SIZExCELL` makes another world, for measurements. `--erosion-measure` erodes seeds and reports, `--parity` runs the
+  checks, `--sight-lines` measures extents.
+
+*M1.7 gotchas:*
+
+- **HLSL's `?:` evaluates both sides**, and root UAVs have no bounds checking: `i > 0 ? Ground(c - 1) : ...` read index −1 at the
+  grid's edge and hung the device (`DXGI_ERROR_DEVICE_HUNG`, reported as a TDR). Every neighbour index is clamped into the grid first.
+- **A transfer smaller than half an ulp of a 2 km height vanishes from the rock but not from the sediment**, creating material.
+  Amounts are made representable first (`a − (a − x)`), and HLSL needs `precise` on them or the compiler folds that back to `x`.
+- **`pow`'s last bit is the C library's.** The exponents the profiles use (1, ½) are done exactly on both sides, so the pinned hash
+  holds wherever CI runs.
+- **A record's `ToString` follows the culture** (decimal commas here): the cache key is built from the fields' bits, never from it.
+- **`cond ? int.Parse(…) : float.Parse(…)` is a float.** Boxed for reflection it stops being an `int`; cast a branch to `object`.
+- **Windows PowerShell 5.1 drops empty-string arguments** to native programs (`--seeds ''` arrived as a bare `--seeds`).
+- **A shared GPU stretches submissions:** one batch planned for 100 ms took 482 ms while another program worked. Erosion submissions
+  stay at about 100 ms planned, far below the ~2 s timeout; the self-test only fails one over 1.5 s.
+
+**M1.7 hand-off.** To understand M1.7, start by reading `Vista.Core/World/ErosionReference.cs` (the five passes and why each is
+gather-only), then `Vista.App/Shaders/VistaErosion.hlsl` beside it, then `Vista.Core/World/WorldBuilder.cs` with `ErosionCache.cs`
+(where a world comes from), then `Vista.App/Gpu/D3D12VistaRenderer.Erosion.cs` (buffers, batches, bindings).
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png [--erosion off] [--grid 2049x16]
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --vary erosion=off,on --out s.png
+dotnet run --project Vista.App -c Release -- --erosion-measure [--recipe r.json] [--seeds 42,7] [--grid 4097x8] [--set Capacity=3]
+    [--parity] [--out dir] [--sight-lines c1.json,c2.json [--sight-grids 1025x16,1025x32]]
+powershell -ExecutionPolicy Bypass -File vista-views/erosion/render.ps1 [-Before <main's Vista.App.dll>] [-Out folder]
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/World/ErosionSettings.cs` | The parameters per profile, their validation, hash and overrides; the per-grid constants (the shader's cbuffer) |
+| `Vista.Core/World/ErosionReference.cs` | The state and the five passes in C# |
+| `Vista.Core/World/ErosionResult.cs` | The eroded world and its maps; curvature |
+| `Vista.Core/World/TerrainEroder.cs`, `WorldBuilder.cs`, `ErosionCache.cs`, `WorldCache.cs` | The seam, the world stage, the disk cache, the in-memory cache |
+| `Vista.Core/World/SightLines.cs`, `TerrainGenerator.cs` | The extent measurement; the 4097² × 8 m grid |
+| `Vista.Core/Cli/*`, `Output/Sidecar.cs`, `Output/DebugImages.cs`, `Rendering/RenderTypes.cs` | `--erosion`, `--grid`, the erosion axis; schema 8; the maps image; BLAS and video memory in the stats |
+| `Vista.App/Shaders/VistaErosion.hlsl`, `Gpu/D3D12VistaRenderer.Erosion.cs` | The passes on the GPU and their host |
+| `Vista.App/Gpu/ErosionParity.cs`, `ErosionMeasure.cs`, `GpuSelfTest.cs`, `Program.cs` | The parity checks, `--erosion-measure`, the self-test's erosion checks, the wiring |
+| `vista-views/erosion/render.ps1`, `vista-views/README.md` | The M1.7 checks |
+| `Vista.Tests/ErosionReferenceTests.cs`, `WorldStageTests.cs`, `TestWorlds.cs` (+ the pipeline tests on the small world) | 25 new tests |
+
+**Next: M1.8** (watch mode). Erosion now costs 19 s a seed the first time and 0.85 s from the cache, and meshing the full grid and
+building its BLAS another second; those are what watch mode keeps alive. The discharge map is the simulation's mean outflow, and its
+channels are short: 1500 steps do not carry rain across a whole catchment, so M3's rivers will need a real flow accumulation.
+
 **M1.8 — Watch mode.**
 - *Goal:* keep the expensive state alive between previews, now that erosion costs seconds (§7.4).
 - *Deliverable:* `--watch` keeps the device, compiled shaders, the eroded world, the mesh and its
@@ -2149,7 +2329,8 @@ balance, lens CA), estimator accuracy.
   re-baselining.
 - **Eroded worlds depend on the GPU driver** (M1 decision: erosion stays on the GPU). The
   per-seed cache and the sidecar's height-field hash make a change visible, but a fresh machine
-  or driver may erode the same seed slightly differently.
+  or driver may erode the same seed slightly differently. Since M1.7, `--gpu-selftest` erodes
+  seed 42 and compares it with the cached copy, naming both drivers when they disagree.
 - **The agent loop needs the GPU.** Only the local RTX 3070 can render, so LLM look-dev
   iteration (§7.4) works only in a local session on the dev box. A CPU preview
   renderer would lift that, but contradicts the no-CPU-port decision (§9); revisit
