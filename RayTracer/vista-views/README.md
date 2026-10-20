@@ -58,3 +58,16 @@ noon and at golden hour and on the down-slope view's shadowed valley, and the se
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/aerial/render.ps1 [-Paths 1048576] [-ReferenceSpp 16384] [-Out folder]
 ```
+
+## Sun and sky sampling checks (M1.5)
+
+`sampling/mountains-dawn.recipe.json` is the day recipe at dawn (the sun 3.6° below the horizon, all light from the sky).
+`render.ps1` reruns every M1.5 check on four views (dawn and day from the default camera, golden hour from the default camera
+and down the slope): `--sampling-compare` of M1.4's estimator against MIS over 32 independent renders of 128 spp each
+(agreement, variance at equal samples, time per sample, and the Russian-roulette sweep), a 16 spp pair of each view to look at,
+and the null test (MIS against itself on other streams). The GPU is often shared with other programs: read `nvidia-smi` first,
+and trust timings as ratios between estimators (`--sampling-compare` interleaves them) or between builds rendered alternately.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/sampling/render.ps1 [-Replicates 32] [-Spp 128] [-Out folder]
+```
