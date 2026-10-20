@@ -77,6 +77,12 @@ public sealed record PreviewRequest
 
     /// <summary>How the air is evaluated (vista-plan §10 M1.3): the LUTs, or the reference.</summary>
     public AtmosphereMode Atmosphere { get; init; } = AtmosphereMode.Luts;
+
+    /// <summary>Which lights a surface samples (vista-plan §10 M1.5): sun and sky with MIS, or M1.4's sun alone.</summary>
+    public LightSampling LightSampling { get; init; } = LightSampling.Mis;
+
+    /// <summary>The bounce from which Russian roulette may end a path (<see cref="RenderSettings.RussianRouletteStart"/>).</summary>
+    public int RussianRouletteStart { get; init; } = RenderSettings.DefaultRussianRouletteStart;
 }
 
 /// <summary>
@@ -87,6 +93,7 @@ public sealed record PreviewRequest
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
 ///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
+///           [--light-sampling mis | sunOnly] [--rr-start 2]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
@@ -95,7 +102,9 @@ public sealed record PreviewRequest
 /// preset (clearing the recipe's solar time) or a local solar time, and <c>--sun-elevation</c> the time at which the
 /// sun stands that high (rising when the time is dawn); <c>--altitude</c> sets the scene's base altitude (§3.6).
 /// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
-/// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4).
+/// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4). <c>--light-sampling
+/// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
+/// with <c>--rr-start 3</c>, M1.4's Russian roulette as well, it renders M1.4's images bit for bit.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -125,7 +134,10 @@ public static class PreviewCommandLine
         "  --sun-elevation <degrees>: the time the sun stands that high (geometric; rising with --time dawn, else setting).\n" +
         "  --altitude <metres>: the scene's base altitude above sea level (default: the place's valley floor), 0 to 8000.\n" +
         "--atmosphere luts (default) | reference | referenceShadowed: the precomputed air, or the air path-traced as a medium\n" +
-        "  (slow, unbiased), optionally with the terrain's shadow in it.";
+        "  (slow, unbiased), optionally with the terrain's shadow in it.\n" +
+        "--light-sampling mis (default) | sunOnly: sample the sun and the sky as lights, weighed against the bounce, or (M1.4)\n" +
+        "  the sun alone, the sky left to the bounce; the same image on average, with different noise.\n" +
+        "--rr-start <bounce>: the bounce from which Russian roulette may end a path (default 2; M1.4 used 3).";
 
     /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
@@ -167,7 +179,8 @@ public static class PreviewCommandLine
     internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
-        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere",
+        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
+        "--rr-start",
     };
 
     /// <summary>
@@ -237,6 +250,8 @@ public static class PreviewCommandLine
         PixelWindow loupe = Loupe(values.GetValueOrDefault("--loupe"), width, height, problems);
         Dictionary<string, string> recipeOverrides = PlaceOverrides(values, problems);
         AtmosphereMode atmosphere = Atmosphere(values.GetValueOrDefault("--atmosphere"), problems);
+        LightSampling lightSampling = Lights(values.GetValueOrDefault("--light-sampling"), problems);
+        int rrStart = Int(values, "--rr-start", RenderSettings.DefaultRussianRouletteStart, 0, RenderSettings.MaxRussianRouletteStart, problems);
 
         if (problems.Count > before)
             return null;
@@ -256,6 +271,8 @@ public static class PreviewCommandLine
             Loupe = loupe,
             RecipeOverrides = recipeOverrides,
             Atmosphere = atmosphere,
+            LightSampling = lightSampling,
+            RussianRouletteStart = rrStart,
         };
     }
 
@@ -271,6 +288,20 @@ public static class PreviewCommandLine
             return mode;
         problems.Add($"--atmosphere must be luts, reference or referenceShadowed, got '{text}'.");
         return AtmosphereMode.Luts;
+    }
+
+    /// <summary>Parses a <c>--light-sampling</c> value (<c>mis</c> or <c>sunOnly</c>).</summary>
+    internal static bool TryParseLightSampling(string text, out LightSampling sampling) =>
+        Enum.TryParse(text, ignoreCase: true, out sampling) && sampling != LightSampling.None && Enum.IsDefined(sampling) && !int.TryParse(text, out _);
+
+    private static LightSampling Lights(string? text, List<string> problems)
+    {
+        if (text is null)
+            return LightSampling.Mis;
+        if (TryParseLightSampling(text, out LightSampling sampling))
+            return sampling;
+        problems.Add($"--light-sampling must be mis or sunOnly, got '{text}'.");
+        return LightSampling.Mis;
     }
 
     /// <summary>The recipe overrides of the place options (JSON values by field), checked here so a typo is one CLI error.</summary>

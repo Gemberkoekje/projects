@@ -43,6 +43,50 @@ public sealed record RenderSettings
     /// anyone sees. A renderer renders it like any other; it only tells the two apart in statistics and tests.
     /// </summary>
     public bool ExposureMeter { get; init; }
+
+    /// <summary>Which lights a surface samples, and how the estimates are combined (vista-plan §10 M1.5).</summary>
+    public LightSampling LightSampling { get; init; } = LightSampling.Mis;
+
+    /// <summary>
+    /// The bounce from which Russian roulette may end a path (0: from the first surface); paths shorter than this always
+    /// continue to <see cref="MaxBounces"/>.
+    /// </summary>
+    public int RussianRouletteStart { get; init; } = DefaultRussianRouletteStart;
+
+    /// <summary>
+    /// The <see cref="RussianRouletteStart"/> every image uses, re-measured with M1.5's light sampling (vista-plan §10 M1.5): from
+    /// bounce 2 instead of M1.4's 3, 1–13% more efficient for under 1% more variance at equal samples; from bounce 1 the
+    /// second surface, which no longer samples the sky, cost up to twice the efficiency.
+    /// </summary>
+    public const int DefaultRussianRouletteStart = 2;
+
+    /// <summary>The latest bounce <see cref="RussianRouletteStart"/> may name.</summary>
+    public const int MaxRussianRouletteStart = 64;
+
+    /// <summary>
+    /// Which set of random numbers the render draws: 0 for every image anyone sees. Another value gives each pixel-sample
+    /// an independent stream, so a second render of the same view is a statistically independent estimate — what a
+    /// per-pixel comparison of two estimators needs (vista-plan §10 M1.5).
+    /// </summary>
+    public uint RandomStream { get; init; }
+}
+
+/// <summary>Which lights the integrator samples at a surface (vista-plan §5.1, §10 M1.5).</summary>
+public enum LightSampling
+{
+    /// <summary>Not chosen.</summary>
+    None,
+    /// <summary>
+    /// Every surface samples the sun's disk and a path's first surface also samples the sky (from <see cref="SkyDistribution"/>),
+    /// and the bounce's own direction counts too: multiple importance sampling (the power heuristic) weighs them.
+    /// </summary>
+    Mis,
+    /// <summary>
+    /// M1.4's estimator, kept for comparison: only the sun is sampled as a light; the sky is reached by the cosine-weighted
+    /// bounce alone, and a bounce that hits the sun's disk counts nothing (next-event estimation already took it). The
+    /// reference atmosphere always works this way.
+    /// </summary>
+    SunOnly,
 }
 
 /// <summary>How the integrator evaluates the atmosphere (vista-plan §10 M1.3).</summary>

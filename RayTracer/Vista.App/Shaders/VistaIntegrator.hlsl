@@ -10,6 +10,13 @@
 // W·m⁻²·sr⁻¹·nm⁻¹. The C# references are Vista.Atmosphere.AtmosphereLuts, AerialPerspective and
 // Vista.Rendering.IntegratorTables (pinned by Vista.Tests).
 //
+// Since M1.5 (LightSampling = 1, the default) every surface samples the sun's disk and a path's first surface also samples
+// the sky (a distribution over the sky view's luminance, VistaSkyLight.hlsli), and the bounce's own direction still counts
+// when it reaches either: multiple importance sampling weighs them by the power heuristic, so golden hour and twilight, lit
+// mostly by the sky, converge faster. The bounce's density in those weights includes its Russian-roulette survival, and is
+// zero after the last bounce, where the lights carry everything. LightSampling = 0 is M1.4's estimator (the sun alone
+// sampled, the sky left to the bounce), kept for comparison; the reference atmosphere always works that way.
+//
 // ATMOSPHERE_REFERENCE (vista-plan §10 M1.3, M1.4; --atmosphere reference) swaps the LUT paths for the slow, unbiased
 // check: the air is tracked as a medium (delta tracking, next-event estimation to the sun disk with ratio-tracked
 // transmittance, Rayleigh or Henyey–Greenstein phase sampling, a Lambertian ground sphere) both along the segments
@@ -18,11 +25,13 @@
 // count. REFERENCE_TERRAIN_SHADOWS (--atmosphere referenceShadowed) adds the terrain's shadow to the sunlight the air
 // scatters once.
 // The reference build also holds CSSkyCheck, which compares LUT and reference for chosen directions and segments,
-// wavelength by wavelength; the LUT build holds CSAerialProbe, the aerial perspective's parity probe.
+// wavelength by wavelength; the LUT build holds CSAerialProbe, the aerial perspective's parity probe, CSSkyLuminance,
+// which measures the sky distribution's cells, and CSSkyProbe, its sampling's parity probe.
 //
-// Determinism contract (BatchPlanner): every random number of a pixel-sample comes from (pixel, sample index)
-// alone — never from the dispatch — and a pixel's samples are always added in sample-index order, starting from
-// zero at sample 0. So the image is the same however the render is split into dispatches.
+// Determinism contract (BatchPlanner): every random number of a pixel-sample comes from (pixel, sample index) alone
+// (and the render's RandomStream, 0 for every image anyone sees) — never from the dispatch — and a pixel's samples are
+// always added in sample-index order, starting from zero at sample 0. So the image is the same however the render is
+// split into dispatches.
 //
 // The loupe (vista-plan §7.4, M1.1): a render may cover only a window of the frame. The output buffers are
 // window-sized, but the camera ray and the random keys belong to the pixel's place in the full frame, so a window
@@ -37,8 +46,10 @@
 #define COMPANION_STRIDE  12u   // HERO_COUNT / COMPANIONS
 #define PI                3.14159265358979
 #define INV_PI            0.318309886183791
-#define RR_START_BOUNCE   3u
 #define T_MAX             1.0e7
+#ifndef SKY_LIGHT_BOUNCES
+#define SKY_LIGHT_BOUNCES 1u    // the surfaces of a path that sample the sky as a light: the first (vista-plan §10 M1.5, measured)
+#endif
 
 #define AOV_ALBEDO        1u
 #define AOV_NORMAL        2u
@@ -72,7 +83,10 @@ cbuffer Constants : register(b0)
     uint   Width;         uint Height;     uint RowStart;   uint RowCount;        // the rendered window; rows within it
     uint   FirstSample;   uint SampleCount; uint _pad1;     uint _pad2;
     uint   WindowX;       uint WindowY;    uint FrameWidth; uint FrameHeight;     // the window's place in the full frame
+    uint   LightSampling; uint SkySampling; uint RandomStream; uint RrStartBounce; // 1: MIS of sun, sky and bounce; 1: the sky distribution is bound and lit
 };
+
+#include "VistaSkyLight.hlsli"
 
 // ── Random numbers: a stream per (pixel, sample index) ────────────────────────────────────────────
 
@@ -196,6 +210,12 @@ bool Occluded(float3 origin, float3 dir)
 bool OnSunDisk(float3 dir)
 {
     return 1.0 - dot(normalize(dir), AtmToSun) <= AtmSunOneMinusCos;
+}
+
+// The pdf in solid angle of next-event estimation's uniform direction in the sun's disk.
+float SunConePdf()
+{
+    return 1.0 / (2.0 * PI * AtmSunOneMinusCos);
 }
 
 float4 MaterialReflectance(uint material, uint4 idx)
@@ -461,7 +481,12 @@ struct SampleResult
 SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 {
     SampleResult result = (SampleResult)0;
-    uint rng = PcgHash(pixelHash ^ PcgHash(sampleIndex));
+    uint key = pixelHash ^ PcgHash(sampleIndex);
+    // Another, independent stream (stream 0 is every image's). The key is hashed before the stream joins it: mixed by XOR
+    // alone, sample i of stream s would draw exactly the numbers of sample s of stream i.
+    if (RandomStream != 0u)
+        key = PcgHash(PcgHash(key) ^ PcgHash(RandomStream));
+    uint rng = PcgHash(key);
 
     uint hero = (pixelHash + sampleIndex) % HERO_COUNT;
     uint4 idx = (hero + uint4(0u, 1u, 2u, 3u) * COMPANION_STRIDE) % HERO_COUNT;
@@ -478,6 +503,8 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 
     float4 radiance = 0.0;
     float4 throughput = 1.0;
+    float bsdfPdf = 0.0; // the density with which the last surface's bounce chose `dir`, its Russian-roulette survival included
+    bool skyNee = false; // whether the last surface sampled the sky as a light
     result.Depth = asfloat(0x7F800000u); // +∞ until the camera ray hits something
 
     for (uint bounce = 0u; ; bounce++)
@@ -496,9 +523,24 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 #else
             float altitude = bounce == 0u ? CameraAltitude : ClampAltitude(GroundAltitude + origin.y);
             float4 sky = SkyRadiance(bounce == 0u, altitude, dir, idx);
-            // Only camera rays see the disk; a bounce's sun is next-event estimation's job (no double count).
-            if (bounce == 0u && OnSunDisk(dir))
-                sky += sunDisk * SunTransmittance4(idx, ClampAltitude(CameraAltitude), dir.y);
+            if (bounce == 0u)
+            {
+                // A camera ray sees the disk itself.
+                if (OnSunDisk(dir))
+                    sky += sunDisk * SunTransmittance4(idx, ClampAltitude(CameraAltitude), dir.y);
+            }
+            else if (LightSampling != 0u)
+            {
+                // The surface this bounce left also sampled the sky and the sun as lights: the bounce takes its share of
+                // each (vista-plan §10 M1.5). The disk is seen through the air from that surface, along its own vertical,
+                // as next-event estimation sees it. Under M1.4's estimator the sky is the bounce's alone and the disk
+                // next-event estimation's alone.
+                if (skyNee)
+                    sky *= PowerHeuristic(bsdfPdf, SkyPdf(dir));
+                if (SunUp != 0u && OnSunDisk(dir))
+                    sky += sunDisk * SunTransmittance4(idx, GroundAltitude + max(origin.y, 0.0), dot(dir, LocalUp(origin)))
+                         * PowerHeuristic(bsdfPdf, SunConePdf());
+            }
             radiance += throughput * sky;
 #endif
             break;
@@ -544,6 +586,17 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 
         float3 next = hit.Position + hit.GeometricNormal * OriginOffset(hit.Position);
 
+        // The bounce that may follow, decided before the lights so their MIS weights see the density it really has: its
+        // Russian-roulette survival (its random number is drawn later, as before) times cos/π, and none after the last
+        // bounce, where the lights carry everything. bsdfScale · cos(n, ω) is that density toward ω.
+        float4 continued = throughput * refl;
+#ifdef ATMOSPHERE_REFERENCE
+        float survive = bounce >= RrStartBounce ? clamp(continued.x, 0.05, 1.0) : 1.0;
+#else
+        float survive = bounce >= RrStartBounce ? clamp(max(max(continued.x, continued.y), max(continued.z, continued.w)), 0.05, 1.0) : 1.0;
+#endif
+        float bsdfScale = bounce < MaxBounces ? survive * INV_PI : 0.0;
+
         // Next-event estimation on the sun: a uniform direction in its disk; E·T·cos·ρ/π per wavelength, where T is
         // the air's transmittance from this point toward that direction (zero in the Earth's shadow), taken against the
         // point's own vertical in the bent frame, as the air just above it is.
@@ -564,24 +617,49 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                     float transmittance = RatioTrack(AtmCoefficients[idx.x], height, muS, rng);
                     radiance.x += throughput.x * refl.x * (INV_PI * cosS) * sunIrradiance.x * transmittance;
 #else
-                    radiance += throughput * refl * (INV_PI * cosS) * sunIrradiance * SunTransmittance4(idx, GroundAltitude + height, muS);
+                    // The disk is 6.8·10⁻⁵ sr, so its density dwarfs the bounce's and the weight is 1 to float precision.
+                    float weight = LightSampling != 0u ? PowerHeuristic(SunConePdf(), bsdfScale * cosS) : 1.0;
+                    radiance += throughput * refl * (INV_PI * cosS) * sunIrradiance * SunTransmittance4(idx, GroundAltitude + height, muS) * weight;
 #endif
                 }
             }
         }
 
+#ifndef ATMOSPHERE_REFERENCE
+        // Next-event estimation on the sky (vista-plan §10 M1.5) at a path's first SKY_LIGHT_BOUNCES surfaces: a direction
+        // from the sky distribution, a shadow ray against the terrain, and the sky view from this point (as a bounce that
+        // escapes here reads it), weighed against the bounce by the power heuristic. Deeper surfaces leave the sky to the
+        // bounce: at today's albedo sampling it there too changed no variance and cost 15%. With a bounce after it
+        // (MaxBounces ≥ 1) the surface's sky is shared with the bounce and the image has exactly M1.4's orders of light;
+        // with no bounces at all (MaxBounces = 0) its sky sample weighs 1 and adds the sky M1.4 left out.
+        skyNee = SkySampling != 0u && bounce < SKY_LIGHT_BOUNCES;
+        if (skyNee)
+        {
+            float k1 = NextFloat(rng);
+            float k2 = NextFloat(rng);
+            float k3 = NextFloat(rng);
+            float skyPdf;
+            float3 toSky = SampleSky(k1, k2, k3, skyPdf);
+            float cosK = dot(hit.ShadingNormal, toSky);
+            if (cosK > 0.0 && dot(hit.GeometricNormal, toSky) > 0.0 && skyPdf > 0.0)
+            {
+                result.Rays++;
+                if (!Occluded(next, toSky))
+                {
+                    float4 sky = SkyRadiance(false, ClampAltitude(GroundAltitude + next.y), toSky, idx);
+                    radiance += throughput * refl * sky * (INV_PI * cosK / skyPdf * PowerHeuristic(skyPdf, bsdfScale * cosK));
+                }
+            }
+        }
+#endif
+
         if (bounce >= MaxBounces)
             break;
 
         // Lambertian bounce, cosine-weighted: f·cos/pdf = ρ.
-        throughput *= refl;
-        if (bounce >= RR_START_BOUNCE)
+        throughput = continued;
+        if (bounce >= RrStartBounce)
         {
-#ifdef ATMOSPHERE_REFERENCE
-            float survive = clamp(throughput.x, 0.05, 1.0);
-#else
-            float survive = clamp(max(max(throughput.x, throughput.y), max(throughput.z, throughput.w)), 0.05, 1.0);
-#endif
             if (NextFloat(rng) >= survive)
                 break;
             throughput /= survive;
@@ -591,6 +669,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         dir = CosineHemisphere(hit.ShadingNormal, v1, v2);
         if (dot(dir, hit.GeometricNormal) <= 0.0)
             break; // the smooth normal tilted the lobe under the true surface
+        bsdfPdf = bsdfScale * dot(hit.ShadingNormal, dir);
         origin = next;
     }
 
@@ -763,6 +842,69 @@ void CSAerialProbe(uint3 tid : SV_DispatchThreadID)
     AerialSegment(seg, uint4(lambda, lambda, lambda, lambda), airT, airS);
     CheckSums[2u * item] = float4(airT.x, airS.x, seg.Mu, seg.Length);
     CheckSums[2u * item + 1u] = float4(seg.Height, seg.MuS, seg.Nu, 0.0);
+}
+
+// ── The sky as a light: its measurement and its parity probe (vista-plan §10 M1.5) ──────────────────
+
+RWStructuredBuffer<float> SkyLuminanceOut : register(u7);
+
+// The sky distribution's measurement: for each (cell, terrain slice) — item = cell · SKY_TERRAIN_SLICES + slice − 1 —
+// the mean over the cell's SKY_DIST_SUB² points of the sky view's luminance in that slice, Σ_λ ȳ_λ·E_λ·(smooth + HG·haze),
+// in the integrator's Y units. The CPU averages the slices and builds the distribution (SkyDistribution.Build). C#
+// reference: SkyDistribution.CellLuminance.
+[numthreads(64, 1, 1)]
+void CSSkyLuminance(uint3 tid : SV_DispatchThreadID)
+{
+    uint item = tid.x;
+    if (item >= SKY_DIST_BANDS * SKY_DIST_COLUMNS * SKY_TERRAIN_SLICES)
+        return;
+    uint slice = 1u + item % SKY_TERRAIN_SLICES;
+    uint cell = item / SKY_TERRAIN_SLICES;
+    uint band = cell / SKY_DIST_COLUMNS;
+    uint column = cell % SKY_DIST_COLUMNS;
+    float muS = clamp(AtmToSun.y, -1.0, 1.0);
+    float sinS = sqrt(max(1.0 - muS * muS, 0.0));
+    float sum = 0.0;
+    for (uint a = 0u; a < SKY_DIST_SUB; a++)
+    {
+        for (uint b = 0u; b < SKY_DIST_SUB; b++)
+        {
+            float2 p = SkyCellPoint(band, column, a, b);
+            float sinTheta = sqrt(max(1.0 - p.x * p.x, 0.0));
+            float phase = HenyeyGreenstein(sinTheta * cos(p.y) * sinS + p.x * muS, MieG);
+            for (uint l = 0u; l < ATM_WAVELENGTHS; l += 4u)
+            {
+                uint4 lambdas = l + uint4(0u, 1u, 2u, 3u);
+                uint4 idx = min(lambdas, ATM_WAVELENGTHS - 1u);
+                float4 smooth, mie;
+                SampleSkyViewSlice(slice, p.x, p.y, idx, smooth, mie);
+                float4 weight = float4(Cie[idx.x].y * AtmSun[idx.x].y, Cie[idx.y].y * AtmSun[idx.y].y,
+                                       Cie[idx.z].y * AtmSun[idx.z].y, Cie[idx.w].y * AtmSun[idx.w].y);
+                weight *= float4(lambdas < ATM_WAVELENGTHS); // the last group's duplicates count nothing
+                sum += dot(weight, smooth + phase * mie);
+            }
+        }
+    }
+    SkyLuminanceOut[item] = sum / float(SKY_DIST_SUB * SKY_DIST_SUB);
+}
+
+// The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads
+// CheckDirection[2i] (xyz: three random numbers) and [2i + 1] (xyz: a unit direction), and writes CheckSums[2i] = (the
+// sampled direction, its pdf) and [2i + 1] = (the direction's pdf, its band, its column, 0).
+[numthreads(64, 1, 1)]
+void CSSkyProbe(uint3 tid : SV_DispatchThreadID)
+{
+    uint item = tid.x;
+    if (item >= CheckDirections)
+        return;
+    float4 u = CheckDirection[2u * item];
+    float3 d = CheckDirection[2u * item + 1u].xyz;
+    float pdf;
+    float3 dir = SampleSky(u.x, u.y, u.z, pdf);
+    uint band, column;
+    SkyCellOf(d, band, column);
+    CheckSums[2u * item] = float4(dir, pdf);
+    CheckSums[2u * item + 1u] = float4(SkyPdf(d), float(band), float(column), 0.0);
 }
 
 #endif

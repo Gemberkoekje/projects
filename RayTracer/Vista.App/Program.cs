@@ -13,7 +13,8 @@ namespace Vista.App;
 /// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
 /// <c>--sheet-from</c> tiles existing images), and the dev-box checks: <c>--gpu-selftest</c> and
 /// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
-/// <c>--atmosphere-compare</c> (one view rendered with both, by distance).
+/// <c>--atmosphere-compare</c> (one view rendered with both, by distance), and <c>--sampling-compare</c> (one view
+/// rendered with M1.4's estimator and with MIS: agreement, noise and cost).
 /// </summary>
 internal static class Program
 {
@@ -28,6 +29,8 @@ internal static class Program
             return RunGpu(() => AtmosphereCheck.Run(args, Console.Out));
         if (args.FirstOrDefault() == AtmosphereCompare.Flag)
             return RunGpu(() => AtmosphereCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == SamplingCompare.Flag)
+            return RunGpu(() => SamplingCompare.Run(args, Console.Out));
 
         try
         {
@@ -92,6 +95,7 @@ internal static class Program
         Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
         Console.Error.WriteLine(AtmosphereCheck.Usage);
         Console.Error.WriteLine(AtmosphereCompare.Usage);
+        Console.Error.WriteLine(SamplingCompare.Usage);
         return 1;
     }
 

@@ -70,6 +70,8 @@ public static class PreviewPipeline
             Batching = new BatchPlannerOptions { DispatchBudgetMs = request.DispatchBudgetMs },
             Window = request.Loupe,
             Atmosphere = request.Atmosphere,
+            LightSampling = request.LightSampling,
+            RussianRouletteStart = request.RussianRouletteStart,
         };
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
@@ -137,7 +139,11 @@ public static class PreviewPipeline
             Seed = request.Seed,
             Camera = camera,
             DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0,
-            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name, window),
+            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name, window)
+            {
+                LightSampling = ImageInfo.LightSamplingOf(settings),
+                RussianRouletteStart = settings.RussianRouletteStart,
+            },
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,
                 terrain.Size,

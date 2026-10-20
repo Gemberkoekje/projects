@@ -55,6 +55,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotAtmCoefficients = 7, SlotAtmSun = 8, SlotColumns = 9, SlotSkyView = 10, SlotCheckDirections = 11;
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
     private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
+    private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -118,6 +119,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _initSeconds["deviceInit"] = Lap(stopwatch);
         CreatePipeline();
         CreateAtmospherePipelines();
+        CreateSkyLightPipelines();
         CreateFixedResources();
         _initSeconds["shaderCompile"] = Lap(stopwatch);
     }
@@ -138,6 +140,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public uint Width, Height, RowStart, RowCount;            // the rendered window; rows within it
         public uint FirstSample, SampleCount, Pad1, Pad2;
         public uint WindowX, WindowY, FrameWidth, FrameHeight;    // the window's place in the full frame
+        public uint LightSampling, SkySampling, RandomStream, RrStartBounce;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -186,6 +189,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             throw new ArgumentException("The scene has no materials.", nameof(scene));
         if (settings.Atmosphere is not (AtmosphereMode.Luts or AtmosphereMode.Reference or AtmosphereMode.ReferenceShadowed))
             throw new ArgumentException($"Unknown atmosphere mode {settings.Atmosphere}.", nameof(settings));
+        if (settings.LightSampling is not (LightSampling.Mis or LightSampling.SunOnly))
+            throw new ArgumentException($"Unknown light sampling {settings.LightSampling}.", nameof(settings));
+        if (settings.RussianRouletteStart is < 0 or > RenderSettings.MaxRussianRouletteStart)
+            throw new ArgumentException($"Russian roulette must start between bounce 0 and {RenderSettings.MaxRussianRouletteStart}.", nameof(settings));
 
         var stages = new SortedDictionary<string, double>(_initSeconds, StringComparer.Ordinal);
         _initSeconds.Clear();
@@ -222,7 +229,20 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         ResetRayCounter();
         stages["setup"] = Lap(stopwatch);
 
-        IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask);
+        // The sky as a light (M1.5): only the LUT air has a sky view to sample; the reference keeps M1.4's estimator.
+        bool skySampling = false;
+        if (settings.LightSampling == LightSampling.Mis && settings.Atmosphere == AtmosphereMode.Luts)
+        {
+            double skyGpuSeconds = EnsureSkyLight(frame);
+            if (skyGpuSeconds > 0.0)
+            {
+                stages["skyDistribution"] = Lap(stopwatch);
+                stages["skyDistributionGpu"] = skyGpuSeconds;
+            }
+            skySampling = _skyLight!.Distribution.HasLight;
+        }
+
+        IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask, skySampling);
         double traceSeconds = 0.0;
         double longest = 0.0;
         double maxCostNs = 0.0;
@@ -288,7 +308,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         return mask;
     }
 
-    private static IntegratorConstants BaseConstants(VistaScene scene, RenderSettings settings, AtmosphereFrame frame, IntegratorTables tables, uint mask)
+    private static IntegratorConstants BaseConstants(VistaScene scene, RenderSettings settings, AtmosphereFrame frame, IntegratorTables tables, uint mask,
+        bool skySampling)
     {
         CameraSpec camera = scene.Camera;
         Vector3D position = new(camera.Position.X, camera.Position.Y, camera.Position.Z);
@@ -314,6 +335,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             WindowY = (uint)settings.Rendered.Y,
             FrameWidth = (uint)settings.Width,
             FrameHeight = (uint)settings.Height,
+            LightSampling = settings.LightSampling == LightSampling.Mis && settings.Atmosphere == AtmosphereMode.Luts ? 1u : 0u,
+            SkySampling = skySampling ? 1u : 0u,
+            RandomStream = settings.RandomStream,
+            RrStartBounce = (uint)settings.RussianRouletteStart,
         };
     }
 
@@ -429,6 +454,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6),   // 12–18: sums, first hit, ray counter, check sums
             Cbv(0), Cbv(1), Cbv(2),                                   // 19–21: integrator, atmosphere, check constants
             Srv(13),                                                  // 22: the summed scattering orders (aerial perspective)
+            Srv(18), Uav(7),                                          // 23–24: the sky distribution, its measurement (M1.5)
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -624,6 +650,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootConstantBufferView(SlotAtmosphereConstants, _atmosphereConstants.GPUVirtualAddress);
         list.SetComputeRootConstantBufferView(SlotCheckConstants, _checkConstants.GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotScatterSum, _scatterSum.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotSkyDistribution, (_skyDistribution ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootUnorderedAccessView(SlotSkyLuminance, (_skyLuminance ?? _dummyUav).GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -797,6 +825,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeImage();
         DisposeTables();
         DisposeScene();
+        DisposeSkyLight();
         DisposeAtmosphere();
         _dummyUav?.Dispose();
         _rayCounterReadback?.Dispose();

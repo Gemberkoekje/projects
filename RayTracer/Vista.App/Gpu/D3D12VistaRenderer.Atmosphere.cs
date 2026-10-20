@@ -283,10 +283,10 @@ internal sealed partial class D3D12VistaRenderer
     }
 
     /// <summary>
-    /// Forces the next <see cref="BuildAtmosphere"/> or render to rebuild every LUT, so a determinism check really
-    /// builds twice.
+    /// Forces the next <see cref="BuildAtmosphere"/> or render to rebuild every LUT and the sky distribution, so a
+    /// determinism check really builds twice.
     /// </summary>
-    public void ForgetAtmosphere() => (_tablesModel, _ordersKey, _skyFrame) = (null, null, null);
+    public void ForgetAtmosphere() => (_tablesModel, _ordersKey, _skyFrame, _skyLightFrame) = (null, null, null, null);
 
     /// <summary>
     /// The LUT air against the reference (<c>--atmosphere-check</c>): for each of <paramref name="directions"/>

@@ -1,0 +1,11 @@
+{
+  "schema": 2,
+  "name": "snow-capped mountains, dawn",
+  "setPieces": [
+    "snowCappedMountains"
+  ],
+  "time": "dawn",
+  "season": "summer",
+  "location": "zermatt",
+  "date": "2026-07-15"
+}

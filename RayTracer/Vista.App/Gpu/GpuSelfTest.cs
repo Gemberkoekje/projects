@@ -31,6 +31,11 @@ namespace Vista.App.Gpu;
 /// segments (<see cref="AerialPerspective"/>); a twilight render (the sun 4° below the horizon) is lit, from the sky
 /// alone; and the reference atmosphere, with and without the terrain's shadow in the air, is bit-identical twice and
 /// under the 0.05 ms budget.</para>
+///
+/// <para>Then the sky as a light (M1.5; every render above already sampled it): the sky distribution is rebuilt
+/// bit-identically; its GPU measurement matches <see cref="SkyDistribution.CellLuminance"/> on the same sky view; the GPU's
+/// sampler and pdf match <see cref="SkyDistribution"/>'s; and MIS and M1.4's estimator agree on the image's mean within its
+/// noise, over independent renders.</para>
 /// </summary>
 internal static class GpuSelfTest
 {
@@ -114,6 +119,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "ground-irradiance entries match the C# reference", GroundParity(air, luts, tables));
         pass &= Check(log, "sky-view LUT texels match the C# reference", SkyParity(air, luts, tables));
         pass &= Check(log, "aerial perspective along world segments matches the C# reference", AerialParity(renderer, scene, air, luts, tables));
+        pass &= SkyLightChecks(renderer, scene, settings, luts, log);
 
         // Twilight: 4° below the horizon the sun lights no surface, so all the light is the sky's.
         Almanac almanac = Almanac.For(scene.Recipe);
@@ -182,6 +188,119 @@ internal static class GpuSelfTest
             geometry.Add($"{where} ν", gpu[i * 8 + 6], seg.Nu, 1e-2);
         }
         return geometry.Verdict() ?? worst.Verdict();
+    }
+
+    /// <summary>
+    /// The sky as a light (M1.5): the distribution of this frame rebuilt is bit-identical; the GPU's luminance per (cell,
+    /// slice) matches <see cref="SkyDistribution.CellLuminance"/> on the sky view <paramref name="luts"/> read back; the GPU's
+    /// sampler and pdf match <see cref="SkyDistribution"/> on the same floats; and MIS agrees with M1.4's estimator on the
+    /// image's mean.
+    /// </summary>
+    private static bool SkyLightChecks(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings, AtmosphereLutData luts, TextWriter log)
+    {
+        bool pass = true;
+        AtmosphereFrame air = scene.AirFrame();
+        var small = settings with { Width = 160, Height = 90, SamplesPerPixel = 4 };
+        Render(renderer, scene, small, new HashSet<Aov>(), new BatchPlannerOptions(), log, "MIS, sky distribution built");
+        SkyLightData first = renderer.SkyLight!;
+        renderer.ForgetAtmosphere();
+        RenderOutput again = Render(renderer, scene, small, new HashSet<Aov>(), new BatchPlannerOptions(), log, "MIS, sky distribution rebuilt");
+        SkyLightData rebuilt = renderer.SkyLight!;
+        pass &= Check(log, "the sky distribution is rebuilt bit-identically",
+            Differs(first.Luminance, rebuilt.Luminance) ?? Differs(first.Distribution.Floats, rebuilt.Distribution.Floats)
+            ?? (rebuilt.Distribution.HasLight ? null : "the golden-hour sky has no light"));
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  sky distribution: {again.Stats.StageSeconds.GetValueOrDefault("skyDistributionGpu") * 1e3:0.00} ms GPU, {again.Stats.StageSeconds.GetValueOrDefault("skyDistribution") * 1e3:0.0} ms in all"));
+
+        AtmosphereTables atmosphere = AtmosphereTables.Build(air.Model);
+        IntegratorTables integrator = IntegratorTables.Build(scene.Materials);
+        var weights = new float[AtmosphereLuts.Wavelengths];
+        for (int l = 0; l < weights.Length; l++)
+            weights[l] = (float)SkyDistribution.LuminanceWeight(integrator, atmosphere, l);
+        var worst = new Worst();
+        foreach ((int band, int column) in new[] { (0, 0), (10, 63), (40, 5), (62, 0), (63, 1), (63, 40), (64, 0), (70, 31), (100, 12), (127, 63) })
+        {
+            foreach (int slice in new[] { 1, 6, 12 })
+            {
+                double expected = SkyDistribution.CellLuminance(luts.SkyView, air, weights, slice, band, column);
+                float gpu = rebuilt.Luminance[(band * SkyDistribution.AzimuthBands + column) * AtmosphereLuts.SkyTerrainSlices + slice - 1];
+                worst.Add(string.Create(CultureInfo.InvariantCulture, $"cell ({band}, {column}) slice {slice}"), gpu, expected, 1e-12);
+            }
+        }
+        pass &= Check(log, "the sky's measured luminance matches the C# reference", worst.Verdict());
+        pass &= Check(log, "the GPU's sky sampler and pdf match the C# reference", SkySamplingParity(renderer, rebuilt.Distribution, air));
+        pass &= Check(log, "MIS and M1.4's estimator agree on the image's mean", Agreement(renderer, scene, small, log));
+        return pass;
+    }
+
+    /// <summary>The GPU's <c>SampleSky</c>, <c>SkyPdf</c> and cell lookup against <see cref="SkyDistribution"/> on the same stored floats.</summary>
+    private static string? SkySamplingParity(D3D12VistaRenderer renderer, SkyDistribution distribution, AtmosphereFrame air)
+    {
+        var random = new Random(42);
+        var probes = new List<(Vector3 Random, Vector3 Direction)>();
+        for (int i = 0; i < 4096; i++)
+        {
+            var u = new Vector3(random.NextSingle(), random.NextSingle(), random.NextSingle());
+            double z = 2.0 * random.NextDouble() - 1.0, phi = 2.0 * Math.PI * random.NextDouble(), r = Math.Sqrt(1.0 - z * z);
+            probes.Add((u, new Vector3((float)(r * Math.Cos(phi)), (float)z, (float)(r * Math.Sin(phi)))));
+        }
+        float[] gpu = renderer.RunSkyProbe(probes);
+        var pdfs = new Worst();
+        int directionMisses = 0, cellMisses = 0;
+        double worstDirection = 0.0;
+        for (int i = 0; i < probes.Count; i++)
+        {
+            (Vector3 u, Vector3 d) = probes[i];
+            (Vector3D dir, double pdf) = distribution.Sample(u.X, u.Y, u.Z, air.ToSun);
+            double angle = Math.Acos(Math.Clamp(dir.X * gpu[i * 8] + dir.Y * gpu[i * 8 + 1] + dir.Z * gpu[i * 8 + 2], -1.0, 1.0));
+            worstDirection = Math.Max(worstDirection, angle);
+            if (angle > 1e-3)
+                directionMisses++;
+            else
+                pdfs.Add(string.Create(CultureInfo.InvariantCulture, $"sample {i}"), gpu[i * 8 + 3], pdf, 1e-12);
+            Vector3D direction = new(d.X, d.Y, d.Z);
+            (int band, int column) = distribution.CellOf(direction, air.ToSun);
+            if ((int)gpu[i * 8 + 5] != band || (int)gpu[i * 8 + 6] != column)
+                cellMisses++;
+            else
+                pdfs.Add(string.Create(CultureInfo.InvariantCulture, $"direction {i}"), gpu[i * 8 + 4], distribution.Pdf(direction, air.ToSun), 1e-12);
+        }
+        // Float trigonometry may put a direction a hair over a cell's edge; more than a few such is a real difference.
+        if (directionMisses > 0 || cellMisses > probes.Count / 200)
+        {
+            return string.Create(CultureInfo.InvariantCulture,
+                $"{directionMisses} of {probes.Count} sampled directions differ (worst {worstDirection * 180.0 / Math.PI:G3}°), {cellMisses} directions land in another cell");
+        }
+        return pdfs.Verdict();
+    }
+
+    /// <summary>
+    /// MIS against M1.4's estimator over independent renders (<see cref="EstimatorComparison"/>): the image's mean luminance
+    /// within four standard errors.
+    /// </summary>
+    private static string? Agreement(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings, TextWriter log)
+    {
+        const int replicates = 8;
+        var mis = new ReplicateStats(settings.Width * settings.Height);
+        var sunOnly = new ReplicateStats(settings.Width * settings.Height);
+        RenderOutput? depth = null;
+        for (int k = 0; k < replicates; k++)
+        {
+            var batching = new BatchPlannerOptions();
+            RenderSettings a = settings with { SamplesPerPixel = 16, RandomStream = (uint)k + 1u };
+            RenderOutput m = renderer.Render(scene, a, k == 0 ? new HashSet<Aov> { Aov.Depth } : new HashSet<Aov>(), new BatchPlanner(a.Width, a.Height, a.SamplesPerPixel, batching));
+            depth ??= m;
+            mis.Add(m.Xyz);
+            RenderSettings b = a with { LightSampling = LightSampling.SunOnly, RandomStream = 1000u + (uint)k };
+            sunOnly.Add(renderer.Render(scene, b, new HashSet<Aov>(), new BatchPlanner(b.Width, b.Height, b.SamplesPerPixel, batching)).Xyz);
+        }
+        EstimatorAgreement r = EstimatorComparison.Compare(mis, sunOnly, EstimatorComparison.InteriorTerrain(depth!.Aovs[Aov.Depth], settings.Width, settings.Height));
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  MIS against M1.4's estimator, {replicates} renders × 16 spp each: mean {r.MeanLuminanceError:+0.000%;-0.000%;0.000%} ± {r.MeanLuminanceNoise:0.000%}, " +
+            $"RMS z {r.RmsZ:0.00}, terrain variance {r.VarianceReduction:0.00}× lower"));
+        return Math.Abs(r.MeanLuminanceError) <= 4.0 * r.MeanLuminanceNoise
+            ? null
+            : string.Create(CultureInfo.InvariantCulture, $"the means differ by {r.MeanLuminanceError:P3}, {Math.Abs(r.MeanLuminanceError) / r.MeanLuminanceNoise:0.0} standard errors");
     }
 
     private static string? ColumnsParity(AtmosphereFrame air, AtmosphereLutData luts)

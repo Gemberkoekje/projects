@@ -19,12 +19,13 @@ namespace Vista.Output;
 /// (the air model, the scene's base altitude, how the air was evaluated) and <see cref="Exposure"/> (how the PNG
 /// was metered), the radiance units in <see cref="ImageInfo.Units"/>, and in <see cref="Sun"/> the sunlight's
 /// transmittance to the camera in place of the M0 light's colour temperature. Schema 5 (M1.4) added, in
-/// <see cref="Atmosphere"/>, where the base altitude came from and how aerial perspective was evaluated.</para>
+/// <see cref="Atmosphere"/>, where the base altitude came from and how aerial perspective was evaluated. Schema 6 (M1.5)
+/// added, in <see cref="Image"/>, which lights surfaces sampled and where Russian roulette starts.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 5;
+    public const int CurrentSchema = 6;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -114,6 +115,22 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>The units of the EXR's values (the PNG is exposed, see <see cref="Sidecar.Exposure"/>).</summary>
     public string Units { get; init; } = RadianceUnits;
+
+    /// <summary>
+    /// Which lights surfaces sampled (vista-plan §10 M1.5): <see cref="LightSampling.Mis"/>, or M1.4's
+    /// <see cref="LightSampling.SunOnly"/> — always for the reference atmosphere, which has no sky view to sample.
+    /// </summary>
+    public LightSampling LightSampling { get; init; } = LightSampling.Mis;
+
+    /// <summary>The bounce from which Russian roulette could end a path.</summary>
+    public int RussianRouletteStart { get; init; } = RenderSettings.DefaultRussianRouletteStart;
+
+    /// <summary>The light sampling a render with <paramref name="settings"/> actually does.</summary>
+    public static LightSampling LightSamplingOf(RenderSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return settings.Atmosphere == AtmosphereMode.Luts ? settings.LightSampling : LightSampling.SunOnly;
+    }
 }
 
 /// <summary>World generation facts.</summary>
