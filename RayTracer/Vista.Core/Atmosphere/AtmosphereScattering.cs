@@ -384,7 +384,7 @@ public static class AtmosphereScattering
     /// and <see cref="DensityThetaBelow"/> below it, each half dense toward the horizon (<c>θ = θ_h·(1 − (1 − u)²)</c>
     /// above, <c>θ_h + (π − θ_h)·u²</c> below). No angle straddles the horizon: from a few kilometres up the twilight
     /// glow lies in the 2° between the horizontal and the dipped horizon, and a fixed grid of 32 angles counted it as
-    /// ground, leaving the multiple scattering in the Earth's shadow 6–9% dark (vista-plan §10 M1.4).
+    /// ground: with the point sun, upward twilight segments came out 6–9% dark (vista-plan §10 M1.4).
     /// </summary>
     public static (double Theta, double DTheta, bool Ground) DensityPolar(int i, double horizon)
     {

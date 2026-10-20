@@ -70,4 +70,15 @@ public sealed class SkyCheckTests
         Assert.AreEqual(0.1, blue.WorstError, 1e-4);
         Assert.IsTrue(e.Bands.Where(b => b != blue).All(b => b.MeanAbsoluteError < 1e-5));
     }
+
+    [TestMethod]
+    public void ABandWithNoLightAnywhere_IsLeftOut()
+    {
+        // Single scattering alone with the observer in the Earth's shadow: the blue band's reference is zero everywhere.
+        float[] wavelengths = Wavelengths();
+        float[] sums = Sums((d, l) => 0.01f, (d, l) => wavelengths[l] < 460f ? 0f : 0.01f);
+        SkyCheckElevation e = SkyCheck.Aggregate(-2.0, sums, Chunks, Paths, wavelengths, Enumerable.Repeat(1f, 50).ToArray());
+        Assert.IsFalse(e.Bands.Any(b => b.Band.StartsWith("400", StringComparison.Ordinal)));
+        Assert.AreEqual(4, e.Bands.Count);
+    }
 }

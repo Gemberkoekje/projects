@@ -892,6 +892,7 @@ Work stops after each PR for review.
 | M1.1 | 0.24 | 0.73 | 0.87 | 1.31 |
 | M1.2 | 0.24 | 0.68 | 0.83 | 1.26 |
 | M1.3 | 0.22 | 2.18 | 1.49 | 2.30 |
+| M1.4 | 0.22 | 2.63 | 2.10 | 3.40 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -902,6 +903,9 @@ M1.3 traces the same rays per sample as M1.2 (1.00, 2.42, 2.29, 3.23); a second 
 float4 loads and four exponentials), and every ray that leaves the terrain after a bounce reads two sky-view slices
 (32 float2 loads for its four wavelengths). Camera rays read one slice, so the sky view got no dearer. The exposure
 meter (a 320 px render, §M1.3 decisions) is not in these numbers; it costs about 1/150 of a 4K frame.
+M1.4 traces the same rays per sample again; a second run gave 0.21, 2.55, 2.06 and 3.39. The +21%, +41% and +48% on terrain
+is aerial perspective, the first real jump since M0: every segment that ends on the terrain marches its air (up to 8 columns
+lookups and two 16-corner reads of the scattering orders for its four wavelengths). The sky view costs what it did.
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -1363,6 +1367,190 @@ segments.
 - *Verify:* 3070: the error against the reference on a layered-ridges view and on a shadowed valley
   at golden hour; a sea-level against 3000 m sheet shows the deeper blue and thinner haze; the cost
   ledger records the first real cost jump since M0.
+
+*M1.4 status (2026-10-20): done.* Every deliverable and check is met; nothing in `RayTracer.Core` / `RayTracer.Gpu` changed.
+`Vista.Tests` has 460 tests (433 before). Aerial perspective is a short march through the LUTs, chosen over the sky view's
+difference by error and by cost. The new check along finite segments found three errors in M1.3's LUT model near the ground
+and one in its ground irradiance; all are fixed here (decisions below), so M1.3's sky check was rerun and its new numbers are
+below too.
+
+*Checks (on the RTX 3070 unless noted):*
+
+- **The LUT air along segments against the reference** (`--atmosphere-check --segments`): the light the air scatters toward
+  an observer along segments of 1, 4 and 16 km, up from 2 m above Zermatt's valley floor (M1.3's 54 directions above the
+  horizon) and down from 1.7 km above it (its 36 below-horizon directions; a segment that reaches the ground sphere ends
+  there), 50 wavelengths, 2²⁰ reference paths per value. Mean |luminance error| (worst):
+
+  | Sun | Up 1 km | Up 4 km | Up 16 km | Down 1 km | Down 4 km | Down 16 km |
+  |---|---|---|---|---|---|---|
+  | +30° | 0.8% (−2.7) | 0.8% (−2.7) | 0.8% (−2.7) | 0.5% (−1.6) | 0.6% (−1.6) | 0.8% (−2.4) |
+  | +5° | 1.1% (+4.5) | 1.2% (+4.3) | 1.4% (+4.2) | 0.6% (+2.3) | 0.7% (−2.8) | 1.0% (−2.8) |
+  | −2° | 1.8% (−5.2) | 1.7% (−5.6) | 2.0% (−5.7) | 1.0% (+3.8) | 1.1% (+4.1) | 1.1% (+3.3) |
+  | −6° | 4.7% (+13) | 3.8% (+12) | 3.7% (−10) | 4.7% (+17) | 2.7% (+7.3) | 2.8% (−6.9) |
+
+  At −6° the reference's own noise (1.6–6.0%) is most of the number. Single scattering alone (`SINGLE_SCATTERING_ONLY`) is
+  within 0.2%, the reference's noise floor, at every length; what remains is the scattering orders' error: worst toward the
+  sun just over the horizon (the haze's lobe, as in the M1.3 sky) and, in twilight, looking up toward the sun with haze.
+- **One view three ways** (`--atmosphere-compare`, 320×180; the LUTs at 1024 spp, the reference and the reference with the
+  terrain's shadow in the air at 16 384 spp; seed 42). Mean luminance by distance to the first hit, LUTs ÷ reference − 1 |
+  shadowed ÷ reference − 1 (± the noise of the means):
+
+  | Distance | Layered ridges, noon | Layered ridges, golden hour, toward the sun | Shadowed valley (down-slope), golden hour |
+  |---|---|---|---|
+  | 0–1 km | | | +0.01% \| −0.05% |
+  | 1–2 km | | | +0.15% \| −2.4% (±0.15) |
+  | 2–4 km | −0.03% \| 0.00% | −0.38% \| −4.4% (±0.16) | +0.11% \| −7.6% (±0.06) |
+  | 4–8 km | −0.01% \| 0.00% | −0.25% \| −8.1% (±0.06) | +0.02% \| −10.0% (±0.17) |
+  | 8–16 km | −0.02% \| 0.00% | +0.71% \| −5.4% (±0.04) | |
+  | sky | −0.04% \| 0.00% | +1.00% \| 0.00% | |
+
+  The LUTs evaluate their model to within 0.4% on terrain (+0.7% beyond 8 km into the low sun, +1.0% in that sky). The
+  **known limit** is the third column of each pair: the air in a mountain's shadow, which the LUTs keep lit, would make the
+  valleys at 2–8 km 4–10% darker at golden hour. At noon the shadows touch none of the air the camera sees. A side-lit golden-hour
+  view (the sun behind the camera's left, across the range) loses only 1.1–1.3%. M4's fog volumes revisit it.
+- **Sea level against 3000 m** (`vista-views/aerial`, the layered ridges at noon, `--vary altitude=0,3000`): at 3000 m the sky
+  is a deeper blue, the horizon haze thinner and the far ridges clearer. The zenith depths from the base fall from 0.097
+  (Rayleigh, 550 nm) and 0.100 (haze) to 0.068 and 0.008; the sun reaches the camera with T₄₅₀ 0.83 → 0.89.
+- **The cost ledger** has the first real jump since M0: +21%, +41% and +48% on the terrain views over M1.3 (the M1.4 row).
+- **Self-test:** passes, and grows: the aerial perspective of five world segments (down from the camera, a short bounce off
+  to the side, a long grazing one across the tile, one up a slope) at three wavelengths matches its C# reference fed the
+  GPU's own LUTs — transmittance, in-scattering and the bent geometry; the shadowed reference is sane and bit-identical under
+  the 0.05 ms budget. Every M1.3 parity check still passes on the changed tables. The LUTs build in 0.87 s (0.82 s).
+- **CI:** 460 tests. The curvature drop (196.5 m at 50 km), the bend (heights kept, verticals tilted by s/R), the chord ending
+  at exactly the far point's height and dipping by s/2R toward a level point; the march's transmittance against a fine
+  integral (0.2%) and its single scattering against a brute-force march (0.5%); the penumbra; the density quadrature (covers
+  the sphere exactly, never straddles the horizon); the ground irradiance's sun map; the 4D view map's round trip and its
+  zenith and nadir coverage near the ground; the altitude control (recipe, CLI, pipeline, sidecar, sheet conflicts); the
+  frame's reach and `SunReachesScene`; the comparison's bins; the committed view.
+- **Before/after:** the four measurement views, `main` (3bf4c77) against this slice at 640 px, 256 spp. The sky view is
+  unchanged to the eye. From the aerial view the far range recedes into blue haze and the shadows turn blue; from the default
+  camera the far peaks pale; in the down-slope view a veil of lit air lifts the shadowed valley (the known limit, in a view).
+- **M1.3's sky check again** (`vista-views/atmosphere/render.ps1`), with M1.4's tables. Mean |error| (worst) per band:
+
+  | Sun | 400–460 nm | 460–510 nm | 510–560 nm | 560–600 nm | 600–660 nm | Luminance |
+  |---|---|---|---|---|---|---|
+  | +30° | 1.0% (−2.8) | 0.6% (−2.6) | 0.5% (−2.4) | 0.4% (−2.3) | 0.4% (−2.2) | 0.4% (−2.4) |
+  | +5° | 0.8% (+3.4) | 0.6% (+3.5) | 0.5% (+3.4) | 0.6% (+3.5) | 0.7% (+3.4) | 0.5% (+3.4) |
+  | −2° | 0.7% (−1.2) | 0.6% (−1.2) | 0.5% (−1.2) | 0.7% (+3.0) | 1.1% (+4.8) | 0.5% (+2.0) |
+  | −6° | 1.2% (+2.6) | 1.2% (+4.0) | 1.7% (+6.5) | 2.8% (+11.5) | 3.3% (+13.1) | 1.6% (+7.1) |
+
+  Below the horizon from 4.2 km (2¹⁸ paths): mean luminance error 0.4% (+5°), 0.8% (−2°), 0.8% (−4°), 2.1% (−6°), against
+  M1.3's 1.5%, 2.7%, 1.5% and 2.6%; the worst, −15% at −2°, is now −5.4% (−10.6% in the red band). Above the horizon the
+  means fell (+30°: 0.8% → 0.4%) except at −6°, where 1.5% became 1.6% and the red bands rose by about a point: a fixed
+  32-angle quadrature that converges to the same numbers at 48 angles shows M1.3's −6° figure was an error cancelling the
+  horizon bug below, not accuracy.
+
+*M1.4 decisions taken in code (revisit freely):*
+
+- **The march, not the sky view's difference.** `L(a) − T·L(b)` was built (`AERIAL_SKY_DIFFERENCE`, kept as a diagnostic
+  define) and measured: looking down, where the check's slices cover the far ends, it was off by 2.3–6.2% by day and 45–58%
+  at −2° (near the horizon up to +970%: two large, nearly equal LUT values subtracted); looking up the check could not give it
+  slices at the far ends, so those numbers say nothing. Nor was it cheaper: 3.98 ns against 2.78 on the aerial view, because a
+  bounce's sky reads two terrain slices per end. The march reads the same tables the sky view is built from.
+- **The march** (`AerialSegment`; C# `AerialPerspective.Integrate`): 2 steps plus one per kilometre, at most 8, dense at the
+  segment's lower end; extinction from the analytic densities; single scattering through the columns LUT; multiple scattering
+  as the summed orders' phase-weighted radiance read at the two ends and blended along the segment, times the local densities.
+  Measured: single scattering at 8 steps is within 0.2% for every segment the terrain can make (48 steps change nothing);
+  reading the orders at every step instead of the ends changes nothing either; and a segment that climbs or drops less than
+  250 m reads them once, in its middle, which saves 5%, 11% and 17% on the terrain views for no measurable error (reading every
+  segment once doubled the error of long ones that climb, 1.8% → 3.5% at −2°). Cost per segment is two 16-corner lookups of
+  four wavelengths plus up to 8 columns lookups: before the single-read rule the orders were 0.6–1.6 ns of the ledger and the
+  steps 0.3–0.5 ns.
+- **The world is bent onto the Earth for the air, around the camera** (`Bend`, `SegmentBetween`; C# `AerialPerspective.Bend`,
+  `Between`). A world point keeps its height above the ground sphere and sits at its horizontal distance from the camera along
+  the sphere, so it sinks by `2R·sin²(s/2R)` and its vertical tilts by `s/R`. A segment is the straight chord between the bent
+  ends, seen from its start: it ends at exactly the far point's height, not 200 m higher at 50 km as a flat ray through
+  spherical air would put it. The surface's sun takes its own tilted vertical (its transmittance and the Earth's shadow), as the
+  air just above it does; rays that leave the terrain still read the sky view in the camera's frame, which is built for one
+  vertical (under 0.1° of tilt across today's tile). `SunReachesScene` counts the terrain's reach from the camera. Whether the
+  geometry itself bends stays M1.9's question.
+- **The 4D tables' view axis is by angle** (C# `TexelToSample`, `CellOf`): split at the ground sphere's horizon, each half
+  dense toward it, as the sky view's rows are. Bruneton's map by distance put every texel of the ground half within 0.5° of the
+  horizon near the ground (at 10 m: texel 0 straight down, texel 1 1.5° below the horizon) and left the zenith a texel apart
+  from 49°: downward segments that end near the ground were 8.8% off (worst −30%) at −2°, 3.5% at +5°. By angle: 1.1% and 1.0%.
+- **The scattering density's quadrature splits at the dipped horizon** (`DensityPolar`, `DensityScales`): 16 polar angles
+  above the ground sphere's horizon and 16 below, each half dense toward it, its weights scaled so a uniform field integrates
+  exactly (the warped midpoint rule alone overshoots by 0.2%). A fixed grid of 32 had one angle straddling the horizon: a few
+  kilometres up, the twilight glow lies in the 2° between the horizontal and the dipped horizon, and the grid called it ground.
+  With the point sun (next) it left upward twilight segments 6–9% dark; the split took the worst from −8.8% to −6.7% and the
+  middle elevations into the noise. Uniform halves did worse than warped ones (the −6° sky 3.2%, below the horizon 4.7%);
+  24 + 8, 24 + 16 and 32 + 16 gave the same numbers as 16 + 16.
+- **The sun is a disk in the Earth's shadow** (`SunVisibility`, `SunLight`): the fraction of its 0.53° disk above the ground
+  sphere's horizon, its light taken along the horizon while the centre is below it. The penumbra is kilometres deep near the
+  terminator (2.9–4.9 km up with the sun 2° down); with a point sun a 4 km segment climbing 75° into it was 6.7% dark against
+  the reference, which samples the disk, and 3.0% with the disk. Surfaces already sampled the disk.
+- **The ground irradiance sits on the sun map** (`GroundIrradianceMuS`): the 4D tables' μ_s map, dense near the horizon, 128
+  entries as before. Evenly spaced cosines were 0.9° apart there, where twilight irradiance changes several-fold per degree, and
+  the overshoot lit the twilight ground 2–3% too bright; 1024 even entries confirmed it but cost 8× the sky view.
+- **What the earlier slices measured and M1.4 did not change:** 16 heights (32 changed nothing), 32 + 32 view angles (64 per
+  half helped only at 50° up), 11 table wavelengths (all 50 helped the red twilight band by 0.7 points at 5× the cost), 5 orders
+  (8 changed 0.4%).
+- **The reference along segments** (`AirPath`): delta tracking along the chord up to the surface; if it scatters first, the
+  rest of the path runs in the air alone, as the LUTs assume, and `--atmosphere reference` checks the LUTs' model.
+  **`--atmosphere referenceShadowed`** (`REFERENCE_TERRAIN_SHADOWS`) lets the terrain hide the sun from each path's first event
+  in the air, which lies on a segment of open air. Only the first: later events of a path that ignores the terrain may sit
+  under the mountains or on the ground sphere beneath the tile, and shadowing them darkened even the noon sky by 3%.
+- **The altitude control** is the recipe's `altitude` (schema 4, `--altitude`, 0–8000 m): the scene's base altitude, world
+  `y = 0`, instead of the place's valley floor (`Places.BaseAltitude`); the terrain keeps its shape and the whole scene moves in
+  the air. M1.11's linked sliders make it auto or pinned. Sheets vary it as any recipe field.
+- **Sidecar schema 5** adds `atmosphere.groundAltitudeFrom` and `atmosphere.aerialPerspective` (how the air along segments was
+  evaluated in that mode).
+- **`--atmosphere-compare`** bins pixels by sample 0's first-hit distance (0–1, 1–2, 2–4, 4–8, 8–16, 16+ km, sky) and compares
+  the bins' mean luminance with the noise from each render's variance output; means over thousands of pixels show a reference
+  render's bias without needing it converged per pixel.
+
+*M1.4 gotchas:*
+
+- **The GPU's `sin` has an absolute error near 10⁻⁶.** Times the Earth's radius that is metres: the parity probe saw a 360 m
+  bounce chord turn by 0.04°. `Bend` uses the series of sin θ/θ, cos θ and the drop instead (θ stays under 0.01).
+- **A mean |error| includes the reference's noise:** at −6° it is most of the number; compare the noise column before reading
+  a twilight figure.
+- **The sky-view difference needs slices at both ends.** `--atmosphere-check --segments` spans the terrain slices over the
+  observer's height only, so its upward segments end above every slice: those numbers are not a test of the difference.
+- **`SINGLE_SCATTERING_ONLY` with the observer in the Earth's shadow** makes a band's reference zero everywhere; the check used
+  to crash on it (an empty `MaxBy`) and now leaves the band out.
+- **A pinned define that is never re-pinned** (`#define X 16u` without `#ifndef`) cannot be swept with `VISTA_SHADER_DEFINES`;
+  the table sizes are pinned in both C# and HLSL, so a sweep edits both and rebuilds.
+
+**M1.4 hand-off.** To understand M1.4, start by reading `Vista.Core/Atmosphere/AerialPerspective.cs` (the bend and the march),
+then the `AerialSegment` and `SunVisibility` functions of `Vista.App/Shaders/VistaAtmosphere.hlsli`, then the lines after
+`TraceClosest` in `Vista.App/Shaders/VistaIntegrator.hlsl` (where every segment gets its air, in both modes), then
+`DensityPolar` and `TexelToSample` in `Vista.Core/Atmosphere/AtmosphereScattering.cs` (the table changes).
+
+*Commands* (from `RayTracer/`):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png [--altitude 3000]
+    [--atmosphere luts | reference | referenceShadowed]
+dotnet run --project Vista.App -c Release -- --atmosphere-check --segments 1000,4000,16000 [--observer-height 1700 --below-horizon]
+dotnet run --project Vista.App -c Release -- --atmosphere-compare --recipe r.json --camera c.json [--spp 1024]
+    [--reference-spp 16384] [--out dir]
+dotnet run --project Vista.App -c Release -- --sheet --recipe r.json --seed 42 --vary altitude=0,3000 --out altitude.png
+powershell -ExecutionPolicy Bypass -File vista-views/aerial/render.ps1
+VISTA_SHADER_DEFINES=AERIAL_SKY_DIFFERENCE   (the measured alternative, in renders and the check)
+```
+
+*Files added or changed:*
+
+| File | What |
+|---|---|
+| `Vista.Core/Atmosphere/AerialPerspective.cs` | C# reference: the bend, the chord, the march |
+| `Vista.Core/Atmosphere/AtmosphereScattering.cs` | The 4D view axis by angle; the split, warped, normalised density quadrature; the sun map for the irradiance by order |
+| `Vista.Core/Atmosphere/AtmosphereLuts.cs` | `SunVisibility` / `SunLight` (the penumbra); the ground irradiance on the sun map |
+| `Vista.Core/Atmosphere/AtmosphereFrame.cs`, `Rendering/RenderTypes.cs` | The terrain's reach; `VistaScene.FrameFor`; `AtmosphereMode.ReferenceShadowed` |
+| `Vista.Core/Atmosphere/SkyCheck.cs`, `RenderComparison.cs` | Segment lengths in the check; the by-distance comparison |
+| `Vista.Core/Recipes/Recipe.cs`, `Astronomy/Places.cs` | Schema 4: `altitude`; `Places.BaseAltitude` |
+| `Vista.Core/Cli/PreviewCommandLine.cs`, `PreviewPipeline.cs`, `Output/Sidecar.cs` | `--altitude`, `referenceShadowed`; the base altitude; schema 5 |
+| `Vista.App/Shaders/VistaAtmosphere.hlsli` | `AerialSegment`, `LookupWeighted4`, `SunVisibility`; the view map by angle; the irradiance on the sun map |
+| `Vista.App/Shaders/VistaAtmosphereLuts.hlsl` | The split density quadrature; the penumbra in single scattering and the sky march |
+| `Vista.App/Shaders/VistaIntegrator.hlsl` | `Bend`, `SegmentBetween`; the air on every segment; `AirPath` with surfaces and terrain shadows; the segment check; `CSAerialProbe` |
+| `Vista.App/Gpu/D3D12VistaRenderer.cs`, `D3D12VistaRenderer.Atmosphere.cs` | The summed orders bound to the integrator; the shadowed pipeline; the probe; segment lengths |
+| `Vista.App/Gpu/AtmosphereCheck.cs`, `AtmosphereCompare.cs`, `GpuSelfTest.cs`, `Program.cs` | `--segments`; `--atmosphere-compare`; the aerial parity and shadowed checks |
+| `vista-views/aerial/` | The layered-ridges camera and `render.ps1` |
+| `Vista.Tests/*` | `AerialPerspective`, `Altitude` and `RenderComparison` tests; schema, CLI, sky-check and view additions |
+
+**Next: M1.5** (sun & sky importance sampling). Its sky distribution is built over the sky-view LUT these checks now cover,
+and its MIS will want the march's cost in mind: aerial perspective is now up to a third of a terrain view's time.
 
 **M1.5 — Sun & sky importance sampling.**
 - *Goal:* converge golden hour and twilight, where the sky carries most of the fill light.

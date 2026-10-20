@@ -107,6 +107,8 @@ public static class SkyCheck
                 if (r0 > 0.0)
                     errors.Add((l0 / r0 - 1.0, se / r0, d));
             }
+            if (errors.Count == 0)
+                continue; // no light in this band anywhere (single scattering alone, in the Earth's shadow)
             (double worst, _, int at) = errors.MaxBy(e => Math.Abs(e.Error));
             bands.Add(new SkyCheckBand(
                 string.Create(CultureInfo.InvariantCulture, $"{low:0}–{high:0} nm"),
