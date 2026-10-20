@@ -71,3 +71,17 @@ and trust timings as ratios between estimators (`--sampling-compare` interleaves
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/sampling/render.ps1 [-Replicates 32] [-Spp 128] [-Out folder]
 ```
+
+## Denoiser checks (M1.6)
+
+`denoise/render.ps1` reruns every M1.6 check on M1.5's four views: each rendered at 16 spp and denoised by Intel Open Image
+Denoise every way `--denoise-compare` knows (albedo and normal noisy, clean or prefiltered; the input scale automatic, physical
+or metered; each quality; the CPU and CUDA), against a 4096 spp reference rendered as two halves, at 640 and 320 px wide; then
+the default settings timed at 4K on both devices, and one raw | denoised | reference sheet of the four views. It needs the
+denoiser fetched first (it is never committed); the CUDA timings share the GPU with whatever else runs on it, and the CPU
+timings the CPU, so read `nvidia-smi` first and build nothing meanwhile.
+
+```
+powershell -ExecutionPolicy Bypass -File tools/fetch-oidn.ps1
+powershell -ExecutionPolicy Bypass -File vista-views/denoise/render.ps1 [-Spp 16] [-ReferenceSpp 4096] [-TimingWidth 3840] [-Out folder]
+```

@@ -56,7 +56,8 @@ public static class SheetCommandLine
         "       Vista.App --sheet --vary <key>=<v1>,<v2>,... --out <sheet.png> [--columns N] [--title <text>] [preview options]\n" +
         "                 keys: seed, recipe (files), camera (files or default), spp, bounces, camera.<field>, <recipe field>\n" +
         "                 e.g. --vary seed=1,2,3,4   --vary time=dawn,day,goldenHour,dusk   --vary camera.yawDegrees=0,90\n" +
-        "                 Writes <sheet>.png, <sheet>.<debug>.png, <sheet>.json (every cell) and each cell under <sheet>.cells/.\n" +
+        "                 Writes <sheet>.png, <sheet>.<debug>.png, <sheet>.json (every cell) and each cell under <sheet>.cells/;\n" +
+        "                 with --denoise also <sheet>.denoised.png, the cells denoised.\n" +
         "       Vista.App --sheet-from <a.png> <b.png> ... --out <sheet.png> [--labels a,b,...] [--columns N] [--title <text>]\n" +
         "                 Tiles existing images, labelled from their sidecars (what differs between them) unless --labels is given.";
 
@@ -77,7 +78,7 @@ public static class SheetCommandLine
 
         var options = new HashSet<string>(PreviewCommandLine.ValueOptions, StringComparer.Ordinal);
         options.UnionWith(SheetOptions);
-        (Dictionary<string, string> values, bool dryRun) = PreviewCommandLine.SplitOptions(args, 1, options, problems);
+        (Dictionary<string, string> values, IReadOnlySet<string> flags) = PreviewCommandLine.SplitOptions(args, 1, options, problems);
 
         SheetAxis? axis = null;
         if (!values.Remove("--vary", out string? vary))
@@ -104,7 +105,7 @@ public static class SheetCommandLine
                 problems.Add($"--columns must be at most the number of cells ({axis.Values.Count}).");
         }
         PreviewRequest? baseRequest = PreviewCommandLine.Build(
-            values, dryRun, recipeRequired: axis?.SuppliesRecipe != true, seedRequired: axis?.SuppliesSeed != true, problems);
+            values, flags, recipeRequired: axis?.SuppliesRecipe != true, seedRequired: axis?.SuppliesSeed != true, problems);
 
         if (problems.Count > 0)
             return false;
@@ -137,9 +138,9 @@ public static class SheetCommandLine
             problems.Add($"'{input}' is not a .png file.");
 
         var options = new HashSet<string>(StringComparer.Ordinal) { "--out", "--labels", "--columns", "--title" };
-        (Dictionary<string, string> values, bool dryRun) = PreviewCommandLine.SplitOptions(args, k, options, problems);
-        if (dryRun)
-            problems.Add("--dry-run does not apply to --sheet-from.");
+        (Dictionary<string, string> values, IReadOnlySet<string> flags) = PreviewCommandLine.SplitOptions(args, k, options, problems);
+        foreach (string flag in flags.Order(StringComparer.Ordinal))
+            problems.Add($"{flag} does not apply to --sheet-from.");
         if (!values.TryGetValue("--out", out string? outPath))
             problems.Add("--out is required.");
         else if (!outPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))

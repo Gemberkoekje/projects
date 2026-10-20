@@ -44,6 +44,7 @@ public static class SheetLabels
         ("image.maxBounces", "bounces"),
         ("image.displayTransform", "display"),
         ("image.lightSampling", "lights"),
+        ("output", "output"),
         ("atmosphere", "atmosphere"),
         ("build", "build"),
     ];
@@ -116,6 +117,31 @@ public static class SheetLabels
     }
 
     /// <summary>
+    /// <see cref="Identity(JsonNode?)"/> of the image at <paramref name="imagePath"/>, plus <c>output</c>: the role the sidecar's
+    /// <c>outputs</c> gives that file (<c>beauty</c>, <c>denoised</c>, <c>normal</c>, …), so a raw and a denoised image of one
+    /// render, which share a sidecar, are told apart.
+    /// </summary>
+    public static SortedDictionary<string, string> Identity(JsonNode? sidecar, string imagePath)
+    {
+        ArgumentNullException.ThrowIfNull(imagePath);
+        SortedDictionary<string, string> fields = Identity(sidecar);
+        string name = Path.GetFileName(imagePath);
+        if (sidecar?["outputs"] is JsonObject outputs)
+        {
+            foreach ((string role, JsonNode? file) in outputs)
+            {
+                if (file is JsonValue value && value.GetValueKind() == JsonValueKind.String
+                    && string.Equals(value.GetValue<string>(), name, StringComparison.OrdinalIgnoreCase))
+                {
+                    fields["output"] = role;
+                    break;
+                }
+            }
+        }
+        return fields;
+    }
+
+    /// <summary>
     /// One label per cell: the identity fields that are not the same in every cell, as <c>short=value</c>. A
     /// field a cell lacks counts as different. Fields with the fewest distinct values come first, then reading
     /// order: in a before/after of several views, <c>build=</c> (two values) leads every label, so it survives
@@ -157,6 +183,7 @@ public static class SheetLabels
                 "recipe.sunElevation" => $"sun at {value}°",
                 "atmosphere" => value == "luts" ? null : $"{value} atmosphere",
                 "image.lightSampling" => value == "mis" ? null : $"{value} light sampling",
+                "output" => value == "beauty" ? null : value,
                 "recipe.latitude" => $"latitude {value}°",
                 "recipe.setPieces" => value.Length == 0 ? "no set pieces" : value,
                 "seed" => $"seed {value}",

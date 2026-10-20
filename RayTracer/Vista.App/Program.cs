@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Vista.App.Denoise;
 using Vista.App.Gpu;
 using Vista.Cli;
 using Vista.Output;
@@ -13,8 +14,9 @@ namespace Vista.App;
 /// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
 /// <c>--sheet-from</c> tiles existing images), and the dev-box checks: <c>--gpu-selftest</c> and
 /// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
-/// <c>--atmosphere-compare</c> (one view rendered with both, by distance), and <c>--sampling-compare</c> (one view
-/// rendered with M1.4's estimator and with MIS: agreement, noise and cost).
+/// <c>--atmosphere-compare</c> (one view rendered with both, by distance), <c>--sampling-compare</c> (one view
+/// rendered with M1.4's estimator and with MIS: agreement, noise and cost), and <c>--denoise-compare</c> (one view at low
+/// samples denoised every way, against a reference: error, cost and determinism).
 /// </summary>
 internal static class Program
 {
@@ -31,6 +33,8 @@ internal static class Program
             return RunGpu(() => AtmosphereCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == SamplingCompare.Flag)
             return RunGpu(() => SamplingCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == DenoiseCompare.Flag)
+            return RunGpu(() => DenoiseCompare.Run(args, Console.Out));
 
         try
         {
@@ -60,7 +64,8 @@ internal static class Program
         return RunGpu(() =>
         {
             using var renderer = new D3D12VistaRenderer();
-            return Report(PreviewPipeline.Run(request, renderer));
+            using var denoiser = new OidnDenoiser();
+            return Report(PreviewPipeline.Run(request, renderer, denoiser: denoiser));
         });
     }
 
@@ -75,7 +80,8 @@ internal static class Program
         return RunGpu(() =>
         {
             using var renderer = new D3D12VistaRenderer();
-            return Report(SheetPipeline.Render(request, renderer));
+            using var denoiser = new OidnDenoiser();
+            return Report(SheetPipeline.Render(request, renderer, denoiser: denoiser));
         });
     }
 
@@ -96,6 +102,7 @@ internal static class Program
         Console.Error.WriteLine(AtmosphereCheck.Usage);
         Console.Error.WriteLine(AtmosphereCompare.Usage);
         Console.Error.WriteLine(SamplingCompare.Usage);
+        Console.Error.WriteLine(DenoiseCompare.Usage);
         return 1;
     }
 
@@ -134,6 +141,12 @@ internal static class Program
                 $"rendered on {sidecar.Engine.Device}: {s.RaysTraced:N0} rays, {render.RaysPerSample:0.00} per sample, " +
                 $"{render.RaysPerSecond / 1e6:0.0} Mrays/s; {s.Dispatches} dispatches, {s.TraceSeconds:0.000} s GPU, " +
                 $"longest dispatch {s.LongestDispatchSeconds * 1e3:0.0} ms"));
+        }
+        if (sidecar.Denoise?.Run is { } denoise)
+        {
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"denoised by {denoise.Library} {denoise.Version} on {denoise.Device}: {denoise.Filter}; " +
+                $"{denoise.CommitSeconds * 1e3:0} ms to prepare, {denoise.ExecuteSeconds * 1e3:0} ms to filter"));
         }
         foreach (string warning in sidecar.Warnings)
             Console.Error.WriteLine($"warning: {warning}");

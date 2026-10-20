@@ -20,9 +20,10 @@ public static class SheetPipeline
     /// <summary>
     /// Renders every cell of <paramref name="request"/> with <paramref name="renderer"/> (null for a dry run,
     /// which tiles the cells' height maps) and writes the sheet. Every cell is checked before the first
-    /// renders, so a misspelt field or a missing file fails before any GPU time is spent.
+    /// renders, so a misspelt field or a missing file fails before any GPU time is spent. A request that denoises needs a
+    /// <paramref name="denoiser"/>, and writes a second sheet of the denoised cells when every cell has one.
     /// </summary>
-    public static SheetSidecar Render(SheetRequest request, IVistaRenderer? renderer, TimeProvider? time = null)
+    public static SheetSidecar Render(SheetRequest request, IVistaRenderer? renderer, TimeProvider? time = null, IDenoiser? denoiser = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (renderer is null && !request.Base.DryRun)
@@ -47,7 +48,7 @@ public static class SheetPipeline
         var worlds = new WorldCache();
         var sidecars = new List<Sidecar>(count);
         foreach (PreviewRequest cell in cells)
-            sidecars.Add(PreviewPipeline.Run(cell, renderer, time, worlds));
+            sidecars.Add(PreviewPipeline.Run(cell, renderer, time, worlds, denoiser));
 
         string beautyRole = renderer is null ? "heightMap" : "beauty";
         var sources = cells.Select((c, i) => Path.Combine(cellDirectory, sidecars[i].Outputs[beautyRole])).ToList();
@@ -69,6 +70,13 @@ public static class SheetPipeline
                 WriteSheet(Path.Combine(directory, file), cells.Select((c, i) => Path.Combine(cellDirectory, sidecars[i].Outputs[role])).ToList(),
                     labels, request.Columns, title);
                 outputs[role] = file;
+            }
+            if (sidecars.All(s => s.Outputs.ContainsKey("denoised")))
+            {
+                string file = baseName + ".denoised.png";
+                WriteSheet(Path.Combine(directory, file), cells.Select((c, i) => Path.Combine(cellDirectory, sidecars[i].Outputs["denoised"])).ToList(),
+                    labels, request.Columns, title.Length > 0 ? title + " · denoised" : "denoised");
+                outputs["denoised"] = file;
             }
         }
         outputs["sidecar"] = baseName + ".json";
@@ -129,7 +137,7 @@ public static class SheetPipeline
             sidecars.Add(node);
         }
 
-        var identities = sidecars.Select(s => (IReadOnlyDictionary<string, string>)SheetLabels.Identity(s)).ToList();
+        var identities = sidecars.Select((s, i) => (IReadOnlyDictionary<string, string>)SheetLabels.Identity(s, request.Inputs[i])).ToList();
         IReadOnlyList<string> labels = request.Labels.Count > 0
             ? request.Labels
             : [.. SheetLabels.Differences(identities).Select((label, i) =>

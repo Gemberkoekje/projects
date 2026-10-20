@@ -157,6 +157,27 @@ public static class ContactSheet
         return sheet;
     }
 
+    /// <summary>
+    /// Enlarges an 8-bit RGB image <paramref name="width"/>×<paramref name="height"/> by a whole <paramref name="factor"/>, each
+    /// pixel a <paramref name="factor"/>-wide square: a crop shown at a sheet cell's size keeps its pixels visible.
+    /// </summary>
+    public static byte[] Magnify(ReadOnlySpan<byte> rgb, int width, int height, int factor)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(factor);
+        if (rgb.Length != width * height * 3)
+            throw new ArgumentException($"Expected {width * height * 3} bytes for {width}×{height}, got {rgb.Length}.", nameof(rgb));
+        int outWidth = width * factor;
+        var output = new byte[outWidth * height * factor * 3];
+        for (int y = 0; y < height * factor; y++)
+        {
+            for (int x = 0; x < outWidth; x++)
+                rgb.Slice(((y / factor) * width + x / factor) * 3, 3).CopyTo(output.AsSpan((y * outWidth + x) * 3, 3));
+        }
+        return output;
+    }
+
     private static IReadOnlyList<string> LabelLines(string label, int width, int scale)
     {
         IReadOnlyList<string> lines = BitmapFont.Wrap(label, width, scale, " ");

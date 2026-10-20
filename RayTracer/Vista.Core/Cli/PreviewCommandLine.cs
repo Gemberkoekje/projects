@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Vista.Astronomy;
+using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
 
@@ -83,6 +84,12 @@ public sealed record PreviewRequest
 
     /// <summary>The bounce from which Russian roulette may end a path (<see cref="RenderSettings.RussianRouletteStart"/>).</summary>
     public int RussianRouletteStart { get; init; } = RenderSettings.DefaultRussianRouletteStart;
+
+    /// <summary>
+    /// Also write a denoised beauty (vista-plan §10 M1.6), with these settings; null writes the raw beauty only. The raw
+    /// beauty is always written.
+    /// </summary>
+    public DenoiseSettings? Denoise { get; init; }
 }
 
 /// <summary>
@@ -93,7 +100,7 @@ public sealed record PreviewRequest
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
 ///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
-///           [--light-sampling mis | sunOnly] [--rr-start 2]
+///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
@@ -104,7 +111,9 @@ public sealed record PreviewRequest
 /// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
 /// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4). <c>--light-sampling
 /// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
-/// with <c>--rr-start 3</c>, M1.4's Russian roulette as well, it renders M1.4's images bit for bit.
+/// with <c>--rr-start 3</c>, M1.4's Russian roulette as well, it renders M1.4's images bit for bit. <c>--denoise</c> also writes
+/// the beauty denoised by Intel Open Image Denoise (M1.6) beside the raw one, on the CPU or, with <c>--denoise-device cuda</c>,
+/// the GPU.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -137,7 +146,9 @@ public static class PreviewCommandLine
         "  (slow, unbiased), optionally with the terrain's shadow in it.\n" +
         "--light-sampling mis (default) | sunOnly: sample the sun and the sky as lights, weighed against the bounce, or (M1.4)\n" +
         "  the sun alone, the sky left to the bounce; the same image on average, with different noise.\n" +
-        "--rr-start <bounce>: the bounce from which Russian roulette may end a path (default 2; M1.4 used 3).";
+        "--rr-start <bounce>: the bounce from which Russian roulette may end a path (default 2; M1.4 used 3).\n" +
+        "--denoise: also write <preview>.denoised.png and <preview>.denoised.exr (Intel Open Image Denoise, fetched by\n" +
+        "  tools/fetch-oidn.ps1; without it a warning, and the raw image only). --denoise-device cpu (default) | cuda.";
 
     /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
@@ -167,8 +178,8 @@ public static class PreviewCommandLine
             return false;
         }
 
-        (Dictionary<string, string> values, bool dryRun) = SplitOptions(args, 1, ValueOptions, problems);
-        PreviewRequest? parsed = Build(values, dryRun, recipeRequired: true, seedRequired: true, problems);
+        (Dictionary<string, string> values, IReadOnlySet<string> flags) = SplitOptions(args, 1, ValueOptions, problems);
+        PreviewRequest? parsed = Build(values, flags, recipeRequired: true, seedRequired: true, problems);
         if (problems.Count > 0)
             return false;
         request = parsed;
@@ -180,25 +191,29 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
-        "--rr-start",
+        "--rr-start", "--denoise-device",
     };
 
+    /// <summary>The options that take no value.</summary>
+    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise" };
+
     /// <summary>
-    /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the
-    /// <c>--dry-run</c> flag, reporting unknown, valueless and repeated options.
+    /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the flags
+    /// (<see cref="FlagOptions"/>) given, reporting unknown, valueless and repeated options.
     /// </summary>
-    internal static (Dictionary<string, string> Values, bool DryRun) SplitOptions(
+    internal static (Dictionary<string, string> Values, IReadOnlySet<string> Flags) SplitOptions(
         IReadOnlyList<string> args, int start, IReadOnlySet<string> valueOptions, List<string> problems)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
-        bool dryRun = false;
+        var flags = new HashSet<string>(StringComparer.Ordinal);
         int k = start;
         while (k < args.Count)
         {
             string arg = args[k++];
-            if (arg == "--dry-run")
+            if (FlagOptions.Contains(arg))
             {
-                dryRun = true;
+                if (!flags.Add(arg))
+                    problems.Add($"{arg} is given more than once.");
             }
             else if (!valueOptions.Contains(arg))
             {
@@ -213,18 +228,20 @@ public static class PreviewCommandLine
                 problems.Add($"{arg} is given more than once.");
             }
         }
-        return (values, dryRun);
+        return (values, flags);
     }
 
     /// <summary>
-    /// Builds a request from split options, adding every problem to <paramref name="problems"/>. A contact
+    /// Builds a request from split options and flags, adding every problem to <paramref name="problems"/>. A contact
     /// sheet whose axis supplies the recipe or the seed passes false for that requirement; the field is then
     /// empty or 0 until the axis fills it in.
     /// </summary>
     internal static PreviewRequest? Build(
-        Dictionary<string, string> values, bool dryRun, bool recipeRequired, bool seedRequired, List<string> problems)
+        Dictionary<string, string> values, IReadOnlySet<string> flags, bool recipeRequired, bool seedRequired, List<string> problems)
     {
         int before = problems.Count;
+        bool dryRun = flags.Contains("--dry-run");
+        DenoiseSettings? denoise = Denoise(flags.Contains("--denoise"), values.GetValueOrDefault("--denoise-device"), dryRun, problems);
         string? recipe = recipeRequired ? Required(values, "--recipe", problems) : values.GetValueOrDefault("--recipe", string.Empty);
         string? seedText = seedRequired ? Required(values, "--seed", problems) : values.GetValueOrDefault("--seed");
         string? outPath = Required(values, "--out", problems);
@@ -273,7 +290,29 @@ public static class PreviewCommandLine
             Atmosphere = atmosphere,
             LightSampling = lightSampling,
             RussianRouletteStart = rrStart,
+            Denoise = denoise,
         };
+    }
+
+    /// <summary>The denoise settings of <c>--denoise</c> and <c>--denoise-device</c>; null without <c>--denoise</c>.</summary>
+    private static DenoiseSettings? Denoise(bool denoise, string? deviceText, bool dryRun, List<string> problems)
+    {
+        if (!denoise)
+        {
+            if (deviceText is not null)
+                problems.Add("--denoise-device needs --denoise.");
+            return null;
+        }
+        if (dryRun)
+            problems.Add("--denoise needs a render, and --dry-run renders nothing.");
+        var settings = new DenoiseSettings();
+        if (deviceText is null)
+            return settings;
+        if (Enum.TryParse(deviceText, ignoreCase: true, out DenoiseDevice device) && device != DenoiseDevice.None && Enum.IsDefined(device)
+            && !int.TryParse(deviceText, out _))
+            return settings with { Device = device };
+        problems.Add($"--denoise-device must be cpu or cuda, got '{deviceText}'.");
+        return settings;
     }
 
     /// <summary>Parses an <c>--atmosphere</c> value (<c>luts</c>, <c>reference</c> or <c>referenceShadowed</c>).</summary>

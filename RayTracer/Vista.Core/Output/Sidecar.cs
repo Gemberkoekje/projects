@@ -20,12 +20,14 @@ namespace Vista.Output;
 /// was metered), the radiance units in <see cref="ImageInfo.Units"/>, and in <see cref="Sun"/> the sunlight's
 /// transmittance to the camera in place of the M0 light's colour temperature. Schema 5 (M1.4) added, in
 /// <see cref="Atmosphere"/>, where the base altitude came from and how aerial perspective was evaluated. Schema 6 (M1.5)
-/// added, in <see cref="Image"/>, which lights surfaces sampled and where Russian roulette starts.</para>
+/// added, in <see cref="Image"/>, which lights surfaces sampled and where Russian roulette starts. Schema 7 (M1.6) added
+/// <see cref="Denoise"/>: the settings asked for, and the denoiser's library, version, device and filter, or why it did not
+/// run.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 6;
+    public const int CurrentSchema = 7;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -68,6 +70,9 @@ public sealed record Sidecar
 
     /// <summary>How the PNG was exposed; absent for a dry run.</summary>
     public ExposureInfo? Exposure { get; init; }
+
+    /// <summary>How the denoised beauty was made, or why there is none; absent when no denoising was asked for.</summary>
+    public DenoiseInfo? Denoise { get; init; }
 
     /// <summary>Data tier per material key (vista-plan §6.2).</summary>
     public required SortedDictionary<string, DataTier> DataTiers { get; init; }

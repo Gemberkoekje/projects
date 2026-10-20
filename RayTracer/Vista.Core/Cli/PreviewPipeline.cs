@@ -21,18 +21,26 @@ namespace Vista.Cli;
 /// <para>Since M1.3 the scene sits in a spectral atmosphere at its base altitude — the recipe's altitude, else its
 /// place's valley floor (<see cref="Places.BaseAltitude"/>, <see cref="AtmosphereFrame"/>) — the EXR is in physical
 /// units, and the PNG is metered (<see cref="AutoExposure"/>, the camera's exposure as compensation).</para>
+///
+/// <para>Since M1.6 a request may also denoise (<see cref="PreviewRequest.Denoise"/>): the raw beauty is written as always, and
+/// the denoised one beside it (<c>&lt;out&gt;.denoised.png</c> at the same exposure, <c>&lt;out&gt;.denoised.exr</c>). A denoiser that
+/// cannot run leaves a warning and the raw files only.</para>
 /// </summary>
 public static class PreviewPipeline
 {
     /// <summary>
     /// Runs <paramref name="request"/>; returns the sidecar that was written. Renders that share a world (the
-    /// cells of a contact sheet) pass one <paramref name="worlds"/> cache so it is generated and meshed once.
+    /// cells of a contact sheet) pass one <paramref name="worlds"/> cache so it is generated and meshed once. A request that
+    /// denoises needs a <paramref name="denoiser"/>.
     /// </summary>
-    public static Sidecar Run(PreviewRequest request, IVistaRenderer? renderer, TimeProvider? time = null, WorldCache? worlds = null)
+    public static Sidecar Run(PreviewRequest request, IVistaRenderer? renderer, TimeProvider? time = null, WorldCache? worlds = null,
+        IDenoiser? denoiser = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (renderer is null && !request.DryRun)
             throw new InvalidOperationException("A renderer is required unless the request is a dry run.");
+        if (renderer is not null && request.Denoise is not null && denoiser is null)
+            throw new InvalidOperationException("A denoiser is required when the request denoises.");
         time ??= TimeProvider.System;
 
         var timings = new SortedDictionary<string, double>(StringComparer.Ordinal);
@@ -84,6 +92,7 @@ public static class PreviewPipeline
 
         RenderInfo? renderInfo = null;
         ExposureInfo? exposure = null;
+        DenoiseInfo? denoised = null;
         if (renderer is null)
         {
             (byte[] map, int size) = DebugImages.HeightMap(terrain, camera);
@@ -95,7 +104,10 @@ public static class PreviewPipeline
         {
             var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude);
             var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
-            RenderOutput output = renderer.Render(scene, settings, AovsFor(request.Debug), planner);
+            var aovs = new HashSet<Aov>(AovsFor(request.Debug));
+            if (request.Denoise is not null)
+                aovs.UnionWith([Aov.Albedo, Aov.Normal]);
+            RenderOutput output = renderer.Render(scene, settings, aovs, planner);
             if (output.Width != window.Width || output.Height != window.Height)
                 throw new InvalidOperationException($"Renderer returned {output.Width}×{output.Height}, expected {window.Width}×{window.Height}.");
             if (output.Xyz.Length != window.Pixels * 3)
@@ -127,6 +139,25 @@ public static class PreviewPipeline
                 outputs[role] = $"{baseName}.{role}.png";
             }
             timings["write"] = Lap(stopwatch);
+
+            if (request.Denoise is { } denoise)
+            {
+                DenoiseInput input = Denoising.Prepare(output, linear, Denoising.InputScale(denoise, exposure), out long clamped);
+                DenoiseResult result = denoiser!.Denoise(input, denoise);
+                if (result.Succeeded)
+                {
+                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv), window.Width, window.Height, PngColor.Rgb);
+                    outputs["denoised"] = baseName + ".denoised.png";
+                    ExrEncoder.WriteRgb(Sibling(".denoised.exr"), result.Color, window.Width, window.Height);
+                    outputs["denoisedExr"] = baseName + ".denoised.exr";
+                }
+                else
+                {
+                    warnings.Add($"Not denoised: {result.Problem} Wrote the raw image only.");
+                }
+                denoised = new DenoiseInfo(denoise, result.Run, result.Succeeded ? null : result.Problem, clamped, DenoiseInfo.InputsDescription);
+                timings["denoise"] = Lap(stopwatch);
+            }
         }
 
         outputs["sidecar"] = baseName + ".json";
@@ -157,6 +188,7 @@ public static class PreviewPipeline
             Sun = SunInfo.From(almanac, frame),
             Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere, altitudeFrom),
             Exposure = exposure,
+            Denoise = denoised,
             DataTiers = MaterialCatalog.TiersOf(materials),
             Render = renderInfo,
             TimingsSeconds = timings,

@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Vista.App.Denoise;
 using Vista.Astronomy;
 using Vista.Atmosphere;
+using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
@@ -36,6 +38,9 @@ namespace Vista.App.Gpu;
 /// bit-identically; its GPU measurement matches <see cref="SkyDistribution.CellLuminance"/> on the same sky view; the GPU's
 /// sampler and pdf match <see cref="SkyDistribution"/>'s; and MIS and M1.4's estimator agree on the image's mean within its
 /// noise, over independent renders.</para>
+///
+/// <para>Then the denoiser (M1.6), when Open Image Denoise has been fetched: the reference render denoised twice on the CPU is
+/// bit-identical, sane and as bright as the raw image; on CUDA, bit-identical twice and as bright as the CPU's.</para>
 /// </summary>
 internal static class GpuSelfTest
 {
@@ -92,8 +97,58 @@ internal static class GpuSelfTest
         pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
 
         pass &= AtmosphereChecks(renderer, scene, settings, tight, log);
+        pass &= DenoiseChecks(reference, log);
         log.WriteLine(pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
+    }
+
+    /// <summary>
+    /// The denoiser (M1.6) on the reference render: on the CPU, denoising the same input twice gives the same bits, and the image
+    /// is finite, not negative, and as bright as the raw one within 2%; on CUDA, the same twice and as bright as the CPU's within
+    /// 1%. Without Open Image Denoise next to the executable the checks are skipped (it is fetched, never committed); a CUDA
+    /// device that cannot run is reported but fails nothing, since the CPU is the default.
+    /// </summary>
+    private static bool DenoiseChecks(RenderOutput reference, TextWriter log)
+    {
+        using var denoiser = new OidnDenoiser();
+        // The reference is 320 px at 16 samples, the meter's own size, so it is its own exposure meter.
+        ExposureInfo exposure = AutoExposure.Measure(reference.Xyz, 0.0);
+        float[] linear = DisplayTransform.XyzToLinearRec709(reference.Xyz);
+        var cpu = new DenoiseSettings { Device = DenoiseDevice.Cpu };
+        DenoiseInput input = Denoising.Prepare(reference, linear, Denoising.InputScale(cpu, exposure), out _);
+        DenoiseResult first = denoiser.Denoise(input, cpu);
+        if (first.Problem == OidnDenoiser.MissingLibrary)
+        {
+            log.WriteLine($"[skip] the denoiser: {first.Problem}");
+            return true;
+        }
+        bool pass = Check(log, "the denoiser runs on the CPU", first.Succeeded ? null : first.Problem);
+        if (!first.Succeeded)
+            return false;
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  denoised by {first.Run!.Library} {first.Run.Version} on {first.Run.Device}: {first.Run.ExecuteSeconds * 1e3:0.0} ms"));
+        DenoiseResult again = denoiser.Denoise(input, cpu);
+        pass &= Check(log, "denoising on the CPU twice is bit-identical",
+            again.Succeeded && ImageError.BitIdentical(first.Color, again.Color) ? null : again.Problem.Length > 0 ? again.Problem : "the images differ");
+        double bias = ImageError.MeanLuminanceBias(first.Color, linear);
+        pass &= Check(log, "the denoised image is sane and keeps the raw one's brightness",
+            first.Color.Any(c => !float.IsFinite(c) || c < 0f) ? "a value is negative or not finite"
+            : Math.Abs(bias) > 0.02 ? string.Create(CultureInfo.InvariantCulture, $"mean luminance {bias:+0.00%;-0.00%} against the raw image") : null);
+
+        var cuda = cpu with { Device = DenoiseDevice.Cuda };
+        DenoiseResult gpu = denoiser.Denoise(input, cuda);
+        if (!gpu.Succeeded)
+        {
+            log.WriteLine($"[note] the CUDA denoiser did not run: {gpu.Problem}");
+            return pass;
+        }
+        DenoiseResult gpuAgain = denoiser.Denoise(input, cuda);
+        pass &= Check(log, "denoising on CUDA twice is bit-identical",
+            gpuAgain.Succeeded && ImageError.BitIdentical(gpu.Color, gpuAgain.Color) ? null : gpuAgain.Problem.Length > 0 ? gpuAgain.Problem : "the images differ");
+        double fromCpu = ImageError.MeanLuminanceBias(gpu.Color, first.Color);
+        pass &= Check(log, "CUDA's denoised image is as bright as the CPU's",
+            Math.Abs(fromCpu) > 0.01 ? string.Create(CultureInfo.InvariantCulture, $"mean luminance {fromCpu:+0.00%;-0.00%} against the CPU's") : null);
+        return pass;
     }
 
     private static bool AtmosphereChecks(D3D12VistaRenderer renderer, VistaScene scene, RenderSettings settings, BatchPlannerOptions tight, TextWriter log)

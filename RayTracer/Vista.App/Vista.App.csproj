@@ -26,6 +26,17 @@
     </None>
   </ItemGroup>
 
+  <!-- Intel Open Image Denoise (vista-plan §10 M1.6): tools/fetch-oidn.ps1 fetches the pinned release into the git-ignored
+       ../.deps/oidn, and the build copies the DLLs the CPU and CUDA devices need next to the .exe. When it has not been fetched
+       (CI, a fresh clone) nothing is copied and a render with denoising warns and writes the raw image only. -->
+  <PropertyGroup>
+    <OidnBin>$(MSBuildThisFileDirectory)../.deps/oidn/bin/</OidnBin>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(OidnBin)OpenImageDenoise.dll')">
+    <None Include="$(OidnBin)OpenImageDenoise.dll;$(OidnBin)OpenImageDenoise_core.dll;$(OidnBin)OpenImageDenoise_device_cpu.dll;$(OidnBin)OpenImageDenoise_device_cuda.dll;$(OidnBin)tbb*.dll"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../RayTracer.Core/RayTracer.csproj" />
     <ProjectReference Include="../RayTracer.Gpu/RayTracer.Gpu.csproj" />

@@ -407,3 +407,6 @@ FodyWeavers.xsd
 
 # SpaceTraders – Kubernetes secrets (never commit)
 SpaceTraders/k8s/secret.yaml
+
+# Vista – fetched third-party binaries (RayTracer/tools/fetch-oidn.ps1; never commit)
+RayTracer/.deps/
