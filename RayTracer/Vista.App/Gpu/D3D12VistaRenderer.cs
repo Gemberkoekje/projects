@@ -41,6 +41,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 {
     private const string ShaderFile = "VistaIntegrator.hlsl";
     private const string ReferenceDefine = "ATMOSPHERE_REFERENCE";
+    private const string TerrainShadowsDefine = "REFERENCE_TERRAIN_SHADOWS";
     private const int GroupSize = 8;
     private const int ConstantBufferBytes = 256;
 
@@ -53,7 +54,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotTlas = 0, SlotPositions = 1, SlotNormals = 2, SlotIndices = 3, SlotCie = 4, SlotReflectance = 5, SlotAlbedo = 6;
     private const int SlotAtmCoefficients = 7, SlotAtmSun = 8, SlotColumns = 9, SlotSkyView = 10, SlotCheckDirections = 11;
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
-    private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21;
+    private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -73,6 +74,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12RootSignature _rootSignature = null!;
     private ID3D12PipelineState _pipeline = null!;
     private ID3D12PipelineState? _referencePipeline;
+    private ID3D12PipelineState? _shadowedPipeline;
     private ID3D12QueryHeap _timestamps = null!;
     private ID3D12Resource _timestampReadback = null!;
     private ID3D12Resource _constants = null!;
@@ -182,13 +184,18 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             throw new ArgumentException("The planner has already issued dispatches.", nameof(planner));
         if (scene.Materials.Count == 0)
             throw new ArgumentException("The scene has no materials.", nameof(scene));
-        if (settings.Atmosphere is not (AtmosphereMode.Luts or AtmosphereMode.Reference))
+        if (settings.Atmosphere is not (AtmosphereMode.Luts or AtmosphereMode.Reference or AtmosphereMode.ReferenceShadowed))
             throw new ArgumentException($"Unknown atmosphere mode {settings.Atmosphere}.", nameof(settings));
 
         var stages = new SortedDictionary<string, double>(_initSeconds, StringComparer.Ordinal);
         _initSeconds.Clear();
         var stopwatch = Stopwatch.StartNew();
-        ID3D12PipelineState pipeline = settings.Atmosphere == AtmosphereMode.Reference ? ReferencePipeline(stages) : _pipeline;
+        ID3D12PipelineState pipeline = settings.Atmosphere switch
+        {
+            AtmosphereMode.Reference => ReferencePipeline(stages, shadows: false),
+            AtmosphereMode.ReferenceShadowed => ReferencePipeline(stages, shadows: true),
+            _ => _pipeline,
+        };
         stopwatch.Restart();
 
         if (!ReferenceEquals(scene.Mesh, _mesh))
@@ -421,6 +428,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Srv(8), Srv(9), Srv(10), Srv(17), Srv(14),                // 7–11: atmosphere tables, columns, sky view, check directions
             Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6),   // 12–18: sums, first hit, ray counter, check sums
             Cbv(0), Cbv(1), Cbv(2),                                   // 19–21: integrator, atmosphere, check constants
+            Srv(13),                                                  // 22: the summed scattering orders (aerial perspective)
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -436,16 +444,18 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         });
     }
 
-    /// <summary>The reference-atmosphere integrator, compiled the first time it is asked for.</summary>
-    private ID3D12PipelineState ReferencePipeline(SortedDictionary<string, double> stages)
+    /// <summary>The reference-atmosphere integrator, with or without the terrain's shadow in the air, compiled the first time it is asked for.</summary>
+    private ID3D12PipelineState ReferencePipeline(SortedDictionary<string, double> stages, bool shadows)
     {
-        if (_referencePipeline is null)
+        ref ID3D12PipelineState? pipeline = ref shadows ? ref _shadowedPipeline : ref _referencePipeline;
+        if (pipeline is null)
         {
             var stopwatch = Stopwatch.StartNew();
-            _referencePipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine), "CSMain", ShaderFile);
+            string source = shadows ? ShaderSource.Load(ShaderFile, ReferenceDefine, TerrainShadowsDefine) : ShaderSource.Load(ShaderFile, ReferenceDefine);
+            pipeline = CompilePipeline(_rootSignature, source, "CSMain", ShaderFile);
             stages["referenceShaderCompile"] = stopwatch.Elapsed.TotalSeconds;
         }
-        return _referencePipeline;
+        return pipeline;
     }
 
     private void CreateFixedResources()
@@ -613,6 +623,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootConstantBufferView(SlotConstants, _constants.GPUVirtualAddress);
         list.SetComputeRootConstantBufferView(SlotAtmosphereConstants, _atmosphereConstants.GPUVirtualAddress);
         list.SetComputeRootConstantBufferView(SlotCheckConstants, _checkConstants.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotScatterSum, _scatterSum.GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -795,6 +806,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _constants?.Dispose();
         _timestampReadback?.Dispose();
         _timestamps?.Dispose();
+        _shadowedPipeline?.Dispose();
         _referencePipeline?.Dispose();
         _pipeline?.Dispose();
         _rootSignature?.Dispose();

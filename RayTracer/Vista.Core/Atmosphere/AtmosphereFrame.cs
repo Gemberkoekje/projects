@@ -5,10 +5,12 @@ namespace Vista.Atmosphere;
 /// <summary>
 /// One render's atmosphere (vista-plan §10 M1.3): the model, where the scene sits in it and where the sun is.
 /// World <c>y = 0</c> is at <see cref="GroundAltitudeMetres"/> above sea level, the scene's base altitude
-/// (the place's valley floor until M1.4's altitude control). The ground sphere passes through it: it casts the
+/// (the recipe's altitude, else the place's valley floor). The ground sphere passes through it: it casts the
 /// Earth's shadow and is the land seen beyond the terrain tile, so the valley floor's horizon is flat and its
-/// sunset is the almanac's. A point's altitude for the air is the base plus its height; M1.4 adds the Earth's
-/// curvature drop across the tile, which this slice ignores (one local vertical, +Y).
+/// sunset is the almanac's. A point's altitude for the air is the base plus its height. The sky view is built for
+/// one local vertical, +Y, the camera's; since M1.4 the air along segments and the sun's height at a surface use the
+/// world bent onto the Earth around the camera (<see cref="AerialPerspective"/>), whose verticals tilt by up to
+/// <see cref="TerrainReachMetres"/>/R across the tile.
 ///
 /// <para>The sky-view LUT has <see cref="AtmosphereLuts.SkySlices"/> slices: slice 0 at the camera's exact
 /// altitude, for camera rays, and <see cref="AtmosphereLuts.SkyTerrainSlices"/> spread evenly over the
@@ -37,6 +39,9 @@ public sealed record AtmosphereFrame
     /// <summary>Highest terrain altitude above sea level (the last terrain slice), m.</summary>
     public required double TerrainHighAltitudeMetres { get; init; }
 
+    /// <summary>The farthest horizontal distance from the camera to the terrain, m: how far the bent world's verticals tilt.</summary>
+    public double TerrainReachMetres { get; init; }
+
     /// <summary>Radius of the sea-level sphere, m.</summary>
     public double SeaLevelRadius => Model.PlanetRadiusMetres;
 
@@ -49,8 +54,12 @@ public sealed record AtmosphereFrame
     /// <summary>Cosine of the sun's zenith angle (the same at every slice: one local vertical).</summary>
     public double SunCosZenith => Math.Clamp(ToSun.Y, -1.0, 1.0);
 
-    /// <summary>The frame for a scene whose world <c>y</c> runs from <paramref name="terrainLowY"/> to <paramref name="terrainHighY"/>.</summary>
-    public static AtmosphereFrame For(AtmosphereModel model, double groundAltitude, Vector3 toSun, double cameraY, double terrainLowY, double terrainHighY)
+    /// <summary>
+    /// The frame for a scene whose world <c>y</c> runs from <paramref name="terrainLowY"/> to <paramref name="terrainHighY"/>,
+    /// its terrain reaching <paramref name="terrainReach"/> metres from the camera.
+    /// </summary>
+    public static AtmosphereFrame For(AtmosphereModel model, double groundAltitude, Vector3 toSun, double cameraY, double terrainLowY, double terrainHighY,
+        double terrainReach = 0.0)
     {
         ArgumentNullException.ThrowIfNull(model);
         return new AtmosphereFrame
@@ -61,6 +70,7 @@ public sealed record AtmosphereFrame
             CameraAltitudeMetres = groundAltitude + cameraY,
             TerrainLowAltitudeMetres = groundAltitude + terrainLowY,
             TerrainHighAltitudeMetres = groundAltitude + Math.Max(terrainLowY, terrainHighY),
+            TerrainReachMetres = Math.Max(terrainReach, 0.0),
         };
     }
 
@@ -77,7 +87,8 @@ public sealed record AtmosphereFrame
 
     /// <summary>
     /// True when some point of the scene (the camera or the highest terrain) can see part of the sun's disk over
-    /// the ground sphere's horizon, so next-event estimation on the sun is worth its shadow rays.
+    /// the ground sphere's horizon, so next-event estimation on the sun is worth its shadow rays. The terrain's reach
+    /// counts: a point that far toward the sun has its vertical tilted that much closer to it.
     /// </summary>
     public bool SunReachesScene
     {
@@ -86,7 +97,7 @@ public sealed record AtmosphereFrame
             double highest = Math.Max(CameraAltitudeMetres, TerrainHighAltitudeMetres) - GroundAltitudeMetres;
             highest = Math.Max(highest, MinimumHeightAboveGround);
             double dip = Math.Atan2(Math.Sqrt(highest * (2.0 * GroundRadius + highest)), GroundRadius);
-            return Math.Asin(SunCosZenith) + SolarSpectrum.AngularRadiusRadians > -dip;
+            return Math.Asin(SunCosZenith) + SolarSpectrum.AngularRadiusRadians + TerrainReachMetres / GroundRadius > -dip;
         }
     }
 

@@ -62,6 +62,7 @@ internal sealed partial class D3D12VistaRenderer
     private ID3D12PipelineState _groundPipeline = null!;
     private ID3D12PipelineState _skyViewPipeline = null!;
     private ID3D12PipelineState? _checkPipeline;
+    private ID3D12PipelineState? _probePipeline;
     private ID3D12Resource _buildConstants = null!;
     private ID3D12Resource _checkConstants = null!;
     private ID3D12Resource _dummySrv = null!;
@@ -288,17 +289,20 @@ internal sealed partial class D3D12VistaRenderer
     public void ForgetAtmosphere() => (_tablesModel, _ordersKey, _skyFrame) = (null, null, null);
 
     /// <summary>
-    /// The LUT sky against the reference (<c>--atmosphere-check</c>): for each of <paramref name="directions"/>
+    /// The LUT air against the reference (<c>--atmosphere-check</c>): for each of <paramref name="directions"/>
     /// from the camera of <paramref name="frame"/> and each wavelength, the LUT's radiance and
     /// <paramref name="chunks"/> × <paramref name="pathsPerThread"/> reference paths, summed per chunk, in
-    /// dispatches of <paramref name="pathsPerDispatch"/> paths per thread (far below the TDR).
+    /// dispatches of <paramref name="pathsPerDispatch"/> paths per thread (far below the TDR). A positive
+    /// <paramref name="segmentLength"/> compares the light scattered toward the camera along a segment that long in
+    /// each direction (ending on the ground sphere if it gets there first, M1.4) instead of the whole sky.
     /// </summary>
-    public SkyCheckRaw RunSkyCheck(AtmosphereFrame frame, IReadOnlyList<Vector3> directions, int chunks, int pathsPerThread, int pathsPerDispatch)
+    public SkyCheckRaw RunSkyCheck(AtmosphereFrame frame, IReadOnlyList<Vector3> directions, int chunks, int pathsPerThread, int pathsPerDispatch,
+        double segmentLength = 0.0)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(directions);
-        if (directions.Count == 0 || chunks <= 0 || pathsPerThread <= 0 || pathsPerDispatch <= 0)
-            throw new ArgumentException("A sky check needs directions, chunks and paths.");
+        if (directions.Count == 0 || chunks <= 0 || pathsPerThread <= 0 || pathsPerDispatch <= 0 || !(segmentLength >= 0.0))
+            throw new ArgumentException("A sky check needs directions, chunks, paths and a length of zero or more.");
         EnsureAtmosphere(frame);
         _checkPipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine), "CSSkyCheck", ShaderFile);
 
@@ -306,7 +310,7 @@ internal sealed partial class D3D12VistaRenderer
         for (int i = 0; i < directions.Count; i++)
         {
             Vector3 d = Vector3.Normalize(directions[i]);
-            (packed[i * 4], packed[i * 4 + 1], packed[i * 4 + 2]) = (d.X, d.Y, d.Z);
+            (packed[i * 4], packed[i * 4 + 1], packed[i * 4 + 2], packed[i * 4 + 3]) = (d.X, d.Y, d.Z, (float)segmentLength);
         }
         int items = directions.Count * AtmosphereLuts.Wavelengths * chunks;
         try
@@ -341,8 +345,52 @@ internal sealed partial class D3D12VistaRenderer
         }
     }
 
+    /// <summary>
+    /// The aerial perspective of world segments on the GPU (<c>CSAerialProbe</c>), for the self-test's parity with
+    /// <see cref="AerialPerspective"/>: each probe's segment from its start to its end, bent around a camera at
+    /// <paramref name="camera"/>, at its wavelength. Returns, per probe, (transmittance, in-scattered light per unit
+    /// solar irradiance, μ, length, height, μ_s, ν, 0).
+    /// </summary>
+    public float[] RunAerialProbe(AtmosphereFrame frame, Vector3 camera, IReadOnlyList<(Vector3 Start, Vector3 End, int Lambda)> probes)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(probes);
+        if (probes.Count == 0)
+            throw new ArgumentException("No probes.", nameof(probes));
+        EnsureAtmosphere(frame);
+        _probePipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSAerialProbe", ShaderFile);
+
+        var packed = new float[probes.Count * 8];
+        for (int i = 0; i < probes.Count; i++)
+        {
+            (Vector3 a, Vector3 b, int lambda) = probes[i];
+            (packed[i * 8], packed[i * 8 + 1], packed[i * 8 + 2]) = (a.X, a.Y, a.Z);
+            (packed[i * 8 + 4], packed[i * 8 + 5], packed[i * 8 + 6], packed[i * 8 + 7]) = (b.X, b.Y, b.Z, lambda);
+        }
+        Write(_constants, new IntegratorConstants { CamPosX = camera.X, CamPosY = camera.Y, CamPosZ = camera.Z });
+        Write(_checkConstants, new CheckConstants { Directions = (uint)probes.Count });
+        try
+        {
+            _checkDirections = CreateDefaultBuffer<float>(packed);
+            _checkSums = CreateUavBuffer((ulong)packed.Length * sizeof(float));
+            Timed(_probePipeline, _rootSignature, list =>
+            {
+                BindIntegrator(list);
+                list.Dispatch((uint)((probes.Count + LutGroupSize - 1) / LutGroupSize), 1, 1);
+            });
+            return ReadFloats(_checkSums, packed.Length);
+        }
+        finally
+        {
+            _checkSums?.Dispose();
+            _checkDirections?.Dispose();
+            (_checkSums, _checkDirections) = (null, null);
+        }
+    }
+
     private void DisposeAtmosphere()
     {
+        _probePipeline?.Dispose();
         _checkSums?.Dispose();
         _checkDirections?.Dispose();
         _atmSun?.Dispose();

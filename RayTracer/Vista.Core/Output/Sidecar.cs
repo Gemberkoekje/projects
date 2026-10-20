@@ -18,12 +18,13 @@ namespace Vista.Output;
 /// sunset, azimuth and elevation, each with where it came from. Schema 4 (M1.3) added <see cref="Atmosphere"/>
 /// (the air model, the scene's base altitude, how the air was evaluated) and <see cref="Exposure"/> (how the PNG
 /// was metered), the radiance units in <see cref="ImageInfo.Units"/>, and in <see cref="Sun"/> the sunlight's
-/// transmittance to the camera in place of the M0 light's colour temperature.</para>
+/// transmittance to the camera in place of the M0 light's colour temperature. Schema 5 (M1.4) added, in
+/// <see cref="Atmosphere"/>, where the base altitude came from and how aerial perspective was evaluated.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 4;
+    public const int CurrentSchema = 5;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -216,40 +217,58 @@ public sealed record SunInfo(
 /// <param name="At650Nm">At 650 nm.</param>
 public sealed record ThreeWavelengths(double At450Nm, double At550Nm, double At650Nm);
 
-/// <summary>The air of one render (vista-plan §5.2, §10 M1.3).</summary>
+/// <summary>The air of one render (vista-plan §5.2, §10 M1.3, M1.4).</summary>
 /// <param name="Mode">How the integrator evaluated it: the LUTs or the reference.</param>
 /// <param name="Model">The atmosphere model.</param>
 /// <param name="GroundAltitudeMetres">The scene's base altitude above sea level: world y = 0 and the ground sphere.</param>
+/// <param name="GroundAltitudeFrom">Where the base altitude came from: the recipe's altitude or the place's valley floor.</param>
 /// <param name="CameraAltitudeMetres">The camera's altitude above sea level.</param>
 /// <param name="ZenithFromSeaLevel">Vertical optical depths from sea level.</param>
 /// <param name="ZenithFromGround">Vertical optical depths from the scene's base altitude.</param>
+/// <param name="AerialPerspective">How the air along segments that end on the terrain was evaluated.</param>
 /// <param name="Sources">Where the constants come from.</param>
 public sealed record AtmosphereInfo(
     AtmosphereMode Mode,
     AtmosphereModel Model,
     double GroundAltitudeMetres,
+    string GroundAltitudeFrom,
     double CameraAltitudeMetres,
     OpticalDepths ZenithFromSeaLevel,
     OpticalDepths ZenithFromGround,
+    string AerialPerspective,
     string Sources)
 {
+    /// <summary>Recorded in <see cref="AerialPerspective"/> for the LUTs.</summary>
+    public static readonly string LutAerialPerspective = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+        $"march: 2 steps + 1 per {Vista.Atmosphere.AerialPerspective.StepLengthMetres:0} m, at most {Vista.Atmosphere.AerialPerspective.MaxSteps}; scattering orders read at both ends (once when the segment spans under {Vista.Atmosphere.AerialPerspective.SingleLookupSpanMetres:0} m of height); the world bent onto the Earth around the camera; no mountain shadows in the air");
+
+    /// <summary>Recorded in <see cref="AerialPerspective"/> for the reference modes.</summary>
+    public const string ReferenceAerialPerspective = "delta tracking along each segment; the rest of a scattered path in the air alone";
+
     /// <summary>Recorded in <see cref="Sources"/>.</summary>
     public const string SourceNotes =
         "Rayleigh: Peck & Reeder 1972 refractive index, Bates 1984 King factor, US Standard Atmosphere column; " +
         "ozone: Serdyuchenko et al. 2014 (233 K) in 10 nm bins via Bruneton 2017; haze: Ångström law, Henyey–Greenstein; " +
-        "LUTs after Hillaire 2020; built-in tier 5";
+        "LUTs after Hillaire 2020, multiple scattering after Bruneton 2017; built-in tier 5";
 
-    /// <summary>The record of <paramref name="frame"/> evaluated by <paramref name="mode"/>.</summary>
-    public static AtmosphereInfo From(AtmosphereFrame frame, AtmosphereMode mode)
+    /// <summary>The record of <paramref name="frame"/> evaluated by <paramref name="mode"/>, its base altitude from <paramref name="groundAltitudeFrom"/>.</summary>
+    public static AtmosphereInfo From(AtmosphereFrame frame, AtmosphereMode mode, string groundAltitudeFrom)
     {
         ArgumentNullException.ThrowIfNull(frame);
         return new AtmosphereInfo(
             mode,
             frame.Model,
             frame.GroundAltitudeMetres,
+            groundAltitudeFrom,
             frame.CameraAltitudeMetres,
             OpticalDepths.Of(frame.Model, 0.0),
             OpticalDepths.Of(frame.Model, frame.GroundAltitudeMetres),
+            mode switch
+            {
+                AtmosphereMode.Reference => ReferenceAerialPerspective,
+                AtmosphereMode.ReferenceShadowed => ReferenceAerialPerspective + "; the terrain's shadow on the sunlight it scatters once",
+                _ => LutAerialPerspective,
+            },
             SourceNotes);
     }
 }

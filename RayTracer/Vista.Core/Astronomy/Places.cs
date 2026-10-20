@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Vista.Recipes;
 
 namespace Vista.Astronomy;
 
@@ -72,7 +73,7 @@ public static class Places
     /// </summary>
     public const Place Default = Place.Zermatt;
 
-    /// <summary>Altitude of a custom latitude until the altitude control (M1.4) sets one: sea level.</summary>
+    /// <summary>The valley altitude of a custom latitude: sea level, unless the recipe's altitude sets one.</summary>
     public const double CustomAltitudeMetres = 0.0;
 
     private static readonly PlaceInfo[] Table =
@@ -100,6 +101,20 @@ public static class Places
         Place key = place == Place.None ? Default : place;
         return Array.Find(Table, p => p.Place == key)
             ?? throw new ArgumentOutOfRangeException(nameof(place), place, "Unknown place.");
+    }
+
+    /// <summary>
+    /// The scene's base altitude above sea level (world <c>y = 0</c>, the valley floor; vista-plan §3.6): the recipe's
+    /// <see cref="Recipe.Altitude"/>, else <paramref name="place"/>'s typical valley floor (a custom latitude's is sea
+    /// level), and where it came from.
+    /// </summary>
+    public static (double Metres, string From) BaseAltitude(Recipe recipe, PlaceInfo place)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+        ArgumentNullException.ThrowIfNull(place);
+        if (recipe.Altitude is double altitude)
+            return (altitude, "recipe altitude");
+        return (place.ValleyAltitudeMetres, place.IsCustom ? "sea level (custom latitude)" : $"valley floor of {place.Name} ({place.Spot})");
     }
 
     /// <summary>A custom latitude (the dropdown's last entry) at sea level.</summary>

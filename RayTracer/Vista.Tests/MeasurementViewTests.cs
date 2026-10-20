@@ -78,4 +78,17 @@ public sealed class MeasurementViewTests
         foreach (string file in cameras)
             Assert.IsNull(DefaultCamera.GroundWarning(VistaJson.ParseCamera(File.ReadAllText(file)), terrain), file);
     }
+
+    [TestMethod]
+    public void TheAerialPerspectiveView_LooksAlongTheRangeAboveTheTerrain()
+    {
+        // vista-views/aerial (M1.4): the layered ridges, rendered with the measurement views' recipes.
+        string[] cameras = System.IO.Directory.GetFiles(Path.Combine(Directory, "aerial"), "*.camera.json");
+        CollectionAssert.AreEquivalent(new[] { "layered-ridges" },
+            cameras.Select(f => Path.GetFileName(f).Replace(".camera.json", "", StringComparison.Ordinal)).ToArray());
+        CameraSpec camera = VistaJson.ParseCamera(File.ReadAllText(cameras[0]));
+        Assert.AreEqual(270.0, camera.YawDegrees, "west, along the range and toward the evening sun");
+        HeightField terrain = TerrainGenerator.Generate(VistaJson.ParseRecipe(Read("mountains-day.recipe.json")), 42);
+        Assert.IsNull(DefaultCamera.GroundWarning(camera, terrain));
+    }
 }

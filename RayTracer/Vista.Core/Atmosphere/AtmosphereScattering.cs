@@ -11,9 +11,12 @@ namespace Vista.Atmosphere;
 /// (<see cref="AtmosphereLuts.SkyMarch"/>); these tables supply orders two and up.
 ///
 /// <para><b>The 4D domain</b>, over a point at height <c>h</c> above the ground sphere looking along ω (the light
-/// travels toward the point along −ω): <c>μ = ω·up</c>, <c>μ_s = s·up</c> and <c>ν = ω·s</c>, with Bruneton's maps
-/// — height by the distance to the horizon, μ split at the horizon into rays that reach the top and rays that reach
-/// the ground (a lookup never blends the two), μ_s dense near the horizon down to <see cref="MuSMin"/>, ν linear.</para>
+/// travels toward the point along −ω): <c>μ = ω·up</c>, <c>μ_s = s·up</c> and <c>ν = ω·s</c>. Height and μ_s use
+/// Bruneton's maps — height by the distance to the horizon, μ_s dense near the horizon down to <see cref="MuSMin"/> — and
+/// ν is linear. μ is split at the ground sphere's horizon into rays that reach the top and rays that reach the ground (a
+/// lookup never blends the two), each half by angle, dense toward the horizon, as the sky view's rows are: Bruneton's map
+/// by distance left the zenith and the nadir a texel or two near the ground, where segments of aerial perspective read
+/// these tables (vista-plan §10 M1.4).</para>
 ///
 /// <para><b>Wavelengths.</b> Multiple scattering is smooth in wavelength, so the tables hold <see cref="MsWavelengths"/>
 /// of the 50 hero wavelengths (<see cref="HeroOf"/>) and a lookup for any of the 50 interpolates between the two around
@@ -72,8 +75,14 @@ public static class AtmosphereScattering
     /// <summary>Steps along each ray of the single and multiple scattering tables.</summary>
     public const int Steps = 40;
 
+    /// <summary>Polar angles of the sphere quadrature of the density above the ground sphere's horizon.</summary>
+    public const int DensityThetaAbove = 16;
+
+    /// <summary>Polar angles of the sphere quadrature of the density below the ground sphere's horizon.</summary>
+    public const int DensityThetaBelow = 16;
+
     /// <summary>Polar angles of the sphere quadrature of the density.</summary>
-    public const int DensityTheta = 32;
+    public const int DensityTheta = DensityThetaAbove + DensityThetaBelow;
 
     /// <summary>Azimuths of the sphere quadrature of the density.</summary>
     public const int DensityPhi = 32;
@@ -131,23 +140,11 @@ public static class AtmosphereScattering
         double bigH = Math.Sqrt(top * (2.0 * rb + top));
         double rho = bigH * ih / (HeightSize - 1);
         double h = Math.Max(rho * rho / (rb + Math.Sqrt(rb * rb + rho * rho)), MinimumHeight);
-        rho = Math.Sqrt(h * (2.0 * rb + h));
-        double r = rb + h;
 
         bool ground = imu >= MuHalfSize;
         double x = (double)(ground ? imu - MuHalfSize : imu) / (MuHalfSize - 1);
-        double mu;
-        if (ground)
-        {
-            double d = h + x * (rho - h);
-            mu = d <= 0.0 ? -1.0 : Math.Clamp(-(rho * rho + d * d) / (2.0 * r * d), -1.0, 1.0);
-        }
-        else
-        {
-            double dMin = top - h;
-            double d = dMin + x * (rho + bigH - dMin);
-            mu = d <= 0.0 ? 1.0 : Math.Clamp(((top - h) * (2.0 * rb + top + h) - d * d) / (2.0 * r * d), -1.0, 1.0);
-        }
+        (double horizon, double below) = AtmosphereLuts.Horizon(rb, h);
+        double mu = Math.Cos(ground ? horizon + below * x * x : horizon * (1.0 - (1.0 - x) * (1.0 - x)));
 
         double muS = MuSFromUnit(frame, (double)imus / (MuSSize - 1));
         double nu = Math.Clamp(2.0 * inu / (NuSize - 1) - 1.0, -1.0, 1.0);
@@ -200,18 +197,11 @@ public static class AtmosphereScattering
         double bigH = Math.Sqrt(top * (2.0 * rb + top));
         double h = Math.Clamp(sample.Height, 0.0, top);
         double rho = Math.Sqrt(h * (2.0 * rb + h));
-        double xMu;
-        if (sample.Ground)
-        {
-            double d = AtmosphereLuts.DistanceToSphereBelow(rb, h, sample.Mu);
-            xMu = rho > h ? (d - h) / (rho - h) : 0.0;
-        }
-        else
-        {
-            double d = AtmosphereLuts.DistanceToShellAbove(rb, h, top, sample.Mu);
-            double dMin = top - h, dMax = rho + bigH;
-            xMu = (d - dMin) / (dMax - dMin);
-        }
+        (double horizon, double below) = AtmosphereLuts.Horizon(rb, h);
+        double zenith = Math.Acos(Math.Clamp(sample.Mu, -1.0, 1.0));
+        double xMu = sample.Ground
+            ? Math.Sqrt(Math.Clamp((zenith - horizon) / below, 0.0, 1.0))
+            : 1.0 - Math.Sqrt(Math.Max(1.0 - zenith / horizon, 0.0));
         (int h0, _, double fh) = AtmosphereLuts.Cell(rho / bigH, HeightSize);
         (int m0, _, double fm) = AtmosphereLuts.Cell(xMu, MuHalfSize);
         (int s0, _, double fs) = AtmosphereLuts.Cell(MuSToUnit(frame, sample.MuS), MuSSize);
@@ -252,14 +242,14 @@ public static class AtmosphereScattering
     public static double DirectIrradianceEntry(ReadOnlySpan<float> columns, AtmosphereFrame frame, in AtmosphereCoefficients k, int entry)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        double muS = 2.0 * entry / (AtmosphereLuts.GroundIrradianceSize - 1) - 1.0;
+        double muS = AtmosphereLuts.GroundIrradianceMuS(frame, entry);
         return muS > 0.0 ? muS * Math.Exp(-k.OpticalDepth(AtmosphereLuts.SampleColumns(columns, frame.Model, frame.GroundAltitudeMetres, muS))) : 0.0;
     }
 
     /// <summary>Linear sample of a ground-irradiance-by-order table (layout <c>entry · MsWavelengths + l</c>) at sun cosine <paramref name="muS"/>.</summary>
-    public static double SampleIrradiance(ReadOnlySpan<float> irradiance, int l, double muS)
+    public static double SampleIrradiance(ReadOnlySpan<float> irradiance, AtmosphereFrame frame, int l, double muS)
     {
-        (int i0, int i1, double f) = AtmosphereLuts.Cell((muS + 1.0) * 0.5, AtmosphereLuts.GroundIrradianceSize);
+        (int i0, int i1, double f) = AtmosphereLuts.Cell(MuSToUnit(frame, muS), AtmosphereLuts.GroundIrradianceSize);
         double a = irradiance[i0 * MsWavelengths + l];
         return a + f * (irradiance[i1 * MsWavelengths + l] - a);
     }
@@ -273,7 +263,7 @@ public static class AtmosphereScattering
         AtmosphereFrame frame, int l, int entry)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        double muS = 2.0 * entry / (AtmosphereLuts.GroundIrradianceSize - 1) - 1.0;
+        double muS = AtmosphereLuts.GroundIrradianceMuS(frame, entry);
         double sinS = Math.Sqrt(Math.Max(1.0 - muS * muS, 0.0));
         double g = frame.Model.AerosolAsymmetry;
         double dTheta = 0.5 * Math.PI / IrradianceTheta;
@@ -320,7 +310,7 @@ public static class AtmosphereScattering
             double muSp = (r0 * sample.MuS + t * sample.Nu) / rp;
             double altitude = frame.GroundAltitudeMetres + hg;
             (_, double extinction, double rayleighScattering, double mieScattering) = AtmosphereLuts.Coefficients(model, k, altitude);
-            double sun = AtmosphereLuts.HitsSphere(rb, hg, muSp) ? 0.0 : Math.Exp(-k.OpticalDepth(AtmosphereLuts.SampleColumns(columns, model, altitude, muSp)));
+            double sun = AtmosphereLuts.SunLight(columns, frame, k, hg, muSp);
             double step = transmittance * AtmosphereLuts.StepIntegral(extinction, dt);
             rayleigh += step * sun * rayleighScattering;
             mie += step * sun * mieScattering;
@@ -347,14 +337,15 @@ public static class AtmosphereScattering
         double rb = frame.GroundRadius;
         double r = rb + sample.Height;
         double g = model.AerosolAsymmetry;
-        double dTheta = Math.PI / DensityTheta;
+        double horizon = AtmosphereLuts.Horizon(rb, sample.Height).HorizonZenith;
+        (double skyScale, double groundScale) = DensityScales(horizon);
         double dPhi = 2.0 * Math.PI / DensityPhi;
         double rayleigh = 0.0, mie = 0.0;
         for (int i = 0; i < DensityTheta; i++)
         {
-            double theta = (i + 0.5) * dTheta;
+            (double theta, double dTheta, bool ground) = DensityPolar(i, horizon);
+            dTheta *= ground ? groundScale : skyScale;
             double cosTheta = Math.Cos(theta), sinTheta = Math.Sin(theta);
-            bool ground = AtmosphereLuts.HitsSphere(rb, sample.Height, cosTheta);
             double groundDistance = 0.0, groundTransmittance = 0.0;
             if (ground)
             {
@@ -376,7 +367,7 @@ public static class AtmosphereScattering
                 if (ground)
                 {
                     double muSg = (r * sample.MuS + groundDistance * nu1) / rb;
-                    incident += groundTransmittance * model.GroundAlbedo / Math.PI * SampleIrradiance(irradiance, l, muSg);
+                    incident += groundTransmittance * model.GroundAlbedo / Math.PI * SampleIrradiance(irradiance, frame, l, muSg);
                 }
                 double nu2 = ox * wx + oy * wy + oz * wz;
                 double weight = incident * sinTheta * dTheta * dPhi;
@@ -385,6 +376,45 @@ public static class AtmosphereScattering
             }
         }
         return (rayleigh, mie);
+    }
+
+    /// <summary>
+    /// Polar angle <paramref name="i"/> of the density's sphere quadrature, its width, and whether it looks at the ground:
+    /// <see cref="DensityThetaAbove"/> angles above the ground sphere's horizon (zenith angle <paramref name="horizon"/>)
+    /// and <see cref="DensityThetaBelow"/> below it, each half dense toward the horizon (<c>θ = θ_h·(1 − (1 − u)²)</c>
+    /// above, <c>θ_h + (π − θ_h)·u²</c> below). No angle straddles the horizon: from a few kilometres up the twilight
+    /// glow lies in the 2° between the horizontal and the dipped horizon, and a fixed grid of 32 angles counted it as
+    /// ground, leaving the multiple scattering in the Earth's shadow 6–9% dark (vista-plan §10 M1.4).
+    /// </summary>
+    public static (double Theta, double DTheta, bool Ground) DensityPolar(int i, double horizon)
+    {
+        if (i < DensityThetaAbove)
+        {
+            double u = (i + 0.5) / DensityThetaAbove;
+            return (horizon * (1.0 - (1.0 - u) * (1.0 - u)), horizon * 2.0 * (1.0 - u) / DensityThetaAbove, false);
+        }
+        double v = (i - DensityThetaAbove + 0.5) / DensityThetaBelow;
+        double span = Math.PI - horizon;
+        return (horizon + span * v * v, span * 2.0 * v / DensityThetaBelow, true);
+    }
+
+    /// <summary>
+    /// The corrections of <see cref="DensityPolar"/>'s weights per half (above, below the horizon), so a uniform field
+    /// integrates to each half's exact solid angle, <c>2π(1 ∓ cos θ_h)</c>: the warped midpoint rule alone overshoots by 0.2%.
+    /// </summary>
+    public static (double Above, double Below) DensityScales(double horizon)
+    {
+        double above = 0.0, below = 0.0;
+        for (int i = 0; i < DensityTheta; i++)
+        {
+            (double theta, double dTheta, bool ground) = DensityPolar(i, horizon);
+            if (ground)
+                below += Math.Sin(theta) * dTheta;
+            else
+                above += Math.Sin(theta) * dTheta;
+        }
+        double c = Math.Cos(horizon);
+        return ((1.0 - c) / above, (1.0 + c) / below);
     }
 
     /// <summary>

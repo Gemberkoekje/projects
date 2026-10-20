@@ -115,7 +115,8 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual(AtmosphereMode.Luts, Parse().Atmosphere);
         Assert.AreEqual(AtmosphereMode.Reference, Parse("--atmosphere", "reference").Atmosphere);
         Assert.IsFalse(PreviewCommandLine.TryParse(["--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--atmosphere", "none"], out _, out IReadOnlyList<string> errors));
-        StringAssert.Contains(errors[0], "luts or reference");
+        StringAssert.Contains(errors[0], "luts, reference or referenceShadowed");
+        Assert.AreEqual(AtmosphereMode.ReferenceShadowed, Parse("--atmosphere", "referenceShadowed").Atmosphere);
     }
 
     [TestMethod]
@@ -144,7 +145,7 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual(Places.Get(Place.Yellowstone).ValleyAltitudeMetres, renderer.Scene!.GroundAltitudeMetres);
         Assert.AreEqual(AtmosphereModel.Default, renderer.Scene.Air);
         PreviewPipeline.Run(Request("""{ "latitude": 10 }"""), renderer);
-        Assert.AreEqual(0.0, renderer.Scene!.GroundAltitudeMetres, "a custom latitude is at sea level until M1.4");
+        Assert.AreEqual(0.0, renderer.Scene!.GroundAltitudeMetres, "a custom latitude without an altitude is at sea level");
     }
 
     [TestMethod]
@@ -161,7 +162,7 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (exposure.MeterWidth, exposure.MeterHeight, exposure.MeterSamplesPerPixel));
         Assert.AreEqual(AtmosphereMode.Luts, sidecar.Atmosphere.Mode);
         Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
-        Assert.AreEqual(4, Sidecar.CurrentSchema);
+        Assert.AreEqual(5, Sidecar.CurrentSchema);
         Assert.AreEqual(ImageInfo.RadianceUnits, sidecar.Image.Units);
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("exposureMeter"));
     }

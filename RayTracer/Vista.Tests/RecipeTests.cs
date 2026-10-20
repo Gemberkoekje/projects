@@ -158,7 +158,9 @@ public sealed class RecipeTests
         Assert.ThrowsExactly<JsonException>(() => VistaJson.ParseRecipe(json));
 
     [TestMethod]
-    [DataRow("""{ "schema": 4 }""", "schema", DisplayName = "future schema")]
+    [DataRow("""{ "schema": 5 }""", "schema", DisplayName = "future schema")]
+    [DataRow("""{ "altitude": -10 }""", "altitude must be in [0, 8000]", DisplayName = "altitude below sea level")]
+    [DataRow("""{ "altitude": 9000 }""", "altitude must be in [0, 8000]", DisplayName = "altitude above the highest valleys")]
     [DataRow("""{ "schema": 0 }""", "schema", DisplayName = "schema zero")]
     [DataRow("""{ "location": "zermatt", "latitude": 46 }""", "not both", DisplayName = "place and custom latitude")]
     [DataRow("""{ "latitude": 91 }""", "Latitude must be in [-90, 90]", DisplayName = "latitude past the pole")]

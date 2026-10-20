@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Vista.Astronomy;
 using Vista.Atmosphere;
@@ -25,10 +26,11 @@ namespace Vista.App.Gpu;
 /// again under the 0.05 ms budget. The window must equal the same pixels cut from the frame, bit for bit in
 /// the beauty and every debug output, however it is split into dispatches.
 ///
-/// <para>Then the atmosphere (M1.3): the LUT build is bit-identical twice; texels of each GPU LUT match their C#
-/// reference (<see cref="AtmosphereLuts"/>) fed the same input LUTs; a twilight render (the sun 4° below the
-/// horizon) is lit, from the sky alone; and the reference atmosphere is bit-identical twice and under the
-/// 0.05 ms budget.</para>
+/// <para>Then the atmosphere (M1.3, M1.4): the LUT build is bit-identical twice; texels of each GPU LUT match their C#
+/// reference (<see cref="AtmosphereLuts"/>) fed the same input LUTs, and so does the aerial perspective of chosen world
+/// segments (<see cref="AerialPerspective"/>); a twilight render (the sun 4° below the horizon) is lit, from the sky
+/// alone; and the reference atmosphere, with and without the terrain's shadow in the air, is bit-identical twice and
+/// under the 0.05 ms budget.</para>
 /// </summary>
 internal static class GpuSelfTest
 {
@@ -49,7 +51,7 @@ internal static class GpuSelfTest
         TerrainMesh mesh = HeightFieldMesher.Build(terrain);
         Almanac almanac = Almanac.For(recipe);
         var scene = new VistaScene(recipe, seed, DefaultCamera.For(terrain), terrain, mesh, almanac.Sun, MaterialCatalog.M0,
-            AtmosphereModel.Default, almanac.Place.ValleyAltitudeMetres);
+            AtmosphereModel.Default, Places.BaseAltitude(recipe, almanac.Place).Metres);
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
 
@@ -111,6 +113,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "order-2 radiance texels match the C# reference", RadianceParity(air, order2, tables));
         pass &= Check(log, "ground-irradiance entries match the C# reference", GroundParity(air, luts, tables));
         pass &= Check(log, "sky-view LUT texels match the C# reference", SkyParity(air, luts, tables));
+        pass &= Check(log, "aerial perspective along world segments matches the C# reference", AerialParity(renderer, scene, air, luts, tables));
 
         // Twilight: 4° below the horizon the sun lights no surface, so all the light is the sky's.
         Almanac almanac = Almanac.For(scene.Recipe);
@@ -129,7 +132,56 @@ internal static class GpuSelfTest
         pass &= Check(log, "the reference atmosphere is sane", Sanity(refA, small));
         pass &= Check(log, "the reference atmosphere is bit-identical twice", Same(refA, refB, compareAovs: true));
         pass &= Check(log, "the reference atmosphere under a 0.05 ms budget is bit-identical", Same(refA, refSplit, compareAovs: true));
+
+        // The reference with the terrain's shadow in the air (M1.4): deterministic too, and darker or equal on average.
+        var shadowed = small with { Atmosphere = AtmosphereMode.ReferenceShadowed };
+        RenderOutput shadA = Render(renderer, scene, shadowed, aovs, new BatchPlannerOptions(), log, "shadowed reference");
+        RenderOutput shadB = Render(renderer, scene, shadowed, aovs, tight, log, "shadowed reference, 0.05 ms budget");
+        pass &= Check(log, "the shadowed reference is sane", Sanity(shadA, shadowed));
+        pass &= Check(log, "the shadowed reference under a 0.05 ms budget is bit-identical", Same(shadA, shadB, compareAovs: true));
         return pass;
+    }
+
+    /// <summary>
+    /// The GPU's aerial perspective (<c>CSAerialProbe</c>: the world bent around the camera, the chord, the march) against
+    /// <see cref="AerialPerspective"/> fed the GPU's own LUTs, on segments like the terrain's: down from the camera, a short
+    /// bounce off to the side, a long grazing one across the tile, and one up a slope; at three wavelengths.
+    /// </summary>
+    private static string? AerialParity(D3D12VistaRenderer renderer, VistaScene scene, AtmosphereFrame air, AtmosphereLutData luts, AtmosphereTables tables)
+    {
+        Vector3D c = new(scene.Camera.Position.X, scene.Camera.Position.Y, scene.Camera.Position.Z);
+        var segments = new (Vector3D A, Vector3D B)[]
+        {
+            (c, new Vector3D(c.X + 3000.0, 600.0, c.Z + 15_000.0)),
+            (c, new Vector3D(c.X + 200.0, c.Y - 300.0, c.Z + 400.0)),
+            (new Vector3D(c.X - 4000.0, 800.0, c.Z + 6000.0), new Vector3D(c.X - 3800.0, 950.0, c.Z + 6300.0)),
+            (new Vector3D(c.X + 4000.0, 2400.0, c.Z + 4000.0), new Vector3D(c.X - 20_000.0, 10.0, c.Z + 20_000.0)),
+            (new Vector3D(c.X, 520.0, c.Z + 2000.0), new Vector3D(c.X + 500.0, 2300.0, c.Z + 5000.0)),
+        };
+        var probes = new List<(Vector3 Start, Vector3 End, int Lambda)>();
+        foreach ((Vector3D a, Vector3D b) in segments)
+        {
+            foreach (int lambda in ParityWavelengths)
+                probes.Add((new Vector3((float)a.X, (float)a.Y, (float)a.Z), new Vector3((float)b.X, (float)b.Y, (float)b.Z), lambda));
+        }
+        float[] gpu = renderer.RunAerialProbe(air, new Vector3((float)c.X, (float)c.Y, (float)c.Z), probes);
+        var worst = new Worst();
+        var geometry = new Worst();
+        for (int i = 0; i < probes.Count; i++)
+        {
+            (Vector3 a, Vector3 b, int lambda) = probes[i];
+            AerialPerspective.Segment seg = AerialPerspective.Between(air, (float)c.X, (float)c.Z, new Vector3D(a.X, a.Y, a.Z), new Vector3D(b.X, b.Y, b.Z));
+            (double t, double s) = AerialPerspective.Integrate(luts.Columns, luts.Orders, air, tables.AsUploaded(lambda), tables.Sun[lambda * 4 + 3], seg);
+            string where = string.Create(CultureInfo.InvariantCulture, $"segment {i / ParityWavelengths.Length} λ{lambda}");
+            worst.Add($"{where} transmittance", gpu[i * 8], t, 1e-6);
+            worst.Add($"{where} in-scattering", gpu[i * 8 + 1], s, 1e-9);
+            geometry.Add($"{where} μ", gpu[i * 8 + 2], seg.Mu, 1e-2);
+            geometry.Add($"{where} length", gpu[i * 8 + 3], seg.Length, 1.0);
+            geometry.Add($"{where} height", gpu[i * 8 + 4], seg.Height, 1.0);
+            geometry.Add($"{where} μ_s", gpu[i * 8 + 5], seg.MuS, 1e-2);
+            geometry.Add($"{where} ν", gpu[i * 8 + 6], seg.Nu, 1e-2);
+        }
+        return geometry.Verdict() ?? worst.Verdict();
     }
 
     private static string? ColumnsParity(AtmosphereFrame air, AtmosphereLutData luts)

@@ -18,7 +18,9 @@
 
 #define COLUMN_STEPS                 1024u
 #define SCATTER_STEPS                40u
-#define DENSITY_THETA                32u
+#define DENSITY_THETA_ABOVE          16u
+#define DENSITY_THETA_BELOW          16u
+#define DENSITY_THETA                (DENSITY_THETA_ABOVE + DENSITY_THETA_BELOW)
 #define DENSITY_PHI                  32u
 #define IRRADIANCE_THETA             16u
 #define IRRADIANCE_PHI               16u
@@ -84,7 +86,7 @@ void CSDirectIrradiance(uint3 tid : SV_DispatchThreadID)
         return;
     uint l = item % SCATTER_MS_WAVELENGTHS;
     uint entry = item / SCATTER_MS_WAVELENGTHS;
-    float muS = 2.0 * float(entry) / float(GROUND_IRRADIANCE_SIZE - 1u) - 1.0;
+    float muS = GroundIrradianceMuS(entry);
     LutOut[item] = muS > 0.0 ? muS * exp(-OpticalDepth(AtmCoefficients[HeroOf(l)], SampleColumns(GroundAltitude, muS))) : 0.0;
 }
 
@@ -96,7 +98,7 @@ void CSIndirectIrradiance(uint3 tid : SV_DispatchThreadID)
         return;
     uint l = item % SCATTER_MS_WAVELENGTHS;
     uint entry = item / SCATTER_MS_WAVELENGTHS;
-    float muS = 2.0 * float(entry) / float(GROUND_IRRADIANCE_SIZE - 1u) - 1.0;
+    float muS = GroundIrradianceMuS(entry);
     float sinS = sqrt(max(1.0 - muS * muS, 0.0));
     float dTheta = 0.5 * ATM_PI / float(IRRADIANCE_THETA);
     float dPhi = 2.0 * ATM_PI / float(IRRADIANCE_PHI);
@@ -145,6 +147,47 @@ void ScatterItem(uint item, out uint l, out uint ih, out uint imu, out uint imus
     ih = texel / (SCATTER_NU_SIZE * SCATTER_MU_S_SIZE * SCATTER_MU_SIZE);
 }
 
+// Polar angle i of the density's sphere quadrature (C# reference: AtmosphereScattering.DensityPolar): DENSITY_THETA_ABOVE
+// angles above the ground sphere's horizon (zenith angle `horizon`) and DENSITY_THETA_BELOW below it, each half dense
+// toward the horizon, so no angle straddles it — from a few kilometres up the twilight glow lies in the 2° between the
+// horizontal and the dipped horizon, which a fixed grid called ground (vista-plan §10 M1.4).
+void DensityPolar(uint i, float horizon, out float theta, out float dTheta, out bool ground)
+{
+    ground = i >= DENSITY_THETA_ABOVE;
+    if (!ground)
+    {
+        float u = (float(i) + 0.5) / float(DENSITY_THETA_ABOVE);
+        theta = horizon * (1.0 - (1.0 - u) * (1.0 - u));
+        dTheta = horizon * 2.0 * (1.0 - u) / float(DENSITY_THETA_ABOVE);
+    }
+    else
+    {
+        float u = (float(i - DENSITY_THETA_ABOVE) + 0.5) / float(DENSITY_THETA_BELOW);
+        float span = ATM_PI - horizon;
+        theta = horizon + span * u * u;
+        dTheta = span * 2.0 * u / float(DENSITY_THETA_BELOW);
+    }
+}
+
+// The weights' corrections per half, so a uniform field integrates to each half's exact solid angle (2π(1 ∓ cos θ_h)):
+// the warped midpoint rule alone overshoots by 0.2%.
+float2 DensityScales(float horizon)
+{
+    float2 sum = 0.0;
+    for (uint i = 0u; i < DENSITY_THETA; i++)
+    {
+        float theta, dTheta;
+        bool ground;
+        DensityPolar(i, horizon, theta, dTheta, ground);
+        if (ground)
+            sum.y += sin(theta) * dTheta;
+        else
+            sum.x += sin(theta) * dTheta;
+    }
+    float c = cos(horizon);
+    return float2((1.0 - c) / sum.x, (1.0 + c) / sum.y);
+}
+
 float RayLength(ScatterPoint p)
 {
     float rb = GroundRadius();
@@ -174,7 +217,9 @@ void CSSingleScattering(uint3 tid : SV_DispatchThreadID)
         float muSp = (r0 * p.MuS + t * p.Nu) / rp;
         float altitude = GroundAltitude + hg;
         float4 medium = MediumAt(k, altitude);
-        float sun = HitsSphere(rb, hg, muSp) ? 0.0 : exp(-OpticalDepth(k, SampleColumns(altitude, muSp)));
+        float sunMu;
+        float visible = SunVisibility(hg, muSp, sunMu);
+        float sun = visible > 0.0 ? visible * exp(-OpticalDepth(k, SampleColumns(altitude, sunMu))) : 0.0;
         float step = transmittance * StepIntegral(medium.y, dt);
         rayleigh += step * sun * medium.z;
         mie += step * sun * medium.w;
@@ -203,7 +248,8 @@ void CSScatteringDensity(uint3 tid : SV_DispatchThreadID)
     float sx = sinMu > 1.0e-6 ? (p.Nu - p.Mu * p.MuS) / sinMu : 0.0;
     float3 sun = float3(sx, p.MuS, sqrt(max(1.0 - sx * sx - p.MuS * p.MuS, 0.0)));
 
-    float dTheta = ATM_PI / float(DENSITY_THETA);
+    float horizon = Horizon(rb, p.Height).x;
+    float2 scales = DensityScales(horizon);
     float dPhi = 2.0 * ATM_PI / float(DENSITY_PHI);
     ScatterCell c;
     CellHeight(p.Height, c.H0, c.Fh);
@@ -211,9 +257,11 @@ void CSScatteringDensity(uint3 tid : SV_DispatchThreadID)
     float2 sum = 0.0;
     for (uint i = 0u; i < DENSITY_THETA; i++)
     {
-        float theta = (float(i) + 0.5) * dTheta;
+        float theta, dTheta;
+        bool ground;
+        DensityPolar(i, horizon, theta, dTheta, ground);
+        dTheta *= ground ? scales.y : scales.x;
         float cosTheta = cos(theta), sinTheta = sin(theta);
-        bool ground = HitsSphere(rb, p.Height, cosTheta);
         CellMu(p.Height, cosTheta, ground, c.Mu0, c.Fmu);
         float groundTransmittance = 0.0;
         float groundDistance = 0.0;
@@ -310,7 +358,9 @@ float2 SkyMarch(float4 k, uint lambda, float height, float mu, float muS, float 
         float muSp = (r0 * muS + t * nu) / rp;
         float altitude = GroundAltitude + hg;
         float4 medium = MediumAt(k, altitude);
-        float sun = HitsSphere(groundRadius, hg, muSp) ? 0.0 : exp(-OpticalDepth(k, SampleColumns(altitude, muSp)));
+        float sunMu;
+        float visible = SunVisibility(hg, muSp, sunMu);
+        float sun = visible > 0.0 ? visible * exp(-OpticalDepth(k, SampleColumns(altitude, sunMu))) : 0.0;
         ScatterPoint q;
         q.Height = hg;
         q.Mu = muP;
@@ -343,7 +393,7 @@ void CSGroundIrradiance(uint3 tid : SV_DispatchThreadID)
         return;
     uint lambda = item % ATM_WAVELENGTHS;
     uint entry = item / ATM_WAVELENGTHS;
-    float muS = 2.0 * float(entry) / float(GROUND_IRRADIANCE_SIZE - 1u) - 1.0;
+    float muS = GroundIrradianceMuS(entry);
     float sinS = sqrt(max(1.0 - muS * muS, 0.0));
     float4 k = AtmCoefficients[lambda];
     float sum = 0.0;

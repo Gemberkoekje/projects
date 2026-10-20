@@ -5,15 +5,20 @@
 // plus three companions that share its path, so the throughput is a float4). Since M1.3 the light comes from a
 // spectral atmosphere on a spherical Earth (VistaAtmosphere.hlsli): the sun reaches a surface through the
 // transmittance of the air from that point, the Earth's shadow included, and rays that leave the terrain read the
-// sky-view LUT. Radiance is in W·m⁻²·sr⁻¹·nm⁻¹. The C# references are Vista.Atmosphere.AtmosphereLuts and
+// sky-view LUT. Since M1.4 every segment that ends on the terrain, camera and bounce, carries the air between its ends
+// (aerial perspective: AerialSegment), with the world bent onto the Earth for the air (Bend). Radiance is in
+// W·m⁻²·sr⁻¹·nm⁻¹. The C# references are Vista.Atmosphere.AtmosphereLuts, AerialPerspective and
 // Vista.Rendering.IntegratorTables (pinned by Vista.Tests).
 //
-// ATMOSPHERE_REFERENCE (vista-plan §10 M1.3, --atmosphere reference) swaps both LUT paths for the slow, unbiased
-// check: rays that leave the terrain are tracked through the air as a medium (delta tracking, next-event estimation
-// to the sun disk with ratio-tracked transmittance, Rayleigh or Henyey–Greenstein phase sampling, a Lambertian
-// ground sphere), and the sun's transmittance to a surface is ratio-tracked too. Free paths depend on the
-// wavelength, so a reference path carries the hero wavelength only, weighted by the companion count. The same file
-// then also holds CSSkyCheck, which compares the two for chosen directions, wavelength by wavelength.
+// ATMOSPHERE_REFERENCE (vista-plan §10 M1.3, M1.4; --atmosphere reference) swaps the LUT paths for the slow, unbiased
+// check: the air is tracked as a medium (delta tracking, next-event estimation to the sun disk with ratio-tracked
+// transmittance, Rayleigh or Henyey–Greenstein phase sampling, a Lambertian ground sphere) both along the segments
+// that end on the terrain and on rays that leave it, and the sun's transmittance to a surface is ratio-tracked too.
+// Free paths depend on the wavelength, so a reference path carries the hero wavelength only, weighted by the companion
+// count. REFERENCE_TERRAIN_SHADOWS (--atmosphere referenceShadowed) adds the terrain's shadow to the sunlight the air
+// scatters once.
+// The reference build also holds CSSkyCheck, which compares LUT and reference for chosen directions and segments,
+// wavelength by wavelength; the LUT build holds CSAerialProbe, the aerial perspective's parity probe.
 //
 // Determinism contract (BatchPlanner): every random number of a pixel-sample comes from (pixel, sample index)
 // alone — never from the dispatch — and a pixel's samples are always added in sample-index order, starting from
@@ -199,6 +204,59 @@ float4 MaterialReflectance(uint material, uint4 idx)
     return float4(Reflectance[row + idx.x], Reflectance[row + idx.y], Reflectance[row + idx.z], Reflectance[row + idx.w]);
 }
 
+// ── The world bent onto the Earth, for the air (vista-plan §10 M1.4) ──────────────────────────────
+//
+// The terrain is traced flat, but the air sees it bent onto the ground sphere around the camera's tangent point: a
+// world point keeps its height above the ground and sinks by the curvature drop 2R·sin²(s/2R) at a horizontal distance
+// s from the camera (≈ 200 m at 50 km), its vertical tilted by s/R. A segment between two world points is the straight
+// chord between their bent places, so its ends sit at exactly their heights. Offsets are kept from the tangent point
+// on the ground sphere, never as planet-centred floats, so metres survive. C# reference: AerialPerspective.Bend.
+
+float3 Bend(float3 p, out float3 up)
+{
+    float2 offset = p.xz - CamPos.xz;
+    float s = length(offset);
+    float rb = GroundRadius();
+    float theta = s / rb;
+    float2 u = s > 0.0 ? offset / s : float2(0.0, 0.0);
+    float h = max(p.y, 0.0);
+    // Series, not sin and cos: the GPU's sin has an absolute error near 1e-6, which the Earth's radius turns into metres
+    // (the parity probe saw a 360 m chord turn by 0.04°). θ stays under 0.01 across any tile, where these are exact in float.
+    float t2 = theta * theta;
+    float sinc = 1.0 - t2 * (1.0 / 6.0 - t2 * (1.0 / 120.0)); // sin θ / θ
+    float cosT = 1.0 - t2 * (0.5 - t2 * (1.0 / 24.0));
+    float drop = 0.5 * s * theta * (1.0 - t2 * (1.0 / 12.0)); // 2R·sin²(θ/2)
+    float horizontal = (s + h * theta) * sinc;                 // (R + h)·sin θ
+    up = float3(u.x * theta * sinc, cosT, u.y * theta * sinc);
+    return float3(u.x * horizontal, h * cosT - drop, u.y * horizontal);
+}
+
+// The air between world points `a` and `b`: the segment seen from `a` (AerialSegment's input), where `a` sits in the
+// bent frame (`start`, offset from the tangent point) and the chord's unit direction there (`dir`, planet axes).
+AirSegment SegmentBetween(float3 a, float3 b, out float3 start, out float3 dir)
+{
+    float3 upA, upB;
+    start = Bend(a, upA);
+    float3 chord = Bend(b, upB) - start;
+    float len = length(chord);
+    dir = len > 0.0 ? chord / len : upA;
+    AirSegment seg;
+    seg.Height = max(a.y, 0.0);
+    seg.Mu = clamp(dot(dir, upA), -1.0, 1.0);
+    seg.MuS = clamp(dot(AtmToSun, upA), -1.0, 1.0);
+    seg.Nu = clamp(dot(dir, AtmToSun), -1.0, 1.0);
+    seg.Length = len;
+    return seg;
+}
+
+// The local vertical of a world point in the bent frame: the sun's height there for its transmittance and the Earth's shadow.
+float3 LocalUp(float3 p)
+{
+    float3 up;
+    Bend(p, up);
+    return up;
+}
+
 // ── The reference atmosphere (--atmosphere reference) ─────────────────────────────────────────────
 
 #ifdef ATMOSPHERE_REFERENCE
@@ -263,14 +321,39 @@ float3 Scatter(float3 d, float cosTheta, float phi)
     return normalize(t * (sinTheta * cos(phi)) + b * (sinTheta * sin(phi)) + d * cosTheta);
 }
 
-// One path through the air from `h0` above the ground sphere along `dir`, for the wavelength whose coefficients
-// are `k` and whose sun row is `sun`: its radiance in W·m⁻²·sr⁻¹·nm⁻¹. A camera ray that never scatters and leaves
-// through the sun's disk sees the disk; any other path reaches the sun only through next-event estimation.
-float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool cameraRay, inout uint rng)
+// Whether the terrain hides the sun from a path's first event in the air (REFERENCE_TERRAIN_SHADOWS): the point is
+// mapped back to the world through `anchor` (world xz = anchor + planet-centred xz, world y = its height). Only the
+// first: it lies on a segment of open air, between the camera or a surface and the next surface or the sky, while
+// later events of a path that ignores the terrain may sit under the mountains or on the ground sphere beneath the tile,
+// where the terrain would shadow light that could never have got there (it darkened even the noon sky by 3%).
+bool TerrainShadows(uint events, float3 p, float h, float2 anchor, float3 toSun)
 {
+#ifdef REFERENCE_TERRAIN_SHADOWS
+    if (events != 0u)
+        return false;
+    float3 world = float3(anchor.x + p.x, h, anchor.y + p.z);
+    return Occluded(world + toSun * OriginOffset(world), toSun);
+#else
+    return false;
+#endif
+}
+
+// One path through the air, for the wavelength whose coefficients are `k` and whose sun row is `sun`, from the
+// planet-centred point `p` (its height `h0` above the ground sphere tracked apart, exactly) along `dir`: its radiance
+// in W·m⁻²·sr⁻¹·nm⁻¹. A camera ray that never scatters and leaves through the sun's disk sees the disk; any other path
+// reaches the sun only through next-event estimation.
+//
+// A positive `surface` is the length of an air segment that ends on the terrain (vista-plan §10 M1.4): the first
+// flight stops there. If it gets there unscattered, `reached` is set and nothing has been added: the caller shades the
+// surface. If it scatters first, the rest of the path runs in the air alone, as the LUTs assume. Inside the air the
+// terrain is ignored, so the reference checks the LUTs' model — except that REFERENCE_TERRAIN_SHADOWS lets the terrain
+// hide the sun from the first event's next-event estimation (`anchor`, see TerrainShadows): the known limit of the LUTs,
+// air in a mountain's shadow, measured on the light it scatters once.
+float AirPath(float4 k, float4 sun, float3 p, float h0, float3 dir, float surface, bool cameraRay, float2 anchor, inout uint rng, out bool reached)
+{
+    reached = false;
     float groundRadius = GroundRadius();
     float top = SeaRadius + TopAltitude - groundRadius;
-    float3 p = float3(0.0, groundRadius + h0, 0.0); // planet-centred; the height is tracked apart, exactly
     float h = h0;
     float3 d = dir;
     float throughput = 1.0;
@@ -279,11 +362,13 @@ float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool camer
     {
         float3 up = normalize(p);
         float mu = dot(d, up);
-        bool toGround = HitsSphere(groundRadius, h, mu);
-        float segment = toGround ? DistanceToSphereBelow(groundRadius, h, mu) : DistanceToShellAbove(groundRadius, h, top, mu);
+        bool toSurface = events == 0u && surface > 0.0;
+        bool toGround = !toSurface && HitsSphere(groundRadius, h, mu);
+        float segment = toSurface ? surface : toGround ? DistanceToSphereBelow(groundRadius, h, mu) : DistanceToShellAbove(groundRadius, h, top, mu);
         float sigmaBar = Majorant(k, h, mu, segment);
 
-        // Delta tracking: tentative collisions at the majorant's rate, real with probability σ_t/σ̄.
+        // Delta tracking: tentative collisions at the majorant's rate, real with probability σ_t/σ̄. A chord between
+        // two low points may dip under the ground sphere's bulge; the air there is taken at the ground's density.
         float t = 0.0;
         bool collided = false;
         float4 medium = 0.0;
@@ -292,7 +377,7 @@ float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool camer
             t -= log(1.0 - NextFloat(rng)) / sigmaBar;
             if (t >= segment)
                 break;
-            medium = MediumAt(k, GroundAltitude + AltitudeAlong(groundRadius, h, mu, t));
+            medium = MediumAt(k, GroundAltitude + max(AltitudeAlong(groundRadius, h, mu, t), 0.0));
             if (NextFloat(rng) * sigmaBar < medium.y)
             {
                 collided = true;
@@ -300,6 +385,11 @@ float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool camer
             }
         }
 
+        if (!collided && toSurface)
+        {
+            reached = true;
+            return 0.0;
+        }
         if (!collided && !toGround)
         {
             if (cameraRay && events == 0u && OnSunDisk(d))
@@ -315,7 +405,7 @@ float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool camer
             h = 0.0;
             float3 n = normalize(p);
             float cosS = dot(n, toSun);
-            if (cosS > 0.0)
+            if (cosS > 0.0 && !TerrainShadows(events, p, h, anchor, toSun))
                 radiance += throughput * sun.z * INV_PI * cosS * sun.y * RatioTrack(k, 0.0, cosS, rng);
             throughput *= sun.z;
             d = CosineHemisphere(n, NextFloat(rng), NextFloat(rng));
@@ -323,11 +413,11 @@ float AtmosphereReference(float4 k, float4 sun, float h0, float3 dir, bool camer
         else
         {
             p += t * d;
-            h = AltitudeAlong(groundRadius, h, mu, t);
+            h = max(AltitudeAlong(groundRadius, h, mu, t), 0.0);
             float3 upHere = normalize(p);
             throughput *= medium.x / medium.y; // the single-scattering albedo of the mix here
             float muS = dot(toSun, upHere);
-            if (!HitsSphere(groundRadius, h, muS))
+            if (!HitsSphere(groundRadius, h, muS) && !TerrainShadows(events, p, h, anchor, toSun))
             {
                 float cosA = dot(d, toSun);
                 float phase = (medium.z * RayleighPhase(cosA) + medium.w * HenyeyGreenstein(cosA, MieG)) / medium.x;
@@ -396,10 +486,13 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         result.Rays++;
         if (!TraceClosest(origin, dir, hit))
         {
-            // The ray leaves the terrain: the sky (and, below the horizon, the land beyond the tile).
+            // The ray leaves the terrain: the sky (and, below the horizon, the land beyond the tile), read in the camera's
+            // frame — the sky view is built for one vertical; across today's tile the bent frame tilts it by under 0.1°.
 #ifdef ATMOSPHERE_REFERENCE
             float h = ClampAltitude(bounce == 0u ? CameraAltitude : GroundAltitude + origin.y) - GroundAltitude;
-            radiance.x += throughput.x * AtmosphereReference(AtmCoefficients[idx.x], AtmSun[idx.x], h, dir, bounce == 0u, rng);
+            bool open;
+            radiance.x += throughput.x * AirPath(AtmCoefficients[idx.x], AtmSun[idx.x], float3(0.0, GroundRadius() + h, 0.0), h, dir, -1.0,
+                                                 bounce == 0u, origin.xz, rng, open);
 #else
             float altitude = bounce == 0u ? CameraAltitude : ClampAltitude(GroundAltitude + origin.y);
             float4 sky = SkyRadiance(bounce == 0u, altitude, dir, idx);
@@ -410,6 +503,34 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 #endif
             break;
         }
+
+        // The air between the ray's origin and the surface (vista-plan §10 M1.4): aerial perspective on every segment,
+        // camera and bounce, through the world bent onto the Earth.
+        float3 airStart, airDir;
+        AirSegment air = SegmentBetween(origin, hit.Position, airStart, airDir);
+#ifdef ATMOSPHERE_REFERENCE
+        bool reached;
+        float scattered = AirPath(AtmCoefficients[idx.x], AtmSun[idx.x], float3(airStart.x, GroundRadius() + airStart.y, airStart.z), air.Height, airDir,
+                                  air.Length, false, origin.xz - airStart.xz, rng, reached);
+        if (!reached)
+        {
+            radiance.x += throughput.x * scattered; // it scattered on the way; the rest of its path was in the air alone
+            break;
+        }
+#else
+        float4 airT, airS;
+#ifdef AERIAL_SKY_DIFFERENCE
+        // The measured alternative (vista-plan §10 M1.4): the sky view's difference L(a) − T·L(b) along the ray.
+        airT = AerialTransmittance(air, idx);
+        float4 skyA = SkyRadiance(bounce == 0u, bounce == 0u ? CameraAltitude : ClampAltitude(GroundAltitude + origin.y), dir, idx);
+        float4 skyB = SkyRadiance(false, ClampAltitude(GroundAltitude + hit.Position.y), dir, idx);
+        airS = max(skyA - airT * skyB, 0.0) / sunIrradiance;
+#else
+        AerialSegment(air, idx, airT, airS);
+#endif
+        radiance += throughput * sunIrradiance * airS;
+        throughput *= airT;
+#endif
 
         uint material = TerrainMaterial;
         float4 refl = MaterialReflectance(material, idx);
@@ -424,24 +545,26 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         float3 next = hit.Position + hit.GeometricNormal * OriginOffset(hit.Position);
 
         // Next-event estimation on the sun: a uniform direction in its disk; E·T·cos·ρ/π per wavelength, where T is
-        // the air's transmittance from this point toward that direction (zero in the Earth's shadow).
+        // the air's transmittance from this point toward that direction (zero in the Earth's shadow), taken against the
+        // point's own vertical in the bent frame, as the air just above it is.
         float u1 = NextFloat(rng);
         float u2 = NextFloat(rng);
         if (SunUp != 0u)
         {
             float3 toSun = SampleCone(AtmToSun, AtmSunOneMinusCos, u1, u2);
             float cosS = dot(hit.ShadingNormal, toSun);
-            float altitude = GroundAltitude + hit.Position.y;
-            if (cosS > 0.0 && dot(hit.GeometricNormal, toSun) > 0.0 && !HitsSphere(GroundRadius(), altitude - GroundAltitude, toSun.y))
+            float height = max(hit.Position.y, 0.0);
+            float muS = dot(toSun, LocalUp(hit.Position));
+            if (cosS > 0.0 && dot(hit.GeometricNormal, toSun) > 0.0 && !HitsSphere(GroundRadius(), height, muS))
             {
                 result.Rays++;
                 if (!Occluded(next, toSun))
                 {
 #ifdef ATMOSPHERE_REFERENCE
-                    float transmittance = RatioTrack(AtmCoefficients[idx.x], max(altitude - GroundAltitude, 0.0), toSun.y, rng);
+                    float transmittance = RatioTrack(AtmCoefficients[idx.x], height, muS, rng);
                     radiance.x += throughput.x * refl.x * (INV_PI * cosS) * sunIrradiance.x * transmittance;
 #else
-                    radiance += throughput * refl * (INV_PI * cosS) * sunIrradiance * SunTransmittance4(idx, altitude, toSun.y);
+                    radiance += throughput * refl * (INV_PI * cosS) * sunIrradiance * SunTransmittance4(idx, GroundAltitude + height, muS);
 #endif
                 }
             }
@@ -548,21 +671,24 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     }
 }
 
-// ── The LUT sky against the reference, wavelength by wavelength (--atmosphere-check) ─────────────
-
-#ifdef ATMOSPHERE_REFERENCE
+// ── Checks: the LUT air against the reference (--atmosphere-check), and the aerial perspective's parity probe ──
 
 cbuffer CheckConstants : register(b2)
 {
-    uint  CheckDirections;  // directions to compare
+    uint  CheckDirections;  // directions (or probes) to evaluate
     uint  CheckChunks;      // threads per (direction, wavelength), each summing its own paths
     uint  CheckPaths;       // paths per thread in this dispatch
     uint  CheckFirstPath;   // index of this dispatch's first path within each thread's sequence
 };
 
-StructuredBuffer<float4>   CheckDirection : register(t14); // xyz: unit direction from the camera (slice 0)
-RWStructuredBuffer<float4> CheckSums      : register(u6);  // per (direction, wavelength, chunk): Σ L, Σ L², LUT L, 0
+StructuredBuffer<float4>   CheckDirection : register(t14); // the check: xyz a unit direction from the camera, w a segment length (0: the sky); the probe: see CSAerialProbe
+RWStructuredBuffer<float4> CheckSums      : register(u6);  // the check, per (direction, wavelength, chunk): Σ L, Σ L², LUT L, 0
 
+#ifdef ATMOSPHERE_REFERENCE
+
+// For each direction from the camera (slice 0) and each wavelength: the LUT's radiance and CheckPaths reference paths.
+// A direction with a segment length compares the light the air scatters toward the camera along that segment, which
+// ends on the ground sphere if it gets there first (vista-plan §10 M1.4); without one, the whole sky (M1.3).
 [numthreads(64, 1, 1)]
 void CSSkyCheck(uint3 tid : SV_DispatchThreadID)
 {
@@ -573,19 +699,70 @@ void CSSkyCheck(uint3 tid : SV_DispatchThreadID)
     uint lambda = (item / CheckChunks) % HERO_COUNT;
     uint direction = item / (CheckChunks * HERO_COUNT);
     float3 dir = normalize(CheckDirection[direction].xyz);
+    float h = ClampAltitude(CameraAltitude) - GroundAltitude;
+    float surface = CheckDirection[direction].w;
+    if (surface > 0.0 && HitsSphere(GroundRadius(), h, dir.y))
+        surface = min(surface, DistanceToSphereBelow(GroundRadius(), h, dir.y));
+    uint4 idx = uint4(lambda, lambda, lambda, lambda);
 
     float4 acc = CheckFirstPath == 0u ? float4(0.0, 0.0, 0.0, 0.0) : CheckSums[item];
     if (CheckFirstPath == 0u)
-        acc.z = SkyRadiance(true, CameraAltitude, dir, uint4(lambda, lambda, lambda, lambda)).x;
-    float h = ClampAltitude(CameraAltitude) - GroundAltitude;
+    {
+        if (surface > 0.0)
+        {
+            AirSegment seg;
+            seg.Height = h;
+            seg.Mu = dir.y;
+            seg.MuS = clamp(AtmToSun.y, -1.0, 1.0);
+            seg.Nu = dot(dir, AtmToSun);
+            seg.Length = surface;
+            float4 airT, airS;
+#ifdef AERIAL_SKY_DIFFERENCE
+            airT = AerialTransmittance(seg, idx);
+            float hEnd = max(AltitudeAlong(GroundRadius(), h, dir.y, surface), 0.0);
+            airS = (SkyRadiance(true, CameraAltitude, dir, idx) - airT * SkyRadiance(false, ClampAltitude(GroundAltitude + hEnd), dir, idx)) / AtmSun[lambda].y;
+#else
+            AerialSegment(seg, idx, airT, airS);
+#endif
+            acc.z = AtmSun[lambda].y * airS.x;
+        }
+        else
+        {
+            acc.z = SkyRadiance(true, CameraAltitude, dir, idx).x;
+        }
+    }
     for (uint p = 0u; p < CheckPaths; p++)
     {
         uint rng = PcgHash(PcgHash(item) ^ PcgHash(CheckFirstPath + p));
-        float l = AtmosphereReference(AtmCoefficients[lambda], AtmSun[lambda], h, dir, false, rng);
+        bool reached;
+        float l = AirPath(AtmCoefficients[lambda], AtmSun[lambda], float3(0.0, GroundRadius() + h, 0.0), h, dir, surface, false, CamPos.xz, rng, reached);
         acc.x += l;
         acc.y += l * l;
     }
     CheckSums[item] = acc;
+}
+
+#else
+
+// The aerial perspective of chosen world segments, for --gpu-selftest's parity with the C# reference
+// (AerialPerspective): probe i reads CheckDirection[2i] (xyz: the start) and [2i + 1] (xyz: the end, w: the
+// wavelength), bends them around the camera of the integrator constants, and writes CheckSums[2i] = (T, S per unit
+// solar irradiance, μ, length) and [2i + 1] = (height, μ_s, ν, 0).
+[numthreads(64, 1, 1)]
+void CSAerialProbe(uint3 tid : SV_DispatchThreadID)
+{
+    uint item = tid.x;
+    if (item >= CheckDirections)
+        return;
+    float4 a = CheckDirection[2u * item];
+    float4 b = CheckDirection[2u * item + 1u];
+    uint lambda = uint(b.w);
+    float3 start, dir;
+    AirSegment seg = SegmentBetween(a.xyz, b.xyz, start, dir);
+    float4 airT, airS;
+    AerialSegment(seg, uint4(lambda, lambda, lambda, lambda), airT, airS);
+    CheckSums[2u * item] = float4(airT.x, airS.x, seg.Mu, seg.Length);
+    CheckSums[2u * item + 1u] = float4(seg.Height, seg.MuS, seg.Nu, 0.0);
 }
 
 #endif

@@ -86,15 +86,16 @@ public sealed record PreviewRequest
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
-///           [--sun-elevation -2] [--atmosphere luts | reference]
+///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
 /// options override the recipe's fields (vista-plan §3.5): <c>--location</c> or <c>--latitude</c> picks the
 /// place (and clears the other), <c>--date</c> overrides the season, and <c>--time</c> takes a time-of-day
 /// preset (clearing the recipe's solar time) or a local solar time, and <c>--sun-elevation</c> the time at which the
-/// sun stands that high (rising when the time is dawn). <c>--atmosphere reference</c> renders the slow, unbiased
-/// reference atmosphere instead of the LUTs (vista-plan §10 M1.3).
+/// sun stands that high (rising when the time is dawn); <c>--altitude</c> sets the scene's base altitude (§3.6).
+/// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
+/// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4).
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -122,7 +123,9 @@ public static class PreviewCommandLine
         "  presets: dawn (sunrise − 20 min), day (solar noon), goldenHour (sunset − 60 min), dusk (sunset + 20 min), night;\n" +
         "  hh:mm is local solar time (12:00 is solar noon). A date overrides the recipe's season.\n" +
         "  --sun-elevation <degrees>: the time the sun stands that high (geometric; rising with --time dawn, else setting).\n" +
-        "--atmosphere luts (default) | reference: the precomputed sky, or the air path-traced as a medium (slow, unbiased).";
+        "  --altitude <metres>: the scene's base altitude above sea level (default: the place's valley floor), 0 to 8000.\n" +
+        "--atmosphere luts (default) | reference | referenceShadowed: the precomputed air, or the air path-traced as a medium\n" +
+        "  (slow, unbiased), optionally with the terrain's shadow in it.";
 
     /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
@@ -133,6 +136,7 @@ public static class PreviewCommandLine
             ["--date"] = ["date", "season"],
             ["--time"] = ["time", "solarTime"],
             ["--sun-elevation"] = ["sunElevation", "solarTime"],
+            ["--altitude"] = ["altitude"],
         };
 
     private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
@@ -163,7 +167,7 @@ public static class PreviewCommandLine
     internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
-        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--atmosphere",
+        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere",
     };
 
     /// <summary>
@@ -255,7 +259,7 @@ public static class PreviewCommandLine
         };
     }
 
-    /// <summary>Parses an <c>--atmosphere</c> value (<c>luts</c> or <c>reference</c>).</summary>
+    /// <summary>Parses an <c>--atmosphere</c> value (<c>luts</c>, <c>reference</c> or <c>referenceShadowed</c>).</summary>
     internal static bool TryParseAtmosphere(string text, out AtmosphereMode mode) =>
         Enum.TryParse(text, ignoreCase: true, out mode) && mode != AtmosphereMode.None && Enum.IsDefined(mode) && !int.TryParse(text, out _);
 
@@ -265,7 +269,7 @@ public static class PreviewCommandLine
             return AtmosphereMode.Luts;
         if (TryParseAtmosphere(text, out AtmosphereMode mode))
             return mode;
-        problems.Add($"--atmosphere must be luts or reference, got '{text}'.");
+        problems.Add($"--atmosphere must be luts, reference or referenceShadowed, got '{text}'.");
         return AtmosphereMode.Luts;
     }
 
@@ -340,6 +344,14 @@ public static class PreviewCommandLine
             {
                 problems.Add($"--sun-elevation must be a number of degrees in [-90, 90], got '{elevationText}'.");
             }
+        }
+        if (values.TryGetValue("--altitude", out string? altitudeText))
+        {
+            if (double.TryParse(altitudeText, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double altitude)
+                && altitude is >= 0.0 and <= Recipe.MaxAltitudeMetres)
+                overrides["altitude"] = altitude.ToString("R", CultureInfo.InvariantCulture);
+            else
+                problems.Add($"--altitude must be a number of metres above sea level in [0, 8000], got '{altitudeText}'.");
         }
         return overrides;
     }

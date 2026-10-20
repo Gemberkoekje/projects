@@ -25,6 +25,7 @@
   <ItemGroup>
     <None Include="../vista-views/*.json" Link="vista-views/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../vista-views/atmosphere/*.json" Link="vista-views/atmosphere/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../vista-views/aerial/*.json" Link="vista-views/aerial/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

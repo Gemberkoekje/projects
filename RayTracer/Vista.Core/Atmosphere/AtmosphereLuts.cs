@@ -42,7 +42,7 @@ public static class AtmosphereLuts
     /// <summary>Midpoint steps per columns texel (256 lost 0.4% of the haze's column straight up).</summary>
     public const int ColumnSteps = 1024;
 
-    /// <summary>Ground-irradiance entries, <c>cos θ_s</c> from −1 to 1.</summary>
+    /// <summary>Ground-irradiance entries, on the 4D tables' sun map (<see cref="GroundIrradianceMuS"/>).</summary>
     public const int GroundIrradianceSize = 128;
 
     /// <summary>Directions per ground-irradiance entry, per side of a cosine-weighted 32 × 32 grid.</summary>
@@ -218,17 +218,49 @@ public static class AtmosphereLuts
         return Math.Exp(-k.OpticalDepth(SampleColumns(columns, frame.Model, altitude, mu)));
     }
 
+    /// <summary>
+    /// The fraction of the sun's disk above the ground sphere's horizon, seen from <paramref name="height"/> above it with
+    /// the disk's centre at <c>cos = muS</c> to the vertical — the Earth's shadow with its penumbra — and the direction to
+    /// take that light along: <paramref name="muS"/>, or the horizon itself while the centre is below it (the visible
+    /// upper limb grazes the ground). The disk is 0.53° across, so near the terminator the penumbra is kilometres deep
+    /// (2.9–4.9 km up with the sun 2° down); a point sun, all or nothing at the centre, left segments ending in it 6% dark
+    /// against the reference, which samples the disk (vista-plan §10 M1.4).
+    /// </summary>
+    public static (double Fraction, double SunMu) SunVisibility(AtmosphereFrame frame, double height, double muS)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        double radius = SolarSpectrum.AngularRadiusRadians;
+        if (muS >= Math.Sin(radius))
+            return (1.0, muS);
+        double rb = frame.GroundRadius;
+        double h = Math.Max(height, 0.0);
+        double dip = Math.Atan2(Math.Sqrt(h * (2.0 * rb + h)), rb);
+        double y = Math.Clamp((Math.Asin(Math.Clamp(muS, -1.0, 1.0)) + dip) / radius, -1.0, 1.0);
+        return (0.5 + (y * Math.Sqrt(1.0 - y * y) + Math.Asin(y)) / Math.PI, Math.Max(muS, -Math.Sin(dip) + 1e-5));
+    }
+
+    /// <summary>
+    /// Sunlight per unit solar irradiance reaching <paramref name="height"/> above the ground sphere with the sun's centre at
+    /// <c>cos = muS</c>: the visible part of the disk (<see cref="SunVisibility"/>) through the air's transmittance.
+    /// </summary>
+    public static double SunLight(ReadOnlySpan<float> columns, AtmosphereFrame frame, in AtmosphereCoefficients k, double height, double muS)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        (double visible, double sunMu) = SunVisibility(frame, height, muS);
+        return visible > 0.0 ? visible * Math.Exp(-k.OpticalDepth(SampleColumns(columns, frame.Model, frame.GroundAltitudeMetres + height, sunMu))) : 0.0;
+    }
+
     // ── Ground irradiance ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// The sky's irradiance on the ground sphere, per unit solar irradiance, with the sun at
-    /// <c>cos θ_s = 2·entry/(n − 1) − 1</c> (no direct sun): π times the mean sky radiance over a cosine-weighted
+    /// <see cref="GroundIrradianceMuS"/> (no direct sun): π times the mean sky radiance over a cosine-weighted
     /// grid of directions, each from <see cref="SkyMarch"/> with the summed scattering orders <paramref name="orders"/>.
     /// </summary>
     public static double GroundIrradianceEntry(ReadOnlySpan<float> columns, ReadOnlySpan<float> orders, AtmosphereFrame frame, in AtmosphereCoefficients k, int lambda, int entry)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        double muS = 2.0 * entry / (GroundIrradianceSize - 1) - 1.0;
+        double muS = GroundIrradianceMuS(frame, entry);
         double sinS = Math.Sqrt(Math.Max(1.0 - muS * muS, 0.0));
         double g = frame.Model.AerosolAsymmetry;
         double sum = 0.0;
@@ -249,10 +281,19 @@ public static class AtmosphereLuts
         return Math.PI * sum / (GroundIrradianceDirectionsPerSide * GroundIrradianceDirectionsPerSide);
     }
 
+    /// <summary>
+    /// The sun cosine of ground-irradiance entry <paramref name="entry"/>: the 4D tables' sun map
+    /// (<see cref="AtmosphereScattering.MuSFromUnit"/>), dense near the horizon, where twilight irradiance changes several-fold
+    /// per degree. Evenly spaced cosines, 0.9° apart there, overshot it and left the twilight ground 2–3% bright against the
+    /// reference (vista-plan §10 M1.4). Below the map's lowest sun the first entry, already dark, stands.
+    /// </summary>
+    public static double GroundIrradianceMuS(AtmosphereFrame frame, int entry) =>
+        AtmosphereScattering.MuSFromUnit(frame, (double)entry / (GroundIrradianceSize - 1));
+
     /// <summary>Linear sample of a ground-irradiance table for wavelength <paramref name="lambda"/> at sun cosine <paramref name="muS"/>.</summary>
-    public static double SampleGroundIrradiance(ReadOnlySpan<float> ground, int lambda, double muS)
+    public static double SampleGroundIrradiance(ReadOnlySpan<float> ground, AtmosphereFrame frame, int lambda, double muS)
     {
-        (int i0, int i1, double f) = Cell((muS + 1.0) * 0.5, GroundIrradianceSize);
+        (int i0, int i1, double f) = Cell(AtmosphereScattering.MuSToUnit(frame, muS), GroundIrradianceSize);
         double a = ground[i0 * Wavelengths + lambda];
         return a + f * (ground[i1 * Wavelengths + lambda] - a);
     }
@@ -337,7 +378,7 @@ public static class AtmosphereLuts
             double muSp = (r0 * muS + t * nu) / rp;
             double altitude = frame.GroundAltitudeMetres + hg;
             (_, double extinction, double rayleighScattering, double mieScattering) = Coefficients(model, k, altitude);
-            double sun = HitsSphere(groundRadius, hg, muSp) ? 0.0 : Math.Exp(-k.OpticalDepth(SampleColumns(columns, model, altitude, muSp)));
+            double sun = SunLight(columns, frame, k, hg, muSp);
             var point = new AtmosphereScattering.Sample(hg, muP, muSp, AtmosphereScattering.ClampNu(muP, muSp, nu), toGround);
             double step = transmittance * StepIntegral(extinction, dt);
             rayleigh += step * sun * rayleighScattering;
@@ -350,7 +391,7 @@ public static class AtmosphereLuts
         {
             double muSg = (r0 * muS + length * nu) / groundRadius;
             double direct = muSg > 0.0 ? muSg * Math.Exp(-k.OpticalDepth(SampleColumns(columns, model, frame.GroundAltitudeMetres, muSg))) : 0.0;
-            smooth += transmittance * model.GroundAlbedo / Math.PI * (direct + SampleGroundIrradiance(ground, lambda, muSg));
+            smooth += transmittance * model.GroundAlbedo / Math.PI * (direct + SampleGroundIrradiance(ground, frame, lambda, muSg));
         }
         return (smooth, mie);
     }

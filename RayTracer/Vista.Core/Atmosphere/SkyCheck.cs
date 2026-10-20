@@ -155,7 +155,7 @@ public static class SkyCheck
     }
 }
 
-/// <summary>One sun elevation's comparison.</summary>
+/// <summary>One sun elevation's comparison (of the sky, or of the air along segments of one length).</summary>
 /// <param name="SunElevationDegrees">The sun's elevation, as rendered.</param>
 /// <param name="PathsPerValue">Reference paths behind each (direction, wavelength) value.</param>
 /// <param name="Bands">The error per wavelength band.</param>
@@ -168,7 +168,14 @@ public sealed record SkyCheckElevation(
     IReadOnlyList<SkyCheckBand> Bands,
     double MeanAbsoluteLuminanceError,
     double WorstLuminanceError,
-    IReadOnlyList<SkyCheckDirection> Directions);
+    IReadOnlyList<SkyCheckDirection> Directions)
+{
+    /// <summary>
+    /// The length of the segments compared, m (vista-plan §10 M1.4: the light the air scatters toward the observer along
+    /// a segment that ends on a surface, or on the ground sphere if it gets there first); 0 for the whole sky.
+    /// </summary>
+    public double SegmentLengthMetres { get; init; }
+}
 
 /// <summary>The LUT's error in one wavelength band, over every direction.</summary>
 /// <param name="Band">The band, e.g. "400–460 nm".</param>

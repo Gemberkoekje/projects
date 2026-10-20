@@ -46,3 +46,15 @@ sheets from −6° to +10°, the peaks sheet and an October time-of-day sheet.
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/atmosphere/render.ps1 [-Paths 1048576] [-Out folder]
 ```
+
+## Aerial perspective checks (M1.4)
+
+`aerial/layered-ridges.camera.json` stands 3 km above the base on the east side of the seed-42 range and looks west
+along it with a 60 mm lens: ridge behind ridge to the far side of the tile. At noon the air between them is lit; at
+golden hour the camera looks toward the sun across valleys in the ridges' shadow. `render.ps1` reruns every M1.4 check:
+`--atmosphere-check --segments` up from the valley floor and down from 1.7 km, `--atmosphere-compare` on the ridges at
+noon and at golden hour and on the down-slope view's shadowed valley, and the sea-level against 3000 m sheet.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/aerial/render.ps1 [-Paths 1048576] [-ReferenceSpp 16384] [-Out folder]
+```

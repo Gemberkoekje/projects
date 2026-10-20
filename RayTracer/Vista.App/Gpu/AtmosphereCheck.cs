@@ -25,8 +25,8 @@ internal static class AtmosphereCheck
     /// <summary>Usage text.</summary>
     public const string Usage =
         "       Vista.App --atmosphere-check [--sun-elevations 30,5,-2,-6] [--paths 65536] [--ground-altitude 1608]\n" +
-        "                 [--observer-height 2] [--below-horizon] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--out check.json]\n" +
-        "                 (the LUT sky against the reference, per wavelength band)";
+        "                 [--observer-height 2] [--below-horizon] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--segments 1000,4000]\n" +
+        "                 [--out check.json]  (the LUT sky, or with --segments the air along segments, against the reference)";
 
     private const int Chunks = 64;
     private const int PathsPerDispatch = 16;
@@ -39,7 +39,7 @@ internal static class AtmosphereCheck
         for (int i = 1; i < args.Count; i++)
         {
             if (i + 1 < args.Count && args[i] is "--sun-elevations" or "--paths" or "--ground-altitude" or "--observer-height" or "--out"
-                    or "--ground-albedo" or "--aerosol-depth")
+                    or "--ground-albedo" or "--aerosol-depth" or "--segments")
                 values[args[i]] = args[++i];
             else if (args[i] == "--below-horizon")
                 values[args[i]] = "true";
@@ -52,6 +52,11 @@ internal static class AtmosphereCheck
         int paths = values.TryGetValue("--paths", out string? p) ? (int)Number(p, problems) : 65536;
         double ground = values.TryGetValue("--ground-altitude", out string? g) ? Number(g, problems) : 1608.0;
         double observer = values.TryGetValue("--observer-height", out string? o) ? Number(o, problems) : 2.0;
+        double[] lengths = values.TryGetValue("--segments", out string? segments)
+            ? segments.Split(',').Select(v => Number(v, problems)).ToArray()
+            : [0.0];
+        if (lengths.Any(l => !(l > 0.0)) && values.ContainsKey("--segments"))
+            problems.Add("--segments takes positive lengths in metres.");
         if (paths < Chunks || paths % (Chunks * PathsPerDispatch) != 0)
             problems.Add($"--paths must be a positive multiple of {Chunks * PathsPerDispatch}.");
         if (problems.Count > 0)
@@ -79,16 +84,22 @@ internal static class AtmosphereCheck
         var results = new List<SkyCheckElevation>();
         foreach (double elevation in elevations)
         {
-            AtmosphereFrame frame = AtmosphereFrame.For(model, ground, SkyCheck.SunDirection(elevation), observer, 0.0, 0.0);
-            SkyCheckRaw raw = renderer.RunSkyCheck(frame, directions, Chunks, paths / Chunks, PathsPerDispatch);
-            SkyCheckElevation result = SkyCheck.Aggregate(elevation, raw.Sums, Chunks, paths / Chunks, tables.WavelengthsNm, weights, below);
-            results.Add(result);
-            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"sun {elevation:+0.#;-0.#;0}°: {raw.Dispatches} dispatches, {raw.GpuSeconds:0.0} s GPU; luminance error mean {result.MeanAbsoluteLuminanceError:P2}, worst {result.WorstLuminanceError:+0.00%;-0.00%}"));
-            foreach (SkyCheckBand band in result.Bands)
+            foreach (double length in lengths)
             {
+                // The terrain slices span the observer's height, so a segment's far end has a sky view to difference against.
+                AtmosphereFrame frame = AtmosphereFrame.For(model, ground, SkyCheck.SunDirection(elevation), observer, 0.0, observer);
+                SkyCheckRaw raw = renderer.RunSkyCheck(frame, directions, Chunks, paths / Chunks, PathsPerDispatch, length);
+                SkyCheckElevation result = SkyCheck.Aggregate(elevation, raw.Sums, Chunks, paths / Chunks, tables.WavelengthsNm, weights, below)
+                    with { SegmentLengthMetres = length };
+                results.Add(result);
+                string what = length > 0.0 ? string.Create(CultureInfo.InvariantCulture, $", segments of {length / 1000.0:0.###} km") : string.Empty;
                 log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"  {band.Band,-12} ({band.Wavelengths,2} λ): mean |error| {band.MeanAbsoluteError:P2}, worst {band.WorstError:+0.00%;-0.00%} at {band.WorstElevation:0.#}° up, {band.WorstAzimuth:0}° from the sun; reference noise {band.MeanStandardError:P2}"));
+                    $"sun {elevation:+0.#;-0.#;0}°{what}: {raw.Dispatches} dispatches, {raw.GpuSeconds:0.0} s GPU; luminance error mean {result.MeanAbsoluteLuminanceError:P2}, worst {result.WorstLuminanceError:+0.00%;-0.00%}"));
+                foreach (SkyCheckBand band in result.Bands)
+                {
+                    log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                        $"  {band.Band,-12} ({band.Wavelengths,2} λ): mean |error| {band.MeanAbsoluteError:P2}, worst {band.WorstError:+0.00%;-0.00%} at {band.WorstElevation:0.#}° up, {band.WorstAzimuth:0}° from the sun; reference noise {band.MeanStandardError:P2}"));
+                }
             }
         }
 

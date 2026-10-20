@@ -18,9 +18,9 @@ namespace Vista.Cli;
 /// from any machine. A loupe request renders only its window of the frame; the files are window-sized and the
 /// sidecar records the window.
 ///
-/// <para>Since M1.3 the scene sits in a spectral atmosphere at its place's valley altitude
-/// (<see cref="AtmosphereFrame"/>), the EXR is in physical units, and the PNG is metered
-/// (<see cref="AutoExposure"/>, the camera's exposure as compensation).</para>
+/// <para>Since M1.3 the scene sits in a spectral atmosphere at its base altitude — the recipe's altitude, else its
+/// place's valley floor (<see cref="Places.BaseAltitude"/>, <see cref="AtmosphereFrame"/>) — the EXR is in physical
+/// units, and the PNG is metered (<see cref="AutoExposure"/>, the camera's exposure as compensation).</para>
 /// </summary>
 public static class PreviewPipeline
 {
@@ -59,8 +59,8 @@ public static class PreviewPipeline
         warnings.AddRange(almanac.Hints);
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
         AtmosphereModel air = AtmosphereModel.Default;
-        double groundAltitude = almanac.Place.ValleyAltitudeMetres;
-        AtmosphereFrame frame = AtmosphereFrame.For(air, groundAltitude, almanac.Sun.ToSun, camera.Position.Y, terrain.MinHeight, terrain.MaxHeight);
+        (double groundAltitude, string altitudeFrom) = Places.BaseAltitude(recipe, almanac.Place);
+        AtmosphereFrame frame = VistaScene.FrameFor(air, groundAltitude, almanac.Sun, camera, terrain);
         var settings = new RenderSettings
         {
             Width = request.Width,
@@ -149,7 +149,7 @@ public static class PreviewPipeline
                 mesh.ByteSize),
             Place = almanac.Place,
             Sun = SunInfo.From(almanac, frame),
-            Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere),
+            Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere, altitudeFrom),
             Exposure = exposure,
             DataTiers = MaterialCatalog.TiersOf(materials),
             Render = renderInfo,

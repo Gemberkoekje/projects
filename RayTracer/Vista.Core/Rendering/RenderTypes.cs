@@ -50,10 +50,23 @@ public enum AtmosphereMode
 {
     /// <summary>Not chosen.</summary>
     None,
-    /// <summary>Precomputed LUTs (Hillaire 2020): the sky-view LUT for rays that leave the terrain, the columns LUT for the sun's transmittance.</summary>
+    /// <summary>
+    /// Precomputed LUTs (Hillaire 2020): the sky-view LUT for rays that leave the terrain, the columns LUT for the sun's
+    /// transmittance, and a short march through both and the scattering orders along every segment that ends on the
+    /// terrain (aerial perspective, M1.4).
+    /// </summary>
     Luts,
-    /// <summary>The air path-traced as a medium (delta tracking, next-event estimation to the sun): slow and unbiased, the check on the LUTs.</summary>
+    /// <summary>
+    /// The air path-traced as a medium (delta tracking, next-event estimation to the sun): slow and unbiased, the check on
+    /// the LUTs. Like them it ignores the terrain inside the air (vista-plan §10 M1.4).
+    /// </summary>
     Reference,
+    /// <summary>
+    /// <see cref="Reference"/> with the terrain's shadow on the sunlight the air scatters once: the light the LUTs cannot
+    /// know about (air in a mountain's shadow is still lit for them), measured (vista-plan §10 M1.4). Later scattering keeps
+    /// ignoring the terrain, as in the reference.
+    /// </summary>
+    ReferenceShadowed,
 }
 
 /// <summary>
@@ -93,7 +106,8 @@ public static class AovLayout
 /// <param name="Air">The atmosphere above the scene.</param>
 /// <param name="GroundAltitudeMetres">
 /// Altitude above sea level of world <c>y = 0</c>: the scene's base altitude, where the ground sphere of the
-/// atmosphere sits (<see cref="AtmosphereFrame"/>). The place's valley floor until M1.4's altitude control.
+/// atmosphere sits (<see cref="AtmosphereFrame"/>): the recipe's altitude, else the place's valley floor
+/// (<see cref="Places.BaseAltitude"/>).
 /// </param>
 public sealed record VistaScene(
     Recipe Recipe,
@@ -107,8 +121,21 @@ public sealed record VistaScene(
     double GroundAltitudeMetres)
 {
     /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
-    public AtmosphereFrame AirFrame() =>
-        AtmosphereFrame.For(Air, GroundAltitudeMetres, Sun.ToSun, Camera.Position.Y, Terrain.MinHeight, Terrain.MaxHeight);
+    public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Terrain);
+
+    /// <summary>
+    /// The atmosphere frame of a view of <paramref name="terrain"/> from <paramref name="camera"/>: the camera's altitude and
+    /// the terrain's span set the sky-view slices, and the terrain's farthest corner from the camera its reach.
+    /// </summary>
+    public static AtmosphereFrame FrameFor(AtmosphereModel air, double groundAltitude, SunPosition sun, CameraSpec camera, HeightField terrain)
+    {
+        ArgumentNullException.ThrowIfNull(air);
+        ArgumentNullException.ThrowIfNull(camera);
+        ArgumentNullException.ThrowIfNull(terrain);
+        double reachX = Math.Max(Math.Abs(terrain.OriginX - camera.Position.X), Math.Abs(terrain.OriginX + terrain.Extent - camera.Position.X));
+        double reachZ = Math.Max(Math.Abs(terrain.OriginZ - camera.Position.Z), Math.Abs(terrain.OriginZ + terrain.Extent - camera.Position.Z));
+        return AtmosphereFrame.For(air, groundAltitude, sun.ToSun, camera.Position.Y, terrain.MinHeight, terrain.MaxHeight, Math.Sqrt(reachX * reachX + reachZ * reachZ));
+    }
 }
 
 /// <summary>What a renderer returns: the <see cref="RenderSettings.Rendered"/> window of the frame.</summary>

@@ -10,7 +10,8 @@ namespace Vista.Recipes;
 ///
 /// <para>Schema 2 (M1.2) added <see cref="Location"/>, <see cref="Latitude"/>, <see cref="Date"/> and
 /// <see cref="SolarTime"/>, and made <see cref="Time"/> relative to the real sunrise and sunset. Schema 3 (M1.3)
-/// added <see cref="SunElevation"/>. Older files still read; schema 1 files render at the default place.</para>
+/// added <see cref="SunElevation"/>, schema 4 (M1.4) <see cref="Altitude"/>. Older files still read; schema 1 files
+/// render at the default place.</para>
 ///
 /// <para><see cref="SetPieces"/> is a <b>set</b>: order never matters (the same pieces in any order make
 /// the same world). Set pieces are chosen before anything renders, and changing the set starts a new scene
@@ -20,7 +21,10 @@ namespace Vista.Recipes;
 public sealed record Recipe
 {
     /// <summary>The recipe file format version this build writes; it reads every version from 1 up to this.</summary>
-    public const int CurrentSchema = 3;
+    public const int CurrentSchema = 4;
+
+    /// <summary>The highest base <see cref="Altitude"/> accepted, m.</summary>
+    public const double MaxAltitudeMetres = 8000.0;
 
     /// <summary>File format version, from 1 to <see cref="CurrentSchema"/>.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -66,6 +70,14 @@ public sealed record Recipe
     public double? SunElevation { get; init; }
 
     /// <summary>
+    /// The scene's base altitude above sea level in metres — world <c>y = 0</c>, the valley floor, where the ground sphere
+    /// of the air sits (vista-plan §3.3, §3.6: thinner air gives a deeper blue, less haze and a brighter sun) — instead of
+    /// the place's typical valley floor; null for that. The terrain keeps its shape: the whole scene moves up or down in
+    /// the air.
+    /// </summary>
+    public double? Altitude { get; init; }
+
+    /// <summary>
     /// This recipe with <paramref name="piece"/> added (unchanged if it is already there). Any piece it
     /// conflicts with (<see cref="SetPieceConflicts"/>) is swapped out: adding a frozen lake replaces the lake.
     /// </summary>
@@ -97,6 +109,8 @@ public sealed record Recipe
             errors.Add($"The sun elevation must be in [-90, 90] degrees, got {elevation.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
         if (SunElevation is not null && SolarTime is not null)
             errors.Add("Give a solar time or a sun elevation, not both.");
+        if (Altitude is double altitude && !(altitude is >= 0.0 and <= MaxAltitudeMetres))
+            errors.Add($"The altitude must be in [0, {MaxAltitudeMetres.ToString(System.Globalization.CultureInfo.InvariantCulture)}] m above sea level, got {altitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
         if (SetPieces is null)
             errors.Add("Set pieces must be a list (empty for plain base ground).");
         else
@@ -128,5 +142,6 @@ public sealed record Recipe
         && Nullable.Equals(Latitude, other.Latitude)
         && Date == other.Date
         && SolarTime == other.SolarTime
-        && Nullable.Equals(SunElevation, other.SunElevation);
+        && Nullable.Equals(SunElevation, other.SunElevation)
+        && Nullable.Equals(Altitude, other.Altitude);
 }

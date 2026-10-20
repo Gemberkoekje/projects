@@ -12,7 +12,8 @@ namespace Vista.App;
 /// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through the offline
 /// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
 /// <c>--sheet-from</c> tiles existing images), and the dev-box checks: <c>--gpu-selftest</c> and
-/// <c>--atmosphere-check</c> (the LUT sky against the reference atmosphere).
+/// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
+/// <c>--atmosphere-compare</c> (one view rendered with both, by distance).
 /// </summary>
 internal static class Program
 {
@@ -25,6 +26,8 @@ internal static class Program
             return RunGpu(() => GpuSelfTest.Run(Console.Out));
         if (args.FirstOrDefault() == AtmosphereCheck.Flag)
             return RunGpu(() => AtmosphereCheck.Run(args, Console.Out));
+        if (args.FirstOrDefault() == AtmosphereCompare.Flag)
+            return RunGpu(() => AtmosphereCompare.Run(args, Console.Out));
 
         try
         {
@@ -88,6 +91,7 @@ internal static class Program
         Console.Error.WriteLine(SheetCommandLine.Usage);
         Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
         Console.Error.WriteLine(AtmosphereCheck.Usage);
+        Console.Error.WriteLine(AtmosphereCompare.Usage);
         return 1;
     }
 
