@@ -22,6 +22,10 @@ namespace Vista.Cli;
 /// place's valley floor (<see cref="Places.BaseAltitude"/>, <see cref="AtmosphereFrame"/>) — the EXR is in physical
 /// units, and the PNG is metered (<see cref="AutoExposure"/>, the camera's exposure as compensation).</para>
 ///
+/// <para>Since M1.7 the world is eroded (<see cref="WorldBuilder"/>): read from the erosion cache when it holds this world, else
+/// eroded by <c>eroder</c> (the GPU) and stored; a dry run with no cached world uses the un-eroded terrain and warns, and writes the
+/// erosion maps (<c>&lt;out&gt;.erosion.png</c>) when it has them.</para>
+///
 /// <para>Since M1.6 a request may also denoise (<see cref="PreviewRequest.Denoise"/>): the raw beauty is written as always, and
 /// the denoised one beside it (<c>&lt;out&gt;.denoised.png</c> at the same exposure, <c>&lt;out&gt;.denoised.exr</c>). A denoiser that
 /// cannot run leaves a warning and the raw files only.</para>
@@ -34,7 +38,7 @@ public static class PreviewPipeline
     /// denoises needs a <paramref name="denoiser"/>.
     /// </summary>
     public static Sidecar Run(PreviewRequest request, IVistaRenderer? renderer, TimeProvider? time = null, WorldCache? worlds = null,
-        IDenoiser? denoiser = null)
+        IDenoiser? denoiser = null, ITerrainEroder? eroder = null, ErosionCache? erosionCache = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (renderer is null && !request.DryRun)
@@ -49,10 +53,13 @@ public static class PreviewPipeline
         var stopwatch = Stopwatch.StartNew();
 
         Recipe recipe = VistaJson.ParseRecipe(JsonOverrides.Apply(File.ReadAllText(request.RecipePath), request.RecipeOverrides));
-        HeightField terrain = worlds?.Terrain(recipe, request.Seed) ?? TerrainGenerator.Generate(recipe, request.Seed);
+        worlds ??= new WorldCache();
+        TerrainWorld world = worlds.World(recipe, request.Seed, request.Grid, eroder, erosionCache, request.Erosion);
+        warnings.AddRange(world.Warnings);
+        HeightField terrain = world.Surface;
         timings["worldGen"] = Lap(stopwatch);
 
-        TerrainMesh mesh = worlds?.Mesh(terrain) ?? HeightFieldMesher.Build(terrain);
+        TerrainMesh mesh = worlds.Mesh(terrain);
         timings["mesh"] = Lap(stopwatch);
 
         CameraSpec camera = request.CameraPath is null
@@ -98,6 +105,12 @@ public static class PreviewPipeline
             (byte[] map, int size) = DebugImages.HeightMap(terrain, camera);
             PngEncoder.Write(Sibling(".heightmap.png"), map, size, size, PngColor.Rgb);
             outputs["heightMap"] = baseName + ".heightmap.png";
+            if (world.Erosion is { } erosion)
+            {
+                (byte[] maps, int mapSize) = DebugImages.ErosionMap(erosion, camera);
+                PngEncoder.Write(Sibling(".erosion.png"), maps, mapSize, mapSize, PngColor.Rgb);
+                outputs["erosionMap"] = baseName + ".erosion.png";
+            }
             timings["write"] = Lap(stopwatch);
         }
         else
@@ -183,7 +196,10 @@ public static class PreviewPipeline
                 terrain.MinHeight,
                 terrain.MaxHeight,
                 mesh.TriangleCount,
-                mesh.ByteSize),
+                mesh.ByteSize)
+            {
+                Erosion = world.Info,
+            },
             Place = almanac.Place,
             Sun = SunInfo.From(almanac, frame),
             Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere, altitudeFrom),

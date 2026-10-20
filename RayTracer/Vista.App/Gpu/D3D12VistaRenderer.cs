@@ -61,6 +61,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
 
     private IDXGIFactory4 _factory = null!;
+    private IDXGIAdapter3? _adapter;
     private ID3D12Device5 _device = null!;
     private ID3D12CommandQueue _queue = null!;
     private ID3D12CommandAllocator _allocator = null!;
@@ -93,6 +94,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12Resource? _blas;
     private ID3D12Resource? _tlas;
     private ID3D12Resource? _instance;
+    private long _blasBytes;
 
     // Surface tables: rebuilt per render, a few kilobytes.
     private ID3D12Resource? _cie;
@@ -164,6 +166,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>()),
             (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>()),
             (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>()),
+            (nameof(ErosionConstants), Unsafe.SizeOf<ErosionConstants>()),
         })
         {
             if (size > ConstantBufferBytes || size % 16 != 0)
@@ -290,6 +293,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             LongestDispatchSeconds = longest,
             MaxCostNsPerPixelSample = maxCostNs,
             StageSeconds = stages,
+            AccelerationStructureBytes = _blasBytes,
+            VideoMemoryBytes = VideoMemoryUsed,
         };
         return new RenderOutput(window.Width, window.Height, xyz, buffers, stats);
     }
@@ -407,6 +412,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             throw new PlatformNotSupportedException("No Direct3D 12 capable GPU was found.");
 
         DeviceName = chosen.Description1.Description;
+        if (chosen.CheckInterfaceSupport(typeof(IDXGIDevice).GUID, out long umd).Success)
+            DriverVersion = $"{(umd >> 48) & 0xFFFF}.{(umd >> 32) & 0xFFFF}.{(umd >> 16) & 0xFFFF}.{umd & 0xFFFF}";
+        _adapter = chosen.QueryInterfaceOrNull<IDXGIAdapter3>();
         chosen.Dispose();
 
         _queue = _device.CreateCommandQueue(new CommandQueueDescription(CommandListType.Direct));
@@ -535,6 +543,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         RaytracingAccelerationStructurePrebuildInfo blasInfo = _device.GetRaytracingAccelerationStructurePrebuildInfo(blasInputs);
         using ID3D12Resource blasScratch = CreateUavBuffer(blasInfo.ScratchDataSizeInBytes);
         _blas = CreateUavBuffer(blasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
+        _blasBytes = (long)blasInfo.ResultDataMaxSizeInBytes;
 
         var instance = new RaytracingInstanceDescription
         {
@@ -827,6 +836,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeScene();
         DisposeSkyLight();
         DisposeAtmosphere();
+        DisposeErosion();
         _dummyUav?.Dispose();
         _rayCounterReadback?.Dispose();
         _rayCounterZero?.Dispose();
@@ -848,6 +858,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 #endif
         _queue?.Dispose();
         _device?.Dispose();
+        _adapter?.Dispose();
         _factory?.Dispose();
     }
 }

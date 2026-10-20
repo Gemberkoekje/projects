@@ -39,6 +39,10 @@ namespace Vista.App.Gpu;
 /// sampler and pdf match <see cref="SkyDistribution"/>'s; and MIS and M1.4's estimator agree on the image's mean within its
 /// noise, over independent renders.</para>
 ///
+/// <para>First of all the world (M1.7): the erosion passes against their C# reference on a 65² patch, and the self-test's world
+/// eroded twice and through a cache round trip, bit-identical each time (see <c>ErosionChecks</c>); the scene above renders that
+/// eroded world.</para>
+///
 /// <para>Then the denoiser (M1.6), when Open Image Denoise has been fetched: the reference render denoised twice on the CPU is
 /// bit-identical, sane and as bright as the raw image; on CUDA, bit-identical twice and as bright as the CPU's.</para>
 /// </summary>
@@ -57,7 +61,9 @@ internal static class GpuSelfTest
             Time = TimeOfDay.GoldenHour,
         };
         const ulong seed = 42;
-        HeightField terrain = TerrainGenerator.Generate(recipe, seed);
+        using var renderer = new D3D12VistaRenderer();
+        log.WriteLine($"Device: {renderer.DeviceName}, driver {renderer.DriverVersion}");
+        bool pass = ErosionChecks(renderer, recipe, seed, log, out HeightField terrain);
         TerrainMesh mesh = HeightFieldMesher.Build(terrain);
         Almanac almanac = Almanac.For(recipe);
         var scene = new VistaScene(recipe, seed, DefaultCamera.For(terrain), terrain, mesh, almanac.Sun, MaterialCatalog.M0,
@@ -65,8 +71,6 @@ internal static class GpuSelfTest
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
 
-        using var renderer = new D3D12VistaRenderer();
-        log.WriteLine($"Device: {renderer.DeviceName}");
         RenderOutput reference = Render(renderer, scene, settings, allAovs, new BatchPlannerOptions(), log, "reference");
         RenderOutput again = Render(renderer, scene, settings, allAovs, new BatchPlannerOptions(), log, "again");
         // A pessimistic first guess keeps the early dispatches to a few rows each.
@@ -74,7 +78,6 @@ internal static class GpuSelfTest
         RenderOutput split = Render(renderer, scene, settings, allAovs, tight, log, "0.05 ms budget");
         RenderOutput bare = Render(renderer, scene, settings, new HashSet<Aov>(), new BatchPlannerOptions(), log, "no debug outputs");
 
-        bool pass = true;
         pass &= Check(log, "reference is sane", Sanity(reference, settings));
         pass &= Check(log, "same render twice is bit-identical", Same(reference, again, compareAovs: true));
         // A dispatch covers whole rows and at least one sample: more dispatches than samples means some pass
@@ -100,6 +103,72 @@ internal static class GpuSelfTest
         pass &= DenoiseChecks(reference, log);
         log.WriteLine(pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
+    }
+
+    /// <summary>
+    /// The world stage (M1.7), first, since every render below draws its world: the GPU's erosion passes against the C#
+    /// reference (<see cref="ErosionParity"/>); then the self-test's world eroded on the GPU, stored in a fresh cache, eroded
+    /// again and read back from the cache — all three the same bits; then, when the default cache holds this world, whether
+    /// this GPU and driver still erode it to the bits the cache holds (a driver update that moves the world fails here instead of
+    /// passing silently). <paramref name="terrain"/> is the eroded surface.
+    /// </summary>
+    private static bool ErosionChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, TextWriter log, out HeightField terrain)
+    {
+        WorldGrid grid = WorldGrid.Default;
+        TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
+        ErosionSettings erosion = ErosionSettings.For(profile);
+        bool pass = ErosionParity.Run(renderer, erosion, grid.CellSize, log);
+
+        string folder = Path.Combine(Path.GetTempPath(), "vista-selftest-worlds-" + Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+        try
+        {
+            var cache = new ErosionCache(folder);
+            TerrainWorld world = WorldBuilder.Build(recipe, seed, grid, renderer, cache);
+            ErosionResult first = world.Erosion!;
+            terrain = first.Surface;
+            ErosionStats stats = world.Info.Stats!;
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  eroded {grid.Size}\u00b2 \u00d7 {grid.CellSize} m in {stats.Seconds:0.00} s GPU ({stats.WallSeconds:0.00} s wall, {stats.Submissions} submissions, " +
+                $"longest {stats.LongestSubmissionSeconds * 1e3:0} ms), {stats.StateBytes / 1048576.0:0} MiB of state; hash {first.Surface.ContentHash():x16}"));
+            pass &= Check(log, "the eroded world is sane", first.Surface.Heights.ToArray().All(float.IsFinite)
+                && first.Loose.All(v => v >= 0f && float.IsFinite(v)) && first.StandingWater.All(v => v >= 0f && float.IsFinite(v))
+                && world.Info.Stats!.LongestSubmissionSeconds < 0.5 ? null : "a value is negative or not finite, or a submission ran too long");
+
+            ErosionResult second = renderer.Erode(TerrainGenerator.Generate(recipe, seed, grid), erosion).Result;
+            pass &= Check(log, "the world eroded twice is bit-identical", SameWorld(first, second));
+
+            (ErosionResult Result, WorldOrigin Origin)? loaded = cache.TryLoad(profile, seed, grid, erosion, out string? problem);
+            pass &= Check(log, "the world read back from the cache is bit-identical",
+                loaded is { } l ? SameWorld(first, l.Result) : problem ?? "the cache does not hold it");
+
+            if (ErosionCache.Default.TryLoad(profile, seed, grid, erosion, out _) is { } cached)
+            {
+                pass &= Check(log, "this GPU and driver erode the cached world to the same bits", SameWorld(first, cached.Result) is null ? null
+                    : $"the cache's copy was eroded on {cached.Origin.Device} (driver {cached.Origin.Driver}, {cached.Origin.CreatedUtc}); " +
+                      $"this is {renderer.DeviceName} (driver {renderer.DriverVersion}). The driver moved the world: re-baseline by deleting the cached file.");
+            }
+            else
+            {
+                log.WriteLine("[skip] the default cache does not hold the self-test world, so a driver change cannot be checked against it");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+        }
+        return pass;
+    }
+
+    /// <summary>Null when the two worlds are the same bits, else what differs.</summary>
+    private static string? SameWorld(ErosionResult a, ErosionResult b)
+    {
+        if (!a.Surface.Heights.SequenceEqual(b.Surface.Heights))
+            return "the surfaces differ";
+        if (!a.Loose.AsSpan().SequenceEqual(b.Loose) || !a.Discharge.AsSpan().SequenceEqual(b.Discharge)
+            || !a.WaterDepth.AsSpan().SequenceEqual(b.WaterDepth) || !a.StandingWater.AsSpan().SequenceEqual(b.StandingWater))
+            return "the maps differ";
+        return a.ContentHash() == b.ContentHash() ? null : "the hashes differ";
     }
 
     /// <summary>
@@ -542,7 +611,7 @@ internal static class GpuSelfTest
         return output;
     }
 
-    private static bool Check(TextWriter log, string name, string? failure)
+    internal static bool Check(TextWriter log, string name, string? failure)
     {
         log.WriteLine(failure is null ? $"[ok]   {name}" : $"[FAIL] {name}: {failure}");
         return failure is null;

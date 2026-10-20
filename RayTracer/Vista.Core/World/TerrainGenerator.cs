@@ -2,12 +2,15 @@ using Vista.Recipes;
 
 namespace Vista.World;
 
-/// <summary>The fixed global terrain grid (vista-plan §4.1). The default spans 16.4 km at 16 m spacing.</summary>
+/// <summary>
+/// The fixed global terrain grid (vista-plan §4.1). Since M1.7 the default is 4097² samples 8 m apart, 32.8 km a side, the grid
+/// erosion runs on (M0's was 1025² at 16 m, 16.4 km); vista-plan §10 M1.7 records why.
+/// </summary>
 /// <param name="Size">Samples per side (at least 2).</param>
 /// <param name="CellSize">Sample spacing in metres.</param>
-public sealed record WorldGrid(int Size = 1025, double CellSize = 16.0)
+public sealed record WorldGrid(int Size = 4097, double CellSize = 8.0)
 {
-    /// <summary>The grid every M0 world is generated on.</summary>
+    /// <summary>The grid every world is generated and eroded on.</summary>
     public static WorldGrid Default { get; } = new();
 }
 

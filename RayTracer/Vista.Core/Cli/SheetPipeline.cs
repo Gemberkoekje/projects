@@ -23,7 +23,8 @@ public static class SheetPipeline
     /// renders, so a misspelt field or a missing file fails before any GPU time is spent. A request that denoises needs a
     /// <paramref name="denoiser"/>, and writes a second sheet of the denoised cells when every cell has one.
     /// </summary>
-    public static SheetSidecar Render(SheetRequest request, IVistaRenderer? renderer, TimeProvider? time = null, IDenoiser? denoiser = null)
+    public static SheetSidecar Render(SheetRequest request, IVistaRenderer? renderer, TimeProvider? time = null, IDenoiser? denoiser = null,
+        ITerrainEroder? eroder = null, ErosionCache? erosionCache = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (renderer is null && !request.Base.DryRun)
@@ -48,7 +49,7 @@ public static class SheetPipeline
         var worlds = new WorldCache();
         var sidecars = new List<Sidecar>(count);
         foreach (PreviewRequest cell in cells)
-            sidecars.Add(PreviewPipeline.Run(cell, renderer, time, worlds, denoiser));
+            sidecars.Add(PreviewPipeline.Run(cell, renderer, time, worlds, denoiser, eroder, erosionCache));
 
         string beautyRole = renderer is null ? "heightMap" : "beauty";
         var sources = cells.Select((c, i) => Path.Combine(cellDirectory, sidecars[i].Outputs[beautyRole])).ToList();

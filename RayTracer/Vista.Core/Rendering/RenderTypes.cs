@@ -240,6 +240,15 @@ public sealed record RenderStats
     /// <summary>Renderer stages (e.g. device init, acceleration build, readback) in seconds.</summary>
     public SortedDictionary<string, double> StageSeconds { get; init; } = new(StringComparer.Ordinal);
 
+    /// <summary>Bytes the terrain's bottom-level acceleration structure takes on the device (0 when not measured).</summary>
+    public long AccelerationStructureBytes { get; init; }
+
+    /// <summary>
+    /// Video memory the whole process used once the scene was on the device, in bytes (DXGI's local segment; 0 when not
+    /// measured): the number the 8 GB budget (vista-plan §7.1) is about.
+    /// </summary>
+    public long VideoMemoryBytes { get; init; }
+
     /// <summary>Mean rays per pixel-sample.</summary>
     public double RaysPerSample() => PixelSamples > 0 ? (double)RaysTraced / PixelSamples : 0.0;
 

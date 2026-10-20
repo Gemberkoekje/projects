@@ -4,6 +4,7 @@ using Vista.Astronomy;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
+using Vista.World;
 
 namespace Vista.Cli;
 
@@ -90,6 +91,15 @@ public sealed record PreviewRequest
     /// beauty is always written.
     /// </summary>
     public DenoiseSettings? Denoise { get; init; }
+
+    /// <summary>
+    /// The world grid (vista-plan §4.1). Every world is made on <see cref="WorldGrid.Default"/>; another grid is another world,
+    /// for measurements (and the tests' small worlds).
+    /// </summary>
+    public WorldGrid Grid { get; init; } = WorldGrid.Default;
+
+    /// <summary>Erode the world (vista-plan §10 M1.7); false renders the un-eroded terrain.</summary>
+    public bool Erosion { get; init; } = true;
 }
 
 /// <summary>
@@ -101,6 +111,7 @@ public sealed record PreviewRequest
 ///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
 ///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
+///           [--erosion on | off] [--grid 4097x8]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
@@ -113,7 +124,8 @@ public sealed record PreviewRequest
 /// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
 /// with <c>--rr-start 3</c>, M1.4's Russian roulette as well, it renders M1.4's images bit for bit. <c>--denoise</c> also writes
 /// the beauty denoised by Intel Open Image Denoise (M1.6) beside the raw one, on the CPU or, with <c>--denoise-device cuda</c>,
-/// the GPU.
+/// the GPU. <c>--erosion off</c> renders the world un-eroded (M1.7), and <c>--grid</c> makes the world on another grid (samples per
+/// side × metres between them): another world, for measurements.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -133,6 +145,7 @@ public static class PreviewCommandLine
         "                 [--debug all|albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]\n" +
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
+        "--erosion off renders the world un-eroded; --grid SIZExCELL makes it on another grid (another world, for measurements).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "Place overrides: [--location <place> | --latitude <degrees>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
@@ -191,7 +204,7 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
-        "--rr-start", "--denoise-device",
+        "--rr-start", "--denoise-device", "--erosion", "--grid",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -269,6 +282,8 @@ public static class PreviewCommandLine
         AtmosphereMode atmosphere = Atmosphere(values.GetValueOrDefault("--atmosphere"), problems);
         LightSampling lightSampling = Lights(values.GetValueOrDefault("--light-sampling"), problems);
         int rrStart = Int(values, "--rr-start", RenderSettings.DefaultRussianRouletteStart, 0, RenderSettings.MaxRussianRouletteStart, problems);
+        bool erosion = Erosion(values.GetValueOrDefault("--erosion"), problems);
+        WorldGrid grid = Grid(values.GetValueOrDefault("--grid"), problems);
 
         if (problems.Count > before)
             return null;
@@ -291,8 +306,41 @@ public static class PreviewCommandLine
             LightSampling = lightSampling,
             RussianRouletteStart = rrStart,
             Denoise = denoise,
+            Erosion = erosion,
+            Grid = grid,
         };
     }
+
+    private static bool Erosion(string? text, List<string> problems)
+    {
+        switch (text)
+        {
+            case null or "on":
+                return true;
+            case "off":
+                return false;
+            default:
+                problems.Add($"--erosion must be on or off, got '{text}'.");
+                return true;
+        }
+    }
+
+    /// <summary>Parses a <c>--grid</c> value, <c>SIZExCELL</c> (e.g. <c>4097x8</c>: samples per side, metres between them).</summary>
+    internal static WorldGrid Grid(string? text, List<string> problems)
+    {
+        if (text is null)
+            return WorldGrid.Default;
+        string[] parts = text.Split('x');
+        if (parts.Length == 2
+            && int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int size) && size is >= 3 and <= MaxGridSize
+            && double.TryParse(parts[1], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double cell) && cell > 0.0 && double.IsFinite(cell))
+            return new WorldGrid(size, cell);
+        problems.Add($"--grid must be SIZExCELL with 3 to {MaxGridSize} samples and a positive cell in metres (e.g. 4097x8), got '{text}'.");
+        return WorldGrid.Default;
+    }
+
+    /// <summary>The largest grid <c>--grid</c> accepts: its mesh and erosion state must fit in memory.</summary>
+    public const int MaxGridSize = 8193;
 
     /// <summary>The denoise settings of <c>--denoise</c> and <c>--denoise-device</c>; null without <c>--denoise</c>.</summary>
     private static DenoiseSettings? Denoise(bool denoise, string? deviceText, bool dryRun, List<string> problems)

@@ -4,6 +4,7 @@ using Vista.Atmosphere;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
+using Vista.World;
 
 namespace Vista.Output;
 
@@ -22,12 +23,14 @@ namespace Vista.Output;
 /// <see cref="Atmosphere"/>, where the base altitude came from and how aerial perspective was evaluated. Schema 6 (M1.5)
 /// added, in <see cref="Image"/>, which lights surfaces sampled and where Russian roulette starts. Schema 7 (M1.6) added
 /// <see cref="Denoise"/>: the settings asked for, and the denoiser's library, version, device and filter, or why it did not
-/// run.</para>
+/// run. Schema 8 (M1.7) added <see cref="WorldInfo.Erosion"/>: where the world's erosion came from (eroded now, the cache, or
+/// none), the settings, the un-eroded field's hash, the device and driver that eroded it, the cache file and the cost; the
+/// <c>heightFieldHash</c> is now the eroded surface's.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 7;
+    public const int CurrentSchema = 8;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -155,7 +158,11 @@ public sealed record WorldInfo(
     double MinHeightMetres,
     double MaxHeightMetres,
     long Triangles,
-    long MeshBytes);
+    long MeshBytes)
+{
+    /// <summary>The world's erosion (schema 8): from the cache, eroded now, or not at all, and why.</summary>
+    public ErosionInfo? Erosion { get; init; }
+}
 
 /// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>
 /// <param name="Source">How the position was computed.</param>

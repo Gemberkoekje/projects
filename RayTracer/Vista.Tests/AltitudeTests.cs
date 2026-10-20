@@ -82,7 +82,7 @@ public sealed class AltitudeTests
     private PreviewRequest Request(string recipeJson, bool dryRun = false)
     {
         File.WriteAllText(Path.Combine(_dir, "r.json"), recipeJson);
-        return new PreviewRequest { RecipePath = Path.Combine(_dir, "r.json"), Seed = 7, OutPath = Path.Combine(_dir, "p.png"), Width = 32, Height = 18, SamplesPerPixel = 4, DryRun = dryRun };
+        return new PreviewRequest { RecipePath = Path.Combine(_dir, "r.json"), Seed = 7, OutPath = Path.Combine(_dir, "p.png"), Width = 32, Height = 18, SamplesPerPixel = 4, DryRun = dryRun, Grid = TestWorlds.Grid, Erosion = false };
     }
 
     [TestMethod]
@@ -98,7 +98,7 @@ public sealed class AltitudeTests
 
         Sidecar valley = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
         Assert.AreEqual("valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
-        Assert.AreEqual(7, valley.Schema);
+        Assert.AreEqual(8, valley.Schema);
     }
 
     [TestMethod]

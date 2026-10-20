@@ -43,6 +43,8 @@ public sealed class SheetPipelineTests
                 SamplesPerPixel = 4,
                 Debug = debug.ToHashSet(),
                 DryRun = dryRun,
+                Grid = TestWorlds.Grid,
+                Erosion = false,
             },
         };
     }
@@ -127,7 +129,7 @@ public sealed class SheetPipelineTests
         CollectionAssert.AreEqual(new[] { "sheet.cells/cell01.heightmap.png", "sheet.cells/cell02.heightmap.png" },
             sheet.Cells.Select(c => c.Source).ToArray());
         Assert.IsNull(sheet.Engine.Device);
-        Assert.AreEqual((512, 512), (sheet.Cells[0].Width, sheet.Cells[0].Height));
+        Assert.AreEqual((TestWorlds.Grid.Size, TestWorlds.Grid.Size), (sheet.Cells[0].Width, sheet.Cells[0].Height));
     }
 
     [TestMethod]

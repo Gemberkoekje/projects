@@ -39,6 +39,8 @@ public sealed class PreviewPipelineTests
         SamplesPerPixel = 4,
         Debug = debug.ToHashSet(),
         DryRun = dryRun,
+        Grid = TestWorlds.Grid,
+        Erosion = false,
     };
 
     [TestMethod]
@@ -51,7 +53,7 @@ public sealed class PreviewPipelineTests
         Assert.IsNull(sidecar.Engine.Device);
         Assert.IsTrue(sidecar.DefaultCamera);
         Assert.AreEqual("mountains", sidecar.World.TerrainProfile);
-        Assert.AreEqual(1025, sidecar.World.GridSize);
+        Assert.AreEqual(TestWorlds.Grid.Size, sidecar.World.GridSize);
         Assert.AreEqual(DataTier.BuiltIn, sidecar.DataTiers["terrain"]);
         CollectionAssert.AreEquivalent(new[] { "heightMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
         Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.heightmap.png")));
@@ -67,7 +69,7 @@ public sealed class PreviewPipelineTests
         Assert.AreEqual(a.World, b.World);
         Assert.AreEqual(a.Camera, b.Camera);
         CollectionAssert.AreEqual(File.ReadAllBytes(Path.Combine(_dir, "p.heightmap.png")), PngEncoder.Encode(
-            DebugImages.HeightMap(World.TerrainGenerator.Generate(a.Recipe, 7), a.Camera).Rgb, 512, 512, PngColor.Rgb));
+            DebugImages.HeightMap(World.TerrainGenerator.Generate(a.Recipe, 7, TestWorlds.Grid), a.Camera).Rgb, TestWorlds.Grid.Size, TestWorlds.Grid.Size, PngColor.Rgb));
     }
 
     [TestMethod]

@@ -38,6 +38,8 @@ public sealed class DenoisingTests
         Height = 18,
         SamplesPerPixel = 4,
         Denoise = denoise,
+        Grid = TestWorlds.Grid,
+        Erosion = false,
     };
 
     private static PreviewRequest Parse(params string[] extra)
@@ -237,7 +239,7 @@ public sealed class DenoisingTests
         string json = File.ReadAllText(P("p.json"));
         Sidecar back = VistaJson.Deserialize<Sidecar>(json);
         Assert.AreEqual(sidecar.Denoise, back.Denoise);
-        Assert.AreEqual(7, back.Schema);
+        Assert.AreEqual(8, back.Schema);
 
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement denoise = doc.RootElement.GetProperty("denoise");

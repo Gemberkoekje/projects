@@ -6,6 +6,7 @@ using Vista.App.Gpu;
 using Vista.Cli;
 using Vista.Output;
 using Vista.Rendering;
+using Vista.World;
 
 namespace Vista.App;
 
@@ -35,6 +36,8 @@ internal static class Program
             return RunGpu(() => SamplingCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == DenoiseCompare.Flag)
             return RunGpu(() => DenoiseCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == ErosionMeasure.Flag)
+            return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
 
         try
         {
@@ -59,13 +62,13 @@ internal static class Program
             return Usage(errors);
 
         if (request!.DryRun)
-            return Report(PreviewPipeline.Run(request, renderer: null));
+            return Report(PreviewPipeline.Run(request, renderer: null, erosionCache: ErosionCache.Default));
 
         return RunGpu(() =>
         {
             using var renderer = new D3D12VistaRenderer();
             using var denoiser = new OidnDenoiser();
-            return Report(PreviewPipeline.Run(request, renderer, denoiser: denoiser));
+            return Report(PreviewPipeline.Run(request, renderer, denoiser: denoiser, eroder: renderer, erosionCache: ErosionCache.Default));
         });
     }
 
@@ -75,13 +78,13 @@ internal static class Program
             return Usage(errors);
 
         if (request!.Base.DryRun)
-            return Report(SheetPipeline.Render(request, renderer: null));
+            return Report(SheetPipeline.Render(request, renderer: null, erosionCache: ErosionCache.Default));
 
         return RunGpu(() =>
         {
             using var renderer = new D3D12VistaRenderer();
             using var denoiser = new OidnDenoiser();
-            return Report(SheetPipeline.Render(request, renderer, denoiser: denoiser));
+            return Report(SheetPipeline.Render(request, renderer, denoiser: denoiser, eroder: renderer, erosionCache: ErosionCache.Default));
         });
     }
 
@@ -103,6 +106,7 @@ internal static class Program
         Console.Error.WriteLine(AtmosphereCompare.Usage);
         Console.Error.WriteLine(SamplingCompare.Usage);
         Console.Error.WriteLine(DenoiseCompare.Usage);
+        Console.Error.WriteLine(ErosionMeasure.Usage);
         return 1;
     }
 
@@ -133,6 +137,18 @@ internal static class Program
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"exposure: metered {exposure.LogAverageLuminanceCdM2:G3} cd/m² (EV100 {(exposure.Ev100 is double ev ? ev.ToString("0.0", CultureInfo.InvariantCulture) : "none: no light")}), " +
                 $"scaled by {exposure.AppliedEv:+0.0;-0.0} EV; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
+        }
+        if (sidecar.World.Erosion is { } erosion)
+        {
+            string how = erosion.Source switch
+            {
+                ErosionSource.Eroded when erosion.Stats is { } st => string.Create(CultureInfo.InvariantCulture,
+                    $"eroded on {erosion.Device} in {st.Seconds:0.00} s GPU ({st.WallSeconds:0.00} s wall, {st.StateBytes / 1048576.0:0} MiB of state)"),
+                ErosionSource.Cache => $"read from the cache (eroded on {erosion.Device}, driver {erosion.Driver}, {erosion.ErodedUtc})",
+                _ => erosion.Source.ToString().ToLowerInvariant(),
+            };
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"world: {sidecar.World.TerrainProfile}, {sidecar.World.GridSize}² × {sidecar.World.CellSizeMetres} m, {how}; hash {sidecar.World.HeightFieldHash}"));
         }
         if (sidecar.Render is { } render)
         {

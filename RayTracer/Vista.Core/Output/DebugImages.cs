@@ -170,6 +170,52 @@ public static class DebugImages
         return (bytes, size);
     }
 
+    /// <summary>
+    /// The erosion maps over a grey hillshade of the eroded surface, top-down with north up like <see cref="HeightMap"/>: loose
+    /// material in tan (full at 30 m and more, on a log scale), the mean discharge in blue (log scale from the grid's median, none, to
+    /// its 99.9th percentile, full), water still standing at the end deeper than 0.5 m in dark blue. At most <paramref name="maxSize"/> pixels a
+    /// side (nearest samples).
+    /// </summary>
+    public static (byte[] Rgb, int Size) ErosionMap(ErosionResult result, CameraSpec? camera, int maxSize = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        HeightField field = result.Surface;
+        int size = Math.Min(field.Size, maxSize);
+        double step = (field.Size - 1) / (double)Math.Max(size - 1, 1);
+        float[] sorted = (float[])result.Discharge.Clone();
+        Array.Sort(sorted);
+        double noDischarge = Math.Log(Math.Max(sorted[(sorted.Length - 1) / 2], 1e-6f));
+        double fullDischarge = Math.Log(Math.Max(sorted[(int)((sorted.Length - 1) * 0.999)], 2e-6f)) - noDischarge;
+        double fullLoose = Math.Log(1.0 + 30.0);
+        var bytes = new byte[size * size * 3];
+        Parallel.For(0, size, row =>
+        {
+            int j = (int)Math.Round((size - 1 - row) * step);
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, field.Size - 1);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, field.Size - 1);
+                double dhdx = (field[i1, j] - field[i0, j]) / ((i1 - i0) * field.CellSize);
+                double dhdz = (field[i, j1] - field[i, j0]) / ((j1 - j0) * field.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double grey = 60 + 170 * shade;
+                (double r, double g, double b) = (grey, grey, grey);
+                int c = j * field.Size + i;
+                double loose = Math.Clamp(Math.Log(1.0 + result.Loose[c]) / fullLoose, 0.0, 1.0);
+                (r, g, b) = (r + (215 * shade + 40 - r) * loose, g + (175 * shade + 30 - g) * loose, b + (110 * shade + 20 - b) * loose);
+                double flow = Math.Clamp((Math.Log(Math.Max(result.Discharge[c], 1e-6f)) - noDischarge) / fullDischarge, 0.0, 1.0);
+                (r, g, b) = (r + (30 - r) * flow, g + (110 - g) * flow, b + (255 - b) * flow);
+                if (result.StandingWater[c] > 0.5f)
+                    (r, g, b) = (20, 40, 150);
+                Put(bytes, row * size + col, ((byte)Math.Round(r), (byte)Math.Round(g), (byte)Math.Round(b)));
+            }
+        });
+        if (camera is not null)
+            MarkCamera(bytes, size, field, camera);
+        return (bytes, size);
+    }
+
     private static void MarkCamera(byte[] bytes, int size, HeightField field, CameraSpec camera)
     {
         double ToCol(double x) => (x - field.OriginX) / field.Extent * (size - 1);

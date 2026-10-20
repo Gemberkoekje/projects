@@ -21,7 +21,7 @@
        next to the .exe: the integrator, the atmosphere LUT builders, their shared atmosphere include and the
        integrator's sky-light include. -->
   <ItemGroup>
-    <None Update="Shaders\VistaIntegrator.hlsl;Shaders\VistaAtmosphereLuts.hlsl;Shaders\VistaAtmosphere.hlsli;Shaders\VistaSkyLight.hlsli">
+    <None Update="Shaders\VistaIntegrator.hlsl;Shaders\VistaAtmosphereLuts.hlsl;Shaders\VistaErosion.hlsl;Shaders\VistaAtmosphere.hlsli;Shaders\VistaSkyLight.hlsli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

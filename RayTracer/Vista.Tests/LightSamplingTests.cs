@@ -83,7 +83,7 @@ public sealed class LightSamplingTests
         File.WriteAllText(Path.Combine(_dir, "r.json"), """{ "setPieces": ["alpineRange"], "time": "goldenHour" }""");
         string[] args = ["--preview", "--recipe", Path.Combine(_dir, "r.json"), "--seed", "7", "--out", Path.Combine(_dir, "p.png"), "--width", "32", "--spp", "4", .. extra];
         Assert.IsTrue(PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors), string.Join(" ", errors));
-        return request!;
+        return request! with { Grid = TestWorlds.Grid, Erosion = false };
     }
 
     [TestMethod]
@@ -95,7 +95,7 @@ public sealed class LightSamplingTests
         Assert.AreEqual(LightSampling.Mis, renderer.Meters.Single().LightSampling, "the meter renders the same way");
         Assert.AreEqual(LightSampling.Mis, mis.Image.LightSampling);
         Assert.AreEqual(2, mis.Image.RussianRouletteStart);
-        Assert.AreEqual(7, Sidecar.CurrentSchema);
+        Assert.AreEqual(8, Sidecar.CurrentSchema);
         Assert.AreEqual(Sidecar.CurrentSchema, mis.Schema);
 
         Sidecar m14 = PreviewPipeline.Run(Request("--light-sampling", "sunOnly", "--rr-start", "3"), renderer);
