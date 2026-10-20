@@ -51,7 +51,9 @@ public static class AutoExposure
 
     /// <summary>
     /// The meter render for an image rendered with <paramref name="image"/>: the whole frame at <see cref="MeterWidth"/>
-    /// (the frame's aspect ratio kept) and <see cref="MeterSamplesPerPixel"/>, every other setting the same.
+    /// (the frame's aspect ratio kept) and <see cref="MeterSamplesPerPixel"/>, through the LUT atmosphere, every other
+    /// setting the same. The reference atmosphere is never metered on: at 16 samples its twilight is mostly zeros and
+    /// rare bright paths, and metering both modes alike exposes a LUT and a reference image the same, side by side.
     /// </summary>
     public static RenderSettings MeterSettings(RenderSettings image)
     {
@@ -63,6 +65,7 @@ public static class AutoExposure
             Height = height,
             Window = default,
             SamplesPerPixel = MeterSamplesPerPixel,
+            Atmosphere = AtmosphereMode.Luts,
             ExposureMeter = true,
         };
     }

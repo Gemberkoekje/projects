@@ -19,6 +19,12 @@ public static class SkyCheck
     /// <summary>View elevations above the horizontal, degrees.</summary>
     public static IReadOnlyList<double> ViewElevations { get; } = [0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 50.0, 75.0];
 
+    /// <summary>
+    /// View elevations below the horizontal, degrees, for <c>--below-horizon</c>: from a high observer the first few
+    /// still see sky above the dipped horizon, the rest the land beyond the tile through a long path of air.
+    /// </summary>
+    public static IReadOnlyList<double> BelowElevations { get; } = [-1.0, -2.5, -4.0, -8.0, -15.0, -30.0];
+
     /// <summary>View azimuths relative to the sun, degrees (0 toward it).</summary>
     public static IReadOnlyList<double> ViewAzimuths { get; } = [0.0, 15.0, 45.0, 90.0, 135.0, 180.0];
 
@@ -33,11 +39,11 @@ public static class SkyCheck
         return new Vector3(0f, (float)Math.Sin(e), (float)Math.Cos(e));
     }
 
-    /// <summary>Every (view elevation, relative azimuth) direction, elevation-major.</summary>
-    public static IReadOnlyList<(double Elevation, double Azimuth, Vector3 Direction)> Directions()
+    /// <summary>Every (view elevation, relative azimuth) direction, elevation-major; <paramref name="belowHorizon"/> uses <see cref="BelowElevations"/>.</summary>
+    public static IReadOnlyList<(double Elevation, double Azimuth, Vector3 Direction)> Directions(bool belowHorizon = false)
     {
         var list = new List<(double, double, Vector3)>();
-        foreach (double e in ViewElevations)
+        foreach (double e in belowHorizon ? BelowElevations : ViewElevations)
         {
             foreach (double a in ViewAzimuths)
             {
@@ -55,11 +61,11 @@ public static class SkyCheck
     /// the bands and the luminance.
     /// </summary>
     public static SkyCheckElevation Aggregate(double sunElevation, ReadOnlySpan<float> sums, int chunks, int pathsPerChunk,
-        IReadOnlyList<float> wavelengthsNm, IReadOnlyList<float> luminanceWeights)
+        IReadOnlyList<float> wavelengthsNm, IReadOnlyList<float> luminanceWeights, bool belowHorizon = false)
     {
         ArgumentNullException.ThrowIfNull(wavelengthsNm);
         ArgumentNullException.ThrowIfNull(luminanceWeights);
-        IReadOnlyList<(double Elevation, double Azimuth, Vector3 Direction)> directions = Directions();
+        IReadOnlyList<(double Elevation, double Azimuth, Vector3 Direction)> directions = Directions(belowHorizon);
         int n = wavelengthsNm.Count;
         if (sums.Length != directions.Count * n * chunks * 4)
             throw new ArgumentException($"Expected {directions.Count * n * chunks * 4} sums, got {sums.Length}.", nameof(sums));

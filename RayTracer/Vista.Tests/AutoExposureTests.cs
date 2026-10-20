@@ -63,13 +63,14 @@ public sealed class AutoExposureTests
     [TestMethod]
     public void Meter_IsTheWholeFrameAtPreviewSize()
     {
-        var image = new RenderSettings { Width = 3840, Height = 1600, SamplesPerPixel = 1024, MaxBounces = 9, Window = new PixelWindow(100, 100, 64, 64) };
+        var image = new RenderSettings { Width = 3840, Height = 1600, SamplesPerPixel = 1024, MaxBounces = 9, Window = new PixelWindow(100, 100, 64, 64), Atmosphere = AtmosphereMode.Reference };
         RenderSettings meter = AutoExposure.MeterSettings(image);
         Assert.AreEqual((320, 133), (meter.Width, meter.Height), "the frame's aspect ratio");
         Assert.IsTrue(meter.Window.IsEmpty, "the whole frame, also for a loupe");
         Assert.AreEqual(AutoExposure.MeterSamplesPerPixel, meter.SamplesPerPixel);
         Assert.AreEqual(9, meter.MaxBounces);
         Assert.IsTrue(meter.ExposureMeter);
+        Assert.AreEqual(AtmosphereMode.Luts, meter.Atmosphere, "a reference image is metered on the LUT sky");
         Assert.IsFalse(image.ExposureMeter);
     }
 }

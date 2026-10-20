@@ -57,4 +57,25 @@ public sealed class MeasurementViewTests
             Assert.IsNull(DefaultCamera.GroundWarning(camera, terrain), file);
         }
     }
+
+    [TestMethod]
+    public void TheAtmosphereCheckViews_AreValidAndAboveTheTerrain()
+    {
+        // vista-views/atmosphere (M1.3): the views render.ps1 renders the atmosphere checks from.
+        string folder = Path.Combine(Directory, "atmosphere");
+        string[] recipes = System.IO.Directory.GetFiles(folder, "*.recipe.json");
+        Assert.AreEqual(2, recipes.Length);
+        foreach (string file in recipes)
+        {
+            Recipe recipe = VistaJson.ParseRecipe(File.ReadAllText(file));
+            Assert.AreEqual(Place.Zermatt, recipe.Location, file);
+            Assert.IsNotNull(recipe.Date, "the date is pinned, so the sun stays put");
+        }
+        HeightField terrain = TerrainGenerator.Generate(VistaJson.ParseRecipe(File.ReadAllText(recipes[0])), 42);
+        string[] cameras = System.IO.Directory.GetFiles(folder, "*.camera.json");
+        CollectionAssert.AreEquivalent(new[] { "away-from-sun", "range", "toward-sun" },
+            cameras.Select(f => Path.GetFileName(f).Replace(".camera.json", "", StringComparison.Ordinal)).ToArray());
+        foreach (string file in cameras)
+            Assert.IsNull(DefaultCamera.GroundWarning(VistaJson.ParseCamera(File.ReadAllText(file)), terrain), file);
+    }
 }

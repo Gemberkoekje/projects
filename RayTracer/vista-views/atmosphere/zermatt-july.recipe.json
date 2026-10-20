@@ -1,0 +1,11 @@
+{
+  "schema": 3,
+  "name": "Zermatt, July evening",
+  "setPieces": [
+    "snowCappedMountains"
+  ],
+  "time": "goldenHour",
+  "season": "summer",
+  "location": "zermatt",
+  "date": "2026-07-15"
+}

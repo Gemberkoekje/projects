@@ -25,7 +25,7 @@ internal static class AtmosphereCheck
     /// <summary>Usage text.</summary>
     public const string Usage =
         "       Vista.App --atmosphere-check [--sun-elevations 30,5,-2,-6] [--paths 65536] [--ground-altitude 1608]\n" +
-        "                 [--observer-height 2] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--out check.json]\n" +
+        "                 [--observer-height 2] [--below-horizon] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--out check.json]\n" +
         "                 (the LUT sky against the reference, per wavelength band)";
 
     private const int Chunks = 64;
@@ -41,6 +41,8 @@ internal static class AtmosphereCheck
             if (i + 1 < args.Count && args[i] is "--sun-elevations" or "--paths" or "--ground-altitude" or "--observer-height" or "--out"
                     or "--ground-albedo" or "--aerosol-depth")
                 values[args[i]] = args[++i];
+            else if (args[i] == "--below-horizon")
+                values[args[i]] = "true";
             else
                 problems.Add($"Unknown or valueless argument '{args[i]}'.");
         }
@@ -67,7 +69,8 @@ internal static class AtmosphereCheck
             model = model with { AerosolOpticalDepth550 = Number(haze, problems) };
         AtmosphereTables tables = AtmosphereTables.Build(model);
         float[] weights = SkyCheck.LuminanceWeights(IntegratorTables.Build(MaterialCatalog.M0));
-        IReadOnlyList<Vector3> directions = [.. SkyCheck.Directions().Select(d => d.Direction)];
+        bool below = values.ContainsKey("--below-horizon");
+        IReadOnlyList<Vector3> directions = [.. SkyCheck.Directions(below).Select(d => d.Direction)];
 
         using var renderer = new D3D12VistaRenderer();
         log.WriteLine($"Device: {renderer.DeviceName}");
@@ -78,7 +81,7 @@ internal static class AtmosphereCheck
         {
             AtmosphereFrame frame = AtmosphereFrame.For(model, ground, SkyCheck.SunDirection(elevation), observer, 0.0, 0.0);
             SkyCheckRaw raw = renderer.RunSkyCheck(frame, directions, Chunks, paths / Chunks, PathsPerDispatch);
-            SkyCheckElevation result = SkyCheck.Aggregate(elevation, raw.Sums, Chunks, paths / Chunks, tables.WavelengthsNm, weights);
+            SkyCheckElevation result = SkyCheck.Aggregate(elevation, raw.Sums, Chunks, paths / Chunks, tables.WavelengthsNm, weights, below);
             results.Add(result);
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"sun {elevation:+0.#;-0.#;0}°: {raw.Dispatches} dispatches, {raw.GpuSeconds:0.0} s GPU; luminance error mean {result.MeanAbsoluteLuminanceError:P2}, worst {result.WorstLuminanceError:+0.00%;-0.00%}"));

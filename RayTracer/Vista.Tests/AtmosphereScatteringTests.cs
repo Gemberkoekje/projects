@@ -104,6 +104,17 @@ public sealed class AtmosphereScatteringTests
     }
 
     [TestMethod]
+    public void Density_BelowTheLowestSun_IsZero()
+    {
+        var ones = new float[AtmosphereScattering.FloatsPerChannel * 2];
+        Array.Fill(ones, 1f);
+        AtmosphereCoefficients k = AtmosphereModel.Default.CoefficientsAt(450.0);
+        var twilight = new AtmosphereScattering.Sample(100.0, 0.2, AtmosphereScattering.MuSMin + 0.01, 0.0, false);
+        Assert.IsTrue(AtmosphereScattering.Density(ones, Frame, k, 0.0, twilight) > 0.0);
+        Assert.AreEqual(0.0, AtmosphereScattering.Density(ones, Frame, k, 0.0, twilight with { MuS = -0.8 }), "night");
+    }
+
+    [TestMethod]
     public void SingleScatteringTexel_IsZeroWithTheSunDeepBelow()
     {
         AtmosphereCoefficients k = AtmosphereModel.Default.CoefficientsAt(550.0);

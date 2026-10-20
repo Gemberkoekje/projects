@@ -34,3 +34,15 @@ dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --sheet --seed 42 --o
     --recipe vista-views/mountains-day.recipe.json \
     --vary camera=vista-views/sky.camera.json,vista-views/aerial.camera.json,vista-views/default.camera.json
 ```
+
+## Atmosphere checks (M1.3)
+
+`atmosphere/` holds the views the M1.3 atmosphere was checked on: two recipes pinned to Zermatt (a July evening and
+15 October) and three cameras over the seed-42 range, two at 4.2 km looking toward and away from the evening sun (the
+reddened sun; the Earth's shadow and the Belt of Venus) and one at 3.4 km looking at the peaks (lit after the valley's
+sunset). `render.ps1` reruns every M1.3 check: `--atmosphere-check` above and below the horizon, the sun-elevation
+sheets from −6° to +10°, the peaks sheet and an October time-of-day sheet.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/atmosphere/render.ps1 [-Paths 1048576] [-Out folder]
+```

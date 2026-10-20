@@ -24,6 +24,7 @@
   <!-- The committed measurement views (M1.1), so a test keeps them valid. -->
   <ItemGroup>
     <None Include="../vista-views/*.json" Link="vista-views/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../vista-views/atmosphere/*.json" Link="vista-views/atmosphere/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

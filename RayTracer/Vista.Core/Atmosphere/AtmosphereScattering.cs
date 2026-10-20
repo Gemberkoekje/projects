@@ -390,11 +390,15 @@ public static class AtmosphereScattering
     /// <summary>
     /// The scattering density of a phase-weighted radiance table (2 channels) at a sample, for a wavelength at
     /// <paramref name="position"/> among the table wavelengths (<see cref="MsPositions"/>, or an integer inside the
-    /// iteration) with coefficients <paramref name="k"/>: <c>σ_R(h)·A_R + σ_M(h)·A_M</c>.
+    /// iteration) with coefficients <paramref name="k"/>: <c>σ_R(h)·A_R + σ_M(h)·A_M</c>. Below the tables' lowest sun
+    /// (<see cref="MuSMin"/>, 30° down, long after astronomical twilight's −18°) it is zero rather than the edge texel's
+    /// last glimmer, which auto exposure would otherwise lift into a blue night sky.
     /// </summary>
     public static double Density(ReadOnlySpan<float> weighted, AtmosphereFrame frame, in AtmosphereCoefficients k, double position, in Sample sample)
     {
         ArgumentNullException.ThrowIfNull(frame);
+        if (sample.MuS < MuSMin)
+            return 0.0;
         Cell cell = CellOf(frame, sample);
         int l0 = Math.Min((int)Math.Floor(position), MsWavelengths - 2);
         double f = position - l0;

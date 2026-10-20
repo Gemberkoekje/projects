@@ -1,0 +1,11 @@
+{
+  "schema": 3,
+  "name": "Zermatt, October",
+  "setPieces": [
+    "snowCappedMountains"
+  ],
+  "time": "day",
+  "season": "autumn",
+  "location": "zermatt",
+  "date": "2026-10-15"
+}

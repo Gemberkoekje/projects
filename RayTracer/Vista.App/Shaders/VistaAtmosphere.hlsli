@@ -365,8 +365,11 @@ float2 Lookup2(StructuredBuffer<float2> table, ScatterCell c, uint l)
 
 // The scattering density of a phase-weighted radiance table at a point, for a wavelength at `position` among the
 // table wavelengths (an integer inside the iteration; AtmSun[λ].w for a hero wavelength): σ_R(h)·A_R + σ_M(h)·A_M.
+// Zero below the tables' lowest sun (30° down), not the edge texel's last glimmer.
 float ScatterDensity(StructuredBuffer<float2> weighted, float4 k, float position, ScatterPoint p)
 {
+    if (p.MuS < SCATTER_MU_S_MIN)
+        return 0.0;
     ScatterCell c = CellOf(p);
     uint l0 = min(uint(floor(position)), SCATTER_MS_WAVELENGTHS - 2u);
     float f = position - float(l0);

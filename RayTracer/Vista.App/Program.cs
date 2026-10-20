@@ -116,7 +116,8 @@ internal static class Program
         if (sidecar.Exposure is { } exposure)
         {
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"exposure: metered {exposure.LogAverageLuminanceCdM2:G3} cd/m² (EV100 {exposure.Ev100:0.0}), scaled by {exposure.AppliedEv:+0.0;-0.0} EV; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
+                $"exposure: metered {exposure.LogAverageLuminanceCdM2:G3} cd/m² (EV100 {(exposure.Ev100 is double ev ? ev.ToString("0.0", CultureInfo.InvariantCulture) : "none: no light")}), " +
+                $"scaled by {exposure.AppliedEv:+0.0;-0.0} EV; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
         }
         if (sidecar.Render is { } render)
         {
