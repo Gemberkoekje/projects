@@ -1700,9 +1700,11 @@ renders M1.4's images bit for bit (checked on three views against `main`, d8f31e
 - **The cost ledger:** the M1.5 row, 0.22, 2.81, 2.17 and 3.62 ns: 3–7% over M1.4 on terrain at 4K (measured against `main`
   alternately on a shared GPU; see the note under the ledger). The efficiencies above use the 320 px cost, the higher one, so at
   4K they are, if anything, larger.
-- **Before/after:** the four measurement views and the dawn view, `main` (d8f31ea) against this slice at 640 px and 16 spp:
-  dawn's speckled slopes and the golden hour's shadowed valley come out smooth, the day views look alike, and the sky view
-  (camera rays only) is unchanged. `vista-views/sampling/render.ps1` also writes a 16 spp pair of each view.
+- **Before/after** (`vista-views/sheets/m1-5-before-after.png`): the four measurement views and the dawn view, `main` (d8f31ea)
+  against this slice at 640 px and 16 spp: dawn's speckled slopes and the golden hour's shadowed valley come out smooth, the day
+  views look alike, and the sky view (camera rays only) is unchanged. `vista-views/sampling/render.ps1` also writes a 16 spp pair
+  of each view, M1.4's estimator beside MIS at one exposure: `vista-views/sheets/m1-5-dawn-16spp.png`,
+  `m1-5-golden-down-slope-16spp.png`, `m1-5-golden-default-16spp.png` and `m1-5-day-16spp.png`.
 
 *M1.5 decisions taken in code (revisit freely):*
 
