@@ -1473,10 +1473,13 @@ below too.
   The LUTs evaluate their model to within 0.4% on terrain (+0.7% beyond 8 km into the low sun, +1.0% in that sky). The
   **known limit** is the third column of each pair: the air in a mountain's shadow, which the LUTs keep lit, would make the
   valleys at 2–8 km 4–10% darker at golden hour. At noon the shadows touch none of the air the camera sees. A side-lit golden-hour
-  view (the sun behind the camera's left, across the range) loses only 1.1–1.3%. M4's fog volumes revisit it.
+  view (the sun behind the camera's left, across the range) loses only 1.1–1.3%. M4's fog volumes revisit it. The three
+  renders of each view, at one exposure: `vista-views/sheets/m1-4-ridges-noon.png`, `m1-4-ridges-golden.png` and
+  `m1-4-valley-golden.png`.
 - **Sea level against 3000 m** (`vista-views/aerial`, the layered ridges at noon, `--vary altitude=0,3000`): at 3000 m the sky
   is a deeper blue, the horizon haze thinner and the far ridges clearer. The zenith depths from the base fall from 0.097
-  (Rayleigh, 550 nm) and 0.100 (haze) to 0.068 and 0.008; the sun reaches the camera with T₄₅₀ 0.83 → 0.89.
+  (Rayleigh, 550 nm) and 0.100 (haze) to 0.068 and 0.008; the sun reaches the camera with T₄₅₀ 0.83 → 0.89
+  (`vista-views/sheets/m1-4-altitude.png`).
 - **The cost ledger** has the first real jump since M0: +21%, +41% and +48% on the terrain views over M1.3 (the M1.4 row).
 - **Self-test:** passes, and grows: the aerial perspective of five world segments (down from the camera, a short bounce off
   to the side, a long grazing one across the tile, one up a slope) at three wavelengths matches its C# reference fed the
@@ -1488,7 +1491,8 @@ below too.
   the sphere exactly, never straddles the horizon); the ground irradiance's sun map; the 4D view map's round trip and its
   zenith and nadir coverage near the ground; the altitude control (recipe, CLI, pipeline, sidecar, sheet conflicts); the
   frame's reach and `SunReachesScene`; the comparison's bins; the committed view.
-- **Before/after:** the four measurement views, `main` (3bf4c77) against this slice at 640 px, 256 spp. The sky view is
+- **Before/after** (`vista-views/sheets/m1-4-before-after.png`): the four measurement views, `main` (3bf4c77) against this
+  slice at 640 px, 256 spp. The sky view is
   unchanged to the eye. From the aerial view the far range recedes into blue haze and the shadows turn blue; from the default
   camera the far peaks pale; in the down-slope view a veil of lit air lifts the shadowed valley (the known limit, in a view).
 - **M1.3's sky check again** (`vista-views/atmosphere/render.ps1`), with M1.4's tables. Mean |error| (worst) per band:
