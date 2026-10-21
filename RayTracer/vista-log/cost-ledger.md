@@ -22,6 +22,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.10 | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.10a | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.11 | 0.27 | 4.02 | 2.78 | 5.67 |
+| M1.11a | 0.22 | 4.04 | 2.69 | 6.44 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -72,3 +73,10 @@ by view, three rounds; median ratios 1.034, 0.996, 0.992 and 1.019 (1.012–1.05
 run-to-run noise but for the down-slope view's +2%. The views trace 1.00, 3.07, 2.51 and 3.80 rays per sample (M1.10a: 1.00, 3.07, 2.51,
 3.89; the lower sun puts more of the slope in shadow). Why that view costs 2% more a sample with fewer rays was not measured. The haze
 should cost nothing: its optical depth is a number in the LUTs, and the day views' ratios are 1.00 within the noise.
+M1.11a changes the world under every view (the stream-power incision and the pool filling) and nothing in the integrator. Measured as M1.11
+was, on a GPU 25–40% busy with other programs: this slice and `main` (cbeadbe2) rendered alternately, view by view, three rounds; median
+ratios 0.817, 1.004, 0.966 and 1.136 (0.775–0.836, 1.003–1.004, 0.966–0.974, 1.134–1.140). The views trace 1.00, 3.16, 2.37 and 3.68 rays per
+sample (M1.11: 1.00, 3.07, 2.51, 3.80). The default and down-slope views now stand 532 and 552 m above a valley floor instead of near the
+ground: the default view sees more sky and costs 3% less; down the slope the frame is a deep valley in shadow and the range beyond it, fewer
+rays per sample but 14% more time per sample, likely the longer rays across the valley through more of the mesh (not measured). The sky
+view's −18% is unexplained, as M1.7's −25% was: it traces one camera ray per sample on both builds (0.05 ns a sample).

@@ -256,6 +256,13 @@ change.
   wetness maps that later stages reuse (rivers, lakes, snow, vegetation). Built in M1.7 ([`vista-log/M1.7.md`](vista-log/M1.7.md)):
   virtual-pipe water and thermal erosion over bedrock and loose material, on a 4097² × 8 m
   grid (32.8 km), cached per seed.
+- **Drainage before erosion** (M1.11a, [`vista-log/M1.11a.md`](vista-log/M1.11a.md)): the ridged base terrain is half closed
+  basins, which the pipe model cannot open (its rain evaporates long before a basin hundreds of metres deep fills). So rivers first
+  incise the base terrain on a 64 m grid by the stream-power law, on the CPU, with the rain routed through the filled hollows: each
+  basin's rim cuts down, the lake behind it fills a little each step, and the basins become valleys that branch and join. The GPU
+  erosion then carves the gullies and lays the loose material on the 8 m grid as before. Every eroded world carries its
+  **drainage** (each cell's way down over the depression-filled surface, its upstream area, and how deep its hollow fills), cached
+  with it: the flow accumulation materials (M1.12) and rivers (M3) read.
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -282,7 +289,9 @@ change.
 ### 4.4 Hydrology & water bodies
 
 - Lakes and rivers placed from the erosion flow map, with the shot-first basin for the
-  "lake" building block.
+  "lake" building block. Since M1.11a the eroded world's drainage gives the flow accumulation and
+  where hollows would fill; the pools the GPU erosion's sediment dams along the valley floors are
+  filled to their outlets (flat floors), so M3's rivers need channels cut through them.
 - Shorelines get wetness bands; lakes get a depth field for absorption.
 - Waterfalls need a step in the river profile — planted by the recipe, carved into the
   terrain.
@@ -1069,6 +1078,13 @@ golden. Left for the review: +2° itself, and a haze that humidity alone barely 
   (every cached world changes); the measurement views' cameras still above the ground (a test flags
   it); a cost-ledger row.
 
+*Status (2026-10-21): done, by the fallback.* The flow accumulation showed the ridged base terrain is half closed basins (43–51% of the
+grid, 41–49% after M1.7's erosion), and coarse-to-fine could not open them: sixteen times M1.7's steps on its 32 m level still left 41%,
+so it was not built. **Stream-power incision** on a 64 m grid, on the CPU before the GPU erosion (13–15 s a seed), drains every basin;
+the pools the GPU erosion's sediment leaves fill to their outlets. On the eroded world the longest lake-free channel runs 38–51 km
+(M1.7: 1.6–1.9) and 98% of the grid drains into a channel of 1 km² (3–6%). The coarse-to-fine conservation check became the incision's own checks.
+Log: [`vista-log/M1.11a.md`](vista-log/M1.11a.md).
+
 **M1.12 — Materials by rule.**
 - *Goal:* rock that reads as rock: strata, scree, soil, alpine grass and wet ground where nature
   puts them (§4.3).
@@ -1265,7 +1281,9 @@ balance, lens CA), estimator accuracy.
 - **Eroded worlds depend on the GPU driver** (M1 decision: erosion stays on the GPU). The
   per-seed cache and the sidecar's height-field hash make a change visible, but a fresh machine
   or driver may erode the same seed slightly differently. Since M1.7, `--gpu-selftest` erodes
-  seed 42 and compares it with the cached copy, naming both drivers when they disagree.
+  seed 42 and compares it with the cached copy, naming both drivers when they disagree. The
+  stream-power incision before the GPU passes (M1.11a) runs on the CPU and is the same on every
+  machine; only the passes depend on the driver.
 - **The agent loop needs the GPU.** Only the local RTX 3070 can render, so LLM look-dev
   iteration (§7.4) works only in a local session on the dev box. A CPU preview
   renderer would lift that, but contradicts the no-CPU-port decision (§9); revisit
