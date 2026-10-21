@@ -30,6 +30,7 @@ public sealed class MeshOptionsTests
         Assert.AreEqual(new MeshSettings { Kind = MeshKind.Uniform, ErrorPixels = 0.5, Detail = false, FarField = false },
             Parse("--mesh", "uniform", "--mesh-error", "0.5", "--detail", "off", "--far-field", "off").Mesh);
         Assert.AreEqual(MeshKind.View, Parse("--mesh", "view").Mesh.Kind);
+        Assert.AreEqual(new MeshSettings { HeightField = true }, Parse("--far-field", "heightField").Mesh, "M1.10's measured alternative");
         StringAssert.Contains(Error("--mesh", "lumpy"), "--mesh must be view or uniform");
         StringAssert.Contains(Error("--mesh-error", "0"), "--mesh-error must be");
         StringAssert.Contains(Error("--mesh-error", "-1"), "--mesh-error must be");

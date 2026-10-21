@@ -142,3 +142,18 @@ One view's mesh by hand (the sidecar's `world.mesh` and the console's `mesh:` li
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --preview --recipe vista-views/mountains-golden.recipe.json --seed 42 \
     --camera vista-views/aerial.camera.json --width 3840 --mesh-error 1 [--detail off] [--far-field off] [--mesh uniform] --out p.png
 ```
+
+## Height-field checks (M1.10, on the prototype's branch)
+
+`heightfield/render.ps1` reruns every M1.10 check: `--height-field-compare` on the five M1.9 views at 4K, golden hour, seed 42, the
+far field meshed (M1.9) against traced as height-field tiles: the size table at 1 and 0.5 px with 8² and 16² tiles (triangles,
+tiles, bytes, acceleration structures, video memory, build times, cost per pixel-sample), the cost of the two rendered alternately
+by two renderers over three rounds (read the median ratio), and the image difference at 2, 1 and 0.5 px against the noise floor,
+with a sheet of the height field, the 1 px mesh and their difference per view. The height field is a prototype: it lives on the
+branch `claude/vista-m1-10-heightfield`, not on `main` (vista-plan §10, M1.10, says why).
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/heightfield/render.ps1 [-ImageSpp 128] [-Out folder]
+```
+
+One view by hand: `--preview ... --far-field heightField`.

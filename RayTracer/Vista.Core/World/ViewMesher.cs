@@ -56,6 +56,15 @@ public sealed record MeshSettings
     /// <summary>Mesh the far field beyond the world grid, out to the horizon.</summary>
     public bool FarField { get; init; } = true;
 
+    /// <summary>
+    /// Trace the far field as height-field tiles instead of meshing it (vista-plan §10 M1.10, the measured alternative): the mesh
+    /// holds the world grid alone and <see cref="TerrainMesh.HeightField"/> the rest. Only with <see cref="FarField"/>.
+    /// </summary>
+    public bool HeightField { get; init; }
+
+    /// <summary>Cells a side of a height-field tile (a power of two, 2 to 256).</summary>
+    public int HeightFieldTileCells { get; init; } = FarHeightField.DefaultTileCells;
+
     /// <summary>Problems that make these settings unusable (empty when valid).</summary>
     public IReadOnlyList<string> Validate()
     {
@@ -68,6 +77,8 @@ public sealed record MeshSettings
             errors.Add("The mesh's error target off screen must be between 0 and 1 rad.");
         if (!double.IsFinite(MaxTrianglePixels) || MaxTrianglePixels < 1.0 || MaxTrianglePixels > 100_000.0)
             errors.Add("The mesh's largest triangle must be between 1 and 100 000 pixels.");
+        if (HeightFieldTileCells is < 2 or > 256 || !System.Numerics.BitOperations.IsPow2(HeightFieldTileCells))
+            errors.Add("A height-field tile must be a power of two between 2 and 256 cells a side.");
         return errors;
     }
 }
@@ -135,6 +146,21 @@ public sealed record MeshInfo
 
     /// <summary>Of those, triangles beyond the world grid (the far field).</summary>
     public long FarTriangles { get; init; }
+
+    /// <summary>Whether the far field is height-field tiles rather than triangles (M1.10).</summary>
+    public bool HeightField { get; init; }
+
+    /// <summary>The far field's height-field tiles (none when it is meshed).</summary>
+    public long HeightFieldTiles { get; init; }
+
+    /// <summary>The tiles' upload size (their frames and boxes), bytes; the world's two grids are <see cref="HeightFieldGridBytes"/>.</summary>
+    public long HeightFieldBytes { get; init; }
+
+    /// <summary>The far grids' upload size, bytes: once per world.</summary>
+    public long HeightFieldGridBytes { get; init; }
+
+    /// <summary>Time to lay out the tiles, s.</summary>
+    public double HeightFieldSeconds { get; init; }
 
     /// <summary>Vertices.</summary>
     public long Vertices { get; init; }
@@ -211,6 +237,7 @@ public static class ViewMesher
 
         bool detail = settings.Kind == MeshKind.View && settings.Detail;
         bool far = settings.Kind == MeshKind.View && settings.FarField;
+        bool heightField = far && settings.HeightField;
         int vertexCount = refiner.VertexCount;
         var positions = new float[vertexCount * 3];
         bool maps = settings.Kind == MeshKind.View;
@@ -241,12 +268,16 @@ public static class ViewMesher
         double min = (far ? hierarchy.MinHeight : hierarchy.Surface.MinHeight) - amplitude;
         double max = (far ? hierarchy.MaxHeight : hierarchy.Surface.MaxHeight) + amplitude;
         double reach = far ? refiner.Reach : FarthestCorner(hierarchy.Surface, view.Camera);
+        FarHeightField tiles = heightField
+            ? FarHeightField.Build(hierarchy.FarGrids, frame, view.Camera.X, view.Camera.Z, refiner.Reach, settings.HeightFieldTileCells)
+            : FarHeightField.None;
         var mesh = new TerrainMesh(positions, normals, indices, mapNormals, maps ? hierarchy.NormalMaps : null)
         {
             Frame = frame,
             MinHeight = min,
             MaxHeight = max,
             ReachMetres = reach,
+            HeightField = tiles,
         };
         mesh.Info = new MeshInfo
         {
@@ -258,6 +289,11 @@ public static class ViewMesher
             Triangles = mesh.TriangleCount,
             DetailTriangles = refiner.DetailTriangles,
             FarTriangles = refiner.FarTriangles,
+            HeightField = heightField,
+            HeightFieldTiles = tiles.TileCount,
+            HeightFieldBytes = tiles.ByteSize,
+            HeightFieldGridBytes = tiles.Any ? tiles.Grids.ByteSize : 0,
+            HeightFieldSeconds = tiles.BuildSeconds,
             Vertices = mesh.VertexCount,
             Bytes = mesh.ByteSize,
             ReachMetres = mesh.ReachMetres,
@@ -381,7 +417,8 @@ public static class ViewMesher
             _h = hierarchy;
             _uniform = settings.Kind == MeshKind.Uniform;
             _subGrid = !_uniform && settings.Detail && !hierarchy.Detail.IsNone;
-            _farField = !_uniform && settings.FarField;
+            // A far field traced as a height field leaves the mesh the triangles over the world grid (FarHeightField takes the rest).
+            _farField = !_uniform && settings.FarField && !settings.HeightField;
             // On screen a pixel is 1/λ rad; off screen the target's angle stands in for τ of them. Errors over τ pixels refine, and
             // on screen so do edges over MaxTrianglePixels pixels.
             double pixel = 1.0 / view.PixelsPerRadian;

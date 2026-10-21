@@ -66,6 +66,12 @@ public sealed class TerrainMesh
     /// </summary>
     public double ReachMetres { get; init; }
 
+    /// <summary>
+    /// The far field as height-field tiles instead of triangles (vista-plan §10 M1.10), when the mesh was built so: the mesh then
+    /// holds the world grid alone and the renderer traces the tiles beside it. <see cref="FarHeightField.None"/> otherwise.
+    /// </summary>
+    public FarHeightField HeightField { get; init; } = FarHeightField.None;
+
     /// <summary>What the mesh is and what it cost.</summary>
     public MeshInfo Info { get; internal set; } = new() { Kind = MeshKind.None };
 }

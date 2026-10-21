@@ -88,6 +88,9 @@ cbuffer Constants : register(b0)
     float2 CamWorld;      uint MapCount;   uint _pad3;                            // the mesh's tangent point in the world; normal maps bound (M1.9)
     float2 Map0Origin;    float Map0Cell;  uint Map0Size;                         // the world grid's normal map
     float2 Map1Origin;    float Map1Cell;  uint Map1Size;                         // the 32 m far grid's
+    float2 Hf1Origin;     float Hf1Cell;   uint HfSize;                           // the far field's height-field grids (M1.10): g1,
+    float2 Hf2Origin;     float Hf2Cell;   uint HfTileCells;                      // g2, and the cells a side of a tile
+    float  HfPad1;        float HfPad2;    float HfEpsilon; float HfMargin;       // the height test's pads; the triangle test's tolerance; the tile's margin
 };
 
 StructuredBuffer<uint> VertexMapNormals : register(t19); // TerrainMesh.MapNormals: the maps' normal at each vertex, two halves (x, z)
@@ -212,6 +215,277 @@ float2 MapNormal(float2 world)
     return SampleMap1(world);
 }
 
+#ifdef HEIGHT_FIELD
+// ── The far field as a height field (vista-plan §10 M1.10; C# reference: Vista.World.FarHeightField) ─────────
+//
+// The measured alternative to meshing the far field. Beyond the world grid the scene's second instance holds one box per tile of
+// g1 (32 m) or g2 (256 m) cells, and a ray that enters a box walks the tile's cells in the tile's local frame — the plane tangent
+// to the ground sphere at its centre, where the cells are a regular grid to a fraction of a percent — and tests every cell whose
+// height range it does not clear against the cell's two 4-8 triangles, bent onto the Earth exactly as the mesh's vertices are
+// (EarthFrame.ToFrame). The local frame clips the ray to the tile (with a margin, HfMargin cells, for the frame's grid being off the
+// bent one by up to FarHeightField.GridMismatch) and gives its height for the height test; the cells themselves are walked on the
+// world's own grid, so the walk visits the cells the ray crosses and the triangle test's tolerance (HfEpsilon) need only cover
+// float rounding. The walk keeps only which triangle it hit and where; the shading is worked out once, for the committed hit
+// (HfShade), so the query loops stay small.
+
+StructuredBuffer<uint4> HfTiles    : register(t22); // FarHeightField.Tiles, three per tile: (O, level | first sample), (U, low), (W, high)
+StructuredBuffer<float> HfHeights1 : register(t23); // HeightFieldGrids.Level1 (g1)
+StructuredBuffer<float> HfHeights2 : register(t24); // HeightFieldGrids.Level2 (g2)
+
+// A hit in a tile: the ray's t, the cell within the tile and which of its two triangles, and the barycentrics of its 2nd and 3rd corner.
+struct HfHit
+{
+    float T;
+    uint  Triangle; // (cell y · cells + cell x) · 2 + triangle
+    float U, V;
+};
+
+float HfHeight(uint level, int2 g)
+{
+    uint k = uint(g.y) * HfSize + uint(g.x);
+    return level == 0u ? HfHeights1[k] : HfHeights2[k];
+}
+
+// EarthFrame.ToFrame in float, less `origin`: world (x, z) at height h, bent onto the ground sphere around the camera.
+float3 HfBend(float2 world, float h, float3 origin)
+{
+    float2 d = world - CamWorld;
+    float s = length(d);
+    float r = GroundRadius();
+    float theta = s / r;
+    float halfSin = sin(0.5 * theta);
+    float sinTheta = sin(theta);
+    float2 xz = s > 0.0 ? d * ((r * sinTheta + h * sinTheta) / s) : float2(0.0, 0.0);
+    return float3(xz.x, h * cos(theta) - 2.0 * r * halfSin * halfSin, xz.y) - origin;
+}
+
+// The corners of triangle `tri` (0 or 1) of grid cell g, as offsets in the cell: the 4-8 diagonal joins the corners of even i + j
+// (TerrainHierarchy's parity rule), so the triangles are (00, 10, 11) and (00, 11, 01), else (00, 10, 01) and (11, 01, 10).
+void HfCorners(int2 g, uint tri, out int2 a, out int2 b, out int2 c)
+{
+    bool mainDiagonal = ((g.x + g.y) & 1) == 0;
+    if (tri == 0u)
+    {
+        a = int2(0, 0);
+        b = int2(1, 0);
+        c = mainDiagonal ? int2(1, 1) : int2(0, 1);
+    }
+    else
+    {
+        a = mainDiagonal ? int2(0, 0) : int2(1, 1);
+        b = int2(mainDiagonal ? 1 : 0, 1);
+        c = mainDiagonal ? int2(0, 1) : int2(1, 0);
+    }
+}
+
+// Möller–Trumbore against (a, b, c), relative to the tile's origin like `ro`, with barycentrics down to −HfEpsilon accepted.
+bool HfTriangle(float3 ro, float3 d, float3 a, float3 b, float3 c, inout float tBest, out float u, out float v)
+{
+    u = 0.0;
+    v = 0.0;
+    float3 e1 = b - a;
+    float3 e2 = c - a;
+    float3 pv = cross(d, e2);
+    float det = dot(e1, pv);
+    if (det == 0.0)
+        return false;
+    float inv = 1.0 / det;
+    float3 tv = ro - a;
+    u = dot(tv, pv) * inv;
+    if (u < -HfEpsilon || u > 1.0 + HfEpsilon)
+        return false;
+    float3 qv = cross(tv, e1);
+    v = dot(d, qv) * inv;
+    if (v < -HfEpsilon || u + v > 1.0 + HfEpsilon)
+        return false;
+    float t = dot(e2, qv) * inv;
+    if (!(t > 0.0) || t >= tBest)
+        return false;
+    tBest = t;
+    return true;
+}
+
+// The nearest hit of the ray with tile k's surface before tMax.
+bool HfIntersect(uint k, float3 origin, float3 dir, float tMax, out HfHit hit)
+{
+    hit.T = tMax;
+    hit.Triangle = 0u;
+    hit.U = 0.0;
+    hit.V = 0.0;
+#ifdef HF_STUB
+    return false;
+#endif
+    uint4 a = HfTiles[3u * k];
+    uint4 b = HfTiles[3u * k + 1u];
+    uint4 w = HfTiles[3u * k + 2u];
+    float3 o = asfloat(a.xyz);
+    float3 u = asfloat(b.xyz);
+    float3 up = asfloat(w.xyz);
+    uint level = a.w >> 26;
+    int2 first = int2(a.w & 0x1FFFu, (a.w >> 13) & 0x1FFFu);
+    float cell = level == 0u ? Hf1Cell : Hf2Cell;
+    float pad = level == 0u ? HfPad1 : HfPad2;
+    float3 ro = origin - o;
+    float3 v = cross(u, up);
+    float n = float(HfTileCells);
+    // The ray in the tile's cells (x, z) and metres up (y).
+    float3 from = float3(dot(ro, u) / cell + 0.5 * n, dot(ro, up), dot(ro, v) / cell + 0.5 * n);
+    float3 along = float3(dot(dir, u) / cell, dot(dir, up), dot(dir, v) / cell);
+
+    // The part of the ray over the tile's square and within its heights (padded): rays that pass over the tile, or over most of it,
+    // walk none of its cells, or only those they cross low enough.
+    float t0 = 0.0;
+    float t1 = tMax;
+    float3 lower = float3(-HfMargin, asfloat(b.w) - pad, -HfMargin);
+    float3 upper = float3(n + HfMargin, asfloat(w.w) + pad, n + HfMargin);
+    [unroll] for (uint axis = 0u; axis < 3u; axis++)
+    {
+        if (along[axis] == 0.0)
+        {
+            if (from[axis] < lower[axis] || from[axis] > upper[axis])
+                return false;
+        }
+        else
+        {
+            float ta = (lower[axis] - from[axis]) / along[axis];
+            float tb = (upper[axis] - from[axis]) / along[axis];
+            t0 = max(t0, min(ta, tb));
+            t1 = min(t1, max(ta, tb));
+        }
+    }
+    if (!(t0 < t1))
+        return false;
+
+    // Through the cells in order (Amanatides & Woo), on the world's grid: the ray's ends mapped back onto the world. A straight ray
+    // projects onto the sphere along a great circle, which the camera-centred map draws straight to millimetres across a tile, so
+    // the walk visits exactly the cells the ray crosses. The height test reads the ray's height in the local frame at
+    // t0 + s·(t1 − t0), off by at most the margin's worth of the ray's slope, which its pad takes on.
+    float2 origin2 = level == 0u ? Hf1Origin : Hf2Origin;
+    float2 corner = origin2 + float2(first) * cell; // world x and z of the tile's first sample
+    float2 q0 = (WorldXZ(origin + dir * t0) - corner) / cell;
+    float2 qd = (WorldXZ(origin + dir * t1) - corner) / cell - q0;
+    int last = int(HfTileCells) - 1;
+    int2 c = clamp(int2(floor(q0)), int2(0, 0), int2(last, last));
+    int2 stepDir = int2(qd.x >= 0.0 ? 1 : -1, qd.y >= 0.0 ? 1 : -1);
+    float2 sDelta = float2(qd.x != 0.0 ? abs(1.0 / qd.x) : 1.0e30, qd.y != 0.0 ? abs(1.0 / qd.y) : 1.0e30);
+    float2 sNext = float2(qd.x != 0.0 ? (float(c.x + (stepDir.x > 0 ? 1 : 0)) - q0.x) / qd.x : 1.0e30,
+                          qd.y != 0.0 ? (float(c.y + (stepDir.y > 0 ? 1 : 0)) - q0.y) / qd.y : 1.0e30);
+    float sEnter = 0.0;
+    float span = t1 - t0;
+    float rayPad = pad + HfMargin * abs(along.y) / max(length(along.xz), 1.0e-20);
+    bool found = false;
+    [loop] for (uint step = 0u; step < 2u * HfTileCells + 2u; step++)
+    {
+        float sExit = min(min(sNext.x, sNext.y), 1.0);
+        int2 g = first + c;
+        float h00 = HfHeight(level, g);
+        float h10 = HfHeight(level, g + int2(1, 0));
+        float h01 = HfHeight(level, g + int2(0, 1));
+        float h11 = HfHeight(level, g + int2(1, 1));
+        float wa = from.y + along.y * (t0 + span * sEnter);
+        float wb = from.y + along.y * (t0 + span * sExit);
+        if (min(wa, wb) <= max(max(h00, h10), max(h01, h11)) + rayPad && max(wa, wb) >= min(min(h00, h10), min(h01, h11)) - rayPad)
+        {
+            float2 w00 = origin2 + float2(g) * cell;
+            float3 p00 = HfBend(w00, h00, o);
+            float3 p10 = HfBend(w00 + float2(cell, 0.0), h10, o);
+            float3 p01 = HfBend(w00 + float2(0.0, cell), h01, o);
+            float3 p11 = HfBend(w00 + float2(cell, cell), h11, o);
+            bool mainDiagonal = ((g.x + g.y) & 1) == 0;
+            uint id = (uint(c.y) * HfTileCells + uint(c.x)) * 2u;
+            float bu, bv;
+            if (HfTriangle(ro, dir, p00, p10, mainDiagonal ? p11 : p01, hit.T, bu, bv))
+            {
+                found = true;
+                hit.Triangle = id;
+                hit.U = bu;
+                hit.V = bv;
+            }
+            if (HfTriangle(ro, dir, mainDiagonal ? p00 : p11, mainDiagonal ? p11 : p01, mainDiagonal ? p01 : p10, hit.T, bu, bv))
+            {
+                found = true;
+                hit.Triangle = id + 1u;
+                hit.U = bu;
+                hit.V = bv;
+            }
+            if (found)
+                break; // the cells come in order along the ray
+        }
+        if (sExit >= 1.0)
+            break;
+        if (sNext.x < sNext.y)
+        {
+            c.x += stepDir.x;
+            sEnter = sNext.x;
+            sNext.x += sDelta.x;
+        }
+        else
+        {
+            c.y += stepDir.y;
+            sEnter = sNext.y;
+            sNext.y += sDelta.y;
+        }
+        if (any(c < 0) || any(c > last))
+            break;
+    }
+    return found;
+}
+
+// g2's smooth normal's x and z at its sample g: central differences, one-sided at the grid's edge (NormalMap's rule, computed
+// here because g2 has no map).
+float2 Hf2CornerNormal(int2 g)
+{
+    int last = int(HfSize) - 1;
+    int2 x0 = int2(max(g.x - 1, 0), g.y);
+    int2 x1 = int2(min(g.x + 1, last), g.y);
+    int2 z0 = int2(g.x, max(g.y - 1, 0));
+    int2 z1 = int2(g.x, min(g.y + 1, last));
+    float dhdx = (HfHeights2[x1.y * HfSize + x1.x] - HfHeights2[x0.y * HfSize + x0.x]) / (float(x1.x - x0.x) * Hf2Cell);
+    float dhdz = (HfHeights2[z1.y * HfSize + z1.x] - HfHeights2[z0.y * HfSize + z0.x]) / (float(z1.y - z0.y) * Hf2Cell);
+    return float2(-dhdx, -dhdz) * rsqrt(dhdx * dhdx + 1.0 + dhdz * dhdz);
+}
+
+// The committed hit's position, geometric normal (up) and shading normal: g1's normal map there (the normals the mesh's far
+// triangles carry), or g2's central differences interpolated alike, turned from the flat world into the tile's frame.
+void HfShade(uint k, HfHit hit, out float3 position, out float3 ng, out float3 ns)
+{
+    uint4 a = HfTiles[3u * k];
+    float3 o = asfloat(a.xyz);
+    float3 u = asfloat(HfTiles[3u * k + 1u].xyz);
+    float3 up = asfloat(HfTiles[3u * k + 2u].xyz);
+    float3 v = cross(u, up);
+    uint level = a.w >> 26;
+    int2 g = int2(a.w & 0x1FFFu, (a.w >> 13) & 0x1FFFu) + int2((hit.Triangle >> 1) % HfTileCells, (hit.Triangle >> 1) / HfTileCells);
+    float cell = level == 0u ? Hf1Cell : Hf2Cell;
+    float2 origin2 = level == 0u ? Hf1Origin : Hf2Origin;
+    int2 ca, cb, cc;
+    HfCorners(g, hit.Triangle & 1u, ca, cb, cc);
+    float3 pa = HfBend(origin2 + float2(g + ca) * cell, HfHeight(level, g + ca), o);
+    float3 pb = HfBend(origin2 + float2(g + cb) * cell, HfHeight(level, g + cb), o);
+    float3 pc = HfBend(origin2 + float2(g + cc) * cell, HfHeight(level, g + cc), o);
+    float w = 1.0 - hit.U - hit.V;
+    position = o + (pa * w + pb * hit.U + pc * hit.V);
+    float3 face = cross(pb - pa, pc - pa);
+    ng = normalize(dot(face, up) >= 0.0 ? face : -face);
+    float2 inCell = saturate(float2(ca) * w + float2(cb) * hit.U + float2(cc) * hit.V);
+    float2 nxz;
+    if (level == 0u)
+    {
+        nxz = SampleMap1(origin2 + (float2(g) + inCell) * cell);
+    }
+    else
+    {
+        float2 n00 = Hf2CornerNormal(g);
+        float2 n10 = Hf2CornerNormal(g + int2(1, 0));
+        float2 n01 = Hf2CornerNormal(g + int2(0, 1));
+        float2 n11 = Hf2CornerNormal(g + int2(1, 1));
+        nxz = lerp(lerp(n00, n10, inCell.x), lerp(n01, n11, inCell.x), inCell.y);
+    }
+    float ny = sqrt(max(1.0 - dot(nxz, nxz), 0.0));
+    ns = normalize(u * nxz.x + up * ny + v * nxz.y);
+}
+#endif
+
 struct Hit
 {
     float  T;
@@ -229,9 +503,44 @@ bool TraceClosest(float3 origin, float3 dir, out Hit hit)
     ray.TMin = 0.0;
     ray.TMax = T_MAX;
 
+#ifdef HEIGHT_FIELD
+    RayQuery<RAY_FLAG_FORCE_OPAQUE> q;
+    q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    HfHit hfHit = (HfHit)0;
+    uint hfTile = 0u;
+    while (q.Proceed())
+    {
+        // Only the far field's tiles come back here: the mesh's triangles are opaque and commit themselves.
+        float tMax = q.CommittedStatus() == COMMITTED_NOTHING ? T_MAX : q.CommittedRayT();
+        HfHit candidate;
+        if (HfIntersect(q.CandidatePrimitiveIndex(), origin, dir, tMax, candidate))
+        {
+            q.CommitProceduralPrimitiveHit(candidate.T);
+            hfHit = candidate;
+            hfTile = q.CandidatePrimitiveIndex();
+        }
+    }
+    if (q.CommittedStatus() == COMMITTED_PROCEDURAL_PRIMITIVE_HIT)
+    {
+        float3 hfNg, hfNs;
+        hit.T = q.CommittedRayT();
+        HfShade(hfTile, hfHit, hit.Position, hfNg, hfNs);
+        if (dot(hfNg, dir) > 0.0) // two-sided, as below
+        {
+            hfNg = -hfNg;
+            hfNs = -hfNs;
+        }
+        if (dot(hfNs, hfNg) <= 0.0)
+            hfNs = hfNg;
+        hit.GeometricNormal = hfNg;
+        hit.ShadingNormal = hfNs;
+        return true;
+    }
+#else
     RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> q;
     q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     q.Proceed();
+#endif
     if (q.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
         return false;
 
@@ -276,9 +585,20 @@ bool Occluded(float3 origin, float3 dir)
     ray.TMin = 0.0;
     ray.TMax = T_MAX;
 
+#ifdef HEIGHT_FIELD
+    RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
+    q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    while (q.Proceed())
+    {
+        HfHit candidate;
+        if (HfIntersect(q.CandidatePrimitiveIndex(), origin, dir, T_MAX, candidate))
+            return true;
+    }
+#else
     RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
     q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     q.Proceed();
+#endif
     return q.CommittedStatus() != COMMITTED_NOTHING;
 }
 

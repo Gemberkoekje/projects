@@ -62,6 +62,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
     private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
     private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24, SlotMapNormals = 25, SlotNormalMap0 = 26, SlotNormalMap1 = 27;
+    private const int SlotHeightFieldTiles = 28, SlotHeights1 = 29, SlotHeights2 = 30;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -160,6 +161,11 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public uint Map0Size;
         public float Map1OriginX, Map1OriginZ, Map1Cell;           // the 32 m far grid's
         public uint Map1Size;
+        public float Hf1OriginX, Hf1OriginZ, Hf1Cell;              // the far field's height-field grids (M1.10): g1,
+        public uint HfSize;
+        public float Hf2OriginX, Hf2OriginZ, Hf2Cell;              // g2,
+        public uint HfTileCells;                                   // and the cells a side of a tile
+        public float HfPad1, HfPad2, HfEpsilon, HfMargin;          // the height test's pads; the triangle test's tolerance; the tile's margin
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -216,10 +222,14 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         if (settings.RussianRouletteStart is < 0 or > RenderSettings.MaxRussianRouletteStart)
             throw new ArgumentException($"Russian roulette must start between bounce 0 and {RenderSettings.MaxRussianRouletteStart}.", nameof(settings));
 
+        bool heightField = scene.Mesh.HeightField.Any;
+        if (heightField && settings.Atmosphere != AtmosphereMode.Luts)
+            throw new ArgumentException("The height-field far field (M1.10's measurement) renders with the LUT atmosphere only.", nameof(settings));
+
         var stages = new SortedDictionary<string, double>(_initSeconds, StringComparer.Ordinal);
         _initSeconds.Clear();
         var stopwatch = Stopwatch.StartNew();
-        ID3D12PipelineState pipeline = settings.Atmosphere switch
+        ID3D12PipelineState pipeline = heightField ? HeightFieldPipeline(stages) : settings.Atmosphere switch
         {
             AtmosphereMode.Reference => ReferencePipeline(stages, shadows: false),
             AtmosphereMode.ReferenceShadowed => ReferencePipeline(stages, shadows: true),
@@ -233,7 +243,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             CheckFits(scene.Mesh);
             UploadMesh(scene.Mesh);
             EnsureNormalMaps(scene.Mesh.NormalMaps);
+            UploadHeightFieldTiles(scene.Mesh.HeightField);
             stages[RenderStageKeys.MeshUpload] = Lap(stopwatch);
+            if (EnsureHeightFieldGrids(scene.Mesh.HeightField))
+                stages[HeightFieldGridsStage] = Lap(stopwatch); // once per world (M1.10)
             BuildAccelerationStructures(scene.Mesh);
             stages[RenderStageKeys.AccelerationBuild] = Lap(stopwatch);
             _mesh = scene.Mesh;
@@ -349,7 +362,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         Vector3D right = camera.Right();
         Vector3D up = camera.Up();
         Vector3D forward = camera.Forward();
-        return new IntegratorConstants
+        var constants = new IntegratorConstants
         {
             CamPosX = (float)position.X, CamPosY = (float)position.Y, CamPosZ = (float)position.Z,
             TanHalfFovY = (float)Math.Tan(camera.VerticalFovRadians() * 0.5),
@@ -378,6 +391,21 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Map0OriginX = Map(scene, 0).OriginX, Map0OriginZ = Map(scene, 0).OriginZ, Map0Cell = Map(scene, 0).Cell, Map0Size = Map(scene, 0).Size,
             Map1OriginX = Map(scene, 1).OriginX, Map1OriginZ = Map(scene, 1).OriginZ, Map1Cell = Map(scene, 1).Cell, Map1Size = Map(scene, 1).Size,
         };
+        FarHeightField field = scene.Mesh.HeightField;
+        if (field.Any)
+        {
+            constants.Hf1OriginX = constants.Hf1OriginZ = (float)field.Grids.Origin1;
+            constants.Hf1Cell = (float)field.Grids.Cell1;
+            constants.HfSize = (uint)field.Grids.Size;
+            constants.Hf2OriginX = constants.Hf2OriginZ = (float)field.Grids.Origin2;
+            constants.Hf2Cell = (float)field.Grids.Cell2;
+            constants.HfTileCells = (uint)field.TileCells;
+            constants.HfPad1 = (float)field.Pad1;
+            constants.HfPad2 = (float)field.Pad2;
+            constants.HfEpsilon = (float)field.Epsilon;
+            constants.HfMargin = (float)field.Margin;
+        }
+        return constants;
     }
 
     /// <summary>Normal map <paramref name="index"/> of the scene's mesh for the constants, or zeros when it has none.</summary>
@@ -504,6 +532,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Srv(13),                                                  // 22: the summed scattering orders (aerial perspective)
             Srv(18), Uav(7),                                          // 23–24: the sky distribution, its measurement (M1.5)
             Srv(19), Srv(20), Srv(21),                                // 25–27: the vertices' map normals, the two normal maps (M1.9)
+            Srv(22), Srv(23), Srv(24),                                // 28–30: the height-field tiles and the far grids (M1.10)
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -582,7 +611,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         if (_adapter is null)
             return;
         RaytracingAccelerationStructurePrebuildInfo info = _device.GetRaytracingAccelerationStructurePrebuildInfo(BlasInputs(mesh, 0, 0));
-        long need = mesh.ByteSize + (long)info.ResultDataMaxSizeInBytes + (long)info.ScratchDataSizeInBytes;
+        long need = mesh.ByteSize + (long)info.ResultDataMaxSizeInBytes + (long)info.ScratchDataSizeInBytes + HeightFieldBytesNeeded(mesh.HeightField);
         QueryVideoMemoryInfo memory = _adapter.QueryVideoMemoryInfo(0, MemorySegmentGroup.Local);
         long free = (long)memory.Budget - (long)memory.CurrentUsage;
         if (need > free)
@@ -628,29 +657,45 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _blas = CreateUavBuffer(blasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
         _blasBytes = (long)blasInfo.ResultDataMaxSizeInBytes;
 
-        var instance = new RaytracingInstanceDescription
+        _allocator.Reset();
+        _commandList.Reset(_allocator, null);
+        // The far field's tiles (M1.10) are a second, procedural bottom level, built first so its address is known.
+        using ID3D12Resource? heightFieldScratch = RecordHeightFieldBlas(mesh.HeightField);
+        var instances = new List<RaytracingInstanceDescription>
         {
-            Transform = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0),
-            InstanceMask = 0xFF,
-            Flags = RaytracingInstanceFlags.None,
-            AccelerationStructure = _blas.GPUVirtualAddress,
+            new()
+            {
+                Transform = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0),
+                InstanceMask = 0xFF,
+                Flags = RaytracingInstanceFlags.None,
+                AccelerationStructure = _blas.GPUVirtualAddress,
+            },
         };
-        _instance = CreateUploadBuffer<RaytracingInstanceDescription>(MemoryMarshal.CreateReadOnlySpan(ref instance, 1));
+        if (_heightFieldBlas is not null)
+        {
+            instances.Add(new RaytracingInstanceDescription
+            {
+                Transform = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0),
+                InstanceMask = 0xFF,
+                InstanceID = new Vortice.UInt24(1),
+                Flags = RaytracingInstanceFlags.None,
+                AccelerationStructure = _heightFieldBlas.GPUVirtualAddress,
+            });
+        }
+        _instance = CreateUploadBuffer<RaytracingInstanceDescription>(CollectionsMarshal.AsSpan(instances));
 
         var tlasInputs = new BuildRaytracingAccelerationStructureInputs
         {
             Type = RaytracingAccelerationStructureType.TopLevel,
             Layout = ElementsLayout.Array,
             Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
-            DescriptorsCount = 1,
+            DescriptorsCount = (uint)instances.Count,
             InstanceDescriptions = _instance.GPUVirtualAddress,
         };
         RaytracingAccelerationStructurePrebuildInfo tlasInfo = _device.GetRaytracingAccelerationStructurePrebuildInfo(tlasInputs);
         using ID3D12Resource tlasScratch = CreateUavBuffer(tlasInfo.ScratchDataSizeInBytes);
         _tlas = CreateUavBuffer(tlasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
 
-        _allocator.Reset();
-        _commandList.Reset(_allocator, null);
         _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
         {
             Inputs = blasInputs,
@@ -747,6 +792,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootShaderResourceView(SlotMapNormals, (_mapNormals ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotNormalMap0, (_mapBuffers.ElementAtOrDefault(0) ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotNormalMap1, (_mapBuffers.ElementAtOrDefault(1) ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotHeightFieldTiles, (_heightFieldTiles ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotHeights1, (_heightsLevel1 ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotHeights2, (_heightsLevel2 ?? _dummySrv).GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -884,6 +932,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
     private void DisposeScene()
     {
+        DisposeHeightFieldTiles();
         _mapNormals?.Dispose();
         _mapNormals = null;
         _instance?.Dispose();
@@ -930,6 +979,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeTables();
         DisposeScene();
         DisposeNormalMaps();
+        DisposeHeightFieldGrids();
         DisposeSkyLight();
         DisposeAtmosphere();
         DisposeErosion();
@@ -941,6 +991,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _constants?.Dispose();
         _timestampReadback?.Dispose();
         _timestamps?.Dispose();
+        _heightFieldPipeline?.Dispose();
         _shadowedPipeline?.Dispose();
         _referencePipeline?.Dispose();
         _pipeline?.Dispose();

@@ -152,7 +152,8 @@ public static class PreviewCommandLine
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
         "--erosion off renders the world un-eroded; --grid SIZExCELL makes it on another grid (another world, for measurements).\n" +
         "--mesh-error <px>: the view-dependent mesh's error target (default 1); --detail off leaves out the detail below the grid,\n" +
-        "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
+        "  --far-field off the terrain beyond it (heightField traces it as height-field tiles instead: M1.10's measurement);\n" +
+        "  --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "Place overrides: [--location <place> | --latitude <degrees>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
@@ -421,6 +422,9 @@ public static class PreviewCommandLine
             switch (values.GetValueOrDefault(option))
             {
                 case null:
+                    break;
+                case "heightField" when option == "--far-field":
+                    settings = settings with { FarField = true, HeightField = true }; // M1.10's measured alternative
                     break;
                 case "on":
                     settings = set(settings, true);

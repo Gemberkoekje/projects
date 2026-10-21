@@ -42,6 +42,8 @@ internal static class Program
             return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
         if (args.FirstOrDefault() == MeshMeasure.Flag)
             return RunGpu(() => MeshMeasure.Run(args, Console.Out));
+        if (args.FirstOrDefault() == HeightFieldCompare.Flag)
+            return RunGpu(() => HeightFieldCompare.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -215,6 +217,7 @@ internal static class Program
         Console.Error.WriteLine(DenoiseCompare.Usage);
         Console.Error.WriteLine(ErosionMeasure.Usage);
         Console.Error.WriteLine(MeshMeasure.Usage);
+        Console.Error.WriteLine(HeightFieldCompare.Usage);
         return 1;
     }
 

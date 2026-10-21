@@ -135,6 +135,17 @@ public sealed class TerrainHierarchy
     /// <summary>The number of levels, coarsest (the root's centre, 0) to finest (<c>2·RootLog − 1</c>).</summary>
     internal int LevelCount => 2 * RootLog;
 
+    /// <summary>g1's first sample, in sub-units on both axes.</summary>
+    internal int Grid1Low => Centre - (Surface.Size - 1) / 2 * Ratio1 * Sub;
+
+    /// <summary>
+    /// The far field's two grids as height fields (vista-plan §10 M1.10), built on first use and kept with the hierarchy:
+    /// what <see cref="FarHeightField"/> traces instead of meshing the far field.
+    /// </summary>
+    internal HeightFieldGrids FarGrids => LazyInitializer.EnsureInitialized(ref _farGrids, () => HeightFieldGrids.Build(this));
+
+    private HeightFieldGrids? _farGrids;
+
     /// <summary>
     /// Builds the hierarchy of <paramref name="surface"/> (the world grid, 2ⁿ + 1 samples a side) in the world of
     /// <paramref name="profile"/> and <paramref name="seed"/>, with <paramref name="detail"/> everywhere.
