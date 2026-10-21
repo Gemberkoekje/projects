@@ -5,9 +5,10 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-nineteen slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-one slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
-measured decision to keep it for the far terrain) and M1.10a (exposure and display) are done, M1.11 (linked sliders) is next. It sits
+measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain)
+and M1.11a (drainage) are done, M1.11b (the display look) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -776,7 +777,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Nineteen slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-one slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -785,6 +786,15 @@ Exposure & display** and **M1.11a — Drainage**, both before the materials (M1.
 are tuned once, under the final light and on the final terrain, as the strategy below intends. M1.11
 gains time-of-day presets by sun height, and M1.12 gains near-camera detail by material. The letter
 suffixes keep the code's references to M1.11–M1.17 valid.
+
+*Added 2026-10-21, after a review of the M1.10a–M1.11a sheets (agreed with the user):* **M1.11b — The
+display look** (AgX's punchy look and a default compensation, by sheet, because incident + plain AgX
+reads dark and flat) and **M1.11c — Uplift & rock hardness** (an uplift map so ranges keep their
+massifs, a rock-hardness field against uniform 45° facets, and the two measurement cameras the
+incision left 500 m up re-placed), both still before the materials. M1.12's strata read M1.11c's
+hardness field; M1.13 gains per-place precipitation and glacial U-valleys; M3 takes M1.11a's flat
+floors as lake sites; M4 gains a seasonal aerosol load. M1.11b's look and M1.10a's meter are
+re-judged at the sign-off (M1.17), once real materials exist.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1085,12 +1095,61 @@ the pools the GPU erosion's sediment leaves fill to their outlets. On the eroded
 (M1.7: 1.6–1.9) and 98% of the grid drains into a channel of 1 km² (3–6%). The coarse-to-fine conservation check became the incision's own checks.
 Log: [`vista-log/M1.11a.md`](vista-log/M1.11a.md).
 
+**M1.11b — The display look.**
+- *Goal:* finished-looking images under M1.10a's incident meter, so the materials (M1.12) are tuned
+  under the look they will ship with.
+- *Why (the review of 2026-10-21):* the incident meter is right (the sunlit slope keeps its colour),
+  but incident + plain AgX reads dark and flat: the day views grey next to the old look, the down-slope
+  view muddy (`m1-10a-before-after.png`, `m1-10a-down-slope-variants.png`). Plain AgX is a base meant
+  for grading. The darker skies are plausible (the part of a clear sky 70–90° from the sun is its
+  darkest), so the sky gets no correction of its own.
+- *Deliverable:* AgX's punchy look as an option of the curve (`--look base|punchy`: power 1.35 and
+  saturation 1.4 after the sigmoid, as Blender's and Filament's), and a default exposure compensation
+  for the incident meter. Both chosen by one sheet: {AgX, AgX punchy} × {0, +0.5, +1 EV} on the four
+  measurement views, the default view at golden hour (+2°), the alpenglow sweep and the ridges in
+  October at +2°. The choice is provisional: it and M1.10a's meter are re-judged at M1.17, once real
+  materials exist. The EXR is unchanged; `--look base` with no compensation writes M1.10a's PNG byte
+  for byte.
+- *Verify:* 3070: the sheet, and the chosen defaults on the measurement views beside M1.10a's. CI: the
+  punchy look against values from the implementation it is ported from. Cost ledger: no change
+  (display only).
+
+**M1.11c — Uplift & rock hardness.**
+- *Goal:* ranges with hierarchy (high massifs, broad main valleys, lower foothills) and slopes that
+  vary (cliffs, ledges, gentler ground) instead of uniform facets, before the materials (M1.12) are
+  tuned on the terrain.
+- *Why (the review of 2026-10-21):* M1.11a's incision gave real drainage, but from the aerial camera
+  the worlds became a uniform field of similar peaks to the horizon and lost the base terrain's
+  massifs (`m1-11a-seeds.png`), and many peaks show planar facets at the talus angle
+  (`m1-11a-views.png`). Both follow from uniform uplift and uniform rock. And the incision lowered the
+  ground under two pinned measurement cameras: the default and down-slope views now stand 532 and
+  552 m above a valley floor, so "down the slope" no longer shows every pixel as terrain (the
+  ledger's M1.11a note).
+- *Deliverable:* an **uplift map** from the base terrain's large-scale shape (its lowest octaves),
+  seeded, so the massifs rise and the foothills stay low; Cordonnier et al. 2016 take an uplift map as
+  their main input. A **rock-hardness field** (seeded and procedural: warped strata bands plus noise)
+  that sets the incision's erodibility and the thermal erosion's talus angle, so hard bands stand as
+  cliffs and ledges and soft ones weather back; the field is stored with the world, and M1.12's rock
+  strata read the same field, so cliffs and material bands line up. It also varies the fluting M1.7's
+  passes cut, which on big faces now reads like couloirs, rather than removing it. The flat floors
+  behind fans stay (M3's lake sites). The default and down-slope cameras are re-placed to their
+  original intent on the new terrain (the default near the ground facing the range, the down-slope
+  view all terrain), and the ledger notes that their rows before and after are not comparable.
+- *Verify:* CI: both fields are pure functions of seed and position; hardness moves erodibility and
+  talus angle as specified (synthetic tests); the incision still drains every basin (M1.11a's
+  checks). 3070, before and after on four seeds: the aerial sheet; the relief's hierarchy, measured
+  (the spread of local relief at 1 km and 5 km scales); the share of slopes within ±2° of the talus
+  angle (the facets, measured); M1.11a's drainage numbers holding (the longest channel, the share
+  drained). The world bit-identical twice and through the cache; the self-test's driver check against
+  the default erosion cache re-baselined deliberately; a cost-ledger row.
+
 **M1.12 — Materials by rule.**
 - *Goal:* rock that reads as rock: strata, scree, soil, alpine grass and wet ground where nature
   puts them (§4.3).
 - *Deliverable:* materials chosen and blended in the shader per hit, from slope, altitude, aspect
   and the erosion maps (M1.11a's flow accumulation, deposition, wetness), all procedural: rock strata
-  as warped altitude bands, scree on deposition under steep faces, soil, grass as a material (its
+  from M1.11c's hardness field (so the material bands line up with the cliffs and ledges it shaped),
+  scree on deposition under steep faces, soil, grass as a material (its
   geometry is M5), and wet darkening. Built-in-tier spectra (tier 5, recorded per material).
   Rough-diffuse rock (Oren–Nayar-style) is measured against Lambert in a sheet, because backscatter
   from a low sun is the golden-hour look. The rules live in `Vista.Core`, with tests. **Near-camera
@@ -1110,10 +1169,19 @@ Log: [`vista-log/M1.11a.md`](vista-log/M1.11a.md).
   erosion curvature), and altitude against the freezing level and the snow slider (M1.11: a seasonal snowline in metres above sea
   level; both are in the sidecar's `sliders`).
   Recipe-owned glaciers and permanent snowfields for the mountain set pieces, carved at the world
-  stage, so snow at zero leaves them. A dry / wet / melting state by altitude against the freezing
-  level. A built-in snow spectrum from ice absorption and grain size (tier 5). Russian roulette is
-  re-measured on bright snow (M0 note). Close-up snow stays in M7.
-- *Verify:* CI: the placement rules. 3070: **bare steep faces**, because on the test views the snow
+  stage, so snow at zero leaves them. **Glacial carving:** where the recipe's glaciers ran, the
+  world stage carves U-shaped valley cross-sections, cirques at their heads and the arêtes and horns
+  between them; M1.11a's incision only cuts V-shaped valleys, and the U-valley is what makes
+  snow-capped alpine scenery read as alpine. **Per-place precipitation:** M1.11's chain uses one
+  precipitation for every place, so maritime snowlines (Fiordland, Lofoten) come out too high and dry
+  ones (Yellowstone) too low (M1.11's known limits); the climate table gains monthly precipitation per
+  place, hand-entered with a source like the normals, and the snowline default uses it. A dry / wet /
+  melting state by altitude against the freezing level. A built-in snow spectrum from ice absorption
+  and grain size (tier 5). Russian roulette is re-measured on bright snow (M0 note). Close-up snow
+  stays in M7.
+- *Verify:* CI: the placement rules; the snowline default moving with each place's precipitation. 3070:
+  a glacier valley's cross-section measured U-shaped (its floor's width at half depth against the
+  incised V's); **bare steep faces**, because on the test views the snow
   fraction on faces steeper than 40° (read from the material-id output) stays under a threshold
   recorded here while ledges and gullies hold snow. **Alpenglow**, because a dawn sheet from −4° to
   +4° shows the peaks pink and red while the valley is in shadow, with no code that knows about
@@ -1176,15 +1244,21 @@ corrupted download, the checksum rejects it.
 
 **M3 — Water.**
 Goal: lakes and rivers that sell the scene. Deliverable: shot-first lake basins and
-rivers from the flow map; spectral water (pure-water absorption, organics, glacial
+rivers from M1.11a's flow accumulation (its filled pools, the flat floors behind fans whose
+fill depths the world cache already holds, are natural lake sites); spectral water (pure-water absorption, organics, glacial
 flour); ripples; wet shores; reflections. Verify: a lake shows turquoise shallows
 grading to blue depth from absorption alone; the mountain backdrop reflects correctly.
 
 **M4 — Fog & clouds.**
 Goal: atmosphere you can see. Deliverable: altitude fog, valley inversion fog / sea of
 clouds, steam fog from lake vs. air temperature, humidity haze, frost on surfaces;
-volumetric clouds with multiple scattering; spectral Mie phase (fogbows, glories).
-Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone.
+volumetric clouds with multiple scattering; spectral Mie phase (fogbows, glories). A
+**seasonal aerosol load** per place: M1.11's haze follows the day's humidity alone, so at
+Zermatt it barely moves through the year (79–84 km visibility) and is, if anything, hazier
+in winter (M1.11's known limits), where a real alpine summer is hazier from convection and
+winter inversions trap the haze below the peaks. Verify: a cold autumn dawn over a lake
+produces steam fog from the defaults alone; a month sheet at one place shows summer hazier
+than winter from the defaults alone.
 
 **M5 — Vegetation.**
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
