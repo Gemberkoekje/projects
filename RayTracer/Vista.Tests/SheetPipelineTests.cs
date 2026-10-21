@@ -96,7 +96,9 @@ public sealed class SheetPipelineTests
         var renderer = new FakeRenderer();
         SheetSidecar sheet = SheetPipeline.Render(Request("time=dawn,dusk,night"), renderer);
 
-        CollectionAssert.AreEqual(new[] { TimeOfDay.Dawn, TimeOfDay.Dusk, TimeOfDay.Night }, renderer.Scenes.Select(s => s.Recipe.Time).ToArray());
+        CollectionAssert.AreEqual(new[] { "dawn", "dusk", "night" },
+            sheet.Cells.Select(c => c.Sidecar!["sliders"]!["values"]!["time"]!["value"]!.GetValue<string>()).ToArray(), "each cell pins its time");
+        Assert.AreEqual(3, renderer.Scenes.Select(s => s.Sun).Distinct().Count());
         Assert.AreSame(renderer.Scenes[0].Mesh, renderer.Scenes[2].Mesh, "the world is generated and meshed once");
         Assert.AreEqual((3, 1), (sheet.Columns, sheet.Rows));
         StringAssert.StartsWith(sheet.Title, "test range · alpineRange · summer · seed 7 · default camera · 32×18 · 4 spp");

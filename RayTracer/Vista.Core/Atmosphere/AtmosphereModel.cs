@@ -23,7 +23,8 @@ namespace Vista.Atmosphere;
 /// <para>The defaults are a clear continental day: haze of optical depth 0.1 at 550 nm (Ångström's α = 1.3)
 /// and Bruneton 2017's aerosol albedo 0.9 and asymmetry 0.8; 300 Dobson units of ozone. Because the haze
 /// profile starts at sea level, a scene high in the mountains sits above most of it, as real mountain air
-/// does. M1.11's haze slider will move <see cref="AerosolOpticalDepth550"/>.</para>
+/// does. Since M1.11 the fog/haze slider sets <see cref="AerosolOpticalDepth550"/> (Weather.Haze: from the day's humidity, or a
+/// pinned visibility); this default is the clear day it is scaled from.</para>
 ///
 /// <para>The <b>ground</b> is not part of the model: a scene puts it at its base altitude
 /// (<see cref="AtmosphereFrame"/>), a sphere that casts the Earth's shadow and stands in for the land beyond

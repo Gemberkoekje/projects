@@ -63,11 +63,11 @@ public sealed class SunElevationAndAtmosphereTests
         Almanac evening = Almanac.For(recipe);
         Assert.AreEqual(-2.0, evening.Sun.TrueElevationDegrees, 1e-6);
         Assert.IsTrue(evening.SolarHours > 12.0);
-        Assert.AreEqual("sunElevation -2°, setting", evening.SolarTimeFrom);
+        Assert.AreEqual("pinned sunElevation −2°, setting", evening.SolarTimeFrom);
 
         Almanac morning = Almanac.For(recipe with { Time = TimeOfDay.Dawn });
         Assert.IsTrue(morning.SolarHours < 12.0);
-        Assert.AreEqual("sunElevation -2°, rising", morning.SolarTimeFrom);
+        Assert.AreEqual("pinned sunElevation −2°, rising", morning.SolarTimeFrom);
     }
 
     [TestMethod]
@@ -76,7 +76,7 @@ public sealed class SunElevationAndAtmosphereTests
         Almanac almanac = Almanac.For(new Recipe { Location = Place.Zermatt, Date = new DateOnly(2026, 12, 21), SunElevation = 40.0 });
         Assert.AreEqual(12.0, almanac.SolarHours, 1e-9);
         Assert.AreEqual(1, almanac.Hints.Count);
-        StringAssert.Contains(almanac.Hints[0], "never stands at 40°");
+        StringAssert.Contains(almanac.Hints[0], "never climbs to +40°");
     }
 
     [TestMethod]
@@ -102,9 +102,9 @@ public sealed class SunElevationAndAtmosphereTests
     public void SunElevationOption_IsARecipeOverride_ThatClearsTheSolarTime()
     {
         PreviewRequest r = Parse("--sun-elevation", "-3.5");
-        Assert.AreEqual("-3.5", r.RecipeOverrides["sunElevation"]);
-        Assert.AreEqual("null", r.RecipeOverrides["solarTime"]);
-        Assert.AreEqual("null", Parse("--time", "17:30").RecipeOverrides["sunElevation"], "a solar time clears a sun elevation");
+        Assert.AreEqual("-3.5", r.SliderOverrides["sunElevation"]);
+        Assert.AreEqual("null", r.SliderOverrides["solarTime"]);
+        Assert.AreEqual("null", Parse("--time", "17:30").SliderOverrides["sunElevation"], "a solar time clears a sun elevation");
         Assert.IsFalse(PreviewCommandLine.TryParse(["--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--time", "17:30", "--sun-elevation", "2"], out _, out _));
         Assert.IsFalse(PreviewCommandLine.TryParse(["--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--sun-elevation", "high"], out _, out _));
     }
@@ -143,7 +143,8 @@ public sealed class SunElevationAndAtmosphereTests
         var renderer = new FakeRenderer();
         PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"], "location": "yellowstone" }"""), renderer);
         Assert.AreEqual(Places.Get(Place.Yellowstone).ValleyAltitudeMetres, renderer.Scene!.GroundAltitudeMetres);
-        Assert.AreEqual(AtmosphereModel.Default, renderer.Scene.Air);
+        Assert.AreEqual(AtmosphereModel.Default with { AerosolOpticalDepth550 = renderer.Scene.Air.AerosolOpticalDepth550 }, renderer.Scene.Air,
+            "the default air, its haze grown by the day's humidity (M1.11)");
         PreviewPipeline.Run(Request("""{ "latitude": 10 }"""), renderer);
         Assert.AreEqual(0.0, renderer.Scene!.GroundAltitudeMetres, "a custom latitude without an altitude is at sea level");
     }
@@ -166,7 +167,7 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (reading.MeterWidth, reading.MeterHeight, reading.MeterSamplesPerPixel));
         Assert.AreEqual(AtmosphereMode.Luts, sidecar.Atmosphere.Mode);
         Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
-        Assert.AreEqual(11, Sidecar.CurrentSchema);
+        Assert.AreEqual(12, Sidecar.CurrentSchema);
         Assert.AreEqual(ImageInfo.RadianceUnits, sidecar.Image.Units);
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("exposureMeter"));
     }
@@ -224,10 +225,10 @@ public sealed class SunElevationAndAtmosphereTests
     {
         JsonNode? Sidecar(string recipe, string mode) => JsonNode.Parse($$"""{ "recipe": {{recipe}}, "atmosphere": { "mode": "{{mode}}" } }""");
         IReadOnlyDictionary<string, string> setting = SheetLabels.Identity(Sidecar("""{ "time": "goldenHour", "sunElevation": -2 }""", "luts"));
-        Assert.IsFalse(setting.ContainsKey("recipe.time"), "the elevation replaced the preset");
-        Assert.AreEqual("-2", setting["recipe.sunElevation"]);
+        Assert.IsFalse(setting.ContainsKey("sliders.time"), "the elevation replaced the preset");
+        Assert.AreEqual("-2", setting["sliders.sunElevation"]);
         IReadOnlyDictionary<string, string> rising = SheetLabels.Identity(Sidecar("""{ "time": "dawn", "sunElevation": -2 }""", "reference"));
-        Assert.AreEqual("dawn", rising["recipe.time"], "dawn says the sun is rising");
+        Assert.AreEqual("dawn", rising["sliders.time"], "dawn says the sun is rising");
         Assert.AreEqual("reference", rising["atmosphere"]);
         IReadOnlyList<string> labels = SheetLabels.Differences([setting, rising]);
         StringAssert.Contains(labels[1], "atmosphere=reference");

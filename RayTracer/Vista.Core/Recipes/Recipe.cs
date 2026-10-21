@@ -1,30 +1,29 @@
 using Vista.Astronomy;
+using Vista.Sliders;
 
 namespace Vista.Recipes;
 
 /// <summary>
-/// A Vista recipe (vista-plan §3.2): the set pieces currently chosen, plus time of day and season, and the
-/// place controls (§3.3, §3.5): a location or a custom latitude, and date and local solar time overrides.
-/// Together with a seed it fixes the whole world (pillar 4, §4.1); the camera only decides how much of that
-/// world is evaluated. The linked sliders (§3.4) arrive in M1.11.
+/// A Vista recipe (vista-plan §3.2): the set pieces currently chosen. Together with a seed it fixes the whole world (pillar 4,
+/// §4.1); the camera only decides how much of that world is evaluated, and the linked sliders (§3.4) the conditions it is seen
+/// in — place, date, time of day and weather.
 ///
-/// <para>Schema 2 (M1.2) added <see cref="Location"/>, <see cref="Latitude"/>, <see cref="Date"/> and
-/// <see cref="SolarTime"/>, and made <see cref="Time"/> relative to the real sunrise and sunset. Schema 3 (M1.3)
-/// added <see cref="SunElevation"/>, schema 4 (M1.4) <see cref="Altitude"/>. Older files still read; schema 1 files
-/// render at the default place.</para>
+/// <para><b>Slider pins</b> belong in a slider file (<see cref="SliderPins"/>, M1.11). A recipe may still pin the sliders it held
+/// before the slider file existed — <see cref="Time"/> and <see cref="Season"/>, and since schema 2 (M1.2) <see cref="Location"/>,
+/// <see cref="Latitude"/>, <see cref="Date"/> and <see cref="SolarTime"/>, schema 3 (M1.3) <see cref="SunElevation"/>, schema 4
+/// (M1.4) <see cref="Altitude"/> — each field it gives pinning its slider as a slider file would
+/// (<see cref="SliderPins.FromRecipe"/>); a field it leaves out is auto. A preview takes its pins from one or the other, never
+/// both. The weather sliders (temperature, humidity, snow, haze) are pinned in a slider file or by options only.</para>
 ///
 /// <para><see cref="SetPieces"/> is a <b>set</b>: order never matters (the same pieces in any order make
 /// the same world). Set pieces are chosen before anything renders, and changing the set starts a new scene
-/// — world, planted viewpoint and auto camera are regenerated (§3.4). What never moves the world is time
-/// of day, season, the sliders and the camera.</para>
+/// — world, planted viewpoint and auto camera are regenerated (§3.4). What never moves the world is the sliders and the
+/// camera.</para>
 /// </summary>
 public sealed record Recipe
 {
     /// <summary>The recipe file format version this build writes; it reads every version from 1 up to this.</summary>
     public const int CurrentSchema = 4;
-
-    /// <summary>The highest base <see cref="Altitude"/> accepted, m.</summary>
-    public const double MaxAltitudeMetres = 8000.0;
 
     /// <summary>File format version, from 1 to <see cref="CurrentSchema"/>.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -38,44 +37,35 @@ public sealed record Recipe
     /// </summary>
     public IReadOnlyList<SetPiece> SetPieces { get; init; } = [];
 
-    /// <summary>
-    /// Time of day, relative to the date's sunrise and sunset (<see cref="Almanac"/>). <see cref="SolarTime"/>
-    /// overrides it.
-    /// </summary>
-    public TimeOfDay Time { get; init; } = TimeOfDay.Day;
+    /// <summary>The time-of-day preset, which pins the <c>time</c> slider; null for auto (day, unless a set piece pushes another).</summary>
+    public TimeOfDay? Time { get; init; }
 
-    /// <summary>Season; it picks the date for the place's hemisphere. <see cref="Date"/> overrides it.</summary>
-    public Season Season { get; init; } = Season.Summer;
+    /// <summary>The season, which pins the <c>season</c> slider; null for auto (the date's, a set piece's, or summer).</summary>
+    public Season? Season { get; init; }
 
-    /// <summary>
-    /// The place from the location dropdown. <see cref="Place.None"/> means none named: the custom
-    /// <see cref="Latitude"/> when there is one, else <see cref="Places.Default"/>.
-    /// </summary>
+    /// <summary>The place from the location dropdown, which pins the <c>location</c> slider; <see cref="Place.None"/> for none.</summary>
     public Place Location { get; init; } = Place.None;
 
-    /// <summary>A custom latitude in degrees (north positive), instead of a <see cref="Location"/>; null for none.</summary>
+    /// <summary>A custom latitude in degrees (north positive), which pins the <c>location</c> slider; null for none.</summary>
     public double? Latitude { get; init; }
 
-    /// <summary>A date overriding <see cref="Season"/>; null takes the season's date (<see cref="SeasonCalendar"/>).</summary>
+    /// <summary>A date, which pins the <c>date</c> slider (and decides the season, M1.2); null for none.</summary>
     public DateOnly? Date { get; init; }
 
-    /// <summary>A local solar time overriding <see cref="Time"/> (12:00 is solar noon); null for none.</summary>
+    /// <summary>A local solar time, which pins the <c>solarTime</c> slider; null for none.</summary>
     public TimeOnly? SolarTime { get; init; }
 
-    /// <summary>
-    /// A geometric sun elevation in degrees overriding <see cref="Time"/>'s preset: the time of day at which the sun
-    /// stands this high, rising when <see cref="Time"/> is dawn and setting otherwise (twilight is defined on the
-    /// geometric elevation: civil twilight ends at −6°). Null for none; not together with <see cref="SolarTime"/>.
-    /// </summary>
+    /// <summary>A geometric sun elevation in degrees, which pins the <c>solarTime</c> slider by height; null for none.</summary>
     public double? SunElevation { get; init; }
 
-    /// <summary>
-    /// The scene's base altitude above sea level in metres — world <c>y = 0</c>, the valley floor, where the ground sphere
-    /// of the air sits (vista-plan §3.3, §3.6: thinner air gives a deeper blue, less haze and a brighter sun) — instead of
-    /// the place's typical valley floor; null for that. The terrain keeps its shape: the whole scene moves up or down in
-    /// the air.
-    /// </summary>
+    /// <summary>The scene's base altitude above sea level in metres, which pins the <c>altitude</c> slider; null for none.</summary>
     public double? Altitude { get; init; }
+
+    /// <summary>True when the recipe pins any slider itself (it gives a time, season, place or altitude field).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasPins =>
+        Time is not null || Season is not null || Location != Place.None || Latitude is not null || Date is not null
+        || SolarTime is not null || SunElevation is not null || Altitude is not null;
 
     /// <summary>
     /// This recipe with <paramref name="piece"/> added (unchanged if it is already there). Any piece it
@@ -99,18 +89,7 @@ public sealed record Recipe
         var errors = new List<string>();
         if (Schema < 1 || Schema > CurrentSchema)
             errors.Add($"Unsupported recipe schema {Schema}; this build reads schemas 1 to {CurrentSchema}.");
-        if (!Enum.IsDefined(Location))
-            errors.Add($"Unknown location {(int)Location}.");
-        if (Latitude is double latitude && !(latitude is >= -90.0 and <= 90.0))
-            errors.Add($"Latitude must be in [-90, 90] degrees, got {latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
-        if (Latitude is not null && Location != Place.None)
-            errors.Add("Give a location or a custom latitude, not both.");
-        if (SunElevation is double elevation && !(elevation is >= -90.0 and <= 90.0))
-            errors.Add($"The sun elevation must be in [-90, 90] degrees, got {elevation.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
-        if (SunElevation is not null && SolarTime is not null)
-            errors.Add("Give a solar time or a sun elevation, not both.");
-        if (Altitude is double altitude && !(altitude is >= 0.0 and <= MaxAltitudeMetres))
-            errors.Add($"The altitude must be in [0, {MaxAltitudeMetres.ToString(System.Globalization.CultureInfo.InvariantCulture)}] m above sea level, got {altitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+        errors.AddRange(SliderPins.FromRecipe(this).Validate());
         if (SetPieces is null)
             errors.Add("Set pieces must be a list (empty for plain base ground).");
         else

@@ -12,7 +12,6 @@ namespace Vista.Output;
 /// The JSON file written next to every image (vista-plan §5.7 / §7.4): everything needed to reproduce it
 /// — recipe, seed, camera, data tier per material, engine version — plus what it cost (rays, samples,
 /// timings), which is what the preview's first calibration of the estimate reads back (§7.2).
-/// The linked sliders join under a new <see cref="Schema"/> later in M1.
 ///
 /// <para>Schema 2 (M1.1) added <see cref="ImageInfo.Window"/>, the part of the frame the image shows. Schema 3
 /// (M1.2) added <see cref="Place"/> and the astronomy in <see cref="Sun"/>: date, local solar time, sunrise,
@@ -32,12 +31,14 @@ namespace Vista.Output;
 /// <c>meshBytes</c> are the view's mesh now, not the world grid's. Schema 11 (M1.10a) added <see cref="ExposureInfo.Meter"/>, which
 /// meter exposed the PNG, with its reading in <see cref="ExposureInfo.Incident"/> or <see cref="ExposureInfo.Average"/> (the
 /// average meter's fields moved there) and the meter's own stops in <see cref="ExposureInfo.MeteredEv"/>, and
-/// <see cref="ImageInfo.Display"/>, the PNG's display curve.</para>
+/// <see cref="ImageInfo.Display"/>, the PNG's display curve. Schema 12 (M1.11) added <see cref="Sliders"/>: every linked slider's value,
+/// whether it was pinned, and where an auto value came from, with the weather the chain worked out (the climate's day, the dew point,
+/// the freezing level, the snowline and the haze).</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 11;
+    public const int CurrentSchema = 12;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -69,8 +70,11 @@ public sealed record Sidecar
     /// <summary>World generation facts.</summary>
     public required WorldInfo World { get; init; }
 
-    /// <summary>The place the sky was computed for: the recipe's location or custom latitude, or the default place.</summary>
+    /// <summary>The place the sky was computed for: the location slider's place or custom latitude.</summary>
     public required PlaceInfo Place { get; init; }
+
+    /// <summary>The linked sliders (schema 12): each one's value, pin and origin, and the weather chain's working.</summary>
+    public required SlidersInfo Sliders { get; init; }
 
     /// <summary>The sun the image was lit by.</summary>
     public required SunInfo Sun { get; init; }
@@ -186,10 +190,10 @@ public sealed record WorldInfo(
 /// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>
 /// <param name="Source">How the position was computed.</param>
 /// <param name="Date">The date.</param>
-/// <param name="DateFrom">"season &lt;name&gt;" when the season chose the date for the hemisphere, "recipe date" for an override.</param>
-/// <param name="Season">The season (the date's, when the recipe gives a date).</param>
+/// <param name="DateFrom">"season &lt;name&gt;" when the season chose the date for the hemisphere, "pinned date" for a pin.</param>
+/// <param name="Season">The season (the date's, when the date is pinned and the season is not).</param>
 /// <param name="SolarTime">The local solar time rendered, <c>HH:mm:ss</c> (12:00:00 is solar noon).</param>
-/// <param name="SolarTimeFrom">How the time was chosen, e.g. "dawn: sunrise − 20 min", "recipe solarTime" or "sunElevation −2°, evening".</param>
+/// <param name="SolarTimeFrom">How the time was chosen, e.g. "dawn: sun at −4°, rising", "pinned solarTime" or "pinned sunElevation −2°, setting".</param>
 /// <param name="Daylight">Whether the sun rises and sets on the date.</param>
 /// <param name="Sunrise">Sunrise in local solar time; null in polar day or night.</param>
 /// <param name="Sunset">Sunset in local solar time; null in polar day or night.</param>
@@ -241,7 +245,7 @@ public sealed record SunInfo(
         return new SunInfo(
             NoaaSource,
             almanac.Date,
-            almanac.DateFromSeason ? "season " + System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(almanac.Season.ToString()) : "recipe date",
+            almanac.DateFromSeason ? "season " + System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(almanac.Season.ToString()) : "pinned date",
             almanac.Season,
             Almanac.FormatHours(almanac.SolarHours),
             almanac.SolarTimeFrom,

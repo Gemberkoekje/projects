@@ -37,11 +37,11 @@ public static class WatchCommandLine
     public const string Usage =
         "Usage: Vista.App --watch --recipe <recipe.json> --seed <n> [--camera <camera.json>] --out <preview.png> [any --preview option]\n" +
         "                 [--options <options.txt>]\n" +
-        "Renders once, then again whenever the recipe, the camera or the options file changes, rebuilding only the stages the\n" +
-        "change touches (world, mesh, sky, render, exposure, denoised image) and rewriting <preview>.* and its sidecar, which lists\n" +
-        "the stages built and reused. The options file holds more --preview options (# starts a comment); they override the\n" +
-        "command line's and are read again whenever it changes: put --seed, --time or --width there to change them. A file that\n" +
-        "does not parse is reported and the session keeps watching. Type quit (or press Ctrl+C) to stop.";
+        "Renders once, then again whenever the recipe, the slider file, the camera or the options file changes, rebuilding only\n" +
+        "the stages the change touches (world, mesh, sky, render, exposure, denoised image) and rewriting <preview>.* and its\n" +
+        "sidecar, which lists the stages built and reused. The options file holds more --preview options (# starts a comment);\n" +
+        "they override the command line's and are read again whenever it changes: put --seed, --time or --width there to change\n" +
+        "them. A file that does not parse is reported and the session keeps watching. Type quit (or press Ctrl+C) to stop.";
 
     /// <summary>The options a watch takes on its command line: every <c>--preview</c> option and the options file.</summary>
     private static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(PreviewCommandLine.ValueOptions, StringComparer.Ordinal) { OptionsOption };

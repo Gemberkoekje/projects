@@ -72,9 +72,9 @@ public sealed class SheetCommandLineTests
         SheetRequest r = Sheet("--sheet", "--recipe", "r.json", "--seed", "1", "--out", "s.png", "--location", "zermatt",
             "--date", "2026-10-15", "--vary", "time=dawn,day,goldenHour,dusk");
         PreviewRequest dusk = r.Axis.Apply(r.Base, 3);
-        Assert.AreEqual("\"zermatt\"", dusk.RecipeOverrides["location"]);
-        Assert.AreEqual("\"2026-10-15\"", dusk.RecipeOverrides["date"]);
-        Assert.AreEqual("\"dusk\"", dusk.RecipeOverrides["time"]);
+        Assert.AreEqual("\"zermatt\"", dusk.SliderOverrides["location"]);
+        Assert.AreEqual("\"2026-10-15\"", dusk.SliderOverrides["date"]);
+        Assert.AreEqual("\"dusk\"", dusk.SliderOverrides["time"]);
     }
 
     [TestMethod]
@@ -125,7 +125,7 @@ public sealed class SheetCommandLineTests
         Assert.AreEqual("b.json", Apply("recipe=a.json,b.json", 1).RecipePath);
         Assert.AreEqual("a.json", Apply("camera=a.json,default", 0).CameraPath);
         Assert.IsNull(Apply("camera=a.json,default", 1).CameraPath, "default is the default camera");
-        Assert.AreEqual("\"goldenHour\"", Apply("time=dawn,goldenHour", 1).RecipeOverrides["time"]);
+        Assert.AreEqual("\"goldenHour\"", Apply("time=dawn,goldenHour", 1).SliderOverrides["time"]);
         Assert.AreEqual("[\"snowCappedMountains\",\"lake\"]",
             Apply("setPieces=[snowCappedMountains],[snowCappedMountains, lake]", 1).RecipeOverrides["setPieces"]);
         PreviewRequest yawed = Apply("camera.yawDegrees=0,90", 1);

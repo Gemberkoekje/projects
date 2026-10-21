@@ -60,8 +60,8 @@ public sealed class AltitudeTests
     [TestMethod]
     public void AltitudeOption_OverridesTheRecipe()
     {
-        Assert.AreEqual("3000", Parse("--altitude", "3000").RecipeOverrides["altitude"]);
-        Assert.AreEqual("0", Parse("--altitude", "0").RecipeOverrides["altitude"]);
+        Assert.AreEqual("3000", Parse("--altitude", "3000").SliderOverrides["altitude"]);
+        Assert.AreEqual("0", Parse("--altitude", "0").SliderOverrides["altitude"]);
         Assert.IsFalse(Parse().RecipeOverrides.ContainsKey("altitude"));
         foreach (string bad in new[] { "-1", "8001", "high" })
         {
@@ -92,13 +92,13 @@ public sealed class AltitudeTests
         Sidecar sidecar = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"], "location": "zermatt", "altitude": 3000 }"""), renderer);
         Assert.AreEqual(3000.0, renderer.Scene!.GroundAltitudeMetres);
         Assert.AreEqual(3000.0, sidecar.Atmosphere.GroundAltitudeMetres);
-        Assert.AreEqual("recipe altitude", sidecar.Atmosphere.GroundAltitudeFrom);
+        Assert.AreEqual("pinned", sidecar.Atmosphere.GroundAltitudeFrom);
         Assert.AreEqual(AtmosphereInfo.LutAerialPerspective, sidecar.Atmosphere.AerialPerspective);
         Assert.IsTrue(sidecar.Atmosphere.ZenithFromGround.Rayleigh550 < 0.07, "thinner air above 3 km");
 
         Sidecar valley = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
-        Assert.AreEqual("valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
-        Assert.AreEqual(11, valley.Schema);
+        Assert.AreEqual("auto: the valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
+        Assert.AreEqual(12, valley.Schema);
     }
 
     [TestMethod]

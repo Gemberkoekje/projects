@@ -20,13 +20,18 @@ public static class SheetLabels
     [
         ("recipe.name", "name"),
         ("recipe.setPieces", "setPieces"),
-        ("recipe.time", "time"),
-        ("recipe.season", "season"),
-        ("recipe.location", "location"),
-        ("recipe.latitude", "latitude"),
-        ("recipe.date", "date"),
-        ("recipe.solarTime", "solarTime"),
-        ("recipe.sunElevation", "sun"),
+        ("sliders.time", "time"),
+        ("sliders.season", "season"),
+        ("sliders.location", "location"),
+        ("sliders.latitude", "latitude"),
+        ("sliders.date", "date"),
+        ("sliders.solarTime", "solarTime"),
+        ("sliders.sunElevation", "sun"),
+        ("sliders.altitude", "altitude"),
+        ("sliders.temperature", "temperature"),
+        ("sliders.humidity", "humidity"),
+        ("sliders.snowline", "snow"),
+        ("sliders.visibility", "visibility"),
         ("seed", "seed"),
         ("camera", "camera"),
         ("camera.position", "position"),
@@ -51,13 +56,19 @@ public static class SheetLabels
         ("build", "build"),
     ];
 
+    // The fields of a recipe before schema 5 that pinned a slider, under the slider file's names.
+    private static readonly string[] RecipePins = ["time", "season", "location", "latitude", "date", "solarTime", "sunElevation", "altitude"];
+
     /// <summary>
-    /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, <c>seed</c>, the
+    /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, the pinned sliders as <c>sliders.*</c> (since
+    /// schema 12, the slider pins; before it, the recipe's own place and time fields, which pinned them), <c>seed</c>, the
     /// camera (just <c>camera = default</c> for the default camera, whose pose follows the terrain),
     /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality and light sampling, the display curve and the exposure
-    /// meter (since M1.10a; older sidecars count as ACES and the average meter), how the air was evaluated, and the build's commit. A recipe field that another overrides says nothing about the image and is left out: the
-    /// season under a date, the time of day under a solar time or under a sun elevation (except dawn, which says the
-    /// sun is rising), and a location of "none" (no place named).
+    /// meter (since M1.10a; older sidecars count as ACES and the average meter), how the air was evaluated, and the build's commit.
+    /// Auto sliders are left out (they follow the rest) but for the time of day and the season, which every sidecar names; so is a
+    /// pin that another overrides, which says nothing about the image:
+    /// the season under a date, the time of day under a solar time or under a sun elevation (except dawn, which says the sun is
+    /// rising), and a location of "none" (no place named).
     /// </summary>
     public static SortedDictionary<string, string> Identity(JsonNode? sidecar)
     {
@@ -68,15 +79,33 @@ public static class SheetLabels
         if (root["recipe"] is JsonObject recipe)
         {
             Flatten("recipe", recipe, fields);
-            if (fields.ContainsKey("recipe.date"))
-                fields.Remove("recipe.season");
-            if (fields.ContainsKey("recipe.solarTime"))
-                fields.Remove("recipe.time");
-            if (fields.ContainsKey("recipe.sunElevation") && fields.GetValueOrDefault("recipe.time") != "dawn")
-                fields.Remove("recipe.time");
-            if (fields.GetValueOrDefault("recipe.location") == "none")
-                fields.Remove("recipe.location");
+            // A recipe's own place and time fields pin sliders (and were the only pins before schema 12), as a slider file's do.
+            foreach (string pin in RecipePins)
+            {
+                if (fields.Remove("recipe." + pin, out string? value))
+                    fields["sliders." + pin] = value;
+            }
         }
+        // The slider file's pins (schema 12), options included; an auto slider follows the others and says nothing more.
+        if (root["sliders"]?["pins"] is JsonObject pins)
+        {
+            Flatten("sliders", pins, fields);
+            fields.Remove("sliders.temperatureUnit");
+            // The time of day and the season name the picture whether pinned or auto, as older sidecars' recipes always did.
+            foreach (string slider in new[] { "time", "season" })
+            {
+                if (root["sliders"]?["values"]?[slider]?["value"] is JsonValue value)
+                    fields["sliders." + slider] = Display(value);
+            }
+        }
+        if (fields.ContainsKey("sliders.date"))
+            fields.Remove("sliders.season");
+        if (fields.ContainsKey("sliders.solarTime"))
+            fields.Remove("sliders.time");
+        if (fields.ContainsKey("sliders.sunElevation") && fields.GetValueOrDefault("sliders.time") != "dawn")
+            fields.Remove("sliders.time");
+        if (fields.GetValueOrDefault("sliders.location") == "none")
+            fields.Remove("sliders.location");
         if (root["seed"] is JsonValue seed)
             fields["seed"] = Display(seed);
 
@@ -204,13 +233,18 @@ public static class SheetLabels
             string value = identities[0][key];
             string? part = key switch
             {
-                "recipe.name" or "recipe.time" or "recipe.season" or "recipe.location" or "recipe.date" or "image.size" => value,
-                "recipe.solarTime" => $"{value} solar",
-                "recipe.sunElevation" => $"sun at {value}°",
+                "recipe.name" or "sliders.time" or "sliders.season" or "sliders.location" or "sliders.date" or "image.size" => value,
+                "sliders.solarTime" => $"{value} solar",
+                "sliders.sunElevation" => $"sun at {value}°",
+                "sliders.altitude" => $"at {value} m",
+                "sliders.temperature" => $"{value} °C",
+                "sliders.humidity" => $"{value}% humidity",
+                "sliders.snowline" => $"snow from {value} m",
+                "sliders.visibility" => $"{value} km visibility",
                 "atmosphere" => value == "luts" ? null : $"{value} atmosphere",
                 "image.lightSampling" => value == "mis" ? null : $"{value} light sampling",
                 "output" => value == "beauty" ? null : value,
-                "recipe.latitude" => $"latitude {value}°",
+                "sliders.latitude" => $"latitude {value}°",
                 "recipe.setPieces" => value.Length == 0 ? "no set pieces" : value,
                 "seed" => $"seed {value}",
                 "camera" => $"{value} camera",

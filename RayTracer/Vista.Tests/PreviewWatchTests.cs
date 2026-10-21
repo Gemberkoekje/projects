@@ -130,7 +130,7 @@ public sealed class PreviewWatchTests
         Assert.AreEqual(WatchEventKind.Rendered, step.Kind, step.Message);
         Assert.AreEqual(8ul, step.Sidecar!.Seed);
         Assert.AreEqual(4, step.Sidecar.Image.SamplesPerPixel);
-        Assert.AreEqual(Recipes.TimeOfDay.Dusk, step.Sidecar.Recipe.Time);
+        Assert.AreEqual("dusk", step.Sidecar.Sliders.Values["time"].Value, "the options file pins the time of day");
         CollectionAssert.AreEqual(new[] { "--seed: 7 → 8", "--spp: 16 → 4", "--time: (none) → dusk" }, step.Sidecar.Watch!.Changes.ToArray());
         Assert.IsTrue(step.Sidecar.Stages.Built.Contains(PreviewStage.World));
 

@@ -14,9 +14,11 @@ namespace Vista.Cli;
 ///   <c>detail=off,on</c>, <c>farField=off,on</c> — how the terrain is meshed (M1.9); <c>meter=average,incident</c>,
 ///   <c>display=aces,agx</c> — how the PNG is exposed and display-encoded (M1.10a; one render serves every cell);</item>
 ///   <item><c>camera.&lt;field&gt;=…</c> — one camera field, e.g. <c>camera.yawDegrees=0,90,180,270</c>;</item>
-///   <item>anything else — one recipe field by its dotted path, e.g. <c>time=dawn,day,goldenHour,dusk</c> or
-///   <c>setPieces=[snowCappedMountains],[snowCappedMountains,lake]</c>. The linked sliders join the recipe
-///   later in M1, and with them this axis.</item>
+///   <item><c>sliders=a.json,b.json</c> — whole slider files; a slider-file field — one slider, pinned per cell (M1.11), e.g.
+///   <c>time=dawn,day,goldenHour,dusk</c>, <c>sunElevation=2,4,6</c>, <c>date=2026-01-15,2026-07-15</c> or <c>visibility=20,80</c>
+///   (<see cref="Sliders.SliderPins.Fields"/>);</item>
+///   <item>anything else — one recipe field by its dotted path, e.g.
+///   <c>setPieces=[snowCappedMountains],[snowCappedMountains,lake]</c>.</item>
 /// </list>
 /// Values are split at top-level commas and written loosely (<see cref="JsonOverrides.LooseValue"/>); field
 /// overrides still pass the strict parser, so a misspelt field fails before anything renders.
@@ -35,7 +37,7 @@ public sealed class SheetAxis
         _apply = apply;
     }
 
-    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>meter</c>, <c>display</c>, <c>camera.&lt;field&gt;</c> or a recipe field path.</summary>
+    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>sliders</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>meter</c>, <c>display</c>, <c>camera.&lt;field&gt;</c>, a slider-file field or a recipe field path.</summary>
     public string Key { get; }
 
     /// <summary>The values as written, one per cell.</summary>
@@ -49,6 +51,9 @@ public sealed class SheetAxis
 
     /// <summary>True when the axis chooses the camera file, so <c>--camera</c> must not be given.</summary>
     public bool SuppliesCamera => Key == "camera";
+
+    /// <summary>True when the axis chooses the slider file, so <c>--sliders</c> must not be given.</summary>
+    public bool SuppliesSliders => Key == "sliders";
 
     /// <summary>The label of cell <paramref name="index"/>: <c>key=value</c>.</summary>
     public string Label(int index) => $"{Key}={Values[index]}";
@@ -115,9 +120,11 @@ public sealed class SheetAxis
                 "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "recipe" => (r, v) => r with { RecipePath = v },
                 "camera" => (r, v) => r with { CameraPath = v == "default" ? null : v },
+                "sliders" => (r, v) => r with { SlidersPath = v },
                 _ when key.StartsWith("camera.", StringComparison.Ordinal) =>
-                    FieldOverride(values, key["camera.".Length..], camera: true),
-                _ => FieldOverride(values, key, camera: false),
+                    FieldOverride(values, key["camera.".Length..], Target.Camera),
+                _ when Sliders.SliderPins.Fields.ContainsKey(key) => FieldOverride(values, key, Target.Sliders),
+                _ => FieldOverride(values, key, Target.Recipe),
             };
         }
         catch (Exception e) when (e is FormatException or OverflowException or ArgumentException)
@@ -168,16 +175,33 @@ public sealed class SheetAxis
         return value >= min && value <= max ? value : throw new ArgumentException($"'{text}' is outside [{min}, {max}].");
     }
 
-    private static Func<PreviewRequest, string, PreviewRequest> FieldOverride(IReadOnlyList<string> values, string path, bool camera)
+    /// <summary>Which file a field override goes to.</summary>
+    private enum Target
+    {
+        None,
+        Recipe,
+        Sliders,
+        Camera,
+    }
+
+    private static Func<PreviewRequest, string, PreviewRequest> FieldOverride(IReadOnlyList<string> values, string path, Target target)
     {
         var json = values.Distinct().ToDictionary(v => v, JsonOverrides.LooseValue, StringComparer.Ordinal);
         return (r, v) =>
         {
-            var overrides = new Dictionary<string, string>(camera ? r.CameraOverrides : r.RecipeOverrides, StringComparer.Ordinal)
+            IReadOnlyDictionary<string, string> current = target switch
             {
-                [path] = json[v],
+                Target.Camera => r.CameraOverrides,
+                Target.Sliders => r.SliderOverrides,
+                _ => r.RecipeOverrides,
             };
-            return camera ? r with { CameraOverrides = overrides } : r with { RecipeOverrides = overrides };
+            var overrides = new Dictionary<string, string>(current, StringComparer.Ordinal) { [path] = json[v] };
+            return target switch
+            {
+                Target.Camera => r with { CameraOverrides = overrides },
+                Target.Sliders => r with { SliderOverrides = overrides },
+                _ => r with { RecipeOverrides = overrides },
+            };
         };
     }
 }

@@ -4,6 +4,7 @@ using Vista.Astronomy;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
+using Vista.Sliders;
 using Vista.World;
 
 namespace Vista.Cli;
@@ -74,6 +75,18 @@ public sealed record PreviewRequest
     /// </summary>
     public IReadOnlyDictionary<string, string> RecipeOverrides { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>
+    /// The slider file (vista-plan §10 M1.11): the sliders pinned and their values; null pins none beyond what the CLI options
+    /// (<see cref="SliderOverrides"/>) and an older recipe's own fields pin.
+    /// </summary>
+    public string? SlidersPath { get; init; }
+
+    /// <summary>
+    /// Slider-file fields to override before the strict parse, as dotted camelCase path → JSON value: the place, time and weather
+    /// options pin their sliders through these, and a contact sheet varies a slider through them.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> SliderOverrides { get; init; } = new Dictionary<string, string>();
+
     /// <summary>Camera fields to override, applied to the supplied or the default camera.</summary>
     public IReadOnlyDictionary<string, string> CameraOverrides { get; init; } = new Dictionary<string, string>();
 
@@ -117,18 +130,21 @@ public sealed record PreviewRequest
 /// Vista.App --preview --recipe r.json --seed N [--camera c.json] --out p.png
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
-///           [--location zermatt | --latitude 46.0] [--date 2026-10-15] [--time dawn | --time 17:30]
-///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
+///           [--sliders s.json] [--location zermatt | --latitude 46.0] [--season autumn] [--date 2026-10-15]
+///           [--time dawn | --time 17:30] [--sun-elevation -2] [--altitude 3000] [--temperature 5 | --temperature 41F]
+///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--meter incident | average] [--display agx | aces]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
-/// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
-/// options override the recipe's fields (vista-plan §3.5): <c>--location</c> or <c>--latitude</c> picks the
-/// place (and clears the other), <c>--date</c> overrides the season, and <c>--time</c> takes a time-of-day
-/// preset (clearing the recipe's solar time) or a local solar time, and <c>--sun-elevation</c> the time at which the
-/// sun stands that high (rising when the time is dawn); <c>--altitude</c> sets the scene's base altitude (§3.6).
+/// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
+/// file (vista-plan §10 M1.11): the sliders pinned. The slider options pin one slider each on top of it (§3.4–§3.6):
+/// <c>--location</c> or <c>--latitude</c> the place (clearing the other), <c>--season</c> and <c>--date</c> the season and the
+/// date, <c>--time</c> a time-of-day preset (clearing a pinned solar time) or a local solar time, and <c>--sun-elevation</c> the
+/// time at which the sun stands that high (rising when the time is dawn); <c>--altitude</c> the scene's base altitude,
+/// <c>--temperature</c> (°C, or °F with an <c>F</c>), <c>--humidity</c> (%), <c>--snowline</c> (m) and <c>--visibility</c> (km)
+/// the weather.
 /// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
 /// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4). <c>--light-sampling
 /// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
@@ -164,13 +180,18 @@ public static class PreviewCommandLine
         "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
-        "Place overrides: [--location <place> | --latitude <degrees>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
+        "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
+        "  pins one slider on top of it:\n" +
+        "  [--location <place> | --latitude <degrees>] [--season <season>] [--date yyyy-mm-dd] [--time <preset> | --time hh:mm]\n" +
         "  places: yellowstone, banff, yosemite, lofoten, iceland, scottishHighlands, zermatt (default), dolomites,\n" +
         "          torresDelPaine, fiordland, hokkaido\n" +
-        "  presets: dawn (sunrise − 20 min), day (solar noon), goldenHour (sunset − 60 min), dusk (sunset + 20 min), night;\n" +
-        "  hh:mm is local solar time (12:00 is solar noon). A date overrides the recipe's season.\n" +
+        "  seasons: spring, summer (default), autumn, winter; a date pins the date, and the season follows it unless pinned too.\n" +
+        "  presets: dawn (the rising sun at −4°), day (solar noon), goldenHour (the setting sun at +2°), dusk (setting, −4°),\n" +
+        "  night (solar midnight); hh:mm is local solar time (12:00 is solar noon).\n" +
         "  --sun-elevation <degrees>: the time the sun stands that high (geometric; rising with --time dawn, else setting).\n" +
         "  --altitude <metres>: the scene's base altitude above sea level (default: the place's valley floor), 0 to 8000.\n" +
+        "  --temperature <°C> (or <°F>F, e.g. 41F), --humidity <%>: the air at the valley floor (default: the climate's).\n" +
+        "  --snowline <metres>: where seasonal snow begins, above sea level; --visibility <km>: the haze (default: the humidity's).\n" +
         "--atmosphere luts (default) | reference | referenceShadowed: the precomputed air, or the air path-traced as a medium\n" +
         "  (slow, unbiased), optionally with the terrain's shadow in it.\n" +
         "--light-sampling mis (default) | sunOnly: sample the sun and the sky as lights, weighed against the bounce, or (M1.4)\n" +
@@ -181,16 +202,21 @@ public static class PreviewCommandLine
         "--meter incident (default) | average: expose the PNG for a grey card facing the sun where the camera stands, or for the\n" +
         "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. Neither changes the EXR.";
 
-    /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
-    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
+    /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
+    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["--location"] = ["location", "latitude"],
             ["--latitude"] = ["location", "latitude"],
+            ["--season"] = ["season", "date"],
             ["--date"] = ["date", "season"],
             ["--time"] = ["time", "solarTime"],
             ["--sun-elevation"] = ["sunElevation", "solarTime"],
             ["--altitude"] = ["altitude"],
+            ["--temperature"] = ["temperature", "temperatureUnit"],
+            ["--humidity"] = ["humidity"],
+            ["--snowline"] = ["snowline"],
+            ["--visibility"] = ["visibility"],
         };
 
     private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
@@ -221,7 +247,8 @@ public static class PreviewCommandLine
     internal static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
-        "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
+        "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
+        "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display",
     };
 
@@ -296,7 +323,7 @@ public static class PreviewCommandLine
         }
         HashSet<DebugOutput> debug = DebugSet(values.GetValueOrDefault("--debug"), problems);
         PixelWindow loupe = Loupe(values.GetValueOrDefault("--loupe"), width, height, problems);
-        Dictionary<string, string> recipeOverrides = PlaceOverrides(values, problems);
+        Dictionary<string, string> sliderOverrides = SliderPinOverrides(values, problems);
         AtmosphereMode atmosphere = Atmosphere(values.GetValueOrDefault("--atmosphere"), problems);
         LightSampling lightSampling = Lights(values.GetValueOrDefault("--light-sampling"), problems);
         int rrStart = Int(values, "--rr-start", RenderSettings.DefaultRussianRouletteStart, 0, RenderSettings.MaxRussianRouletteStart, problems);
@@ -322,7 +349,8 @@ public static class PreviewCommandLine
             DispatchBudgetMs = dispatchMs,
             DryRun = dryRun,
             Loupe = loupe,
-            RecipeOverrides = recipeOverrides,
+            SlidersPath = values.GetValueOrDefault("--sliders"),
+            SliderOverrides = sliderOverrides,
             Atmosphere = atmosphere,
             LightSampling = lightSampling,
             RussianRouletteStart = rrStart,
@@ -493,8 +521,8 @@ public static class PreviewCommandLine
         return LightSampling.Mis;
     }
 
-    /// <summary>The recipe overrides of the place options (JSON values by field), checked here so a typo is one CLI error.</summary>
-    private static Dictionary<string, string> PlaceOverrides(Dictionary<string, string> values, List<string> problems)
+    /// <summary>The slider-file overrides of the slider options (JSON values by field), checked here so a typo is one CLI error.</summary>
+    private static Dictionary<string, string> SliderPinOverrides(Dictionary<string, string> values, List<string> problems)
     {
         var overrides = new Dictionary<string, string>(StringComparer.Ordinal);
         bool hasLocation = values.TryGetValue("--location", out string? location);
@@ -565,15 +593,67 @@ public static class PreviewCommandLine
                 problems.Add($"--sun-elevation must be a number of degrees in [-90, 90], got '{elevationText}'.");
             }
         }
-        if (values.TryGetValue("--altitude", out string? altitudeText))
+        if (values.TryGetValue("--season", out string? seasonText))
         {
-            if (double.TryParse(altitudeText, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double altitude)
-                && altitude is >= 0.0 and <= Recipe.MaxAltitudeMetres)
-                overrides["altitude"] = altitude.ToString("R", CultureInfo.InvariantCulture);
+            if (Enum.TryParse(seasonText, ignoreCase: true, out Season season) && Enum.IsDefined(season) && !int.TryParse(seasonText, out _))
+                overrides["season"] = JsonSerializer.Serialize(JsonName(season.ToString()));
             else
-                problems.Add($"--altitude must be a number of metres above sea level in [0, 8000], got '{altitudeText}'.");
+                problems.Add($"--season must be spring, summer, autumn or winter, got '{seasonText}'.");
         }
+        Number("--altitude", "altitude", 0.0, SliderPins.MaxAltitudeMetres, "metres above sea level");
+        if (values.TryGetValue("--temperature", out string? temperatureText))
+        {
+            if (TryParseTemperature(temperatureText, out double celsius, out TemperatureUnit unit))
+            {
+                overrides["temperature"] = celsius.ToString("R", CultureInfo.InvariantCulture);
+                overrides["temperatureUnit"] = JsonSerializer.Serialize(JsonName(unit.ToString()));
+            }
+            else
+            {
+                problems.Add(string.Create(CultureInfo.InvariantCulture,
+                    $"--temperature must be degrees Celsius in [{SliderPins.MinTemperatureCelsius}, {SliderPins.MaxTemperatureCelsius}] (or Fahrenheit with an F, like 41F), got '{temperatureText}'."));
+            }
+        }
+        Number("--humidity", "humidity", 0.0, 100.0, "% relative humidity");
+        Number("--snowline", "snowline", 0.0, SliderPins.MaxSnowlineMetres, "metres above sea level");
+        Number("--visibility", "visibility", SliderPins.MinVisibilityKm, SliderPins.MaxVisibilityKm, "km");
         return overrides;
+
+        void Number(string option, string field, double min, double max, string unit)
+        {
+            if (!values.TryGetValue(option, out string? text))
+                return;
+            if (double.TryParse(text, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double value)
+                && value >= min && value <= max)
+                overrides[field] = value.ToString("R", CultureInfo.InvariantCulture);
+            else
+                problems.Add(string.Create(CultureInfo.InvariantCulture, $"{option} must be a number of {unit} in [{min}, {max}], got '{text}'."));
+        }
+    }
+
+    /// <summary>
+    /// Parses a <c>--temperature</c> value: degrees Celsius (<c>5</c>, <c>-3.5</c>, <c>5C</c>), or Fahrenheit with an <c>F</c>
+    /// (<c>41F</c>), which also asks for temperatures to be shown in °F; the value returned is °C, inside the slider's range.
+    /// </summary>
+    internal static bool TryParseTemperature(string text, out double celsius, out TemperatureUnit unit)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        string number = text.Trim();
+        unit = TemperatureUnit.Celsius;
+        if (number.EndsWith('F') || number.EndsWith('f'))
+        {
+            unit = TemperatureUnit.Fahrenheit;
+            number = number[..^1];
+        }
+        else if (number.EndsWith('C') || number.EndsWith('c'))
+        {
+            number = number[..^1];
+        }
+        celsius = 0.0;
+        if (!double.TryParse(number, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out double value))
+            return false;
+        celsius = unit == TemperatureUnit.Fahrenheit ? (value - 32.0) * 5.0 / 9.0 : value;
+        return celsius is >= SliderPins.MinTemperatureCelsius and <= SliderPins.MaxTemperatureCelsius;
     }
 
     private static string JsonName(string name) => JsonNamingPolicy.CamelCase.ConvertName(name);

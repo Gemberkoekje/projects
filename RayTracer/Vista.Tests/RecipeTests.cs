@@ -47,8 +47,8 @@ public sealed class RecipeTests
         Recipe recipe = VistaJson.ParseRecipe("{}");
         Assert.AreEqual(Recipe.CurrentSchema, recipe.Schema);
         Assert.AreEqual(0, recipe.SetPieces.Count, "no pieces = plain base ground");
-        Assert.AreEqual(TimeOfDay.Day, recipe.Time);
-        Assert.AreEqual(Season.Summer, recipe.Season);
+        Assert.IsNull(recipe.Time, "auto: day, unless a set piece pushes another");
+        Assert.IsNull(recipe.Season, "auto: summer, unless a set piece or a date says otherwise");
         Assert.IsNull(recipe.Name);
         Assert.AreEqual(Place.None, recipe.Location, "no place named: the default place");
         Assert.IsNull(recipe.Latitude);

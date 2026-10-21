@@ -245,6 +245,12 @@ internal static class Program
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"sun: {sidecar.Place.Name} ({sidecar.Place.LatitudeDegrees:0.00}°), {sun.Date:yyyy-MM-dd} ({sun.DateFrom}), " +
             $"{sun.SolarTime} solar ({sun.SolarTimeFrom}); azimuth {sun.AzimuthDegrees:0.0}°, elevation {sun.ElevationDegrees:0.00}°; {daylight}"));
+        SlidersInfo sliders = sidecar.Sliders;
+        string pinned = string.Join(", ", sliders.Values.Where(v => v.Value.Pinned).Select(v => v.Key));
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"weather: {sliders.Values["temperature"].Value}, {sliders.Values["humidity"].Value} humidity, freezing level {sliders.Weather.FreezingLevelMetres:0} m, " +
+            $"snow from {sliders.Values["snow"].Value}, visibility {sliders.Values["haze"].Value} ({sliders.Weather.Station}); " +
+            $"pinned: {(pinned.Length > 0 ? pinned : "none")} (from {sliders.PinsFrom})"));
         if (sidecar.Exposure is { } exposure)
         {
             string reading = (exposure.Incident, exposure.Average) switch

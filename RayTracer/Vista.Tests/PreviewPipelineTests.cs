@@ -250,13 +250,14 @@ public sealed class PreviewPipelineTests
         Assert.AreEqual(Place.Zermatt, sidecar.Place.Place, "the default place");
         Assert.AreEqual(new DateOnly(SeasonCalendar.ReferenceYear, 7, 15), sidecar.Sun.Date);
         Assert.AreEqual("season summer", sidecar.Sun.DateFrom);
-        Assert.AreEqual("goldenHour: sunset − 60 min", sidecar.Sun.SolarTimeFrom);
+        Assert.AreEqual("goldenHour: sun at +2°, setting", sidecar.Sun.SolarTimeFrom);
         Assert.AreEqual(DaylightKind.RisesAndSets, sidecar.Sun.Daylight);
         Almanac almanac = Almanac.For(VistaJson.ParseRecipe(File.ReadAllText(Path.Combine(_dir, "r.json"))));
         Assert.AreEqual(almanac.Sun, renderer.Scene!.Sun, "the renderer gets the almanac's sun");
         Assert.AreEqual(almanac.Sun.AzimuthDegrees, sidecar.Sun.AzimuthDegrees);
         Assert.AreEqual(almanac.Sun.ElevationDegrees, sidecar.Sun.ElevationDegrees);
-        Assert.AreEqual(Almanac.FormatHours(almanac.Daylight.SunsetHours - 1.0), sidecar.Sun.SolarTime);
+        Assert.AreEqual(Almanac.FormatHours(almanac.SolarHours), sidecar.Sun.SolarTime);
+        Assert.AreEqual(Almanac.GoldenHourElevationDegrees, sidecar.Sun.TrueElevationDegrees, 1e-6, "golden hour is a sun height (M1.11)");
         Assert.AreEqual(Almanac.FormatHours(almanac.Daylight.SunsetHours), sidecar.Sun.Sunset);
         Assert.AreEqual(-almanac.Sun.ToSun.Y, sidecar.Sun.Direction.Y, 1e-6, "the direction is the sunlight's travel");
 
@@ -279,11 +280,11 @@ public sealed class PreviewPipelineTests
         };
         Sidecar sidecar = PreviewPipeline.Run(Request(dryRun: true) with { RecipeOverrides = overrides }, renderer: null);
         Assert.AreEqual(Place.Lofoten, sidecar.Place.Place);
-        Assert.AreEqual("recipe date", sidecar.Sun.DateFrom);
+        Assert.AreEqual("pinned date", sidecar.Sun.DateFrom);
         Assert.AreEqual(DaylightKind.PolarDay, sidecar.Sun.Daylight);
         Assert.IsNull(sidecar.Sun.Sunrise);
-        Assert.AreEqual("00:00:00", sidecar.Sun.SolarTime);
-        StringAssert.Contains(sidecar.Warnings.Single(), "Polar day at Lofoten");
+        Assert.AreEqual("24:00:00", sidecar.Sun.SolarTime, "dusk's lowest sun is the midnight after the evening");
+        StringAssert.Contains(sidecar.Warnings.Single(), "never sinks to −4° at Lofoten on 2026-06-21 (polar day)");
     }
 
     [TestMethod]

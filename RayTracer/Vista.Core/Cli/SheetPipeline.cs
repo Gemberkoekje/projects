@@ -179,7 +179,8 @@ public static class SheetPipeline
     {
         try
         {
-            VistaJson.ParseRecipe(JsonOverrides.Apply(File.ReadAllText(cell.RecipePath), cell.RecipeOverrides));
+            Recipe recipe = VistaJson.ParseRecipe(JsonOverrides.Apply(File.ReadAllText(cell.RecipePath), cell.RecipeOverrides));
+            PreviewSession.ReadPins(recipe, cell);
             string camera = cell.CameraPath is null
                 ? VistaJson.Serialize(new CameraSpec { Position = new WorldPoint(0.0, 0.0, 0.0) })
                 : File.ReadAllText(cell.CameraPath);

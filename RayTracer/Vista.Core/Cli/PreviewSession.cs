@@ -7,6 +7,7 @@ using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
+using Vista.Sliders;
 using Vista.World;
 
 namespace Vista.Cli;
@@ -112,11 +113,15 @@ public sealed class PreviewSession
         if (DefaultCamera.GroundWarning(camera, terrain) is { } groundWarning)
             warnings.Add(groundWarning);
 
-        Almanac almanac = Almanac.For(recipe);
-        warnings.AddRange(almanac.Hints);
+        // The linked sliders (vista-plan §10 M1.11): the pins, resolved with the set pieces into the place, the sun and the weather.
+        (SliderPins pins, string pinsFrom) = ReadPins(recipe, request);
+        SliderState sliders = LinkedSliders.Resolve(recipe, pins, AtmosphereModel.Default);
+        warnings.AddRange(sliders.Hints);
+        Almanac almanac = sliders.Almanac;
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
-        AtmosphereModel air = AtmosphereModel.Default;
-        (double groundAltitude, string altitudeFrom) = Places.BaseAltitude(recipe, almanac.Place);
+        AtmosphereModel air = sliders.Air(AtmosphereModel.Default);
+        double groundAltitude = sliders.BaseAltitudeMetres;
+        string altitudeFrom = sliders.Readings[Slider.Altitude].From;
 
         // The mesh follows the camera's position and the frame (vista-plan §10 M1.9), never the loupe: a loupe is a crop of the
         // frame's own render.
@@ -329,6 +334,7 @@ public sealed class PreviewSession
                 Mesh = mesh.Info,
             },
             Place = almanac.Place,
+            Sliders = SlidersInfo.From(sliders, request.SlidersPath, pinsFrom),
             Sun = SunInfo.From(almanac, frame),
             Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere, altitudeFrom),
             Exposure = exposure,
@@ -360,6 +366,29 @@ public sealed class PreviewSession
         Mark(PreviewStage.SkyView, RenderStageKeys.SkyView);
         if (settings.LightSampling == LightSampling.Mis)
             Mark(PreviewStage.SkyDistribution, RenderStageKeys.SkyDistribution);
+    }
+
+    /// <summary>
+    /// The slider pins of <paramref name="request"/> and where they came from: its slider file, or the recipe's own place and time
+    /// fields, or none — with the slider options' overrides on top. A recipe that pins sliders itself cannot be given with a slider
+    /// file: the pins would have two homes.
+    /// </summary>
+    internal static (SliderPins Pins, string From) ReadPins(Recipe recipe, PreviewRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+        ArgumentNullException.ThrowIfNull(request);
+        SliderPins Parse(string text) => VistaJson.ParseSliders(JsonOverrides.Apply(text, request.SliderOverrides));
+        if (request.SlidersPath is string path)
+        {
+            if (recipe.HasPins)
+                throw new InvalidDataException(
+                    $"{request.RecipePath}: the recipe pins sliders itself (its time, season, place or altitude); with --sliders, pin them in the slider file and leave the recipe its set pieces.");
+            return (ReadInput(path, Parse), request.SliderOverrides.Count > 0 ? "slider file and options" : "slider file");
+        }
+        string from = recipe.HasPins ? "recipe" : "none";
+        if (request.SliderOverrides.Count > 0)
+            from += " and options";
+        return (Parse(VistaJson.Serialize(SliderPins.FromRecipe(recipe))), from);
     }
 
     /// <summary>Reads and parses an input file; an error in it names the file, since a watch reads several that may have changed.</summary>

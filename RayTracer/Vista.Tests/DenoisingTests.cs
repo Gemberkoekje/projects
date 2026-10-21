@@ -247,7 +247,7 @@ public sealed class DenoisingTests
         string json = File.ReadAllText(P("p.json"));
         Sidecar back = VistaJson.Deserialize<Sidecar>(json);
         Assert.AreEqual(sidecar.Denoise, back.Denoise);
-        Assert.AreEqual(11, back.Schema);
+        Assert.AreEqual(12, back.Schema);
 
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement denoise = doc.RootElement.GetProperty("denoise");

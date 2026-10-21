@@ -2,11 +2,12 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Vista.Scene;
+using Vista.Sliders;
 
 namespace Vista.Recipes;
 
 /// <summary>
-/// The one JSON dialect for every Vista file — recipes, cameras and sidecars (vista-plan §7.4): camelCase
+/// The one JSON dialect for every Vista file — recipes, slider files, cameras and sidecars (vista-plan §7.4): camelCase
 /// names, enums as camelCase strings, indented output, and <b>unknown properties rejected</b> so a typo in a
 /// hand- or LLM-edited file fails loudly instead of being silently ignored.
 /// </summary>
@@ -49,6 +50,16 @@ public static class VistaJson
         if (errors.Count > 0)
             throw new InvalidDataException("Invalid recipe: " + string.Join(" ", errors));
         return recipe;
+    }
+
+    /// <summary>Parses and validates a slider file; throws <see cref="InvalidDataException"/> listing every problem.</summary>
+    public static SliderPins ParseSliders(string json)
+    {
+        SliderPins pins = Deserialize<SliderPins>(json);
+        IReadOnlyList<string> errors = pins.Validate();
+        if (errors.Count > 0)
+            throw new InvalidDataException("Invalid slider file: " + string.Join(" ", errors));
+        return pins;
     }
 
     /// <summary>Parses and validates a camera; throws <see cref="InvalidDataException"/> listing every problem.</summary>

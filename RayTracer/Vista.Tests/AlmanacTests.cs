@@ -4,8 +4,8 @@ using Vista.Recipes;
 namespace Vista.Tests;
 
 /// <summary>
-/// A recipe resolved to a sun (vista-plan §3.5, §10 M1.2): the place, the season's date or an override, and the
-/// time-of-day presets relative to that day's sunrise and sunset, with polar day and night handled.
+/// A recipe resolved to a sun (vista-plan §3.5, §10 M1.2, M1.11): the place, the season's date or a pinned date, and the
+/// time-of-day presets by sun height, falling back to the sun's nearest approach where it never reaches one.
 /// </summary>
 [TestClass]
 public sealed class AlmanacTests
@@ -26,18 +26,22 @@ public sealed class AlmanacTests
     }
 
     [TestMethod]
-    public void Presets_AreRelativeToSunriseAndSunset()
+    public void Presets_AreSunHeights()
     {
         var recipe = new Recipe { Location = Place.Zermatt, Season = Season.Autumn };
-        Daylight daylight = SolarPosition.DaylightOn(46.02, new DateOnly(SeasonCalendar.ReferenceYear, 10, 15));
-
-        Assert.AreEqual(daylight.SunriseHours - 20.0 / 60.0, At(recipe, TimeOfDay.Dawn).SolarHours, 1e-12);
+        Almanac dawn = At(recipe, TimeOfDay.Dawn);
+        Almanac golden = At(recipe, TimeOfDay.GoldenHour);
+        Almanac dusk = At(recipe, TimeOfDay.Dusk);
+        Assert.AreEqual(Almanac.DawnElevationDegrees, dawn.Sun.TrueElevationDegrees, 1e-6);
+        Assert.AreEqual(Almanac.GoldenHourElevationDegrees, golden.Sun.TrueElevationDegrees, 1e-6);
+        Assert.AreEqual(Almanac.DuskElevationDegrees, dusk.Sun.TrueElevationDegrees, 1e-6);
+        Assert.IsTrue(dawn.SolarHours < 12.0 && golden.SolarHours > 12.0 && dusk.SolarHours > golden.SolarHours, "dawn rises, golden hour and dusk set");
         Assert.AreEqual(12.0, At(recipe, TimeOfDay.Day).SolarHours);
-        Assert.AreEqual(daylight.SunsetHours - 1.0, At(recipe, TimeOfDay.GoldenHour).SolarHours, 1e-12);
-        Assert.AreEqual(daylight.SunsetHours + 20.0 / 60.0, At(recipe, TimeOfDay.Dusk).SolarHours, 1e-12);
         Assert.AreEqual(0.0, At(recipe, TimeOfDay.Night).SolarHours);
-        Assert.AreEqual("dawn: sunrise − 20 min", At(recipe, TimeOfDay.Dawn).SolarTimeFrom);
-        Assert.AreEqual("goldenHour: sunset − 60 min", At(recipe, TimeOfDay.GoldenHour).SolarTimeFrom);
+        Assert.AreEqual("dawn: sun at −4°, rising", dawn.SolarTimeFrom);
+        Assert.AreEqual("goldenHour: sun at +2°, setting", golden.SolarTimeFrom);
+        Assert.AreEqual("dusk: sun at −4°, setting", dusk.SolarTimeFrom);
+        Assert.AreEqual(0, dawn.Hints.Count + golden.Hints.Count + dusk.Hints.Count);
     }
 
     [TestMethod]
@@ -50,10 +54,57 @@ public sealed class AlmanacTests
             Assert.IsTrue(elevation is > -6.0 and < -2.0, $"{time} at {elevation:0.00}° should be civil twilight");
         }
         double golden = At(recipe, TimeOfDay.GoldenHour).Sun.ElevationDegrees;
-        Assert.IsTrue(golden is > 5.0 and < 12.0, $"golden hour at {golden:0.00}°");
+        Assert.IsTrue(golden > Almanac.GoldenHourElevationDegrees && golden < Almanac.GoldenHourElevationDegrees + 0.6,
+            $"golden hour at {golden:0.00}° (apparent: lifted by refraction)");
         Assert.IsTrue(At(recipe, TimeOfDay.Dawn).Sun.AzimuthDegrees is > 90.0 and < 120.0, "dawn in the east-southeast");
         Assert.IsTrue(At(recipe, TimeOfDay.Dusk).Sun.AzimuthDegrees is > 240.0 and < 270.0, "dusk in the west-southwest");
         Assert.IsTrue(At(recipe, TimeOfDay.Night).Sun.ElevationDegrees < -18.0, "solar midnight is astronomical night");
+    }
+
+    [TestMethod]
+    public void EveryPreset_LandsAtItsHeight_AtEveryPlaceInEverySeason_OrFallsBackWithAHint()
+    {
+        int fallbacks = 0;
+        foreach (PlaceInfo place in Places.All)
+        {
+            foreach (Season season in Enum.GetValues<Season>())
+            {
+                var recipe = new Recipe { Location = place.Place, Season = season };
+                foreach (TimeOfDay time in new[] { TimeOfDay.Dawn, TimeOfDay.GoldenHour, TimeOfDay.Dusk })
+                {
+                    Almanac almanac = At(recipe, time);
+                    double target = Almanac.PresetElevation(time);
+                    string what = $"{time} at {place.Name} in {season} ({almanac.Date:yyyy-MM-dd})";
+                    if (almanac.Hints.Count == 0)
+                    {
+                        Assert.AreEqual(target, almanac.Sun.TrueElevationDegrees, 1e-6, what);
+                        Assert.AreEqual(time == TimeOfDay.Dawn, almanac.SolarHours < 12.0, $"{what}: dawn rises, the others set");
+                        continue;
+                    }
+                    // The sun never reaches the height: the preset takes its nearest approach, and says so.
+                    fallbacks++;
+                    bool highest = almanac.SolarHours == 12.0;
+                    Assert.IsTrue(highest || almanac.SolarHours is 0.0 or 24.0, $"{what}: noon or midnight, got {almanac.SolarHours}");
+                    double noon = SolarPosition.At(place.LatitudeDegrees, almanac.Date, 12.0).TrueElevationDegrees;
+                    double midnight = SolarPosition.At(place.LatitudeDegrees, almanac.Date, 0.0).TrueElevationDegrees;
+                    Assert.IsTrue(highest ? noon < target : midnight > target, $"{what}: the height is out of the sun's reach");
+                    StringAssert.Contains(almanac.Hints.Single(), highest ? "never climbs to" : "never sinks to", what);
+                }
+            }
+        }
+        // Only Lofoten is ever out of reach: its July white night never sinks to −4°, and its January sun never climbs to +2°.
+        Assert.AreEqual(3, fallbacks, "dawn and dusk at Lofoten in July, golden hour there in January");
+    }
+
+    [TestMethod]
+    public void AGoldenHourByHeight_IsTheSameLightEverywhere()
+    {
+        // M1.2's "sunset − 60 min" put the sun from 4.3° (Lofoten) to 10.7° (Yosemite) on the same October date.
+        foreach (Place place in new[] { Place.Zermatt, Place.Lofoten, Place.Yosemite, Place.TorresDelPaine })
+        {
+            Almanac almanac = At(new Recipe { Location = place, Season = Season.Autumn }, TimeOfDay.GoldenHour);
+            Assert.AreEqual(Almanac.GoldenHourElevationDegrees, almanac.Sun.TrueElevationDegrees, 1e-6, place.ToString());
+        }
     }
 
     [TestMethod]
@@ -79,7 +130,7 @@ public sealed class AlmanacTests
     {
         Almanac almanac = Almanac.For(new Recipe { Time = TimeOfDay.Dawn, SolarTime = new TimeOnly(17, 30) });
         Assert.AreEqual(17.5, almanac.SolarHours);
-        Assert.AreEqual("recipe solarTime", almanac.SolarTimeFrom);
+        Assert.AreEqual("pinned solarTime", almanac.SolarTimeFrom);
         Assert.AreEqual(SolarPosition.At(46.02, almanac.Date, 17.5), almanac.Sun);
     }
 
@@ -94,43 +145,53 @@ public sealed class AlmanacTests
     }
 
     [TestMethod]
-    public void PolarDay_SendsTheLowSunPresetsToMidnight_WithAHint()
+    public void PolarDay_SendsDawnAndDuskToMidnight_WithAHint()
     {
         var recipe = new Recipe { Location = Place.Lofoten, Date = new DateOnly(2026, 6, 21) };
         Assert.AreEqual(DaylightKind.PolarDay, At(recipe, TimeOfDay.Day).Daylight.Kind);
-        foreach (TimeOfDay time in new[] { TimeOfDay.Dawn, TimeOfDay.GoldenHour, TimeOfDay.Dusk })
+        foreach (TimeOfDay time in new[] { TimeOfDay.Dawn, TimeOfDay.Dusk })
         {
             Almanac almanac = At(recipe, time);
-            Assert.AreEqual(0.0, almanac.SolarHours, $"{time}");
+            Assert.AreEqual(time == TimeOfDay.Dawn ? 0.0 : 24.0, almanac.SolarHours, $"{time}");
             Assert.IsTrue(almanac.Sun.ElevationDegrees > 0.0, "the midnight sun is up");
-            StringAssert.Contains(almanac.Hints.Single(), "Polar day at Lofoten on 2026-06-21");
+            StringAssert.Contains(almanac.Hints.Single(), "never sinks to −4° at Lofoten on 2026-06-21 (polar day)");
         }
+        Almanac golden = At(recipe, TimeOfDay.GoldenHour);
+        Assert.AreEqual(0, golden.Hints.Count, "the midnight sun still sinks to +2° in the evening");
+        Assert.AreEqual(Almanac.GoldenHourElevationDegrees, golden.Sun.TrueElevationDegrees, 1e-6);
         Assert.AreEqual(0, At(recipe, TimeOfDay.Day).Hints.Count);
         Assert.AreEqual(0, At(recipe, TimeOfDay.Night).Hints.Count, "night is solar midnight anyway");
     }
 
     [TestMethod]
-    public void PolarNight_SendsTheDaytimePresetsToNoon_WithAHint()
+    public void PolarNight_SendsGoldenHourToNoon_WithAHint_AndKeepsItsTwilight()
     {
         var recipe = new Recipe { Location = Place.Lofoten, Date = new DateOnly(2026, 12, 21) };
-        foreach (TimeOfDay time in new[] { TimeOfDay.Dawn, TimeOfDay.GoldenHour, TimeOfDay.Dusk })
+        Almanac golden = At(recipe, TimeOfDay.GoldenHour);
+        Assert.AreEqual(12.0, golden.SolarHours);
+        Assert.IsTrue(golden.Sun.ElevationDegrees is < 0.0 and > -2.0, "the noon sun stays just below the horizon");
+        StringAssert.Contains(golden.Hints.Single(), "never climbs to +2° at Lofoten on 2026-12-21 (polar night)");
+        foreach (TimeOfDay time in new[] { TimeOfDay.Dawn, TimeOfDay.Dusk })
         {
             Almanac almanac = At(recipe, time);
-            Assert.AreEqual(12.0, almanac.SolarHours, $"{time}");
-            Assert.IsTrue(almanac.Sun.ElevationDegrees is < 0.0 and > -2.0, "the noon sun stays just below the horizon");
-            StringAssert.Contains(almanac.Hints.Single(), "Polar night");
+            Assert.AreEqual(0, almanac.Hints.Count, $"{time}: the polar night's noon twilight still reaches −4°");
+            Assert.AreEqual(-4.0, almanac.Sun.TrueElevationDegrees, 1e-6);
         }
         Assert.AreEqual(0, At(recipe, TimeOfDay.Night).Hints.Count);
     }
 
     [TestMethod]
-    public void Presets_StayInsideTheDay()
+    public void APinnedSunElevation_ReplacesThePresetsHeight()
     {
-        var shortDay = new Daylight(DaylightKind.RisesAndSets, 11.5, 12.5);
-        Assert.AreEqual(12.0, Almanac.SolarHoursFor(TimeOfDay.GoldenHour, shortDay).Hours, "golden hour is never before noon");
-        var longDay = new Daylight(DaylightKind.RisesAndSets, 0.1, 23.9);
-        Assert.AreEqual(0.0, Almanac.SolarHoursFor(TimeOfDay.Dawn, longDay).Hours);
-        Assert.AreEqual(24.0, Almanac.SolarHoursFor(TimeOfDay.Dusk, longDay).Hours);
+        var recipe = new Recipe { Location = Place.Zermatt, Season = Season.Autumn, SunElevation = 2.0 };
+        Almanac evening = At(recipe, TimeOfDay.GoldenHour);
+        Almanac morning = At(recipe, TimeOfDay.Dawn);
+        Assert.AreEqual(2.0, evening.Sun.TrueElevationDegrees, 1e-6);
+        Assert.IsTrue(evening.SolarHours > 12.0 && morning.SolarHours < 12.0, "rising for dawn, setting otherwise");
+        Assert.AreEqual("pinned sunElevation +2°, setting", evening.SolarTimeFrom);
+        Almanac never = At(recipe with { SunElevation = 60.0 }, TimeOfDay.Day);
+        Assert.AreEqual(12.0, never.SolarHours);
+        StringAssert.Contains(never.Hints.Single(), "the pinned sun elevation uses its highest");
     }
 
     [TestMethod]

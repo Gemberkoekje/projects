@@ -35,8 +35,8 @@ public sealed record WatchEvent(WatchEventKind Kind)
 }
 
 /// <summary>
-/// Watch mode (vista-plan §7.4, §10 M1.8): a <see cref="PreviewSession"/> that renders again whenever the recipe, the camera or
-/// the options file (<see cref="WatchCommandLine"/>) changes. The session keeps the device, the world, the mesh, the acceleration
+/// Watch mode (vista-plan §7.4, §10 M1.8): a <see cref="PreviewSession"/> that renders again whenever the recipe, the slider file
+/// (since M1.11), the camera or the options file (<see cref="WatchCommandLine"/>) changes. The session keeps the device, the world, the mesh, the acceleration
 /// structure, the atmosphere LUTs and the last render alive between renders and rebuilds only what a change touched; each render's
 /// sidecar records which stages were built and which reused, and what changed (<see cref="WatchInfo"/>).
 ///
@@ -85,7 +85,7 @@ public sealed class PreviewWatch
     /// <summary>Renders so far.</summary>
     public int Renders { get; private set; }
 
-    /// <summary>The files the last poll read: the options file, the recipe and the camera (when one is given).</summary>
+    /// <summary>The files the last poll read: the options file, the recipe, the slider file and the camera (when given).</summary>
     public IReadOnlyList<string> Watched { get; private set; } = [];
 
     /// <summary>
@@ -184,7 +184,7 @@ public sealed class PreviewWatch
             return new Snapshot(options, null, string.Join(" ", problems), [], string.Empty, paths, values, flags);
 
         var files = new List<InputFile>();
-        foreach ((string role, string? path) in new[] { ("recipe", request.RecipePath), ("camera", request.CameraPath) })
+        foreach ((string role, string? path) in new[] { ("recipe", request.RecipePath), ("sliders", request.SlidersPath), ("camera", request.CameraPath) })
         {
             if (path is null)
                 continue;

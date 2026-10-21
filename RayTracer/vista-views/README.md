@@ -16,8 +16,9 @@ ground there). It is a file now so later terrain changes do not move the view; i
 ground above it, the preview warns and the view needs a new height.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
-defaults change (M1.11 lets set pieces push them): day is solar noon, 65.5° up due south, and golden hour
-sunset − 60 min, 8.5° up at azimuth 292°.
+defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
+until M1.11 made it a sun height: the setting sun at +2° (19:22:35 solar, azimuth 299°, 2.3° up with refraction). The weather sliders are
+auto, so since M1.11 the haze follows Zermatt's July humidity (optical depth 0.119 against M1.3's fixed 0.1).
 
 Measure (from `RayTracer/`, after `dotnet build Vista.App -c Release`):
 
@@ -163,4 +164,17 @@ options file):
 ```
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --sheet --recipe vista-views/mountains-golden.recipe.json --seed 42 \
     --camera vista-views/down-slope.camera.json --meter average --vary display=aces,agx --out average.png
+```
+
+## Linked sliders (M1.11)
+
+`sliders/render.ps1` reruns the M1.11 checks: the golden-hour height sheet (the setting sun at +2°, +4° and +6° on the
+down-slope, layered-ridges and default views at Zermatt in July, and the layered ridges in October), with each cell's
+sunlight reddening and the warmth and saturation of its brightest tenth; the month sheet (Zermatt at solar noon on the 15th
+of every month from the aerial camera, every slider auto but the date), with the season, temperature, humidity, haze and
+snowline the chain chose; and with `-Before`, a before/after of the measurement views and the ridges at golden hour against
+`main`. A slider file pins sliders (`--sliders s.json`); the views' recipes still pin theirs themselves.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/sliders/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 480] [-Spp 64] [-Out folder]
 ```

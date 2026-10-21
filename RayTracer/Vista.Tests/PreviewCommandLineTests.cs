@@ -22,23 +22,25 @@ public sealed class PreviewCommandLineTests
     }
 
     [TestMethod]
-    public void PlaceOptions_BecomeRecipeOverrides()
+    public void SliderOptions_PinTheirSliders()
     {
         PreviewRequest r = Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png",
             "--location", "TorresDelPaine", "--date", "2026-04-15", "--time", "17:30");
-        Assert.AreEqual("\"torresDelPaine\"", r.RecipeOverrides["location"]);
-        Assert.AreEqual("null", r.RecipeOverrides["latitude"], "a place clears a custom latitude");
-        Assert.AreEqual("\"2026-04-15\"", r.RecipeOverrides["date"]);
-        Assert.AreEqual("\"17:30:00\"", r.RecipeOverrides["solarTime"]);
-        Assert.IsFalse(r.RecipeOverrides.ContainsKey("time"));
+        Assert.AreEqual("\"torresDelPaine\"", r.SliderOverrides["location"]);
+        Assert.AreEqual("null", r.SliderOverrides["latitude"], "a place clears a custom latitude");
+        Assert.AreEqual("\"2026-04-15\"", r.SliderOverrides["date"]);
+        Assert.AreEqual("\"17:30:00\"", r.SliderOverrides["solarTime"]);
+        Assert.IsFalse(r.SliderOverrides.ContainsKey("time"));
 
         PreviewRequest custom = Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png", "--latitude", "-33.9", "--time", "goldenhour");
-        Assert.AreEqual("-33.9", custom.RecipeOverrides["latitude"]);
-        Assert.AreEqual("\"none\"", custom.RecipeOverrides["location"]);
-        Assert.AreEqual("\"goldenHour\"", custom.RecipeOverrides["time"]);
-        Assert.AreEqual("null", custom.RecipeOverrides["solarTime"], "a preset clears the recipe's solar time");
+        Assert.AreEqual("-33.9", custom.SliderOverrides["latitude"]);
+        Assert.AreEqual("\"none\"", custom.SliderOverrides["location"]);
+        Assert.AreEqual("\"goldenHour\"", custom.SliderOverrides["time"]);
+        Assert.AreEqual("null", custom.SliderOverrides["solarTime"], "a preset clears a pinned solar time");
 
-        Assert.AreEqual(0, Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png").RecipeOverrides.Count);
+        PreviewRequest none = Parse("--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png");
+        Assert.AreEqual(0, none.RecipeOverrides.Count + none.SliderOverrides.Count);
+        Assert.IsNull(none.SlidersPath);
     }
 
     [TestMethod]

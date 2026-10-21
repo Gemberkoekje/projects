@@ -33,7 +33,7 @@ public sealed class SheetLabelsTests
     {
         IReadOnlyDictionary<string, string> id = Id(Sidecar());
         CollectionAssert.AreEquivalent(
-            new[] { "recipe.name", "recipe.setPieces", "recipe.time", "recipe.season", "seed", "camera", "image.size",
+            new[] { "recipe.name", "recipe.setPieces", "sliders.time", "sliders.season", "seed", "camera", "image.size",
                     "image.samplesPerPixel", "image.maxBounces", "image.display", "build" },
             id.Keys.ToArray());
         Assert.AreEqual("aces", id["image.display"], "every sidecar before schema 11 is the ACES fit's");
@@ -110,15 +110,15 @@ public sealed class SheetLabelsTests
         JsonObject recipe = sidecar["recipe"]!.AsObject();
         recipe["location"] = "none";
         recipe["latitude"] = null;
-        Assert.IsFalse(Id(sidecar).ContainsKey("recipe.location"), "no place named");
-        Assert.IsFalse(Id(sidecar).ContainsKey("recipe.latitude"));
+        Assert.IsFalse(Id(sidecar).ContainsKey("sliders.location"), "no place named");
+        Assert.IsFalse(Id(sidecar).ContainsKey("sliders.latitude"));
 
         recipe["location"] = "zermatt";
         recipe["date"] = "2026-10-15";
         recipe["solarTime"] = "17:30:00";
         IReadOnlyDictionary<string, string> id = Id(sidecar);
-        Assert.IsFalse(id.ContainsKey("recipe.season"), "the date replaced the season");
-        Assert.IsFalse(id.ContainsKey("recipe.time"), "the solar time replaced the time of day");
+        Assert.IsFalse(id.ContainsKey("sliders.season"), "the date replaced the season");
+        Assert.IsFalse(id.ContainsKey("sliders.time"), "the solar time replaced the time of day");
         StringAssert.Contains(SheetLabels.Title([id]), "alpine range · snowCappedMountains · zermatt · 2026-10-15 · 17:30:00 solar · seed 42");
     }
 
