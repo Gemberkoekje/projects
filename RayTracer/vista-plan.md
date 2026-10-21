@@ -994,9 +994,11 @@ is byte-identical to `main` (the aerial view with every debug output and the dow
   every debug output) are byte-identical to the M0 build's PNGs and EXRs, and the ledger views trace the
   same rays per sample as M0.
 - **Before/after, the PR way:** the four measurement views rendered by a `main` build (11e489b) and by
-  this branch are byte-identical pair by pair; `--sheet-from` tiles the eight and labels each pair by build.
+  this branch are byte-identical pair by pair; `--sheet-from` tiles the eight and labels each pair by build
+  (`vista-views/sheets/m1-1-before-after.png`).
 - **Sheets headless:** a four-seed sheet (2.7 s wall, four worlds) and a five-cell time-of-day sheet with
-  a normal-map sheet (2.0 s wall, one world) rendered from one `Vista.App` call each. A 4K loupe of a peak
+  a normal-map sheet (2.0 s wall, one world) rendered from one `Vista.App` call each
+  (`vista-views/sheets/m1-1-seeds.png`, `m1-1-time-of-day.png`, `m1-1-time-of-day-normals.png`). A 4K loupe of a peak
   (320×180 out of 3840×2160) takes 1.4 s wall, almost all of it world generation.
 - **CI:** layout geometry, the font, label and title derivation, the sheet sidecar (written and read
   back), the axis parser, `--sheet-from` labelling, the PNG decoder (every filter type), JSON overrides,
