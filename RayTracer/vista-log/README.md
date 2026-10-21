@@ -27,4 +27,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.9.md`](M1.9.md) | View-dependent terrain mesh |
 | [`M1.10.md`](M1.10.md) | Height-field intersection: the measured decision |
 | [`M1.10a.md`](M1.10a.md) | Exposure & display |
+| [`M1.11.md`](M1.11.md) | Linked sliders & the weather chain |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

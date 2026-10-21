@@ -21,6 +21,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.9 | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.10 | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.10a | 0.26 | 4.04 | 2.80 | 5.56 |
+| M1.11 | 0.27 | 4.02 | 2.78 | 5.67 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -65,3 +66,9 @@ M1.10a changes the PNG only (its exposure and display curve), so its row is M1.1
 rendered by `main` (db9dcae4) and by this slice (480 px, 64 spp) have byte-identical EXRs, and `main`'s PNGs equal this slice's
 `--meter average --display aces`. The integrator's `CSMain` is unchanged; the incident meter is a kernel of its own, about 1 ms of GPU a
 view, where the average meter rendered the frame again at 320 px.
+M1.11 moves the golden-hour sun (8.5° to 2.3°: the down-slope view) and the haze (optical depth 0.100 to 0.119 on all four views: Zermatt's
+July humidity). Measured as M1.9 was, on a GPU 36–72% busy with other programs: this slice and `main` (a65a87af) rendered alternately, view
+by view, three rounds; median ratios 1.034, 0.996, 0.992 and 1.019 (1.012–1.057, 0.994–1.033, 0.990–0.995, 1.017–1.024), within the
+run-to-run noise but for the down-slope view's +2%. The views trace 1.00, 3.07, 2.51 and 3.80 rays per sample (M1.10a: 1.00, 3.07, 2.51,
+3.89; the lower sun puts more of the slope in shadow). Why that view costs 2% more a sample with fewer rays was not measured. The haze
+should cost nothing: its optical depth is a number in the LUTs, and the day views' ratios are 1.00 within the noise.

@@ -149,6 +149,13 @@ One generic mechanism, not special cases:
   restart the preview. Snow and season (snow depth near the camera, snow on branches, bare
   deciduous trees) change near-camera geometry and rebuild part of the scene — seconds,
   not instant — still deterministic from seed + slider, so nothing moves.
+- **As built (M1.11):** the pins live in a **slider file** (`--sliders`), beside the recipe
+  (what the world is made of) and the camera; a slider the file does not name is auto. Ten
+  sliders, two of them coarse/fine pairs: season ⇄ date and the time-of-day preset ⇄ the solar
+  time (pinned by the clock or by the sun's height). A recipe may still pin the place and time
+  fields it held since M1.2, but never beside a slider file. The sidecar records every slider's
+  value, whether it was pinned, and what an auto value followed. Log:
+  [`vista-log/M1.11.md`](vista-log/M1.11.md).
 
 ### 3.5 Location & astronomy
 
@@ -159,8 +166,10 @@ One generic mechanism, not special cases:
   Zermatt, Dolomites, Torres del Paine, Fiordland, Hokkaido — plus "custom latitude".
   The location sets **only the sky and the climate defaults**; the recipe decides what
   the terrain looks like.
-- **Time of day is local solar time**, or relative to sunrise/sunset ("dawn" = sunrise
-  minus ~20 minutes). Longitude and time zones drop out.
+- **Time of day is local solar time**, or a preset by the sun's height (M1.11; M1.2's
+  offsets from sunrise and sunset put golden hour anywhere from 4° to 11° up): dawn is the
+  rising sun at −4°, golden hour the setting sun at +2°, dusk the setting sun at −4°, day and
+  night solar noon and midnight. Longitude and time zones drop out.
 - **Season and date drive each other.** "Autumn" at Torres del Paine means April
   (southern hemisphere), so the sun path always matches the season. An explicit date
   override stays available (advanced). A finer "early / peak / late" control sets the
@@ -196,6 +205,19 @@ location + season/date + time of day
 - **Altitude** (advanced) also changes the sky: thinner air gives a deeper blue, less
   haze and a brighter sun — the spectral atmosphere with less air above, at no extra
   cost.
+
+*As built (M1.11; [`vista-log/M1.11.md`](vista-log/M1.11.md)):* the normals are 1991–2020
+station tables (stand-ins where a place has no station: Skrova for Lofoten, Hjarðarland for
+Þingvellir, Tulloch Bridge for Glen Coe, Punta Arenas for Torres del Paine) moved to the
+scene's valley floor along 6.5 °C/km; a custom latitude uses North, Cahalan & Coakley's (1981)
+zonal-mean fit. The daily curve is two half cosines, the low at sunrise and the high at 14:00.
+The dew point is the day's low (FAO-56), so the humidity follows the temperature. The **snow**
+slider is the seasonal snowline in metres above sea level, from a degree-day snowpack run over
+the climate's year (snow is history), moved by half of the freezing level's move when the
+temperature is pinned or pushed (temperature nudges it). The **fog/haze** slider is the
+visibility at the valley floor (the WMO's meteorological optical range); its auto value is the
+haze grown by the **day's** humidity, (1 − RH)^−0.4, so moving the time of day does not rebuild
+the air's tables. Only the frozen lake pushes defaults so far (winter, ≤ −5 °C).
 
 ---
 
@@ -1019,6 +1041,12 @@ skies come out darker (the sky-only view 2.5 EV), both left for review. Log: [`v
   or falls back with the hint. 3070: a month sheet at one place changes sun and haze from the
   defaults alone; the golden-hour height sheet.
 
+*Status (2026-10-21): done.* Ten linked sliders, auto or pinned, in a slider file (`--sliders`), and the weather chain from 1991–2020
+station normals: the daily curve, the dew point, the freezing level, a degree-day snowline and haze grown by the day's humidity, all in the
+sidecar. The presets are sun heights, and the height sheet put golden hour at **+2°**, not the +4° expected: only there do sunlit faces read
+golden. Left for the review: +2° itself, and a haze that humidity alone barely moves through the year. Log:
+[`vista-log/M1.11.md`](vista-log/M1.11.md).
+
 **M1.11a — Drainage.**
 - *Goal:* valleys that branch and join like real drainage, before the materials read the erosion maps
   (M1.12) and the snow reads their gullies (M1.13).
@@ -1063,7 +1091,8 @@ skies come out darker (the sky-only view 2.5 EV), both left for review. Log: [`v
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
 - *Deliverable:* snow cover from slope (shed above ~35–40°), aspect (poleward faces keep more,
   hemisphere from the latitude), wind and curvature (ridges scoured and hollows filled, from the
-  erosion curvature), and altitude against the freezing level and the snow slider (M1.11).
+  erosion curvature), and altitude against the freezing level and the snow slider (M1.11: a seasonal snowline in metres above sea
+  level; both are in the sidecar's `sliders`).
   Recipe-owned glaciers and permanent snowfields for the mountain set pieces, carved at the world
   stage, so snow at zero leaves them. A dry / wet / melting state by altitude against the freezing
   level. A built-in snow spectrum from ice absorption and grain size (tier 5). Russian roulette is
