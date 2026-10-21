@@ -5,10 +5,10 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-one slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-two slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain)
-M1.11a (drainage) and M1.11b (the display look) are done, M1.11c (uplift and rock hardness) is next. It sits
+M1.11a (drainage) and M1.11b (the display look) are done, M1.11c (the output finish) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -733,15 +733,20 @@ for a slice hold for every milestone.
   Release, all tests pass (the full solution, not only `Vista.Tests`), and `Vista.App --gpu-selftest`
   passes on the RTX 3070, growing with the slice where noted. No engine change is planned; a slice
   that does touch `RayTracer.Core` / `RayTracer.Gpu` also passes `--phase6-selftest` and
-  `--phase6-regress` (§9.2). The CI run on `main` confirms afterwards; a red run there is fixed
-  before anything else lands.
+  `--phase6-regress` (§9.2). Every sheet the push adds or replaces meets the size rule below: no cell
+  over 640 px and no file over about 1 MB (`Get-ChildItem vista-views/sheets/<slice>-*.png | Where-Object
+  Length -gt 1MB` lists nothing); a sheet over it is re-tiled with smaller cells or fewer of them, or
+  cropped to a loupe, before the push, never after. The CI run on `main` confirms the build and tests
+  afterwards; a red run there is fixed before anything else lands.
 - **A slice that changes the look** commits a before/after contact sheet to `vista-views/sheets/`
   (with its row in that folder's README) and adds a row to the cost ledger
   ([`vista-log/cost-ledger.md`](vista-log/cost-ledger.md)).
 - **Sheets stay small:** PNG (lossless, so noise and banding can be compared), cells of at most
   640 px, about 1 MB a sheet at most. Where full-resolution detail matters, commit a crop of that
-  region (a loupe), not the whole 4K frame. No Git LFS. (Since 2026-10-21; the M1.1–M1.10 sheets,
-  70 MB in all, stay as committed.)
+  region (a loupe), not the whole 4K frame. No Git LFS. A slice's render script writes the sheets it
+  commits at that size, so a rerun reproduces them. (Since 2026-10-21; the M1.1–M1.10 sheets, 70 MB
+  in all, stay as committed. M1.11b first pushed two over it and replaced them after the review; the
+  originals stay in the history.)
 - **It ends with its log**, `vista-log/<slice>.md`, in the layout of the existing logs (status,
   checks, decisions, gotchas, hand-off, commands, files, next; [`vista-log/README.md`](vista-log/README.md)).
   Its entry here gets one status line linking to it. A decision that changes the design or a later
@@ -778,7 +783,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Twenty-one slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-two slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -790,12 +795,19 @@ suffixes keep the code's references to M1.11–M1.17 valid.
 
 *Added 2026-10-21, after a review of the M1.10a–M1.11a sheets (agreed with the user):* **M1.11b — The
 display look** (AgX's punchy look and a default compensation, by sheet, because incident + plain AgX
-reads dark and flat) and **M1.11c — Uplift & rock hardness** (an uplift map so ranges keep their
+reads dark and flat) and **M1.11d — Uplift & rock hardness** (an uplift map so ranges keep their
 massifs, a rock-hardness field against uniform 45° facets, and the two measurement cameras the
-incision left 500 m up re-placed), both still before the materials. M1.12's strata read M1.11c's
+incision left 500 m up re-placed), both still before the materials. M1.12's strata read M1.11d's
 hardness field; M1.13 gains per-place precipitation and glacial U-valleys; M3 takes M1.11a's flat
 floors as lake sites; M4 gains a seasonal aerosol load. M1.11b's look and M1.10a's meter are
 re-judged at the sign-off (M1.17), once real materials exist.
+
+*Added 2026-10-21, after a review of the M1.11b sheets (agreed with the user):* **M1.11c — Output
+finish** (the punchy look's saturation held back where it would clip a channel, a deterministic
+dither for the 8-bit PNG, and an optional 16-bit PNG), display only, so the terrain work is judged
+under the finished output. Uplift & rock hardness became **M1.11d**; nothing in the code referred to
+it. The punchy look's dark shadows (down the slope the frame's mean is 23 of 255) are judged at
+M1.17, with real materials and M1.11d's re-placed camera.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1119,12 +1131,44 @@ Log: [`vista-log/M1.11a.md`](vista-log/M1.11a.md).
 +1): on the day and golden-hour views it is as bright as plain AgX at +0 (the frame's mean 129, 129, 97 and 147 of 255 against 128,
 126, 99 and 145) with 1.6–2.5 times its saturation, because the look's power puts middle grey a stop lower (sRGB 88 for 128).
 Plain AgX at +1 is brighter and paler still. Down the slope every variant is dark (M1.11a left that camera 552 m above a valley in
-shadow; M1.11c re-places it), and punchy darkens it most. The sky-only view turns deep blue, its red channel at 0. `--look base
+shadow; M1.11d re-places it), and punchy darkens it most. The sky-only view turns deep blue, its red channel at 0. `--look base
 --compensation 0` writes `main`'s PNG byte for byte; the EXR is unchanged. Sheets: `m1-11b-before-after.png`,
 `m1-11b-golden-looks.png`, `m1-11b-ridges-looks.png`, `m1-11b-down-slope-looks.png`, `m1-11b-alpenglow.png`.
 Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
 
-**M1.11c — Uplift & rock hardness.**
+**M1.11c — Output finish.**
+- *Goal:* a PNG that is finished output, with no clipped hues and no banding, so the terrain
+  (M1.11d) and the materials (M1.12) are judged under it.
+- *Why (the review of M1.11b, 2026-10-21):* the punchy look's saturation (1.4 about the luma)
+  pushes the lowest channel of an already saturated colour below zero, and the curve's clamp cuts
+  it off: the sky-only view comes out a flat cobalt with its red channel at 0
+  (`m1-11b-before-after.png`), and across a large sky gradient a hard clip can show as a hue shift
+  or a visible edge. And the 8-bit PNG is quantised with no dither at all: the path tracer's noise
+  hides that in previews, but a denoised or high-sample 4K final has smooth sky gradients, where
+  banding shows, and the sky is most of a wallpaper.
+- *Deliverable:* **gamut-safe saturation:** per pixel, the punchy look's saturation is lowered from
+  1.4 just enough that no channel of the PNG's linear Rec.709 goes below zero, never below 1 (so the
+  base look is unchanged, and a colour the base itself clips is not the look's to fix); found in
+  closed form at the look where that suffices, else by a few bisection steps through the rest of
+  the curve. Colours that never clipped keep Filament's look exactly. **Dither:** before the 8-bit
+  quantisation, a triangular (TPDF) dither of ±1 step in the sRGB-encoded value, from a hash of the
+  frame pixel (not the loupe window's, so a loupe stays an exact crop of the frame) and the channel:
+  zero-mean, the same bytes every run, on by default for the beauty and the denoised PNG;
+  `--dither off` writes M1.11b's bytes. **16-bit PNG:** `--png16` writes the PNGs at 16 bits a
+  channel instead (no dither needed), through the same exposure and curve. Recorded in the
+  sidecar (schema 15: the dither and the bit depth).
+- *Verify:* CI: the saturation never lets a channel go below zero and equals 1.4 wherever Filament's
+  look did not clip (M1.11b's reference values for those inputs), greys unchanged, the hue kept (the
+  Oklab hue angle of a saturated blue within a few degrees of the base look's, where the clipped
+  look moved it); the dither deterministic, zero-mean over a flat field, keyed by the frame pixel (a
+  loupe still a crop), off writing M1.11b's bytes; a 16-bit PNG read back by the decoder.
+  3070: the sky-only and default views, the share of sky pixels with a channel at 0 before and
+  after; banding on a 3840×2160 denoised sky (a loupe of it in the sheet): the longest run of equal
+  8-bit values down a sky column, and the step edges visible in a contrast-stretched loupe, before
+  and after; the measurement views with `--dither off` byte-identical to M1.11b. Cost ledger: no
+  change (display only, on the CPU).
+
+**M1.11d — Uplift & rock hardness.**
 - *Goal:* ranges with hierarchy (high massifs, broad main valleys, lower foothills) and slopes that
   vary (cliffs, ledges, gentler ground) instead of uniform facets, before the materials (M1.12) are
   tuned on the terrain.
@@ -1158,7 +1202,7 @@ Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
   puts them (§4.3).
 - *Deliverable:* materials chosen and blended in the shader per hit, from slope, altitude, aspect
   and the erosion maps (M1.11a's flow accumulation, deposition, wetness), all procedural: rock strata
-  from M1.11c's hardness field (so the material bands line up with the cliffs and ledges it shaped),
+  from M1.11d's hardness field (so the material bands line up with the cliffs and ledges it shaped),
   scree on deposition under steep faces, soil, grass as a material (its
   geometry is M5), and wet darkening. Built-in-tier spectra (tier 5, recorded per material).
   Rough-diffuse rock (Oren–Nayar-style) is measured against Lambert in a sheet, because backscatter
@@ -1238,7 +1282,10 @@ Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
 - *Deliverable:* the Vista golden suite at preview size (fixed seeds, committed PNG/EXR goldens,
   `--golden-check` with a tolerance, re-baselined deliberately) covering the M1 checks; the hero
   render "alpine range at golden hour" at 3840×2160 with its sidecar; the M1 status, decisions,
-  gotchas and hand-off in its log, and M1's overall status in this section.
+  gotchas and hand-off in its log, and M1's overall status in this section. The display look
+  (M1.11b: AgX punchy, +1 EV on the incident meter) and M1.10a's meter re-judged under the real
+  materials, the punchy look's shadows first (down the slope the frame's mean was 23 of 255 at
+  M1.11b, in a valley M1.11d's camera no longer looks into).
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).

@@ -2,7 +2,9 @@
 # incident meter's own compensation, on the four measurement views, the default view at golden hour (+2 deg), the layered ridges
 # in October at +2 deg and the alpenglow sweep (+2 to -1.5 deg). Each view's six PNGs come from one EXR (two sheets, one per look,
 # the compensation their axis; compared byte for byte). The script prints each variant's exposure, its mean and median (the
-# largest channel, of 255), and its brightest tenth with its saturation. With -Before (a main build's Vista.App.dll) it renders
+# largest channel, of 255), and its brightest tenth with its saturation. The sheets to commit stay small (cells of -SweepWidth):
+# before-after.png (each view's M1.11a look against the defaults) and alpenglow-before-after.png. With -Before (a main build's
+# Vista.App.dll) it renders
 # the four measurement views with main, which must be byte-identical to this build's --look base --compensation 0 (PNG and EXR).
 # Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(
@@ -134,6 +136,29 @@ foreach ($look in $looks) {
 }
 Run $App (@('--sheet-from') + $sweep + @('--labels', ($sweepLabels -join ','), '--columns', '6',
            '--title', 'alpenglow: AgX base then punchy, each at +0, +0.5, +1 EV (rows)', '--out', (Join-Path $Out 'alpenglow-looks.png')))
+# The committed sweep (sheets stay small, vista-plan section 10): M1.11a's look (base +0, the first row) against the new default
+# (punchy at the last compensation, the last row).
+$last = $sweep.Count - 6
+Run $App (@('--sheet-from') + $sweep[0..5] + $sweep[$last..($last + 5)] + @('--labels', (($sweepLabels[0..5] + $sweepLabels[$last..($last + 5)]) -join ','),
+           '--columns', '6', '--title', 'alpenglow: AgX base +0 EV (top), punchy (bottom)', '--out', (Join-Path $Out 'alpenglow-before-after.png')))
+
+'Before/after at the sweep width, for the committed sheet: M1.11a''s look (--look base --compensation 0) against the defaults:'
+$pairs = @()
+$labels = @()
+foreach ($v in $list) {
+    $old = Join-Path $Out "small-$($v.Name)-before.png"
+    $new = Join-Path $Out "small-$($v.Name)-after.png"
+    Run $App (@('--preview', '--seed', '42', '--width', $SweepWidth, '--spp', $Spp, '--look', 'base', '--compensation', '0', '--out', $old) + $v.View)
+    Run $App (@('--preview', '--seed', '42', '--width', $SweepWidth, '--spp', $Spp, '--out', $new) + $v.View)
+    if ((Hash ([IO.Path]::ChangeExtension($old, '.exr'))) -ne (Hash ([IO.Path]::ChangeExtension($new, '.exr')))) {
+        throw "$($v.Name): the before and after EXRs differ."
+    }
+    $pairs += $old, $new
+    $labels += "before: $($v.Name)", "after: $($v.Name)"
+}
+Run $App (@('--sheet-from') + $pairs + @('--labels', ($labels -join ','), '--columns', '2',
+           '--title', 'before: M1.11a (AgX base, +0 EV) | after: the defaults', '--out', (Join-Path $Out 'before-after.png')))
+'  every view''s before and after share one EXR'
 
 if ($Before -ne '') {
     'Main (-Before) against this build''s --look base --compensation 0:'
