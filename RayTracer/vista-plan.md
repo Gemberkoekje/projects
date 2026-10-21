@@ -1834,10 +1834,11 @@ bit-identical on both.
   | Day, default camera | 65.5° | 0.00581 → 0.00085 | 110 spp | 6.40 → 2.30 | −0.25% | 63 spp |
 
   So 16 denoised samples do the work of 110–235 raw ones at 640 px (7–15×), and of 63–135 at the preview's 320 px (4–8×): a
-  smaller image gives the filter less around each pixel. The day gains least; its loupe shows the sunlit faces' fine shading
-  partly smoothed. The mean brightness moves by at most 0.25%. The sheet
-  (`denoise-sheet.png`) shows the raw speckle gone and the shadowed faces, the skylines and the sunlit slopes kept; the faintest
-  far-slope texture is softened.
+  smaller image gives the filter less around each pixel. The day gains least; its loupe (`vista-views/sheets/m1-6-day-loupe.png`)
+  shows the sunlit faces' fine shading partly smoothed. The mean brightness moves by at most 0.25%. The sheet of the four views
+  (`vista-views/sheets/m1-6-denoise.png`) shows the raw speckle gone and the shadowed faces, the skylines and the sunlit slopes
+  kept; the faintest far-slope texture is softened. Each view's raw | denoised | reference with a 4× loupe below is
+  `m1-6-dawn-loupe.png`, `m1-6-golden-down-slope-loupe.png`, `m1-6-golden-default-loupe.png` and `m1-6-day-loupe.png`.
 - **Every way, measured** (equal-error spp at 640 px, 320 px in brackets; the time to filter with a prepared filter, over the four
   views):
 
