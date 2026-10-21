@@ -52,11 +52,12 @@ later, read what happened. It can fail. It usually won't.
    the valley, and remembers through the chronicle and the annals. A hundred-year-old village should
    be legible as a hundred years of decisions.
 6. **Static in the photograph, dynamic on top (§6).** Anything that doesn't move between Vista
-   renders is Vista's — buildings, ruins, roads, terraces, torch *light*. Anything that moves is
-   Hamlet's — people, smoke, fire, carts, wheels, bells. Hamlet's renderer is a small deferred
-   compositor whose G-buffer is a path tracer's output.
-7. **Stay out of the way.** CPU only in the steady state; Vista's GPU render is a minute every
-   quarter hour, skipped if the GPU is busy. Sound off by default and rare. Never a notification.
+   renders is in Vista's photograph — buildings (whose meshes Hamlet generates, §8.5), ruins, roads,
+   terraces, torch *light*. Anything that moves is Hamlet's — people, smoke, fire, carts, wheels,
+   bells. Hamlet's renderer is a small deferred compositor whose G-buffer is a path tracer's output.
+7. **Stay out of the way.** CPU only in the steady state; Vista's GPU render is seconds every
+   quarter hour, skipped if the GPU is busy, and holds no video memory between renders (§8.1).
+   Sound off by default and rare. Never a notification.
 
 ### Non-goals
 
@@ -103,6 +104,12 @@ Three presets, chosen at setup. Height **120 / 240 / 480 px** at 1× / 2× / 4×
 monitor's. Vista renders the backdrop at the preset's native pixels. The fast layer's sprites are
 authored once at 1× and integer-scaled, so people are 5 px tall at 1× and 20 px at 4×. No custom
 scaling, no resizing. Multi-monitor: one monitor, chosen at setup.
+
+**The window is an AppBar** (Windows' `SHAppBarMessage`): it reserves its edge the way the taskbar
+does, so maximized windows shrink to fit instead of sliding under the strip or being covered by it.
+It is **per-monitor DPI aware** (PerMonitorV2), so the 1× / 2× / 4× presets stay whole device pixels
+under Windows' 125% or 150% display scaling instead of being blurred by bitmap scaling. (Added
+2026-10-21.)
 
 ### 3.4 The chronicle
 
@@ -370,6 +377,15 @@ backdrop), the waterwheel turns, a cart does its loop, nobody asks why. The buil
 photograph; only the little people are on top. The palette and lighting of sprites follow Vista's
 sun and sky so the two layers share a light.
 
+### 6.7 Projection
+
+**The backdrop is a cylindrical panorama**, not a perspective image. At 32:1 (3840×120) a
+perspective camera with even a 5° vertical field of view spans about 110° across and stretches the
+strip's ends about 3×. Vista's M11 adds the projection (pulled forward as its own slice if H4 comes
+first). The stage turns depth into world positions, places sprites and casts its shadow rays
+(§6.5) through the same projection, read from the backdrop's sidecar; the stand-in backdrop (§8.4)
+uses it too, so nothing changes at H4. (Added 2026-10-21.)
+
 ---
 
 ## 7. Weather and sky
@@ -390,23 +406,31 @@ sun and sky so the two layers share a light.
 
 ## 8. The Vista contract
 
-Hamlet is a client of Vista. Everything below is a *data* interface; Vista gains no behaviour.
+Hamlet is a client of Vista. Everything below is a *data* interface; Vista gains no
+Hamlet-specific behaviour. The two capabilities it does gain serve wallpapers too: props as given
+meshes with states (Vista M8) and a cylindrical projection (Vista M11, §6.7).
 
 ### 8.1 Vista exports, per backdrop
 
 - Beauty, split into additive buffers: **sky-lit**, **direct-sun**, and **one per emitter** (or
   emitter cluster), each denoised separately; nearest emitters at 2–3 jittered positions.
 - **Depth**, **normal**, **material id** (the auto camera's G-buffer, M1.14, at strip resolution).
-- The camera (so depth → world position), the sun direction, a sky colour, the exposure used
-  (so the stage can light sprites in the same units and the same display curve, AgX).
-- Resolution: the strip's native pixels (§3.3). Cost: ~2.5× the 320-px preview at 1×; well under a
-  minute at full quality, less with lower spp + OIDN.
+- The camera and its projection (cylindrical, §6.7; so depth → world position), the sun
+  direction, a sky colour, the exposure used (so the stage can light sprites in the same units and
+  the same display curve, AgX).
+- Resolution: the strip's native pixels (§3.3). **Cost: seconds of tracing, not minutes.** At
+  Vista's measured cost by M1.11 (about 5 ns a pixel-sample on terrain), 3840×120 at 1024 spp is
+  about 2.4 s, before the emitter buffers multiply it. What costs is video memory and setup.
+- **Render, then release** (the default): each backdrop is a cold render from Vista's caches (the
+  eroded world, its hierarchy), after which Vista frees everything, so Hamlet holds no video memory
+  between backdrops and a game started meanwhile has the whole 8 GB. Rebuilding from the cache costs
+  seconds every quarter hour; a resident Vista session is an option, not the default.
 
 ### 8.2 Vista imports, per backdrop
 
-- The **prop instance list with states**: `(prop type, state, position, orientation, scale)` for
-  every static thing the village owns — M8's cabins, docks, paths, fences, plus Hamlet's additions
-  (mill, chapel, well, ruin states, scorch decals, fields by crop and season).
+- The **prop instance list with states**: `(prop, state, position, orientation, scale)` for every
+  static thing the village owns — M8's types (paths, fences, docks) plus Hamlet's own buildings as
+  **given meshes** (§8.5), scorch decals and fields by crop and season.
 - A **terrain-modification layer**: terraces, mill races, worn paths, a small height/material
   edit over the eroded grid near the village. Deterministic, part of the village's static state.
 - The **emitter list** (torches, hearths, fires, windows at night) with positions and intensities.
@@ -415,11 +439,12 @@ Hamlet is a client of Vista. Everything below is a *data* interface; Vista gains
 
 ### 8.3 What Vista needs to know now
 
-Two notes, nothing more, until Vista's M1 is signed off:
+Two notes, nothing more, until Vista's M1 is signed off (both written into `vista-plan.md` M8 on
+2026-10-21, with the projection in M11):
 
 1. **M8 (props):** the shot-first layout should place props **from a prop-instance list** that can
-   come from a file as well as from the recipe rules, and props should have **states**. That is
-   the entire bridge; it costs M8 nothing to design in.
+   come from a file as well as from the recipe rules, props should have **states**, and a prop is
+   a **type or a given mesh** (§8.5). That is the entire bridge; it costs M8 nothing to design in.
 2. **M8 / M3 (layout):** a "village" set piece reserves a **buildable stage** near the camera —
    a flattish valley floor, the river leaving the backdrop — and the recipe plants the viewpoint
    looking across it.
@@ -434,15 +459,24 @@ with sun/sky lighting, writing the same buffers in the same format) so the sim, 
 chronicle can be built and unit-tested without the GPU, in CI, and before the Vista contract
 exists. Not shipped.
 
+### 8.5 Who builds the buildings
+
+**Hamlet does** (decided 2026-10-21). Houses, the mill, the chapel, the well and every state of each
+(new, weathered, burned shell, ruin, overgrown) come from Hamlet's own shape grammars, procedurally,
+and go to Vista as meshes with Vista material ids, which Vista renders like its own props (Vista M8).
+Vista keeps its wallpaper props (cabins, docks, paths, fences) and grows no medieval catalogue. The
+grammars are a pure library, `Hamlet.Buildings`, unit-tested in CI; the stand-in backdrop rasterises
+the same meshes, so every building state can be seen and tested before H4.
+
 ---
 
 ## 9. Working conventions
 
 Inherited from Vista where they fit:
 
-1. **Pure libraries, tested in CI.** `Hamlet.Sim` (village model, events, chronicle, annals) and
-   `Hamlet.Stage` (compositor, sprites, shadows, vignettes) are plain `net10.0` with unit tests and
-   no GPU. `Hamlet.App` is the WinForms shell: the layered always-on-top window, the timer, the
+1. **Pure libraries, tested in CI.** `Hamlet.Sim` (village model, events, chronicle, annals),
+   `Hamlet.Buildings` (the building grammars and their states, §8.5) and `Hamlet.Stage`
+   (compositor, sprites, shadows, vignettes) are plain `net10.0` with unit tests and no GPU. `Hamlet.App` is the WinForms shell: the layered always-on-top window, the timer, the
    chronicle window, sound, Open-Meteo, and the Vista client. No game engine (decision, 2026-10-21).
 2. **Determinism.** Seed + recorded weather feed → the same village. Goldens for the stage at 1×
    with the stand-in backdrop.
@@ -452,7 +486,9 @@ Inherited from Vista where they fit:
    no numbers unless a villager would say them.
 5. **Measure the glance.** Each tier's cadence (§4.4) is checked on a logged real week: how many
    visible changes per hour, how many headlines per day, how long between upheavals.
-6. **Don't move Vista.** Vista changes are data contracts (§8) and the M8 note; never behaviour.
+6. **Don't move Vista.** Vista changes are data contracts (§8), the M8 note and M11's
+   cylindrical projection, which Vista's multi-monitor spans need anyway; never Hamlet-specific
+   behaviour.
 7. **Slices land directly on `main`, then stop for review**, each ending with a log, as in Vista.
 
 ---
@@ -464,7 +500,8 @@ Milestones H0–H3 need no Vista at all (the stand-in backdrop) and could be bui
 
 **H0 — Skeleton.**
 Goal: the window, the clocks, the stand-in backdrop. Deliverable: `Hamlet.Sim` / `Hamlet.Stage` /
-`Hamlet.App` in the solution; the layered always-on-top window at 1×/2×/4×, top or bottom; Vista's
+`Hamlet.App` in the solution; the AppBar window at 1×/2×/4×, top or bottom, per-monitor DPI aware
+(§3.3); Vista's
 astronomy for the real sky over a flat-shaded stand-in valley with a day/night cycle; the two-clock
 model with the ratio as a setting; save, and resume with the capped fast-forward (§5.7). Verify:
 the window survives a day; the sky matches the real sun; a resume after 3 hours off advances the
@@ -472,7 +509,7 @@ village 3 village weeks, a resume after 3 days off advances it 24.
 
 **H1 — Proof of life.**
 Goal: a glance always shows something alive. Deliverable: the stage compositor over the stand-in
-G-buffer (depth test, sun-lit sprites, sun shadows of capsules); ambient animations (smoke, the
+G-buffer, in the cylindrical projection (§6.7) (depth test, sun-lit sprites, sun shadows of capsules); ambient animations (smoke, the
 waterwheel, washing, a cart loop, chickens); texture-tier events from a stub sim on the 10–20
 minute cadence. Verify: a logged real day shows a texture change at least every 20 minutes; sprites
 occlude correctly behind stand-in terrain.
@@ -496,11 +533,13 @@ live playing; annals read as a parish register on a sample century.
 
 **H4 — Vista backdrop.**
 Goal: the photograph. Deliverable: the Vista contract (§8): the exports as AOVs, the imports as
-files, the 15-minute cadence with GPU-busy skip, the village's static state (props with states,
-terrain mods) rendered by Vista; the stand-in retired to tests. Needs Vista M8 (props) and the
-light-buffer AOVs. Verify: a burned house hands over from stage flames to backdrop shell with no
-visible seam; a 1× backdrop renders in under a minute at the chosen quality; Vista's own goldens
-and self-tests unmoved.
+files, the 15-minute cadence with GPU-busy skip and render-and-release (§8.1), the village's static
+state (props with states, terrain mods) rendered by Vista, with `Hamlet.Buildings`' grammars
+handing every building state over as meshes (§8.5); the stand-in retired to tests. Needs Vista M8
+(props from a list, given meshes, states), the light-buffer AOVs, and the cylindrical projection
+(M11's, pulled forward if needed). Verify: a burned house hands over from stage flames to backdrop
+shell with no visible seam; a 1× backdrop renders in seconds at the chosen quality; Hamlet holds
+no video memory between backdrops; Vista's own goldens and self-tests unmoved.
 
 **H5 — Light.**
 Goal: torches that live. Deliverable: emitter buffers with flicker, waver and colour wobble;
@@ -546,7 +585,8 @@ see §11).
   Vista stalls, H0–H3 still ship on the stand-in, which is why the stand-in exists.
 - **GPU contention with Vista look-dev.** The backdrop must yield to any GPU use, not only to
   games; "skip the tick, keep the old sky" has to be the default behaviour, with the stale backdrop
-  age shown nowhere but the log.
+  age shown nowhere but the log. Memory is the sharper half: render-and-release (§8.1) keeps
+  Hamlet's video memory at zero between backdrops, at the price of a few seconds' rebuild each tick.
 - **Overnight bias** (§4.3) depends on detecting absence from idleness. Keep it coarse (hours) so
   a lunch break never counts, and never let it change event frequency.
 - **Reacting to the user** is tempting and dangerous: it risks becoming a productivity tracker in
@@ -562,7 +602,7 @@ see §11).
 | Topic | Decision |
 |---|---|
 | What it is | An ambient village at the screen edge, glanced at while working; not an idle game. Zero input *into the village*: the only input is the chronicle, first-run setup and a settings menu (sound, size, clock ratio, weather, location, restart), none of which touch the sim |
-| Window | Always-on-top borderless window docked to the top or bottom edge; 1× / 2× / 4× height presets, native width; no custom scaling |
+| Window | An AppBar docked to the top or bottom edge, reserving it like the taskbar; 1× / 2× / 4× height presets, native width, per-monitor DPI aware; no custom scaling |
 | Stack | C#, WinForms shell, own CPU compositor; no game engine — it would give nothing Vista or the compositor doesn't already need to own |
 | Setting | Generic medieval Europe; ages are a later idea, not a feature |
 | People | Full person records forever (cheap); households as the sim's unit; emergent surnames; a rotating cast of named notables; genealogy is a by-product, never a goal |
@@ -574,7 +614,10 @@ see §11).
 | Location | First-run setup: "exactly where I am", custom coordinates, or presets; V1 ships one terrain type |
 | Chronicle | A button, top right, opens a scrollable window: 24-hour recent list with play (rewinds the strip), older years condensed into annals, no replay; hand-written templates |
 | Rendering | Static in Vista's still (buildings, ruins, terrain mods, emitter light as separable buffers); dynamic on a CPU deferred compositor using Vista's depth/normal/light AOVs; torch flicker and waver by buffer multipliers and position blends; dynamic shadows by shadow rays against capsule proxies |
-| Vista | Untouched: a data contract (§8) and one note for M8 (props from a list, with states; a buildable stage) |
+| Vista | No Hamlet-specific behaviour: a data contract (§8), the note in M8 (props from a list, with states, as types or given meshes; a buildable stage) and M11's cylindrical projection, both useful to wallpapers too |
+| Buildings (2026-10-21) | Hamlet generates them, every state, with its own grammars (`Hamlet.Buildings`), and hands Vista meshes with material ids; Vista grows no medieval catalogue |
+| Projection (2026-10-21) | The backdrop is a cylindrical panorama (a 32:1 perspective strip stretches its ends about 3×); the stage and the stand-in use the same projection |
+| Backdrop cost (2026-10-21) | Seconds of tracing per backdrop, not minutes; render and release by default, so no video memory is held between backdrops |
 | Stand-in backdrop | Yes, for development and tests; never shipped |
 | V1 minimum | Ambient animations, texture events, one upheaval (fire), chronicle with replay — replay is the USP and is in V1 |
 | Sound | Off by default; bell for weddings, funerals, large fires; a hammer for building; sparse and meaningful |

@@ -1340,6 +1340,19 @@ mountains + dawn" renders with plausible snow everywhere from the defaults.
 Goal: signs of people. Deliverable: shape-grammar cabins with blackbody window glow,
 docks, rowboats, paths, fences, placed by the shot-first layout. Verify: a cabin at dusk
 glows warm against a blue-hour sky.
+*Notes from Hamlet (`hamlet-plan.md` §8, agreed 2026-10-21), designed in from the start:*
+- **Props come from a prop-instance list** — `(prop, state, position, orientation, scale)` —
+  that the shot-first layout writes from the recipe's rules or that is read from a file. Props
+  have **states** (new, weathered, burned, ruined, overgrown…), part of the scene's static state.
+- **A prop is a type or a given mesh.** Vista's own grammars (cabins, docks, rowboats, paths,
+  fences) build the types; a client such as Hamlet hands over **procedurally generated meshes**
+  with Vista material ids (still procedural, so §2's purity holds), and Vista renders them like its
+  own. Vista does not grow a medieval architecture catalogue: Hamlet owns its buildings and every
+  state of them.
+- **A "village" set piece** reserves a buildable stage near the camera (a flattish valley floor, the
+  river leaving the frame), and the recipe plants the viewpoint looking across it (with M3's layout).
+- **Light stays separable:** sun, sky and each emitter (or cluster) can be written as their own
+  additive buffers, which the integrator already samples apart (M1.5); Hamlet's stage composites them.
 
 **M9 — Coast & ocean.**
 Goal: seascapes. Deliverable: FFT ocean, foam and whitecaps, cliffs and beaches, moon
@@ -1354,8 +1367,14 @@ rainbow appears at the correct ~42° angle from the antisolar point.
 **M11 — All targets.**
 Goal: every wallpaper shape. Deliverable: 8K; tiled 16K; ultrawide; multi-monitor spans;
 phone portrait; per-aspect auto camera and safe-frame overlays; HDR output if Windows
-support checks out. Verify: a 16K render completes within the VRAM budget and resumes
-after an interruption.
+support checks out. A **cylindrical (panoramic) projection** for very wide frames: a
+perspective camera stretches the edges of a multi-monitor span, and of Hamlet's 32:1 strip
+(3840×120: even a 5° vertical field of view is about 110° across, the edges stretched about
+3×); the lens models, the loupe's frame-keyed pixels and the auto camera learn it, and the
+sidecar records it so a client can turn depth back into positions. It is independent of the
+tiling and can be pulled forward as its own slice if Hamlet's H4 comes first. Verify: a 16K
+render completes within the VRAM budget and resumes after an interruption; a span and a 32:1
+strip show no edge stretch (a sphere at the edge renders round).
 
 **Ongoing:** composition scoring, camera filters (sensor / film spectral curves, white
 balance, lens CA), estimator accuracy.
