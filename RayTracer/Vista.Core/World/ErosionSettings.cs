@@ -8,7 +8,8 @@ namespace Vista.World;
 /// transport and deposition, plus thermal erosion to a talus angle, over two layers — bedrock and the loose material
 /// erosion leaves behind. Everything is in metres and seconds on the world grid, and every value is a <see cref="float"/>
 /// because that is what the GPU computes with: the C# reference (<see cref="ErosionReference"/>) and the shader read the
-/// same numbers.
+/// same numbers. Since M1.11a the <c>Incision*</c> settings run the stream-power incision on a coarse grid first
+/// (<see cref="StreamPower"/>, on the CPU), which drains the base terrain's closed basins into valleys that join.
 /// </summary>
 public sealed record ErosionSettings
 {
@@ -69,11 +70,53 @@ public sealed record ErosionSettings
     /// <summary>The step from which the flow maps (discharge, water depth) average.</summary>
     public int AverageFrom { get; init; }
 
+    /// <summary>
+    /// Steps of stream-power incision on the coarse grid before the pipe-model erosion (<see cref="StreamPower"/>, vista-plan §10
+    /// M1.11a); 0 runs M1.7's erosion alone.
+    /// </summary>
+    public int IncisionSteps { get; init; }
+
+    /// <summary>The incision grid's cell size in metres: a whole multiple of the world grid's that nests in it.</summary>
+    public float IncisionCell { get; init; } = 64f;
+
+    /// <summary>
+    /// The stream-power law's <c>K·Δt</c> per incision step (dimensionless): an explicit step would lower a channel cell by this
+    /// times the square root of its upstream area in m², times its slope.
+    /// </summary>
+    public float IncisionRate { get; init; }
+
+    /// <summary>The upstream area from which a cell incises as a channel, in km²; below it a cell is hillslope.</summary>
+    public float ChannelAreaKm2 { get; init; } = 0.1f;
+
+    /// <summary>The steepest slope a cell keeps toward the cell it drains into while the valleys incise, in degrees.</summary>
+    public float IncisionTalusDegrees { get; init; } = 45f;
+
+    /// <summary>
+    /// Uplift per incision step at the base terrain's highest point, in metres (in proportion to the base terrain's height
+    /// elsewhere; the grid's edge stays put): the ranges keep rising while the rivers cut.
+    /// </summary>
+    public float IncisionUplift { get; init; }
+
+    /// <summary>
+    /// The share of a lake's depth that fills with sediment per incision step (1: a lake fills to its outlet at once; 0: only
+    /// the outlet cutting down drains it).
+    /// </summary>
+    public float IncisionLakeFill { get; init; }
+
+    /// <summary>
+    /// How deep the pools the erosion leaves fill with sediment, in metres (<see cref="ErosionResult.From(ErosionState, float)"/>):
+    /// the lakes behind the fans side valleys build across the valleys below. 0 leaves them, as M1.7 did.
+    /// </summary>
+    public float PoolFillMetres { get; init; }
+
     /// <summary>The erosion of the mountain profiles (snow-capped mountains, alpine range) on the default grid.</summary>
     /// <remarks>
     /// Chosen by contact sheets of the measurement views on the 4097² × 8 m grid (vista-plan §10 M1.7): the discharge to the
     /// first power and hard rock carve gullies into the faces and keep the crests; heavy flux damping and the slow exchange of
     /// sediment keep the water from drilling needles into the valley floors and rippling the loose slopes; rock stands to 50°.
+    /// The incision (vista-plan §10 M1.11a) was chosen by drainage measures and sheets of seed 42: 300 steps on a 64 m grid drain
+    /// every closed basin (a coarser step rate leaves lakes; filling the lakes at once leaves them as plains; more uplift flattens
+    /// the hillslopes into talus planes; a second, 32 m level grooves the faces).
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -93,13 +136,26 @@ public sealed record ErosionSettings
         RockTalusDegrees = 50.0f,
         ThermalRate = 0.25f,
         AverageFrom = 750,
+        IncisionSteps = 300,
+        IncisionCell = 64.0f,
+        IncisionRate = 0.03f,
+        ChannelAreaKm2 = 0.1f,
+        IncisionTalusDegrees = 45.0f,
+        IncisionUplift = 2.0f,
+        IncisionLakeFill = 0.05f,
+        PoolFillMetres = 100.0f,
     };
 
-    /// <summary>The erosion of the hills profile (rolling hills, and the base ground of every other set).</summary>
+    /// <summary>
+    /// The erosion of the hills profile (rolling hills, and the base ground of every other set), without the incision and the pool
+    /// filling until the hills are tuned in their own milestone.
+    /// </summary>
     public static ErosionSettings Hills { get; } = Mountains with
     {
         Capacity = 1.0f,
         RockTalusDegrees = 45.0f,
+        IncisionSteps = 0,
+        PoolFillMetres = 0.0f,
     };
 
     /// <summary>
@@ -173,6 +229,16 @@ public sealed record ErosionSettings
         Fraction(nameof(ThermalRate), ThermalRate, 0.5f);
         if (!(LooseTalusDegrees > 0f && LooseTalusDegrees < RockTalusDegrees && RockTalusDegrees < 90f))
             errors.Add($"Talus angles must satisfy 0 < loose < rock < 90° (got {LooseTalusDegrees}°, {RockTalusDegrees}°).");
+        if (IncisionSteps < 0)
+            errors.Add($"IncisionSteps must not be negative (got {IncisionSteps}).");
+        Positive(nameof(IncisionCell), IncisionCell);
+        Fraction(nameof(IncisionRate), IncisionRate, float.MaxValue);
+        Positive(nameof(ChannelAreaKm2), ChannelAreaKm2);
+        Fraction(nameof(IncisionUplift), IncisionUplift, float.MaxValue);
+        Fraction(nameof(IncisionLakeFill), IncisionLakeFill);
+        Fraction(nameof(PoolFillMetres), PoolFillMetres, float.MaxValue);
+        if (!(IncisionTalusDegrees > 0f && IncisionTalusDegrees < 90f))
+            errors.Add($"IncisionTalusDegrees must be in (0, 90) (got {IncisionTalusDegrees}°).");
         return errors;
     }
 
@@ -184,11 +250,11 @@ public sealed record ErosionSettings
     {
         int[] words =
         [
-            Iterations, AverageFrom,
+            Iterations, AverageFrom, IncisionSteps,
             .. new[]
             {
                 TimeStep, PipeArea, FluxDamping, RainPerStep, Evaporation, Capacity, DischargeExponent, MinSlope, Dissolve, RockErodibility, Deposition,
-                LooseTalusDegrees, RockTalusDegrees, ThermalRate,
+                LooseTalusDegrees, RockTalusDegrees, ThermalRate, IncisionCell, IncisionRate, ChannelAreaKm2, IncisionTalusDegrees, IncisionUplift, IncisionLakeFill, PoolFillMetres,
             }.Select(BitConverter.SingleToInt32Bits),
         ];
         Span<byte> buffer = stackalloc byte[4];

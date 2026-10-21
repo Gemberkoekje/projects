@@ -57,6 +57,9 @@ public sealed class WorldStageTests
         Assert.AreEqual(result.ContentHash(), back.Value.Result.ContentHash());
         CollectionAssert.AreEqual(result.Surface.Heights.ToArray(), back.Value.Result.Surface.Heights.ToArray());
         CollectionAssert.AreEqual(result.Discharge, back.Value.Result.Discharge);
+        CollectionAssert.AreEqual(result.Drainage.Direction, back.Value.Result.Drainage.Direction);
+        CollectionAssert.AreEqual(result.Drainage.FillDepth, back.Value.Result.Drainage.FillDepth);
+        CollectionAssert.AreEqual(result.Drainage.Upstream, back.Value.Result.Drainage.Upstream, "the upstream areas follow from the directions");
         Assert.AreEqual(result.Steps, back.Value.Result.Steps);
         Assert.IsFalse(Directory.GetFiles(cache.Directory, "*.tmp").Any(), "no temporary file is left behind");
     }
@@ -193,7 +196,7 @@ public sealed class WorldStageTests
         Sidecar rendered = PreviewPipeline.Run(Request(dryRun: false), renderer, eroder: new CountingEroder(), erosionCache: cache);
         ErosionInfo erosion = rendered.World.Erosion!;
         Assert.AreEqual(ErosionSource.Eroded, erosion.Source);
-        Assert.AreEqual(12, rendered.Schema);
+        Assert.AreEqual(13, rendered.Schema);
         Assert.AreEqual(renderer.Scene!.Terrain.ContentHash().ToString("x16"), rendered.World.HeightFieldHash, "the sidecar hashes the eroded surface");
         Assert.AreNotEqual(erosion.BaseHeightFieldHash, rendered.World.HeightFieldHash);
         Assert.AreEqual(0, rendered.Warnings.Count);

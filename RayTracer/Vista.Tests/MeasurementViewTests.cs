@@ -59,6 +59,30 @@ public sealed class MeasurementViewTests
     }
 
     [TestMethod]
+    public void EveryCamera_StandsAboveTheIncisedSeed42Terrain()
+    {
+        // M1.11a's incision moves the ground by hundreds of metres, valleys and ridges both, before the GPU erosion runs (whose
+        // own changes the self-test checks on the eroded world). The incision runs on the CPU, so CI can check the views over it.
+        Recipe recipe = VistaJson.ParseRecipe(Read("mountains-day.recipe.json"));
+        HeightField ground = TerrainGenerator.Generate(recipe, 42);
+        HeightField incised = StreamPower.Prepare(ground, recipe, 42, ErosionSettings.For(TerrainProfile.For(recipe.SetPieces)));
+        string[] cameras = [.. System.IO.Directory.GetFiles(Directory, "*.camera.json", SearchOption.AllDirectories)];
+        Assert.AreEqual(8, cameras.Length, "the measurement, atmosphere and aerial views");
+        foreach (string file in cameras)
+        {
+            CameraSpec camera = VistaJson.ParseCamera(File.ReadAllText(file));
+            double clearance = camera.Position.Y - incised.HeightAt(camera.Position.X, camera.Position.Z);
+            Assert.IsTrue(clearance > ClearanceMetres, $"{Path.GetFileName(file)} stands {clearance:0.0} m above the incised ground");
+        }
+    }
+
+    /// <summary>
+    /// How far above the incised ground a view must stand, so the GPU erosion's cut and fill (tens of metres on most of the ground;
+    /// its loose material piles higher only on valley floors) does not bury it.
+    /// </summary>
+    private const double ClearanceMetres = 20.0;
+
+    [TestMethod]
     public void TheAtmosphereCheckViews_AreValidAndAboveTheTerrain()
     {
         // vista-views/atmosphere (M1.3): the views render.ps1 renders the atmosphere checks from.

@@ -23,10 +23,17 @@ public sealed record WorldGrid(int Size = 4097, double CellSize = 8.0)
 public static class TerrainGenerator
 {
     /// <summary>The height field for <paramref name="recipe"/> and <paramref name="seed"/>.</summary>
-    public static HeightField Generate(Recipe recipe, ulong seed, WorldGrid? grid = null)
+    public static HeightField Generate(Recipe recipe, ulong seed, WorldGrid? grid = null) =>
+        Generate(recipe, seed, grid ?? WorldGrid.Default, int.MaxValue);
+
+    /// <summary>
+    /// The height field with only the profile's first <paramref name="octaves"/> octaves (<see cref="TerrainProfile.Height(ulong, double, double, int)"/>):
+    /// a coarse grid's base terrain, without the octaves it cannot hold (vista-plan §10 M1.11a's incision grid).
+    /// </summary>
+    public static HeightField Generate(Recipe recipe, ulong seed, WorldGrid grid, int octaves)
     {
         ArgumentNullException.ThrowIfNull(recipe);
-        grid ??= WorldGrid.Default;
+        ArgumentNullException.ThrowIfNull(grid);
         TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
         ulong terrainSeed = SeedDerivation.Derive(seed, SeedDerivation.TerrainBase);
 
@@ -38,7 +45,7 @@ public static class TerrainGenerator
         {
             double z = origin + j * grid.CellSize;
             for (int i = 0; i < size; i++)
-                heights[j * size + i] = (float)profile.Height(terrainSeed, origin + i * grid.CellSize, z);
+                heights[j * size + i] = (float)profile.Height(terrainSeed, origin + i * grid.CellSize, z, octaves);
         });
         return new HeightField(size, grid.CellSize, heights);
     }

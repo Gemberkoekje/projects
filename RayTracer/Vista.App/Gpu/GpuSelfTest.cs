@@ -15,7 +15,7 @@ namespace Vista.App.Gpu;
 /// <summary>
 /// <c>Vista.App --gpu-selftest</c>: the checks that need the RTX 3070 (vista-plan §10), headless with a pass/fail
 /// exit code, like the maze's <c>--phase6-selftest</c>. One fixed scene (snow-capped mountains at golden hour,
-/// seed 42, the default camera, 320×180, 16 spp, every debug output) is rendered four times:
+/// seed 42, M0's default camera for seed 42, 320×180, 16 spp, every debug output) is rendered four times:
 /// <list type="number">
 ///   <item>the reference, at the default dispatch budget — it must be sane (finite, lit, sky and terrain both
 ///   in frame, more rays than pixel-samples);</item>
@@ -46,8 +46,8 @@ namespace Vista.App.Gpu;
 /// renderer that rebuilt only the part of the air the change touched renders bit-identically to one that rebuilt all of it.</para>
 ///
 /// <para>First of all the world (M1.7): the erosion passes against their C# reference on a 65² patch, and the self-test's world
-/// eroded twice and through a cache round trip, bit-identical each time (see <c>ErosionChecks</c>); the scene above renders that
-/// eroded world.</para>
+/// eroded twice and through a cache round trip, bit-identical each time, its drainage included (see <c>ErosionChecks</c>); the
+/// scene above renders that eroded world, and every committed view in <c>vista-views/</c> must stand above it (M1.11a).</para>
 ///
 /// <para>Then the denoiser (M1.6), when Open Image Denoise has been fetched: the reference render denoised twice on the CPU is
 /// bit-identical, sane and as bright as the raw image; on CUDA, bit-identical twice and as bright as the CPU's.</para>
@@ -56,6 +56,18 @@ internal static class GpuSelfTest
 {
     /// <summary>Largest relative difference a GPU LUT texel may have from its C# reference (float against double).</summary>
     private const double LutTolerance = 2e-3;
+
+    /// <summary>
+    /// The camera every render here uses: M0's default camera for seed 42 (<c>vista-views/default.camera.json</c>), looking north
+    /// over the range with the sky above it. Since M1.11a's incision, <see cref="DefaultCamera.For"/> puts the eye on a valley floor
+    /// facing a wall there, with no sky in frame; this pose stands 532 m above that floor.
+    /// </summary>
+    private static readonly CameraSpec SelfTestCamera = new()
+    {
+        Position = new WorldPoint(0.0, 1692.2126708984372, -5734.4),
+        YawDegrees = 0.0,
+        PitchDegrees = 3.0,
+    };
 
     /// <summary>Runs the checks, writing a report to <paramref name="log"/>; returns 0 when every check passes.</summary>
     public static int Run(TextWriter log)
@@ -70,10 +82,11 @@ internal static class GpuSelfTest
         using var renderer = new D3D12VistaRenderer();
         log.WriteLine($"Device: {renderer.DeviceName}, driver {renderer.DriverVersion}");
         bool pass = ErosionChecks(renderer, recipe, seed, log, out HeightField terrain);
+        pass &= ViewChecks(terrain, log);
         Almanac almanac = Almanac.For(recipe);
         double ground = Places.BaseAltitude(recipe, almanac.Place).Metres;
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
-        CameraSpec camera = DefaultCamera.For(terrain);
+        CameraSpec camera = SelfTestCamera;
         TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new TerrainDetail(seed, terrain.CellSize));
         TerrainMesh mesh = MeshFor(hierarchy, camera, settings, ground);
         var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.M0, AtmosphereModel.Default, ground);
@@ -98,9 +111,10 @@ internal static class GpuSelfTest
         pass &= Check(log, "0.05 ms budget is bit-identical", Same(reference, split, compareAovs: true));
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
 
-        // The loupe: off the 8-pixel thread-group grid, with the central peak and sky in it.
+        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.11a the range lies below the horizon from
+        // this pose, the skyline near row 200).
         var frame = settings with { Width = 640, Height = 360 };
-        var window = new PixelWindow(291, 137, 64, 64);
+        var window = new PixelWindow(291, 171, 64, 64);
         RenderOutput full = Render(renderer, scene, frame, allAovs, new BatchPlannerOptions(), log, "640×360 frame");
         RenderOutput loupe = Render(renderer, scene, frame with { Window = window }, allAovs, new BatchPlannerOptions(), log, $"loupe {window}");
         RenderOutput loupeSplit = Render(renderer, scene, frame with { Window = window }, allAovs, tight, log, $"loupe {window}, 0.05 ms budget");
@@ -144,7 +158,8 @@ internal static class GpuSelfTest
                 && first.Loose.All(v => v >= 0f && float.IsFinite(v)) && first.StandingWater.All(v => v >= 0f && float.IsFinite(v))
                 && world.Info.Stats!.LongestSubmissionSeconds < 1.5 ? null : "a value is negative or not finite, or a submission came near the GPU timeout");
 
-            ErosionResult second = renderer.Erode(TerrainGenerator.Generate(recipe, seed, grid), erosion).Result;
+            HeightField ground = TerrainGenerator.Generate(recipe, seed, grid);
+            ErosionResult second = renderer.Erode(StreamPower.Prepare(ground, recipe, seed, erosion), erosion).Result;
             pass &= Check(log, "the world eroded twice is bit-identical", SameWorld(first, second));
 
             (ErosionResult Result, WorldOrigin Origin)? loaded = cache.TryLoad(profile, seed, grid, erosion, out string? problem);
@@ -178,7 +193,39 @@ internal static class GpuSelfTest
         if (!a.Loose.AsSpan().SequenceEqual(b.Loose) || !a.Discharge.AsSpan().SequenceEqual(b.Discharge)
             || !a.WaterDepth.AsSpan().SequenceEqual(b.WaterDepth) || !a.StandingWater.AsSpan().SequenceEqual(b.StandingWater))
             return "the maps differ";
+        if (!a.Drainage.Direction.AsSpan().SequenceEqual(b.Drainage.Direction) || !a.Drainage.FillDepth.AsSpan().SequenceEqual(b.Drainage.FillDepth))
+            return "the drainage differs";
         return a.ContentHash() == b.ContentHash() ? null : "the hashes differ";
+    }
+
+    /// <summary>
+    /// The committed views (every <c>*.camera.json</c> under <c>vista-views/</c>, found above the executable) stand above the eroded
+    /// seed-42 ground (M1.11a: the incision moves the ground by hundreds of metres, and CI only sees the ground before the GPU
+    /// erosion). Skipped when the folder is not there.
+    /// </summary>
+    private static bool ViewChecks(HeightField terrain, TextWriter log)
+    {
+        DirectoryInfo? folder = new(AppContext.BaseDirectory);
+        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "vista-views")))
+            folder = folder.Parent;
+        if (folder is null)
+        {
+            log.WriteLine("[skip] no vista-views folder above the executable, so the committed views cannot be checked");
+            return true;
+        }
+        var problems = new List<string>();
+        double lowest = double.MaxValue;
+        string[] files = Directory.GetFiles(Path.Combine(folder.FullName, "vista-views"), "*.camera.json", SearchOption.AllDirectories);
+        foreach (string file in files)
+        {
+            CameraSpec camera = VistaJson.ParseCamera(File.ReadAllText(file));
+            double clearance = camera.Position.Y - terrain.HeightAt(camera.Position.X, camera.Position.Z);
+            lowest = Math.Min(lowest, clearance);
+            if (clearance <= 0.0)
+                problems.Add(string.Create(CultureInfo.InvariantCulture, $"{Path.GetFileName(file)} is {-clearance:0.0} m underground"));
+        }
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  {files.Length} committed views, the lowest {lowest:0.0} m above the eroded ground"));
+        return Check(log, "every committed view stands above the eroded seed-42 ground", problems.Count == 0 ? null : string.Join("; ", problems));
     }
 
     /// <summary>

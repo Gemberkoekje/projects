@@ -216,6 +216,61 @@ public static class DebugImages
         return (bytes, size);
     }
 
+    /// <summary>
+    /// The drainage (M1.11a) over a grey hillshade of <paramref name="surface"/>, top-down with north up like
+    /// <see cref="ErosionMap"/>: the upstream area in blue from 0.05 km² (faint) to the largest river on the grid (full), on a log
+    /// scale, and lakes (filled deeper than 1 m) in dark blue. Each pixel shows the largest upstream area among the cells it
+    /// covers, so a channel one cell wide survives the reduction to at most <paramref name="maxSize"/> pixels a side.
+    /// </summary>
+    public static (byte[] Rgb, int Size) DrainageImage(HeightField surface, DrainageMap drainage, CameraSpec? camera, int maxSize = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(drainage);
+        if (drainage.Size != surface.Size)
+            throw new ArgumentException("The drainage is not on the surface's grid.", nameof(drainage));
+        int n = surface.Size;
+        int size = Math.Min(n, maxSize);
+        double step = (n - 1) / (double)Math.Max(size - 1, 1);
+        double faint = Math.Log(0.05e6 / drainage.CellArea);
+        double full = Math.Log(drainage.Upstream.Max()) - faint;
+        var bytes = new byte[size * size * 3];
+        Parallel.For(0, size, row =>
+        {
+            int j = (int)Math.Round((size - 1 - row) * step);
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
+            int bj0 = (int)Math.Round((size - 1 - row - 0.5) * step), bj1 = (int)Math.Round((size - 1 - row + 0.5) * step);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1);
+                double dhdx = (surface[i1, j] - surface[i0, j]) / ((i1 - i0) * surface.CellSize);
+                double dhdz = (surface[i, j1] - surface[i, j0]) / ((j1 - j0) * surface.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double grey = 60 + 170 * shade;
+                int most = 0;
+                bool lake = false;
+                int bi0 = (int)Math.Round((col - 0.5) * step), bi1 = (int)Math.Round((col + 0.5) * step);
+                for (int bj = Math.Max(bj0, 0); bj <= Math.Min(bj1, n - 1); bj++)
+                {
+                    for (int bi = Math.Max(bi0, 0); bi <= Math.Min(bi1, n - 1); bi++)
+                    {
+                        int c = bj * n + bi;
+                        most = Math.Max(most, drainage.Upstream[c]);
+                        lake |= drainage.FillDepth[c] > 1f;
+                    }
+                }
+                double flow = Math.Clamp((Math.Log(most) - faint) / full, 0.0, 1.0);
+                (double r, double g, double b) = (grey + (30 - grey) * flow, grey + (110 - grey) * flow, grey + (255 - grey) * flow);
+                if (lake)
+                    (r, g, b) = (20, 40, 150);
+                Put(bytes, row * size + col, ((byte)Math.Round(r), (byte)Math.Round(g), (byte)Math.Round(b)));
+            }
+        });
+        if (camera is not null)
+            MarkCamera(bytes, size, surface, camera);
+        return (bytes, size);
+    }
+
     private static void MarkCamera(byte[] bytes, int size, HeightField field, CameraSpec camera)
     {
         double ToCol(double x) => (x - field.OriginX) / field.Extent * (size - 1);

@@ -22,7 +22,7 @@ public enum ErosionSource
     Off,
 }
 
-/// <summary>The erosion of a world, for the sidecar (schema 8): what made it, with what, and what it cost.</summary>
+/// <summary>The erosion of a world, for the sidecar (schema 8): what made it, with what, what it cost, and how it drains (schema 13).</summary>
 public sealed record ErosionInfo
 {
     /// <summary>Where it came from.</summary>
@@ -51,6 +51,9 @@ public sealed record ErosionInfo
 
     /// <summary>What the erosion cost, when it ran in this process.</summary>
     public ErosionStats? Stats { get; init; }
+
+    /// <summary>The eroded world's drainage measures (schema 13, vista-plan §10 M1.11a); null when it was not eroded.</summary>
+    public DrainageStats? Drainage { get; init; }
 }
 
 /// <summary>A world ready to mesh: the surface, its erosion maps when it was eroded, and how it came about.</summary>
@@ -62,8 +65,9 @@ public sealed record TerrainWorld(HeightField Surface, ErosionResult? Erosion, E
 
 /// <summary>
 /// The world stage (vista-plan §4.1, §10 M1.7): the base terrain of the recipe and seed on the global grid, then its erosion —
-/// read from the cache when it holds this world, else run on the eroder (the GPU) and stored. With neither (a dry run with no
-/// cached world) the un-eroded terrain stands in, with a warning, so the world side still runs anywhere.
+/// read from the cache when it holds this world, else incised on the CPU (<see cref="StreamPower"/>, M1.11a), run on the eroder
+/// (the GPU) and stored. With neither (a dry run with no cached world) the un-eroded terrain stands in, with a warning, so the
+/// world side still runs anywhere.
 /// </summary>
 public static class WorldBuilder
 {
@@ -98,6 +102,7 @@ public static class WorldBuilder
                 Driver = hit.Origin.Driver,
                 ErodedUtc = hit.Origin.CreatedUtc,
                 CacheFile = cache!.PathFor(profile, seed, grid, settings),
+                Drainage = DrainageStats.Measure(hit.Result.Drainage),
             }, warnings);
         }
 
@@ -116,7 +121,10 @@ public static class WorldBuilder
             }, warnings);
         }
 
-        ErosionRun run = eroder.Erode(ground, settings);
+        var incision = System.Diagnostics.Stopwatch.StartNew();
+        HeightField incised = StreamPower.Prepare(ground, recipe, seed, settings);
+        double incisionSeconds = incision.Elapsed.TotalSeconds;
+        ErosionRun run = eroder.Erode(incised, settings);
         string created = time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
         string? file = cache?.Store(profile, seed, grid, settings, run.Result, new WorldOrigin(eroder.DeviceName, eroder.DriverVersion, created, ground.ContentHash()));
         return new TerrainWorld(run.Result.Surface, run.Result, new ErosionInfo
@@ -129,7 +137,8 @@ public static class WorldBuilder
             Driver = eroder.DriverVersion,
             ErodedUtc = created,
             CacheFile = file,
-            Stats = run.Stats,
+            Stats = run.Stats with { IncisionSeconds = incisionSeconds },
+            Drainage = DrainageStats.Measure(run.Result.Drainage),
         }, warnings);
     }
 

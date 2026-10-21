@@ -204,7 +204,7 @@ public sealed class ErosionReferenceTests
     }
 
     private const string PinnedSurfaceHash = "7200f9178eca7e04";
-    private const string PinnedResultHash = "8d70073446ac0bcf";
+    private const string PinnedResultHash = "a2b1446bb693f3b0";
 
     [TestMethod]
     public void Erosion_CarvesTheMountains_AndLeavesLooseMaterialLowerDown()
@@ -239,6 +239,26 @@ public sealed class ErosionReferenceTests
     }
 
     [TestMethod]
+    public void Result_FillsThePools_UpToTheLimit()
+    {
+        // A plane falling to the west with two holes: 3 m and 30 m deep below their west rims. With a 10 m limit the shallow one
+        // fills to its rim, a flat the water crosses, and the deep one rises by 10 m and stays a lake; its water is gone either way.
+        const int n = 17;
+        var state = new ErosionState(Field(n, 8.0, (i, j) => 2f * i - (i == 5 && j == 5 ? 5f : 0f) - (i == 11 && j == 11 ? 32f : 0f)));
+        state.Water[5 * n + 5] = 1f;
+        ErosionResult kept = ErosionResult.From(state);
+        ErosionResult filled = ErosionResult.From(state, poolFillMetres: 10f);
+        Assert.AreEqual(2f * 5 - 5f, kept.Surface[5, 5], "without the fill the hole stays");
+        Assert.AreEqual(2f * 4, filled.Surface[5, 5], "the shallow hole fills to its rim");
+        Assert.AreEqual(3f, filled.Loose[5 * n + 5], "the fill is loose material");
+        Assert.AreEqual(0f, filled.StandingWater[5 * n + 5], "its water is gone");
+        Assert.AreEqual(2f * 11 - 32f + 10f, filled.Surface[11, 11], 1e-4f, "the deep one rises by the limit");
+        Assert.IsTrue(filled.Drainage.FillDepth[11 * n + 11] > 1f, "and still holds a lake");
+        Assert.AreEqual(0f, filled.Drainage.FillDepth[5 * n + 5], "the filled one drains");
+        Assert.AreEqual(kept.Surface[8, 8], filled.Surface[8, 8], "the plane does not move");
+    }
+
+    [TestMethod]
     public void Curvature_IsTheLaplacian()
     {
         // h = a(x² + z²) has Laplacian 4a everywhere; the edges are left at 0.
@@ -259,6 +279,9 @@ public sealed class ErosionReferenceTests
         Assert.AreEqual(1, (ErosionSettings.Mountains with { RockTalusDegrees = 30f }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { TimeStep = 0f }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { Iterations = -1 }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionSteps = -1 }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionTalusDegrees = 90f }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionLakeFill = 1.5f }).Validate().Count);
         Assert.ThrowsExactly<ArgumentException>(() => ErosionReference.Erode(Mountains(), ErosionSettings.Mountains with { Dissolve = 2f }));
 
         Assert.AreSame(ErosionSettings.Mountains, ErosionSettings.For(TerrainProfile.Mountains));
@@ -266,6 +289,9 @@ public sealed class ErosionReferenceTests
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), ErosionSettings.Hills.ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { AverageFrom = 1 }).ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { FluxDamping = 0.5f }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionSteps = 301 }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionUplift = 3f }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionLakeFill = 0.1f }).ContentHash());
 
         ErosionSettings tuned = ErosionSettings.Mountains.With("Capacity=3; Iterations=10,DischargeExponent=0.5");
         Assert.AreEqual((3f, 10, 0.5f), (tuned.Capacity, tuned.Iterations, tuned.DischargeExponent));

@@ -122,24 +122,40 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         EnsureErosionPipelines();
         int n = ground.Size;
         int cells = n * n;
-        using var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), n);
+        float[] terrainAfter, waterAfter, sedimentAfter, flowAfter;
+        double seconds, longest;
+        int submissions;
+        long memory, stateBytes;
+        // The state is freed before the maps and the drainage are worked out on the CPU.
+        using (var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), n))
+        {
+            var terrain = new float[cells * 2];
+            ReadOnlySpan<float> heights = ground.Heights;
+            for (int c = 0; c < cells; c++)
+                terrain[c * 2] = heights[c];
+            Upload(buffers.Terrain[0], terrain);
+            terrain = [];
+            foreach (ID3D12Resource buffer in buffers.All.Where(b => b != buffers.Terrain[0]))
+                Clear(buffers, buffer);
 
-        var terrain = new float[cells * 2];
-        ReadOnlySpan<float> heights = ground.Heights;
-        for (int c = 0; c < cells; c++)
-            terrain[c * 2] = heights[c];
-        Upload(buffers.Terrain[0], terrain);
-        terrain = [];
-        foreach (ID3D12Resource buffer in buffers.All.Where(b => b != buffers.Terrain[0]))
-            Clear(buffers, buffer);
-
-        long memory = VideoMemoryUsed;
-        (double seconds, int submissions, double longest, int water) = RunSteps(buffers, settings, ground.CellSize, settings.Iterations, firstWater: 0, firstStep: 0);
+            memory = VideoMemoryUsed;
+            int water;
+            (seconds, submissions, longest, water) = RunSteps(buffers, settings, ground.CellSize, settings.Iterations, firstWater: 0, firstStep: 0);
+            terrainAfter = ReadFloats(buffers.Terrain[0], cells * 2);
+            waterAfter = ReadFloats(buffers.Water[water], cells);
+            sedimentAfter = ReadFloats(buffers.Sediment[0], cells);
+            flowAfter = ReadFloats(buffers.Flow, cells * 2);
+            stateBytes = buffers.StateBytes;
+        }
         int flowSteps = Math.Max(0, settings.Iterations - settings.AverageFrom);
-        ErosionResult result = ErosionResult.From(n, ground.CellSize,
-            ReadFloats(buffers.Terrain[0], cells * 2), ReadFloats(buffers.Water[water], cells),
-            ReadFloats(buffers.Sediment[0], cells), ReadFloats(buffers.Flow, cells * 2), flowSteps, settings.Iterations);
-        return new ErosionRun(result, new ErosionStats(seconds, wall.Elapsed.TotalSeconds, submissions, longest, buffers.StateBytes) { ProcessVideoMemory = memory });
+        var maps = Stopwatch.StartNew();
+        ErosionResult result = ErosionResult.From(n, ground.CellSize, terrainAfter, waterAfter, sedimentAfter, flowAfter, flowSteps, settings.Iterations,
+            settings.PoolFillMetres);
+        return new ErosionRun(result, new ErosionStats(seconds, wall.Elapsed.TotalSeconds, submissions, longest, stateBytes)
+        {
+            ProcessVideoMemory = memory,
+            MapsSeconds = maps.Elapsed.TotalSeconds,
+        });
     }
 
     /// <summary>

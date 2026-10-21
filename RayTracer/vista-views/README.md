@@ -13,7 +13,8 @@ every slice measures the same pixels. They are the views M0's batch defaults wer
 
 `default.camera.json` is the pose `DefaultCamera.For` gave seed 42 on the M0 terrain (1.7 m above the
 ground there). It is a file now so later terrain changes do not move the view; if erosion (M1.7) lifts the
-ground above it, the preview warns and the view needs a new height.
+ground above it, the preview warns and the view needs a new height. Since M1.11a's incision the ground there is a valley floor
+532 m below it (552 m below the down-slope view), so both views look over the range from above; the views stay as they are.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
 defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
@@ -177,4 +178,18 @@ snowline the chain chose; and with `-Before`, a before/after of the measurement 
 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/sliders/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 480] [-Spp 64] [-Out folder]
+```
+
+## Drainage checks (M1.11a)
+
+`drainage/render.ps1` reruns the M1.11a checks: `--erosion-measure` on four seeds with M1.7's erosion alone (`--set IncisionSteps=0 --set PoolFillMetres=0`)
+and with the stream-power incision first, printing each world's drainage measures (the longest channel without a lake or a closed
+basin, the share that drains into a channel, the lakes, the Strahler orders) for the base terrain, the coarse grid before and after
+the incision, the ground handed to the GPU and the eroded world; then a sheet of the four seeds' drainage images, M1.7's world against
+this build's. With `-Before` (a `main` build) it also renders the four seeds from the aerial camera and the seed-42 views (default,
+down a slope, layered ridges, range) with both builds, in a low afternoon sun (the day recipe at `--sun-elevation 12`, which shows
+the relief better than golden hour's +2°). A dry run writes `<out>.drainage.png` beside `<out>.erosion.png` when its world is eroded.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/drainage/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 640] [-Spp 64] [-Out folder]
 ```

@@ -16,8 +16,9 @@ public sealed record WorldOrigin(string Device, string Driver, string CreatedUtc
 /// Eroded worlds on disk (vista-plan §10 M1 decisions: "the eroded field is cached per (recipe, seed)"), so a world is eroded
 /// once per seed and every later render, sheet or dry run — on any machine that has the file — reads the same bits. The key is
 /// everything the erosion reads: the terrain profile, the seed, the grid, the erosion settings and the versions of the terrain
-/// generator and of the passes. A file holds the surface in full precision and the maps in half precision
-/// (<see cref="ErosionResult.ToHalf"/>), with the hash of the whole and who made it; a file whose hash does not match is
+/// generator and of the passes. A file holds the surface in full precision, the maps in half precision
+/// (<see cref="ErosionResult.ToHalf"/>) and the drainage's directions and fill depths (its upstream areas follow from the
+/// directions when it is read), with the hash of the whole and who made it; a file whose hash does not match is
 /// treated as missing. Writes go to a temporary file first, so a crash never leaves half a world. The folder keeps at most
 /// <see cref="MaxBytes"/>; the least recently used worlds go first.
 /// </summary>
@@ -27,18 +28,19 @@ public sealed class ErosionCache
     public const string DirectoryVariable = "VISTA_WORLD_CACHE";
 
     /// <summary>
-    /// The version of the erosion passes. Bump it whenever <see cref="ErosionReference"/> and the shader change what they
-    /// compute, so worlds eroded by the old passes are not read as the new ones'.
+    /// The version of the erosion passes. Bump it whenever <see cref="ErosionReference"/> and the shader, or the incision before
+    /// them (<see cref="StreamPower"/>), change what they compute, so worlds eroded by the old passes are not read as the new
+    /// ones'. 2 (M1.11a): the stream-power incision.
     /// </summary>
-    public const int PassesVersion = 1;
+    public const int PassesVersion = 2;
 
     /// <summary>
     /// The version of the base terrain generator, for the same reason (its pinned hashes in the tests catch a change).
     /// </summary>
     public const int TerrainVersion = 1;
 
-    /// <summary>The file format version.</summary>
-    public const int FormatVersion = 1;
+    /// <summary>The file format version. 2 (M1.11a) added the drainage: its directions (a byte a cell) and fill depths (halves).</summary>
+    public const int FormatVersion = 2;
 
     /// <summary>The file extension.</summary>
     public const string Extension = ".vworld";
@@ -110,7 +112,10 @@ public sealed class ErosionCache
             int cells = grid.Size * grid.Size;
             float[] heights = ReadFloats(stream, cells);
             float[][] maps = [ReadHalves(stream, cells), ReadHalves(stream, cells), ReadHalves(stream, cells), ReadHalves(stream, cells)];
-            var result = new ErosionResult(new HeightField(grid.Size, grid.CellSize, heights), maps[0], maps[1], maps[2], maps[3], steps);
+            var directions = new byte[cells];
+            stream.ReadExactly(directions);
+            var drainage = new DrainageMap(grid.Size, grid.CellSize, directions, ReadHalves(stream, cells));
+            var result = new ErosionResult(new HeightField(grid.Size, grid.CellSize, heights), maps[0], maps[1], maps[2], maps[3], steps, drainage);
             if (result.ContentHash() != hash)
                 throw new InvalidDataException("its contents do not match its hash");
             Touch(path);
@@ -151,6 +156,8 @@ public sealed class ErosionCache
             WriteFloats(stream, result.Surface.Heights);
             foreach (float[] map in new[] { result.Loose, result.Discharge, result.WaterDepth, result.StandingWater })
                 WriteHalves(stream, map);
+            stream.Write(result.Drainage.Direction);
+            WriteHalves(stream, result.Drainage.FillDepth);
         }
         File.Move(temporary, path, overwrite: true);
         Trim(keep: path);

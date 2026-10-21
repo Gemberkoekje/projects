@@ -33,12 +33,14 @@ namespace Vista.Output;
 /// average meter's fields moved there) and the meter's own stops in <see cref="ExposureInfo.MeteredEv"/>, and
 /// <see cref="ImageInfo.Display"/>, the PNG's display curve. Schema 12 (M1.11) added <see cref="Sliders"/>: every linked slider's value,
 /// whether it was pinned, and where an auto value came from, with the weather the chain worked out (the climate's day, the dew point,
-/// the freezing level, the snowline and the haze).</para>
+/// the freezing level, the snowline and the haze). Schema 13 (M1.11a) added, in <see cref="WorldInfo.Erosion"/>, the world's drainage
+/// measures (<see cref="ErosionInfo.Drainage"/>), the stream-power incision's settings and its time and that of the maps and the
+/// drainage in the cost.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 12;
+    public const int CurrentSchema = 13;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;

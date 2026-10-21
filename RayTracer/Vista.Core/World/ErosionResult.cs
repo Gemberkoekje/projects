@@ -4,15 +4,20 @@ namespace Vista.World;
 /// An eroded world (vista-plan §4.3, §10 M1.7): the ground surface, and the maps later stages read — the loose material left
 /// on the bedrock (scree under faces, sediment in valleys: the deposition map), the mean discharge (the flow map: rivers carry
 /// the rain of everything upstream), the mean water depth (the wetness map) and the water standing at the end (where lakes
-/// pool). Curvature is a function of the surface alone (<see cref="TerrainMaps.Curvature"/>). Every map is row-major on the
-/// grid of <see cref="Surface"/>.
+/// pool). Curvature is a function of the surface alone (<see cref="TerrainMaps.Curvature"/>). Since M1.11a it also holds the
+/// surface's drainage (<see cref="DrainageMap"/>): where the rain on every cell goes, and how much land drains through it — the
+/// flow accumulation that the materials and the rivers read, where the simulation's mean discharge only follows the water of
+/// its last steps. Every map is row-major on the grid of <see cref="Surface"/>.
 /// </summary>
 public sealed class ErosionResult
 {
     /// <summary>Wraps the maps without copying.</summary>
-    public ErosionResult(HeightField surface, float[] loose, float[] discharge, float[] waterDepth, float[] standingWater, int steps)
+    public ErosionResult(HeightField surface, float[] loose, float[] discharge, float[] waterDepth, float[] standingWater, int steps, DrainageMap drainage)
     {
         ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(drainage);
+        if (drainage.Size != surface.Size || drainage.CellSize != surface.CellSize)
+            throw new ArgumentException("The drainage is not on the surface's grid.", nameof(drainage));
         int cells = surface.Size * surface.Size;
         foreach ((string name, float[] map) in new[] { (nameof(loose), loose), (nameof(discharge), discharge), (nameof(waterDepth), waterDepth), (nameof(standingWater), standingWater) })
         {
@@ -26,6 +31,7 @@ public sealed class ErosionResult
         WaterDepth = waterDepth;
         StandingWater = standingWater;
         Steps = steps;
+        Drainage = drainage;
     }
 
     /// <summary>The ground surface (bedrock plus loose material).</summary>
@@ -46,20 +52,26 @@ public sealed class ErosionResult
     /// <summary>Steps the erosion ran.</summary>
     public int Steps { get; }
 
+    /// <summary>The surface's drainage: each cell's way down, its upstream area, and how deep its hollow would fill.</summary>
+    public DrainageMap Drainage { get; }
+
     /// <summary>
     /// The result of <paramref name="state"/>: the sediment still suspended is set down where it is (the water dries out), the
     /// flow sums become means, and every map is rounded to half precision (<see cref="Half"/>), the precision the cache keeps
     /// them in, so a world fresh from the device and the same world read from the cache are the same bits. The surface stays
-    /// full precision.
+    /// full precision. The pools the water leaves fill with sediment up to <paramref name="poolFillMetres"/> deep
+    /// (<see cref="ErosionSettings.PoolFillMetres"/>; 0 leaves them). The drainage is worked out from the surface
+    /// (<see cref="DrainageMap.Of"/>, a few seconds for the world grid).
     /// </summary>
-    public static ErosionResult From(ErosionState state)
+    public static ErosionResult From(ErosionState state, float poolFillMetres = 0f)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return From(state.Size, state.CellSize, state.Terrain, state.Water, state.Sediment, state.Flow, state.FlowSteps, state.Steps);
+        return From(state.Size, state.CellSize, state.Terrain, state.Water, state.Sediment, state.Flow, state.FlowSteps, state.Steps, poolFillMetres);
     }
 
     /// <summary>The result of a state given as its buffers (laid out as <see cref="ErosionState"/>'s), read back from a device.</summary>
-    public static ErosionResult From(int size, double cellSize, float[] terrain, float[] water, float[] sediment, float[] flow, int flowSteps, int steps)
+    public static ErosionResult From(int size, double cellSize, float[] terrain, float[] water, float[] sediment, float[] flow, int flowSteps, int steps,
+        float poolFillMetres = 0f)
     {
         ArgumentNullException.ThrowIfNull(terrain);
         ArgumentNullException.ThrowIfNull(water);
@@ -86,16 +98,46 @@ public sealed class ErosionResult
                 standing[c] = ToHalf(water[c]);
             }
         });
-        return new ErosionResult(new HeightField(size, cellSize, heights), loose, discharge, depth, standing, steps);
+        var surface = new HeightField(size, cellSize, heights);
+        if (poolFillMetres > 0f)
+            surface = FillPools(surface, loose, standing, poolFillMetres);
+        return new ErosionResult(surface, loose, discharge, depth, standing, steps, DrainageMap.Of(surface));
+    }
+
+    /// <summary>
+    /// The pools the erosion left fill with sediment toward their outlets, at most <paramref name="limit"/> deep (vista-plan §10
+    /// M1.11a): the sediment the water set down at the mouths of side valleys dams the valleys below, and a lake behind such a dam
+    /// fills as it would in time, into a flat valley floor the water crosses. The fill joins the loose material; the water that
+    /// stood there is gone.
+    /// </summary>
+    private static HeightField FillPools(HeightField surface, float[] loose, float[] standing, float limit)
+    {
+        double[] routing = DrainageMap.Flood(surface);
+        float[] heights = surface.Heights.ToArray();
+        int size = surface.Size;
+        Parallel.For(0, size, j =>
+        {
+            for (int c = j * size; c < (j + 1) * size; c++)
+            {
+                double depth = routing[c] - heights[c];
+                if (depth <= 0.0)
+                    continue;
+                float filled = (float)(heights[c] + Math.Min(depth, limit));
+                loose[c] = ToHalf(loose[c] + (filled - heights[c]));
+                standing[c] = 0f;
+                heights[c] = filled;
+            }
+        });
+        return new HeightField(size, surface.CellSize, heights);
     }
 
     /// <summary><paramref name="value"/> rounded to the nearest half-precision value.</summary>
     public static float ToHalf(float value) => (float)(Half)value;
 
-    /// <summary>A 64-bit fingerprint of the surface and every map's exact bits.</summary>
+    /// <summary>A 64-bit fingerprint of the surface, every map's exact bits and the drainage.</summary>
     public ulong ContentHash()
     {
-        ulong hash = Surface.ContentHash();
+        ulong hash = StableHash.Combine(Surface.ContentHash(), Drainage.ContentHash());
         Span<byte> buffer = stackalloc byte[4];
         foreach (float[] map in new[] { Loose, Discharge, WaterDepth, StandingWater })
         {

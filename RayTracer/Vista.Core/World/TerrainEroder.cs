@@ -31,6 +31,15 @@ public sealed record ErosionStats(double Seconds, double WallSeconds, int Submis
 {
     /// <summary>Video memory the whole process used while the state was allocated (DXGI), in bytes; 0 when not measured.</summary>
     public long ProcessVideoMemory { get; init; }
+
+    /// <summary>
+    /// Seconds the stream-power incision took on the CPU before the passes (<see cref="StreamPower"/>, M1.11a); 0 when the
+    /// settings run none.
+    /// </summary>
+    public double IncisionSeconds { get; init; }
+
+    /// <summary>Seconds the maps and the drainage took on the CPU after the passes (part of <see cref="WallSeconds"/>).</summary>
+    public double MapsSeconds { get; init; }
 }
 
 /// <summary>The C# reference as an <see cref="ITerrainEroder"/>: exact, but some 10⁴ times slower than the GPU, so for small grids.</summary>
@@ -46,9 +55,14 @@ public sealed class ReferenceEroder : ITerrainEroder
     public ErosionRun Erode(HeightField ground, ErosionSettings settings)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        ErosionResult result = ErosionReference.Erode(ground, settings);
+        var state = new ErosionState(ground);
+        ErosionReference.Run(state, settings, settings.Iterations);
         double seconds = stopwatch.Elapsed.TotalSeconds;
+        ErosionResult result = ErosionResult.From(state, settings.PoolFillMetres);
         long cells = (long)ground.Size * ground.Size;
-        return new ErosionRun(result, new ErosionStats(seconds, seconds, 0, 0.0, cells * ErosionState.FloatsPerCell * sizeof(float)));
+        return new ErosionRun(result, new ErosionStats(seconds, stopwatch.Elapsed.TotalSeconds, 0, 0.0, cells * ErosionState.FloatsPerCell * sizeof(float))
+        {
+            MapsSeconds = stopwatch.Elapsed.TotalSeconds - seconds,
+        });
     }
 }

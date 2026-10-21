@@ -134,7 +134,7 @@ public static class ErosionReference
         ArgumentNullException.ThrowIfNull(settings);
         var state = new ErosionState(ground);
         Run(state, settings, settings.Iterations);
-        return ErosionResult.From(state);
+        return ErosionResult.From(state, settings.PoolFillMetres);
     }
 
     /// <summary>Runs <paramref name="steps"/> more steps of <paramref name="settings"/> on <paramref name="state"/>.</summary>

@@ -31,7 +31,7 @@ namespace Vista.Cli;
 /// is bit-identical to a cold one.</para>
 ///
 /// <para>With no renderer (<c>--dry-run</c>) a render stops before the GPU and writes the sidecar plus a top-down height map (and
-/// the erosion maps when the world has them), so the world side can be inspected from any machine. A loupe request renders only its
+/// the erosion maps and the drainage when the world has them), so the world side can be inspected from any machine. A loupe request renders only its
 /// window of the frame; the files are window-sized and the sidecar records the window. Since M1.3 the scene sits in a spectral
 /// atmosphere at its base altitude, the EXR is in physical units and the PNG is metered (<see cref="AutoExposure"/>); since M1.6 a
 /// request may also denoise; since M1.7 the world is eroded (<see cref="WorldBuilder"/>); since M1.10a the PNG is metered by the
@@ -164,6 +164,9 @@ public sealed class PreviewSession
                 (byte[] maps, int mapSize) = DebugImages.ErosionMap(erosion, camera);
                 PngEncoder.Write(Sibling(".erosion.png"), maps, mapSize, mapSize, PngColor.Rgb);
                 outputs["erosionMap"] = baseName + ".erosion.png";
+                (byte[] drainage, int drainageSize) = DebugImages.DrainageImage(erosion.Surface, erosion.Drainage, camera);
+                PngEncoder.Write(Sibling(".drainage.png"), drainage, drainageSize, drainageSize, PngColor.Rgb);
+                outputs["drainageMap"] = baseName + ".drainage.png";
             }
             timings["write"] = Lap(stopwatch);
         }
