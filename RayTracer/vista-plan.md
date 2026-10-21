@@ -2186,7 +2186,8 @@ are no slider files yet (M1.11 makes them): the watch reads the recipe, the came
   | Seed 7 → 42 | the same | 3.44 s (cached) | 3.61 s | 1.83 s | 2.02 s | 6.07 / 5.06 s |
 
   At 640 px every render writes the beauty, the EXR, six debug images and the denoised pair (CUDA); at 320 px the beauty and the
-  EXR. The 640 px run eroded both seeds into a fresh cache; the 320 px run found them there.
+  EXR. The 640 px run eroded both seeds into a fresh cache; the 320 px run found them there. The 320 px run's eight steps, each watch
+  render beside its cold `--preview`, are `vista-views/sheets/m1-8-watch-vs-cold.png`.
 
   A cold `--preview` takes 5–6 s (process start, device, shaders, the world from the cache, the mesh and its BLAS, the LUTs). In a
   watch, a new seed costs its world from the cache, its mesh and its BLAS, about 2 s (3.4 s while the GPU was busiest), or, the
@@ -2197,8 +2198,8 @@ are no slider files yet (M1.11 makes them): the watch reads the recipe, the came
   altitude, the scattering orders) is bit-identical to the same view rendered after `ForgetAtmosphere`, and each reports
   rebuilding exactly those parts.
 - **No pixel moved:** the four ledger views and a golden-hour view with every debug output, rendered by `main` (b96f2e57) and by this
-  slice at 640 px, 16 spp, are byte-identical (16 files). A four-cell sheet varying `camera.exposureEv` renders once and
-  re-exposes three times.
+  slice at 640 px, 16 spp, are byte-identical (16 files; the beauty pairs are `vista-views/sheets/m1-8-before-after.png`). A
+  four-cell sheet varying `camera.exposureEv` renders once and re-exposes three times (`m1-8-exposure.png`).
 - **By hand:** `--watch` in a terminal re-renders on a camera save (exposure 0.05 s), an options-file `--time dusk` (0.19 s), and
   reports a broken recipe with its path and keeps watching.
 - **CI:** 560 tests. The session: one-shot and dry runs build every stage that applies; a sequence of eleven changes in one session
