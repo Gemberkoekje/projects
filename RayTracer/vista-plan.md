@@ -3,9 +3,9 @@
 The single source of truth for the landscape-wallpaper effort. **M0 is done** (2026-10-19):
 `Vista.Core` / `Vista.App` / `Vista.Tests` render a recipe + seed end to end on the RTX 3070
 through offline integrator v0 (see **M0 status** and **M0 hand-off** in §10). M1 is planned as
-seventeen slices in §10 (**M1 plan**); M1.1–M1.9 (iteration tools, astronomy, the spectral atmosphere, aerial
-perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh) are
-done, M1.10 (the height-field decision) is next. It sits
+seventeen slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh, and the
+measured decision to keep it for the far terrain) are done, M1.11 (linked sliders and the weather chain) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -246,6 +246,12 @@ change.
   normal maps putting the grid's shading back on coarse triangles. At 4K a view takes 6.4–9.8 M triangles and
   1.0–1.3 GiB for the process (the uniform mesh: 33.6 M and 3.2 GiB); a 320 px preview 0.26–1.5 M. The far field is
   40–56% of an elevated view's triangles: what M1.10 measures a height-field path against.
+  **Decided in M1.10** (§10, M1.10 has the tables): **the mesh stays the far terrain's path.** The height field — the far grids
+  traced as procedural tiles in the inline ray query, the cells walked on the world's own grid and their triangles bent onto
+  the Earth exactly — renders what the mesh converges to as its error target shrinks, and saves about 200 MiB of video memory
+  and 0.4–1.2 s of build per 4K view, but costs 1.27–1.39× per pixel-sample on the views that show the far field (parity on
+  those that do not), and a still pays for its samples. Revisit at M11 (8K, 16K), where the mesh's far field grows with the
+  pixel count and the height field's does not; the prototype is on the branch `claude/vista-m1-10-heightfield`.
 - **Materials by rule:** rock strata, scree, soil, grass, moss, snow, wet vs. dry —
   placed by slope, altitude, aspect, erosion flow and moisture.
 
@@ -489,7 +495,9 @@ Measured in M1.7: the uniform mesh of the 4097² eroded grid takes 0.8 GB plus a
 (3.1 GiB for the process at render), twice the terrain line, until M1.9's view-dependent mesh;
 erosion's own state (1.15 GiB) is freed before the mesh is built. Measured in M1.9: at 4K and 1 px the
 view-dependent mesh takes 160–240 MiB plus a 430–650 MiB BLAS and 134 MB of normal maps, 1.0–1.3 GiB for the
-process with its image buffers: inside the terrain line. Twice as fine (0.5 px) takes 1.7–2.3 GiB.
+process with its image buffers: inside the terrain line. Twice as fine (0.5 px) takes 1.7–2.3 GiB. M1.10's height-field
+far field would take about 200 MiB of that away at 1 px (0.3–0.5 GiB at 0.5 px), for 1.27–1.39× the cost per sample; it stays
+on its branch (§4.3).
 
 One RGBA32F buffer is ~133 MB at 4K, ~531 MB at 8K and ~2.1 GB at 16K, so image buffers
 alone reach ~3 GB at 8K and ~13 GB at 16K: **tiled rendering** arrives with the larger
@@ -884,7 +892,7 @@ Work stops after each PR for review.
   weather chain instead of a stub that gets rewired later.
 - **The view-dependent mesh comes first, height-field intersection second** (M1.9, M1.10). The mesh
   rides the 3070's hardware triangle path, so it is the default; the height-field path is built only
-  far enough to measure it against the mesh on the same views.
+  far enough to measure it against the mesh on the same views. M1.10 measured it: the mesh stays (§4.3).
 - **The estimate comes before the window**, so the window can show it.
 - **Vista goldens arrive at the sign-off (M1.17).** Every look slice moves every image, so earlier
   goldens would only be re-baselined each time. Until then the self-test's bit-identity checks guard
@@ -917,6 +925,7 @@ Work stops after each PR for review.
 | M1.7 | 0.17 | 3.62 | 2.20 | 3.94 |
 | M1.8 | 0.17 | 3.62 | 2.20 | 3.94 |
 | M1.9 | 0.26 | 4.04 | 2.80 | 5.56 |
+| M1.10 | 0.26 | 4.04 | 2.80 | 5.56 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -955,6 +964,8 @@ by view, three rounds; median ratios 1.508, 1.117, 1.271 and 1.411 (1.495–1.53
 terrain. The normal maps are 5% of it (the same build with and without them, alternately: 1.00, 1.06, 1.05, 1.05); the rest is the far
 field and, down the slope, the 3.7 M triangles of detail near the camera. The sky view's +0.1 ns is its camera rays crossing a BLAS whose
 root now spans the far field.
+M1.10 changes nothing on `main` but this plan (the height field stays on its branch), so its row is M1.9's. On the branch the mesh path
+is byte-identical to `main` (the aerial view with every debug output and the down-slope view, 640 px, PNG and EXR).
 
 **M1.1 — Contact sheets & loupe.**
 - *Goal:* compare variants in one look, and check final-resolution detail without rendering the
@@ -2468,6 +2479,132 @@ meshes on the same views, with the same normal maps for its shading.
   prototype stays on its branch.
 - *Verify:* 3070: the numbers table and difference images; the self-test passes on whatever ships.
 
+*M1.10 status (2026-10-21): done; the mesh stays the far terrain's path.* A height-field far field was built far enough to measure
+it against M1.9's mesh on the five M1.9 views at 4K: the two render the same far field (the mesh converges onto the height field as
+its error target shrinks), and the height field saves about 200 MiB of video memory and 0.4–1.2 s of build per view, but on the three
+views that show the far field it costs 1.27–1.39× per pixel-sample. The prototype stays on the branch `claude/vista-m1-10-heightfield`
+(one commit on top of this plan); `main` carries the numbers, these notes and two contact sheets (`vista-views/sheets/`).
+Nothing in `RayTracer.Core` / `RayTracer.Gpu` changed. On the branch `Vista.Tests` has 603 tests (596 before) and `--gpu-selftest`
+passes its 50 checks.
+
+*What was built (on the branch):* `--far-field heightField` meshes the world grid alone (the triangles that overlap it, as
+`--far-field off` does) and lays the far field out as square tiles of 8² cells: g1's outside the world grid's square, g2's outside
+g1's, out to the same horizon reach (`FarHeightField`). Each tile is an axis-aligned box in the camera's bent frame (a procedural
+primitive of a second BLAS beside the mesh's, a second TLAS instance) and a local frame at its centre. The integrator compiled with
+`HEIGHT_FIELD` hands each tile a ray query returns to a walk: the ray is clipped to the tile's square and height range in the local
+frame, then walks the cells on the world's own grid, tests each cell its height range does not clear against the cell's two 4-8
+triangles bent exactly as the mesh's vertices are (`EarthFrame.ToFrame` in float), and commits the nearest hit; the hit is shaded
+once, after the query, with g1's normal map (g2's normals by central differences in the shader). The far grids are kept per world
+(two 4097² float grids, 128 MiB on the GPU, 0.03 s to build, 0.05 s to upload); the tiles per view (0.1 s).
+
+*Checks (on the RTX 3070, driver 32.0.16.1664; the GPU idle but for the desktop, 0–38% busy):*
+
+- **The numbers table** (`vista-views/heightfield/render.ps1`, `--height-field-compare`, seed 42, golden hour, 3840×2160, 16 spp, error
+  1 px, 8² tiles; "VRAM" is the process's, normal maps and image buffers included; the cost is the median ratio of three rounds in
+  which the mesh and the height field were rendered alternately by two renderers):
+
+  | View | Pixels beyond the grid | Triangles: mesh (beyond the grid) → height field's mesh + tiles | Mesh + BLAS, MiB | VRAM, MiB | Build, CPU (refine + place + tiles) | Build, GPU (upload + BLAS) | Cost, height field / mesh |
+  |---|---|---|---|---|---|---|---|
+  | default | 0.0% | 9.77 M (3.84) → 5.92 M + 327,592 | 242 + 651 → 147 + 23 + 407 | 1282 → 1092 | 2.24 → 1.21 s | 0.38 → 0.19 s | 1.025 (1.001–1.035) |
+  | aerial | 9.8% | 7.20 M (4.05) → 3.15 M + 378,486 | 179 + 480 → 78 + 26 + 223 | 1047 → 844 | 1.02 → 0.56 s | 0.15 → 0.10 s | 1.337 (1.333–1.374) |
+  | down the slope | 0.0% | 6.40 M (1.23) → 5.17 M + 328,046 | 159 + 427 → 128 + 23 + 356 | 973 → 1023 | 1.25 → 1.20 s | 0.13 → 0.12 s | 0.999 (0.974–1.010) |
+  | layered ridges | 9.1% | 8.23 M (3.94) → 4.29 M + 355,473 | 204 + 549 → 106 + 24 + 299 | 1142 → 946 | 1.15 → 0.80 s | 0.19 → 0.12 s | 1.328 (1.236–1.341) |
+  | range | 6.2% | 7.30 M (4.01) → 3.29 M + 363,342 | 181 + 487 → 82 + 25 + 233 | 1056 → 855 | 1.09 → 0.58 s | 0.17 → 0.11 s | 1.393 (1.319–1.453) |
+
+  The height field's memory is its mesh, its tiles and its BLAS plus the world's 128 MiB of far grids, which is why the down-slope
+  view, whose far field is only 1.2 M triangles, takes 50 MiB more. At 0.5 px the mesh's far field grows (5.8–7.2 M triangles on the
+  elevated views) and the height field's does not: VRAM 2322 → 1952, 1762 → 1274, 1721 → 1760, 2064 → 1758 and 1786 → 1311 MiB, and the
+  cost ratios narrow to 1.035, 1.267, 0.995, 1.291 and 1.276. 16² tiles (a quarter of the boxes, 20 MiB less) cost 3–5% more on the
+  views with far field (1.383, 1.357, 1.443) and the same on the others.
+- **The two agree** (`vista-views/sheets/m1-10-far-field.png` and `m1-10-convergence.png`; 4K, 128 spp, one random stream, so the meshes
+  over the world grid are identical and only the far field differs). Mean |ΔY| over the pixels whose first hit lies beyond the world
+  grid, as a share of their mean (and their mean luminance, mesh against height field):
+
+  | View | Mesh 2 px | Mesh 1 px | Mesh 0.5 px | Noise floor (mesh 1 px, two streams) |
+  |---|---|---|---|---|
+  | aerial | 4.03% (−0.14%) | 2.14% (−0.16%) | 1.34% (−0.18%) | 0.49% |
+  | range | 4.53% (−1.02%) | 2.42% (−0.54%) | 1.58% (−0.38%) | 0.50% |
+  | layered ridges | 0.31% (+0.09%) | 0.15% (+0.01%) | 0.11% (+0.01%) | 0.20% |
+
+  The difference halves with the error target and lies in the far band alone, as speckle at the mesh's own error; on the ridges,
+  whose far field sits in haze, it is below the noise floor at every target. On the default and down-slope views the 1 px mesh and the
+  height field are the same image to 0.00%. 16² and 8² tiles render the same image (0.00%).
+- **Deterministic:** the height field rendered twice, and again in 2,444 dispatches of 0.05 ms, gives the same EXR bit for bit.
+- **The mesh path is unmoved** on the branch: the aerial view with every debug output and the down-slope view (640 px, 16 spp) are
+  byte-identical to `main`'s, PNG and EXR; `--gpu-selftest` passes (50 checks).
+- **D3D12 debug layer with GPU-based validation** (a Debug build) reports nothing for a height-field preview with every debug output.
+- **CI** (on the branch): 603 tests. The far grids hold the hierarchy's surface at every sample; the tiles cover the far field exactly
+  once out to the reach, g1's first; every box holds its tile's samples bent onto the Earth; the local frames are orthonormal and their
+  grids within the clip's margin at every sample; the mesh beside the tiles is the world grid's alone, with the far field's reach and
+  heights; the same bits every time; tiles that do not divide the inner squares are refused; `--far-field heightField`.
+
+*M1.10 decisions (revisit freely):*
+
+- **The mesh stays.** A still's time is its samples: a 4K final of the aerial view at 1024 spp traces for about 36 s, and the height
+  field would add 12 s to save 0.5 s of build and 200 MiB of 8 GB, while the mesh's 973–1282 MiB at 1 px is inside §7.1's terrain
+  line. The height field wins only where memory binds, which at 4K it does not.
+- **Revisit at M11.** At 8K and 16K the mesh's far field grows with the pixel count and one acceleration structure takes 48 M
+  triangles (§11); the height field's grids do not grow, and at 0.5 px (about 1 px at 8K) its cost gap is already down to 1.27–1.29×.
+  The branch is the starting point; to ship it would need a C# reference of the walk with a parity probe (§9.1), the self-test's
+  checks, and the sidecar's mesh fields (the prototype adds them to `MeshInfo` unversioned).
+- **Procedural tiles in the inline ray query, not a traversal of its own.** The hardware BVH over the tiles' boxes is the min/max
+  quadtree above the tiles and orders them along the ray with the mesh's triangles, so one query returns the nearest of both. The
+  query loop itself is nearly free (with the walk stubbed out it cost 2–6%).
+- **The walk runs on the world's grid; the local frame only clips and gives heights.** A straight ray projects onto the sphere along a
+  great circle, which the camera-centred map draws straight to millimetres across a tile, so walking the ray's mapped ends visits the
+  cells the ray crosses exactly; the local frame's grid is off the bent samples by up to 0.9% of a cell (16² tiles at the reach),
+  covered by a margin on the clip and a pad on the height test (both scaled by the ray's slope), and the triangle test's tolerance is
+  0.1%, for float rounding.
+- **8² tiles.** At 1920 px on the aerial and ridges views (with the first, local-frame walk): 4² 1.36–1.37×, 8² 1.38×, 16² 1.47×,
+  32² 1.61–1.71×; 4² needs about 1.5 M boxes.
+- **No detail in the far field's heights.** The mesh adds the detail at its far vertices (±1.3 m, under a fifth of a 4K pixel 16 km
+  out); the height field's samples do not. g2's normals are central differences in the shader, as `NormalMap` would compute.
+
+*M1.10 gotchas:*
+
+- **Code that never runs can cost half the frame.** The first walk, with the shading inside the query loop and three inlined copies
+  (the camera and bounce ray, the sun's and the sky's shadow rays), cost +55% on a view with no tiles at all; register pressure, not
+  work. Keeping only (cell, triangle, barycentrics) through the walk and shading once after the query brought it down to the
+  default view's 2.5% at 4K.
+- **A tolerance that covers a walk's mismatch fattens silhouettes.** With the cells walked in the local frame and a 1–2% tolerance,
+  16² and 8² tiles differed by 0.28% in the far pixels' mean luminance; walked on the world's grid they agree to 0.00%.
+- **Compare at the final's size.** At 640 px a 1 px mesh is 6 px at 4K, so preview-size comparisons made the mesh look worse than it is
+  (7.6% far |ΔY| at 1 px on the aerial view, against 2.1% at 4K).
+- **Same stream, same near field:** with one random stream the two renders agree bit for bit until a path reaches the far field, so
+  "all pixels" differences are the far field's alone; the noise floor needs two streams.
+- **Clipping each tile's ray to its height range barely moved the cost:** it is in the rays that do reach the terrain.
+- Vortice's `RaytracingInstanceDescription.InstanceID` is a `UInt24`; `string.Create` with an interpolated string concatenated to a
+  plain one does not compile (CS1620); Windows PowerShell 5.1 reads a script without a BOM as ANSI, so the scripts with `·` or `²` keep one.
+
+**M1.10 hand-off.** To understand M1.10, start with the decision in §4.3 and the tables above; then, on the branch
+`claude/vista-m1-10-heightfield`, read `Vista.Core/World/FarHeightField.cs` (the grids, the tiles, their boxes and frames), the
+`HEIGHT_FIELD` block of `Vista.App/Shaders/VistaIntegrator.hlsl` (`HfIntersect`, `HfShade`, and the query loops in `TraceClosest` and
+`Occluded`), and `Vista.App/Gpu/HeightFieldCompare.cs` (how it was measured).
+
+*Commands* (from `RayTracer/`, on the branch):
+
+```
+dotnet run --project Vista.App -c Release -- --preview --recipe r.json --seed 42 --out p.png --far-field heightField
+dotnet run --project Vista.App -c Release -- --height-field-compare --cameras a.json,b.json [--size 3840] [--errors 1,0.5]
+    [--tiles 8,16] [--rounds 3] [--spp 16] [--image-width 3840] [--image-spp 128] [--image-errors 2,1,0.5|none] [--out dir]
+powershell -ExecutionPolicy Bypass -File vista-views/heightfield/render.ps1 [-ImageSpp 128] [-Out folder]
+```
+
+*Files added or changed* (on the branch; on `main` only this plan and `vista-views/sheets/`):
+
+| File | What |
+|---|---|
+| `Vista.Core/World/FarHeightField.cs` | `HeightFieldGrids` (the far grids, once per world) and `FarHeightField` (the view's tiles, boxes, frames, margin and pads) |
+| `Vista.Core/World/ViewMesher.cs`, `TerrainMesh.cs`, `TerrainHierarchy.cs` | `MeshSettings.HeightField` and its tile size; the world grid's mesh beside the tiles; `MeshInfo`'s tile fields; the far grids kept with the hierarchy |
+| `Vista.Core/Cli/PreviewCommandLine.cs` | `--far-field heightField` |
+| `Vista.App/Shaders/VistaIntegrator.hlsl` | The `HEIGHT_FIELD` variant: the walk, the shading, the query loops |
+| `Vista.App/Gpu/D3D12VistaRenderer.cs`, `D3D12VistaRenderer.HeightField.cs` | The variant's pipeline, the far grids and tiles on the GPU, the procedural BLAS, the two-instance TLAS |
+| `Vista.App/Gpu/HeightFieldCompare.cs`, `Program.cs` | `--height-field-compare` |
+| `vista-views/heightfield/render.ps1`, `vista-views/README.md` | The M1.10 checks |
+| `Vista.Tests/FarHeightFieldTests.cs`, `MeshOptionsTests.cs` | 7 new tests, one new assertion |
+
+**Next: M1.11** (linked sliders and the weather chain).
+
 **M1.11 — Linked sliders & the weather chain.**
 - *Goal:* one auto/pinned mechanism, with plausible defaults from the place and the season (§3.4,
   §3.6).
@@ -2645,6 +2782,10 @@ balance, lens CA), estimator accuracy.
   shadow's own blur); reflections are not yet: water (M3/M4) will need off-screen geometry where its reflected rays go.
 - **A cold preview pays the world's hierarchy** (2.7–3.2 s since M1.9) and a 4K camera move about 1.5 s of meshing;
   caching the far grids and a parallel refinement are the levers if either starts to matter.
+- **The mesh at 8K and 16K.** The far field's triangles grow with the pixel count: 0.5 px at 4K (about 1 px at 8K) is
+  14.6–21.1 M triangles and 1.7–2.3 GiB, and 1 px at 16K (0.25 px at 4K) is about 64 M, past what one acceleration structure
+  takes here (M1.9). M11 decides between a coarser target in pixels at 16K, tiles with meshes of their own, and M1.10's height
+  field (on its branch), which at 0.5 px saves 0.3–0.5 GiB and costs 1.27–1.29× per sample.
 
 **Data.**
 - **No public measured autumn-leaf spectra found** (2026-10) — PROSPECT-D covers it; revisit
