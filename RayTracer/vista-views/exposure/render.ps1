@@ -143,7 +143,7 @@ $labels = @($values | ForEach-Object { "before $_ deg" }) + @($values | ForEach-
 Run $App (@('--sheet-from') + $rows + @('--labels', ($labels -join ','), '--columns', '6', '--title', 'alpenglow: average + ACES (top), incident + AgX (bottom)',
            '--out', (Join-Path $Out 'alpenglow-before-after.png')))
 
-'Dawn and dusk from the default camera (the sun 4-5 deg down): the incident card is lit by the sky alone:'
+'Dawn and dusk from the default camera (the sun under the horizon): the incident card is lit by the sky alone:'
 $dawnDusk = @()
 foreach ($meter in 'average', 'incident') {
     $sheet = Join-Path $Out "twilight-$meter.png"

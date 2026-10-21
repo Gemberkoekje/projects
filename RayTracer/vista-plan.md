@@ -6,8 +6,8 @@ and the risks (§11). What each finished slice built, checked and measured is in
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
 nineteen slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
-perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh, and the
-measured decision to keep it for the far terrain) are done, M1.10a (exposure and display) is next. It sits
+perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
+measured decision to keep it for the far terrain) and M1.10a (exposure and display) are done, M1.11 (linked sliders) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -396,6 +396,10 @@ maze's real-time path):
   portrait, simple, cine; physical f-stop, focus distance, polygonal iris).
 - Exposure triangle (aperture ↔ shutter ↔ ISO) — listed in the engine's `plan.md` §4
   ideas; Vista needs it for real exposure.
+- **Metering** (M1.10a, [`vista-log/M1.10a.md`](vista-log/M1.10a.md)): an incident meter by default — an 18% grey card
+  where the camera stands, facing the sun (never below the horizontal), lit by the sun through the air and the camera's
+  sky view, at middle grey — so the light of the place and hour sets the exposure, not the framing. The frame's
+  log-average (M1.3) stays as `--meter average`; the camera's EV is a compensation on top of either.
 - **Filters as camera settings** (pillar 2): spectral sensor response curves and film
   stocks instead of LUTs; real white balance as chromatic adaptation against the scene
   illuminant; lens chromatic aberration from the dispersion IOR.
@@ -406,7 +410,8 @@ maze's real-time path):
   fed albedo and normal buffers. Built in M1.6 ([`vista-log/M1.6.md`](vista-log/M1.6.md)): OIDN 2.5.1, fetched and checksummed, never committed;
   `--denoise` writes the denoised image beside the raw one.
 - **Formats:** EXR (scene-referred, for the user's own grading) plus PNG/JPEG through a
-  filmic tonemap (AgX- or ACES-style).
+  filmic tonemap: AgX since M1.10a (three.js r169's port of Blender's AgX base), the per-channel ACES fit
+  one option away (`--display aces`).
 - **Sidecar** next to every image: recipe, seed, camera, all slider values (auto or
   pinned), data tier per material (§6.2), sample counts, render time, engine version.
 - **HDR wallpapers** (e.g. JXR on Windows 11) — to verify before committing to it (M11).
@@ -983,6 +988,13 @@ shows. Revisit at M11 (§4.3); the prototype is on the branch `claude/vista-m1-1
   the sunlit slope no longer clips; dawn and dusk are exposed from the sky alone. CI: the meter's
   maths (a sun-facing card; the sun below the horizon) and each display curve against values from the
   implementation it is ported from. Cost ledger: no change (display only).
+
+*Status (2026-10-21): done.* The incident meter (a grey card at the camera, facing the sun, lit by the sun
+through the air and the camera's sky view; about 1 ms of GPU) and AgX (three.js r169's) are the defaults;
+`--meter average --display aces` writes `main`'s PNG byte for byte. The washed-out slope is the meter's doing:
+down the slope the card exposes 2.24 EV below the log-average, and the sunlit faces drop from near white to
+mid-tones with their colour. AgX is flatter and less saturated than the ACES fit at the same exposure, and
+skies come out darker (the sky-only view 2.5 EV), both left for review. Log: [`vista-log/M1.10a.md`](vista-log/M1.10a.md).
 
 **M1.11 — Linked sliders & the weather chain.**
 - *Goal:* one auto/pinned mechanism, with plausible defaults from the place and the season (§3.4,

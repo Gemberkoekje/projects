@@ -20,6 +20,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.8 | 0.17 | 3.62 | 2.20 | 3.94 |
 | M1.9 | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.10 | 0.26 | 4.04 | 2.80 | 5.56 |
+| M1.10a | 0.26 | 4.04 | 2.80 | 5.56 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -60,3 +61,7 @@ field and, down the slope, the 3.7 M triangles of detail near the camera. The sk
 root now spans the far field.
 M1.10 changes nothing on `main` but this plan (the height field stays on its branch), so its row is M1.9's. On the branch the mesh path
 is byte-identical to `main` (the aerial view with every debug output and the down-slope view, 640 px, PNG and EXR).
+M1.10a changes the PNG only (its exposure and display curve), so its row is M1.10's: the four ledger views and the golden-hour ridges
+rendered by `main` (db9dcae4) and by this slice (480 px, 64 spp) have byte-identical EXRs, and `main`'s PNGs equal this slice's
+`--meter average --display aces`. The integrator's `CSMain` is unchanged; the incident meter is a kernel of its own, about 1 ms of GPU a
+view, where the average meter rendered the frame again at 320 px.
