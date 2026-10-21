@@ -21,17 +21,20 @@ namespace Vista.Cli;
 ///
 /// <para>What each stage is reused by: the world and its mesh by <see cref="WorldCache"/> (the set pieces' terrain profile, the seed,
 /// the grid and the erosion); the device, the acceleration structure, the atmosphere LUTs and the sky distribution by the renderer
-/// itself, which reports what it rebuilt (<see cref="RenderStageKeys"/>); the render and the exposure meter here, when everything
-/// the renderer reads is the same (<see cref="RenderKey"/>: the camera's exposure is display only, so changing it re-exposes the
-/// image without rendering); the denoised image when the render and the denoiser's settings and input scale are. Writing the files
-/// always runs, so every file on disk belongs to the last sidecar. Each reused result is exactly what a fresh session would make,
-/// because every stage is deterministic (vista-plan §9.5): a watch render is bit-identical to a cold one.</para>
+/// itself, which reports what it rebuilt (<see cref="RenderStageKeys"/>); the render here, when everything the renderer reads is the
+/// same (<see cref="RenderKey"/>: the camera's exposure is display only, so changing it re-exposes the image without rendering); the
+/// exposure meter, as the incident meter when the air's frame is the same, as the average meter when its render's key is; the
+/// denoised image when the render and the denoiser's settings and input scale are. Writing the files always runs, so every file on
+/// disk belongs to the last sidecar, and the meter and the display curve (M1.10a) only re-expose and re-encode a kept render. Each
+/// reused result is exactly what a fresh session would make, because every stage is deterministic (vista-plan §9.5): a watch render
+/// is bit-identical to a cold one.</para>
 ///
 /// <para>With no renderer (<c>--dry-run</c>) a render stops before the GPU and writes the sidecar plus a top-down height map (and
 /// the erosion maps when the world has them), so the world side can be inspected from any machine. A loupe request renders only its
 /// window of the frame; the files are window-sized and the sidecar records the window. Since M1.3 the scene sits in a spectral
 /// atmosphere at its base altitude, the EXR is in physical units and the PNG is metered (<see cref="AutoExposure"/>); since M1.6 a
-/// request may also denoise; since M1.7 the world is eroded (<see cref="WorldBuilder"/>).</para>
+/// request may also denoise; since M1.7 the world is eroded (<see cref="WorldBuilder"/>); since M1.10a the PNG is metered by the
+/// incident meter (<see cref="IncidentMeter"/>) and display-encoded through AgX unless the request asks otherwise.</para>
 ///
 /// <para>Not thread-safe: one render at a time.</para>
 /// </summary>
@@ -44,14 +47,19 @@ public sealed class PreviewSession
     private readonly TimeProvider _time;
     private readonly WorldCache _worlds = new();
 
-    // The last image render, the last meter render and the last denoised image, with what each was made from. Set only once a
-    // stage has finished, so a render that fails leaves the session as it was.
+    // The last image render, the last meter render, the last incident measurement and the last denoised image, with what each was
+    // made from. Set only once a stage has finished, so a render that fails leaves the session as it was.
     private RenderKey? _renderKey;
     private RenderOutput? _render;
     private RenderKey? _meterKey;
     private RenderOutput? _meter;
+    private AtmosphereFrame? _incidentKey;
+    private IncidentLight? _incident;
     private DenoiseKey? _denoiseKey;
     private (DenoiseResult Result, long Clamped)? _denoised;
+
+    // The spectral tables the incident meter weighs its card's light with, for the materials they were built from.
+    private (IReadOnlyList<VistaMaterial> Materials, IntegratorTables Tables)? _tables;
 
     /// <summary>
     /// A session rendering on <paramref name="renderer"/> (null for dry runs only), denoising on <paramref name="denoiser"/> (needed
@@ -188,36 +196,60 @@ public sealed class PreviewSession
             timings["render"] = Lap(stopwatch);
             renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
 
-            // The exposure meter: the whole frame at a fixed size, so every size and loupe of this view is exposed alike. It reads
-            // neither the size nor the loupe, so it is reused across them; the camera's compensation is applied after it.
-            RenderSettings meter = AutoExposure.MeterSettings(settings);
-            var meterKey = RenderKey.Of(scene, meter);
-            RenderOutput metered;
-            if (_meter is not null && meterKey == _meterKey)
+            // The exposure meter reads neither the size nor the loupe, so every size and loupe of this view is exposed alike and
+            // the meter is reused across them; the camera's compensation is applied after it. The incident meter (M1.10a) reads
+            // the air's LUTs the render just built: the light on a grey card where the camera stands. The average meter renders
+            // the whole frame at a fixed size.
+            if (request.Meter == Metering.Incident)
             {
-                metered = _meter;
-                stages[PreviewStage.ExposureMeter] = true;
+                // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air.
+                IncidentLight light;
+                if (_incident is not null && Equals(frame, _incidentKey))
+                {
+                    light = _incident;
+                    stages[PreviewStage.ExposureMeter] = true;
+                }
+                else
+                {
+                    (_incident, _incidentKey) = (null, null);
+                    light = _renderer.MeasureIncidentLight(scene);
+                    (_incident, _incidentKey) = (light, frame);
+                    built.UnionWith(light.StageSeconds.Keys);
+                    rendered = true;
+                    stages[PreviewStage.ExposureMeter] = false;
+                }
+                exposure = IncidentMeter.Measure(light, frame, Tables(materials), camera.ExposureEv);
             }
             else
             {
-                (_meter, _meterKey) = (null, null);
-                metered = _renderer.Render(scene, meter, new HashSet<Aov>(), new BatchPlanner(meter.Width, meter.Height, meter.SamplesPerPixel, meter.Batching));
-                (_meter, _meterKey) = (metered, meterKey);
-                built.UnionWith(metered.Stats.StageSeconds.Keys);
-                rendered = true;
-                stages[PreviewStage.ExposureMeter] = false;
+                RenderSettings meter = AutoExposure.MeterSettings(settings);
+                var meterKey = RenderKey.Of(scene, meter);
+                RenderOutput metered;
+                if (_meter is not null && meterKey == _meterKey)
+                {
+                    metered = _meter;
+                    stages[PreviewStage.ExposureMeter] = true;
+                }
+                else
+                {
+                    (_meter, _meterKey) = (null, null);
+                    metered = _renderer.Render(scene, meter, new HashSet<Aov>(), new BatchPlanner(meter.Width, meter.Height, meter.SamplesPerPixel, meter.Batching));
+                    (_meter, _meterKey) = (metered, meterKey);
+                    built.UnionWith(metered.Stats.StageSeconds.Keys);
+                    rendered = true;
+                    stages[PreviewStage.ExposureMeter] = false;
+                }
+                exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv);
+                exposure = exposure with
+                {
+                    Average = exposure.Average! with { MeterWidth = meter.Width, MeterHeight = meter.Height, MeterSamplesPerPixel = meter.SamplesPerPixel },
+                };
             }
-            exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv) with
-            {
-                MeterWidth = meter.Width,
-                MeterHeight = meter.Height,
-                MeterSamplesPerPixel = meter.SamplesPerPixel,
-            };
             timings["exposureMeter"] = Lap(stopwatch);
             MarkRendererStages(stages, rendered, built, settings);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv), window.Width, window.Height, PngColor.Rgb);
+            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv, request.Display), window.Width, window.Height, PngColor.Rgb);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
             ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
             outputs["beautyExr"] = baseName + ".exr";
@@ -252,7 +284,8 @@ public sealed class PreviewSession
                 }
                 if (result.Succeeded)
                 {
-                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv), window.Width, window.Height, PngColor.Rgb);
+                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv, request.Display), window.Width, window.Height,
+                        PngColor.Rgb);
                     outputs["denoised"] = baseName + ".denoised.png";
                     ExrEncoder.WriteRgb(Sibling(".denoised.exr"), result.Color, window.Width, window.Height);
                     outputs["denoisedExr"] = baseName + ".denoised.exr";
@@ -276,10 +309,11 @@ public sealed class PreviewSession
             Seed = request.Seed,
             Camera = camera,
             DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0,
-            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.Name, window)
+            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.NameOf(request.Display), window)
             {
                 LightSampling = ImageInfo.LightSamplingOf(settings),
                 RussianRouletteStart = settings.RussianRouletteStart,
+                Display = request.Display,
             },
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,
@@ -368,6 +402,14 @@ public sealed class PreviewSession
             DebugOutput.Variance => DebugImages.Variance(Buffer(Aov.Variance)),
             _ => throw new ArgumentOutOfRangeException(nameof(debug), debug, "Unknown debug output."),
         };
+    }
+
+    /// <summary>The integrator's spectral tables for <paramref name="materials"/>, built once per material list.</summary>
+    private IntegratorTables Tables(IReadOnlyList<VistaMaterial> materials)
+    {
+        if (_tables is not { } kept || !ReferenceEquals(kept.Materials, materials))
+            _tables = kept = (materials, IntegratorTables.Build(materials));
+        return kept.Tables;
     }
 
     private static double Lap(Stopwatch stopwatch)

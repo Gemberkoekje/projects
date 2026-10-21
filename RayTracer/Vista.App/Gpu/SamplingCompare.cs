@@ -167,7 +167,7 @@ internal static class SamplingCompare
             ];
             foreach ((string name, float[] xyz, _) in images)
             {
-                byte[] rgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(xyz), ev);
+                byte[] rgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(xyz), ev, DisplayTransform.DefaultCurve);
                 PngEncoder.Write(Path.Combine(outDir, name + ".png"), rgb, width, height, PngColor.Rgb);
                 tiles.Add(rgb);
             }

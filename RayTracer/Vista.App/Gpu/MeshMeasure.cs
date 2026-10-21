@@ -137,7 +137,7 @@ internal static class MeshMeasure
                         float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
                         double ev = AutoExposure.Measure(output.Xyz, camera.ExposureEv).AppliedEv;
                         string file = Path.Combine(outDir, string.Create(CultureInfo.InvariantCulture, $"{view}-{width}-{name.Replace(' ', '-')}.png"));
-                        PngEncoder.Write(file, DisplayTransform.ToSrgb8(linear, ev), width, height, PngColor.Rgb);
+                        PngEncoder.Write(file, DisplayTransform.ToSrgb8(linear, ev, DisplayTransform.DefaultCurve), width, height, PngColor.Rgb);
                     }
                 }
                 if (downsample && outDir is not null && settings.Kind == MeshKind.View)
@@ -159,7 +159,7 @@ internal static class MeshMeasure
         RenderOutput small = images.MinBy(i => i.Width)!;
         double ev = AutoExposure.Measure(small.Xyz, camera.ExposureEv).AppliedEv;
         PngEncoder.Write(string.Create(CultureInfo.InvariantCulture, $"{prefix}-{small.Width}.png"),
-            DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(small.Xyz), ev), small.Width, small.Height, PngColor.Rgb);
+            DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(small.Xyz), ev, DisplayTransform.DefaultCurve), small.Width, small.Height, PngColor.Rgb);
         foreach (RenderOutput large in images.Where(i => i.Width > small.Width))
         {
             int f = large.Width / small.Width;
@@ -183,7 +183,7 @@ internal static class MeshMeasure
                 }
             }
             PngEncoder.Write(string.Create(CultureInfo.InvariantCulture, $"{prefix}-{large.Width}-down.png"),
-                DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(down), ev), small.Width, small.Height, PngColor.Rgb);
+                DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(down), ev, DisplayTransform.DefaultCurve), small.Width, small.Height, PngColor.Rgb);
             double meanSmall = 0.0, meanDown = 0.0, absolute = 0.0;
             int pixels = small.Width * small.Height;
             for (int k = 0; k < pixels; k++)

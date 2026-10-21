@@ -27,7 +27,8 @@
 // scatters once.
 // The reference build also holds CSSkyCheck, which compares LUT and reference for chosen directions and segments,
 // wavelength by wavelength; the LUT build holds CSAerialProbe, the aerial perspective's parity probe, CSSkyLuminance,
-// which measures the sky distribution's cells, and CSSkyProbe, its sampling's parity probe.
+// which measures the sky distribution's cells, CSSkyProbe, its sampling's parity probe, and CSIncidentMeter, the light on
+// the exposure's grey card (M1.10a).
 //
 // Determinism contract (BatchPlanner): every random number of a pixel-sample comes from (pixel, sample index) alone
 // (and the render's RandomStream, 0 for every image anyone sees) — never from the dispatch — and a pixel's samples are
@@ -950,6 +951,75 @@ void CSSkyLuminance(uint3 tid : SV_DispatchThreadID)
         }
     }
     SkyLuminanceOut[item] = sum / float(SKY_DIST_SUB * SKY_DIST_SUB);
+}
+
+// ── The incident meter (vista-plan §10 M1.10a) ───────────────────────────────────────────────────────
+//
+// An 18% grey card at the camera's altitude, facing the sun's azimuth and tilted up to the sun's elevation, never below the
+// horizontal: lit by the sun through the air (the visible part of its disk over the ground sphere) and by the camera's sky view
+// (slice 0: below the horizon, the lit ground sphere it holds) over the card's hemisphere. The terrain is not in its way. Item =
+// group · (SKY_DIST_BANDS + 1) + band, for the four wavelengths of the group: a band item sums, over the band's cells, the mean over
+// each cell's SKY_DIST_SUB² points of L·cos⁺(card, ω) (the CPU multiplies by the cell's solid angle and adds the bands); the last
+// item of a group is the sun's irradiance on the card. Written as four floats per item into SkyLuminanceOut, which no other
+// kernel uses at the same time. C# reference: IncidentMeter.BandSky and IncidentMeter.SunOnCard.
+#define INCIDENT_GROUPS ((ATM_WAVELENGTHS + 3u) / 4u)
+
+[numthreads(64, 1, 1)]
+void CSIncidentMeter(uint3 tid : SV_DispatchThreadID)
+{
+    uint item = tid.x;
+    if (item >= INCIDENT_GROUPS * (SKY_DIST_BANDS + 1u))
+        return;
+    uint band = item % (SKY_DIST_BANDS + 1u);
+    uint4 lambdas = 4u * (item / (SKY_DIST_BANDS + 1u)) + uint4(0u, 1u, 2u, 3u);
+    uint4 idx = min(lambdas, ATM_WAVELENGTHS - 1u);
+    float4 toa = float4(AtmSun[idx.x].y, AtmSun[idx.y].y, AtmSun[idx.z].y, AtmSun[idx.w].y);
+    float muS = clamp(AtmToSun.y, -1.0, 1.0);
+    float sinS = sqrt(max(1.0 - muS * muS, 0.0));
+    float cardCos = saturate(AtmToSun.y);
+    float cardSin = sqrt(max(1.0 - cardCos * cardCos, 0.0));
+    float4 light = 0.0;
+    if (band == SKY_DIST_BANDS)
+    {
+        float height = ClampAltitude(CameraAltitude) - GroundAltitude;
+        float sunMu;
+        float visible = SunVisibility(height, muS, sunMu);
+        if (visible > 0.0)
+        {
+            float3 c = SampleColumns(GroundAltitude + height, sunMu);
+            float4 transmittance = exp(-float4(OpticalDepth(AtmCoefficients[idx.x], c), OpticalDepth(AtmCoefficients[idx.y], c),
+                                               OpticalDepth(AtmCoefficients[idx.z], c), OpticalDepth(AtmCoefficients[idx.w], c)));
+            light = toa * visible * transmittance * max(cardSin * sinS + cardCos * muS, 0.0);
+        }
+    }
+    else
+    {
+        float4 sum = 0.0;
+        for (uint column = 0u; column < SKY_DIST_COLUMNS; column++)
+        {
+            for (uint a = 0u; a < SKY_DIST_SUB; a++)
+            {
+                for (uint b = 0u; b < SKY_DIST_SUB; b++)
+                {
+                    float2 p = SkyCellPoint(band, column, a, b);
+                    float sinTheta = sqrt(max(1.0 - p.x * p.x, 0.0));
+                    float cosCard = cardSin * sinTheta * cos(p.y) + cardCos * p.x;
+                    if (cosCard <= 0.0)
+                        continue;
+                    float phase = HenyeyGreenstein(sinTheta * cos(p.y) * sinS + p.x * muS, MieG);
+                    float4 smooth, mie;
+                    SampleSkyViewSlice(0u, p.x, p.y, idx, smooth, mie);
+                    sum += (smooth + phase * mie) * cosCard;
+                }
+            }
+        }
+        light = toa * sum / float(SKY_DIST_SUB * SKY_DIST_SUB);
+    }
+    light *= float4(lambdas < ATM_WAVELENGTHS); // the last group's duplicates count nothing
+    SkyLuminanceOut[4u * item] = light.x;
+    SkyLuminanceOut[4u * item + 1u] = light.y;
+    SkyLuminanceOut[4u * item + 2u] = light.z;
+    SkyLuminanceOut[4u * item + 3u] = light.w;
 }
 
 // The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads

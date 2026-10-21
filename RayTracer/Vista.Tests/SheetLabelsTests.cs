@@ -34,12 +34,28 @@ public sealed class SheetLabelsTests
         IReadOnlyDictionary<string, string> id = Id(Sidecar());
         CollectionAssert.AreEquivalent(
             new[] { "recipe.name", "recipe.setPieces", "recipe.time", "recipe.season", "seed", "camera", "image.size",
-                    "image.samplesPerPixel", "image.maxBounces", "image.displayTransform", "build" },
+                    "image.samplesPerPixel", "image.maxBounces", "image.display", "build" },
             id.Keys.ToArray());
+        Assert.AreEqual("aces", id["image.display"], "every sidecar before schema 11 is the ACES fit's");
         Assert.AreEqual("default", id["camera"], "the default camera's pose follows the terrain, so it is not compared");
         Assert.AreEqual("320×180", id["image.size"]);
         Assert.AreEqual("566b68d", id["build"]);
         Assert.AreEqual("snowCappedMountains", id["recipe.setPieces"]);
+    }
+
+    [TestMethod]
+    public void Identity_TellsTheMetersAndTheCurvesApart()
+    {
+        JsonNode old = Sidecar();
+        old["exposure"] = JsonNode.Parse("""{ "method": "auto", "appliedEv": 3 }""");
+        JsonNode card = Sidecar();
+        card["exposure"] = JsonNode.Parse("""{ "meter": "incident", "appliedEv": 2 }""");
+        card["image"]!["display"] = "agx";
+        Assert.AreEqual("average", Id(old)["exposure.meter"], "every sidecar before schema 11 is the average meter's");
+        Assert.AreEqual(("incident", "agx"), (Id(card)["exposure.meter"], Id(card)["image.display"]));
+        CollectionAssert.AreEqual(new[] { "display=aces meter=average", "display=agx meter=incident" },
+            SheetLabels.Differences([Id(old), Id(card)]).ToArray());
+        Assert.IsFalse(Id(Sidecar()).ContainsKey("exposure.meter"), "no exposure (a dry run), no meter");
     }
 
     [TestMethod]
@@ -110,7 +126,8 @@ public sealed class SheetLabelsTests
     public void Title_ListsWhatEveryCellShares()
     {
         string title = SheetLabels.Title([Id(Sidecar(seed: "1")), Id(Sidecar(seed: "2"))]);
-        Assert.AreEqual("alpine range · snowCappedMountains · goldenHour · summer · default camera · 320×180 · 64 spp · 6 bounces · build 566b68d", title);
+        Assert.AreEqual("alpine range · snowCappedMountains · goldenHour · summer · default camera · 320×180 · 64 spp · 6 bounces · aces curve · build 566b68d", title,
+            "AgX and the incident meter, the defaults since M1.10a, go without saying; an older sidecar's ACES does not");
 
         string supplied = SheetLabels.Title([Id(Sidecar(defaultCamera: false))]);
         StringAssert.Contains(supplied, "seed 42 · camera at 0,1692.21,-5734.4 · yaw 20° · pitch -30° · 24 mm · 320×180");

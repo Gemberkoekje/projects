@@ -90,12 +90,12 @@ public sealed class LightSamplingTests
     public void Pipeline_PassesTheEstimatorToTheRenderer_AndTheSidecarRecordsIt()
     {
         var renderer = new FakeRenderer();
-        Sidecar mis = PreviewPipeline.Run(Request(), renderer);
+        Sidecar mis = PreviewPipeline.Run(Request("--meter", "average"), renderer);
         Assert.AreEqual(LightSampling.Mis, renderer.Settings!.LightSampling);
-        Assert.AreEqual(LightSampling.Mis, renderer.Meters.Single().LightSampling, "the meter renders the same way");
+        Assert.AreEqual(LightSampling.Mis, renderer.Meters.Single().LightSampling, "the average meter renders the same way");
         Assert.AreEqual(LightSampling.Mis, mis.Image.LightSampling);
         Assert.AreEqual(2, mis.Image.RussianRouletteStart);
-        Assert.AreEqual(10, Sidecar.CurrentSchema);
+        Assert.AreEqual(11, Sidecar.CurrentSchema);
         Assert.AreEqual(Sidecar.CurrentSchema, mis.Schema);
 
         Sidecar m14 = PreviewPipeline.Run(Request("--light-sampling", "sunOnly", "--rr-start", "3"), renderer);

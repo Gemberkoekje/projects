@@ -9,7 +9,8 @@ namespace Vista.Tests;
 /// rendered window's size. A pixel's XYZ is a function of its place in the full frame, so a loupe's pixels
 /// equal the same pixels of a full render, as the real integrator's do. It keeps its stages the way the D3D12 host does
 /// (the device, the mesh's acceleration structure, the air's tables, orders and sky view, the sky distribution) and reports
-/// those it built under <see cref="RenderStageKeys"/>.
+/// those it built under <see cref="RenderStageKeys"/>. The incident meter's card gets flat spectra: the sky's always, the sun's
+/// while it is up.
 /// </summary>
 internal sealed class FakeRenderer : IVistaRenderer
 {
@@ -45,6 +46,26 @@ internal sealed class FakeRenderer : IVistaRenderer
 
     /// <summary>Exposure-meter renders (<see cref="RenderSettings.ExposureMeter"/>), kept apart from the image renders above.</summary>
     public List<RenderSettings> Meters { get; } = [];
+
+    /// <summary>The scenes the incident meter's light was measured for, in order.</summary>
+    public List<VistaScene> Incidents { get; } = [];
+
+    /// <summary>The sky's flat spectral irradiance on the incident meter's card, W·m⁻²·nm⁻¹ (the card's illuminance in Y with no sun).</summary>
+    public const double IncidentSky = 0.25;
+
+    /// <summary>The sun's flat spectral irradiance on the card while the sun is up (with <see cref="SceneDependent"/>, times its elevation's sine).</summary>
+    public const double IncidentSun = 2.0;
+
+    public IncidentLight MeasureIncidentLight(VistaScene scene)
+    {
+        Incidents.Add(scene);
+        double sun = scene.Sun.ElevationDegrees <= 0.0 ? 0.0 : SceneDependent ? IncidentSun * Math.Sin(scene.Sun.ElevationDegrees * Math.PI / 180.0) : IncidentSun;
+        SortedDictionary<string, double> stages = AirStages(scene, LightSampling.SunOnly, AtmosphereMode.Luts);
+        stages[RenderStageKeys.IncidentMeter] = 0.0001;
+        return new IncidentLight(Flat(sun), Flat(IncidentSky)) { StageSeconds = stages };
+    }
+
+    private static double[] Flat(double value) => [.. Enumerable.Repeat(value, AtmosphereLuts.Wavelengths)];
 
     public RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner)
     {
@@ -122,18 +143,25 @@ internal sealed class FakeRenderer : IVistaRenderer
     /// <summary>What a D3D12 host would build for this render, given what it built before.</summary>
     private SortedDictionary<string, double> Stages(VistaScene scene, RenderSettings settings)
     {
+        SortedDictionary<string, double> stages = AirStages(scene, settings.LightSampling, settings.Atmosphere);
+        if (!ReferenceEquals(scene.Mesh, _mesh))
+        {
+            stages[RenderStageKeys.MeshUpload] = 0.01;
+            stages[RenderStageKeys.AccelerationBuild] = 0.01;
+            _mesh = scene.Mesh;
+        }
+        return stages;
+    }
+
+    /// <summary>The device and the air a D3D12 host would build for <paramref name="scene"/>, given what it built before.</summary>
+    private SortedDictionary<string, double> AirStages(VistaScene scene, LightSampling lightSampling, AtmosphereMode atmosphere)
+    {
         var stages = new SortedDictionary<string, double>(StringComparer.Ordinal);
         if (!_initialised)
         {
             stages[RenderStageKeys.DeviceInit] = 0.1;
             stages[RenderStageKeys.ShaderCompile] = 0.2;
             _initialised = true;
-        }
-        if (!ReferenceEquals(scene.Mesh, _mesh))
-        {
-            stages[RenderStageKeys.MeshUpload] = 0.01;
-            stages[RenderStageKeys.AccelerationBuild] = 0.01;
-            _mesh = scene.Mesh;
         }
         AtmosphereFrame frame = scene.AirFrame();
         if (!Equals(_model, frame.Model))
@@ -151,7 +179,7 @@ internal sealed class FakeRenderer : IVistaRenderer
             stages[RenderStageKeys.SkyView] = 0.001;
             _skyView = frame;
         }
-        if (settings.LightSampling == LightSampling.Mis && settings.Atmosphere == AtmosphereMode.Luts && !Equals(_skyLight, frame))
+        if (lightSampling == LightSampling.Mis && atmosphere == AtmosphereMode.Luts && !Equals(_skyLight, frame))
         {
             stages[RenderStageKeys.SkyDistribution] = 0.001;
             _skyLight = frame;

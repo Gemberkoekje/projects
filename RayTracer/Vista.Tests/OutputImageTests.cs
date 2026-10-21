@@ -37,10 +37,13 @@ public sealed class OutputImageTests
     [TestMethod]
     public void Exposure_IsInStops()
     {
-        float[] grey = [0.1f, 0.1f, 0.1f];
-        byte[] plusOne = DisplayTransform.ToSrgb8(grey, 1.0);
-        byte[] doubled = DisplayTransform.ToSrgb8([0.2f, 0.2f, 0.2f], 0.0);
-        CollectionAssert.AreEqual(doubled, plusOne);
+        foreach (DisplayCurve curve in new[] { DisplayCurve.Agx, DisplayCurve.Aces })
+        {
+            float[] grey = [0.1f, 0.1f, 0.1f];
+            byte[] plusOne = DisplayTransform.ToSrgb8(grey, 1.0, curve);
+            byte[] doubled = DisplayTransform.ToSrgb8([0.2f, 0.2f, 0.2f], 0.0, curve);
+            CollectionAssert.AreEqual(doubled, plusOne, curve.ToString());
+        }
     }
 
     [TestMethod]

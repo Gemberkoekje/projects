@@ -10,8 +10,9 @@ namespace Vista.App.Gpu;
 
 /// <summary>
 /// <c>Vista.App --watch-check</c>: the M1.8 check (vista-plan §10) on the RTX 3070. It starts <c>--watch</c> as a process of its own on
-/// copies of a recipe and a camera, then changes them one at a time the way a person or an agent would — the exposure, the time
-/// of day, a camera turn, a camera move, the base altitude, the seed (through the options file) and the seed back — and after each
+/// copies of a recipe and a camera, then changes them one at a time the way a person or an agent would — the exposure, since M1.10a
+/// the meter and the display curve and back (through the options file), the time of day, a camera turn, a camera move, the base
+/// altitude, the seed (through the options file) and the seed back — and after each
 /// render checks that the sidecar lists exactly the stages that change should rebuild. Then it renders every step again with a cold
 /// <c>--preview</c> process of the same files and compares the two byte for byte: the PNG, the EXR, every debug image and the denoised
 /// image. It prints the wall time of each change, from saving the file to the files being written, against the cold render's.
@@ -32,13 +33,15 @@ internal static class WatchCheck
     /// <summary>One change and the stages it must rebuild; every other stage that applies must be reused.</summary>
     private sealed record Step(string Name, Action<Files> Change, IReadOnlyList<PreviewStage> Rebuilds);
 
-    /// <summary>The working copies the watch reads, and the seed it renders.</summary>
+    /// <summary>The working copies the watch reads, and the seed, the meter and the display curve its options file gives.</summary>
     private sealed class Files(string recipe, string camera, string options)
     {
         public string Recipe { get; } = recipe;
         public string Camera { get; } = camera;
         public string Options { get; } = options;
         public ulong Seed { get; set; }
+        public string Meter { get; set; } = "incident";
+        public string Display { get; set; } = "agx";
     }
 
     public static int Run(string[] args, TextWriter log)
@@ -79,16 +82,24 @@ internal static class WatchCheck
         log.WriteLine($"  {recipeSource}, {cameraSource}, seeds {seed} and {secondSeed}; {string.Join(" ", common)}");
 
         PreviewStage[] lit = [PreviewStage.SkyView, PreviewStage.SkyDistribution];
-        PreviewStage[] image = denoise ? [PreviewStage.Render, PreviewStage.ExposureMeter, PreviewStage.Denoise] : [PreviewStage.Render, PreviewStage.ExposureMeter];
+        PreviewStage[] denoised = denoise ? [PreviewStage.Denoise] : [];
+        PreviewStage[] render = [PreviewStage.Render, .. denoised];
+        PreviewStage[] image = [PreviewStage.Render, PreviewStage.ExposureMeter, .. denoised];
         PreviewStage[] mesh = [PreviewStage.Mesh, PreviewStage.AccelerationStructure];
         PreviewStage[] world = [PreviewStage.World, .. mesh];
         var steps = new List<Step>
         {
             new("first render", _ => { }, [PreviewStage.Device, .. world, PreviewStage.AtmosphereTables, PreviewStage.ScatteringOrders, .. lit, .. image]),
             new("exposure +1 EV", f => EditJson(f.Camera, j => j["exposureEv"] = Number(j["exposureEv"]) + 1.0), []),
+            // Since M1.10a the meter and the curve re-expose and re-encode the kept render; the denoiser's input scale is the meter's.
+            new("meter: average", f => { f.Meter = "average"; WriteOptions(f); }, [PreviewStage.ExposureMeter, .. denoised]),
+            new("display: aces", f => { f.Display = "aces"; WriteOptions(f); }, []),
+            new("meter: incident", f => { f.Meter = "incident"; WriteOptions(f); }, denoised),
+            new("display: agx", f => { f.Display = "agx"; WriteOptions(f); }, []),
             new("time of day: goldenHour", f => EditJson(f.Recipe, j => j["time"] = "goldenHour"), [.. lit, .. image]),
-            // Since M1.9 the mesh follows the camera's frustum and place, and the ground sphere it is bent onto.
-            new("camera turn: yaw +20°", f => EditJson(f.Camera, j => j["yawDegrees"] = Number(j["yawDegrees"]) + 20.0), [.. mesh, .. image]),
+            // Since M1.9 the mesh follows the camera's frustum and place, and the ground sphere it is bent onto; the incident meter
+            // reads only the air's frame (the sun, the camera's altitude), which a turn keeps.
+            new("camera turn: yaw +20°", f => EditJson(f.Camera, j => j["yawDegrees"] = Number(j["yawDegrees"]) + 20.0), [.. mesh, .. render]),
             new("camera move: 500 m up", f => EditJson(f.Camera, j => j["position"]!["y"] = Number(j["position"]!["y"]) + 500.0), [.. mesh, .. lit, .. image]),
             new("base altitude: 3000 m", f => EditJson(f.Recipe, j => j["altitude"] = 3000.0), [.. mesh, PreviewStage.ScatteringOrders, .. lit, .. image]),
             new($"seed {secondSeed}", f => { f.Seed = secondSeed; WriteOptions(f); }, [.. world, .. lit, .. image]),
@@ -127,10 +138,12 @@ internal static class WatchCheck
         for (int n = 1; n <= results.Count; n++)
         {
             string prefix = Path.Combine(folder, $"step{n}");
-            ulong stepSeed = results[n - 1].Sidecar["seed"]!.GetValue<ulong>();
+            JsonNode stepSidecar = results[n - 1].Sidecar;
+            ulong stepSeed = stepSidecar["seed"]!.GetValue<ulong>();
             var clock = Stopwatch.StartNew();
             using (Process preview = Start(["--preview", "--recipe", prefix + ".recipe.json", "--camera", prefix + ".camera.json",
-                "--seed", stepSeed.ToString(CultureInfo.InvariantCulture), "--out", Path.Combine(folder, $"cold{n}.png"), .. common], out BlockingCollection<string> _))
+                "--seed", stepSeed.ToString(CultureInfo.InvariantCulture), "--meter", stepSidecar["exposure"]!["meter"]!.GetValue<string>(),
+                "--display", stepSidecar["image"]!["display"]!.GetValue<string>(), "--out", Path.Combine(folder, $"cold{n}.png"), .. common], out BlockingCollection<string> _))
             {
                 if (!preview.WaitForExit(StepTimeout) || preview.ExitCode != 0)
                 {
@@ -301,7 +314,8 @@ internal static class WatchCheck
                 problems.Add($"{role} differs");
             compared++;
         }
-        foreach (string path in new[] { "world.heightFieldHash", "render.stats.raysTraced", "exposure.appliedEv", "sun.elevationDegrees", "atmosphere.cameraAltitudeMetres" })
+        foreach (string path in new[] { "world.heightFieldHash", "render.stats.raysTraced", "exposure.appliedEv", "exposure.meter", "image.display", "sun.elevationDegrees",
+            "atmosphere.cameraAltitudeMetres" })
         {
             string a = At(watched, path);
             string b = At(cold, path);
@@ -334,7 +348,8 @@ internal static class WatchCheck
     }
 
     private static void WriteOptions(Files files) =>
-        Save(files.Options, "# The watch check's options: the seed changes here.\n--seed " + files.Seed.ToString(CultureInfo.InvariantCulture) + "\n");
+        Save(files.Options, "# The watch check's options: the seed, the meter and the display curve change here.\n--seed " +
+            files.Seed.ToString(CultureInfo.InvariantCulture) + "\n--meter " + files.Meter + "\n--display " + files.Display + "\n");
 
     private static void Save(string path, string text)
     {

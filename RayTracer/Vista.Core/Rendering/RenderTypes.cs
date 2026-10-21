@@ -39,8 +39,8 @@ public sealed record RenderSettings
     public AtmosphereMode Atmosphere { get; init; } = AtmosphereMode.Luts;
 
     /// <summary>
-    /// True for the small render the PNG's exposure is metered from (<see cref="Output.AutoExposure"/>), not an image
-    /// anyone sees. A renderer renders it like any other; it only tells the two apart in statistics and tests.
+    /// True for the small render the average meter reads the PNG's exposure from (<see cref="Output.AutoExposure"/>), not an
+    /// image anyone sees. A renderer renders it like any other; it only tells the two apart in statistics and tests.
     /// </summary>
     public bool ExposureMeter { get; init; }
 
@@ -216,6 +216,24 @@ public interface IVistaRenderer
     /// each one's GPU time back to it, and returns the requested <paramref name="aovs"/>.
     /// </summary>
     RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner);
+
+    /// <summary>
+    /// Measures the light on the incident meter's card for <paramref name="scene"/> (vista-plan §10 M1.10a,
+    /// <see cref="Output.IncidentMeter"/>) from the scene's atmosphere LUTs, building whichever of them the scene changed.
+    /// </summary>
+    IncidentLight MeasureIncidentLight(VistaScene scene);
+}
+
+/// <summary>
+/// The light on the incident meter's grey card (vista-plan §10 M1.10a, <see cref="Output.IncidentMeter"/>) as a renderer measures
+/// it: the spectral irradiance the sun and the sky put on the card at each hero wavelength (cycle order), in W·m⁻²·nm⁻¹.
+/// </summary>
+/// <param name="Sun">The sun's irradiance on the card, one value per hero wavelength.</param>
+/// <param name="Sky">The sky's over the card's hemisphere (below the horizon, the ground sphere the sky view holds), per hero wavelength.</param>
+public sealed record IncidentLight(double[] Sun, double[] Sky)
+{
+    /// <summary>The renderer stages the measurement built, in seconds (<see cref="RenderStageKeys"/>); a stage it reused is absent.</summary>
+    public SortedDictionary<string, double> StageSeconds { get; init; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
@@ -250,6 +268,9 @@ public static class RenderStageKeys
 
     /// <summary>GPU seconds measuring the sky distribution (a new frame, when the sky is sampled as a light).</summary>
     public const string SkyDistribution = "skyDistributionGpu";
+
+    /// <summary>GPU seconds measuring the light on the incident meter's card (every measurement).</summary>
+    public const string IncidentMeter = "incidentMeterGpu";
 }
 
 /// <summary>

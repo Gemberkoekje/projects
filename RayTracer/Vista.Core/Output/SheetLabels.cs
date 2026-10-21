@@ -42,7 +42,8 @@ public static class SheetLabels
         ("image.window", "loupe"),
         ("image.samplesPerPixel", "spp"),
         ("image.maxBounces", "bounces"),
-        ("image.displayTransform", "display"),
+        ("image.display", "display"),
+        ("exposure.meter", "meter"),
         ("image.lightSampling", "lights"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
@@ -53,8 +54,8 @@ public static class SheetLabels
     /// <summary>
     /// The identity fields of a sidecar as flat key → display value: <c>recipe.*</c>, <c>seed</c>, the
     /// camera (just <c>camera = default</c> for the default camera, whose pose follows the terrain),
-    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality and light sampling, how the air was evaluated,
-    /// and the build's commit. A recipe field that another overrides says nothing about the image and is left out: the
+    /// <c>image.size</c>, <c>image.window</c> (only for a loupe), quality and light sampling, the display curve and the exposure
+    /// meter (since M1.10a; older sidecars count as ACES and the average meter), how the air was evaluated, and the build's commit. A recipe field that another overrides says nothing about the image and is left out: the
     /// season under a date, the time of day under a solar time or under a sun elevation (except dawn, which says the
     /// sun is rising), and a location of "none" (no place named).
     /// </summary>
@@ -102,12 +103,21 @@ public static class SheetLabels
             if (image["window"] is JsonObject w
                 && !(Int(w["x"]) == 0 && Int(w["y"]) == 0 && Int(w["width"]) == width && Int(w["height"]) == height))
                 fields["image.window"] = string.Create(CultureInfo.InvariantCulture, $"{Int(w["x"])},{Int(w["y"])},{Int(w["width"])},{Int(w["height"])}");
-            foreach (string key in new[] { "samplesPerPixel", "maxBounces", "displayTransform", "lightSampling" })
+            foreach (string key in new[] { "samplesPerPixel", "maxBounces", "lightSampling" })
             {
                 if (image[key] is JsonValue v)
                     fields["image." + key] = Display(v);
             }
+            // The display curve (schema 11); every build before it used the ACES fit.
+            if (image["display"] is JsonValue display)
+                fields["image.display"] = Display(display);
+            else if (image["displayTransform"] is not null)
+                fields["image.display"] = "aces";
         }
+
+        // How the PNG was metered (schema 11); every build before it used the average meter.
+        if (root["exposure"] is JsonObject exposure)
+            fields["exposure.meter"] = exposure["meter"] is JsonValue meter ? Display(meter) : "average";
 
         if (root["atmosphere"]?["mode"] is JsonValue mode)
             fields["atmosphere"] = Display(mode);
@@ -210,7 +220,9 @@ public static class SheetLabels
                 "camera.rollDegrees" => value == "0" ? null : $"roll {value}°",
                 "camera.focalLengthMm" => $"{value} mm",
                 "camera.exposureEv" => value == "0" ? null : $"{value} EV",
-                "camera.sensorHeightMm" or "camera.fStop" or "camera.focusDistanceMetres" or "image.displayTransform" => null,
+                "camera.sensorHeightMm" or "camera.fStop" or "camera.focusDistanceMetres" => null,
+                "image.display" => value == "agx" ? null : $"{value} curve",
+                "exposure.meter" => value == "incident" ? null : $"{value} meter",
                 "image.window" => $"loupe {value}",
                 "image.samplesPerPixel" => $"{value} spp",
                 "image.maxBounces" => $"{value} bounces",

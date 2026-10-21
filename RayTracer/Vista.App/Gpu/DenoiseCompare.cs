@@ -116,10 +116,10 @@ internal static class DenoiseCompare
         double ev = exposure.AppliedEv;
         double scale = Math.Pow(2.0, ev);
         RelativeError rawError = ImageError.RelativeMse(rawLinear, halfA, halfB, scale);
-        byte[] rawRgb = DisplayTransform.ToSrgb8(rawLinear, ev);
-        byte[] referenceRgb = DisplayTransform.ToSrgb8(reference, ev);
+        byte[] rawRgb = DisplayTransform.ToSrgb8(rawLinear, ev, DisplayTransform.DefaultCurve);
+        byte[] referenceRgb = DisplayTransform.ToSrgb8(reference, ev, DisplayTransform.DefaultCurve);
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"  exposure {ev:+0.00;-0.00} EV (metered {exposure.LogAverageLuminanceCdM2:G3} cd/m²); reference noise relMSE {rawError.ReferenceNoise:G3} " +
+            $"  exposure {ev:+0.00;-0.00} EV (metered {exposure.Average!.LogAverageLuminanceCdM2:G3} cd/m²); reference noise relMSE {rawError.ReferenceNoise:G3} " +
             $"({referenceSpp} spp); raw {spp} spp: relMSE {rawError.Corrected:0.00000}, display RMSE {ImageError.DisplayRmse(rawRgb, referenceRgb):0.00}, " +
             $"mean {ImageError.MeanLuminanceBias(rawLinear, reference):+0.000%;-0.000%;0.000%}"));
 
@@ -162,7 +162,7 @@ internal static class DenoiseCompare
             float[]? cpu = images.GetValueOrDefault(way with { Device = DenoiseDevice.Cpu });
             double? fromCpu = way.Device != DenoiseDevice.Cpu && cpu is not null ? ImageError.MaxRelativeDifference(first.Color, cpu) : null;
             var row = new DenoiseCompareRow(way, error.Corrected, double.IsFinite(equal) ? equal : null,
-                ImageError.DisplayRmse(DisplayTransform.ToSrgb8(first.Color, ev), referenceRgb), ImageError.MeanLuminanceBias(first.Color, reference),
+                ImageError.DisplayRmse(DisplayTransform.ToSrgb8(first.Color, ev, DisplayTransform.DefaultCurve), referenceRgb), ImageError.MeanLuminanceBias(first.Color, reference),
                 ImageError.BitIdentical(first.Color, second.Color), first.Run!.CommitSeconds * 1e3, second.Run!.ExecuteSeconds * 1e3, fromCpu, clamped,
                 first.Run);
             rows.Add(row);
@@ -195,8 +195,8 @@ internal static class DenoiseCompare
             string waysDir = Path.Combine(outDir, "ways");
             Directory.CreateDirectory(waysDir);
             foreach ((DenoiseSettings way, float[] image) in images)
-                PngEncoder.Write(Path.Combine(waysDir, FileName(way) + ".png"), DisplayTransform.ToSrgb8(image, ev), width, height, PngColor.Rgb);
-            byte[] denoisedRgb = DisplayTransform.ToSrgb8(images[defaults], ev);
+                PngEncoder.Write(Path.Combine(waysDir, FileName(way) + ".png"), DisplayTransform.ToSrgb8(image, ev, DisplayTransform.DefaultCurve), width, height, PngColor.Rgb);
+            byte[] denoisedRgb = DisplayTransform.ToSrgb8(images[defaults], ev, DisplayTransform.DefaultCurve);
             PngEncoder.Write(Path.Combine(outDir, "raw.png"), rawRgb, width, height, PngColor.Rgb);
             PngEncoder.Write(Path.Combine(outDir, "denoised.png"), denoisedRgb, width, height, PngColor.Rgb);
             PngEncoder.Write(Path.Combine(outDir, "reference.png"), referenceRgb, width, height, PngColor.Rgb);
@@ -248,13 +248,13 @@ internal static class DenoiseCompare
             }, raw.Stats);
         float[] linear = loupe.Crop(rawLinear, raw.Width, 3);
         float[] crop = loupe.Crop(frame, raw.Width, 3);
-        byte[] cropRgb = DisplayTransform.ToSrgb8(crop, ev);
+        byte[] cropRgb = DisplayTransform.ToSrgb8(crop, ev, DisplayTransform.DefaultCurve);
         (double Rmse, double Max) Against(DenoiseSettings way)
         {
             DenoiseResult result = denoiser.Denoise(Denoising.Prepare(window, linear, Denoising.InputScale(way, exposure), out _), way);
             if (!result.Succeeded)
                 throw new InvalidOperationException($"The loupe did not denoise: {result.Problem}");
-            return (ImageError.DisplayRmse(DisplayTransform.ToSrgb8(result.Color, ev), cropRgb), ImageError.MaxRelativeDifference(result.Color, crop));
+            return (ImageError.DisplayRmse(DisplayTransform.ToSrgb8(result.Color, ev, DisplayTransform.DefaultCurve), cropRgb), ImageError.MaxRelativeDifference(result.Color, crop));
         }
         (double rmse, double max) = Against(settings);
         (double autoRmse, _) = Against(settings with { InputScale = DenoiseInputScale.Auto });

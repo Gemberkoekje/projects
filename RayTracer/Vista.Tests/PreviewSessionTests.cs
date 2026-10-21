@@ -16,6 +16,7 @@ public sealed class PreviewSessionTests
 {
     private static readonly PreviewStage[] Sky = [PreviewStage.SkyView, PreviewStage.SkyDistribution];
     private static readonly PreviewStage[] Image = [PreviewStage.Render, PreviewStage.ExposureMeter];
+    private static readonly PreviewStage[] Render = [PreviewStage.Render];
     private static readonly PreviewStage[] Mesh = [PreviewStage.Mesh, PreviewStage.AccelerationStructure];
     private static readonly PreviewStage[] Everything =
     [
@@ -79,18 +80,23 @@ public sealed class PreviewSessionTests
         var renderer = new FakeRenderer { SceneDependent = true };
         var session = new PreviewSession(renderer);
         PreviewRequest request = Base;
+        // The incident meter (M1.10a) reads only the air's frame (the sun, the camera's altitude), which a turn or a new width keeps.
         var steps = new (string Name, Func<PreviewRequest, PreviewRequest> Change, PreviewStage[] Rebuilds)[]
         {
             ("first render", r => r, Everything),
             ("the same again", r => r, []),
             ("exposure +1 EV", r => Camera(r, "exposureEv", "1"), []),
             ("time of day", r => Recipe(r, "time", "\"goldenHour\""), [.. Sky, .. Image]),
-            ("camera turn", r => Camera(r, "yawDegrees", "20"), [.. Mesh, .. Image]),
+            ("camera turn", r => Camera(r, "yawDegrees", "20"), [.. Mesh, .. Render]),
             ("camera move", r => Camera(r, "position.y", "3000"), [.. Mesh, .. Sky, .. Image]),
             ("base altitude", r => Recipe(r, "altitude", "3000"), [.. Mesh, PreviewStage.ScatteringOrders, .. Sky, .. Image]),
             ("seed", r => r with { Seed = 8 }, [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, .. Sky, .. Image]),
-            ("width", r => r with { Width = 48, Height = 27 }, [.. Mesh, .. Image]),
-            ("width back", r => r with { Width = 32, Height = 18 }, [.. Mesh, .. Image]),
+            ("width", r => r with { Width = 48, Height = 27 }, [.. Mesh, .. Render]),
+            ("width back", r => r with { Width = 32, Height = 18 }, [.. Mesh, .. Render]),
+            ("average meter", r => r with { Meter = Metering.Average }, [PreviewStage.ExposureMeter]),
+            ("ACES", r => r with { Display = DisplayCurve.Aces }, []),
+            ("incident meter again", r => r with { Meter = Metering.Incident }, []),
+            ("AgX again", r => r with { Display = DisplayCurve.Agx }, []),
             ("exposure back", r => Camera(r, "exposureEv", "0"), []),
         };
 
@@ -105,8 +111,32 @@ public sealed class PreviewSessionTests
             foreach (string suffix in new[] { ".png", ".exr" })
                 CollectionAssert.AreEqual(File.ReadAllBytes(P("cold" + suffix)), File.ReadAllBytes(P("p" + suffix)), $"{name}: {suffix} as a cold render");
         }
-        Assert.AreEqual(8, renderer.Scenes.Count, "the first, time, turn, move, altitude, seed and both widths; never for the exposure");
-        Assert.AreEqual(8, renderer.Meters.Count, "the meter renders the image's mesh, which follows the frame (M1.9)");
+        Assert.AreEqual(8, renderer.Scenes.Count, "the first, time, turn, move, altitude, seed and both widths; never for the exposure, the meter or the curve");
+        Assert.AreEqual(5, renderer.Incidents.Count, "the first, time, move, altitude and seed: each changed the air's frame");
+        Assert.AreEqual(1, renderer.Meters.Count, "the average meter, once");
+    }
+
+    [TestMethod]
+    public void MeterAndCurve_ReExposeAndReEncodeTheKeptRender_TheExrNeverChanges()
+    {
+        var renderer = new FakeRenderer { SceneDependent = true };
+        var session = new PreviewSession(renderer);
+        var pngs = new List<byte[]>();
+        byte[]? exr = null;
+        foreach (Metering meter in new[] { Metering.Incident, Metering.Average })
+        {
+            foreach (DisplayCurve curve in new[] { DisplayCurve.Agx, DisplayCurve.Aces })
+            {
+                Sidecar sidecar = session.Run(Base with { Meter = meter, Display = curve });
+                Assert.AreEqual(meter, sidecar.Exposure!.Meter);
+                Assert.AreEqual(curve, sidecar.Image.Display);
+                pngs.Add(File.ReadAllBytes(P("p.png")));
+                exr ??= File.ReadAllBytes(P("p.exr"));
+                CollectionAssert.AreEqual(exr, File.ReadAllBytes(P("p.exr")), $"{meter}, {curve}: the EXR is the render's");
+            }
+        }
+        Assert.AreEqual(1, renderer.Scenes.Count, "one render for all four");
+        Assert.AreEqual(4, pngs.Select(Convert.ToBase64String).Distinct().Count(), "four different PNGs");
     }
 
     [TestMethod]
@@ -120,7 +150,7 @@ public sealed class PreviewSessionTests
         Sidecar bright = session.Run(Camera(Base, "exposureEv", "2"));
 
         Assert.AreEqual(1, renderer.Scenes.Count);
-        Assert.AreEqual(1, renderer.Meters.Count);
+        Assert.AreEqual(1, renderer.Incidents.Count);
         Assert.AreEqual(dark.Exposure!.AppliedEv + 2.0, bright.Exposure!.AppliedEv, 1e-12);
         CollectionAssert.AreNotEqual(png, File.ReadAllBytes(P("p.png")), "the PNG is exposed anew");
         CollectionAssert.AreEqual(exr, File.ReadAllBytes(P("p.exr")), "the EXR is scene-referred");
@@ -222,6 +252,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(10, back.Schema);
+        Assert.AreEqual(11, back.Schema);
     }
 }

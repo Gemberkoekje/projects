@@ -55,8 +55,9 @@ public enum DenoiseInputScale
     /// </summary>
     Physical,
     /// <summary>
-    /// The exposure meter's (<see cref="AutoExposure"/>): the frame's metered log-average luminance to 0.18, as the filter's own
-    /// guess does, but measured on the whole frame, so a loupe is scaled like its frame.
+    /// The exposure meter's (<see cref="ExposureInfo.MeterScale"/>), before the camera's compensation: middle grey at 0.18 — since
+    /// M1.10a by default the incident meter's grey card, with the average meter the frame's log-average luminance, as the filter's
+    /// own guess does — but metered on the whole view, so a loupe is scaled like its frame.
     /// </summary>
     Metered,
 }
@@ -184,7 +185,7 @@ public static class Denoising
         {
             DenoiseInputScale.Auto => float.NaN,
             DenoiseInputScale.Physical => (float)(IntegratorTables.LuminancePerY / 100.0),
-            DenoiseInputScale.Metered => exposure.LogAverageY > 0.0 ? (float)(AutoExposure.Key / exposure.LogAverageY) : float.NaN,
+            DenoiseInputScale.Metered => (float)exposure.MeterScale(),
             _ => throw new ArgumentOutOfRangeException(nameof(settings), settings.InputScale, "Unknown input scale."),
         };
     }

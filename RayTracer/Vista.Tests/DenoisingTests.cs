@@ -56,7 +56,10 @@ public sealed class DenoisingTests
         return errors;
     }
 
-    private static ExposureInfo Exposure(double logAverageY) => new(AutoExposure.MethodName, 0.0, logAverageY, logAverageY * IntegratorTables.LuminancePerY, 10.0, 3.0);
+    private static ExposureInfo Exposure(double logAverageY) => new(Metering.Average, AutoExposure.MethodName, 0.0, 3.0, 10.0, 3.0)
+    {
+        Average = new AverageReading(logAverageY, logAverageY * IntegratorTables.LuminancePerY),
+    };
 
     [TestMethod]
     public void Defaults_AreTheMeasuredChoice()
@@ -78,6 +81,11 @@ public sealed class DenoisingTests
         Assert.AreEqual(729.83, Denoising.InputScale(settings with { InputScale = DenoiseInputScale.Physical }, exposure), 0.01, "1 is 100 cd/m²");
         Assert.AreEqual(9f, Denoising.InputScale(settings, exposure), 1e-5f, "the meter's mean maps to 0.18");
         Assert.IsTrue(float.IsNaN(Denoising.InputScale(settings, Exposure(0.0))), "no light metered: the filter chooses");
+        var card = new ExposureInfo(Metering.Incident, IncidentMeter.MethodName, 1.0, 2.0, 12.0, 3.0)
+        {
+            Incident = new IncidentReading(5.0, 2000.0, Math.PI / 4.0, 1.0, 0.5, 0.5),
+        };
+        Assert.AreEqual(4f, Denoising.InputScale(settings, card), 1e-6f, "the grey card maps to 0.18: π / E, the compensation left out");
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => Denoising.InputScale(settings with { InputScale = DenoiseInputScale.None }, exposure));
     }
 
@@ -168,7 +176,7 @@ public sealed class DenoisingTests
         CollectionAssert.AreEquivalent(new[] { Aov.Albedo, Aov.Normal }, renderer.Requested!.ToArray(), "the denoiser's inputs, though no debug image was asked for");
         DenoiseInput input = denoiser.Inputs.Single();
         Assert.AreEqual((32, 18, 32 * 18 * 3), (input.Width, input.Height, input.Color.Length));
-        Assert.AreEqual((float)(AutoExposure.Key / sidecar.Exposure!.LogAverageY), input.InputScale, "metered on the frame");
+        Assert.AreEqual((float)(Math.PI / sidecar.Exposure!.Incident!.IlluminanceY), input.InputScale, "the incident meter's grey card");
         Assert.AreEqual(new DenoiseSettings(), denoiser.Settings.Single());
 
         CollectionAssert.AreEquivalent(new[] { "beauty", "beautyExr", "denoised", "denoisedExr", "sidecar" }, sidecar.Outputs.Keys.ToArray());
@@ -177,7 +185,7 @@ public sealed class DenoisingTests
         foreach (string file in sidecar.Outputs.Values)
             Assert.IsTrue(File.Exists(P(file)), file);
         float[] halved = [.. input.Color.Select(c => 0.5f * c)];
-        CollectionAssert.AreEqual(PngEncoder.Encode(DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv), 32, 18, PngColor.Rgb),
+        CollectionAssert.AreEqual(PngEncoder.Encode(DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv, DisplayCurve.Agx), 32, 18, PngColor.Rgb),
             File.ReadAllBytes(P("p.denoised.png")), "the denoised PNG is exposed like the raw one");
         CollectionAssert.AreEqual(ExrEncoder.EncodeRgb(halved, 32, 18), File.ReadAllBytes(P("p.denoised.exr")));
 
@@ -239,7 +247,7 @@ public sealed class DenoisingTests
         string json = File.ReadAllText(P("p.json"));
         Sidecar back = VistaJson.Deserialize<Sidecar>(json);
         Assert.AreEqual(sidecar.Denoise, back.Denoise);
-        Assert.AreEqual(10, back.Schema);
+        Assert.AreEqual(11, back.Schema);
 
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement denoise = doc.RootElement.GetProperty("denoise");

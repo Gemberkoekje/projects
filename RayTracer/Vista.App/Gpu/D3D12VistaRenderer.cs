@@ -20,7 +20,8 @@ namespace Vista.App.Gpu;
 /// The D3D12 host of the offline integrator (vista-plan §10 M0, M1.3): <c>Shaders/VistaIntegrator.hlsl</c> on DXR
 /// 1.1 inline ray tracing. It uploads the <see cref="TerrainMesh"/> into default-heap buffers, builds a BLAS
 /// (32-bit indices) and a one-instance TLAS, builds the atmosphere LUTs a scene needs
-/// (<c>D3D12VistaRenderer.Atmosphere.cs</c>), and runs the dispatches a <see cref="BatchPlanner"/> plans —
+/// (<c>D3D12VistaRenderer.Atmosphere.cs</c>), measures the light on the incident meter's card from them
+/// (<c>D3D12VistaRenderer.Incident.cs</c>), and runs the dispatches a <see cref="BatchPlanner"/> plans —
 /// <c>Next</c> → dispatch → <c>Complete</c> with the GPU time from timestamp queries — then reads the float sums
 /// back and converts them with <see cref="IntegratorReadback"/>.
 ///
@@ -133,6 +134,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         CreatePipeline();
         CreateAtmospherePipelines();
         CreateSkyLightPipelines();
+        CreateIncidentPipeline();
         CreateFixedResources();
         _initSeconds[RenderStageKeys.ShaderCompile] = Lap(stopwatch);
     }
@@ -931,6 +933,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeScene();
         DisposeNormalMaps();
         DisposeSkyLight();
+        _incidentPipeline?.Dispose();
         DisposeAtmosphere();
         DisposeErosion();
         _dummyUav?.Dispose();

@@ -11,7 +11,8 @@ namespace Vista.Cli;
 ///   the default camera);</item>
 ///   <item><c>spp=16,64,256</c> / <c>bounces=1,3,6</c> / <c>atmosphere=luts,reference</c> / <c>lightSampling=mis,sunOnly</c> —
 ///   render settings; <c>erosion=off,on</c> — the world un-eroded and eroded (M1.7); <c>mesh=uniform,view</c>, <c>meshError=0.5,1,2</c>,
-///   <c>detail=off,on</c>, <c>farField=off,on</c> — how the terrain is meshed (M1.9);</item>
+///   <c>detail=off,on</c>, <c>farField=off,on</c> — how the terrain is meshed (M1.9); <c>meter=average,incident</c>,
+///   <c>display=aces,agx</c> — how the PNG is exposed and display-encoded (M1.10a; one render serves every cell);</item>
 ///   <item><c>camera.&lt;field&gt;=…</c> — one camera field, e.g. <c>camera.yawDegrees=0,90,180,270</c>;</item>
 ///   <item>anything else — one recipe field by its dotted path, e.g. <c>time=dawn,day,goldenHour,dusk</c> or
 ///   <c>setPieces=[snowCappedMountains],[snowCappedMountains,lake]</c>. The linked sliders join the recipe
@@ -34,7 +35,7 @@ public sealed class SheetAxis
         _apply = apply;
     }
 
-    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>camera.&lt;field&gt;</c> or a recipe field path.</summary>
+    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>meter</c>, <c>display</c>, <c>camera.&lt;field&gt;</c> or a recipe field path.</summary>
     public string Key { get; }
 
     /// <summary>The values as written, one per cell.</summary>
@@ -110,6 +111,8 @@ public sealed class SheetAxis
                 "meshError" => Checked(values, MeshError, (r, v) => r with { Mesh = r.Mesh with { ErrorPixels = MeshError(v) } }),
                 "detail" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { Detail = OnOff(v) } }),
                 "farField" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { FarField = OnOff(v) } }),
+                "meter" => Checked(values, Meter, (r, v) => r with { Meter = Meter(v) }),
+                "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "recipe" => (r, v) => r with { RecipePath = v },
                 "camera" => (r, v) => r with { CameraPath = v == "default" ? null : v },
                 _ when key.StartsWith("camera.", StringComparison.Ordinal) =>
@@ -139,6 +142,12 @@ public sealed class SheetAxis
 
     private static Rendering.LightSampling Lights(string text) =>
         PreviewCommandLine.TryParseLightSampling(text, out Rendering.LightSampling sampling) ? sampling : throw new ArgumentException($"'{text}' is not mis or sunOnly.");
+
+    private static Output.Metering Meter(string text) =>
+        PreviewCommandLine.TryParseMeter(text, out Output.Metering meter) ? meter : throw new ArgumentException($"'{text}' is not incident or average.");
+
+    private static Output.DisplayCurve Display(string text) =>
+        PreviewCommandLine.TryParseDisplay(text, out Output.DisplayCurve curve) ? curve : throw new ArgumentException($"'{text}' is not agx or aces.");
 
     private static bool OnOff(string text) => text switch
     {

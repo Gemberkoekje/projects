@@ -247,9 +247,16 @@ internal static class Program
             $"{sun.SolarTime} solar ({sun.SolarTimeFrom}); azimuth {sun.AzimuthDegrees:0.0}°, elevation {sun.ElevationDegrees:0.00}°; {daylight}"));
         if (sidecar.Exposure is { } exposure)
         {
+            string reading = (exposure.Incident, exposure.Average) switch
+            {
+                ({ } card, _) => string.Create(CultureInfo.InvariantCulture,
+                    $"incident: card at {card.CardElevationDegrees:0.0}° gets {card.IlluminanceLux:G3} lux (sun {card.SunLux:G3}, sky {card.SkyLux:G3})"),
+                (_, { } average) => string.Create(CultureInfo.InvariantCulture, $"average: {average.LogAverageLuminanceCdM2:G3} cd/m²"),
+                _ => "none",
+            };
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"exposure: metered {exposure.LogAverageLuminanceCdM2:G3} cd/m² (EV100 {(exposure.Ev100 is double ev ? ev.ToString("0.0", CultureInfo.InvariantCulture) : "none: no light")}), " +
-                $"scaled by {exposure.AppliedEv:+0.0;-0.0} EV; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
+                $"exposure: {reading} (EV100 {(exposure.Ev100 is double ev ? ev.ToString("0.0", CultureInfo.InvariantCulture) : "none: no light")}), " +
+                $"scaled by {exposure.AppliedEv:+0.0;-0.0} EV, display {sidecar.Image.Display.ToString().ToLowerInvariant()}; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
         }
         if (sidecar.World.Erosion is { } erosion)
         {

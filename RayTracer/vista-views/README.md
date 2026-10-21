@@ -104,7 +104,8 @@ powershell -ExecutionPolicy Bypass -File vista-views/erosion/render.ps1 [-Before
 ## Watch mode checks (M1.8)
 
 `watch/render.ps1` reruns every M1.8 check: `--watch-check` starts a `--watch` process on copies of the day recipe and the aerial
-camera, changes them one at a time (the exposure, the time of day, a camera turn, a camera move, the base altitude, the seed through
+camera, changes them one at a time (the exposure, since M1.10a the meter and the display curve and back through the options file,
+the time of day, a camera turn, a camera move, the base altitude, the seed through
 the options file, and the seed back), checks that each render rebuilt exactly the stages that change touches, then renders every
 step again with a cold `--preview` process and compares the files byte for byte. It runs at 640 px with every debug output and the
 denoised image (eroding both seeds into a cache under `-Out`: the first-time cost), then at the default 320 px (the worlds now
@@ -141,4 +142,25 @@ One view's mesh by hand (the sidecar's `world.mesh` and the console's `mesh:` li
 ```
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --preview --recipe vista-views/mountains-golden.recipe.json --seed 42 \
     --camera vista-views/aerial.camera.json --width 3840 --mesh-error 1 [--detail off] [--far-field off] [--mesh uniform] --out p.png
+```
+
+## Exposure and display checks (M1.10a)
+
+`exposure/render.ps1` reruns every M1.10a check: the four measurement views and the layered ridges at golden hour, each under
+{average, incident} × {ACES, AgX} (two sheets per view, one per meter, varying the display curve; the four cells must share one EXR,
+byte for byte), the alpenglow sweep (`atmosphere/zermatt-july.recipe.json` from `atmosphere/range.camera.json`, the sun at +2° to
+−1.5°) the same way, and prints each variant's exposure, the meter's reading and the share of the frame that clips (a channel at
+255) or is white. With `-Before` (a `main` build) it renders the five views with `main` too, checks that they are byte-identical to
+this build's `--meter average --display aces`, PNG and EXR, and tiles the before/after sheets.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/exposure/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 480] [-SweepWidth 320] [-Spp 64] [-Out folder]
+```
+
+One view's four looks by hand (only the PNG changes; a watch re-exposes a kept render when `--meter` or `--display` changes in its
+options file):
+
+```
+dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --sheet --recipe vista-views/mountains-golden.recipe.json --seed 42 \
+    --camera vista-views/down-slope.camera.json --meter average --vary display=aces,agx --out average.png
 ```

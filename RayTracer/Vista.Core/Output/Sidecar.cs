@@ -29,12 +29,15 @@ namespace Vista.Output;
 /// ran for this image and which it reused from an earlier render in the same process, and <see cref="Watch"/>, what changed
 /// before a watch render. Schema 10 (M1.9) added <see cref="WorldInfo.Mesh"/>: the view-dependent mesh's settings, its
 /// triangles (those below the world grid and beyond it apart), its reach and what it cost; <c>triangles</c> and
-/// <c>meshBytes</c> are the view's mesh now, not the world grid's.</para>
+/// <c>meshBytes</c> are the view's mesh now, not the world grid's. Schema 11 (M1.10a) added <see cref="ExposureInfo.Meter"/>, which
+/// meter exposed the PNG, with its reading in <see cref="ExposureInfo.Incident"/> or <see cref="ExposureInfo.Average"/> (the
+/// average meter's fields moved there) and the meter's own stops in <see cref="ExposureInfo.MeteredEv"/>, and
+/// <see cref="ImageInfo.Display"/>, the PNG's display curve.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 10;
+    public const int CurrentSchema = 11;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -133,6 +136,9 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>The units of the EXR's values (the PNG is exposed, see <see cref="Sidecar.Exposure"/>).</summary>
     public string Units { get; init; } = RadianceUnits;
+
+    /// <summary>The PNG's display curve (schema 11); <see cref="DisplayTransform"/> says the same in words.</summary>
+    public DisplayCurve Display { get; init; } = Output.DisplayTransform.DefaultCurve;
 
     /// <summary>
     /// Which lights surfaces sampled (vista-plan §10 M1.5): <see cref="LightSampling.Mis"/>, or M1.4's
@@ -350,8 +356,10 @@ public sealed record RenderInfo(RenderStats Stats, double RaysPerSample, double 
 /// A stage of a preview, in pipeline order (vista-plan §7.4, §10 M1.8). What each depends on decides when a session rebuilds it:
 /// the world follows the set pieces and the seed; the mesh the world (and the camera from M1.9); the acceleration structure the
 /// mesh; the air's tables its model, the scattering orders also the base altitude, the sky view and the sky distribution also the
-/// sun, the camera's altitude and the terrain's span; the render everything the renderer reads, the exposure meter the same at
-/// its own size; the denoised image the render and the denoise settings. Writing the files always runs.
+/// sun, the camera's altitude and the terrain's span; the render everything the renderer reads; the exposure meter, as the incident
+/// meter, the air's frame (the sun, the camera's altitude), or as the average meter the same as the render at its own size; the
+/// denoised image the render, the denoise settings and the meter. Writing the files — exposing and display-encoding the PNG
+/// included — always runs.
 /// </summary>
 public enum PreviewStage
 {
@@ -385,7 +393,7 @@ public enum PreviewStage
     /// <summary>The image's render (trace and readback), with its debug outputs.</summary>
     Render,
 
-    /// <summary>The exposure meter's render.</summary>
+    /// <summary>The exposure meter: the incident meter's measurement (M1.10a), or the average meter's render.</summary>
     ExposureMeter,
 
     /// <summary>The denoised image.</summary>

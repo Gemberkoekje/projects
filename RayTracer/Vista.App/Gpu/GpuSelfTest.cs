@@ -39,6 +39,9 @@ namespace Vista.App.Gpu;
 /// sampler and pdf match <see cref="SkyDistribution"/>'s; and MIS and M1.4's estimator agree on the image's mean within its
 /// noise, over independent renders.</para>
 ///
+/// <para>Then the incident meter (M1.10a): the GPU's measurement of the light on the grey card matches its C# reference on the same
+/// LUTs, is bit-identical when the LUTs are rebuilt, has the sun outshine the sky at golden hour, and the sky alone 4° after sunset.</para>
+///
 /// <para>Then what watch mode relies on (M1.8): after a change of the time of day, the camera's height or the base altitude, a
 /// renderer that rebuilt only the part of the air the change touched renders bit-identically to one that rebuilt all of it.</para>
 ///
@@ -260,6 +263,7 @@ internal static class GpuSelfTest
         var aovs = new HashSet<Aov> { Aov.MaterialId };
         RenderOutput dim = Render(renderer, twilight, settings, aovs, new BatchPlannerOptions(), log, "twilight, sun at −4°");
         pass &= Check(log, "twilight is lit by the sky alone", Twilight(dim));
+        pass &= IncidentChecks(renderer, scene, twilight, luts, tables, log);
 
         // The reference atmosphere: deterministic like the rest, at a few samples.
         var small = settings with { SamplesPerPixel = 4, Atmosphere = AtmosphereMode.Reference };
@@ -442,6 +446,57 @@ internal static class GpuSelfTest
         pass &= Check(log, "the sky's measured luminance matches the C# reference", worst.Verdict());
         pass &= Check(log, "the GPU's sky sampler and pdf match the C# reference", SkySamplingParity(renderer, rebuilt.Distribution, air));
         pass &= Check(log, "MIS and M1.4's estimator agree on the image's mean", Agreement(renderer, scene, small, log));
+        return pass;
+    }
+
+    /// <summary>
+    /// The incident meter (M1.10a): <c>CSIncidentMeter</c>'s band and sun items against <see cref="IncidentMeter.BandSky"/> and
+    /// <see cref="IncidentMeter.SunOnCard"/> fed the LUTs <paramref name="luts"/> read back for <paramref name="scene"/>'s frame, on bands
+    /// over the zenith, about the horizon and under it; the measurement made again after every LUT is rebuilt, the same bits; at golden
+    /// hour the sun outshines the sky on the card, and in <paramref name="twilight"/> (the sun 4° down) the sun's term is under a
+    /// millionth of the sky's, and the exposure is still finite.
+    /// </summary>
+    private static bool IncidentChecks(D3D12VistaRenderer renderer, VistaScene scene, VistaScene twilight, AtmosphereLutData luts, AtmosphereTables tables,
+        TextWriter log)
+    {
+        AtmosphereFrame air = scene.AirFrame();
+        IncidentLight golden = renderer.MeasureIncidentLight(scene);
+        float[] raw = renderer.IncidentRaw!;
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  incident meter: {golden.StageSeconds.GetValueOrDefault(RenderStageKeys.IncidentMeter) * 1e3:0.00} ms GPU, {golden.StageSeconds.GetValueOrDefault("incidentMeter") * 1e3:0.0} ms in all"));
+        var worst = new Worst();
+        foreach (int lambda in ParityWavelengths)
+        {
+            int first = lambda / IncidentMeter.WavelengthsPerItem * IncidentMeter.ItemsPerGroup;
+            int lane = lambda % IncidentMeter.WavelengthsPerItem;
+            float toa = tables.Sun[lambda * 4 + 1];
+            foreach (int band in new[] { 0, 20, 45, 63, 64, 66, 90, 127 })
+            {
+                double expected = IncidentMeter.BandSky(luts.SkyView, air, toa, lambda, band);
+                worst.Add(string.Create(CultureInfo.InvariantCulture, $"band {band} λ{lambda}"), raw[(first + band) * 4 + lane], expected, 1e-6);
+            }
+            double sun = IncidentMeter.SunOnCard(luts.Columns, air, tables.AsUploaded(lambda), toa);
+            worst.Add(string.Create(CultureInfo.InvariantCulture, $"sun λ{lambda}"), raw[(first + SkyDistribution.ZenithBands) * 4 + lane], sun, 1e-6);
+        }
+        bool pass = Check(log, "the incident meter's sky bands and sun match the C# reference", worst.Verdict());
+
+        renderer.ForgetAtmosphere();
+        IncidentLight again = renderer.MeasureIncidentLight(scene);
+        pass &= Check(log, "the incident meter measured again on rebuilt LUTs is bit-identical",
+            Differs(raw, renderer.IncidentRaw!) ?? (again.StageSeconds.ContainsKey(RenderStageKeys.SkyView) ? null : "the LUTs were not rebuilt"));
+
+        IntegratorTables integrator = IntegratorTables.Build(scene.Materials);
+        double sunY = IncidentMeter.Luminous(golden.Sun, integrator), skyY = IncidentMeter.Luminous(golden.Sky, integrator);
+        IncidentLight dusk = renderer.MeasureIncidentLight(twilight);
+        double duskSun = IncidentMeter.Luminous(dusk.Sun, integrator), duskSky = IncidentMeter.Luminous(dusk.Sky, integrator);
+        ExposureInfo duskExposure = IncidentMeter.Measure(dusk, twilight.AirFrame(), integrator, 0.0);
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  card at golden hour: sun {sunY * IntegratorTables.LuminancePerY:G4} lux, sky {skyY * IntegratorTables.LuminancePerY:G4} lux; " +
+            $"at −4°: sun {duskSun:G3}, sky {duskSky * IntegratorTables.LuminancePerY:G4} lux, exposure {duskExposure.AppliedEv:+0.00;-0.00} EV"));
+        pass &= Check(log, "at golden hour the sun outshines the sky on the card", sunY > skyY && skyY > 0.0 ? null : $"sun {sunY:G3}, sky {skyY:G3}");
+        // Not exactly zero: SunVisibility's float asin leaves about 3·10⁻⁸ of a disk wholly under the horizon "visible" (the LUTs share it).
+        pass &= Check(log, "4° after sunset the card is lit by the sky alone",
+            duskSun < 1e-6 * duskSky && duskSky > 0.0 && duskExposure.MeteredEv is double ev && double.IsFinite(ev) ? null : $"sun {duskSun:G3}, sky {duskSky:G3}");
         return pass;
     }
 

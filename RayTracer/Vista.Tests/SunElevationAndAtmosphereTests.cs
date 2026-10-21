@@ -149,22 +149,50 @@ public sealed class SunElevationAndAtmosphereTests
     }
 
     [TestMethod]
-    public void Render_MetersTheWholeFrame_AndRecordsIt()
+    public void AverageMeter_MetersTheWholeFrame_AndRecordsIt()
     {
         var renderer = new FakeRenderer();
-        PreviewRequest request = Request("""{ "setPieces": ["alpineRange"] }""") with { Loupe = new PixelWindow(4, 2, 8, 8) };
+        PreviewRequest request = Request("""{ "setPieces": ["alpineRange"] }""") with { Loupe = new PixelWindow(4, 2, 8, 8), Meter = Metering.Average };
         Sidecar sidecar = PreviewPipeline.Run(request, renderer);
 
         RenderSettings meter = renderer.Meters.Single();
         Assert.AreEqual((AutoExposure.MeterWidth, 180), (meter.Width, meter.Height));
         Assert.IsTrue(meter.Window.IsEmpty);
+        Assert.AreEqual(0, renderer.Incidents.Count);
         ExposureInfo exposure = sidecar.Exposure!;
-        Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (exposure.MeterWidth, exposure.MeterHeight, exposure.MeterSamplesPerPixel));
+        Assert.AreEqual(Metering.Average, exposure.Meter);
+        Assert.IsNull(exposure.Incident);
+        AverageReading reading = exposure.Average!;
+        Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (reading.MeterWidth, reading.MeterHeight, reading.MeterSamplesPerPixel));
         Assert.AreEqual(AtmosphereMode.Luts, sidecar.Atmosphere.Mode);
         Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
-        Assert.AreEqual(10, Sidecar.CurrentSchema);
+        Assert.AreEqual(11, Sidecar.CurrentSchema);
         Assert.AreEqual(ImageInfo.RadianceUnits, sidecar.Image.Units);
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("exposureMeter"));
+    }
+
+    [TestMethod]
+    public void IncidentMeter_IsTheDefault_AndRecordsTheCard()
+    {
+        var renderer = new FakeRenderer();
+        PreviewRequest request = Request("""{ "setPieces": ["alpineRange"], "time": "goldenHour" }""") with { Loupe = new PixelWindow(4, 2, 8, 8) };
+        Sidecar sidecar = PreviewPipeline.Run(request, renderer);
+
+        Assert.AreEqual(0, renderer.Meters.Count, "no meter render");
+        Assert.AreSame(renderer.Scene, renderer.Incidents.Single(), "the image's own scene");
+        ExposureInfo exposure = sidecar.Exposure!;
+        Assert.AreEqual(Metering.Incident, exposure.Meter);
+        Assert.AreEqual(IncidentMeter.MethodName, exposure.Method);
+        Assert.IsNull(exposure.Average);
+        IncidentReading card = exposure.Incident!;
+        Assert.AreEqual(FakeRenderer.IncidentSun + FakeRenderer.IncidentSky, card.IlluminanceY, 1e-5, "flat spectra: Y is their value");
+        Assert.AreEqual(Math.Log2(Math.PI / card.IlluminanceY), exposure.AppliedEv, 1e-12);
+        Assert.AreEqual(card.IlluminanceY * IntegratorTables.LuminancePerY, card.IlluminanceLux, 1e-6);
+        Assert.AreEqual(card.IlluminanceLux, card.SunLux + card.SkyLux, 1e-6);
+        Assert.AreEqual(sidecar.Sun.ElevationDegrees, card.CardElevationDegrees, 0.01, "facing the sun");
+        Assert.AreEqual(sidecar.Atmosphere.CameraAltitudeMetres, card.AltitudeMetres, 1e-9);
+        Assert.AreEqual(DisplayCurve.Agx, sidecar.Image.Display);
+        Assert.AreEqual(DisplayTransform.AgxName, sidecar.Image.DisplayTransform);
     }
 
     [TestMethod]

@@ -103,6 +103,12 @@ public sealed record PreviewRequest
 
     /// <summary>How the terrain is meshed (vista-plan §10 M1.9): the view-dependent mesh by default.</summary>
     public MeshSettings Mesh { get; init; } = new();
+
+    /// <summary>How the PNG's exposure is metered (vista-plan §10 M1.10a): the incident meter by default. The EXR never changes.</summary>
+    public Metering Meter { get; init; } = Metering.Incident;
+
+    /// <summary>The PNG's display curve (vista-plan §10 M1.10a): AgX by default. The EXR never changes.</summary>
+    public DisplayCurve Display { get; init; } = DisplayTransform.DefaultCurve;
 }
 
 /// <summary>
@@ -115,6 +121,7 @@ public sealed record PreviewRequest
 ///           [--sun-elevation -2] [--altitude 3000] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
+///           [--meter incident | average] [--display agx | aces]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. The place
@@ -131,6 +138,8 @@ public sealed record PreviewRequest
 /// side × metres between them): another world, for measurements. <c>--mesh-error</c> sets the view-dependent mesh's error target in
 /// pixels (M1.9), <c>--detail off</c> leaves out the detail below the world grid, <c>--far-field off</c> the terrain beyond it, and
 /// <c>--mesh uniform</c> meshes every sample of the world grid and nothing else (M1.7's mesh, bent onto the Earth), for comparisons.
+/// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
+/// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -168,7 +177,9 @@ public static class PreviewCommandLine
         "  the sun alone, the sky left to the bounce; the same image on average, with different noise.\n" +
         "--rr-start <bounce>: the bounce from which Russian roulette may end a path (default 2; M1.4 used 3).\n" +
         "--denoise: also write <preview>.denoised.png and <preview>.denoised.exr (Intel Open Image Denoise, fetched by\n" +
-        "  tools/fetch-oidn.ps1; without it a warning, and the raw image only). --denoise-device cpu (default) | cuda.";
+        "  tools/fetch-oidn.ps1; without it a warning, and the raw image only). --denoise-device cpu (default) | cuda.\n" +
+        "--meter incident (default) | average: expose the PNG for a grey card facing the sun where the camera stands, or for the\n" +
+        "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. Neither changes the EXR.";
 
     /// <summary>The recipe fields each place option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> PlaceOptionFields { get; } =
@@ -211,7 +222,7 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--location", "--latitude", "--date", "--time", "--sun-elevation", "--altitude", "--atmosphere", "--light-sampling",
-        "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field",
+        "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -292,6 +303,8 @@ public static class PreviewCommandLine
         bool erosion = Erosion(values.GetValueOrDefault("--erosion"), problems);
         WorldGrid grid = Grid(values.GetValueOrDefault("--grid"), problems);
         MeshSettings mesh = Mesh(values, problems);
+        Metering meter = Meter(values.GetValueOrDefault("--meter"), problems);
+        DisplayCurve display = Display(values.GetValueOrDefault("--display"), problems);
 
         if (problems.Count > before)
             return null;
@@ -317,7 +330,37 @@ public static class PreviewCommandLine
             Erosion = erosion,
             Grid = grid,
             Mesh = mesh,
+            Meter = meter,
+            Display = display,
         };
+    }
+
+    /// <summary>Parses a <c>--meter</c> value (<c>incident</c> or <c>average</c>).</summary>
+    internal static bool TryParseMeter(string text, out Metering meter) =>
+        Enum.TryParse(text, ignoreCase: true, out meter) && meter != Metering.None && Enum.IsDefined(meter) && !int.TryParse(text, out _);
+
+    private static Metering Meter(string? text, List<string> problems)
+    {
+        if (text is null)
+            return Metering.Incident;
+        if (TryParseMeter(text, out Metering meter))
+            return meter;
+        problems.Add($"--meter must be incident or average, got '{text}'.");
+        return Metering.Incident;
+    }
+
+    /// <summary>Parses a <c>--display</c> value (<c>agx</c> or <c>aces</c>).</summary>
+    internal static bool TryParseDisplay(string text, out DisplayCurve curve) =>
+        Enum.TryParse(text, ignoreCase: true, out curve) && curve != DisplayCurve.None && Enum.IsDefined(curve) && !int.TryParse(text, out _);
+
+    private static DisplayCurve Display(string? text, List<string> problems)
+    {
+        if (text is null)
+            return DisplayTransform.DefaultCurve;
+        if (TryParseDisplay(text, out DisplayCurve curve))
+            return curve;
+        problems.Add($"--display must be agx or aces, got '{text}'.");
+        return DisplayTransform.DefaultCurve;
     }
 
     private static bool Erosion(string? text, List<string> problems)

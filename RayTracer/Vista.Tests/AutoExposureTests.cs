@@ -19,9 +19,13 @@ public sealed class AutoExposureTests
     public void UniformImage_MapsToMiddleGrey()
     {
         ExposureInfo e = AutoExposure.Measure(Uniform(100, 0.05f), 0.0);
-        Assert.AreEqual(0.05, e.LogAverageY, 1e-6);
+        Assert.AreEqual(Metering.Average, e.Meter);
+        Assert.IsNull(e.Incident);
+        Assert.AreEqual(0.05, e.Average!.LogAverageY, 1e-6);
         Assert.AreEqual(Math.Log2(0.18 / 0.05), e.AppliedEv, 1e-6);
-        Assert.AreEqual(0.05 * IntegratorTables.LuminancePerY, e.LogAverageLuminanceCdM2, 1e-3);
+        Assert.AreEqual(e.AppliedEv, e.MeteredEv);
+        Assert.AreEqual(0.18 / e.Average.LogAverageY, e.MeterScale(), "the denoiser's metered scale");
+        Assert.AreEqual(0.05 * IntegratorTables.LuminancePerY, e.Average.LogAverageLuminanceCdM2, 1e-3);
         Assert.AreEqual(AutoExposure.MethodName, e.Method);
     }
 
@@ -40,7 +44,7 @@ public sealed class AutoExposureTests
         float[] sky = Uniform(1000, 0.02f);
         sky[1] = 3e4f; // one pixel of sun
         ExposureInfo e = AutoExposure.Measure(sky, 0.0);
-        Assert.AreEqual(0.02, e.LogAverageY, 0.02 * 1e-6, "the brightest 1% is clamped to its percentile");
+        Assert.AreEqual(0.02, e.Average!.LogAverageY, 0.02 * 1e-6, "the brightest 1% is clamped to its percentile");
     }
 
     [TestMethod]
@@ -57,6 +61,8 @@ public sealed class AutoExposureTests
         ExposureInfo e = AutoExposure.Measure(new float[30], 0.5);
         Assert.AreEqual(AutoExposure.BlackMethodName, e.Method);
         Assert.IsNull(e.Ev100);
+        Assert.IsNull(e.MeteredEv);
+        Assert.IsTrue(double.IsNaN(e.MeterScale()), "the denoiser chooses its own scale");
         Assert.AreEqual(0.5, e.AppliedEv);
     }
 

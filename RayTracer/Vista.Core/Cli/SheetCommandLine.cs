@@ -54,8 +54,8 @@ public static class SheetCommandLine
     /// <summary>Usage text.</summary>
     public const string Usage =
         "       Vista.App --sheet --vary <key>=<v1>,<v2>,... --out <sheet.png> [--columns N] [--title <text>] [preview options]\n" +
-        "                 keys: seed, recipe (files), camera (files or default), spp, bounces, camera.<field>, <recipe field>\n" +
-        "                 e.g. --vary seed=1,2,3,4   --vary time=dawn,day,goldenHour,dusk   --vary camera.yawDegrees=0,90\n" +
+        "                 keys: seed, recipe (files), camera (files or default), spp, bounces, meter, display, camera.<field>, <recipe field>\n" +
+        "                 e.g. --vary seed=1,2,3,4   --vary time=dawn,day,goldenHour,dusk   --vary camera.yawDegrees=0,90   --vary meter=average,incident\n" +
         "                 Writes <sheet>.png, <sheet>.<debug>.png, <sheet>.json (every cell) and each cell under <sheet>.cells/;\n" +
         "                 with --denoise also <sheet>.denoised.png, the cells denoised.\n" +
         "       Vista.App --sheet-from <a.png> <b.png> ... --out <sheet.png> [--labels a,b,...] [--columns N] [--title <text>]\n" +

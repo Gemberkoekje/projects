@@ -93,7 +93,7 @@ internal static class AtmosphereCompare
             RenderOutput[] outputs = [lut, reference, shadowed];
             for (int i = 0; i < outputs.Length; i++)
             {
-                byte[] rgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(outputs[i].Xyz), ev);
+                byte[] rgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(outputs[i].Xyz), ev, DisplayTransform.DefaultCurve);
                 PngEncoder.Write(Path.Combine(outDir, names[i] + ".png"), rgb, width, height, PngColor.Rgb);
                 tiles.Add(rgb);
             }
