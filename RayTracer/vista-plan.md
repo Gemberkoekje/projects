@@ -1115,7 +1115,7 @@ before/after of the measurement views and adds a ledger row.
   (probed by tightening them). Eight polar day / night cases, the season ↔ date tests, the presets and the
   polar fallbacks are CI too.
 - **A time-of-day sheet at Zermatt in October** (a plain `season: autumn, location: zermatt` recipe, seed 42,
-  640×360, 64 spp, default camera), one `Vista.App --sheet` call:
+  640×360, 64 spp, default camera), one `Vista.App --sheet` call (`vista-views/sheets/m1-2-time-of-day.png`):
 
   | Preset | Local solar time | Azimuth | Elevation |
   |---|---|---|---|
@@ -1127,12 +1127,12 @@ before/after of the measurement views and adds a ledger row.
 
   Sunrise 06:30:53 and sunset 17:28:23 solar on 2026-10-15 are NOAA's to the second. Dawn, dusk and night
   render dark, as planned: the M0 dome has no twilight until M1.3. A solar-time sweep (07:00 to 17:00 from
-  the aerial view) shows the sun crossing east, south and west; a golden-hour sheet over four places on the
-  same October date shows the sun at 4.3° at Lofoten against 10.7° at Yosemite (8.1° at Torres del Paine in
-  April, its autumn).
+  the aerial view) shows the sun crossing east, south and west (`m1-2-solar-time.png`); a golden-hour sheet
+  over four places on the same October date shows the sun at 4.3° at Lofoten against 10.7° at Yosemite (8.1°
+  at Torres del Paine in April, its autumn) (`m1-2-places-golden-hour.png`).
 - **Self-test:** `--gpu-selftest` passes (the self-test scene now has Zermatt's July golden-hour sun).
 - **Before/after:** the four measurement views, `main` (370690d) against this slice, tiled with
-  `--sheet-from`. The views now pin Zermatt on 2026-07-15. The noon sun stands due south at 65.5°, behind the
+  `--sheet-from` (`vista-views/sheets/m1-2-before-after.png`). The views now pin Zermatt on 2026-07-15. The noon sun stands due south at 65.5°, behind the
   north-facing cameras, so the range is front-lit and flatter than under M0's sun, which stood high in the
   north and back-lit it. The down-slope view's golden hour moves to azimuth 292°, 8.5° up.
 
