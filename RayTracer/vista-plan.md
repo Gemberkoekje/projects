@@ -5,9 +5,9 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-seventeen slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+nineteen slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh, and the
-measured decision to keep it for the far terrain) are done, M1.11 (linked sliders and the weather chain) is next. It sits
+measured decision to keep it for the far terrain) are done, M1.10a (exposure and display) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -700,6 +700,10 @@ for a slice hold for every milestone.
 - **A slice that changes the look** commits a before/after contact sheet to `vista-views/sheets/`
   (with its row in that folder's README) and adds a row to the cost ledger
   ([`vista-log/cost-ledger.md`](vista-log/cost-ledger.md)).
+- **Sheets stay small:** PNG (lossless, so noise and banding can be compared), cells of at most
+  640 px, about 1 MB a sheet at most. Where full-resolution detail matters, commit a crop of that
+  region (a loupe), not the whole 4K frame. No Git LFS. (Since 2026-10-21; the M1.1–M1.10 sheets,
+  70 MB in all, stay as committed.)
 - **It ends with its log**, `vista-log/<slice>.md`, in the layout of the existing logs (status,
   checks, decisions, gotchas, hand-off, commands, files, next; [`vista-log/README.md`](vista-log/README.md)).
   Its entry here gets one status line linking to it. A decision that changes the design or a later
@@ -736,9 +740,15 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Seventeen slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Nineteen slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
+
+*Added 2026-10-21, after a review of the M1.1–M1.10 sheets (agreed with the user):* **M1.10a —
+Exposure & display** and **M1.11a — Drainage**, both before the materials (M1.12), so rock and snow
+are tuned once, under the final light and on the final terrain, as the strategy below intends. M1.11
+gains time-of-day presets by sun height, and M1.12 gains near-camera detail by material. The letter
+suffixes keep the code's references to M1.11–M1.17 valid.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -758,7 +768,8 @@ directly on `main`.)
   ships in the same slice as the LUTs, so every later atmosphere change can be checked against it.
 - **Light gets physical units in M1.3.** Day and twilight differ by about 10⁴ in the real atmosphere,
   so the PNG gets auto exposure (log-average luminance plus EV compensation, recorded in the sidecar).
-  The EXR stays scene-referred.
+  The EXR stays scene-referred. (M1.10a makes an incident meter the default; the log-average stays
+  an option.)
 - **Linked sliders land before materials and snow**, so snow reads its freezing level from the
   weather chain instead of a stub that gets rewired later.
 - **The view-dependent mesh comes first, height-field intersection second** (M1.9, M1.10). The mesh
@@ -953,6 +964,26 @@ about 200 MiB and 0.4–1.2 s of build a view, but costs 1.27–1.39× per pixel
 shows. Revisit at M11 (§4.3); the prototype is on the branch `claude/vista-m1-10-heightfield`. Log:
 [`vista-log/M1.10.md`](vista-log/M1.10.md).
 
+**M1.10a — Exposure & display.**
+- *Goal:* golden hour that looks golden, so the materials and snow (M1.12, M1.13) are tuned under the
+  exposure and display curve they will ship with.
+- *Why (the sheet review, 2026-10-21):* the golden-hour views show pale cream sunlit faces and
+  saturated blue shadows. The log-average meter over-exposes the sunlit slope by 3.9 EV on the
+  down-slope view (`m1-3-down-slope-exposure.png`), because half the frame is in shadow; and the
+  display curve, a per-channel ACES fit, pushes bright warm colours toward yellow-white on its shoulder.
+- *Deliverable:* an **incident meter**, the new default: the exposure that puts an 18% grey card facing
+  the sun, lit by the sun (through its transmittance) and the sky the renderer already computes, at
+  middle grey. It does not depend on the framing; with the sun below the horizon only the sky term is
+  left. The log-average meter stays an option (`--meter average|incident`), EV compensation stays, and
+  the sidecar records the meter and its reading. **AgX** as the default display curve, with the ACES
+  fit one option away (`--display agx|aces`). The EXR stays scene-referred and unchanged; a watch
+  re-exposes and re-displays a kept render without rebuilding anything upstream.
+- *Verify:* 3070: the four measurement views, a golden-hour view and the alpenglow sweep (+2° to −1.5°)
+  under {average, incident} × {ACES, AgX}, from the same EXRs (byte-identical; only the PNGs differ);
+  the sunlit slope no longer clips; dawn and dusk are exposed from the sky alone. CI: the meter's
+  maths (a sun-facing card; the sun below the horizon) and each display curve against values from the
+  implementation it is ported from. Cost ledger: no change (display only).
+
 **M1.11 — Linked sliders & the weather chain.**
 - *Goal:* one auto/pinned mechanism, with plausible defaults from the place and the season (§3.4,
   §3.6).
@@ -964,22 +995,57 @@ shows. Revisit at M11 (§4.3); the prototype is on the branch `claude/vista-m1-1
   mid-afternoon) → humidity → freezing level (6.5 °C per 1000 m) → the snow default, with the season;
   haze density from humidity and the fog/haze slider (fog itself is M4). Custom latitude falls back
   to a latitude model. A slider file holds the pinned values; the sidecar records every slider's
-  value and whether it was auto or pinned.
+  value and whether it was auto or pinned. **Time-of-day presets by sun height** instead of offsets
+  from sunrise and sunset: M1.2's "sunset − 60 min" put golden hour anywhere from 4.3° to 10.7° up,
+  depending on place and season (`m1-2-places-golden-hour.png`), while the warm light only arrives
+  around 2° and below (`m1-3-peaks-lit.png`). Dawn and dusk at −4° (rising, setting), golden hour at
+  the height a +2° / +4° / +6° sheet picks (about +4° expected), day at solar noon, night at solar
+  midnight; where the sun never reaches a preset's height, M1.2's polar fallbacks apply, with the hint.
 - *Verify:* CI: the chain (pinning temperature still lets snow follow; reset re-links; a set piece
   pushes its default; the implausible hint; autumn at Torres del Paine is April; Lofoten milder than
-  its latitude model). 3070: a month sheet at one place changes sun and haze from the defaults alone.
+  its latitude model); each preset lands at its sun height at every dropdown place in every season,
+  or falls back with the hint. 3070: a month sheet at one place changes sun and haze from the
+  defaults alone; the golden-hour height sheet.
+
+**M1.11a — Drainage.**
+- *Goal:* valleys that branch and join like real drainage, before the materials read the erosion maps
+  (M1.12) and the snow reads their gullies (M1.13).
+- *Why (the sheet review, 2026-10-21):* the eroded slopes show evenly spaced, parallel fluting, and the
+  discharge map shows short, scattered rills rather than tributaries feeding main valleys
+  (`m1-7-maps.png`, `m1-7-seeds.png`): M1.7's 1500 steps at 8 m do not carry water across a catchment
+  (M1.7's status).
+- *Deliverable:* a **real flow accumulation** (each cell's upstream area over the eroded surface, with
+  depressions filled or breached), deterministic, cached with the world and shown beside the existing
+  maps; M1.12 and M3 read it. Then **coarse-to-fine erosion**: M1.7's passes at 32 m and 16 m for many
+  more steps, upsampled and refined at 8 m, reusing the passes and their C# reference. **Only if that
+  does not give branching valleys:** a stream-power uplift-and-erosion model (Cordonnier et al. 2016),
+  which grows dendritic drainage by construction. The choice is measured: the longest channel, the
+  share of the grid that drains into channels above a threshold, the network's Strahler orders, the
+  erosion time per seed, and a four-seed sheet.
+- *Verify:* CI: flow accumulation on synthetic surfaces (a tilted plane, a V-shaped valley, a pit) and
+  its determinism; the coarse-to-fine reference conserves water and sediment as M1.7's does. 3070: the
+  measures above before and after, on four seeds; the eroded world bit-identical twice and through the
+  cache; the self-test's driver check against the default erosion cache re-baselined deliberately
+  (every cached world changes); the measurement views' cameras still above the ground (a test flags
+  it); a cost-ledger row.
 
 **M1.12 — Materials by rule.**
 - *Goal:* rock that reads as rock: strata, scree, soil, alpine grass and wet ground where nature
   puts them (§4.3).
 - *Deliverable:* materials chosen and blended in the shader per hit, from slope, altitude, aspect
-  and the erosion maps (flow, deposition, wetness), all procedural: rock strata as warped altitude
-  bands, scree on deposition under steep faces, soil, grass as a material (its geometry is M5), and
-  wet darkening. Built-in-tier spectra (tier 5, recorded per material). Rough-diffuse rock
-  (Oren–Nayar-style) is measured against Lambert in a sheet, because backscatter from a low sun is
-  the golden-hour look. The rules live in `Vista.Core`, with tests.
-- *Verify:* CI: rule tests (steep → rock, deposition below a steep face → scree, …). 3070:
-  material-id and tier previews over four seeds; a before/after beauty sheet; a cost-ledger row.
+  and the erosion maps (M1.11a's flow accumulation, deposition, wetness), all procedural: rock strata
+  as warped altitude bands, scree on deposition under steep faces, soil, grass as a material (its
+  geometry is M5), and wet darkening. Built-in-tier spectra (tier 5, recorded per material).
+  Rough-diffuse rock (Oren–Nayar-style) is measured against Lambert in a sheet, because backscatter
+  from a low sun is the golden-hour look. The rules live in `Vista.Core`, with tests. **Near-camera
+  detail by material:** M1.9's seeded detail is smooth gradient noise, which reads as sand or snow
+  drifts in the 4K loupes (`m1-9-loupes.png`). Rock gets sharp, broken or terraced detail (ridged
+  noise, strata steps), scree small angular bumps, and soil and grass stay smooth. The detail is
+  geometry, so the material rules run where the mesh is built (C#) as well as per hit (HLSL),
+  from one definition with a parity test, and each kind's error bound is measured as M1.9's was.
+- *Verify:* CI: rule tests (steep → rock, deposition below a steep face → scree, …); the detail's
+  bounds per kind. 3070: material-id and tier previews over four seeds; a before/after beauty sheet;
+  a 4K loupe sheet of rock, scree and soil near the camera; a cost-ledger row.
 
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
