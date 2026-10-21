@@ -23,6 +23,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.10a | 0.26 | 4.04 | 2.80 | 5.56 |
 | M1.11 | 0.27 | 4.02 | 2.78 | 5.67 |
 | M1.11a | 0.22 | 4.04 | 2.69 | 6.44 |
+| M1.11b | 0.22 | 4.04 | 2.69 | 6.44 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -80,3 +81,6 @@ sample (M1.11: 1.00, 3.07, 2.51, 3.80). The default and down-slope views now sta
 ground: the default view sees more sky and costs 3% less; down the slope the frame is a deep valley in shadow and the range beyond it, fewer
 rays per sample but 14% more time per sample, likely the longer rays across the valley through more of the mesh (not measured). The sky
 view's −18% is unexplained, as M1.7's −25% was: it traces one camera ray per sample on both builds (0.05 ns a sample).
+M1.11b changes the PNG only (AgX's punchy look and the incident meter's +1 EV), so its row is M1.11a's: the four ledger views rendered
+by `main` (bfa57bfc) and by this slice (480 px, 64 spp) have byte-identical EXRs, and `main`'s PNGs equal this slice's `--look base
+--compensation 0`. Nothing on the GPU changed.

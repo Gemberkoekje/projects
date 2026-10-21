@@ -29,4 +29,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.10a.md`](M1.10a.md) | Exposure & display |
 | [`M1.11.md`](M1.11.md) | Linked sliders & the weather chain |
 | [`M1.11a.md`](M1.11a.md) | Drainage |
+| [`M1.11b.md`](M1.11b.md) | The display look |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

@@ -8,7 +8,7 @@ render a recipe + seed end to end on the RTX 3070 through offline integrator v0.
 twenty-one slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain)
-and M1.11a (drainage) are done, M1.11b (the display look) is next. It sits
+M1.11a (drainage) and M1.11b (the display look) are done, M1.11c (uplift and rock hardness) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -442,8 +442,9 @@ maze's real-time path):
   fed albedo and normal buffers. Built in M1.6 ([`vista-log/M1.6.md`](vista-log/M1.6.md)): OIDN 2.5.1, fetched and checksummed, never committed;
   `--denoise` writes the denoised image beside the raw one.
 - **Formats:** EXR (scene-referred, for the user's own grading) plus PNG/JPEG through a
-  filmic tonemap: AgX since M1.10a (three.js r169's port of Blender's AgX base), the per-channel ACES fit
-  one option away (`--display aces`).
+  filmic tonemap: AgX since M1.10a (three.js r169's port of Blender's AgX base), with its punchy look and
+  +1 EV on the incident meter since M1.11b ([`vista-log/M1.11b.md`](vista-log/M1.11b.md); `--look base`, `--compensation`),
+  the per-channel ACES fit one option away (`--display aces`).
 - **Sidecar** next to every image: recipe, seed, camera, all slider values (auto or
   pinned), data tier per material (§6.2), sample counts, render time, engine version.
 - **HDR wallpapers** (e.g. JXR on Windows 11) — to verify before committing to it (M11).
@@ -1113,6 +1114,15 @@ Log: [`vista-log/M1.11a.md`](vista-log/M1.11a.md).
 - *Verify:* 3070: the sheet, and the chosen defaults on the measurement views beside M1.10a's. CI: the
   punchy look against values from the implementation it is ported from. Cost ledger: no change
   (display only).
+
+*Status (2026-10-21): done.* **AgX punchy at +1 EV** is the new default (`--look punchy`, the incident meter's `--compensation`
++1): on the day and golden-hour views it is as bright as plain AgX at +0 (the frame's mean 129, 129, 97 and 147 of 255 against 128,
+126, 99 and 145) with 1.6–2.5 times its saturation, because the look's power puts middle grey a stop lower (sRGB 88 for 128).
+Plain AgX at +1 is brighter and paler still. Down the slope every variant is dark (M1.11a left that camera 552 m above a valley in
+shadow; M1.11c re-places it), and punchy darkens it most. The sky-only view turns deep blue, its red channel at 0. `--look base
+--compensation 0` writes `main`'s PNG byte for byte; the EXR is unchanged. Sheets: `m1-11b-before-after.png`,
+`m1-11b-golden-looks.png`, `m1-11b-ridges-looks.png`, `m1-11b-down-slope-looks.png`, `m1-11b-alpenglow.png`.
+Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
 
 **M1.11c — Uplift & rock hardness.**
 - *Goal:* ranges with hierarchy (high massifs, broad main valleys, lower foothills) and slopes that
