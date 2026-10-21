@@ -1272,12 +1272,14 @@ target by a factor of two to four (decisions below). Transmittance and sky view 
   long path of air): mean luminance error 1.5% (+5°), 2.7% (−2°), 1.5% (−4°), 2.6% (−6°); worst −15%, at −2° just
   under the dipped horizon toward the sun. The bright twilight lowlands in the anti-solar sheet are therefore physical.
 - **A sun-elevation sheet from −6° to +10°** (`vista-views/atmosphere`, from 4.2 km): toward the sun, the sun reddens
-  and sets into an orange band that fades through twilight; away from it, the dark-blue Earth's shadow rises on the
-  horizon under the pink Belt of Venus at −2° and climbs and fades by −4°. A LUT and a reference render of the anti-solar
-  sky at −4° and +5° (the reference at 16 384 spp) show the same bands.
+  and sets into an orange band that fades through twilight (`vista-views/sheets/m1-3-toward-sun.png`); away from it, the
+  dark-blue Earth's shadow rises on the horizon under the pink Belt of Venus at −2° and climbs and fades by −4°
+  (`m1-3-away-from-sun.png`). A LUT and a reference render of the anti-solar sky at −4° and +5° (the reference at 16 384
+  spp) show the same bands (`m1-3-luts-vs-reference.png`).
 - **Peaks stay lit after the valley floor's sunset**, from transmittance alone: from the range camera, at a true sun
-  elevation of −1° only the summits are lit, orange-red, above valleys in shadow, and at −1.5° only the highest. The
-  sun's transmittance at three heights above the ground sphere (Zermatt's floor, 1608 m):
+  elevation of −1° only the summits are lit, orange-red, above valleys in shadow, and at −1.5° only the highest
+  (`vista-views/sheets/m1-3-peaks-lit.png`). The sun's transmittance at three heights above the ground sphere (Zermatt's
+  floor, 1608 m):
 
   | True sun elevation | 5 m | 1200 m | 2400 m |
   |---|---|---|---|
@@ -1288,14 +1290,16 @@ target by a factor of two to four (decisions below). Transmittance and sky view 
   | −2° | Earth's shadow | Earth's shadow | Earth's shadow |
 
 - **Time of day at Zermatt on 2026-10-15:** dawn meters at EV100 6.7, day 14.9, golden hour 14.0, dusk 5.6, and night
-  is black (no light at all, so only the camera's EV is applied). M1.2's dawn and dusk were black.
-- **Before/after:** the four measurement views, `main` (bb26be7) against this slice at 640 px: a deeper blue sky that
+  is black (no light at all, so only the camera's EV is applied). M1.2's dawn and dusk were black
+  (`vista-views/sheets/m1-3-time-of-day.png`).
+- **Before/after:** the four measurement views, `main` (bb26be7) against this slice at 640 px
+  (`vista-views/sheets/m1-3-before-after.png`): a deeper blue sky that
   darkens toward the zenith; a horizon glow and, from the aerial view, the land beyond the tile as a hazy plain; on the
   down-slope golden hour, blue sky-lit shadows and a pale, warm-white sunlit slope. That slope is right for the light (the
   8.5° sun reaches the 3.3 km camera with T = 0.36, 0.54, 0.70 at 450, 550, 650 nm: a mild warm cast, because almost no
   haze is left above 3 km) but over-exposed: the view is mostly shadow, so the meter lifts it 3.9 EV and the ACES curve
-  bleaches the slope. M0's orange came from its 2400–3000 K placeholder. The camera's EV compensation recovers it; a
-  highlight-aware meter is a candidate for the display transform.
+  bleaches the slope. M0's orange came from its 2400–3000 K placeholder. The camera's EV compensation recovers it
+  (`m1-3-down-slope-exposure.png`: 0, −1 and −2 EV); a highlight-aware meter is a candidate for the display transform.
 
 *M1.3 decisions taken in code (revisit freely):*
 
