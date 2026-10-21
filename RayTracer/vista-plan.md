@@ -2035,7 +2035,8 @@ weaker than planned: the flow map is the simulation's mean discharge, whose chan
   belongs to the view-dependent mesh (M1.9) or the height-field path (M1.10), with the eroded edge blended into it there.
 - **Before/after sheets** (`vista-views/erosion/render.ps1 -Before <main's Vista.App.dll>`, 640 px, 64 spp, raw): the four seeds from
   the aerial camera and the seed-42 views (default, down a slope, layered ridges, range), each as `main` (M1.6: 16.4 km at 16 m) |
-  this build un-eroded (32.8 km at 8 m) | eroded, plus the four seeds' erosion maps. Eroded faces are fluted with gullies from crest
+  this build un-eroded (32.8 km at 8 m) | eroded (`vista-views/sheets/m1-7-seeds.png`, `m1-7-views.png`), plus the four seeds'
+  erosion maps (`m1-7-maps.png`). Eroded faces are fluted with gullies from crest
   to foot and the crests stay sharp; loose aprons and flat sediment floors fill the valleys; the far range is now terrain where M1.6
   showed the grid's edge. What still looks wrong: some loose valley fills read as a field of low hummocks ("dunes") under a low sun,
   and the 8 m facets near a camera on the ground are as plain as M1.6's 16 m ones (M1.9's near-camera detail).
@@ -2069,10 +2070,13 @@ weaker than planned: the flow map is the simulation's mean discharge, whose chan
 - **Limiters, all local:** the flux keeps 20% of its last value per step (`FluxDamping` 0.8; undamped water sloshed uphill and piled
   sediment 2 km high), and in one step a cell never cuts below its lowest edge neighbour nor fills above its highest. Without them
   the valley floors filled with single-cell needles (33 000 cells over 5 m above all eight neighbours, against 1 400 in the base
-  terrain; now under 200). The pick-up and drop-off rates are 0.1 per step: faster ones left a washboard ripple on loose slopes.
+  terrain; now under 200): `vista-views/sheets/m1-7-tuning-needles.png`, and the damping that cleared them in
+  `m1-7-tuning-damping.png`. The pick-up and drop-off rates are 0.1 per step: faster ones left a washboard ripple on loose slopes
+  (`m1-7-tuning-ripples.png`).
 - **Open edges:** past the grid the ground continues at the edge's slope, dry, so water and its sediment leave where the land falls
   away; the thermal passes see no neighbour there. The balance tests account for both.
-- **Parameters by sheet, per profile:** the mountains' were chosen from nine sheets of the four views (`ErosionSettings.Mountains`); the
+- **Parameters by sheet, per profile:** the mountains' were chosen from nine sheets of the four views (`ErosionSettings.Mountains`;
+  the three comparisons that decided it are the `m1-7-tuning-*.png` sheets above); the
   hills share them with half the capacity and rock to 45°, and change only gently. `VISTA_EROSION_SETTINGS` overrides any of them for
   tuning (the settings are in the cache key and the sidecar).
 - **The grid is 4097² × 8 m (32.8 km), not 4 m (16.4 km):** the same cost, twice the reach (the sight lines above), and at 8 m a
