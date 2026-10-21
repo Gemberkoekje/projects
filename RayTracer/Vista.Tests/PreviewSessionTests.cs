@@ -141,6 +141,34 @@ public sealed class PreviewSessionTests
     }
 
     [TestMethod]
+    public void LookAndCompensation_ReEncodeTheKeptRender_AndAreRecorded()
+    {
+        var renderer = new FakeRenderer { SceneDependent = true };
+        var session = new PreviewSession(renderer);
+        Sidecar plain = session.Run(Base with { Look = DisplayLook.Base, MeterCompensationEv = 0.0 });
+        byte[] png = File.ReadAllBytes(P("p.png"));
+        byte[] exr = File.ReadAllBytes(P("p.exr"));
+        Sidecar byDefault = session.Run(Base);
+        Assert.AreEqual(IncidentMeter.DefaultCompensationEv, byDefault.Exposure!.MeterCompensationEv, "the incident meter's default");
+        Assert.AreEqual(DisplayTransform.DefaultLook, byDefault.Image.Look);
+        Sidecar punchy = session.Run(Base with { Look = DisplayLook.Punchy, MeterCompensationEv = 1.0 });
+
+        Assert.AreEqual(1, renderer.Scenes.Count, "one render for all three");
+        Assert.AreEqual(1, renderer.Incidents.Count);
+        Assert.AreEqual(plain.Exposure!.AppliedEv + 1.0, punchy.Exposure!.AppliedEv, 1e-12);
+        Assert.AreEqual(0.0, punchy.Exposure.CompensationEv, "the camera's EV is its own");
+        Assert.AreEqual((1.0, DisplayLook.Punchy, DisplayTransform.AgxPunchyName), (punchy.Exposure.MeterCompensationEv, punchy.Image.Look, punchy.Image.DisplayTransform));
+        CollectionAssert.AreNotEqual(png, File.ReadAllBytes(P("p.png")));
+        CollectionAssert.AreEqual(exr, File.ReadAllBytes(P("p.exr")), "the EXR is scene-referred");
+
+        Sidecar average = session.Run(Base with { Meter = Metering.Average, Display = DisplayCurve.Aces, Look = DisplayLook.Punchy });
+        Assert.AreEqual((0.0, DisplayLook.None), (average.Exposure!.MeterCompensationEv, average.Image.Look), "the average meter adds nothing; ACES has no look");
+        Sidecar both = session.Run(Camera(Base with { MeterCompensationEv = 0.5 }, "exposureEv", "1"));
+        Assert.AreEqual(plain.Exposure.AppliedEv + 1.5, both.Exposure!.AppliedEv, 1e-12, "the camera's EV and the meter's add up");
+        Assert.AreEqual((1.0, 0.5), (both.Exposure.CompensationEv, both.Exposure.MeterCompensationEv));
+    }
+
+    [TestMethod]
     public void Exposure_ReExposesThePng_WithoutRendering()
     {
         var renderer = new FakeRenderer { SceneDependent = true };
@@ -253,6 +281,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(13, back.Schema);
+        Assert.AreEqual(14, back.Schema);
     }
 }

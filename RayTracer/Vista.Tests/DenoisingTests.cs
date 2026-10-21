@@ -185,7 +185,7 @@ public sealed class DenoisingTests
         foreach (string file in sidecar.Outputs.Values)
             Assert.IsTrue(File.Exists(P(file)), file);
         float[] halved = [.. input.Color.Select(c => 0.5f * c)];
-        CollectionAssert.AreEqual(PngEncoder.Encode(DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv, DisplayCurve.Agx), 32, 18, PngColor.Rgb),
+        CollectionAssert.AreEqual(PngEncoder.Encode(DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv, DisplayCurve.Agx, DisplayTransform.DefaultLook), 32, 18, PngColor.Rgb),
             File.ReadAllBytes(P("p.denoised.png")), "the denoised PNG is exposed like the raw one");
         CollectionAssert.AreEqual(ExrEncoder.EncodeRgb(halved, 32, 18), File.ReadAllBytes(P("p.denoised.exr")));
 
@@ -247,7 +247,7 @@ public sealed class DenoisingTests
         string json = File.ReadAllText(P("p.json"));
         Sidecar back = VistaJson.Deserialize<Sidecar>(json);
         Assert.AreEqual(sidecar.Denoise, back.Denoise);
-        Assert.AreEqual(13, back.Schema);
+        Assert.AreEqual(14, back.Schema);
 
         using JsonDocument doc = JsonDocument.Parse(json);
         JsonElement denoise = doc.RootElement.GetProperty("denoise");

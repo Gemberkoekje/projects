@@ -193,3 +193,15 @@ the relief better than golden hour's +2°). A dry run writes `<out>.drainage.png
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/drainage/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 640] [-Spp 64] [-Out folder]
 ```
+
+## Display look (M1.11b)
+
+`look/render.ps1` makes the M1.11b choice sheet: the four measurement views, the default camera at golden hour (+2°), the layered
+ridges in October at +2° and the alpenglow sweep, each under {AgX base, AgX punchy} × {0, +0.5, +1 EV} of the incident meter's own
+compensation (two sheets per view, one per look, varying `compensation`; the six cells must share one EXR, byte for byte), and prints
+each variant's exposure, the frame's mean and median (the largest channel), its saturation and its brightest tenth. With `-Before`
+(a `main` build) it checks that `main`'s four measurement views are byte-identical to this build's `--look base --compensation 0`.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/look/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 480] [-SweepWidth 320] [-Spp 64] [-Compensations 0,0.5,1] [-Out folder]
+```

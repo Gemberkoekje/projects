@@ -205,9 +205,11 @@ public sealed class PreviewSession
             renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
 
             // The exposure meter reads neither the size nor the loupe, so every size and loupe of this view is exposed alike and
-            // the meter is reused across them; the camera's compensation is applied after it. The incident meter (M1.10a) reads
-            // the air's LUTs the render just built: the light on a grey card where the camera stands. The average meter renders
-            // the whole frame at a fixed size.
+            // the meter is reused across them; the camera's compensation and the meter's own (M1.11b) are applied after it. The
+            // incident meter (M1.10a) reads the air's LUTs the render just built: the light on a grey card where the camera stands.
+            // The average meter renders the whole frame at a fixed size.
+            double meterCompensation = request.MeterCompensationEv
+                ?? (request.Meter == Metering.Incident ? IncidentMeter.DefaultCompensationEv : 0.0);
             if (request.Meter == Metering.Incident)
             {
                 // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air.
@@ -226,7 +228,7 @@ public sealed class PreviewSession
                     rendered = true;
                     stages[PreviewStage.ExposureMeter] = false;
                 }
-                exposure = IncidentMeter.Measure(light, frame, Tables(materials), camera.ExposureEv);
+                exposure = IncidentMeter.Measure(light, frame, Tables(materials), camera.ExposureEv + meterCompensation);
             }
             else
             {
@@ -247,17 +249,19 @@ public sealed class PreviewSession
                     rendered = true;
                     stages[PreviewStage.ExposureMeter] = false;
                 }
-                exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv);
+                exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv + meterCompensation);
                 exposure = exposure with
                 {
                     Average = exposure.Average! with { MeterWidth = meter.Width, MeterHeight = meter.Height, MeterSamplesPerPixel = meter.SamplesPerPixel },
                 };
             }
+            exposure = exposure with { CompensationEv = camera.ExposureEv, MeterCompensationEv = meterCompensation };
             timings["exposureMeter"] = Lap(stopwatch);
             MarkRendererStages(stages, rendered, built, settings);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv, request.Display), window.Width, window.Height, PngColor.Rgb);
+            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv, request.Display, request.Look), window.Width, window.Height,
+                PngColor.Rgb);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
             ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
             outputs["beautyExr"] = baseName + ".exr";
@@ -292,7 +296,7 @@ public sealed class PreviewSession
                 }
                 if (result.Succeeded)
                 {
-                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv, request.Display), window.Width, window.Height,
+                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv, request.Display, request.Look), window.Width, window.Height,
                         PngColor.Rgb);
                     outputs["denoised"] = baseName + ".denoised.png";
                     ExrEncoder.WriteRgb(Sibling(".denoised.exr"), result.Color, window.Width, window.Height);
@@ -317,11 +321,12 @@ public sealed class PreviewSession
             Seed = request.Seed,
             Camera = camera,
             DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0,
-            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.NameOf(request.Display), window)
+            Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.NameOf(request.Display, request.Look), window)
             {
                 LightSampling = ImageInfo.LightSamplingOf(settings),
                 RussianRouletteStart = settings.RussianRouletteStart,
                 Display = request.Display,
+                Look = DisplayTransform.LookOf(request.Display, request.Look),
             },
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,

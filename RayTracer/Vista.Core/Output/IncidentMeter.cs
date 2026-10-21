@@ -42,6 +42,13 @@ public static class IncidentMeter
     /// <summary>Incident-light meter calibration constant for a flat receptor, lux·s (ISO 2720).</summary>
     public const double Calibration = 250.0;
 
+    /// <summary>
+    /// The stops the incident meter adds on its own unless <c>--compensation</c> says otherwise (vista-plan §10 M1.11b), chosen by
+    /// sheet with the look (+1 EV with AgX's punchy look, which deepens middle grey by about 1 EV): the card's exposure is right for a
+    /// sunlit grey, but a whole landscape at it reads dark. The camera's EV comes on top. Provisional: re-judged at M1.17 with real materials.
+    /// </summary>
+    public const double DefaultCompensationEv = 1.0;
+
     /// <summary>Wavelengths per kernel item (a float4).</summary>
     public const int WavelengthsPerItem = 4;
 

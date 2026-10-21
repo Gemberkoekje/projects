@@ -23,6 +23,25 @@ public enum DisplayCurve
 }
 
 /// <summary>
+/// A look on top of AgX's sigmoid (vista-plan §10 M1.11b): AgX's base is a neutral start meant for grading; a look grades it.
+/// The ACES fit has none.
+/// </summary>
+public enum DisplayLook
+{
+    /// <summary>Not chosen, or a curve without looks (<see cref="DisplayCurve.Aces"/>).</summary>
+    None,
+
+    /// <summary>AgX's base, ungraded (M1.10a's).</summary>
+    Base,
+
+    /// <summary>
+    /// AgX's "punchy" look (Blender's and Filament's): after the sigmoid, each channel to the power 1.35 and the saturation about
+    /// the luma raised by 1.4 (<see cref="DisplayTransform.AgxPunchy"/>). Deeper mid-tones and more colour.
+    /// </summary>
+    Punchy,
+}
+
+/// <summary>
 /// From the integrator's CIE XYZ to files (vista-plan §5.7). XYZ → linear Rec.709 uses the engine's own
 /// matrix (<see cref="JobSystem.ToSRGB"/>), so Vista and the maze agree on colour. The PNG display transform is
 /// exposure — metered since M1.3 (<see cref="AutoExposure"/>, and since M1.10a by default <see cref="IncidentMeter"/>) — then a
@@ -37,15 +56,38 @@ public static class DisplayTransform
     /// <summary>Recorded in the sidecar for <see cref="DisplayCurve.Agx"/>.</summary>
     public const string AgxName = "exposure + AgX (three.js r169: Blender's AgX base after Filament, Rec.2020 primaries, Wrensch's sigmoid fit) + sRGB";
 
+    /// <summary>Recorded in the sidecar for <see cref="DisplayCurve.Agx"/> with <see cref="DisplayLook.Punchy"/>.</summary>
+    public const string AgxPunchyName = "exposure + AgX punchy (three.js r169's AgX, Filament's punchy look after the sigmoid: power 1.35, saturation 1.4) + sRGB";
+
     /// <summary>Recorded in the sidecar for <see cref="DisplayCurve.Aces"/>.</summary>
     public const string AcesName = "exposure + ACES fit (Narkowicz 2016, per channel) + sRGB";
 
+    /// <summary>
+    /// The look AgX gets unless another is asked for: punchy since M1.11b, chosen by sheet with the incident meter's
+    /// <see cref="IncidentMeter.DefaultCompensationEv"/> (vista-plan §10 M1.11b). Provisional: re-judged at M1.17 with real materials.
+    /// </summary>
+    public const DisplayLook DefaultLook = DisplayLook.Punchy;
+
     /// <summary>How a PNG made with <paramref name="curve"/> was display-encoded, for the sidecar.</summary>
-    public static string NameOf(DisplayCurve curve) => curve switch
+    public static string NameOf(DisplayCurve curve) => NameOf(curve, DisplayLook.Base);
+
+    /// <summary>How a PNG made with <paramref name="curve"/> and <paramref name="look"/> was display-encoded, for the sidecar.</summary>
+    public static string NameOf(DisplayCurve curve, DisplayLook look) => (curve, LookOf(curve, look)) switch
     {
-        DisplayCurve.Agx => AgxName,
-        DisplayCurve.Aces => AcesName,
+        (DisplayCurve.Agx, DisplayLook.Punchy) => AgxPunchyName,
+        (DisplayCurve.Agx, _) => AgxName,
+        (DisplayCurve.Aces, _) => AcesName,
         _ => throw new ArgumentOutOfRangeException(nameof(curve), curve, "Unknown display curve."),
+    };
+
+    /// <summary>
+    /// The look <paramref name="curve"/> actually applies when <paramref name="look"/> is asked for: AgX's own (<see cref="DisplayLook.None"/>
+    /// read as its base), and none for the ACES fit, which has no looks.
+    /// </summary>
+    public static DisplayLook LookOf(DisplayCurve curve, DisplayLook look) => curve switch
+    {
+        DisplayCurve.Agx => look == DisplayLook.None ? DisplayLook.Base : look,
+        _ => DisplayLook.None,
     };
 
     /// <summary>Converts interleaved XYZ to interleaved linear Rec.709 RGB.</summary>
@@ -68,7 +110,14 @@ public static class DisplayTransform
     /// Display-encodes interleaved linear RGB to 8-bit sRGB after <paramref name="exposureEv"/> stops of exposure, through
     /// <paramref name="curve"/>.
     /// </summary>
-    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve)
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve) =>
+        ToSrgb8(linearRgb, exposureEv, curve, DisplayLook.Base);
+
+    /// <summary>
+    /// Display-encodes interleaved linear RGB to 8-bit sRGB after <paramref name="exposureEv"/> stops of exposure, through
+    /// <paramref name="curve"/> with <paramref name="look"/> (AgX's only; the ACES fit ignores it).
+    /// </summary>
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look)
     {
         if (linearRgb.Length % 3 != 0)
             throw new ArgumentException("RGB data must hold three floats per pixel.", nameof(linearRgb));
@@ -77,9 +126,10 @@ public static class DisplayTransform
         switch (curve)
         {
             case DisplayCurve.Agx:
+                DisplayLook agxLook = LookOf(curve, look);
                 for (int p = 0; p < linearRgb.Length; p += 3)
                 {
-                    Vector3 c = Agx(new Vector3(linearRgb[p], linearRgb[p + 1], linearRgb[p + 2]) * scale);
+                    Vector3 c = Agx(new Vector3(linearRgb[p], linearRgb[p + 1], linearRgb[p + 2]) * scale, agxLook);
                     bytes[p] = EncodeSrgb(c.X);
                     bytes[p + 1] = EncodeSrgb(c.Y);
                     bytes[p + 2] = EncodeSrgb(c.Z);
@@ -139,14 +189,42 @@ public static class DisplayTransform
     /// power back to linear, back to Rec.709, clamped to [0, 1]. Linear Rec.709 in and out, as three.js's; the sRGB transfer
     /// follows (<see cref="EncodeSrgb"/>). NaN maps to 0. Middle grey (0.18) comes out at 0.2145, sRGB 128.
     /// </summary>
-    public static Vector3 Agx(Vector3 linear)
+    public static Vector3 Agx(Vector3 linear) => Agx(linear, DisplayLook.Base);
+
+    /// <summary>
+    /// <see cref="Agx(Vector3)"/> with <paramref name="look"/> graded on the sigmoid's output, before the outset, where Filament's
+    /// <c>AgxToneMapper</c> applies its looks (<see cref="AgxPunchy"/>).
+    /// </summary>
+    public static Vector3 Agx(Vector3 linear, DisplayLook look)
     {
         Vector3 c = AgxInset.Times(Rec709ToRec2020.Times(Finite(linear)));
         c = new Vector3(AgxEncode(c.X), AgxEncode(c.Y), AgxEncode(c.Z));
-        c = AgxOutset.Times(new Vector3(AgxSigmoid(c.X), AgxSigmoid(c.Y), AgxSigmoid(c.Z)));
+        c = new Vector3(AgxSigmoid(c.X), AgxSigmoid(c.Y), AgxSigmoid(c.Z));
+        c = look switch
+        {
+            DisplayLook.Base or DisplayLook.None => c,
+            DisplayLook.Punchy => AgxPunchy(c),
+            _ => throw new ArgumentOutOfRangeException(nameof(look), look, "Unknown look."),
+        };
+        c = AgxOutset.Times(c);
         c = new Vector3(MathF.Pow(Math.Max(c.X, 0f), 2.2f), MathF.Pow(Math.Max(c.Y, 0f), 2.2f), MathF.Pow(Math.Max(c.Z, 0f), 2.2f));
         c = Rec2020ToRec709.Times(c);
         return Vector3.Clamp(c, Vector3.Zero, Vector3.One);
+    }
+
+    /// <summary>
+    /// AgX's punchy look on the sigmoid's output, ported from Filament's <c>agxLook</c> (<c>filament/src/ToneMapper.cpp</c>, Apache 2.0;
+    /// Wrensch's after Blender's): an ASC CDL power of 1.35 per channel (slope 1, offset 0), then the saturation about the luma
+    /// before the power (Rec.709's weights, as Filament's) scaled by 1.4. One change: the channel is clamped at 0 before the power.
+    /// Filament's own sigmoid fit never goes below 0.0028; three.js's (Wrensch's) dips to −0.0023 at the bottom of the encoding,
+    /// where the power would be NaN.
+    /// </summary>
+    internal static Vector3 AgxPunchy(Vector3 sigmoid)
+    {
+        const float power = 1.35f, saturation = 1.4f;
+        float luma = Vector3.Dot(sigmoid, new Vector3(0.2126f, 0.7152f, 0.0722f));
+        var graded = new Vector3(MathF.Pow(Math.Max(sigmoid.X, 0f), power), MathF.Pow(Math.Max(sigmoid.Y, 0f), power), MathF.Pow(Math.Max(sigmoid.Z, 0f), power));
+        return new Vector3(luma) + saturation * (graded - new Vector3(luma));
     }
 
     /// <summary>One channel log₂ encoded onto [0, 1] (zero and negatives at the bottom).</summary>

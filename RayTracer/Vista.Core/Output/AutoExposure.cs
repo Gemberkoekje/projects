@@ -31,9 +31,18 @@ public enum Metering
 /// <param name="CompensationEv">The camera's compensation, stops.</param>
 /// <param name="MeteredEv">The stops the meter alone scaled the linear image by (log₂ of <see cref="MeterScale"/>); null when it found no light.</param>
 /// <param name="Ev100">The scene's exposure value at ISO 100 by that meter's calibration; null when it found no light.</param>
-/// <param name="AppliedEv">The stops the display transform scaled the linear image by: the metered stops plus the compensation.</param>
+/// <param name="AppliedEv">
+/// The stops the display transform scaled the linear image by: the metered stops plus the camera's compensation and
+/// <see cref="MeterCompensationEv"/>.
+/// </param>
 public sealed record ExposureInfo(Metering Meter, string Method, double CompensationEv, double? MeteredEv, double? Ev100, double AppliedEv)
 {
+    /// <summary>
+    /// The stops added for the meter itself, beside the camera's (schema 14, vista-plan §10 M1.11b): <c>--compensation</c>, or by
+    /// default the incident meter's <see cref="IncidentMeter.DefaultCompensationEv"/> and the average meter's 0.
+    /// </summary>
+    public double MeterCompensationEv { get; init; }
+
     /// <summary>The average meter's reading (<see cref="Metering.Average"/>); null for the incident meter.</summary>
     public AverageReading? Average { get; init; }
 

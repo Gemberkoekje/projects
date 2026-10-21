@@ -5,7 +5,8 @@ namespace Vista.Tests;
 
 /// <summary>
 /// The PNG's display curves (vista-plan §10 M1.10a), each against values from the implementation it is ported from: AgX against
-/// three.js r169's own <c>AgXToneMapping</c>, ACES against Narkowicz's formula.
+/// three.js r169's own <c>AgXToneMapping</c>, its punchy look (M1.11b) against the same with Filament's look added, ACES against
+/// Narkowicz's formula.
 /// </summary>
 [TestClass]
 public sealed class DisplayCurveTests
@@ -44,6 +45,94 @@ public sealed class DisplayCurveTests
         (new(0.001f, 0.2f, 0.003f), new(0.0268874224f, 0.220347241f, 0.0110861966f)),
         (new(-0.1f, 0.5f, 0.2f), new(0.0234726612f, 0.428286821f, 0.244051129f)),
     ];
+
+    /// <summary>
+    /// Three.js r169's <c>AgXToneMapping</c> as in <see cref="ThreeJs"/> (loaded from unpkg.com/three@0.169.0 on 2026-10-21, and checked
+    /// to give those values again), with Filament's <c>agxLook</c> for the punchy look (<c>filament/src/ToneMapper.cpp</c>, main on
+    /// 2026-10-21) written into it in GLSL after the sigmoid, as Filament applies it, with M1.11b's one change (the channel clamped at 0
+    /// before the power): the same inputs, run the same way.
+    /// </summary>
+    private static readonly Vector3[] ThreeJsPunchy =
+    [
+        new(2.13132253e-7f, 2.13110937e-7f, 2.13089635e-7f),
+        new(2.13132253e-7f, 2.13110937e-7f, 2.13089635e-7f),
+        new(0f, 0f, 0f),
+        new(0.000215106134f, 0.000214881133f, 0.0002150082f),
+        new(0.0132472627f, 0.0132404733f, 0.0132431183f),
+        new(0.0966401994f, 0.0966064557f, 0.0966143757f),
+        new(0.276182413f, 0.276109248f, 0.27611506f),
+        new(0.453755856f, 0.453661025f, 0.453653395f),
+        new(0.641936421f, 0.641817331f, 0.641785502f),
+        new(0.79981941f, 0.79971087f, 0.799650967f),
+        new(0.907304943f, 0.907217562f, 0.907132626f),
+        new(0.992829859f, 0.992699981f, 0.992631435f),
+        new(0.99545145f, 0.995351791f, 0.995252371f),
+        new(0.739496231f, 0f, 0f),
+        new(0.0189362038f, 0.485038161f, 0f),
+        new(0f, 0.0408605859f, 0.895308554f),
+        new(0.117035799f, 0.0308768302f, 0f),
+        new(0.256313503f, 0.132623747f, 0.0412926599f),
+        new(0.62161839f, 0.412114024f, 0.215364799f),
+        new(0.846637309f, 0.688639641f, 0.504810929f),
+        new(0.97212702f, 0.795037448f, 0.541567564f),
+        new(0f, 0.017166473f, 0.0884260088f),
+        new(0.163701683f, 0.356173247f, 0.664369106f),
+        new(0.592254162f, 0.0372190811f, 0.263510108f),
+        new(0f, 0.115833431f, 0f),
+        new(0f, 0.30763039f, 0.0977621228f),
+    ];
+
+    [TestMethod]
+    public void AgxPunchy_MatchesThreeJsWithFilamentsLook()
+    {
+        // The look's power and saturation scale the sigmoid's float cancellation (see Agx_MatchesThreeJs) a little.
+        float worst = 0f;
+        string where = string.Empty;
+        for (int i = 0; i < ThreeJs.Length; i++)
+        {
+            Vector3 difference = Vector3.Abs(DisplayTransform.Agx(ThreeJs[i].In, DisplayLook.Punchy) - ThreeJsPunchy[i]);
+            float largest = Math.Max(difference.X, Math.Max(difference.Y, difference.Z));
+            if (largest > worst)
+                (worst, where) = (largest, ThreeJs[i].In.ToString());
+        }
+        Assert.IsTrue(worst <= 3e-5f, $"worst {worst:E2} at {where}");
+    }
+
+    [TestMethod]
+    public void AgxPunchy_DeepensTheMidTones_AndAddsColour()
+    {
+        // Middle grey falls from sRGB 128 to 88 (why the look comes with a compensation), the greys stay grey and in order, and a
+        // warm golden-hour colour two stops over grey comes out more saturated than the base gives it.
+        CollectionAssert.AreEqual(new byte[] { 88, 88, 88 }, DisplayTransform.ToSrgb8([0.18f, 0.18f, 0.18f], 0.0, DisplayCurve.Agx, DisplayLook.Punchy));
+        float previous = -1f;
+        for (float x = 1e-3f; x < 1e4f; x *= 1.2f)
+        {
+            Vector3 c = DisplayTransform.Agx(new Vector3(x), DisplayLook.Punchy);
+            Assert.IsTrue(c.Y >= previous && c.Y <= 1f && c.Y >= 0f, $"grey {x}");
+            Assert.AreEqual(c.X, c.Y, 1e-3f, $"grey {x} stays grey");
+            previous = c.Y;
+        }
+        static float Saturation(Vector3 c) => (Math.Max(c.X, Math.Max(c.Y, c.Z)) - Math.Min(c.X, Math.Min(c.Y, c.Z))) / Math.Max(c.X, Math.Max(c.Y, c.Z));
+        var warm = new Vector3(0.72f, 0.45f, 0.2f);
+        Assert.IsTrue(Saturation(DisplayTransform.Agx(warm, DisplayLook.Punchy)) > 1.3f * Saturation(DisplayTransform.Agx(warm)));
+        Assert.AreEqual(Vector3.Zero, DisplayTransform.Agx(new Vector3(float.NaN), DisplayLook.Punchy) - DisplayTransform.Agx(Vector3.Zero, DisplayLook.Punchy));
+    }
+
+    [TestMethod]
+    public void Looks_AreAgxs_TheBaseIsM1_10asCurve()
+    {
+        float[] colours = [0.18f, 0.18f, 0.18f, 4f, 2.5f, 1.2f, 0.02f, 0.05f, 0.12f, 0.9f, 0.05f, 0.4f];
+        CollectionAssert.AreEqual(DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Agx), DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Agx, DisplayLook.Base));
+        CollectionAssert.AreEqual(DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Agx), DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Agx, DisplayLook.None));
+        CollectionAssert.AreEqual(DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Aces), DisplayTransform.ToSrgb8(colours, 0.5, DisplayCurve.Aces, DisplayLook.Punchy),
+            "the ACES fit has no looks");
+        Assert.AreEqual(DisplayLook.Punchy, DisplayTransform.LookOf(DisplayCurve.Agx, DisplayLook.Punchy));
+        Assert.AreEqual(DisplayLook.Base, DisplayTransform.LookOf(DisplayCurve.Agx, DisplayLook.None));
+        Assert.AreEqual(DisplayLook.None, DisplayTransform.LookOf(DisplayCurve.Aces, DisplayLook.Punchy));
+        Assert.AreEqual(DisplayTransform.AgxPunchyName, DisplayTransform.NameOf(DisplayCurve.Agx, DisplayLook.Punchy));
+        Assert.AreEqual(DisplayTransform.AgxName, DisplayTransform.NameOf(DisplayCurve.Agx, DisplayLook.Base));
+        Assert.AreEqual(DisplayTransform.AcesName, DisplayTransform.NameOf(DisplayCurve.Aces, DisplayLook.Punchy));
+    }
 
     [TestMethod]
     public void Agx_MatchesThreeJs()

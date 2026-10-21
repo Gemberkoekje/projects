@@ -48,7 +48,9 @@ public static class SheetLabels
         ("image.samplesPerPixel", "spp"),
         ("image.maxBounces", "bounces"),
         ("image.display", "display"),
+        ("image.look", "look"),
         ("exposure.meter", "meter"),
+        ("exposure.meterCompensationEv", "compensation"),
         ("image.lightSampling", "lights"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
@@ -142,11 +144,20 @@ public static class SheetLabels
                 fields["image.display"] = Display(display);
             else if (image["displayTransform"] is not null)
                 fields["image.display"] = "aces";
+            // AgX's look (schema 14); every AgX before it was the base.
+            if (image["look"] is JsonValue look)
+                fields["image.look"] = Display(look);
+            else if (fields.GetValueOrDefault("image.display") == "agx")
+                fields["image.look"] = "base";
         }
 
         // How the PNG was metered (schema 11); every build before it used the average meter.
         if (root["exposure"] is JsonObject exposure)
+        {
             fields["exposure.meter"] = exposure["meter"] is JsonValue meter ? Display(meter) : "average";
+            // The meter's own stops (schema 14); none before it.
+            fields["exposure.meterCompensationEv"] = exposure["meterCompensationEv"] is JsonValue compensation ? Display(compensation) : "0";
+        }
 
         if (root["atmosphere"]?["mode"] is JsonValue mode)
             fields["atmosphere"] = Display(mode);
@@ -257,6 +268,8 @@ public static class SheetLabels
                 "camera.sensorHeightMm" or "camera.fStop" or "camera.focusDistanceMetres" => null,
                 "image.display" => value == "agx" ? null : $"{value} curve",
                 "exposure.meter" => value == "incident" ? null : $"{value} meter",
+                "image.look" => value == "none" || value == DisplayTransform.DefaultLook.ToString().ToLowerInvariant() ? null : $"{value} look",
+                "exposure.meterCompensationEv" => $"{(value.StartsWith('-') ? value : "+" + value)} EV meter",
                 "image.window" => $"loupe {value}",
                 "image.samplesPerPixel" => $"{value} spp",
                 "image.maxBounces" => $"{value} bounces",

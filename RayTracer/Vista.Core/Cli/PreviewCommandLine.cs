@@ -122,6 +122,15 @@ public sealed record PreviewRequest
 
     /// <summary>The PNG's display curve (vista-plan §10 M1.10a): AgX by default. The EXR never changes.</summary>
     public DisplayCurve Display { get; init; } = DisplayTransform.DefaultCurve;
+
+    /// <summary>AgX's look (vista-plan §10 M1.11b); the ACES fit has none and ignores it. The EXR never changes.</summary>
+    public DisplayLook Look { get; init; } = DisplayTransform.DefaultLook;
+
+    /// <summary>
+    /// The stops the meter adds on its own, beside the camera's EV (vista-plan §10 M1.11b); null for the meter's default
+    /// (<see cref="IncidentMeter.DefaultCompensationEv"/>, or 0 for the average meter). The EXR never changes.
+    /// </summary>
+    public double? MeterCompensationEv { get; init; }
 }
 
 /// <summary>
@@ -135,7 +144,7 @@ public sealed record PreviewRequest
 ///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
-///           [--meter incident | average] [--display agx | aces]
+///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
@@ -200,7 +209,9 @@ public static class PreviewCommandLine
         "--denoise: also write <preview>.denoised.png and <preview>.denoised.exr (Intel Open Image Denoise, fetched by\n" +
         "  tools/fetch-oidn.ps1; without it a warning, and the raw image only). --denoise-device cpu (default) | cuda.\n" +
         "--meter incident (default) | average: expose the PNG for a grey card facing the sun where the camera stands, or for the\n" +
-        "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. Neither changes the EXR.";
+        "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. --look punchy (default) | base: AgX's look\n" +
+        "  (the ACES fit has none). --compensation <EV>: the stops the meter adds on its own, beside the camera's EV (default: the\n" +
+        "  incident meter's +1 EV, the average meter's 0). None of them changes the EXR.";
 
     /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
@@ -249,7 +260,7 @@ public static class PreviewCommandLine
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
-        "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display",
+        "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -332,6 +343,8 @@ public static class PreviewCommandLine
         MeshSettings mesh = Mesh(values, problems);
         Metering meter = Meter(values.GetValueOrDefault("--meter"), problems);
         DisplayCurve display = Display(values.GetValueOrDefault("--display"), problems);
+        DisplayLook look = Look(values.GetValueOrDefault("--look"), problems);
+        double? compensation = Compensation(values.GetValueOrDefault("--compensation"), problems);
 
         if (problems.Count > before)
             return null;
@@ -360,6 +373,8 @@ public static class PreviewCommandLine
             Mesh = mesh,
             Meter = meter,
             Display = display,
+            Look = look,
+            MeterCompensationEv = compensation,
         };
     }
 
@@ -389,6 +404,37 @@ public static class PreviewCommandLine
             return curve;
         problems.Add($"--display must be agx or aces, got '{text}'.");
         return DisplayTransform.DefaultCurve;
+    }
+
+    /// <summary>Parses a <c>--look</c> value (<c>base</c> or <c>punchy</c>).</summary>
+    internal static bool TryParseLook(string text, out DisplayLook look) =>
+        Enum.TryParse(text, ignoreCase: true, out look) && look != DisplayLook.None && Enum.IsDefined(look) && !int.TryParse(text, out _);
+
+    private static DisplayLook Look(string? text, List<string> problems)
+    {
+        if (text is null)
+            return DisplayTransform.DefaultLook;
+        if (TryParseLook(text, out DisplayLook look))
+            return look;
+        problems.Add($"--look must be base or punchy, got '{text}'.");
+        return DisplayTransform.DefaultLook;
+    }
+
+    /// <summary>Most stops <c>--compensation</c> may add or take away.</summary>
+    internal const double MaxCompensationEv = 10.0;
+
+    /// <summary>Parses a <c>--compensation</c> value: stops, within ±<see cref="MaxCompensationEv"/>.</summary>
+    internal static bool TryParseCompensation(string text, out double ev) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out ev) && double.IsFinite(ev) && Math.Abs(ev) <= MaxCompensationEv;
+
+    private static double? Compensation(string? text, List<string> problems)
+    {
+        if (text is null)
+            return null;
+        if (TryParseCompensation(text, out double ev))
+            return ev;
+        problems.Add($"--compensation must be a number of stops within ±{MaxCompensationEv}, got '{text}'.");
+        return null;
     }
 
     private static bool Erosion(string? text, List<string> problems)

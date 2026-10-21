@@ -53,7 +53,7 @@ public sealed class SheetLabelsTests
         card["image"]!["display"] = "agx";
         Assert.AreEqual("average", Id(old)["exposure.meter"], "every sidecar before schema 11 is the average meter's");
         Assert.AreEqual(("incident", "agx"), (Id(card)["exposure.meter"], Id(card)["image.display"]));
-        CollectionAssert.AreEqual(new[] { "display=aces meter=average", "display=agx meter=incident" },
+        CollectionAssert.AreEqual(new[] { "display=aces look=- meter=average", "display=agx look=base meter=incident" },
             SheetLabels.Differences([Id(old), Id(card)]).ToArray());
         Assert.IsFalse(Id(Sidecar()).ContainsKey("exposure.meter"), "no exposure (a dry run), no meter");
     }
