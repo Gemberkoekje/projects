@@ -1,7 +1,7 @@
 # Contact sheets
 
-Sheets that back a decision in `vista-plan.md` §10, kept where the plan can point at them. The scripts that make them write into
-`%TEMP%`; a sheet lands here when a slice's status cites it.
+Sheets that back a decision in a slice's log ([`vista-log/`](../../vista-log/README.md)), kept where the logs can point at them. The scripts that make them write into
+`%TEMP%`; a sheet lands here when a slice's log cites it.
 
 | Sheet | Slice | What it shows | Made by |
 |---|---|---|---|

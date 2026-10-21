@@ -1,4 +1,4 @@
-# The M1 cost ledger (vista-plan section 10): renders the four measurement views at 3840x2160, 64 spp, seed 42 on
+# The M1 cost ledger (vista-log/cost-ledger.md): renders the four measurement views at 3840x2160, 64 spp, seed 42 on
 # the local GPU and prints the mean and worst-dispatch cost in nanoseconds per pixel-sample, the numbers the
 # ledger records after each slice. Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(

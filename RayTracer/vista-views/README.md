@@ -1,6 +1,6 @@
 # Vista measurement views
 
-The four views the M1 cost ledger is measured on (vista-plan §10, "M1 cost ledger"), committed in M1.1 so
+The four views the M1 cost ledger is measured on ([`vista-log/cost-ledger.md`](../vista-log/cost-ledger.md)), committed in M1.1 so
 every slice measures the same pixels. They are the views M0's batch defaults were measured on, at
 3840×2160, 64 spp, seed 42:
 
