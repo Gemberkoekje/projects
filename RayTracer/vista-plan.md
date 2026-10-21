@@ -2346,21 +2346,21 @@ uniform mesh at 33.6 M and 3.2 GiB, and it builds in about 1.5 s; the preview's 
   rays used to escape to the sky) and the detail (more surface near the camera) are what the view mesh adds. The far field is 40–56%
   of every elevated view's 4K triangles: what M1.10's height-field path would replace. The world's hierarchy takes 2.7–3.2 s, once per
   world (a watch keeps it).
-- **No facets beyond the target near the camera** (`loupes-sheet.png`, 4K, 960×540 loupes of the default view's foreground ridge and
-  the down-slope view's slope, 64 spp): the grid alone (no detail) shows the 8 m grid's flat triangles as planes with hard edges; the
-  view mesh at 1 px and at 0.5 px (twice the triangles) cannot be told apart, both smooth, with the detail's bumps on the ridge line and
-  in the shadow's edge.
+- **No facets beyond the target near the camera** (`vista-views/sheets/m1-9-loupes.png`, 4K, 960×540 loupes of the default view's
+  foreground ridge and the down-slope view's slope, 64 spp): the grid alone (no detail) shows the 8 m grid's flat triangles as planes
+  with hard edges; the view mesh at 1 px and at 0.5 px (twice the triangles) cannot be told apart, both smooth, with the detail's bumps
+  on the ridge line and in the shadow's edge.
 - **The shadow of a peak off screen** (`vista-views/mesh/offscreen-shadow.camera.json`, 1280 px): 30 m over a valley floor, looking
   away from the golden-hour sun, the valley lies in the shadow of a ridge about a kilometre behind the camera. `main` (M1.8, the flat
   8 m mesh), the uniform mesh (everything kept, bent) and the view mesh cast the same shadow, its edge across the valley in the same
-  place.
-- **The same world at every size** (`sizes-sheet.png`, default, aerial and layered ridges, 64 spp): each view at 4K box-filtered to
-  320 px beside its 320 px preview at one exposure: the same ridges, valleys and shadows; mean luminance −1.45%, −0.30% and −0.60%, mean
-  |ΔY| 3.4%, 6.6% and 1.3% of the mean (most of it the preview's noise). Before the normal maps the preview had the same world but
-  lost the eroded fluting the 4K showed (coarse triangles carry their corners' normals only); with them the two match.
-- **Before and after** (`before-after-day.png`, `before-after-golden.png`, 640 px): where M1.8 and M1.9 overlap they match; the far
-  field now fills the aerial, layered-ridges and range views to the horizon where M1.8 showed the bare ground sphere; the ground near
-  the camera is smooth with its detail where M1.8 showed 8 m facets.
+  place (`vista-views/sheets/m1-9-offscreen-shadow.png`).
+- **The same world at every size** (`vista-views/sheets/m1-9-sizes.png`, default, aerial and layered ridges, 64 spp): each view at 4K
+  box-filtered to 320 px beside its 320 px preview at one exposure: the same ridges, valleys and shadows; mean luminance −1.45%, −0.30%
+  and −0.60%, mean |ΔY| 3.4%, 6.6% and 1.3% of the mean (most of it the preview's noise). Before the normal maps the preview had the
+  same world but lost the eroded fluting the 4K showed (coarse triangles carry their corners' normals only); with them the two match.
+- **Before and after** (`vista-views/sheets/m1-9-before-after-day.png`, `m1-9-before-after-golden.png`, 640 px): where M1.8 and M1.9
+  overlap they match; the far field now fills the aerial, layered-ridges and range views to the horizon where M1.8 showed the bare
+  ground sphere; the ground near the camera is smooth with its detail where M1.8 showed 8 m facets.
 - **`--gpu-selftest`** (50 checks): the self-test world's view mesh built twice is bit-identical, has no crack (no vertex at the
   midpoint of a triangle's edge), keeps the ground behind the camera and reaches past the grid; every render check, the loupe, the
   atmosphere parity (now on frame points, with a new 150 km far-field segment) and the watch checks (the base altitude now rebuilds
