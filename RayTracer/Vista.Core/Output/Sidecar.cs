@@ -37,12 +37,13 @@ namespace Vista.Output;
 /// measures (<see cref="ErosionInfo.Drainage"/>), the stream-power incision's settings and its time and that of the maps and the
 /// drainage in the cost. Schema 14 (M1.11b) added <see cref="ImageInfo.Look"/>, AgX's look, and
 /// <see cref="ExposureInfo.MeterCompensationEv"/>, the stops the meter added on its own. Schema 15 (M1.11c) added
-/// <see cref="ImageInfo.Dither"/> and <see cref="ImageInfo.BitDepth"/>, how the PNG was quantised.</para>
+/// <see cref="ImageInfo.Dither"/> and <see cref="ImageInfo.BitDepth"/>, how the PNG was quantised. Schema 16 (M1.11d) added, in
+/// <see cref="WorldInfo.Erosion"/>, the uplift map's and the rock's settings and the rock's frame (<see cref="ErosionInfo.Strata"/>).</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 15;
+    public const int CurrentSchema = 16;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;

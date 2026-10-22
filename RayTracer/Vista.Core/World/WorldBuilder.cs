@@ -22,7 +22,10 @@ public enum ErosionSource
     Off,
 }
 
-/// <summary>The erosion of a world, for the sidecar (schema 8): what made it, with what, what it cost, and how it drains (schema 13).</summary>
+/// <summary>
+/// The erosion of a world, for the sidecar (schema 8): what made it, with what, what it cost, how it drains (schema 13), and where
+/// its rock's beds are (schema 16).
+/// </summary>
 public sealed record ErosionInfo
 {
     /// <summary>Where it came from.</summary>
@@ -54,6 +57,12 @@ public sealed record ErosionInfo
 
     /// <summary>The eroded world's drainage measures (schema 13, vista-plan §10 M1.11a); null when it was not eroded.</summary>
     public DrainageStats? Drainage { get; init; }
+
+    /// <summary>
+    /// How the eroded world's heights map to its rock's frame (schema 16, vista-plan §10 M1.11d), so its beds can be found at any
+    /// height (<see cref="RockHardness"/>); null when it was not eroded.
+    /// </summary>
+    public StrataFrame? Strata { get; init; }
 }
 
 /// <summary>A world ready to mesh: the surface, its erosion maps when it was eroded, and how it came about.</summary>
@@ -103,6 +112,7 @@ public static class WorldBuilder
                 ErodedUtc = hit.Origin.CreatedUtc,
                 CacheFile = cache!.PathFor(profile, seed, grid, settings),
                 Drainage = DrainageStats.Measure(hit.Result.Drainage),
+                Strata = hit.Result.Strata,
             }, warnings);
         }
 
@@ -122,9 +132,9 @@ public static class WorldBuilder
         }
 
         var incision = System.Diagnostics.Stopwatch.StartNew();
-        HeightField incised = StreamPower.Prepare(ground, recipe, seed, settings);
+        (HeightField incised, StrataGrid strata) = Prepare(ground, recipe, seed, settings);
         double incisionSeconds = incision.Elapsed.TotalSeconds;
-        ErosionRun run = eroder.Erode(incised, settings);
+        ErosionRun run = eroder.Erode(incised, settings, strata);
         string created = time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
         string? file = cache?.Store(profile, seed, grid, settings, run.Result, new WorldOrigin(eroder.DeviceName, eroder.DriverVersion, created, ground.ContentHash()));
         return new TerrainWorld(run.Result.Surface, run.Result, new ErosionInfo
@@ -139,7 +149,24 @@ public static class WorldBuilder
             CacheFile = file,
             Stats = run.Stats with { IncisionSeconds = incisionSeconds },
             Drainage = DrainageStats.Measure(run.Result.Drainage),
+            Strata = run.Result.Strata,
         }, warnings);
+    }
+
+    /// <summary>
+    /// The ground the erosion starts from (<see cref="StreamPower.Prepare"/>) and its rock laid out on the world grid
+    /// (<see cref="StrataGrid"/>), in the frame the incision left it in.
+    /// </summary>
+    public static (HeightField Ground, StrataGrid Strata) Prepare(HeightField ground, Recipe recipe, ulong seed, ErosionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(ground);
+        ArgumentNullException.ThrowIfNull(recipe);
+        ArgumentNullException.ThrowIfNull(settings);
+        (HeightField incised, StrataFrame frame, HeightField? uplift) = StreamPower.Prepare(ground, recipe, seed, settings);
+        // The rock rose by the uplift the incision used, interpolated between its cells.
+        StrataGrid strata = StrataGrid.For(RockHardness.For(seed, settings), ground.Size, ground.CellSize, frame,
+            (x, z) => uplift is null ? 0.0 : uplift.HeightAt(x, z));
+        return (incised, strata);
     }
 
     private static string Hex(ulong value) => value.ToString("x16", CultureInfo.InvariantCulture);

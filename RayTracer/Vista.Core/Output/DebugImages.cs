@@ -271,6 +271,43 @@ public static class DebugImages
         return (bytes, size);
     }
 
+    /// <summary>
+    /// The rock's hardness at the bedrock's surface (M1.11d, <see cref="ErosionResult.Hardness"/>) over a hillshade of the eroded
+    /// surface, top-down with north up like <see cref="ErosionMap"/>: soft rock in rust, hard rock in pale blue-grey, so the beds
+    /// show as bands where slopes cut through them. At most <paramref name="maxSize"/> pixels a side (nearest samples).
+    /// </summary>
+    public static (byte[] Rgb, int Size) HardnessImage(ErosionResult result, CameraSpec? camera, int maxSize = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        HeightField field = result.Surface;
+        int n = field.Size;
+        int size = Math.Min(n, maxSize);
+        double step = (n - 1) / (double)Math.Max(size - 1, 1);
+        var bytes = new byte[size * size * 3];
+        Parallel.For(0, size, row =>
+        {
+            int j = (int)Math.Round((size - 1 - row) * step);
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1);
+                double dhdx = (field[i1, j] - field[i0, j]) / ((i1 - i0) * field.CellSize);
+                double dhdz = (field[i, j1] - field[i, j0]) / ((j1 - j0) * field.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double light = 0.3 + 0.7 * shade;
+                double h = result.Hardness[j * n + i];
+                Put(bytes, row * size + col, (
+                    (byte)Math.Round(light * (200 - 20 * h)),
+                    (byte)Math.Round(light * (110 + 95 * h)),
+                    (byte)Math.Round(light * (60 + 170 * h))));
+            }
+        });
+        if (camera is not null)
+            MarkCamera(bytes, size, field, camera);
+        return (bytes, size);
+    }
+
     private static void MarkCamera(byte[] bytes, int size, HeightField field, CameraSpec camera)
     {
         double ToCol(double x) => (x - field.OriginX) / field.Extent * (size - 1);

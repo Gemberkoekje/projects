@@ -58,14 +58,14 @@ internal static class GpuSelfTest
     private const double LutTolerance = 2e-3;
 
     /// <summary>
-    /// The camera every render here uses: M0's default camera for seed 42 (<c>vista-views/default.camera.json</c>), looking north
-    /// over the range with the sky above it. Since M1.11a's incision, <see cref="DefaultCamera.For"/> puts the eye on a valley floor
-    /// facing a wall there, with no sky in frame; this pose stands 532 m above that floor.
+    /// The camera every render here uses: the default measurement view for seed 42 (<c>vista-views/default.camera.json</c>), 3 m
+    /// above rock, looking north-north-west at the range with the sky above it. <see cref="DefaultCamera.For"/>'s pose has stood on a
+    /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world).
     /// </summary>
     private static readonly CameraSpec SelfTestCamera = new()
     {
-        Position = new WorldPoint(0.0, 1692.2126708984372, -5734.4),
-        YawDegrees = 0.0,
+        Position = new WorldPoint(2625.0, 1607.42, -4375.0),
+        YawDegrees = -20.0,
         PitchDegrees = 3.0,
     };
 
@@ -111,8 +111,8 @@ internal static class GpuSelfTest
         pass &= Check(log, "0.05 ms budget is bit-identical", Same(reference, split, compareAovs: true));
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
 
-        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.11a the range lies below the horizon from
-        // this pose, the skyline near row 200).
+        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.11d's pose the range's skyline crosses it
+        // near row 190, a third of it sky).
         var frame = settings with { Width = 640, Height = 360 };
         var window = new PixelWindow(291, 171, 64, 64);
         RenderOutput full = Render(renderer, scene, frame, allAovs, new BatchPlannerOptions(), log, "640×360 frame");
@@ -159,7 +159,8 @@ internal static class GpuSelfTest
                 && world.Info.Stats!.LongestSubmissionSeconds < 1.5 ? null : "a value is negative or not finite, or a submission came near the GPU timeout");
 
             HeightField ground = TerrainGenerator.Generate(recipe, seed, grid);
-            ErosionResult second = renderer.Erode(StreamPower.Prepare(ground, recipe, seed, erosion), erosion).Result;
+            (HeightField prepared, StrataGrid strata) = WorldBuilder.Prepare(ground, recipe, seed, erosion);
+            ErosionResult second = renderer.Erode(prepared, erosion, strata).Result;
             pass &= Check(log, "the world eroded twice is bit-identical", SameWorld(first, second));
 
             (ErosionResult Result, WorldOrigin Origin)? loaded = cache.TryLoad(profile, seed, grid, erosion, out string? problem);
@@ -195,6 +196,8 @@ internal static class GpuSelfTest
             return "the maps differ";
         if (!a.Drainage.Direction.AsSpan().SequenceEqual(b.Drainage.Direction) || !a.Drainage.FillDepth.AsSpan().SequenceEqual(b.Drainage.FillDepth))
             return "the drainage differs";
+        if (!a.Hardness.AsSpan().SequenceEqual(b.Hardness) || a.Strata != b.Strata)
+            return "the rock's hardness differs";
         return a.ContentHash() == b.ContentHash() ? null : "the hashes differ";
     }
 

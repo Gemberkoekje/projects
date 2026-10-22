@@ -8,13 +8,16 @@ every slice measures the same pixels. They are the views M0's batch defaults wer
 |---|---|---|---|
 | Sky only | `mountains-day.recipe.json` | `sky.camera.json` (pitch +45°) | camera rays that escape: the floor |
 | Aerial over the range, day | `mountains-day.recipe.json` | `aerial.camera.json` (4.2 km up, pitch −12°) | the range in depth |
-| Default camera, day | `mountains-day.recipe.json` | `default.camera.json` | the M0 default camera for seed 42, pinned |
+| Default camera, day | `mountains-day.recipe.json` | `default.camera.json` | near the ground, facing the range |
 | Down a slope, golden hour | `mountains-golden.recipe.json` | `down-slope.camera.json` (pitch −30°) | every pixel terrain, low sun |
 
-`default.camera.json` is the pose `DefaultCamera.For` gave seed 42 on the M0 terrain (1.7 m above the
-ground there). It is a file now so later terrain changes do not move the view; if erosion (M1.7) lifts the
-ground above it, the preview warns and the view needs a new height. Since M1.11a's incision the ground there is a valley floor
-532 m below it (552 m below the down-slope view), so both views look over the range from above; the views stay as they are.
+`default.camera.json` was the pose `DefaultCamera.For` gave seed 42 on the M0 terrain (1.7 m above the
+ground there), a file so later terrain changes do not move the view; if erosion lifts the ground above a view, the preview
+warns. M1.11a's incision left it and the down-slope view 532 and 552 m above a valley floor, and on M1.11d's world that spot is
+83 m underground, so M1.11d re-placed both on the eroded seed-42 ground, 3 m above rock the GPU erosion barely moves (CI checks
+them over the incised ground, the self-test over the eroded one): the default at (2625, −4375) looking 20° west of north at the
+range, down the slope on a lit 37° face at (−2850, 0) looking down it toward the golden-hour sun. The sky view stands at the
+default's spot, pitched up 45°. Ledger rows from before M1.11d measured other poses.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
 defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
@@ -219,4 +222,19 @@ of the 8-bit PNG. It writes the two sheets the log cites: `before-after.png` and
 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/finish/render.ps1 -Before ..\main\Vista.App.dll [-Width 480] [-CellWidth 320] [-Spp 64] [-SkyWidth 3840] [-SkySpp 1024] [-DenoiseDevice cuda] [-LoupeWidth 400] [-Out folder]
+```
+
+## Relief checks (M1.11d)
+
+`relief/render.ps1` reruns the M1.11d checks: `--erosion-measure` on four seeds with M1.11a's world (this build with M1.11a's uplift
+and no hardness: `UpliftOctaves=0` and the old talus and erodibility, which makes `main`'s world bit for bit) and with this build's
+uplift map and rock, printing each world's drainage, its relief (the local relief in 1 km and 5 km squares, the highest point of each
+1 km square: their 10th, 50th and 90th percentiles), its slopes (the share in the most crowded ±2° window from 20° up: the facets)
+and its rock's hardness; then a sheet of each seed's uplift map and hardness map. With `-Before` (a `main` build) it also renders the
+four seeds from the aerial camera and the seed-42 range and layered-ridges views with both builds, and the default and down-slope views
+of `-BeforeRef` (`main` before M1.11d) against the re-placed ones, in a low afternoon sun (the day recipe at `--sun-elevation 12`). A
+dry run writes `<out>.hardness.png` beside `<out>.drainage.png` when its world is eroded.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/relief/render.ps1 [-Before ..\main\Vista.App.dll] [-CellWidth 400] [-Spp 64] [-MapSize 256] [-Out folder]
 ```

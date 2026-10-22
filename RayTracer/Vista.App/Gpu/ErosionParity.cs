@@ -11,7 +11,8 @@ namespace Vista.App.Gpu;
 /// it; from that state each of the five passes runs once on both sides and their outputs are compared; then both run the whole
 /// schedule's first steps from the bare ground and their surfaces are compared. Differences come from float rounding alone (the
 /// GPU may fuse a multiply and an add, and its square root and division round differently), so a pass agrees to a few units in
-/// the last place, and a run of steps a little less, since erosion amplifies differences.
+/// the last place, and a run of steps a little less, since erosion amplifies differences. The patch's rock has the seed's strata
+/// (M1.11d), so the passes that read its hardness are compared with it.
 /// </summary>
 internal static class ErosionParity
 {
@@ -36,10 +37,11 @@ internal static class ErosionParity
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(settings);
         HeightField patch = TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.AlpineRange] }, 42, new WorldGrid(Size, cellSize));
-        var warm = new ErosionState(patch);
+        StrataGrid strata = StrataGrid.For(RockHardness.For(42, settings), Size, cellSize, StrataFrame.Identity, (_, _) => 0.0);
+        var warm = new ErosionState(patch, strata);
         ErosionSettings averaging = settings with { AverageFrom = 0 };
         ErosionReference.Run(warm, averaging, WarmUpSteps);
-        ErosionConstants k = ErosionConstants.For(averaging, Size, cellSize);
+        ErosionConstants k = ErosionConstants.For(averaging, Size, cellSize).WithStrata(warm);
         k.Accumulate = 1;
         int cells = Size * Size;
         bool pass = true;
@@ -56,7 +58,7 @@ internal static class ErosionParity
                     break;
                 case ErosionPass.Water:
                     float[] terrain = new float[cells * 2], water = new float[cells], sediment = new float[cells];
-                    ErosionReference.Water(k, cpu.Terrain, cpu.Water, cpu.Sediment, cpu.Flux, terrain, water, sediment, cpu.Flow);
+                    ErosionReference.Water(k, cpu.Terrain, cpu.Water, cpu.Sediment, cpu.Flux, terrain, water, sediment, cpu.Flow, cpu.Strata, cpu.Bands);
                     expected = [terrain, water, sediment, cpu.Flow];
                     break;
                 case ErosionPass.Transport:
@@ -65,7 +67,7 @@ internal static class ErosionParity
                     expected = [moved];
                     break;
                 case ErosionPass.ThermalOut:
-                    ErosionReference.ThermalOut(k, cpu.Terrain, cpu.Thermal);
+                    ErosionReference.ThermalOut(k, cpu.Terrain, cpu.Thermal, cpu.Strata, cpu.Bands);
                     expected = [cpu.Thermal];
                     break;
                 default:
@@ -83,7 +85,7 @@ internal static class ErosionParity
             log.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  {p}: largest difference {worst:E2} of the largest value"));
         }
 
-        var bare = new ErosionState(patch);
+        var bare = new ErosionState(patch, strata);
         ErosionState cpuRun = bare.Clone();
         ErosionReference.Run(cpuRun, settings, RunSteps);
         ErosionState gpuRun = renderer.RunErosion(bare, settings, RunSteps);

@@ -100,6 +100,35 @@ public sealed record TerrainProfile(
     }
 
     /// <summary>
+    /// The terrain's large-scale shape (vista-plan §10 M1.11d's uplift map): its first <paramref name="octaves"/> octaves alone,
+    /// normalised by their own weights to [0, 1] (no means stand in for the rest), at world <c>(x, z)</c> under the same warp
+    /// and rotations as <see cref="Height(ulong, double, double, int)"/>, so its high ground is the terrain's massifs.
+    /// </summary>
+    public double Shape(ulong seed, double x, double z, int octaves)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(octaves);
+        octaves = Math.Min(octaves, Octaves);
+        double wf = 1.0 / (WavelengthMetres * WarpWavelengthFactor);
+        double warp = WarpFraction * WavelengthMetres;
+        ulong warpSeed = StableHash.Combine(seed, WarpStream);
+        double px = x + warp * GradientNoise.Sample(warpSeed, x * wf, z * wf);
+        double pz = z + warp * GradientNoise.Sample(StableHash.Mix(warpSeed), x * wf, z * wf);
+        double frequency = 1.0 / WavelengthMetres;
+        double amplitude = 1.0, sum = 0.0, norm = 0.0;
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            double n = GradientNoise.Sample(StableHash.Combine(seed, (ulong)octave), px * frequency, pz * frequency);
+            double r = 1.0 - Math.Abs(n);
+            sum += (Ridged ? r * r : n * 0.5 + 0.5) * amplitude;
+            norm += amplitude;
+            amplitude *= Persistence;
+            frequency *= 2.0;
+            (px, pz) = (0.8 * px - 0.6 * pz, 0.6 * px + 0.8 * pz);
+        }
+        return Math.Clamp(sum / norm, 0.0, 1.0);
+    }
+
+    /// <summary>
     /// The number of octaves a grid of <paramref name="cellSize"/> metres can hold: those whose wavelength is at least two
     /// cells (at least one).
     /// </summary>

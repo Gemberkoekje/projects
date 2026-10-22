@@ -196,7 +196,7 @@ public sealed class WorldStageTests
         Sidecar rendered = PreviewPipeline.Run(Request(dryRun: false), renderer, eroder: new CountingEroder(), erosionCache: cache);
         ErosionInfo erosion = rendered.World.Erosion!;
         Assert.AreEqual(ErosionSource.Eroded, erosion.Source);
-        Assert.AreEqual(15, rendered.Schema);
+        Assert.AreEqual(16, rendered.Schema);
         Assert.AreEqual(renderer.Scene!.Terrain.ContentHash().ToString("x16"), rendered.World.HeightFieldHash, "the sidecar hashes the eroded surface");
         Assert.AreNotEqual(erosion.BaseHeightFieldHash, rendered.World.HeightFieldHash);
         Assert.AreEqual(0, rendered.Warnings.Count);
@@ -205,6 +205,7 @@ public sealed class WorldStageTests
         Assert.AreEqual(ErosionSource.Cache, dry.World.Erosion!.Source);
         Assert.AreEqual(rendered.World.HeightFieldHash, dry.World.HeightFieldHash, "the dry run shows the world the render drew");
         Assert.IsTrue(File.Exists(Path.Combine(_dir, dry.Outputs["erosionMap"])));
+        Assert.IsTrue(File.Exists(Path.Combine(_dir, dry.Outputs["hardnessMap"])), "the rock's hardness map (M1.11d)");
         Assert.AreEqual(0, dry.Warnings.Count);
 
         // The sidecar's erosion block reads back.
@@ -213,6 +214,9 @@ public sealed class WorldStageTests
         Assert.AreEqual("cache", block.GetProperty("source").GetString());
         Assert.AreEqual(ErosionSettings.Mountains.ContentHash().ToString("x16"), block.GetProperty("settingsHash").GetString());
         Assert.AreEqual(1500, block.GetProperty("settings").GetProperty("iterations").GetInt32());
+        Assert.AreEqual(ErosionSettings.Mountains.IncisionSteps, block.GetProperty("strata").GetProperty("upliftSteps").GetInt32(),
+            "the rock's frame (schema 16)");
+        Assert.AreEqual(dry.World.Erosion.Strata, rendered.World.Erosion.Strata, "the cached world keeps its frame");
     }
 
     [TestMethod]
@@ -311,10 +315,10 @@ public sealed class WorldStageTests
 
         public string DriverVersion => _reference.DriverVersion;
 
-        public ErosionRun Erode(HeightField ground, ErosionSettings settings)
+        public ErosionRun Erode(HeightField ground, ErosionSettings settings, StrataGrid? strata = null)
         {
             Runs++;
-            return _reference.Erode(ground, settings with { Iterations = 60, AverageFrom = 30 });
+            return _reference.Erode(ground, settings with { Iterations = 60, AverageFrom = 30 }, strata);
         }
     }
 }

@@ -28,7 +28,10 @@ public sealed class StreamPowerTests
     public void WithoutIncision_TheGroundIsUntouched()
     {
         HeightField ground = TerrainGenerator.Generate(Alpine, 5, TestWorlds.Small);
-        Assert.AreSame(ground, StreamPower.Prepare(ground, Alpine, 5, ErosionSettings.Hills));
+        (HeightField prepared, StrataFrame frame, HeightField? uplift) = StreamPower.Prepare(ground, Alpine, 5, ErosionSettings.Hills);
+        Assert.AreSame(ground, prepared);
+        Assert.AreEqual(StrataFrame.Identity, frame, "the rock stays where it was");
+        Assert.IsNull(uplift);
         Assert.AreEqual(0, ErosionSettings.Hills.IncisionSteps, "the hills are not incised until their own milestone");
         Assert.IsTrue(ErosionSettings.Mountains.IncisionSteps > 0);
     }
@@ -56,7 +59,7 @@ public sealed class StreamPowerTests
         DrainageStats before = DrainageStats.Measure(DrainageMap.Of(ground), channelAreaKm2: 0.1);
         Assert.IsTrue(before.BasinShare > 0.02, $"the crater is a closed basin ({before.BasinShare:0.0%} of the grid)");
 
-        HeightField incised = StreamPower.Incise(ground, ErosionSettings.Mountains);
+        HeightField incised = StreamPower.Incise(ground, ErosionSettings.Mountains, UpliftMap.On(Alpine, 1, ErosionSettings.Mountains, ground)).Incised;
         DrainageStats after = DrainageStats.Measure(DrainageMap.Of(incised), channelAreaKm2: 0.1);
         Assert.AreEqual(0.0, after.BasinShare, "the rim is cut and the crater drains");
         Assert.IsTrue(after.LakeShare < before.LakeShare / 4, $"lakes {before.LakeShare:0.0%} → {after.LakeShare:0.0%}");
@@ -71,14 +74,14 @@ public sealed class StreamPowerTests
         var grid = new WorldGrid(129, 16.0);
         ErosionSettings settings = ErosionSettings.Mountains with { IncisionSteps = 60 };
         HeightField ground = TerrainGenerator.Generate(Alpine, 9, grid);
-        HeightField a = StreamPower.Prepare(ground, Alpine, 9, settings);
-        HeightField b = StreamPower.Prepare(ground, Alpine, 9, settings);
+        HeightField a = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
+        HeightField b = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
         Assert.AreEqual(a.ContentHash(), b.ContentHash());
         Assert.AreNotEqual(ground.ContentHash(), a.ContentHash());
         Assert.AreEqual(PinnedPreparedHash, a.ContentHash().ToString("x16"));
     }
 
-    private const string PinnedPreparedHash = "96b1fa58db5650a3";
+    private const string PinnedPreparedHash = "6607fcdede7e57c0";
 
     [TestMethod]
     public void Upsampling_KeepsTheCoarseSamples_AndInterpolatesBetweenThem()

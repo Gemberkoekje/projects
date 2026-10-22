@@ -5,7 +5,9 @@
 //   CSTransport      suspended sediment moves with the water                         (Water of the step, Flux, Sediment B → A)
 //   CSThermalOut     how much loose material and rock leaves each cell               (Terrain B → Thermal)
 //   CSThermalApply   each cell loses what it sent, gains its share of its neighbours' (Terrain B, Thermal → Terrain A)
-// plus CSClear, which zeroes a buffer. Each thread computes one cell and writes only it (gather-only, no atomics), so a run
+// Since M1.11d the rock has strata (Vista.World.RockHardness): CSWater's rock erodibility and CSThermalOut's rock talus follow
+// the hardness of the rock at its current height, looked up in the bed table as the reference does. Plus CSClear, which
+// zeroes a buffer. Each thread computes one cell and writes only it (gather-only, no atomics), so a run
 // is bit-identical every time on one driver. Every buffer is a UAV: passes are separated by UAV barriers, never state
 // transitions. The C# reference is Vista.World.ErosionReference, mirrored line for line; amounts that move between layers are
 // made exactly representable first, and `precise` keeps the compiler from folding that away.
@@ -36,6 +38,14 @@ cbuffer ErosionConstants : register(b0)
     float LooseDropCorner;
     float RockDropEdge;
     float RockDropCorner;
+    float RockErodibilityHard;
+    float RockDropEdgeHard;
+    float RockDropCornerHard;
+    float TableScale;       // bed-table entries per metre of rock height
+    float TableLast;        // the largest table coordinate a lookup reads
+    uint  _pad2;
+    uint  _pad3;
+    uint  _pad4;
 };
 
 RWStructuredBuffer<float2> TerrainIn   : register(u0); // (bedrock, loose)
@@ -48,11 +58,27 @@ RWStructuredBuffer<float>  SedimentOut : register(u6);
 RWStructuredBuffer<float2> Flow        : register(u7); // sums of (outflow, water depth)
 RWStructuredBuffer<float4> Thermal     : register(u8); // (loose moved, rock moved, sum of the loose excess, 0)
 RWByteAddressBuffer        ClearTarget : register(u9);
+RWStructuredBuffer<float2> Strata      : register(u10); // per cell (bed-table coordinate at height 0, mottle)
+RWStructuredBuffer<float>  Bands       : register(u11); // the bed table: hardness by stratigraphic height
 
 float Ground(uint c)
 {
     float2 t = TerrainIn[c];
     return t.x + t.y;
+}
+
+// The hardness of the rock at height `rock` in cell c: the bed table interpolated at the rock's table coordinate, plus the mottle.
+float Hardness(uint c, float rock)
+{
+    float2 s = Strata[c];
+    precise float scaled = rock * TableScale;
+    precise float t = clamp(scaled + s.x, 0.0, TableLast);
+    precise float b = floor(t);
+    uint k = uint(b);
+    precise float f = t - b;
+    float lo = Bands[k], hi = Bands[k + 1u];
+    precise float bed = lo + (hi - lo) * f;
+    return clamp(bed + s.y, 0.0, 1.0);
 }
 
 // The eight neighbours, in the order both sides sum them.
@@ -144,7 +170,9 @@ void CSWater(uint3 tid : SV_DispatchThreadID)
         float demand = min(Dissolve * (capacity - carried), max(0.0, ground - lowest));
         precise float looseLeft = loose - min(demand, loose);
         precise float fromLoose = loose - looseLeft;
-        precise float rockLeft = rock - (demand - fromLoose) * RockErodibility;
+        float hardness = Hardness(c, rock);
+        precise float erodibility = RockErodibility + (RockErodibilityHard - RockErodibility) * hardness;
+        precise float rockLeft = rock - (demand - fromLoose) * erodibility;
         precise float fromRock = rock - rockLeft;
         loose = looseLeft;
         rock = rockLeft;
@@ -202,6 +230,10 @@ void CSThermalOut(uint3 tid : SV_DispatchThreadID)
     precise float rock = t.x;
     precise float loose = t.y;
     float ground = rock + loose;
+    // Harder rock stands steeper: the drops it holds follow its hardness.
+    float hardness = Hardness(c, rock);
+    precise float rockEdge = RockDropEdge + (RockDropEdgeHard - RockDropEdge) * hardness;
+    precise float rockCorner = RockDropCorner + (RockDropCornerHard - RockDropCorner) * hardness;
     float maxLoose = 0.0, maxRock = 0.0, sum = 0.0;
     [unroll]
     for (uint q = 0u; q < 8u; q++)
@@ -214,7 +246,7 @@ void CSThermalOut(uint3 tid : SV_DispatchThreadID)
         bool corner = NeighbourI[q] != 0 && NeighbourJ[q] != 0;
         precise float drop = ground - Ground(m);
         precise float overLoose = max(0.0, drop - (corner ? LooseDropCorner : LooseDropEdge));
-        float overRock = max(0.0, drop - (corner ? RockDropCorner : RockDropEdge));
+        float overRock = max(0.0, drop - (corner ? rockCorner : rockEdge));
         maxLoose = max(maxLoose, overLoose);
         maxRock = max(maxRock, overRock);
         sum += overLoose;

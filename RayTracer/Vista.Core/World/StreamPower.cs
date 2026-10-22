@@ -10,8 +10,10 @@ namespace Vista.World;
 /// over the filled surface (<see cref="DrainageMap"/>), so a hollow's whole catchment drains through its lowest rim: that rim
 /// cuts down fastest, the lake behind it fills with sediment a little each step, and the closed basins of the base terrain become
 /// valleys that join. Cells under a lake do not incise; cells that drain less than a channel's area do not either (hillslopes);
-/// every cell is kept within a talus slope of the cell it drains into, so incised valleys widen into V shapes. The ranges keep
-/// rising where the base terrain is high, and the result is mapped back to the base terrain's range of heights.
+/// every cell is kept within a talus slope of the cell it drains into, so incised valleys widen into V shapes. The ground keeps
+/// rising by the uplift map (<see cref="UpliftMap"/>, M1.11d), so the massifs stand where it is high, and the rock's hardness
+/// (<see cref="RockHardness"/>, M1.11d) sets each cell's erodibility and talus slope, so hard beds stand as cliffs and ledges;
+/// the result is mapped back to the base terrain's range of heights.
 /// </summary>
 /// <remarks>
 /// Single-threaded where order matters (the solve runs in the drainage's order, in double precision), so the result is a pure
@@ -23,26 +25,29 @@ public static class StreamPower
     public const float DetailFadeMetres = 25f;
 
     /// <summary>
-    /// The ground the pipe-model erosion starts from: <paramref name="ground"/> (the base terrain on the world grid) when the
-    /// settings run no incision; else the base terrain on the coarse grid incised (<see cref="Coarse"/>) and brought back to the
-    /// world grid (<see cref="Refine"/>).
+    /// The ground the pipe-model erosion starts from, with the frame of its rock (<see cref="StrataFrame"/>) and the uplift per
+    /// step the incision lifted it by (on the incision grid; null without an incision): <paramref name="ground"/> (the base terrain
+    /// on the world grid) when the settings run no incision; else the base terrain on the coarse grid incised (<see cref="Coarse"/>)
+    /// and brought back to the world grid (<see cref="Refine"/>).
     /// </summary>
-    public static HeightField Prepare(HeightField ground, Recipe recipe, ulong seed, ErosionSettings settings)
+    public static (HeightField Ground, StrataFrame Frame, HeightField? Uplift) Prepare(HeightField ground, Recipe recipe, ulong seed, ErosionSettings settings)
     {
         ArgumentNullException.ThrowIfNull(ground);
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(settings);
         if (settings.IncisionSteps == 0)
-            return ground;
-        (HeightField coarse, HeightField incised) = Coarse(recipe, seed, new WorldGrid(ground.Size, ground.CellSize), settings);
-        return Refine(incised, coarse, ground, settings.ChannelAreaKm2);
+            return (ground, StrataFrame.Identity, null);
+        (HeightField coarse, HeightField incised, StrataFrame frame, HeightField uplift) = Coarse(recipe, seed, new WorldGrid(ground.Size, ground.CellSize), settings);
+        return (Refine(incised, coarse, ground, settings.ChannelAreaKm2), frame, uplift);
     }
 
     /// <summary>
     /// The base terrain on the incision grid of a world on <paramref name="grid"/> (with the octaves that grid holds), and the
-    /// same incised (<see cref="Incise"/>).
+    /// same incised (<see cref="Incise"/>) under the recipe's uplift map and the seed's rock, with the frame it leaves the rock in
+    /// and the uplift per step on that grid.
     /// </summary>
-    public static (HeightField Base, HeightField Incised) Coarse(Recipe recipe, ulong seed, WorldGrid grid, ErosionSettings settings)
+    public static (HeightField Base, HeightField Incised, StrataFrame Frame, HeightField Uplift) Coarse(Recipe recipe, ulong seed, WorldGrid grid,
+        ErosionSettings settings)
     {
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(grid);
@@ -51,7 +56,22 @@ public static class StreamPower
         var coarseGrid = new WorldGrid((grid.Size - 1) / factor + 1, grid.CellSize * factor);
         TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
         HeightField coarse = TerrainGenerator.Generate(recipe, seed, coarseGrid, profile.OctavesFor(coarseGrid.CellSize));
-        return (coarse, Incise(coarse, settings));
+        float[] uplift = UpliftMap.On(recipe, seed, settings, coarse);
+        // The rock on the coarse grid: per cell its beds' fold and its mottle, so a lookup per step is one table read.
+        RockHardness rock = RockHardness.For(seed, settings);
+        int n = coarse.Size;
+        var fold = new double[n * n];
+        var mottle = new float[n * n];
+        Parallel.For(0, n, j =>
+        {
+            for (int i = 0; i < n; i++)
+            {
+                fold[j * n + i] = rock.Fold(coarse.XOf(i), coarse.ZOf(j));
+                mottle[j * n + i] = (float)rock.Mottle(coarse.XOf(i), coarse.ZOf(j));
+            }
+        });
+        (HeightField incised, StrataFrame frame) = Incise(coarse, settings, uplift, (c, y) => rock.AtSigma(y + fold[c], mottle[c]));
+        return (coarse, incised, frame, new HeightField(n, coarse.CellSize, uplift));
     }
 
     /// <summary>
@@ -95,31 +115,34 @@ public static class StreamPower
         return factor;
     }
 
-    /// <summary>Runs <see cref="ErosionSettings.IncisionSteps"/> steps of stream-power incision on <paramref name="ground"/>.</summary>
-    public static HeightField Incise(HeightField ground, ErosionSettings settings)
+    /// <summary>
+    /// Runs <see cref="ErosionSettings.IncisionSteps"/> steps of stream-power incision on <paramref name="ground"/>, lifting each
+    /// cell by <paramref name="uplift"/> (metres per step, row-major on the ground's grid) every step. <paramref name="hardness"/>
+    /// gives the hardness of the rock in cell <c>c</c> at a height in the rock's frame (the height less the uplift so far); without
+    /// it every rock is the softest. Returns the incised ground mapped back to the base terrain's range, and that map as the rock's frame.
+    /// </summary>
+    public static (HeightField Incised, StrataFrame Frame) Incise(HeightField ground, ErosionSettings settings, float[] uplift,
+        Func<int, double, float>? hardness = null)
     {
         ArgumentNullException.ThrowIfNull(ground);
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(uplift);
         int n = ground.Size;
         int cells = n * n;
+        if (uplift.Length != cells)
+            throw new ArgumentException($"Expected {cells} uplift values, got {uplift.Length}.", nameof(uplift));
         float[] h = ground.Heights.ToArray();
         int channel = (int)Math.Ceiling(settings.ChannelAreaKm2 * 1e6 / (ground.CellSize * ground.CellSize));
         // Rounded to float like every other setting, so the last bit of the platform's tangent cannot move the result.
-        double talus = (float)Math.Tan(settings.IncisionTalusDegrees * Math.PI / 180.0);
-        // Uplift in proportion to the base terrain's height: the ranges keep rising where the base terrain is high while the
-        // rivers cut down; the edge is the base level and does not move.
-        var uplift = new float[cells];
+        double talusSoft = (float)Math.Tan(settings.IncisionTalusDegrees * Math.PI / 180.0);
+        double talusHard = (float)Math.Tan(settings.IncisionTalusHardDegrees * Math.PI / 180.0);
         float low = ground.MinHeight, span = Math.Max(ground.MaxHeight - low, 1e-3f);
-        for (int j = 1; j < n - 1; j++)
-        {
-            for (int i = 1; i < n - 1; i++)
-                uplift[j * n + i] = settings.IncisionUplift * ((h[j * n + i] - low) / span);
-        }
         for (int step = 0; step < settings.IncisionSteps; step++)
         {
             for (int c = 0; c < cells; c++)
                 h[c] += uplift[c];
             DrainageMap drainage = DrainageMap.Of(new HeightField(n, ground.CellSize, (float[])h.Clone()));
+            int lifted = step + 1;
             // Outlets first, so each cell's receiver already has this step's height (the implicit solve).
             for (int k = cells - 1; k >= 0; k--)
             {
@@ -135,11 +158,14 @@ public static class StreamPower
                 }
                 double length = drainage.StepLength(c);
                 double height = h[c];
+                // The rock at the cell's surface: harder rock cuts more slowly and stands steeper.
+                double hard = hardness is null ? 0.0 : hardness(c, h[c] - lifted * (double)uplift[c]);
                 if (drainage.Upstream[c] >= channel)
                 {
-                    double f = settings.IncisionRate * Math.Sqrt(drainage.Area(c)) / length;
+                    double f = settings.IncisionRate * (1.0 + (settings.HardErodibility - 1.0) * hard) * Math.Sqrt(drainage.Area(c)) / length;
                     height = (height + f * h[r]) / (1.0 + f);
                 }
+                double talus = talusSoft + (talusHard - talusSoft) * hard;
                 h[c] = (float)Math.Min(height, h[r] + talus * length);
             }
         }
@@ -149,7 +175,7 @@ public static class StreamPower
         double scale = span / Math.Max(top - bottom, 1e-3);
         for (int c = 0; c < cells; c++)
             h[c] = (float)(low + (h[c] - bottom) * scale);
-        return new HeightField(n, ground.CellSize, h);
+        return (new HeightField(n, ground.CellSize, h), new StrataFrame(low, bottom, scale, settings.IncisionSteps));
     }
 
     /// <summary>

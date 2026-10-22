@@ -12,8 +12,11 @@ public interface ITerrainEroder
     /// <summary>The driver behind <see cref="DeviceName"/>, or empty when there is none to name.</summary>
     string DriverVersion { get; }
 
-    /// <summary>Erodes <paramref name="ground"/> with <paramref name="settings"/>.</summary>
-    ErosionRun Erode(HeightField ground, ErosionSettings settings);
+    /// <summary>
+    /// Erodes <paramref name="ground"/> with <paramref name="settings"/>, its rock's hardness from <paramref name="strata"/> (on the
+    /// ground's grid; without them every rock is the softest).
+    /// </summary>
+    ErosionRun Erode(HeightField ground, ErosionSettings settings, StrataGrid? strata = null);
 }
 
 /// <summary>One erosion: the world, and what it cost.</summary>
@@ -52,13 +55,13 @@ public sealed class ReferenceEroder : ITerrainEroder
     public string DriverVersion => string.Empty;
 
     /// <inheritdoc />
-    public ErosionRun Erode(HeightField ground, ErosionSettings settings)
+    public ErosionRun Erode(HeightField ground, ErosionSettings settings, StrataGrid? strata = null)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var state = new ErosionState(ground);
+        var state = new ErosionState(ground, strata);
         ErosionReference.Run(state, settings, settings.Iterations);
         double seconds = stopwatch.Elapsed.TotalSeconds;
-        ErosionResult result = ErosionResult.From(state, settings.PoolFillMetres);
+        ErosionResult result = ErosionResult.From(state, settings.PoolFillMetres, strata);
         long cells = (long)ground.Size * ground.Size;
         return new ErosionRun(result, new ErosionStats(seconds, stopwatch.Elapsed.TotalSeconds, 0, 0.0, cells * ErosionState.FloatsPerCell * sizeof(float))
         {

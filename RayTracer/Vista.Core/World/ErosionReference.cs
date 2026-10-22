@@ -3,13 +3,17 @@ namespace Vista.World;
 /// <summary>
 /// The state of an erosion run, laid out as the GPU's buffers are (vista-plan §10 M1.7), so a test or the self-test can feed
 /// both sides the same numbers: per cell, the ground as (bedrock, loose) heights, the water depth, the suspended sediment,
-/// the outflow to the four neighbours (−x, +x, −z, +z) in m³/s, the thermal move of the last step, and the flow sums.
-/// Cell <c>(i, j)</c> is index <c>j·Size + i</c>, as in <see cref="HeightField"/>.
+/// the outflow to the four neighbours (−x, +x, −z, +z) in m³/s, the thermal move of the last step, and the flow sums; and,
+/// since M1.11d, the rock's strata (per cell the bed-table offset and the mottle, and the bed table), from which the passes
+/// read the hardness of the rock at its current height. Cell <c>(i, j)</c> is index <c>j·Size + i</c>, as in <see cref="HeightField"/>.
 /// </summary>
 public sealed class ErosionState
 {
-    /// <summary>A dry, clean state on <paramref name="ground"/>: every sample bedrock, nothing loose.</summary>
-    public ErosionState(HeightField ground)
+    /// <summary>
+    /// A dry, clean state on <paramref name="ground"/>: every sample bedrock, nothing loose; the rock's strata from
+    /// <paramref name="strata"/> (on the ground's grid), or, without them, every rock the softest.
+    /// </summary>
+    public ErosionState(HeightField ground, StrataGrid? strata = null)
     {
         ArgumentNullException.ThrowIfNull(ground);
         Size = ground.Size;
@@ -24,6 +28,31 @@ public sealed class ErosionState
         Flux = new float[cells * 4];
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
+        Strata = Interleave(strata, cells);
+        Bands = strata?.Table ?? NoBeds;
+        TableScale = strata?.TableScale ?? 0f;
+    }
+
+    /// <summary>The bed table without strata: every rock the softest.</summary>
+    public static float[] NoBeds => [0f, 0f];
+
+    /// <summary>
+    /// <paramref name="strata"/> laid out as <see cref="Strata"/> is, per cell (offset, mottle), for <paramref name="cells"/> cells;
+    /// zeros without strata.
+    /// </summary>
+    public static float[] Interleave(StrataGrid? strata, int cells)
+    {
+        var interleaved = new float[cells * 2];
+        if (strata is null)
+            return interleaved;
+        if (strata.Offset.Length != cells)
+            throw new ArgumentException("The strata are not on the ground's grid.", nameof(strata));
+        for (int c = 0; c < cells; c++)
+        {
+            interleaved[c * 2] = strata.Offset[c];
+            interleaved[c * 2 + 1] = strata.Mottle[c];
+        }
+        return interleaved;
     }
 
     /// <summary>
@@ -56,6 +85,15 @@ public sealed class ErosionState
     /// <summary>Per cell, the sums of (outflow in m³/s, water depth in m) over the steps that averaged.</summary>
     public float[] Flow { get; }
 
+    /// <summary>Per cell, the rock's (bed-table coordinate at height 0, mottle) (<see cref="StrataGrid"/>).</summary>
+    public float[] Strata { get; }
+
+    /// <summary>The bed table (<see cref="RockHardness.Table"/>; two zeros without strata).</summary>
+    public float[] Bands { get; private init; }
+
+    /// <summary>Bed-table entries per metre of rock height (0 without strata).</summary>
+    public float TableScale { get; private init; }
+
     /// <summary>Steps added to <see cref="Flow"/>.</summary>
     public int FlowSteps { get; set; }
 
@@ -65,7 +103,8 @@ public sealed class ErosionState
     /// <summary>A deep copy, for running one pass on both sides from the same state.</summary>
     public ErosionState Clone()
     {
-        var copy = new ErosionState(Size, CellSize) { FlowSteps = FlowSteps, Steps = Steps };
+        var copy = new ErosionState(Size, CellSize) { FlowSteps = FlowSteps, Steps = Steps, Bands = Bands, TableScale = TableScale };
+        Strata.CopyTo(copy.Strata, 0);
         Terrain.CopyTo(copy.Terrain, 0);
         Water.CopyTo(copy.Water, 0);
         Sediment.CopyTo(copy.Sediment, 0);
@@ -86,6 +125,8 @@ public sealed class ErosionState
         Flux = new float[cells * 4];
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
+        Strata = new float[cells * 2];
+        Bands = NoBeds;
     }
 
     /// <summary>Totals in double: ground (bedrock + loose), bedrock, loose, water and suspended sediment, in metres summed over the cells.</summary>
@@ -114,11 +155,12 @@ public sealed class ErosionState
 ///   <item><see cref="Water"/>: the water after this step's inflow and outflow; the discharge per metre of width from the net
 ///   flux through the cell; the sediment capacity <c>K·sin α·√q</c> (stream power with the usual m/n of ½: steep slopes and big
 ///   rivers cut, sheet flow on a ridge barely does); erosion of the spare capacity (loose material first, then rock at its
-///   erodibility) or deposition of the excess as loose material; evaporation; the flow sums.</item>
+///   erodibility, which falls with the rock's hardness) or deposition of the excess as loose material; evaporation; the flow
+///   sums.</item>
 ///   <item><see cref="Transport"/>: suspended sediment moves with the water — each cell sends the fraction of its sediment
 ///   that its water sent — so sediment is conserved, unlike semi-Lagrangian advection.</item>
 ///   <item><see cref="ThermalOut"/>: where the ground is steeper than the loose talus angle, loose material slides; where it is
-///   steeper than the rock talus angle, rock collapses. Each cell works out how much leaves it.</item>
+///   steeper than the rock's talus angle (steeper for harder rock), rock collapses. Each cell works out how much leaves it.</item>
 ///   <item><see cref="ThermalApply"/>: each cell loses what it sent and gains, as loose material, its share of what its
 ///   neighbours sent, split in proportion to how far each neighbour exceeds the talus toward it.</item>
 /// </list>
@@ -127,14 +169,17 @@ public sealed class ErosionState
 /// </summary>
 public static class ErosionReference
 {
-    /// <summary>Runs <paramref name="settings"/> on <paramref name="ground"/> and returns the eroded world.</summary>
-    public static ErosionResult Erode(HeightField ground, ErosionSettings settings)
+    /// <summary>
+    /// Runs <paramref name="settings"/> on <paramref name="ground"/> (its rock's hardness from <paramref name="strata"/>) and
+    /// returns the eroded world.
+    /// </summary>
+    public static ErosionResult Erode(HeightField ground, ErosionSettings settings, StrataGrid? strata = null)
     {
         ArgumentNullException.ThrowIfNull(ground);
         ArgumentNullException.ThrowIfNull(settings);
-        var state = new ErosionState(ground);
+        var state = new ErosionState(ground, strata);
         Run(state, settings, settings.Iterations);
-        return ErosionResult.From(state, settings.PoolFillMetres);
+        return ErosionResult.From(state, settings.PoolFillMetres, strata);
     }
 
     /// <summary>Runs <paramref name="steps"/> more steps of <paramref name="settings"/> on <paramref name="state"/>.</summary>
@@ -149,15 +194,15 @@ public static class ErosionReference
         var terrainB = new float[cells * 2];
         var waterB = new float[cells];
         var sedimentB = new float[cells];
-        ErosionConstants k = ErosionConstants.For(settings, state.Size, state.CellSize);
+        ErosionConstants k = ErosionConstants.For(settings, state.Size, state.CellSize).WithStrata(state);
         for (int s = 0; s < steps; s++)
         {
             k.Accumulate = state.Steps >= settings.AverageFrom ? 1u : 0u;
             Flux(k, state.Terrain, state.Water, state.Flux);
-            Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow);
+            Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
             Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
             waterB.CopyTo(state.Water, 0);
-            ThermalOut(k, terrainB, state.Thermal);
+            ThermalOut(k, terrainB, state.Thermal, state.Strata, state.Bands);
             ThermalApply(k, terrainB, state.Thermal, state.Terrain);
             if (k.Accumulate != 0)
                 state.FlowSteps++;
@@ -178,13 +223,13 @@ public static class ErosionReference
 
     /// <summary>Pass 2: water, speed, erosion or deposition, evaporation and the flow sums, from the A buffers into the B buffers.</summary>
     public static void Water(ErosionConstants k, float[] terrain, float[] water, float[] sediment, float[] flux,
-        float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow)
+        float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands)
     {
         int n = (int)k.Size;
         Parallel.For(0, n, j =>
         {
             for (int i = 0; i < n; i++)
-                WaterCell(k, n, i, j, terrain, water, sediment, flux, terrainOut, waterOut, sedimentOut, flow);
+                WaterCell(k, n, i, j, terrain, water, sediment, flux, terrainOut, waterOut, sedimentOut, flow, strata, bands);
         });
     }
 
@@ -200,13 +245,13 @@ public static class ErosionReference
     }
 
     /// <summary>Pass 4: how much loose material and rock leaves each cell.</summary>
-    public static void ThermalOut(ErosionConstants k, float[] terrain, float[] thermal)
+    public static void ThermalOut(ErosionConstants k, float[] terrain, float[] thermal, float[] strata, float[] bands)
     {
         int n = (int)k.Size;
         Parallel.For(0, n, j =>
         {
             for (int i = 0; i < n; i++)
-                ThermalOutCell(k, n, i, j, terrain, thermal);
+                ThermalOutCell(k, n, i, j, terrain, thermal, strata, bands);
         });
     }
 
@@ -228,6 +273,15 @@ public static class ErosionReference
     private static readonly int[] Dj = [-1, -1, -1, 0, 0, 1, 1, 1];
 
     private static float Ground(float[] terrain, int c) => terrain[c * 2] + terrain[c * 2 + 1];
+
+    // The hardness of the rock at height `rock` in cell c (RockHardness.Of, with the clamp's bound in the constants).
+    private static float Hardness(ErosionConstants k, float[] strata, float[] bands, int c, float rock)
+    {
+        float t = Math.Clamp(rock * k.TableScale + strata[c * 2], 0f, k.TableLast);
+        int b = (int)MathF.Floor(t);
+        float f = t - b;
+        return Math.Clamp(bands[b] + (bands[b + 1] - bands[b]) * f + strata[c * 2 + 1], 0f, 1f);
+    }
 
     private static void FluxCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] water, float[] flux)
     {
@@ -253,7 +307,7 @@ public static class ErosionReference
     }
 
     private static void WaterCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] water, float[] sediment,
-        float[] flux, float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow)
+        float[] flux, float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands)
     {
         int c = j * n + i;
         float rock = terrain[c * 2];
@@ -296,7 +350,9 @@ public static class ErosionReference
             float demand = MathF.Min(k.Dissolve * (capacity - carried), MathF.Max(0f, ground - lowest));
             float looseLeft = loose - MathF.Min(demand, loose);
             float fromLoose = loose - looseLeft;
-            float rockLeft = rock - (demand - fromLoose) * k.RockErodibility;
+            float hardness = Hardness(k, strata, bands, c, rock);
+            float erodibility = k.RockErodibility + (k.RockErodibilityHard - k.RockErodibility) * hardness;
+            float rockLeft = rock - (demand - fromLoose) * erodibility;
             float fromRock = rock - rockLeft;
             loose = looseLeft;
             rock = rockLeft;
@@ -345,12 +401,16 @@ public static class ErosionReference
         sedimentOut[c] = MathF.Max(0f, (sediment[c] - leaving) + ((fromXm + fromXp) + (fromZm + fromZp)));
     }
 
-    private static void ThermalOutCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] thermal)
+    private static void ThermalOutCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] thermal, float[] strata, float[] bands)
     {
         int c = j * n + i;
         float rock = terrain[c * 2];
         float loose = terrain[c * 2 + 1];
         float ground = rock + loose;
+        // Harder rock stands steeper: the drops it holds follow its hardness.
+        float hardness = Hardness(k, strata, bands, c, rock);
+        float rockEdge = k.RockDropEdge + (k.RockDropEdgeHard - k.RockDropEdge) * hardness;
+        float rockCorner = k.RockDropCorner + (k.RockDropCornerHard - k.RockDropCorner) * hardness;
         float maxLoose = 0f, maxRock = 0f, sum = 0f;
         for (int q = 0; q < 8; q++)
         {
@@ -360,7 +420,7 @@ public static class ErosionReference
             bool corner = Di[q] != 0 && Dj[q] != 0;
             float drop = ground - Ground(terrain, nj * n + ni);
             float overLoose = MathF.Max(0f, drop - (corner ? k.LooseDropCorner : k.LooseDropEdge));
-            float overRock = MathF.Max(0f, drop - (corner ? k.RockDropCorner : k.RockDropEdge));
+            float overRock = MathF.Max(0f, drop - (corner ? rockCorner : rockEdge));
             maxLoose = MathF.Max(maxLoose, overLoose);
             maxRock = MathF.Max(maxRock, overRock);
             sum += overLoose;

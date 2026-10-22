@@ -61,8 +61,14 @@ public sealed record ErosionSettings
     /// <summary>The angle loose material (scree, sediment) comes to rest at, in degrees.</summary>
     public float LooseTalusDegrees { get; init; }
 
-    /// <summary>The steepest slope bedrock holds, in degrees; steeper rock collapses into loose material.</summary>
+    /// <summary>
+    /// The steepest slope the softest bedrock holds, in degrees; steeper rock collapses into loose material. The hardest holds
+    /// <see cref="RockTalusHardDegrees"/>; between them the slope's tangent follows the hardness.
+    /// </summary>
     public float RockTalusDegrees { get; init; }
+
+    /// <summary>The steepest slope the hardest bedrock holds, in degrees (vista-plan §10 M1.11d).</summary>
+    public float RockTalusHardDegrees { get; init; }
 
     /// <summary>The fraction of the excess over a talus angle that moves per step (at most 0.5 keeps neighbours from overshooting).</summary>
     public float ThermalRate { get; init; }
@@ -88,14 +94,44 @@ public sealed record ErosionSettings
     /// <summary>The upstream area from which a cell incises as a channel, in km²; below it a cell is hillslope.</summary>
     public float ChannelAreaKm2 { get; init; } = 0.1f;
 
-    /// <summary>The steepest slope a cell keeps toward the cell it drains into while the valleys incise, in degrees.</summary>
+    /// <summary>
+    /// The steepest slope the softest rock keeps toward the cell it drains into while the valleys incise, in degrees (the
+    /// hardest keeps <see cref="IncisionTalusHardDegrees"/>; between them the slope's tangent follows the hardness).
+    /// </summary>
     public float IncisionTalusDegrees { get; init; } = 45f;
 
+    /// <summary>The steepest slope the hardest rock keeps while the valleys incise, in degrees (vista-plan §10 M1.11d).</summary>
+    public float IncisionTalusHardDegrees { get; init; } = 45f;
+
     /// <summary>
-    /// Uplift per incision step at the base terrain's highest point, in metres (in proportion to the base terrain's height
-    /// elsewhere; the grid's edge stays put): the ranges keep rising while the rivers cut.
+    /// Uplift per incision step where the uplift map is highest, in metres (<see cref="UpliftMap"/>; the grid's edge stays put):
+    /// the ranges keep rising while the rivers cut.
     /// </summary>
     public float IncisionUplift { get; init; }
+
+    /// <summary>
+    /// The base terrain's octaves the uplift map follows (its large-scale shape; vista-plan §10 M1.11d); 0 is M1.11a's uplift, in
+    /// proportion to the base terrain's own height on the incision grid.
+    /// </summary>
+    public int UpliftOctaves { get; init; } = 1;
+
+    /// <summary>The power the uplift map's shape is raised to: above 1 the massifs rise and the foothills stay lower.</summary>
+    public float UpliftContrast { get; init; } = 1f;
+
+    /// <summary>
+    /// How erodible the hardest rock is relative to the softest (vista-plan §10 M1.11d), for the incision and the erosion's rock
+    /// alike; between them the erodibility follows the hardness (<see cref="RockHardness"/>). 1: hardness changes nothing.
+    /// </summary>
+    public float HardErodibility { get; init; } = 1f;
+
+    /// <summary>The mean thickness of a bed of rock, in metres (<see cref="RockHardness"/>).</summary>
+    public float StrataThickness { get; init; } = 60f;
+
+    /// <summary>The steepest dip the beds may have, in degrees (each seed picks a direction and a dip up to it).</summary>
+    public float StrataDipDegrees { get; init; } = 8f;
+
+    /// <summary>How far the hardness strays from its bed's from place to place (± this, before the clamp to [0, 1]).</summary>
+    public float HardnessMottle { get; init; } = 0.15f;
 
     /// <summary>
     /// The share of a lake's depth that fills with sediment per incision step (1: a lake fills to its outlet at once; 0: only
@@ -133,15 +169,23 @@ public sealed record ErosionSettings
         RockErodibility = 0.1f,
         Deposition = 0.1f,
         LooseTalusDegrees = 35.0f,
-        RockTalusDegrees = 50.0f,
+        RockTalusDegrees = 40.0f,
+        RockTalusHardDegrees = 65.0f,
         ThermalRate = 0.25f,
         AverageFrom = 750,
         IncisionSteps = 300,
         IncisionCell = 64.0f,
         IncisionRate = 0.03f,
         ChannelAreaKm2 = 0.1f,
-        IncisionTalusDegrees = 45.0f,
-        IncisionUplift = 2.0f,
+        IncisionTalusDegrees = 35.0f,
+        IncisionTalusHardDegrees = 60.0f,
+        IncisionUplift = 8.0f,
+        UpliftOctaves = 1,
+        UpliftContrast = 1.5f,
+        HardErodibility = 0.3f,
+        StrataThickness = 60.0f,
+        StrataDipDegrees = 8.0f,
+        HardnessMottle = 0.08f,
         IncisionLakeFill = 0.05f,
         PoolFillMetres = 100.0f,
     };
@@ -154,6 +198,8 @@ public sealed record ErosionSettings
     {
         Capacity = 1.0f,
         RockTalusDegrees = 45.0f,
+        RockTalusHardDegrees = 45.0f,
+        HardErodibility = 1.0f,
         IncisionSteps = 0,
         PoolFillMetres = 0.0f,
     };
@@ -227,8 +273,8 @@ public sealed record ErosionSettings
         Fraction(nameof(RockErodibility), RockErodibility);
         Fraction(nameof(Deposition), Deposition);
         Fraction(nameof(ThermalRate), ThermalRate, 0.5f);
-        if (!(LooseTalusDegrees > 0f && LooseTalusDegrees < RockTalusDegrees && RockTalusDegrees < 90f))
-            errors.Add($"Talus angles must satisfy 0 < loose < rock < 90° (got {LooseTalusDegrees}°, {RockTalusDegrees}°).");
+        if (!(LooseTalusDegrees > 0f && LooseTalusDegrees < RockTalusDegrees && RockTalusDegrees <= RockTalusHardDegrees && RockTalusHardDegrees < 90f))
+            errors.Add($"Talus angles must satisfy 0 < loose < soft rock ≤ hard rock < 90° (got {LooseTalusDegrees}°, {RockTalusDegrees}°, {RockTalusHardDegrees}°).");
         if (IncisionSteps < 0)
             errors.Add($"IncisionSteps must not be negative (got {IncisionSteps}).");
         Positive(nameof(IncisionCell), IncisionCell);
@@ -237,8 +283,17 @@ public sealed record ErosionSettings
         Fraction(nameof(IncisionUplift), IncisionUplift, float.MaxValue);
         Fraction(nameof(IncisionLakeFill), IncisionLakeFill);
         Fraction(nameof(PoolFillMetres), PoolFillMetres, float.MaxValue);
-        if (!(IncisionTalusDegrees > 0f && IncisionTalusDegrees < 90f))
-            errors.Add($"IncisionTalusDegrees must be in (0, 90) (got {IncisionTalusDegrees}°).");
+        if (!(IncisionTalusDegrees > 0f && IncisionTalusDegrees <= IncisionTalusHardDegrees && IncisionTalusHardDegrees < 90f))
+            errors.Add($"Incision talus angles must satisfy 0 < soft ≤ hard < 90° (got {IncisionTalusDegrees}°, {IncisionTalusHardDegrees}°).");
+        if (UpliftOctaves < 0)
+            errors.Add($"UpliftOctaves must not be negative (got {UpliftOctaves}).");
+        Positive(nameof(UpliftContrast), UpliftContrast);
+        if (!(HardErodibility > 0f && HardErodibility <= 1f))
+            errors.Add($"HardErodibility must be in (0, 1] (got {HardErodibility}).");
+        Positive(nameof(StrataThickness), StrataThickness);
+        if (!(StrataDipDegrees >= 0f && StrataDipDegrees < 45f))
+            errors.Add($"StrataDipDegrees must be in [0, 45) (got {StrataDipDegrees}°).");
+        Fraction(nameof(HardnessMottle), HardnessMottle);
         return errors;
     }
 
@@ -250,11 +305,12 @@ public sealed record ErosionSettings
     {
         int[] words =
         [
-            Iterations, AverageFrom, IncisionSteps,
+            Iterations, AverageFrom, IncisionSteps, UpliftOctaves,
             .. new[]
             {
                 TimeStep, PipeArea, FluxDamping, RainPerStep, Evaporation, Capacity, DischargeExponent, MinSlope, Dissolve, RockErodibility, Deposition,
                 LooseTalusDegrees, RockTalusDegrees, ThermalRate, IncisionCell, IncisionRate, ChannelAreaKm2, IncisionTalusDegrees, IncisionUplift, IncisionLakeFill, PoolFillMetres,
+                RockTalusHardDegrees, IncisionTalusHardDegrees, UpliftContrast, HardErodibility, StrataThickness, StrataDipDegrees, HardnessMottle,
             }.Select(BitConverter.SingleToInt32Bits),
         ];
         Span<byte> buffer = stackalloc byte[4];
@@ -348,7 +404,34 @@ public struct ErosionConstants
     /// <summary>The same to a corner neighbour.</summary>
     public float RockDropCorner;
 
-    /// <summary>The constants for <paramref name="settings"/> on a grid of <paramref name="size"/>² cells <paramref name="cell"/> metres apart.</summary>
+    /// <summary>Rock erodibility of the hardest rock (<see cref="RockErodibility"/> is the softest's; vista-plan §10 M1.11d).</summary>
+    public float RockErodibilityHard;
+
+    /// <summary>Height the hardest rock may drop to an edge neighbour (<see cref="RockDropEdge"/> is the softest's).</summary>
+    public float RockDropEdgeHard;
+
+    /// <summary>The same to a corner neighbour.</summary>
+    public float RockDropCornerHard;
+
+    /// <summary>Bed-table entries per metre of rock height (<see cref="StrataGrid.TableScale"/>); 0 without strata.</summary>
+    public float TableScale;
+
+    /// <summary>The largest bed-table coordinate a lookup reads (the table's last entry less 1.001).</summary>
+    public float TableLast;
+
+    /// <summary>Padding to a 16-byte row.</summary>
+    public uint Pad2;
+
+    /// <summary>Padding to a 16-byte row.</summary>
+    public uint Pad3;
+
+    /// <summary>Padding to a 16-byte row.</summary>
+    public uint Pad4;
+
+    /// <summary>
+    /// The constants for <paramref name="settings"/> on a grid of <paramref name="size"/>² cells <paramref name="cell"/> metres
+    /// apart; the bed table's (<see cref="TableScale"/>, <see cref="TableLast"/>) come from the state (<see cref="WithStrata"/>).
+    /// </summary>
     public static ErosionConstants For(ErosionSettings settings, int size, double cell)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -356,6 +439,7 @@ public struct ErosionConstants
         const float Gravity = 9.81f;
         float tanLoose = (float)Math.Tan(settings.LooseTalusDegrees * Math.PI / 180.0);
         float tanRock = (float)Math.Tan(settings.RockTalusDegrees * Math.PI / 180.0);
+        float tanHard = (float)Math.Tan(settings.RockTalusHardDegrees * Math.PI / 180.0);
         float diagonal = (float)Math.Sqrt(2.0);
         return new ErosionConstants
         {
@@ -380,6 +464,19 @@ public struct ErosionConstants
             LooseDropCorner = tanLoose * l * diagonal,
             RockDropEdge = tanRock * l,
             RockDropCorner = tanRock * l * diagonal,
+            RockErodibilityHard = settings.RockErodibility * settings.HardErodibility,
+            RockDropEdgeHard = tanHard * l,
+            RockDropCornerHard = tanHard * l * diagonal,
         };
     }
+
+    /// <summary>These constants with the bed table of <paramref name="state"/>.</summary>
+    public readonly ErosionConstants WithStrata(ErosionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return WithStrata(state.TableScale, state.Bands.Length);
+    }
+
+    /// <summary>These constants with a bed table of <paramref name="entries"/> entries read at <paramref name="tableScale"/> per metre.</summary>
+    public readonly ErosionConstants WithStrata(float tableScale, int entries) => this with { TableScale = tableScale, TableLast = entries - 1.001f };
 }

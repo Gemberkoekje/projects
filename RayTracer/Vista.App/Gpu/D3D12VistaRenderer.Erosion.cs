@@ -48,6 +48,8 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         Flow,        // u7
         Thermal,     // u8
         Clear,       // u9
+        Strata,      // u10
+        Bands,       // u11
     }
 
     private ID3D12RootSignature? _erosionRootSignature;
@@ -58,10 +60,17 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
     private ID3D12PipelineState? _thermalApplyPipeline;
     private ID3D12PipelineState? _clearPipeline;
 
-    /// <summary>The erosion state's buffers on the device: A and B sides of the double-buffered layers, and the rest.</summary>
-    private sealed class ErosionBuffers(Func<ulong, ID3D12Resource> create, int size) : IDisposable
+    /// <summary>
+    /// The erosion state's buffers on the device: A and B sides of the double-buffered layers, the rest, and the rock's strata
+    /// (per cell, and the bed table of <paramref name="bands"/> entries, read at <paramref name="tableScale"/> entries per metre).
+    /// </summary>
+    private sealed class ErosionBuffers(Func<ulong, ID3D12Resource> create, int size, int bands, float tableScale) : IDisposable
     {
         public readonly int Size = size;
+        public readonly int BandEntries = bands;
+        public readonly float TableScale = tableScale;
+        public readonly ID3D12Resource Strata = create(Bytes(size, 2));
+        public readonly ID3D12Resource Bands = create(((ulong)bands * sizeof(float) + 15ul) & ~15ul);
         public readonly ID3D12Resource[] Terrain = [create(Bytes(size, 2)), create(Bytes(size, 2))];
         public readonly ID3D12Resource[] Water = [create(Bytes(size, 1)), create(Bytes(size, 1))];
         public readonly ID3D12Resource[] Sediment = [create(Bytes(size, 1)), create(Bytes(size, 1))];
@@ -74,9 +83,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         /// <summary>Bytes of a buffer of <paramref name="floats"/> floats per cell, rounded up to 16 for the clear kernel.</summary>
         public static ulong Bytes(int size, int floats) => ((ulong)size * (ulong)size * (ulong)floats * sizeof(float) + 15ul) & ~15ul;
 
-        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 4 + Bytes(Size, 4) * 2 + Bytes(Size, 2));
+        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 4 + Bytes(Size, 4) * 2 + Bytes(Size, 2) * 2 + Bands.Description.Width);
 
-        public IEnumerable<ID3D12Resource> All => Terrain.Concat(Water).Concat(Sediment).Concat([Flux, Flow, Thermal]);
+        public IEnumerable<ID3D12Resource> All => Terrain.Concat(Water).Concat(Sediment).Concat([Flux, Flow, Thermal, Strata, Bands]);
 
         public void Dispose()
         {
@@ -92,7 +101,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         var rootParameters = new[]
         {
             Cbv(0),
-            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6), Uav(7), Uav(8), Uav(9),
+            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6), Uav(7), Uav(8), Uav(9), Uav(10), Uav(11),
         };
         _erosionRootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         string source = ShaderSource.Load(ErosionShaderFile);
@@ -111,7 +120,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
     public long VideoMemoryUsed => _adapter is null ? 0 : (long)_adapter.QueryVideoMemoryInfo(0, Vortice.DXGI.MemorySegmentGroup.Local).CurrentUsage;
 
     /// <inheritdoc />
-    public ErosionRun Erode(HeightField ground, ErosionSettings settings)
+    public ErosionRun Erode(HeightField ground, ErosionSettings settings, StrataGrid? strata = null)
     {
         ArgumentNullException.ThrowIfNull(ground);
         ArgumentNullException.ThrowIfNull(settings);
@@ -127,7 +136,8 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         int submissions;
         long memory, stateBytes;
         // The state is freed before the maps and the drainage are worked out on the CPU.
-        using (var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), n))
+        float[] bands = strata?.Table ?? ErosionState.NoBeds;
+        using (var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), n, bands.Length, strata?.TableScale ?? 0f))
         {
             var terrain = new float[cells * 2];
             ReadOnlySpan<float> heights = ground.Heights;
@@ -135,7 +145,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
                 terrain[c * 2] = heights[c];
             Upload(buffers.Terrain[0], terrain);
             terrain = [];
-            foreach (ID3D12Resource buffer in buffers.All.Where(b => b != buffers.Terrain[0]))
+            Upload(buffers.Strata, ErosionState.Interleave(strata, cells));
+            Upload(buffers.Bands, bands);
+            foreach (ID3D12Resource buffer in buffers.All.Where(b => b != buffers.Terrain[0] && b != buffers.Strata && b != buffers.Bands))
                 Clear(buffers, buffer);
 
             memory = VideoMemoryUsed;
@@ -150,7 +162,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         int flowSteps = Math.Max(0, settings.Iterations - settings.AverageFrom);
         var maps = Stopwatch.StartNew();
         ErosionResult result = ErosionResult.From(n, ground.CellSize, terrainAfter, waterAfter, sedimentAfter, flowAfter, flowSteps, settings.Iterations,
-            settings.PoolFillMetres);
+            settings.PoolFillMetres, strata);
         return new ErosionRun(result, new ErosionStats(seconds, wall.Elapsed.TotalSeconds, submissions, longest, stateBytes)
         {
             ProcessVideoMemory = memory,
@@ -216,7 +228,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
 
     private ErosionBuffers UploadState(ErosionState state)
     {
-        var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), state.Size);
+        var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), state.Size, state.Bands.Length, state.TableScale);
+        Upload(buffers.Strata, state.Strata);
+        Upload(buffers.Bands, state.Bands);
         Upload(buffers.Terrain[0], state.Terrain);
         Upload(buffers.Water[0], state.Water);
         Upload(buffers.Sediment[0], state.Sediment);
@@ -293,12 +307,14 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
             case ErosionPass.Water:
                 (bind[ErosionSlot.TerrainIn], bind[ErosionSlot.WaterIn], bind[ErosionSlot.SedimentIn], bind[ErosionSlot.Flux]) = (b.Terrain[0], b.Water[water], b.Sediment[0], b.Flux);
                 (bind[ErosionSlot.TerrainOut], bind[ErosionSlot.WaterOut], bind[ErosionSlot.SedimentOut], bind[ErosionSlot.Flow]) = (b.Terrain[1], b.Water[1 - water], b.Sediment[1], b.Flow);
+                (bind[ErosionSlot.Strata], bind[ErosionSlot.Bands]) = (b.Strata, b.Bands);
                 break;
             case ErosionPass.Transport:
                 (bind[ErosionSlot.WaterIn], bind[ErosionSlot.Flux], bind[ErosionSlot.SedimentIn], bind[ErosionSlot.SedimentOut]) = (b.Water[water], b.Flux, b.Sediment[1], b.Sediment[0]);
                 break;
             case ErosionPass.ThermalOut:
                 (bind[ErosionSlot.TerrainIn], bind[ErosionSlot.Thermal]) = (b.Terrain[1], b.Thermal);
+                (bind[ErosionSlot.Strata], bind[ErosionSlot.Bands]) = (b.Strata, b.Bands);
                 break;
             case ErosionPass.ThermalApply:
                 (bind[ErosionSlot.TerrainIn], bind[ErosionSlot.Thermal], bind[ErosionSlot.TerrainOut]) = (b.Terrain[1], b.Thermal, b.Terrain[0]);
@@ -316,13 +332,13 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
 
     private void BindErosion(ID3D12GraphicsCommandList4 list, Dictionary<ErosionSlot, ID3D12Resource> bind)
     {
-        for (ErosionSlot slot = ErosionSlot.TerrainIn; slot <= ErosionSlot.Clear; slot++)
+        for (ErosionSlot slot = ErosionSlot.TerrainIn; slot <= ErosionSlot.Bands; slot++)
             list.SetComputeRootUnorderedAccessView((uint)slot, (bind.TryGetValue(slot, out ID3D12Resource? r) ? r : _dummyUav).GPUVirtualAddress);
     }
 
     private void WriteErosionConstants(ErosionBuffers buffers, ErosionSettings settings, double cell)
     {
-        ErosionConstants k = ErosionConstants.For(settings, buffers.Size, cell);
+        ErosionConstants k = ErosionConstants.For(settings, buffers.Size, cell).WithStrata(buffers.TableScale, buffers.BandEntries);
         for (int accumulate = 0; accumulate < 2; accumulate++)
         {
             buffers.Constants[accumulate] ??= CreateBuffer(HeapType.Upload, ConstantBufferBytes, ResourceStates.GenericRead);

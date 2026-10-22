@@ -114,21 +114,26 @@ internal static class ErosionMeasure
             HeightField ground = TerrainGenerator.Generate(recipe, seed, grid);
             double baseSeconds = wall.Elapsed.TotalSeconds;
             HeightField incised = ground;
+            StrataFrame frame = StrataFrame.Identity;
+            HeightField? upliftField = null;
             if (settings.IncisionSteps > 0)
             {
                 // StreamPower.Prepare in its two halves, so the coarse grid can be measured too.
                 var incisionClock = Stopwatch.StartNew();
-                (HeightField coarseBase, HeightField coarseIncised) = StreamPower.Coarse(recipe, seed, grid, settings);
+                (HeightField coarseBase, HeightField coarseIncised, frame, upliftField) = StreamPower.Coarse(recipe, seed, grid, settings);
                 double coarseSeconds = incisionClock.Elapsed.TotalSeconds;
                 incised = StreamPower.Refine(coarseIncised, coarseBase, ground, settings.ChannelAreaKm2);
                 double incisionSeconds = incisionClock.Elapsed.TotalSeconds;
                 DrainageMap coarseBefore = DrainageMap.Of(coarseBase), coarseAfter = DrainageMap.Of(coarseIncised);
                 DrainageMap incisedDrainage = DrainageMap.Of(incised);
                 log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"seed {seed}: incision {incisionSeconds:0.00} s on the CPU ({coarseSeconds:0.00} s of it {settings.IncisionSteps} steps on the {coarseBase.Size}² × {coarseBase.CellSize} m grid)"));
+                    $"seed {seed}: incision {incisionSeconds:0.00} s on the CPU ({coarseSeconds:0.00} s of it {settings.IncisionSteps} steps on the {coarseBase.Size}² × {coarseBase.CellSize} m grid); " +
+                    $"mapped back from {frame.Bottom:0} m by {frame.Scale:0.000} to the base terrain's range from {frame.Low:0} m"));
                 log.WriteLine("  " + Describe("coarse base   ", DrainageStats.Measure(coarseBefore)));
                 log.WriteLine("  " + Describe("coarse incised", DrainageStats.Measure(coarseAfter)));
                 log.WriteLine("  " + Describe("incised       ", DrainageStats.Measure(incisedDrainage)));
+                log.WriteLine("  " + Describe("coarse base   ", ReliefStats.Measure(coarseBase)));
+                log.WriteLine("  " + Describe("coarse incised", ReliefStats.Measure(coarseIncised)));
                 if (outDir is not null)
                 {
                     (byte[] image, int imageSize) = DebugImages.DrainageImage(coarseIncised, coarseAfter, null, 1024);
@@ -137,13 +142,35 @@ internal static class ErosionMeasure
                     PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.coarse.png"), relief, imageSize, imageSize, PngColor.Rgb);
                     (image, imageSize) = DebugImages.DrainageImage(incised, incisedDrainage, null, 1024);
                     PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.incised.drainage.png"), image, imageSize, imageSize, PngColor.Rgb);
+                    // The uplift map on the coarse grid, black to white from none to IncisionUplift, north up.
+                    ReadOnlySpan<float> uplift = upliftField.Heights;
+                    int us = coarseBase.Size;
+                    var grey = new byte[us * us * 3];
+                    for (int row = 0; row < us; row++)
+                    {
+                        for (int col = 0; col < us; col++)
+                        {
+                            byte v = (byte)Math.Round(255.0 * Math.Clamp(uplift[(us - 1 - row) * us + col] / Math.Max(settings.IncisionUplift, 1e-6f), 0f, 1f));
+                            grey[(row * us + col) * 3] = grey[(row * us + col) * 3 + 1] = grey[(row * us + col) * 3 + 2] = v;
+                        }
+                    }
+                    PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.uplift.png"), grey, us, us, PngColor.Rgb);
                 }
                 if (inciseOnly)
                     continue;
             }
-            ErosionRun run = renderer.Erode(incised, settings);
+            TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
+            StrataGrid strata = StrataGrid.For(RockHardness.For(seed, settings), grid.Size, grid.CellSize, frame,
+                (x, z) => upliftField is null ? 0.0 : upliftField.HeightAt(x, z));
+            ErosionRun run = renderer.Erode(incised, settings, strata);
             ErosionResult r = run.Result;
             ErosionStats s = run.Stats;
+            if (grid == WorldGrid.Default)
+            {
+                // Kept in the cache, so a render of the same world after the measure reads it instead of eroding it again.
+                ErosionCache.Default.Store(profile, seed, grid, settings, r, new WorldOrigin(renderer.DeviceName, renderer.DriverVersion,
+                    DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture), ground.ContentHash()));
+            }
             double moved = 0.0, deepest = 0.0, highest = 0.0;
             for (int c = 0; c < ground.Heights.Length; c++)
             {
@@ -167,6 +194,12 @@ internal static class ErosionMeasure
                 log.WriteLine("  " + Describe("base  ", DrainageStats.Measure(baseDrainage, threshold)));
                 log.WriteLine("  " + Describe("eroded", DrainageStats.Measure(r.Drainage, threshold)));
             }
+            log.WriteLine("  " + Describe("base  ", ReliefStats.Measure(ground)));
+            // The eroded slopes against each cell's own rock talus angle (the GPU erosion's, from the rock's hardness there).
+            double tanSoft = Math.Tan(settings.RockTalusDegrees * Math.PI / 180.0), tanHard = Math.Tan(settings.RockTalusHardDegrees * Math.PI / 180.0);
+            log.WriteLine("  " + Describe("eroded", ReliefStats.Measure(r.Surface, c => Math.Atan(tanSoft + (tanHard - tanSoft) * r.Hardness[c]) * 180.0 / Math.PI)));
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  hardness at the surface: mean {r.Hardness.Average():0.000}, soft (< 0.3) {r.Hardness.Count(v => v < 0.3f) * 100.0 / r.Hardness.Length:0}%, hard (> 0.7) {r.Hardness.Count(v => v > 0.7f) * 100.0 / r.Hardness.Length:0}%"));
             if (outDir is not null)
             {
                 string stem = Path.Combine(outDir, $"seed{seed}");
@@ -180,6 +213,8 @@ internal static class ErosionMeasure
                 PngEncoder.Write(stem + ".base.drainage.png", drainage, size, size, PngColor.Rgb);
                 (drainage, _) = DebugImages.DrainageImage(r.Surface, r.Drainage, null, 1024);
                 PngEncoder.Write(stem + ".drainage.png", drainage, size, size, PngColor.Rgb);
+                (byte[] hardness, _) = DebugImages.HardnessImage(r, null, 1024);
+                PngEncoder.Write(stem + ".hardness.png", hardness, size, size, PngColor.Rgb);
             }
         }
         return pass ? 0 : 1;
@@ -191,6 +226,18 @@ internal static class ErosionMeasure
         $"{s.LongestOpenChannelKm:0.0} km without a closed basin ({s.LongestRouteKm:0.0} km through both); {s.DrainsToChannels:0.0%} drains into one; " +
         $"lakes {s.LakeShare:0.0%}, closed basins {s.BasinShare:0.0%}; largest catchment {s.LargestBasinShare:0.0%}; " +
         $"Strahler {s.MaxOrder} ({string.Join('/', s.Streams)}), bifurcation {s.BifurcationRatio:0.00}");
+
+    /// <summary>One line of relief measures (vista-plan §10 M1.11d).</summary>
+    internal static string Describe(string label, ReliefStats s)
+    {
+        static string Slopes(ReliefStats.SlopeStats t) => string.Create(CultureInfo.InvariantCulture,
+            $"at {t.SpacingMetres:0} m mean {t.MeanDegrees:0.0}°, over 40° {t.Over40:0.0%}, facet {t.FacetShare:0.0%} at {t.FacetDegrees:0.0}°")
+            + (double.IsNaN(t.NearTalus) ? "" : string.Create(CultureInfo.InvariantCulture, $", near its talus {t.NearTalus:0.0%}"));
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{label} relief 1 km {s.Relief1Km.P10:0}/{s.Relief1Km.P50:0}/{s.Relief1Km.P90:0} m (spread {s.Relief1Km.Spread:0.00}), " +
+            $"5 km {s.Relief5Km.P10:0}/{s.Relief5Km.P50:0}/{s.Relief5Km.P90:0} m (spread {s.Relief5Km.Spread:0.00}); summits {s.Summits1Km.P10:0}/{s.Summits1Km.P50:0}/{s.Summits1Km.P90:0} m; " +
+            $"slopes {Slopes(s.Slopes)}; {Slopes(s.CoarseSlopes)}");
+    }
 
     /// <summary>Cells that stand more than <paramref name="metres"/> above all eight neighbours.</summary>
     internal static int Spikes(HeightField field, float metres)

@@ -48,10 +48,13 @@ public sealed class MeasurementViewTests
     }
 
     [TestMethod]
-    public void EveryCamera_StandsAboveTheSeed42Terrain()
+    public void TheHighCameras_StandAboveTheSeed42Terrain()
     {
+        // The un-eroded terrain stands in for a world nothing could erode (a dry run without a cache). The default and down-slope
+        // views stand near the eroded ground since M1.11d, where the base terrain may rise above them; only the high views are
+        // checked over it.
         HeightField terrain = TerrainGenerator.Generate(VistaJson.ParseRecipe(Read("mountains-day.recipe.json")), 42);
-        foreach (string file in new[] { "sky", "aerial", "default", "down-slope" })
+        foreach (string file in new[] { "sky", "aerial" })
         {
             CameraSpec camera = VistaJson.ParseCamera(Read(file + ".camera.json"));
             Assert.IsNull(DefaultCamera.GroundWarning(camera, terrain), file);
@@ -63,16 +66,20 @@ public sealed class MeasurementViewTests
     {
         // M1.11a's incision moves the ground by hundreds of metres, valleys and ridges both, before the GPU erosion runs (whose
         // own changes the self-test checks on the eroded world). The incision runs on the CPU, so CI can check the views over it.
+        // The near-ground views (M1.11d: the default, down a slope, and the sky view at the default's spot) stand on rock the GPU
+        // erosion barely moves, a few metres up; the rest well clear.
         Recipe recipe = VistaJson.ParseRecipe(Read("mountains-day.recipe.json"));
         HeightField ground = TerrainGenerator.Generate(recipe, 42);
-        HeightField incised = StreamPower.Prepare(ground, recipe, 42, ErosionSettings.For(TerrainProfile.For(recipe.SetPieces)));
+        HeightField incised = StreamPower.Prepare(ground, recipe, 42, ErosionSettings.For(TerrainProfile.For(recipe.SetPieces))).Ground;
         string[] cameras = [.. System.IO.Directory.GetFiles(Directory, "*.camera.json", SearchOption.AllDirectories)];
         Assert.AreEqual(8, cameras.Length, "the measurement, atmosphere and aerial views");
         foreach (string file in cameras)
         {
             CameraSpec camera = VistaJson.ParseCamera(File.ReadAllText(file));
             double clearance = camera.Position.Y - incised.HeightAt(camera.Position.X, camera.Position.Z);
-            Assert.IsTrue(clearance > ClearanceMetres, $"{Path.GetFileName(file)} stands {clearance:0.0} m above the incised ground");
+            bool near = Path.GetFileName(file) is "default.camera.json" or "down-slope.camera.json" or "sky.camera.json";
+            Assert.IsTrue(near ? clearance > NearClearanceMetres && clearance < 20.0 : clearance > ClearanceMetres,
+                $"{Path.GetFileName(file)} stands {clearance:0.0} m above the incised ground");
         }
     }
 
@@ -81,6 +88,12 @@ public sealed class MeasurementViewTests
     /// its loose material piles higher only on valley floors) does not bury it.
     /// </summary>
     private const double ClearanceMetres = 20.0;
+
+    /// <summary>
+    /// How far above the incised ground the near-ground views (default, down a slope, sky) must stand: they were placed where the
+    /// GPU erosion moved the ground by less than this, and the self-test checks them over the eroded ground itself.
+    /// </summary>
+    private const double NearClearanceMetres = 1.0;
 
     [TestMethod]
     public void TheAtmosphereCheckViews_AreValidAndAboveTheTerrain()

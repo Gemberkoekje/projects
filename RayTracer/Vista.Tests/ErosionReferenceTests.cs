@@ -33,7 +33,7 @@ public sealed class ErosionReferenceTests
         // Per step: Σ(water after the flow) = Σ(water before + rain) − what left over the edges, and evaporation then takes its
         // fixed fraction. Checked step by step from bare ground, through the wet-up and into the steady flow.
         var state = new ErosionState(Mountains());
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, Patch.Size, Patch.CellSize);
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, Patch.Size, Patch.CellSize).WithStrata(state);
         int n = Patch.Size, cells = n * n;
         var terrainB = new float[cells * 2];
         var waterB = new float[cells];
@@ -44,12 +44,12 @@ public sealed class ErosionReferenceTests
             ErosionReference.Flux(k, state.Terrain, state.Water, state.Flux);
             double before = state.Water.Sum(w => (double)w + k.Rain);
             double leftOverEdges = EdgeOutflow(n, state.Flux, (c, flux) => flux);
-            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow);
+            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
             double after = waterB.Sum(w => (double)w) / k.Retain;
             worst = Math.Max(worst, Math.Abs(after - (before - k.DepthPerFlux * leftOverEdges)) / before);
             ErosionReference.Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
             waterB.CopyTo(state.Water, 0);
-            ErosionReference.ThermalOut(k, terrainB, state.Thermal);
+            ErosionReference.ThermalOut(k, terrainB, state.Thermal, state.Strata, state.Bands);
             ErosionReference.ThermalApply(k, terrainB, state.Thermal, state.Terrain);
         }
         Assert.IsTrue(worst < 1e-5, $"water out of balance by {worst:E2} of the total in one step");
@@ -61,7 +61,7 @@ public sealed class ErosionReferenceTests
     {
         // Bedrock + loose + suspended sediment changes only by the sediment that leaves over the edges with the water.
         var state = new ErosionState(Mountains());
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, Patch.Size, Patch.CellSize);
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, Patch.Size, Patch.CellSize).WithStrata(state);
         int n = Patch.Size, cells = n * n;
         var terrainB = new float[cells * 2];
         var waterB = new float[cells];
@@ -70,12 +70,12 @@ public sealed class ErosionReferenceTests
         for (int step = 0; step < 300; step++)
         {
             ErosionReference.Flux(k, state.Terrain, state.Water, state.Flux);
-            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow);
+            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
             float[] water = state.Water;
             lost += EdgeOutflow(n, state.Flux, (c, flux) => sedimentB[c] * (flux * (k.DepthPerFlux / (water[c] + k.Rain))));
             ErosionReference.Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
             waterB.CopyTo(state.Water, 0);
-            ErosionReference.ThermalOut(k, terrainB, state.Thermal);
+            ErosionReference.ThermalOut(k, terrainB, state.Thermal, state.Strata, state.Bands);
             ErosionReference.ThermalApply(k, terrainB, state.Thermal, state.Terrain);
             eroded = Math.Max(eroded, state.Sediment.Sum(s => (double)s));
         }
@@ -106,7 +106,7 @@ public sealed class ErosionReferenceTests
         var other = new float[n * n * 2];
         for (int step = 0; step < 3000; step++)
         {
-            ErosionReference.ThermalOut(k, state.Terrain, state.Thermal);
+            ErosionReference.ThermalOut(k, state.Terrain, state.Thermal, state.Strata, state.Bands);
             ErosionReference.ThermalApply(k, state.Terrain, state.Thermal, other);
             other.CopyTo(state.Terrain, 0);
         }
@@ -120,19 +120,21 @@ public sealed class ErosionReferenceTests
     [TestMethod]
     public void Thermal_CollapsesRockSteeperThanItsTalus_AndLeavesTheRestStanding()
     {
-        // A rock wall of 70° collapses to the rock talus (50°), its debris lands as loose material; a 40° rock slope stands.
+        // A rock wall of 70° collapses to the rock talus (50°), its debris lands as loose material; a 40° rock slope stands. Without
+        // strata every rock is the softest, whose talus this is.
         const int n = 33;
         const double cell = 8.0;
         double tan70 = Math.Tan(70.0 * Math.PI / 180.0), tan40 = Math.Tan(40.0 * Math.PI / 180.0);
         var wall = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan70)));
         var slope = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan40)));
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, n, cell);
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { RockTalusDegrees = 50f, RockTalusHardDegrees = 60f }, n, cell)
+            .WithStrata(wall);
         foreach (ErosionState state in new[] { wall, slope })
         {
             var other = new float[n * n * 2];
             for (int step = 0; step < 2000; step++)
             {
-                ErosionReference.ThermalOut(k, state.Terrain, state.Thermal);
+                ErosionReference.ThermalOut(k, state.Terrain, state.Thermal, state.Strata, state.Bands);
                 ErosionReference.ThermalApply(k, state.Terrain, state.Thermal, other);
                 other.CopyTo(state.Terrain, 0);
             }
@@ -203,8 +205,8 @@ public sealed class ErosionReferenceTests
         Assert.AreEqual(PinnedResultHash, a.ContentHash().ToString("x16"));
     }
 
-    private const string PinnedSurfaceHash = "7200f9178eca7e04";
-    private const string PinnedResultHash = "a2b1446bb693f3b0";
+    private const string PinnedSurfaceHash = "05c7ac89357f294b";
+    private const string PinnedResultHash = "3f6a3639797cffa9";
 
     [TestMethod]
     public void Erosion_CarvesTheMountains_AndLeavesLooseMaterialLowerDown()
@@ -302,13 +304,23 @@ public sealed class ErosionReferenceTests
     [TestMethod]
     public void Constants_FitTheShadersCbuffer_AndDeriveFromTheSettings()
     {
-        Assert.AreEqual(96, System.Runtime.CompilerServices.Unsafe.SizeOf<ErosionConstants>(), "six 16-byte rows, as VistaErosion.hlsl declares");
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains, 65, 8.0);
+        Assert.AreEqual(128, System.Runtime.CompilerServices.Unsafe.SizeOf<ErosionConstants>(), "eight 16-byte rows, as VistaErosion.hlsl declares");
+        ErosionSettings settings = ErosionSettings.Mountains with { RockTalusDegrees = 40f, RockTalusHardDegrees = 65f, HardErodibility = 0.25f };
+        ErosionConstants k = ErosionConstants.For(settings, 65, 8.0);
         Assert.AreEqual(0.25f * 20f * 9.81f / 8f, k.FluxPerHead);
         Assert.AreEqual(0.25f / 64f, k.DepthPerFlux);
         Assert.AreEqual(1f - 0.8f, k.FluxKept);
         Assert.AreEqual(Math.Tan(35.0 * Math.PI / 180.0) * 8.0 * Math.Sqrt(2.0), k.LooseDropCorner, 1e-4);
         Assert.AreEqual(0.125f, k.HalfThermalRate);
+        Assert.AreEqual(Math.Tan(40.0 * Math.PI / 180.0) * 8.0, k.RockDropEdge, 1e-4);
+        Assert.AreEqual(Math.Tan(65.0 * Math.PI / 180.0) * 8.0 * Math.Sqrt(2.0), k.RockDropCornerHard, 1e-4);
+        Assert.AreEqual(settings.RockErodibility * 0.25f, k.RockErodibilityHard);
+        Assert.AreEqual(0f, k.TableScale, "the bed table's come from the state");
+        var state = new ErosionState(TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.AlpineRange] }, 1, new WorldGrid(9, 8.0)),
+            StrataGrid.For(RockHardness.For(1, settings), 9, 8.0, new StrataFrame(0.0, 0.0, 2.0, 0), (_, _) => 0.0));
+        k = k.WithStrata(state);
+        Assert.AreEqual(1f / (2f * RockHardness.TableSpacingMetres), k.TableScale);
+        Assert.AreEqual(RockHardness.TableEntries - 1.001f, k.TableLast);
     }
 
     // Σ over the edge cells of what each sends past the edge: f(c, its outflow toward the outside).
