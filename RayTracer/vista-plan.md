@@ -5,11 +5,11 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-two slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-three slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness) and M1.12 (materials by
-rule) are done, M1.13 (snow and glaciers) is next. It sits
+rule) are done, M1.12a (the colour quadrature, found in M1.12) is next, then M1.13 (snow and glaciers). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -1266,9 +1266,45 @@ built-in spectra (tier 5) the sidecar records (schema 17). Over four seeds rock 
 as M1.9's, the bound taken per region) and below 2 m the shading carries the roughness (`m1-12-loupes.png`); a 4K mesh near the ground
 is 1.5–2.0 times `--materials off`'s (the default view 15.5 M triangles). Rough diffuse surfaces (Oren–Nayar) by default: on the ground
 +6.6% with the sun behind the camera, 3% darker looking toward it (`m1-12-diffuse.png`). `--materials off` renders `main`'s image to float
-rounding. Found on the way: the hero wavelengths' colour cast (§11) and the display's missing white balance (M1.17). A sample costs
+rounding. Found on the way: the hero wavelengths' colour cast (§11, M1.12a) and the display's missing white balance (M1.17). A sample costs
 1.40–1.55 times M1.11d's on the ground views, nearly all of it the materials' evaluation at each hit (the cost ledger).
 Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
+
+**M1.12a — Colour quadrature.**
+- *Goal:* colour that integrates true, so snow and ice (M1.13), water (M3) and the M1.17 look are
+  judged on their spectra and not on the hero wavelengths' cast.
+- *Why (found in M1.12, 2026-10-22; §11):* the engine's 50 hero wavelengths sit where the
+  colour-matching functions' cumulative mass (x̄ + ȳ + z̄) passes i/51, each weighted by the inverse
+  of that sum at its own wavelength (the engine's fix for a magenta cast). That weight is a point
+  value standing in for the width of the wavelength's share of the mass, and x̄, ȳ and z̄ change
+  differently across it, so every colour carries a cast against dense 1 nm CIE 1931 integration: a
+  flat grey 2.6 ΔE₇₆ greenish, M1.12's ground spectra 1.7–2.9, ten metres of water 3.0, a Rayleigh
+  sky 3.4, a sun at air mass 20 4.1; luminance within 1.7%. The span (419–651 nm) is not the cause:
+  only 1.8–1.9% of the functions' mass lies beyond it at each end.
+- *Deliverable:* **Vista's own wavelength table** in `Vista.Core`, the engine's `WavelengthLookup`
+  untouched (the maze does not move, §9.2): 50 bins of equal x̄ + ȳ + z̄ mass, each wavelength at its
+  bin's median (whole nanometres, 413–661 nm, still ascending, so the multiple-scattering tables'
+  interpolation and the companion stride hold), and each entry's tristimulus weight its bin's own
+  integrals of x̄, ȳ and z̄, so a flat spectrum integrates exactly to equal-energy white. Everything
+  that reads the engine's cycle today reads Vista's: the integrator's CIE table and its correction,
+  the materials' spectra and the RGB-to-reflectance basis, the atmosphere's tables and LUTs, the
+  multiple-scattering positions, the incident meter and the albedo output's colours. The shader does
+  not change: it already sums `Cie[i]·L(λᵢ)` under one correction. **`--quadrature bins|engine`**
+  (default bins): `engine` is the engine's table and renders `main`'s image byte for byte. The
+  setting joins the render key; the sidecar records it with the table's span (schema 18).
+- *Verify:* CI: the table against dense 1 nm integration of a set of spectra (flat, M1.12's five
+  ground spectra, water through 2 m and 10 m, the solar spectrum through air mass 1 to 20, a λ⁻⁴
+  sky): a flat spectrum exactly neutral, every one within 1 ΔE₇₆ and 1% in luminance (0.9 ΔE₇₆ at
+  worst predicted, grass, half of it the red edge past the last wavelength) where the engine's table
+  misses by 1.7–4.1; the wavelengths ascending, each inside its bin, every entry visited four times
+  in a 50-sample cycle; `engine` reproducing the engine's table to the bit; the pins that move
+  re-baselined deliberately, each named in the log. 3070: `--quadrature engine` byte-identical to `main` on the ledger views; a
+  before/after sheet of the ledger and M1.12 views with a ΔE₇₆ map per view; each view's mean
+  colour shift against the shift CI predicts for its light (the sky view's Rayleigh sky about 3.4
+  ΔE₇₆, less green); the exposure the incident meter picks, before and after (the luminance moves
+  under 2%); the sky view's share of red channels at 0 (M1.11c: 96.6%), before and after;
+  `--gpu-selftest` with the atmosphere's checks at the new wavelengths; a cost-ledger row (expected
+  unchanged: only the tables change).
 
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
@@ -1444,13 +1480,14 @@ balance, lens CA), estimator accuracy.
 ## 11. Open questions & risks
 
 **Realism.**
-- **The colour quadrature (measured in M1.12).** The engine's 50 hero wavelengths, placed where the colour-matching functions'
-  cumulative mass passes i/51 and weighted as one, leave a cast on everything: a flat grey integrates 2.6 ΔE₇₆ greenish of its true
-  colour, the M1.12 spectra 1.7–2.9, ten metres of water 3.0, a sun at air mass 20 4.1, a Rayleigh sky 3.4 (dense 1 nm CIE 1931
-  integration as the reference; the span, 419–651 nm, leaves only 1.8–1.9% of the functions' mass out at each end and is not the
-  cause). The same 50 wavelengths at their equal-mass bins' middles, each weighted by its bin's own integral of x̄, ȳ and z̄, give
-  0.0–0.9 ΔE₇₆ on every one, for no cost per sample. The hero table is the maze's too (§9.2), so a change is Vista's own table,
-  gated, with before/after sheets: a slice of its own, worth landing before snow, ice and water (M1.13, M3) and the M1.17 look.
+- **The colour quadrature (measured in M1.12; fixed in M1.12a).** The engine's 50 hero wavelengths, placed where the
+  colour-matching functions' cumulative mass passes i/51 and each weighted by the inverse of the functions' sum at its own
+  wavelength, leave a cast on everything: a flat grey integrates 2.6 ΔE₇₆ greenish of its true colour, the M1.12 spectra 1.7–2.9,
+  ten metres of water 3.0, a sun at air mass 20 4.1, a Rayleigh sky 3.4 (dense 1 nm CIE 1931 integration as the reference; the span,
+  419–651 nm, leaves only 1.8–1.9% of the functions' mass out at each end and is not the cause). 50 equal-mass bins with each
+  wavelength at its bin's median, weighted by the bin's own integrals of x̄, ȳ and z̄, give 0.0–0.9 ΔE₇₆ on every one, for no cost
+  per sample. The hero table is the maze's too (§9.2), so M1.12a gives Vista its own, gated, before snow, ice and water (M1.13, M3)
+  and the M1.17 look; the maze keeps the cast (the engine's `plan.md` could take the same fix).
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus
