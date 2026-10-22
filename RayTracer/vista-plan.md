@@ -1294,8 +1294,12 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   setting joins the render key; the sidecar records it with the table's span (schema 18).
 - *Verify:* CI: the table against dense 1 nm integration of a set of spectra (flat, M1.12's five
   ground spectra, water through 2 m and 10 m, the solar spectrum through air mass 1 to 20, a λ⁻⁴
-  sky): a flat spectrum exactly neutral, every one within 1 ΔE₇₆ and 1% in luminance (0.9 ΔE₇₆ at
-  worst predicted, grass, half of it the red edge past the last wavelength) where the engine's table
+  sky, and **the twilight light that makes alpenglow**: the sun at −1°, its path through the air
+  beyond air mass 20 and its light mostly deep red, where the last wavelength (661 nm) stands for
+  everything above it, on a flat 0.9 reflector standing in for snow until M1.13 re-runs it with its
+  own spectrum): a flat spectrum exactly neutral, every one within 1 ΔE₇₆ and 1% in luminance (0.9 ΔE₇₆ at
+  worst predicted, grass, half of it the red edge past the last wavelength; the twilight case's error
+  recorded, and if it misses, the log names the fix, such as a narrower last bin) where the engine's table
   misses by 1.7–4.1; the wavelengths ascending, each inside its bin, every entry visited four times
   in a 50-sample cycle; `engine` reproducing the engine's table to the bit; the pins that move
   re-baselined deliberately, each named in the log. 3070: `--quadrature engine` byte-identical to `main` on the ledger views; a
@@ -1329,7 +1333,11 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   fraction on faces steeper than 40° (read from the material-id output) stays under a threshold
   recorded here while ledges and gullies hold snow. **Alpenglow**, because a dawn sheet from −4° to
   +4° shows the peaks pink and red while the valley is in shadow, with no code that knows about
-  alpenglow. A season sheet moves the snowline from the defaults alone.
+  alpenglow. A season sheet moves the snowline from the defaults alone. CI: M1.12a's twilight check
+  re-run with the snow spectrum in place of its flat stand-in, within 1 ΔE₇₆ of dense integration.
+  The brown "stony ground above the grass line" (M1.12's soil), which dominates some views and reads
+  as desert (seed 42 in `m1-12-ids.png`), is judged again once snow covers the high ground, before
+  any retuning of the soil rule.
 
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
@@ -1339,9 +1347,15 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   candidates around it are scored from low-resolution G-buffer renders (depth, normal, material id)
   on: horizon near a third, foreground / midground / background layering, sun angle, sky fraction,
   the peaks in frame, nothing blocking the lens. Camera collision. `--auto-camera` in the CLI; the
-  scores and the winner go in the sidecar.
-- *Verify:* CI: scoring tests on synthetic G-buffers. 3070: an auto-camera sheet over eight seeds ×
-  both set pieces against the default camera; the same pick twice; the scoring time recorded.
+  scores and the winner go in the sidecar. **A near-field penalty until M5:** the materials' close-up
+  look does not hold up yet (`m1-12-loupes.png`: scree as large flat shards with a marbled texture,
+  the meadow in regular wavy bands that look like a single-frequency pattern and are worth a check of
+  their own, the rock face blotchy), and grass geometry is M5's. A candidate whose ground within
+  about 100 m (from the depth buffer) covers more than a recorded share of the frame is penalised,
+  unless that ground is snow (M1.13); the share is relaxed as M5 and M7 make the near field hold.
+- *Verify:* CI: scoring tests on synthetic G-buffers, the near-field penalty among them. 3070: an
+  auto-camera sheet over eight seeds × both set pieces against the default camera, every pick's near
+  ground under the recorded share; the same pick twice; the scoring time recorded.
 
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
@@ -1418,7 +1432,9 @@ Goal: forests, and with them the north star. Deliverable: procedural tree specie
 bark, grass, ferns, shrubs, leaf litter; ecosystem placement; mass TLAS instancing;
 leaf translucency; PROSPECT-D leaves driven by the season slider; leaf-off in winter;
 distant-forest representation (measured decision). Verify: **"autumn lake, dawn, fog"**
-renders at 4K within the 8 GB budget; backlit leaves glow.
+renders at 4K within the 8 GB budget; backlit leaves glow; M1.12a's colour check gains PROSPECT's
+leaf spectra, green and autumn (reflectance and transmittance), whose sharp red edge lies past the
+last wavelength (661 nm), each within 1 ΔE₇₆ of dense integration or the miss recorded with its fix.
 
 **M6 — Night.**
 Goal: moonlit scenes that look right for the right reason. Deliverable: moon position,
