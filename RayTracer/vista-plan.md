@@ -7,8 +7,8 @@ status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
 twenty-two slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
-measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain)
-M1.11a (drainage) and M1.11b (the display look) are done, M1.11c (the output finish) is next. It sits
+measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
+M1.11a (drainage), M1.11b (the display look) and M1.11c (the output finish) are done, M1.11d (uplift and rock hardness) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -444,7 +444,9 @@ maze's real-time path):
 - **Formats:** EXR (scene-referred, for the user's own grading) plus PNG/JPEG through a
   filmic tonemap: AgX since M1.10a (three.js r169's port of Blender's AgX base), with its punchy look and
   +1 EV on the incident meter since M1.11b ([`vista-log/M1.11b.md`](vista-log/M1.11b.md); `--look base`, `--compensation`),
-  the per-channel ACES fit one option away (`--display aces`).
+  the per-channel ACES fit one option away (`--display aces`). Since M1.11c ([`vista-log/M1.11c.md`](vista-log/M1.11c.md)) the
+  punchy look's saturation is held back per pixel where it would take a channel below zero, and the 8-bit PNG gets a triangular
+  dither keyed by the frame pixel (`--dither off` for none); `--png16` writes 16 bits a channel instead.
 - **Sidecar** next to every image: recipe, seed, camera, all slider values (auto or
   pinned), data tier per material (§6.2), sample counts, render time, engine version.
 - **HDR wallpapers** (e.g. JXR on Windows 11) — to verify before committing to it (M11).
@@ -1167,6 +1169,14 @@ Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
   8-bit values down a sky column, and the step edges visible in a contrast-stretched loupe, before
   and after; the measurement views with `--dither off` byte-identical to M1.11b. Cost ledger: no
   change (display only, on the CPU).
+
+*Status (2026-10-22): done.* The punchy look's saturation is held back per pixel where it would clip (the closed form at the look
+only bounds it, so a bisection finds it), the 8-bit PNG is dithered by default (`--dither off`), and `--png16` writes 16 bits. On a
+3840×2160 sky at 1024 spp, denoised, the undithered PNG's levels run 260–530 rows down a column; dithered, at most 27. The sky view's
+red channel stays at 0 (96.6% of its pixels): held back just enough, this sky's colour sits on Rec.709's edge, 2–4 levels greener and
+2–3° toward cyan; whether it should keep some red (a margin short of the edge) is a change of look, left for the review. Only the sky
+view and the deepest shadows down the slope change; `--look base --dither off` writes `main`'s PNG byte for byte. Sheets:
+`m1-11c-before-after.png`, `m1-11c-sky-loupe.png`. Log: [`vista-log/M1.11c.md`](vista-log/M1.11c.md).
 
 **M1.11d — Uplift & rock hardness.**
 - *Goal:* ranges with hierarchy (high massifs, broad main valleys, lower foothills) and slopes that

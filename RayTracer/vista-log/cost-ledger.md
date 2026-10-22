@@ -24,6 +24,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.11 | 0.27 | 4.02 | 2.78 | 5.67 |
 | M1.11a | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11b | 0.22 | 4.04 | 2.69 | 6.44 |
+| M1.11c | 0.22 | 4.04 | 2.69 | 6.44 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -84,3 +85,6 @@ view's −18% is unexplained, as M1.7's −25% was: it traces one camera ray per
 M1.11b changes the PNG only (AgX's punchy look and the incident meter's +1 EV), so its row is M1.11a's: the four ledger views rendered
 by `main` (bfa57bfc) and by this slice (480 px, 64 spp) have byte-identical EXRs, and `main`'s PNGs equal this slice's `--look base
 --compensation 0`. Nothing on the GPU changed.
+M1.11c also changes the PNG only (the punchy look's saturation held back where it clips, the dither, the 16-bit option), so its row is
+M1.11b's: the six views of its checks rendered by `main` (7b0ffbe9) and by this slice (480 px, 64 spp) have byte-identical EXRs, and
+`main`'s `--look base` PNGs equal this slice's `--look base --dither off`. The finish runs on the CPU when the files are written.
