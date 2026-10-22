@@ -54,6 +54,38 @@ public sealed class ExposureOptionsTests
     }
 
     [TestMethod]
+    public void TheCommandLine_SetsTheDitherAndTheBitDepth()
+    {
+        Assert.AreEqual((PngDither.Triangular, 8), (Parse().Dither, Parse().BitDepth), "the dither at 8 bits by default (M1.11c)");
+        Assert.AreEqual(PngDither.Off, Parse("--dither", "off").Dither);
+        Assert.AreEqual(PngDither.Triangular, Parse("--dither", "on").Dither);
+        Assert.AreEqual(16, Parse("--png16").BitDepth);
+        StringAssert.Contains(Error("--dither", "tpdf"), "--dither must be on or off");
+        StringAssert.Contains(Error("--dither", "none"), "--dither must be on or off");
+        StringAssert.Contains(Error("--png16", "--png16"), "--png16 is given more than once");
+    }
+
+    [TestMethod]
+    public void ASheet_VariesTheDither_AndAWatchsOptionsFileChangesBoth()
+    {
+        var request = new PreviewRequest { RecipePath = "r.json", Seed = 1, OutPath = "p.png" };
+        Assert.IsTrue(SheetAxis.TryParse("dither=off,on", out SheetAxis? dither, out string? problem), problem);
+        Assert.AreEqual((PngDither.Off, PngDither.Triangular), (dither!.Apply(request, 0).Dither, dither.Apply(request, 1).Dither));
+        Assert.IsFalse(SheetAxis.TryParse("dither=off,blue", out _, out problem));
+        StringAssert.Contains(problem, "not on or off");
+
+        var watch = new WatchRequest
+        {
+            Values = new Dictionary<string, string> { ["--recipe"] = "r.json", ["--seed"] = "1", ["--out"] = "p.png" },
+            Flags = new HashSet<string>(),
+        };
+        var problems = new List<string>();
+        PreviewRequest? merged = WatchCommandLine.Merge(watch, "--dither off\n--png16  # for the final\n", problems, out _, out _);
+        Assert.AreEqual(0, problems.Count, string.Join(" | ", problems));
+        Assert.AreEqual((PngDither.Off, 16), (merged!.Dither, merged.BitDepth));
+    }
+
+    [TestMethod]
     public void ASheet_VariesTheLookAndTheCompensation()
     {
         var request = new PreviewRequest { RecipePath = "r.json", Seed = 1, OutPath = "p.png" };

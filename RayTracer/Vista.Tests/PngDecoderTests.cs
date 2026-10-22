@@ -62,6 +62,40 @@ public sealed class PngDecoderTests
     }
 
     [TestMethod]
+    [DataRow(PngColor.Gray)]
+    [DataRow(PngColor.Rgb)]
+    [DataRow(PngColor.Rgba)]
+    public void Decode_RoundTrips16BitSamples(PngColor color)
+    {
+        // The 16-bit PNG (vista-plan §10 M1.11c): every sample back as written, and the nearest 8-bit step for a sheet's tiles.
+        const int width = 29, height = 11;
+        var samples = new ushort[width * height * PngEncoder.Channels(color)];
+        for (int i = 0; i < samples.Length; i++)
+            samples[i] = (i % 5) switch { 0 => 0, 1 => 65535, 2 => (ushort)(i * 257), _ => (ushort)World.StableHash.Mix((ulong)i) };
+        PngImage image = PngDecoder.Decode(PngEncoder.Encode16(samples, width, height, color));
+        Assert.AreEqual((width, height, color, 16), (image.Width, image.Height, image.Color, image.BitDepth));
+        CollectionAssert.AreEqual(samples, image.Samples16);
+        CollectionAssert.AreEqual(samples.Select(s => (byte)Math.Round(s / 257.0)).ToArray(), image.Pixels);
+        Assert.AreEqual(8, PngDecoder.Decode(PngEncoder.Encode([1, 2, 3], 1, 1, PngColor.Rgb)).BitDepth);
+        Assert.AreEqual(0, PngDecoder.Decode(PngEncoder.Encode([1, 2, 3], 1, 1, PngColor.Rgb)).Samples16.Length);
+    }
+
+    [TestMethod]
+    public void A16BitFile_FiltersWholePixelsOfBytes()
+    {
+        // Written by hand: one RGB row of two pixels, filter Sub, whose predictor is the byte six back (a 16-bit pixel), not three.
+        ushort[] expected = [0x0102, 0x0304, 0x0506, 0x1111, 0x2222, 0x3333];
+        var bytes = new byte[12];
+        for (int i = 0; i < expected.Length; i++)
+            BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(i * 2), expected[i]);
+        var raw = new byte[13];
+        raw[0] = 1;
+        for (int i = 0; i < 12; i++)
+            raw[1 + i] = (byte)(bytes[i] - (i >= 6 ? bytes[i - 6] : 0));
+        CollectionAssert.AreEqual(expected, PngDecoder.Decode(Png(2, 1, colorType: 2, bitDepth: 16, interlace: 0, raw)).Samples16);
+    }
+
+    [TestMethod]
     public void ToRgb_ExpandsGreyAndDropsAlpha()
     {
         CollectionAssert.AreEqual(new byte[] { 7, 7, 7, 9, 9, 9 }, new PngImage([7, 9], 2, 1, PngColor.Gray).ToRgb());
@@ -73,7 +107,7 @@ public sealed class PngDecoderTests
     {
         byte[] row = [0, 1, 2, 3];
         Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode("not a png at all"u8));
-        StringAssert.Contains(Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode(Png(1, 1, 2, 16, 0, row))).Message, "8-bit");
+        StringAssert.Contains(Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode(Png(1, 1, 2, 4, 0, row))).Message, "8- and 16-bit");
         StringAssert.Contains(Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode(Png(1, 1, 2, 8, 1, row))).Message, "Interlaced");
         StringAssert.Contains(Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode(Png(1, 1, 3, 8, 0, row))).Message, "colour type 3");
         StringAssert.Contains(Assert.ThrowsExactly<InvalidDataException>(() => PngDecoder.Decode(Png(1, 1, 2, 8, 0, [9, 1, 2, 3]))).Message, "filter type 9");

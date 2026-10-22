@@ -205,3 +205,18 @@ each variant's exposure, the frame's mean and median (the largest channel), its 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/look/render.ps1 [-Before ..\main\Vista.App.dll] [-Width 480] [-SweepWidth 320] [-Spp 64] [-Compensations 0,0.5,1] [-Out folder]
 ```
+
+## Output finish (M1.11c)
+
+`finish/render.ps1` checks the M1.11c finish against a `main` build (`-Before`, required). Six views (the four measurement views,
+the default camera at golden hour and the layered ridges in October at +2°) rendered by `main` and by this build with `--dither off`,
+one EXR each: the share of pixels with a channel at 0, the share that changed (every one must have had a channel at 0 under `main`,
+so only clipped colours move), and over those the Oklab hue's mean distance from AgX's base look. Then `--look base --dither off`
+against `main`'s `--look base` on the four measurement views, PNG and EXR byte for byte; the sky view at 3840×2160, denoised, the
+dither off and on from one render (`--vary dither=off,on`): the longest run of equal 8-bit values down five sky columns and a loupe of
+the sky, plain and contrast-stretched; and the default view with `--png16`, read back by GDI+ (an independent decoder) within a step
+of the 8-bit PNG. It writes the two sheets the log cites: `before-after.png` and `sky-loupe.png`.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/finish/render.ps1 -Before ..\main\Vista.App.dll [-Width 480] [-CellWidth 320] [-Spp 64] [-SkyWidth 3840] [-SkySpp 1024] [-DenoiseDevice cuda] [-LoupeWidth 400] [-Out folder]
+```

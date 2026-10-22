@@ -36,12 +36,13 @@ namespace Vista.Output;
 /// the freezing level, the snowline and the haze). Schema 13 (M1.11a) added, in <see cref="WorldInfo.Erosion"/>, the world's drainage
 /// measures (<see cref="ErosionInfo.Drainage"/>), the stream-power incision's settings and its time and that of the maps and the
 /// drainage in the cost. Schema 14 (M1.11b) added <see cref="ImageInfo.Look"/>, AgX's look, and
-/// <see cref="ExposureInfo.MeterCompensationEv"/>, the stops the meter added on its own.</para>
+/// <see cref="ExposureInfo.MeterCompensationEv"/>, the stops the meter added on its own. Schema 15 (M1.11c) added
+/// <see cref="ImageInfo.Dither"/> and <see cref="ImageInfo.BitDepth"/>, how the PNG was quantised.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 14;
+    public const int CurrentSchema = 15;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -149,6 +150,12 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>AgX's look (schema 14); <see cref="DisplayLook.None"/> under the ACES fit, which has none.</summary>
     public DisplayLook Look { get; init; } = Output.DisplayTransform.DefaultLook;
+
+    /// <summary>The 8-bit PNG's dither (schema 15); <see cref="PngDither.None"/> for a 16-bit PNG, which needs none.</summary>
+    public PngDither Dither { get; init; } = Output.DisplayTransform.DefaultDither;
+
+    /// <summary>The beauty's and the denoised beauty's bits per channel (schema 15): 8, or 16.</summary>
+    public int BitDepth { get; init; } = Output.DisplayTransform.DefaultBitDepth;
 
     /// <summary>
     /// Which lights surfaces sampled (vista-plan §10 M1.5): <see cref="LightSampling.Mis"/>, or M1.4's

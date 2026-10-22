@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Vista.Output;
 
-/// <summary>PNG colour layouts the encoder writes (8 bits per channel).</summary>
+/// <summary>PNG colour layouts the encoder writes (8 or 16 bits per channel).</summary>
 public enum PngColor
 {
     /// <summary>One grey channel.</summary>
@@ -17,7 +17,7 @@ public enum PngColor
 
 /// <summary>
 /// A small, dependency-free PNG encoder (vista-plan §5.7) — <c>System.Drawing</c> is Windows-only and the
-/// encoder must run in the net10.0 tests. 8-bit, non-interlaced, tagged sRGB, with the usual per-row
+/// encoder must run in the net10.0 tests. 8-bit (or, since M1.11c, 16-bit), non-interlaced, tagged sRGB, with the usual per-row
 /// adaptive filter choice (minimum sum of absolute differences) so large wallpapers compress well.
 /// </summary>
 public static class PngEncoder
@@ -34,14 +34,33 @@ public static class PngEncoder
     };
 
     /// <summary>Encodes tightly packed, top-row-first 8-bit <paramref name="pixels"/> as a PNG file.</summary>
-    public static byte[] Encode(ReadOnlySpan<byte> pixels, int width, int height, PngColor color)
+    public static byte[] Encode(ReadOnlySpan<byte> pixels, int width, int height, PngColor color) => Encode(pixels, width, height, color, bitDepth: 8);
+
+    /// <summary>
+    /// Encodes tightly packed, top-row-first 16-bit <paramref name="samples"/> as a 16-bit PNG file (vista-plan §10 M1.11c); the file
+    /// holds them big-endian, as PNG's samples are.
+    /// </summary>
+    public static byte[] Encode16(ReadOnlySpan<ushort> samples, int width, int height, PngColor color)
+    {
+        var bytes = new byte[samples.Length * 2];
+        for (int i = 0; i < samples.Length; i++)
+            BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(i * 2), samples[i]);
+        return Encode(bytes, width, height, color, bitDepth: 16);
+    }
+
+    /// <summary>Encodes and writes a 16-bit PNG file.</summary>
+    public static void Write16(string path, ReadOnlySpan<ushort> samples, int width, int height, PngColor color) =>
+        File.WriteAllBytes(path, Encode16(samples, width, height, color));
+
+    // Raw big-endian samples of bitDepth bits; the filters work on bytes, bpp of them a pixel.
+    private static byte[] Encode(ReadOnlySpan<byte> pixels, int width, int height, PngColor color, int bitDepth)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        int bpp = Channels(color);
+        int bpp = Channels(color) * bitDepth / 8;
         int stride = width * bpp;
         if (pixels.Length != (long)stride * height)
-            throw new ArgumentException($"Expected {(long)stride * height} bytes, got {pixels.Length}.", nameof(pixels));
+            throw new ArgumentException($"Expected {(long)stride * height / (bitDepth / 8)} samples, got {pixels.Length / (bitDepth / 8)}.", nameof(pixels));
 
         using var file = new MemoryStream();
         file.Write(Signature);
@@ -49,7 +68,7 @@ public static class PngEncoder
         Span<byte> ihdr = stackalloc byte[13];
         BinaryPrimitives.WriteInt32BigEndian(ihdr, width);
         BinaryPrimitives.WriteInt32BigEndian(ihdr[4..], height);
-        ihdr[8] = 8;            // bit depth
+        ihdr[8] = (byte)bitDepth;
         ihdr[9] = (byte)color;
         ihdr[10] = 0;           // deflate
         ihdr[11] = 0;           // adaptive filtering

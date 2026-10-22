@@ -169,6 +169,32 @@ public sealed class PreviewSessionTests
     }
 
     [TestMethod]
+    public void DitherAndBitDepth_ReEncodeTheKeptRender_AndAreRecorded()
+    {
+        var renderer = new FakeRenderer { SceneDependent = true };
+        var session = new PreviewSession(renderer);
+        Sidecar dithered = session.Run(Base);
+        Assert.AreEqual((PngDither.Triangular, 8), (dithered.Image.Dither, dithered.Image.BitDepth), "the dither at 8 bits by default");
+        byte[] exr = File.ReadAllBytes(P("p.exr"));
+        PngImage noisy = PngDecoder.Read(P("p.png"));
+
+        Sidecar off = session.Run(Base with { Dither = PngDither.Off });
+        Assert.AreEqual((PngDither.Off, 8), (off.Image.Dither, off.Image.BitDepth));
+        PngImage rounded = PngDecoder.Read(P("p.png"));
+        Assert.IsTrue(noisy.Pixels.Zip(rounded.Pixels).All(p => Math.Abs(p.First - p.Second) <= 1), "the dither moves a value a step at most");
+        Assert.IsTrue(noisy.Pixels.Zip(rounded.Pixels).Any(p => p.First != p.Second));
+
+        Sidecar wide = session.Run(Base with { BitDepth = 16 });
+        Assert.AreEqual((PngDither.None, 16), (wide.Image.Dither, wide.Image.BitDepth), "a 16-bit PNG has no dither");
+        PngImage image = PngDecoder.Read(P("p.png"));
+        Assert.AreEqual((16, 32, 18), (image.BitDepth, image.Width, image.Height));
+        Assert.IsTrue(image.Samples16.Zip(rounded.Pixels).All(p => Math.Abs(p.First - p.Second * 257) <= 129), "the same curve, 257 times finer");
+
+        Assert.AreEqual(1, renderer.Scenes.Count, "one render for all three");
+        CollectionAssert.AreEqual(exr, File.ReadAllBytes(P("p.exr")), "the EXR is scene-referred");
+    }
+
+    [TestMethod]
     public void Exposure_ReExposesThePng_WithoutRendering()
     {
         var renderer = new FakeRenderer { SceneDependent = true };
@@ -281,6 +307,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(14, back.Schema);
+        Assert.AreEqual(15, back.Schema);
     }
 }

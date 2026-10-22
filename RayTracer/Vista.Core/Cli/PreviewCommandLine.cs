@@ -131,6 +131,15 @@ public sealed record PreviewRequest
     /// (<see cref="IncidentMeter.DefaultCompensationEv"/>, or 0 for the average meter). The EXR never changes.
     /// </summary>
     public double? MeterCompensationEv { get; init; }
+
+    /// <summary>
+    /// The 8-bit PNG's dither (vista-plan §10 M1.11c): the triangular dither by default, <see cref="PngDither.Off"/> for M1.11b's
+    /// bytes. A 16-bit PNG has none. The EXR never changes.
+    /// </summary>
+    public PngDither Dither { get; init; } = DisplayTransform.DefaultDither;
+
+    /// <summary>The beauty's and the denoised beauty's bits per channel (vista-plan §10 M1.11c): 8, or 16 with <c>--png16</c>.</summary>
+    public int BitDepth { get; init; } = DisplayTransform.DefaultBitDepth;
 }
 
 /// <summary>
@@ -145,6 +154,7 @@ public sealed record PreviewRequest
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
+///           [--dither on | off] [--png16]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
@@ -165,6 +175,8 @@ public sealed record PreviewRequest
 /// <c>--mesh uniform</c> meshes every sample of the world grid and nothing else (M1.7's mesh, bent onto the Earth), for comparisons.
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
+/// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
+/// beauty at 16 bits a channel instead, which need none.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -211,7 +223,9 @@ public static class PreviewCommandLine
         "--meter incident (default) | average: expose the PNG for a grey card facing the sun where the camera stands, or for the\n" +
         "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. --look punchy (default) | base: AgX's look\n" +
         "  (the ACES fit has none). --compensation <EV>: the stops the meter adds on its own, beside the camera's EV (default: the\n" +
-        "  incident meter's +1 EV, the average meter's 0). None of them changes the EXR.";
+        "  incident meter's +1 EV, the average meter's 0). None of them changes the EXR.\n" +
+        "--dither on (default) | off: a triangular dither of ±1 step before the 8-bit PNG is rounded, against banding in smooth skies.\n" +
+        "--png16: write <preview>.png (and <preview>.denoised.png) at 16 bits a channel instead, with no dither.";
 
     /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
@@ -261,10 +275,11 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
+        "--dither",
     };
 
     /// <summary>The options that take no value.</summary>
-    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise" };
+    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise", "--png16" };
 
     /// <summary>
     /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the flags
@@ -345,6 +360,7 @@ public static class PreviewCommandLine
         DisplayCurve display = Display(values.GetValueOrDefault("--display"), problems);
         DisplayLook look = Look(values.GetValueOrDefault("--look"), problems);
         double? compensation = Compensation(values.GetValueOrDefault("--compensation"), problems);
+        PngDither dither = Dither(values.GetValueOrDefault("--dither"), problems);
 
         if (problems.Count > before)
             return null;
@@ -375,7 +391,31 @@ public static class PreviewCommandLine
             Display = display,
             Look = look,
             MeterCompensationEv = compensation,
+            Dither = dither,
+            BitDepth = flags.Contains("--png16") ? 16 : DisplayTransform.DefaultBitDepth,
         };
+    }
+
+    /// <summary>Parses a <c>--dither</c> value: <c>on</c> (the triangular dither) or <c>off</c>.</summary>
+    internal static bool TryParseDither(string text, out PngDither dither)
+    {
+        dither = text switch
+        {
+            "on" => PngDither.Triangular,
+            "off" => PngDither.Off,
+            _ => PngDither.None,
+        };
+        return dither != PngDither.None;
+    }
+
+    private static PngDither Dither(string? text, List<string> problems)
+    {
+        if (text is null)
+            return DisplayTransform.DefaultDither;
+        if (TryParseDither(text, out PngDither dither))
+            return dither;
+        problems.Add($"--dither must be on or off, got '{text}'.");
+        return DisplayTransform.DefaultDither;
     }
 
     /// <summary>Parses a <c>--meter</c> value (<c>incident</c> or <c>average</c>).</summary>

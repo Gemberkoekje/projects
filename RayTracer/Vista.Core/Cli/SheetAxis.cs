@@ -13,7 +13,8 @@ namespace Vista.Cli;
 ///   render settings; <c>erosion=off,on</c> — the world un-eroded and eroded (M1.7); <c>mesh=uniform,view</c>, <c>meshError=0.5,1,2</c>,
 ///   <c>detail=off,on</c>, <c>farField=off,on</c> — how the terrain is meshed (M1.9); <c>meter=average,incident</c>,
 ///   <c>display=aces,agx</c> — how the PNG is exposed and display-encoded (M1.10a), <c>look=base,punchy</c> and
-///   <c>compensation=0,0.5,1</c> — AgX's look and the meter's own stops (M1.11b; one render serves every cell);</item>
+///   <c>compensation=0,0.5,1</c> — AgX's look and the meter's own stops (M1.11b; one render serves every cell), <c>dither=off,on</c> —
+///   the 8-bit PNG's dither (M1.11c; one render too);</item>
 ///   <item><c>camera.&lt;field&gt;=…</c> — one camera field, e.g. <c>camera.yawDegrees=0,90,180,270</c>;</item>
 ///   <item><c>sliders=a.json,b.json</c> — whole slider files; a slider-file field — one slider, pinned per cell (M1.11), e.g.
 ///   <c>time=dawn,day,goldenHour,dusk</c>, <c>sunElevation=2,4,6</c>, <c>date=2026-01-15,2026-07-15</c> or <c>visibility=20,80</c>
@@ -38,7 +39,7 @@ public sealed class SheetAxis
         _apply = apply;
     }
 
-    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>sliders</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>meter</c>, <c>display</c>, <c>look</c>, <c>compensation</c>, <c>camera.&lt;field&gt;</c>, a slider-file field or a recipe field path.</summary>
+    /// <summary>What varies: <c>seed</c>, <c>recipe</c>, <c>sliders</c>, <c>camera</c>, <c>spp</c>, <c>bounces</c>, <c>atmosphere</c>, <c>lightSampling</c>, <c>erosion</c>, <c>mesh</c>, <c>meshError</c>, <c>detail</c>, <c>farField</c>, <c>meter</c>, <c>display</c>, <c>look</c>, <c>compensation</c>, <c>dither</c>, <c>camera.&lt;field&gt;</c>, a slider-file field or a recipe field path.</summary>
     public string Key { get; }
 
     /// <summary>The values as written, one per cell.</summary>
@@ -121,6 +122,7 @@ public sealed class SheetAxis
                 "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "look" => Checked(values, Look, (r, v) => r with { Look = Look(v) }),
                 "compensation" => Checked(values, Compensation, (r, v) => r with { MeterCompensationEv = Compensation(v) }),
+                "dither" => Checked(values, Dither, (r, v) => r with { Dither = Dither(v) }),
                 "recipe" => (r, v) => r with { RecipePath = v },
                 "camera" => (r, v) => r with { CameraPath = v == "default" ? null : v },
                 "sliders" => (r, v) => r with { SlidersPath = v },
@@ -165,6 +167,9 @@ public sealed class SheetAxis
     private static double Compensation(string text) =>
         PreviewCommandLine.TryParseCompensation(text, out double ev) ? ev
             : throw new ArgumentException($"'{text}' is not a number of stops within ±{PreviewCommandLine.MaxCompensationEv}.");
+
+    private static Output.PngDither Dither(string text) =>
+        PreviewCommandLine.TryParseDither(text, out Output.PngDither dither) ? dither : throw new ArgumentException($"'{text}' is not on or off.");
 
     private static bool OnOff(string text) => text switch
     {

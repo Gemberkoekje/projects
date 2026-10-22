@@ -49,6 +49,8 @@ public static class SheetLabels
         ("image.maxBounces", "bounces"),
         ("image.display", "display"),
         ("image.look", "look"),
+        ("image.dither", "dither"),
+        ("image.bitDepth", "bits"),
         ("exposure.meter", "meter"),
         ("exposure.meterCompensationEv", "compensation"),
         ("image.lightSampling", "lights"),
@@ -149,6 +151,9 @@ public static class SheetLabels
                 fields["image.look"] = Display(look);
             else if (fields.GetValueOrDefault("image.display") == "agx")
                 fields["image.look"] = "base";
+            // How the PNG was quantised (schema 15); every build before it rounded to 8 bits with no dither.
+            fields["image.dither"] = image["dither"] is JsonValue dither ? Display(dither) : "off";
+            fields["image.bitDepth"] = image["bitDepth"] is JsonValue bits ? Display(bits) : "8";
         }
 
         // How the PNG was metered (schema 11); every build before it used the average meter.
@@ -270,6 +275,8 @@ public static class SheetLabels
                 "exposure.meter" => value == "incident" ? null : $"{value} meter",
                 "image.look" => value == "none" || value == DisplayTransform.DefaultLook.ToString().ToLowerInvariant() ? null : $"{value} look",
                 "exposure.meterCompensationEv" => $"{(value.StartsWith('-') ? value : "+" + value)} EV meter",
+                "image.dither" => value == "off" ? "no dither" : null,
+                "image.bitDepth" => value == "8" ? null : $"{value}-bit",
                 "image.window" => $"loupe {value}",
                 "image.samplesPerPixel" => $"{value} spp",
                 "image.maxBounces" => $"{value} bounces",

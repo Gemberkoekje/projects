@@ -82,20 +82,117 @@ public sealed class DisplayCurveTests
         new(0f, 0.30763039f, 0.0977621228f),
     ];
 
+    /// <summary>True when Filament's look clipped the colour: the clamp left a channel of the reference at 0.</summary>
+    private static bool Clipped(Vector3 reference) => Math.Min(reference.X, Math.Min(reference.Y, reference.Z)) == 0f;
+
     [TestMethod]
-    public void AgxPunchy_MatchesThreeJsWithFilamentsLook()
+    public void AgxPunchy_MatchesThreeJsWithFilamentsLook_WhereItDidNotClip()
     {
-        // The look's power and saturation scale the sigmoid's float cancellation (see Agx_MatchesThreeJs) a little.
+        // The look's power and saturation scale the sigmoid's float cancellation (see Agx_MatchesThreeJs) a little. Since M1.11c a
+        // colour Filament's look clipped gets less saturation (AgxPunchy_HoldsTheSaturationBack_JustEnough); every other colour, and
+        // every grey, keeps Filament's look and its saturation of 1.4 exactly.
         float worst = 0f;
         string where = string.Empty;
+        int kept = 0;
         for (int i = 0; i < ThreeJs.Length; i++)
         {
-            Vector3 difference = Vector3.Abs(DisplayTransform.Agx(ThreeJs[i].In, DisplayLook.Punchy) - ThreeJsPunchy[i]);
+            Vector3 input = ThreeJs[i].In;
+            bool grey = input.X == input.Y && input.Y == input.Z;
+            if (Clipped(ThreeJsPunchy[i]) && !grey)
+                continue;
+            kept++;
+            Vector3 difference = Vector3.Abs(DisplayTransform.Agx(input, DisplayLook.Punchy) - ThreeJsPunchy[i]);
             float largest = Math.Max(difference.X, Math.Max(difference.Y, difference.Z));
             if (largest > worst)
-                (worst, where) = (largest, ThreeJs[i].In.ToString());
+                (worst, where) = (largest, input.ToString());
+            if (!Clipped(ThreeJsPunchy[i]))
+            {
+                DisplayTransform.AgxLinear(input, DisplayLook.Punchy, out float saturation);
+                Assert.AreEqual(DisplayTransform.PunchySaturation, saturation, $"{input}: Filament's saturation");
+            }
         }
+        Assert.AreEqual(19, kept, "the 13 greys and the 6 colours Filament's look kept whole");
         Assert.IsTrue(worst <= 3e-5f, $"worst {worst:E2} at {where}");
+    }
+
+    [TestMethod]
+    public void AgxPunchy_HoldsTheSaturationBack_JustEnough()
+    {
+        // Colours over 18 stops and every hue, saturated to the edge of Rec.709 and beyond (a negative channel). Under the punchy
+        // look no channel of the PNG's linear Rec.709 goes below 0, unless even the power alone (saturation 1) takes it there; a
+        // colour held back is held back just enough: its lowest channel sits at 0, within the bisection's step.
+        int heldBack = 0, floor = 0;
+        foreach (float level in new[] { 1e-3f, 0.01f, 0.05f, 0.18f, 0.7f, 3f, 20f, 200f })
+        {
+            for (int h = 0; h < 24; h++)
+            {
+                foreach (float chroma in new[] { 0.3f, 0.7f, 0.95f, 1.2f })
+                {
+                    double angle = h * Math.PI / 12.0;
+                    var direction = new Vector3((float)Math.Cos(angle), (float)Math.Cos(angle - 2.0 * Math.PI / 3.0), (float)Math.Cos(angle + 2.0 * Math.PI / 3.0));
+                    Vector3 input = level * (Vector3.One + chroma * direction);
+                    Vector3 linear = DisplayTransform.AgxLinear(input, DisplayLook.Punchy, out float saturation);
+                    float lowest = Math.Min(linear.X, Math.Min(linear.Y, linear.Z));
+                    Assert.IsTrue(saturation >= 1f && saturation <= DisplayTransform.PunchySaturation, $"{input}: saturation {saturation}");
+                    if (saturation > 1f)
+                        Assert.IsTrue(lowest >= 0f, $"{input}: {linear} at saturation {saturation}");
+                    if (saturation < DisplayTransform.PunchySaturation)
+                    {
+                        Assert.IsTrue(lowest <= 1e-4f, $"{input}: held back to {saturation}, its lowest channel {lowest} could have had more");
+                        if (saturation > 1f)
+                            heldBack++;
+                        else
+                            floor++;
+                    }
+                    Assert.AreEqual(Vector3.Clamp(linear, Vector3.Zero, Vector3.One), DisplayTransform.Agx(input, DisplayLook.Punchy));
+                }
+            }
+        }
+        Assert.IsTrue(heldBack > 100, $"{heldBack} colours held back");
+        Assert.IsTrue(floor > 0, "and a few the power alone clips");
+    }
+
+    [TestMethod]
+    public void AgxPunchy_HeldBack_KeepsASkysHueWithinAFewDegreesOfTheBase()
+    {
+        // Clear-sky blues as the 3070 renders them (the sky view's pixels after its exposure, M1.11c's log) and deeper ones: every one
+        // clips under Filament's saturation, and held back its Oklab hue stays within a few degrees of AgX's base, the size of the
+        // look's own shift on a blue it does not clip.
+        Vector3[] skies =
+        [
+            new(0.0295f, 0.0556f, 0.1206f), new(0.0315f, 0.0586f, 0.1312f), new(0.0419f, 0.0866f, 0.1812f), new(0.0371f, 0.0655f, 0.1440f),
+            new(0.02f, 0.05f, 0.12f), new(0.015f, 0.04f, 0.13f), new(0.05f, 0.12f, 0.35f),
+        ];
+        foreach (Vector3 sky in skies)
+        {
+            DisplayTransform.AgxLinear(sky, DisplayLook.Punchy, out float saturation);
+            Assert.IsTrue(saturation < DisplayTransform.PunchySaturation, $"{sky} clips under Filament's saturation");
+            double shift = HueDistance(DisplayTransform.Agx(sky, DisplayLook.Punchy), DisplayTransform.Agx(sky));
+            Assert.IsTrue(shift < 4.0, $"{sky}: {shift:0.00}° from the base");
+        }
+        var unclipped = new Vector3(0.1f, 0.2f, 0.5f);
+        DisplayTransform.AgxLinear(unclipped, DisplayLook.Punchy, out float kept);
+        Assert.AreEqual(DisplayTransform.PunchySaturation, kept);
+        double own = HueDistance(DisplayTransform.Agx(unclipped, DisplayLook.Punchy), DisplayTransform.Agx(unclipped));
+        Assert.IsTrue(own > 1.0 && own < 4.0, $"the look's own shift on an unclipped blue: {own:0.00}°");
+    }
+
+    /// <summary>The distance in degrees between two linear Rec.709 colours' Oklab hues.</summary>
+    private static double HueDistance(Vector3 a, Vector3 b)
+    {
+        double d = Math.Abs(OklabHue(a) - OklabHue(b));
+        return d > 180.0 ? 360.0 - d : d;
+    }
+
+    /// <summary>The Oklab hue angle in degrees of a linear Rec.709 colour (Björn Ottosson's matrices, 2020).</summary>
+    private static double OklabHue(Vector3 rgb)
+    {
+        double l = Math.Cbrt(0.4122214708 * rgb.X + 0.5363325363 * rgb.Y + 0.0514459929 * rgb.Z);
+        double m = Math.Cbrt(0.2119034982 * rgb.X + 0.6806995451 * rgb.Y + 0.1073969566 * rgb.Z);
+        double s = Math.Cbrt(0.0883024619 * rgb.X + 0.2817188376 * rgb.Y + 0.6299787005 * rgb.Z);
+        double a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+        double b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+        return Math.Atan2(b, a) * 180.0 / Math.PI;
     }
 
     [TestMethod]

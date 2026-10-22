@@ -35,7 +35,8 @@ namespace Vista.Cli;
 /// window of the frame; the files are window-sized and the sidecar records the window. Since M1.3 the scene sits in a spectral
 /// atmosphere at its base altitude, the EXR is in physical units and the PNG is metered (<see cref="AutoExposure"/>); since M1.6 a
 /// request may also denoise; since M1.7 the world is eroded (<see cref="WorldBuilder"/>); since M1.10a the PNG is metered by the
-/// incident meter (<see cref="IncidentMeter"/>) and display-encoded through AgX unless the request asks otherwise.</para>
+/// incident meter (<see cref="IncidentMeter"/>) and display-encoded through AgX unless the request asks otherwise; since M1.11c it
+/// is dithered before its 8-bit rounding, or written at 16 bits.</para>
 ///
 /// <para>Not thread-safe: one render at a time.</para>
 /// </summary>
@@ -260,8 +261,7 @@ public sealed class PreviewSession
             MarkRendererStages(stages, rendered, built, settings);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            PngEncoder.Write(request.OutPath, DisplayTransform.ToSrgb8(linear, exposure.AppliedEv, request.Display, request.Look), window.Width, window.Height,
-                PngColor.Rgb);
+            WriteDisplayPng(request.OutPath, linear, exposure.AppliedEv, request, window);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
             ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
             outputs["beautyExr"] = baseName + ".exr";
@@ -296,8 +296,7 @@ public sealed class PreviewSession
                 }
                 if (result.Succeeded)
                 {
-                    PngEncoder.Write(Sibling(".denoised.png"), DisplayTransform.ToSrgb8(result.Color, exposure.AppliedEv, request.Display, request.Look), window.Width, window.Height,
-                        PngColor.Rgb);
+                    WriteDisplayPng(Sibling(".denoised.png"), result.Color, exposure.AppliedEv, request, window);
                     outputs["denoised"] = baseName + ".denoised.png";
                     ExrEncoder.WriteRgb(Sibling(".denoised.exr"), result.Color, window.Width, window.Height);
                     outputs["denoisedExr"] = baseName + ".denoised.exr";
@@ -327,6 +326,8 @@ public sealed class PreviewSession
                 RussianRouletteStart = settings.RussianRouletteStart,
                 Display = request.Display,
                 Look = DisplayTransform.LookOf(request.Display, request.Look),
+                Dither = DisplayTransform.DitherOf(request.BitDepth, request.Dither),
+                BitDepth = request.BitDepth,
             },
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,
@@ -374,6 +375,22 @@ public sealed class PreviewSession
         Mark(PreviewStage.SkyView, RenderStageKeys.SkyView);
         if (settings.LightSampling == LightSampling.Mis)
             Mark(PreviewStage.SkyDistribution, RenderStageKeys.SkyDistribution);
+    }
+
+    /// <summary>
+    /// Writes the beauty or the denoised beauty, <paramref name="linear"/> Rec.709 of <paramref name="window"/>, as the PNG
+    /// <paramref name="request"/> asks for (vista-plan §10 M1.11c): exposed by <paramref name="exposureEv"/>, display-encoded, then at
+    /// 8 bits with its dither keyed by the frame pixel, or at 16 bits.
+    /// </summary>
+    private static void WriteDisplayPng(string path, float[] linear, double exposureEv, PreviewRequest request, PixelWindow window)
+    {
+        if (request.BitDepth == 16)
+        {
+            PngEncoder.Write16(path, DisplayTransform.ToSrgb16(linear, exposureEv, request.Display, request.Look), window.Width, window.Height, PngColor.Rgb);
+            return;
+        }
+        PngEncoder.Write(path, DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look, request.Dither, window), window.Width, window.Height,
+            PngColor.Rgb);
     }
 
     /// <summary>
