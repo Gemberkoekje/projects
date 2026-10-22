@@ -771,6 +771,14 @@ for a slice hold for every milestone.
   checks, decisions, gotchas, hand-off, commands, files, next; [`vista-log/README.md`](vista-log/README.md)).
   Its entry here gets one status line linking to it. A decision that changes the design or a later
   milestone is also written where it applies (§1–§9, that milestone's entry, §11), not only in the log.
+- **A slice that changes the look tells the user what to judge** (since 2026-10-22): its status line
+  and its log end with three short items, written for someone who knows landscapes, not rendering.
+  *Judge this:* what the slice is meant to change, and where to look (which sheet, which part of the
+  frame). *Ignore this:* what is still a placeholder, each with the slice that replaces it. *Questions:*
+  two or three questions the sheets answer without any rendering knowledge ("do the snowcaps read as
+  real, or as icing?"), naming a real photo to compare against where one helps. Real photos are for
+  judging only: the user's own may be committed beside a sheet (downscaled to the size rule, metadata
+  stripped); anyone else's stay local.
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
