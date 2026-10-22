@@ -8,7 +8,8 @@ render a recipe + seed end to end on the RTX 3070 through offline integrator v0.
 twenty-two slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
-M1.11a (drainage), M1.11b (the display look) and M1.11c (the output finish) are done, M1.11d (uplift and rock hardness) is next. It sits
+M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish) and M1.11d (uplift and rock hardness) are done, M1.12
+(materials by rule) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -264,6 +265,15 @@ change.
   erosion then carves the gullies and lays the loose material on the 8 m grid as before. Every eroded world carries its
   **drainage** (each cell's way down over the depression-filled surface, its upstream area, and how deep its hollow fills), cached
   with it: the flow accumulation materials (M1.12) and rivers (M3) read.
+- **Uplift and rock** (M1.11d, [`vista-log/M1.11d.md`](vista-log/M1.11d.md)): the incision lifts the ground by an **uplift map**
+  — the base terrain's lowest octave (6 km), raised to the power 1.5, up to 8 m a step — so in the steady state of uplift and
+  incision the rivers stand high where the map is high: the massifs rise and the foothills stay low, where uniform uplift had
+  left a field of similar peaks. The rock has **strata**: seeded beds of hard and soft rock (60 m thick on average), dipping up to
+  8° and slowly folded, with a slight lateral mottle. Hardness sets the erodibility (the hardest rock 0.3 times the softest's) and
+  the talus slope (35° to 60° in the incision, 40° to 65° in the GPU erosion, the tangent following the hardness), so hard beds
+  stand as cliffs and ledges and soft ones weather back, instead of uniform 45° facets. The field is a pure function of the
+  seed and a position in the rock's frame (the uplift carries the beds up with the ground); every eroded world stores the hardness
+  at its bedrock surface and the frame, so the materials' strata (M1.12) are the beds that shaped its cliffs.
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -285,7 +295,7 @@ change.
   those that do not), and a still pays for its samples. Revisit at M11 (8K, 16K), where the mesh's far field grows with the
   pixel count and the height field's does not; the prototype is on the branch `claude/vista-m1-10-heightfield`.
 - **Materials by rule:** rock strata, scree, soil, grass, moss, snow, wet vs. dry —
-  placed by slope, altitude, aspect, erosion flow and moisture.
+  placed by slope, altitude, aspect, erosion flow and moisture; the strata from the world's own beds (M1.11d).
 
 ### 4.4 Hydrology & water bodies
 
@@ -1212,6 +1222,14 @@ view and the deepest shadows down the slope change; `--look base --dither off` w
   angle (the facets, measured); M1.11a's drainage numbers holding (the longest channel, the share
   drained). The world bit-identical twice and through the cache; the self-test's driver check against
   the default erosion cache re-baselined deliberately; a cost-ledger row.
+
+*Status (2026-10-22): done.* The incision lifts the ground by an uplift map (the base terrain's 6 km octave to the power 1.5, up to
+8 m a step), and the rock has seeded strata whose hardness sets the erodibility and the talus slope in the incision and the GPU
+erosion. The aerial sheet shows massifs with lower ground between them (`m1-11d-seeds.png`); the facets are gone (the most crowded ±2°
+of 8 m slopes holds 8.6–10.8%, M1.11a's 36–39%, `m1-11d-views.png`); the 1 km relief spreads 1.2–1.4 times more, the 5 km relief less
+(back toward the base terrain's); the drainage holds (34–52 km lake-free channels, 96–97.5% drained). The world stores its hardness
+and the rock's frame for M1.12 (`m1-11d-maps.png`). The default and down-slope views stand 3 m above rock again; the ledger's rows before
+and after are not comparable. With M1.11a's settings this build makes `main`'s worlds bit for bit. Log: [`vista-log/M1.11d.md`](vista-log/M1.11d.md).
 
 **M1.12 — Materials by rule.**
 - *Goal:* rock that reads as rock: strata, scree, soil, alpine grass and wet ground where nature

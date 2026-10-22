@@ -31,4 +31,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.11a.md`](M1.11a.md) | Drainage |
 | [`M1.11b.md`](M1.11b.md) | The display look |
 | [`M1.11c.md`](M1.11c.md) | Output finish |
+| [`M1.11d.md`](M1.11d.md) | Uplift & rock hardness |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

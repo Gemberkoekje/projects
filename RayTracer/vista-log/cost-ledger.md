@@ -25,6 +25,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.11a | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11b | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11c | 0.22 | 4.04 | 2.69 | 6.44 |
+| M1.11d | 0.26 | 3.79 | 2.63 | 5.82 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -88,3 +89,12 @@ by `main` (bfa57bfc) and by this slice (480 px, 64 spp) have byte-identical EXRs
 M1.11c also changes the PNG only (the punchy look's saturation held back where it clips, the dither, the 16-bit option), so its row is
 M1.11b's: the six views of its checks rendered by `main` (7b0ffbe9) and by this slice (480 px, 64 spp) have byte-identical EXRs, and
 `main`'s `--look base` PNGs equal this slice's `--look base --dither off`. The finish runs on the CPU when the files are written.
+M1.11d moves the terrain (the uplift map and the rock's strata) and three of the four views: the default and down-slope views stand
+3 m above rock again (re-placed on the new world), and the sky view moved to the default's spot (M0's spot is underground now). So
+only the aerial view measures the same pose; **the default and down-slope rows before and after M1.11d are not comparable.** The row
+is M1.11c's scaled by this slice against `main` (1a741723, with its own cameras and world), rendered alternately, view by view, three
+rounds, on a GPU shared with other programs: median ratios 1.170, 0.938, 0.977 and 0.903 (1.166–1.175, 0.917–0.943, 0.972–0.978,
+0.899–0.908). The views trace 1.00, 3.03, 2.60 and 3.69 rays per sample (M1.11c: 1.00, 3.16, 2.37, 3.68). Over the new world the aerial
+view traces 4% fewer rays per sample and costs 6% less. The sky view's +17% is likely its new height: its rays still all escape (one per
+sample) but now start 3 m above the ground, among the terrain's finest triangles, where before they started 550 m up (not measured).
+Making a world costs what it did (the incision 13–14 s, the GPU erosion 19–21 s, the maps 8–9 s; `vista-log/M1.11d.md`).
