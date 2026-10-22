@@ -1393,9 +1393,22 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   their own, the rock face blotchy), and grass geometry is M5's. A candidate whose ground within
   about 100 m (from the depth buffer) covers more than a recorded share of the frame is penalised,
   unless that ground is snow (M1.13); the share is relaxed as M5 and M7 make the near field hold.
-- *Verify:* CI: scoring tests on synthetic G-buffers, the near-field penalty among them. 3070: an
-  auto-camera sheet over eight seeds × both set pieces against the default camera, every pick's near
-  ground under the recorded share; the same pick twice; the scoring time recorded.
+  **Composition after the user's paintings** (added 2026-10-22): the user's own oil landscapes in
+  Bob Ross's manner (2018–2022) are the composition references; they are the user's work, so they
+  may be committed downscaled when the user provides them. The score favours what they do
+  consistently: clear depth layers (a light background range, a darker middle ground, a dark
+  foreground); a framing mass at one edge, never centred (a ridge or rock in shadow until M5's trees,
+  and beyond the near-field limit above); the main peak off-centre near a third, with water or low
+  ground in the lower third where there is any; a diagonal leading line (a shore, a ridge, a valley).
+  **Focal length is part of the search** (about 24–135 mm): a long lens stacks the layers and makes
+  the peak loom behind them, where 28 mm leaves it a small bump on a wide landscape. **The squint
+  test as a score:** the frame's value structure at thumbnail size (a blurred, downscaled luminance
+  image falling into a few distinct groups rather than muddy mid-tones).
+- *Verify:* CI: scoring tests on synthetic G-buffers, the near-field penalty, the layers, the
+  framing, the leading line and the squint score among them. 3070: an auto-camera sheet over eight
+  seeds × both set pieces against the default camera, every pick's near ground under the recorded
+  share and its focal length recorded; the picks beside the user's paintings in a sheet, judged on
+  composition rather than on colour or style; the same pick twice; the scoring time recorded.
 
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
@@ -1463,9 +1476,14 @@ volumetric clouds with multiple scattering; spectral Mie phase (fogbows, glories
 **seasonal aerosol load** per place: M1.11's haze follows the day's humidity alone, so at
 Zermatt it barely moves through the year (79–84 km visibility) and is, if anything, hazier
 in winter (M1.11's known limits), where a real alpine summer is hazier from convection and
-winter inversions trap the haze below the peaks. Verify: a cold autumn dawn over a lake
-produces steam fog from the defaults alone; a month sheet at one place shows summer hazier
-than winter from the defaults alone.
+winter inversions trap the haze below the peaks. **Mist at the foot of the mountains comes
+first** (added 2026-10-22): low valley mist and haze layers, the base of a range fading into
+them, appear in nearly every one of the user's paintings, so when M4 is sliced they lead,
+ahead of the cumulus; then cloud shadows on the terrain, then cumulus fields with full
+multiple scattering checked against a reference, then the optical effects (fogbows, glories).
+Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
+sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
+fades into valley mist from the defaults of a cool, still morning.
 
 **M5 — Vegetation.**
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
@@ -1531,6 +1549,12 @@ strip show no edge stretch (a sphere at the edge renders round).
 
 **Ongoing:** composition scoring, camera filters (sensor / film spectral curves, white
 balance, lens CA), estimator accuracy.
+
+**Later, after photorealism:** painterly filters, such as a wet-on-wet oil look after the
+user's own Bob Ross paintings, applied to the finished photoreal render as a display-side
+filter (pillar 2). Welcome feature creep (the user, 2026-10-22), but only once photorealism is
+reached, or once the user is done pushing it; nothing before that bends the physics toward a
+style.
 
 ---
 
@@ -1638,4 +1662,6 @@ balance, lens CA), estimator accuracy.
 | Hardware | RTX 3070, 8 GB |
 | Scope | Stills only |
 | Style | Photoreal target; anything else via filters / camera settings |
+| Painterly filter (2026-10-22) | Welcome as later feature creep (an oil look after the user's Bob Ross paintings), but only after photorealism is reached or the user is done pushing it |
+| Composition (2026-10-22) | The user's own paintings are the composition references for the auto camera: depth layers, a framing mass at one edge, the peak on a third, a leading line, focal length searched, the squint test |
 | M1 strategy (2026-10-19) | All of the sky before the terrain; contact sheets + loupe first, tweak window last; erosion on the GPU, cached per seed with its hash in the sidecar; climate normals hand-entered for M1 (§10, M1 plan) |
