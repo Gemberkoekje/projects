@@ -5,7 +5,7 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-four slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-five slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness) and M1.12 (materials by
@@ -812,7 +812,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Twenty-four slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-five slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -849,6 +849,14 @@ of a clear sky is on the edge, and M1.11d and M1.12 tune the terrain and the mat
 is dark, rough texture rather than trees, and it stays dark among snow-covered open ground, so the
 snow (M1.13) must be tuned with the forest in place. It is M5's distant-forest representation,
 built early; M5 adds real trees near the camera and keeps the material beyond them.
+
+*Added 2026-10-22, from the user's paintings (agreed with the user):* **M1.13a — Valley haze layer**,
+before the auto camera. In the user's own words, mist at a mountain's foot "hides the lines, so the
+mountain doesn't really need to land anywhere, and adds distance by increasing the contrast to the
+layers in front of it." It is also physics: haze is densest in the lowest air, and on cold, still
+mornings an inversion traps it under a lid (the white band with a crisp top in the user's photos
+over the Alps). A layer that depends on altitude alone fits the atmosphere's existing tables, so it
+comes long before M4's volumes, and M1.14 judges compositions with it available.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1379,6 +1387,30 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   as desert (seed 42 in `m1-12-ids.png`), is judged again once snow covers the high ground, before
   any retuning of the soil rule.
 
+**M1.13a — Valley haze layer.**
+- *Goal:* the painter's mist at the foot of the mountains, from physics: a range's base fading into a
+  pale layer that hides where it meets the valley and separates it from the layers in front.
+- *Why (the user, 2026-10-22):* the foot of a distant range, where it meets the valley floor, is the
+  busiest and weakest part of a render, the middle-ground counterpart of M1.14's near-field penalty;
+  a haze layer hides it honestly, because real haze is densest in the lowest air and an inversion
+  traps it under a fairly sharp lid. And the pale band reads as distance: it raises the contrast
+  between the layers, which M1.14's layer and squint scores reward.
+- *Deliverable:* an **inversion haze layer** in the atmosphere: denser aerosol below an inversion
+  height, with a soft but distinct top, on top of M1.11's haze. It depends on altitude alone, so it
+  goes through the existing LUTs (transmittance, multiple scattering, sky view) and the aerial
+  perspective march unchanged in kind, with the brute-force reference mode checking it. **The weather
+  chain sets it**: strongest on cold, clear, still mornings (dawn, autumn and winter, a valley well
+  below the peaks, high humidity), its height from the valley floor and the temperature, fading as
+  the day warms; a slider (`valleyHaze`, auto or pinned, advanced) with the sidecar recording it.
+  Terrain-following, patchy mist that fills some valleys and not others stays M4's.
+- *Verify:* CI: the profile (denser below the lid, the lid's sharpness, continuity), the chain (a cold
+  autumn dawn gives a layer, a warm afternoon none). 3070: the LUT air against the reference mode with
+  the layer (as M1.4's segment check); a dawn sheet in which the range's foot fades into the layer
+  while the peaks stay crisp; the layered-ridges and aerial views beside the user's photo over the
+  Alps (the haze band's crisp top), judged on how the band sits rather than on the phone's colours;
+  a valley-haze sheet (off, auto, strong); a cost-ledger row (expected near unchanged: the profile
+  changes, not the number of lookups).
+
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
   §4.8).
@@ -1479,7 +1511,8 @@ in winter (M1.11's known limits), where a real alpine summer is hazier from conv
 winter inversions trap the haze below the peaks. **Mist at the foot of the mountains comes
 first** (added 2026-10-22): low valley mist and haze layers, the base of a range fading into
 them, appear in nearly every one of the user's paintings, so when M4 is sliced they lead,
-ahead of the cumulus; then cloud shadows on the terrain, then cumulus fields with full
+ahead of the cumulus (M1.13a's altitude-only inversion layer comes first; M4 adds the
+terrain-following, patchy mist that fills some valleys and not others); then cloud shadows on the terrain, then cumulus fields with full
 multiple scattering checked against a reference, then the optical effects (fogbows, glories).
 Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
 sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
