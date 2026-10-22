@@ -811,6 +811,12 @@ under the finished output. Uplift & rock hardness became **M1.11d**; nothing in 
 it. The punchy look's dark shadows (down the slope the frame's mean is 23 of 255) are judged at
 M1.17, with real materials and M1.11d's re-placed camera.
 
+*Added 2026-10-22, after M1.11c (agreed with the user):* the deep clear sky's flat cobalt, its red
+channel at 0, is the punchy look's own colour for that sky (held back just enough, it sits on
+Rec.709's edge), not the clamp's. Whether it keeps some red (a margin or a knee short of the edge)
+is a change of look, so it is one line of M1.17's re-judgement, not a slice: only the darkest part
+of a clear sky is on the edge, and M1.11d and M1.12 tune the terrain and the materials, not the sky.
+
 *Strategy decisions (the user's answers, 2026-10-19):*
 
 | Question | Decision |
@@ -1174,7 +1180,7 @@ Log: [`vista-log/M1.11b.md`](vista-log/M1.11b.md).
 only bounds it, so a bisection finds it), the 8-bit PNG is dithered by default (`--dither off`), and `--png16` writes 16 bits. On a
 3840×2160 sky at 1024 spp, denoised, the undithered PNG's levels run 260–530 rows down a column; dithered, at most 27. The sky view's
 red channel stays at 0 (96.6% of its pixels): held back just enough, this sky's colour sits on Rec.709's edge, 2–4 levels greener and
-2–3° toward cyan; whether it should keep some red (a margin short of the edge) is a change of look, left for the review. Only the sky
+2–3° toward cyan; whether it should keep some red (a margin short of the edge) is a change of look, re-judged at M1.17. Only the sky
 view and the deepest shadows down the slope change; `--look base --dither off` writes `main`'s PNG byte for byte. Sheets:
 `m1-11c-before-after.png`, `m1-11c-sky-loupe.png`. Log: [`vista-log/M1.11c.md`](vista-log/M1.11c.md).
 
@@ -1295,7 +1301,10 @@ view and the deepest shadows down the slope change; `--look base --dither off` w
   gotchas and hand-off in its log, and M1's overall status in this section. The display look
   (M1.11b: AgX punchy, +1 EV on the incident meter) and M1.10a's meter re-judged under the real
   materials, the punchy look's shadows first (down the slope the frame's mean was 23 of 255 at
-  M1.11b, in a valley M1.11d's camera no longer looks into).
+  M1.11b, in a valley M1.11d's camera no longer looks into); then the deep clear sky, which M1.11c's
+  held-back saturation leaves on Rec.709's edge with its red channel at 0 (96.6% of the sky view):
+  keep it, or stop the look's saturation short of the edge (a margin or a knee), judged against
+  `m1-11b-before-after.png` and `m1-11c-before-after.png`.
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).
