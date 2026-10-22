@@ -67,18 +67,21 @@ public sealed class MeasurementViewTests
         // M1.11a's incision moves the ground by hundreds of metres, valleys and ridges both, before the GPU erosion runs (whose
         // own changes the self-test checks on the eroded world). The incision runs on the CPU, so CI can check the views over it.
         // The near-ground views (M1.11d: the default, down a slope, and the sky view at the default's spot) stand on rock the GPU
-        // erosion barely moves, a few metres up; the rest well clear.
+        // erosion barely moves, a few metres up; the materials views on its fill; the rest well clear.
         Recipe recipe = VistaJson.ParseRecipe(Read("mountains-day.recipe.json"));
         HeightField ground = TerrainGenerator.Generate(recipe, 42);
         HeightField incised = StreamPower.Prepare(ground, recipe, 42, ErosionSettings.For(TerrainProfile.For(recipe.SetPieces))).Ground;
         string[] cameras = [.. System.IO.Directory.GetFiles(Directory, "*.camera.json", SearchOption.AllDirectories)];
-        Assert.AreEqual(8, cameras.Length, "the measurement, atmosphere and aerial views");
+        Assert.AreEqual(11, cameras.Length, "the measurement, atmosphere, aerial and materials views");
         foreach (string file in cameras)
         {
             CameraSpec camera = VistaJson.ParseCamera(File.ReadAllText(file));
             double clearance = camera.Position.Y - incised.HeightAt(camera.Position.X, camera.Position.Z);
             bool near = Path.GetFileName(file) is "default.camera.json" or "down-slope.camera.json" or "sky.camera.json";
-            Assert.IsTrue(near ? clearance > NearClearanceMetres && clearance < 20.0 : clearance > ClearanceMetres,
+            // The materials views (M1.12) stand 2 m above the sediment the GPU erosion laid in their valleys, 10–53 m above the
+            // incised ground; the self-test checks them over the eroded ground.
+            bool onFill = Path.GetFileName(Path.GetDirectoryName(file)) == "materials";
+            Assert.IsTrue(near ? clearance > NearClearanceMetres && clearance < 20.0 : onFill ? clearance > NearClearanceMetres : clearance > ClearanceMetres,
                 $"{Path.GetFileName(file)} stands {clearance:0.0} m above the incised ground");
         }
     }

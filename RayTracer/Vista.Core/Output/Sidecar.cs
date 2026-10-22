@@ -38,12 +38,16 @@ namespace Vista.Output;
 /// drainage in the cost. Schema 14 (M1.11b) added <see cref="ImageInfo.Look"/>, AgX's look, and
 /// <see cref="ExposureInfo.MeterCompensationEv"/>, the stops the meter added on its own. Schema 15 (M1.11c) added
 /// <see cref="ImageInfo.Dither"/> and <see cref="ImageInfo.BitDepth"/>, how the PNG was quantised. Schema 16 (M1.11d) added, in
-/// <see cref="WorldInfo.Erosion"/>, the uplift map's and the rock's settings and the rock's frame (<see cref="ErosionInfo.Strata"/>).</para>
+/// <see cref="WorldInfo.Erosion"/>, the uplift map's and the rock's settings and the rock's frame (<see cref="ErosionInfo.Strata"/>). Schema 17
+/// (M1.12) added <see cref="Materials"/>: whether the ground has its materials by rule, the rules, the grass line and where it came
+/// from, each material's roughness and albedo, the detail kinds below the grid and, for a dry run, the shares of the world grid each
+/// material covers; <see cref="ImageInfo.Diffuse"/>, how diffuse surfaces scattered; and in <see cref="WorldInfo.Mesh"/>,
+/// whether the detail followed the materials.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 16;
+    public const int CurrentSchema = 17;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -95,6 +99,9 @@ public sealed record Sidecar
 
     /// <summary>Data tier per material key (vista-plan §6.2).</summary>
     public required SortedDictionary<string, DataTier> DataTiers { get; init; }
+
+    /// <summary>The ground's materials (schema 17, vista-plan §10 M1.12).</summary>
+    public MaterialsInfo? Materials { get; init; }
 
     /// <summary>Renderer statistics; absent for a dry run.</summary>
     public RenderInfo? Render { get; init; }
@@ -166,6 +173,9 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>The bounce from which Russian roulette could end a path.</summary>
     public int RussianRouletteStart { get; init; } = RenderSettings.DefaultRussianRouletteStart;
+
+    /// <summary>How diffuse surfaces scattered (schema 17, vista-plan §10 M1.12).</summary>
+    public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
 
     /// <summary>The light sampling a render with <paramref name="settings"/> actually does.</summary>
     public static LightSampling LightSamplingOf(RenderSettings settings)
@@ -435,3 +445,57 @@ public sealed record WatchInfo(int Render, IReadOnlyList<string> Changes, double
     /// <summary>Wall time of the render itself, from its start to the sidecar (every stage, the files included).</summary>
     public double RunSeconds { get; init; }
 }
+
+/// <summary>The ground's materials (schema 17, vista-plan §10 M1.12).</summary>
+public sealed record MaterialsInfo
+{
+    /// <summary>True when the rules put rock, scree, soil and grass on the ground; false for M0's single material (<c>--materials off</c>).</summary>
+    public required bool ByRule { get; init; }
+
+    /// <summary>Each material the render shaded: its key, tier, roughness and linear-sRGB albedo.</summary>
+    public required IReadOnlyList<MaterialEntry> Table { get; init; }
+
+    /// <summary>The rules' thresholds; null without them.</summary>
+    public MaterialRules? Rules { get; init; }
+
+    /// <summary>The grass line above sea level, m; null without the rules.</summary>
+    public double? GrassLineMetres { get; init; }
+
+    /// <summary>Where the grass line came from.</summary>
+    public string? GrassLineFrom { get; init; }
+
+    /// <summary>1 when the pole lies toward +z (north), −1 when toward −z.</summary>
+    public int Poleward { get; init; }
+
+    /// <summary>The detail kinds below the grid and how fast their weights change; null without the rules or without detail.</summary>
+    public MaterialDetailInfo? Detail { get; init; }
+
+    /// <summary>For a dry run, the shares of the world grid's samples each material covers; null otherwise.</summary>
+    public MaterialShares? Shares { get; init; }
+}
+
+/// <summary>One material as a render shaded it.</summary>
+/// <param name="Key">Its key.</param>
+/// <param name="Tier">Where its spectrum came from.</param>
+/// <param name="Roughness">Its roughness for the rough diffuse surface.</param>
+/// <param name="Albedo">Its linear-sRGB albedo, R, G and B.</param>
+public sealed record MaterialEntry(string Key, DataTier Tier, float Roughness, float[] Albedo);
+
+/// <summary>The detail kinds below the world grid (schema 17): each one's amplitude and how fast its weight changes.</summary>
+/// <param name="RockAmplitudeMetres">The most the rock detail moves a point, m.</param>
+/// <param name="ScreeAmplitudeMetres">The most the scree detail does, m.</param>
+/// <param name="SmoothAmplitudeMetres">The most the smooth detail does, m.</param>
+/// <param name="RockGradientPerMetre">The steepest the rock detail's weight changes, per metre.</param>
+/// <param name="ScreeGradientPerMetre">The scree's.</param>
+/// <param name="SmoothGradientPerMetre">The smooth detail's.</param>
+public sealed record MaterialDetailInfo(double RockAmplitudeMetres, double ScreeAmplitudeMetres, double SmoothAmplitudeMetres,
+    double RockGradientPerMetre, double ScreeGradientPerMetre, double SmoothGradientPerMetre);
+
+/// <summary>The shares of the world grid's samples each material covers (their weights summed), and the mean wetness.</summary>
+/// <param name="RockHard">Hard rock (rock on beds of hardness 0.5 and up).</param>
+/// <param name="RockSoft">Soft rock.</param>
+/// <param name="Scree">Scree.</param>
+/// <param name="Soil">Soil.</param>
+/// <param name="Grass">Grass.</param>
+/// <param name="Wet">The mean wetness.</param>
+public sealed record MaterialShares(double RockHard, double RockSoft, double Scree, double Soil, double Grass, double Wet);

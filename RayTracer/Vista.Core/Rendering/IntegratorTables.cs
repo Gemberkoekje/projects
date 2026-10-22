@@ -18,8 +18,10 @@ namespace Vista.Rendering;
 ///   <item><see cref="Cie"/>: 4 per entry — the white-balanced CIE x̄ȳz̄ (<see cref="WavelengthLookup.TryGet"/>)
 ///   and the wavelength in nm, the engine's <c>DeterXYZ</c> layout.</item>
 ///   <item><see cref="Reflectance"/>: <c>[material · Count + entry]</c>, the built-in-tier spectrum of each
-///   material (<see cref="RgbToReflectanceBasis"/> applied to its linear-sRGB albedo).</item>
-///   <item><see cref="Albedo"/>: 4 per material — its linear-sRGB albedo and 0, for the albedo output.</item>
+///   material: its own (<see cref="VistaMaterial.Spectrum"/>, M1.12), else <see cref="RgbToReflectanceBasis"/> applied to its
+///   linear-sRGB albedo.</item>
+///   <item><see cref="Albedo"/>: 4 per material — its linear-sRGB albedo, for the albedo output, and its roughness
+///   (<see cref="VistaMaterial.Roughness"/>, M1.12).</item>
 /// </list>
 /// A pixel-sample's XYZ is <c>Σₖ Cie[iₖ].xyz · L(λᵢₖ) / CompanionCount · DeterministicCorrection</c>, which
 /// maps a flat spectrum of 1 to luminance 1: Y is the ȳ-weighted mean spectral radiance, in W·m⁻²·sr⁻¹·nm⁻¹, and
@@ -96,15 +98,64 @@ public sealed class IntegratorTables
         for (int m = 0; m < materials.Count; m++)
         {
             (float r, float g, float b) = materials[m].LinearRgbAlbedo;
-            float[] curve = basis.Reflectance(new Vector3(r, g, b));
-            for (int i = 0; i < n; i++)
-                reflectance[m * n + i] = Math.Clamp(curve[i], 0f, 1f);
+            if (materials[m].Spectrum is { } spectrum)
+            {
+                for (int i = 0; i < n; i++)
+                    reflectance[m * n + i] = Math.Clamp((float)ReflectanceAt(spectrum, cie[i * 4 + 3]), 0f, 1f);
+            }
+            else
+            {
+                float[] curve = basis.Reflectance(new Vector3(r, g, b));
+                for (int i = 0; i < n; i++)
+                    reflectance[m * n + i] = Math.Clamp(curve[i], 0f, 1f);
+            }
             albedo[m * 4] = r;
             albedo[m * 4 + 1] = g;
             albedo[m * 4 + 2] = b;
+            albedo[m * 4 + 3] = materials[m].Roughness;
         }
 
         return new IntegratorTables(n, spectral.DeterministicCorrection, cie, reflectance, albedo);
+    }
+
+    /// <summary>
+    /// The reflectance of a spectrum given as (wavelength in nm, reflectance) pairs at <paramref name="nm"/>: linear between its
+    /// points, flat past its ends (<see cref="VistaMaterial.Spectrum"/>).
+    /// </summary>
+    public static double ReflectanceAt(IReadOnlyList<double> spectrum, double nm)
+    {
+        ArgumentNullException.ThrowIfNull(spectrum);
+        if (spectrum.Count < 2 || spectrum.Count % 2 != 0)
+            throw new ArgumentException("A spectrum is (wavelength, reflectance) pairs, at least one.", nameof(spectrum));
+        if (nm <= spectrum[0])
+            return spectrum[1];
+        for (int k = 2; k < spectrum.Count; k += 2)
+        {
+            if (nm <= spectrum[k])
+                return spectrum[k - 1] + (spectrum[k + 1] - spectrum[k - 1]) * (nm - spectrum[k - 2]) / (spectrum[k] - spectrum[k - 2]);
+        }
+        return spectrum[^1];
+    }
+
+    /// <summary>
+    /// The linear-sRGB colour of a reflectance spectrum (pairs as <see cref="ReflectanceAt"/>) under light of equal energy: the
+    /// integrator's own quadrature over the hero wavelengths, so a material's albedo output is the colour it renders with.
+    /// </summary>
+    public static (float R, float G, float B) LinearRgbOf(IReadOnlyList<double> spectrum)
+    {
+        ArgumentNullException.ThrowIfNull(spectrum);
+        WavelengthLookup lookup = Wavelengths;
+        int n = lookup.DeterministicCount;
+        Vector3 xyz = Vector3.Zero;
+        for (int i = 0; i < n; i++)
+        {
+            int nm = lookup.GetDeterministicWavelength(i);
+            if (lookup.TryGet(nm, out Vector3 cmf))
+                xyz += cmf * (float)ReflectanceAt(spectrum, nm);
+        }
+        xyz *= lookup.DeterministicCorrection / n;
+        float[] rgb = Output.DisplayTransform.XyzToLinearRec709([xyz.X, xyz.Y, xyz.Z]);
+        return (rgb[0], rgb[1], rgb[2]);
     }
 
     /// <summary>

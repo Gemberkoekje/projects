@@ -68,6 +68,9 @@ public static class SeedDerivation
     /// <summary>Stage key for the rock's strata and hardness (vista-plan §10 M1.11d).</summary>
     public const string TerrainStrata = "terrain.strata";
 
+    /// <summary>Stage key for the ground's materials: their breakup noise and the rocks' and scree's detail (vista-plan §10 M1.12).</summary>
+    public const string TerrainMaterials = "terrain.materials";
+
     /// <summary>The sub-seed for <paramref name="stage"/> under the user seed <paramref name="seed"/>.</summary>
     public static ulong Derive(ulong seed, string stage) => StableHash.Combine(seed, StableHash.Of(stage));
 }

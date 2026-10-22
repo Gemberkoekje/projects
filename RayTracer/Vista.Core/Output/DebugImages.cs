@@ -67,16 +67,86 @@ public static class DebugImages
         return bytes;
     }
 
-    /// <summary>One stable colour per material id; sky (negative id) is black.</summary>
-    public static byte[] Material(ReadOnlySpan<float> materialIds)
+    /// <summary>
+    /// One stable colour per material id (the ground's materials in their legend colours, <see cref="MaterialColor"/>; others from a
+    /// palette); sky (negative id) is black.
+    /// </summary>
+    public static byte[] Material(ReadOnlySpan<float> materialIds, IReadOnlyList<VistaMaterial>? materials = null)
     {
         var bytes = new byte[materialIds.Length * 3];
         for (int p = 0; p < materialIds.Length; p++)
         {
             float id = materialIds[p];
-            Put(bytes, p, id >= 0f && float.IsFinite(id) ? PaletteColor((int)id) : Black);
+            int index = id >= 0f && float.IsFinite(id) ? (int)id : -1;
+            (byte R, byte G, byte B) colour = Black;
+            if (index >= 0)
+                colour = materials is not null && index < materials.Count ? MaterialColor(materials[index].Key, index) : PaletteColor(index);
+            Put(bytes, p, colour);
         }
         return bytes;
+    }
+
+    /// <summary>
+    /// The legend colour of the ground's materials (vista-plan §10 M1.12): hard rock pale blue-grey, soft rock dark slate, scree sand,
+    /// soil brown, grass green; any other key a palette colour by its id.
+    /// </summary>
+    public static (byte R, byte G, byte B) MaterialColor(string key, int id) => key switch
+    {
+        "rock.hard" => (176, 184, 198),
+        "rock.soft" => (86, 82, 98),
+        "scree" => (214, 196, 156),
+        "soil" => (150, 98, 56),
+        "grass" => (88, 158, 62),
+        _ => PaletteColor(id),
+    };
+
+    /// <summary>
+    /// The ground's materials from above (vista-plan §10 M1.12), north up: each sample's legend colours mixed by its
+    /// <paramref name="weights"/> (rock as hard or soft by its bed, stony soil toward scree), wet ground darker and bluer, over a
+    /// hillshade; reduced to at
+    /// most <paramref name="maxSize"/> pixels a side.
+    /// </summary>
+    public static (byte[] Rgb, int Size) MaterialMap(HeightField field, World.MaterialField materials, World.MaterialWeights[] weights, CameraSpec? camera,
+        int maxSize = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(materials);
+        ArgumentNullException.ThrowIfNull(weights);
+        int n = field.Size;
+        int size = Math.Min(n, maxSize);
+        double step = (n - 1) / (double)Math.Max(size - 1, 1);
+        var bytes = new byte[size * size * 3];
+        Parallel.For(0, size, row =>
+        {
+            int j = (int)Math.Round((size - 1 - row) * step);
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1);
+                double dhdx = (field[i1, j] - field[i0, j]) / ((i1 - i0) * field.CellSize);
+                double dhdz = (field[i, j1] - field[i, j0]) / ((j1 - j0) * field.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double light = 0.35 + 0.65 * shade;
+                World.MaterialWeights w = weights[j * n + i];
+                float hardness = materials.BedAt((float)field.XOf(i), (float)field.ZOf(j), field[i, j]).Hardness;
+                (byte R, byte G, byte B) rock = MaterialColor(hardness >= 0.5f ? "rock.hard" : "rock.soft", 0);
+                (byte R, byte G, byte B) scree = MaterialColor("scree", 0), loam = MaterialColor("soil", 0), grass = MaterialColor("grass", 0);
+                double stony = 0.65 * w.Stony;
+                (double R, double G, double B) soil = (loam.R + (scree.R - loam.R) * stony, loam.G + (scree.G - loam.G) * stony, loam.B + (scree.B - loam.B) * stony);
+                double dry = 1.0 - 0.45 * w.Wet;
+                double r = (w.Rock * rock.R + w.Scree * scree.R + w.Soil * soil.R + w.Grass * grass.R) * dry;
+                double g = (w.Rock * rock.G + w.Scree * scree.G + w.Soil * soil.G + w.Grass * grass.G) * dry;
+                double b = (w.Rock * rock.B + w.Scree * scree.B + w.Soil * soil.B + w.Grass * grass.B) * dry + 60.0 * w.Wet;
+                Put(bytes, row * size + col, (
+                    (byte)Math.Round(Math.Clamp(light * r, 0.0, 255.0)),
+                    (byte)Math.Round(Math.Clamp(light * g, 0.0, 255.0)),
+                    (byte)Math.Round(Math.Clamp(light * b, 0.0, 255.0))));
+            }
+        });
+        if (camera is not null)
+            MarkCamera(bytes, size, field, camera);
+        return (bytes, size);
     }
 
     /// <summary>

@@ -63,6 +63,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
     private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
     private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24, SlotMapNormals = 25, SlotNormalMap0 = 26, SlotNormalMap1 = 27;
+    private const int SlotMaterialMap = 28, SlotBedTable = 29, SlotMaterialConstants = 30;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -186,6 +187,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>()),
             (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>()),
             (nameof(ErosionConstants), Unsafe.SizeOf<ErosionConstants>()),
+            (nameof(MaterialConstants), Unsafe.SizeOf<MaterialConstants>()),
         })
         {
             if (size > ConstantBufferBytes || size % 16 != 0)
@@ -235,6 +237,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             CheckFits(scene.Mesh);
             UploadMesh(scene.Mesh);
             EnsureNormalMaps(scene.Mesh.NormalMaps);
+            EnsureMaterials(scene.Mesh.Materials);
             stages[RenderStageKeys.MeshUpload] = Lap(stopwatch);
             BuildAccelerationStructures(scene.Mesh);
             stages[RenderStageKeys.AccelerationBuild] = Lap(stopwatch);
@@ -275,6 +278,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         }
 
         IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask, skySampling);
+        Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Height));
         double traceSeconds = 0.0;
         double longest = 0.0;
         double maxCostNs = 0.0;
@@ -506,6 +510,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Srv(13),                                                  // 22: the summed scattering orders (aerial perspective)
             Srv(18), Uav(7),                                          // 23–24: the sky distribution, its measurement (M1.5)
             Srv(19), Srv(20), Srv(21),                                // 25–27: the vertices' map normals, the two normal maps (M1.9)
+            Srv(22), Srv(23), Cbv(3),                                 // 28–30: the material map, the bed table, the material constants (M1.12)
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -546,6 +551,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _rayCounterReadback = CreateBuffer(HeapType.Readback, 2 * sizeof(uint), ResourceStates.CopyDest);
         _dummyUav = CreateUavBuffer(16);
         CreateAtmosphereFixedResources();
+        CreateMaterialResources();
     }
 
     // ── Scene ───────────────────────────────────────────────────────────────────────────────────────
@@ -749,6 +755,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootShaderResourceView(SlotMapNormals, (_mapNormals ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotNormalMap0, (_mapBuffers.ElementAtOrDefault(0) ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotNormalMap1, (_mapBuffers.ElementAtOrDefault(1) ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotMaterialMap, (_materialMap ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotBedTable, (_bedTable ?? _dummySrv).GPUVirtualAddress);
+        list.SetComputeRootConstantBufferView(SlotMaterialConstants, _materialConstants.GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -932,6 +941,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         DisposeTables();
         DisposeScene();
         DisposeNormalMaps();
+        DisposeMaterials();
+        _materialProbePipeline?.Dispose();
+        _materialConstants?.Dispose();
         DisposeSkyLight();
         _incidentPipeline?.Dispose();
         DisposeAtmosphere();

@@ -15,8 +15,11 @@ namespace Vista.World;
 public sealed class WorldCache
 {
     private (TerrainProfile Profile, ulong Seed, WorldGrid Grid, bool Erode, bool CanErode)? _key;
+    private Recipe? _recipe;
     private TerrainWorld? _world;
+    private MaterialField? _materials;
     private TerrainHierarchy? _hierarchy;
+    private (bool Detail, bool Materials)? _hierarchyKey;
     private (MeshView View, MeshSettings Settings)? _meshKey;
     private TerrainMesh? _mesh;
 
@@ -37,8 +40,8 @@ public sealed class WorldCache
         if (!reused)
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
-            _key = key;
-            (_hierarchy, _meshKey, _mesh) = (null, null, null);
+            (_key, _recipe) = (key, recipe);
+            (_materials, _hierarchy, _hierarchyKey, _meshKey, _mesh) = (null, null, null, null, null);
         }
         return _world!;
     }
@@ -67,16 +70,42 @@ public sealed class WorldCache
         return mesh;
     }
 
-    /// <summary>The cached world's hierarchy with the detail <paramref name="settings"/> ask for, built when it is missing.</summary>
+    /// <summary>
+    /// The cached world's material field (vista-plan §10 M1.12), built the first time a mesh asks for materials: its rock laid out
+    /// again from the seed and the frame the erosion left (<see cref="WorldBuilder.StrataOf"/>), its maps from the erosion.
+    /// </summary>
+    public MaterialField Materials()
+    {
+        if (_world is null || _key is null || _recipe is null)
+            throw new InvalidOperationException("Ask for the world before its materials.");
+        if (_materials is null)
+        {
+            ulong seed = _key.Value.Seed;
+            StrataGrid strata = WorldBuilder.StrataOf(_recipe, seed, _world.Surface, _world.Erosion?.Strata ?? StrataFrame.Identity, out RockHardness rock);
+            _materials = MaterialField.For(_world.Surface, _world.Erosion, strata, rock.Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed));
+        }
+        return _materials;
+    }
+
+    /// <summary>
+    /// The cached world's hierarchy with the detail and the materials <paramref name="settings"/> ask for, built when it is missing:
+    /// the detail by material (<see cref="MaterialDetail"/>) with the materials, M1.9's smooth detail without them.
+    /// </summary>
     private TerrainHierarchy Hierarchy(MeshSettings settings, ref double seconds)
     {
         (TerrainProfile profile, ulong seed, _, _, _) = _key!.Value;
         bool detail = settings.Kind == MeshKind.View && settings.Detail;
-        if (_hierarchy is null || _hierarchy.Detail.IsNone == detail)
+        var key = (detail, settings.Materials);
+        if (_hierarchy is null || _hierarchyKey != key)
         {
-            TerrainDetail wanted = detail ? new TerrainDetail(seed, _world!.Surface.CellSize) : TerrainDetail.None;
-            _hierarchy = TerrainHierarchy.Build(_world!.Surface, profile, seed, wanted);
-            seconds = _hierarchy.BuildSeconds;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            MaterialField? materials = settings.Materials ? Materials() : null;
+            ISurfaceDetail wanted = !detail ? TerrainDetail.None
+                : materials is not null ? new MaterialDetail(seed, materials)
+                : new TerrainDetail(seed, _world!.Surface.CellSize);
+            _hierarchy = TerrainHierarchy.Build(_world!.Surface, profile, seed, wanted, materials);
+            _hierarchyKey = key;
+            seconds = stopwatch.Elapsed.TotalSeconds;
         }
         return _hierarchy;
     }

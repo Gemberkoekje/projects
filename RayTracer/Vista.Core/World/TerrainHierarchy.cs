@@ -17,7 +17,7 @@ namespace Vista.World;
 /// each grid blends over its outer <see cref="BlendCells"/> cells into the surface of the next one out, so the eroded world
 /// fades into the base terrain and the 32 m far field into the 256 m one without a step. Every other vertex of the hierarchy —
 /// between a grid's samples, or below the 8 m grid near the camera — lies on the straight edge it splits, plus the
-/// <see cref="TerrainDetail"/>, which is everywhere.</para>
+/// detail (<see cref="ISurfaceDetail"/>), which is everywhere.</para>
 ///
 /// <para><b>Coordinates.</b> Vertices are integer points of the root square in sub-units, <see cref="Sub"/> to a g0 cell
 /// (<see cref="SubLevels"/> halvings below the grid), so the root is <see cref="RootSize"/> = (size − 1)·32·<see cref="Sub"/>
@@ -65,12 +65,15 @@ public sealed class TerrainHierarchy
 
     private readonly Store[] _stores;
     private readonly float[] _analyticError;
+    private readonly double[][] _kindBounds;
     private readonly float[] _analyticRadius;
 
-    private TerrainHierarchy(HeightField surface, TerrainDetail detail, Store[] stores, float[] analyticError, float[] analyticRadius,
-        double slopeBound, float minHeight, float maxHeight, IReadOnlyList<NormalMap> normalMaps, double seconds)
+    private TerrainHierarchy(HeightField surface, ISurfaceDetail detail, Store[] stores, float[] analyticError, double[][] kindBounds, float[] analyticRadius,
+        double slopeBound, float minHeight, float maxHeight, IReadOnlyList<NormalMap> normalMaps, MaterialField? materials, double seconds)
     {
         Surface = surface;
+        Materials = materials;
+        _kindBounds = kindBounds;
         NormalMaps = normalMaps;
         Detail = detail;
         _stores = stores;
@@ -91,8 +94,11 @@ public sealed class TerrainHierarchy
     /// <summary>The eroded (or base) world grid the hierarchy was built from.</summary>
     public HeightField Surface { get; }
 
+    /// <summary>The world's material field, which every mesh of the hierarchy carries to the shader (null: M0's single material).</summary>
+    public MaterialField? Materials { get; }
+
     /// <summary>The detail added everywhere.</summary>
-    public TerrainDetail Detail { get; }
+    public ISurfaceDetail Detail { get; }
 
     /// <summary>
     /// The smooth normals of g0 and g1, finest first (<see cref="NormalMap"/>): the shading coarse triangles get back. g2 needs none:
@@ -137,9 +143,10 @@ public sealed class TerrainHierarchy
 
     /// <summary>
     /// Builds the hierarchy of <paramref name="surface"/> (the world grid, 2ⁿ + 1 samples a side) in the world of
-    /// <paramref name="profile"/> and <paramref name="seed"/>, with <paramref name="detail"/> everywhere.
+    /// <paramref name="profile"/> and <paramref name="seed"/>, with <paramref name="detail"/> everywhere and the world's
+    /// <paramref name="materials"/> for its meshes to carry.
     /// </summary>
-    public static TerrainHierarchy Build(HeightField surface, TerrainProfile profile, ulong seed, TerrainDetail detail)
+    public static TerrainHierarchy Build(HeightField surface, TerrainProfile profile, ulong seed, ISurfaceDetail detail, MaterialField? materials = null)
     {
         ArgumentNullException.ThrowIfNull(surface);
         ArgumentNullException.ThrowIfNull(profile);
@@ -190,6 +197,7 @@ public sealed class TerrainHierarchy
         int rootLog = BitOperations.Log2((uint)root);
         int levels = 2 * rootLog;
         (float[] analyticError, float[] analyticRadius) = AnalyticBounds(levels, rootLog, subUnit, detail, slope);
+        double[][] kindBounds = KindBounds(levels, rootLog, subUnit, detail);
 
         var builder = new Builder(stores, data, analyticError, analyticRadius, root, subUnit, detail);
         builder.Heights(rootLog);
@@ -202,7 +210,7 @@ public sealed class TerrainHierarchy
             new NormalMap(d0, size, cell, rootOrigin + g0.Low * subUnit, rootOrigin + g0.Low * subUnit),
             new NormalMap(d1, size, Ratio1 * cell, rootOrigin + g1.Low * subUnit, rootOrigin + g1.Low * subUnit),
         ];
-        return new TerrainHierarchy(surface, detail, stores, analyticError, analyticRadius, slope, min, max, maps, stopwatch.Elapsed.TotalSeconds);
+        return new TerrainHierarchy(surface, detail, stores, analyticError, kindBounds, analyticRadius, slope, min, max, maps, materials, stopwatch.Elapsed.TotalSeconds);
     }
 
     // ── Levels ──────────────────────────────────────────────────────────────────────────────────────
@@ -281,6 +289,24 @@ public sealed class TerrainHierarchy
 
     /// <summary>The analytic error of level <paramref name="level"/> (the detail's bound), m.</summary>
     internal float AnalyticError(int level) => _analyticError[level];
+
+    /// <summary>
+    /// The analytic error of vertex (<paramref name="i"/>, <paramref name="j"/>) below the world grid (<paramref name="t"/> &lt;
+    /// <see cref="SubLevels"/>), at level <paramref name="level"/>: the detail's bound in a box around the vertex that holds its edge
+    /// and every descendant's (vista-plan §10 M1.12; <see cref="ISurfaceDetail.MidpointBoundIn"/>), so a descendant's box lies in its
+    /// own and its error is never larger. An axis vertex of level t splits an edge 2^(t+1) long and its descendants lie within
+    /// 2^(t+1) − 1 of it; a diagonal one reaches 2^t further, to its children's: half-widths 2^(t+1) − 1 and 3·2^t − 1 sub-units. Never
+    /// more than <see cref="AnalyticError"/>.
+    /// </summary>
+    internal float SubGridError(int i, int j, int level, int t, bool diagonal)
+    {
+        double[] kinds = _kindBounds[level];
+        if (kinds.Length == 0)
+            return _analyticError[level];
+        double half = ((diagonal ? 3 << t : 2 << t) - 1) * SubUnit;
+        double x = WorldOf(i), z = WorldOf(j);
+        return Math.Min(RoundUp(Detail.MidpointBoundIn(EdgeLength(level), kinds, x - half, z - half, x + half, z + half)), _analyticError[level]);
+    }
 
     /// <summary>The length of the edge a vertex of level <paramref name="level"/> splits, m.</summary>
     internal double EdgeLength(int level)
@@ -508,7 +534,7 @@ public sealed class TerrainHierarchy
     /// every descendant — each child's offset over the steepest slope plus the child's own radius, down to the finest level, whose
     /// radius is the detail's amplitude.
     /// </summary>
-    private static (float[] Error, float[] Radius) AnalyticBounds(int levels, int rootLog, double subUnit, TerrainDetail detail, double slope)
+    private static (float[] Error, float[] Radius) AnalyticBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail, double slope)
     {
         var error = new float[levels];
         var radius = new float[levels];
@@ -532,6 +558,19 @@ public sealed class TerrainHierarchy
         return (error, radius);
     }
 
+    /// <summary>The detail's kinds' bounds for every level's edge (<see cref="ISurfaceDetail.KindBounds"/>), for <see cref="SubGridError"/>.</summary>
+    private static double[][] KindBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail)
+    {
+        var bounds = new double[levels][];
+        for (int level = 0; level < levels; level++)
+        {
+            int t = rootLog - 1 - level / 2;
+            double s = (1 << t) * subUnit;
+            bounds[level] = detail.KindBounds(level % 2 == 0 ? 2.0 * s * Math.Sqrt(2.0) : 2.0 * s);
+        }
+        return bounds;
+    }
+
     /// <summary>The smallest float not below <paramref name="value"/>, so a bound never shrinks on the way to float.</summary>
     internal static float RoundUp(double value)
     {
@@ -548,11 +587,11 @@ public sealed class TerrainHierarchy
         private readonly float[] _analyticRadius;
         private readonly int _root;
         private readonly double _subUnit;
-        private readonly TerrainDetail _detail;
+        private readonly ISurfaceDetail _detail;
         private readonly int _rootLog;
 
         public Builder(Store[] stores, (Grid, float[])[] data, float[] analyticError, float[] analyticRadius, int root, double subUnit,
-            TerrainDetail detail)
+            ISurfaceDetail detail)
         {
             _stores = stores;
             _data = data;

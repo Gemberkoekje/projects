@@ -52,10 +52,7 @@ public static class StreamPower
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(grid);
         ArgumentNullException.ThrowIfNull(settings);
-        int factor = CoarseFactor(grid.Size, grid.CellSize, settings.IncisionCell);
-        var coarseGrid = new WorldGrid((grid.Size - 1) / factor + 1, grid.CellSize * factor);
-        TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
-        HeightField coarse = TerrainGenerator.Generate(recipe, seed, coarseGrid, profile.OctavesFor(coarseGrid.CellSize));
+        HeightField coarse = CoarseBase(recipe, seed, grid, settings);
         float[] uplift = UpliftMap.On(recipe, seed, settings, coarse);
         // The rock on the coarse grid: per cell its beds' fold and its mottle, so a lookup per step is one table read.
         RockHardness rock = RockHardness.For(seed, settings);
@@ -72,6 +69,31 @@ public static class StreamPower
         });
         (HeightField incised, StrataFrame frame) = Incise(coarse, settings, uplift, (c, y) => rock.AtSigma(y + fold[c], mottle[c]));
         return (coarse, incised, frame, new HeightField(n, coarse.CellSize, uplift));
+    }
+
+    /// <summary>
+    /// The uplift per step on the incision grid of a world on <paramref name="grid"/>, as <see cref="Coarse"/> lifts it, without
+    /// incising (vista-plan §10 M1.12): what a world read from the cache needs to find its rock's beds (<see cref="StrataGrid"/>).
+    /// Null when the settings run no incision.
+    /// </summary>
+    public static HeightField? UpliftField(Recipe recipe, ulong seed, WorldGrid grid, ErosionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+        ArgumentNullException.ThrowIfNull(grid);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.IncisionSteps == 0)
+            return null;
+        HeightField coarse = CoarseBase(recipe, seed, grid, settings);
+        return new HeightField(coarse.Size, coarse.CellSize, UpliftMap.On(recipe, seed, settings, coarse));
+    }
+
+    /// <summary>The base terrain on the incision grid of a world on <paramref name="grid"/>, with the octaves that grid holds.</summary>
+    private static HeightField CoarseBase(Recipe recipe, ulong seed, WorldGrid grid, ErosionSettings settings)
+    {
+        int factor = CoarseFactor(grid.Size, grid.CellSize, settings.IncisionCell);
+        var coarseGrid = new WorldGrid((grid.Size - 1) / factor + 1, grid.CellSize * factor);
+        TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
+        return TerrainGenerator.Generate(recipe, seed, coarseGrid, profile.OctavesFor(coarseGrid.CellSize));
     }
 
     /// <summary>

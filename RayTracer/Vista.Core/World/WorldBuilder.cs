@@ -169,5 +169,23 @@ public static class WorldBuilder
         return (incised, strata);
     }
 
+    /// <summary>
+    /// The rock of a finished world laid out on its grid (vista-plan §10 M1.12): the beds of <paramref name="seed"/> in
+    /// <paramref name="frame"/>, the frame its incision left them in (<see cref="StrataFrame.Identity"/> for a world that was not
+    /// eroded), lifted by the uplift the incision used — the same layout <see cref="Prepare"/> gave the erosion, worked out again
+    /// for a world read from the cache, so the materials find the beds that shaped its cliffs. <paramref name="rock"/> is the beds'
+    /// field itself.
+    /// </summary>
+    public static StrataGrid StrataOf(Recipe recipe, ulong seed, HeightField surface, StrataFrame frame, out RockHardness rock)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(frame);
+        ErosionSettings settings = ErosionSettings.For(TerrainProfile.For(recipe.SetPieces));
+        HeightField? uplift = frame.UpliftSteps == 0 ? null : StreamPower.UpliftField(recipe, seed, new WorldGrid(surface.Size, surface.CellSize), settings);
+        rock = RockHardness.For(seed, settings);
+        return StrataGrid.For(rock, surface.Size, surface.CellSize, frame, (x, z) => uplift is null ? 0.0 : uplift.HeightAt(x, z));
+    }
+
     private static string Hex(ulong value) => value.ToString("x16", CultureInfo.InvariantCulture);
 }

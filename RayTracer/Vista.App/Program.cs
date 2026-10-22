@@ -42,6 +42,8 @@ internal static class Program
             return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
         if (args.FirstOrDefault() == MeshMeasure.Flag)
             return RunGpu(() => MeshMeasure.Run(args, Console.Out));
+        if (args.FirstOrDefault() == DiffuseCompare.Flag)
+            return RunGpu(() => DiffuseCompare.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -215,6 +217,7 @@ internal static class Program
         Console.Error.WriteLine(DenoiseCompare.Usage);
         Console.Error.WriteLine(ErosionMeasure.Usage);
         Console.Error.WriteLine(MeshMeasure.Usage);
+        Console.Error.WriteLine(DiffuseCompare.Usage);
         return 1;
     }
 

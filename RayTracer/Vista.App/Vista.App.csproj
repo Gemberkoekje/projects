@@ -19,9 +19,9 @@
 
   <!-- The shaders load from AppContext.BaseDirectory/Shaders/ (Gpu/ShaderSource.cs inlines the .hlsli), so they ship
        next to the .exe: the integrator, the atmosphere LUT builders, their shared atmosphere include and the
-       integrator's sky-light include. -->
+       integrator's sky-light and materials includes. -->
   <ItemGroup>
-    <None Update="Shaders\VistaIntegrator.hlsl;Shaders\VistaAtmosphereLuts.hlsl;Shaders\VistaErosion.hlsl;Shaders\VistaAtmosphere.hlsli;Shaders\VistaSkyLight.hlsli">
+    <None Update="Shaders\VistaIntegrator.hlsl;Shaders\VistaAtmosphereLuts.hlsl;Shaders\VistaErosion.hlsl;Shaders\VistaAtmosphere.hlsli;Shaders\VistaSkyLight.hlsli;Shaders\VistaMaterials.hlsli">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

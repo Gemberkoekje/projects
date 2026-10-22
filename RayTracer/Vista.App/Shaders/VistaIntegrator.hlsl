@@ -30,6 +30,11 @@
 // which measures the sky distribution's cells, CSSkyProbe, its sampling's parity probe, and CSIncidentMeter, the light on
 // the exposure's grey card (M1.10a).
 //
+// Since M1.12 the ground has materials by rule (VistaMaterials.hlsli): rock coloured by its bed, scree, soil and grass, blended per
+// hit from the slope, the altitude, the aspect and the erosion's maps, and shaded as rough diffuse surfaces (Oren–Nayar in Fujii's
+// form) unless --diffuse lambert asks for Lambert's. With --materials off (MatMode 0) every hit is the single M0 material, Lambert,
+// and the integrator does exactly what it did before M1.12.
+//
 // Determinism contract (BatchPlanner): every random number of a pixel-sample comes from (pixel, sample index) alone
 // (and the render's RandomStream, 0 for every image anyone sees) — never from the dispatch — and a pixel's samples are
 // always added in sample-index order, starting from zero at sample 0. So the image is the same however the render is
@@ -174,6 +179,17 @@ float2 WorldXZ(float3 p)
         return CamWorld;
     float r = GroundRadius();
     return CamWorld + p.xz * (r * atan2(horizontal, p.y + r) / horizontal);
+}
+
+// The world x and z of frame point `p` less the camera's: WorldXZ without adding the camera's place back, so single precision keeps
+// its centimetres (the shading's bump, M1.12).
+float2 WorldOffset(float3 p)
+{
+    float horizontal = length(p.xz);
+    if (horizontal <= 0.0)
+        return 0.0;
+    float r = GroundRadius();
+    return p.xz * (r * atan2(horizontal, p.y + r) / horizontal);
 }
 
 bool OnMap(float2 world, float2 origin, float cell, uint size)
@@ -338,6 +354,29 @@ AirSegment SegmentBetween(float3 a, float3 b, out float3 dir)
     seg.Nu = clamp(dot(dir, AtmToSun), -1.0, 1.0);
     seg.Length = len;
     return seg;
+}
+
+#include "VistaMaterials.hlsli"
+
+// The surface a path hit: the ground's materials by rule (MatMode 1), or the single material of M0's table (MatMode 0).
+// A camera hit passes the metres its pixel covers there (`footprint`), for the shading's bump; later surfaces pass 0.
+GroundSurface SurfaceAt(Hit hit, float3 wo, uint4 idx, float footprint)
+{
+    if (MatMode != 0u)
+        return ShadeGround(hit.Position, hit.ShadingNormal, wo, idx, footprint);
+    GroundSurface g;
+    g.Refl = MaterialReflectance(TerrainMaterial, idx);
+    g.Back = 0.0;
+    g.Albedo = MaterialAlbedo[TerrainMaterial].xyz;
+    g.Normal = hit.ShadingNormal;
+    g.Id = TerrainMaterial;
+    return g;
+}
+
+// π × the BRDF for light from `wi` seen along `wo`: the reflectance alone for Lambert, which stays exactly M1.11d's product.
+float4 Brdf(GroundSurface g, float3 n, float3 wi, float3 wo)
+{
+    return MatDiffuse != 0u ? g.Refl + g.Back * OrenNayarG(n, wi, wo) : g.Refl;
 }
 
 // ── The reference atmosphere (--atmosphere reference) ─────────────────────────────────────────────
@@ -537,6 +576,7 @@ struct SampleResult
     float  Depth;
     float3 Albedo;
     float3 Normal;
+    uint   Material;
     uint   Rays;
 };
 
@@ -639,14 +679,18 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         throughput *= airT;
 #endif
 
-        uint material = TerrainMaterial;
-        float4 refl = MaterialReflectance(material, idx);
+        GroundSurface surface = SurfaceAt(hit, -dir, idx, bounce == 0u ? hit.T * MatPixelAngle : 0.0);
+        if (dot(surface.Normal, hit.GeometricNormal) > 0.0)
+            hit.ShadingNormal = surface.Normal;
+        float4 refl = surface.Refl;
+        float3 wo = -dir;
         if (bounce == 0u)
         {
             result.HitSurface = true;
             result.Depth = hit.T;
-            result.Albedo = MaterialAlbedo[material].xyz;
+            result.Albedo = surface.Albedo;
             result.Normal = hit.ShadingNormal;
+            result.Material = surface.Id;
         }
 
         float3 next = hit.Position + hit.GeometricNormal * OriginOffset(hit.Position);
@@ -680,11 +724,12 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                 {
 #ifdef ATMOSPHERE_REFERENCE
                     float transmittance = RatioTrack(AtmCoefficients[idx.x], height, muS, rng);
-                    radiance.x += throughput.x * refl.x * (INV_PI * cosS) * sunIrradiance.x * transmittance;
+                    radiance.x += throughput.x * Brdf(surface, hit.ShadingNormal, toSun, wo).x * (INV_PI * cosS) * sunIrradiance.x * transmittance;
 #else
                     // The disk is 6.8·10⁻⁵ sr, so its density dwarfs the bounce's and the weight is 1 to float precision.
                     float weight = LightSampling != 0u ? PowerHeuristic(SunConePdf(), bsdfScale * cosS) : 1.0;
-                    radiance += throughput * refl * (INV_PI * cosS) * sunIrradiance * SunTransmittance4(idx, GroundAltitude + height, muS) * weight;
+                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS) * sunIrradiance
+                              * SunTransmittance4(idx, GroundAltitude + height, muS) * weight;
 #endif
                 }
             }
@@ -712,7 +757,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                 if (!Occluded(next, toSky))
                 {
                     float4 sky = SkyRadiance(false, ClampAltitude(GroundAltitude + HeightAbove(next)), toSky, idx);
-                    radiance += throughput * refl * sky * (INV_PI * cosK / skyPdf * PowerHeuristic(skyPdf, bsdfScale * cosK));
+                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSky, wo) * sky * (INV_PI * cosK / skyPdf * PowerHeuristic(skyPdf, bsdfScale * cosK));
                 }
             }
         }
@@ -721,7 +766,9 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         if (bounce >= MaxBounces)
             break;
 
-        // Lambertian bounce, cosine-weighted: f·cos/pdf = ρ.
+        // The bounce, cosine-weighted: f·cos/pdf = π·f, which for Lambert is ρ. Russian roulette decides on ρ·A alone (any
+        // survival probability keeps the estimate unbiased); a rough surface then weighs the direction it chose.
+        float4 before = throughput;
         throughput = continued;
         if (bounce >= RrStartBounce)
         {
@@ -734,6 +781,8 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         dir = CosineHemisphere(hit.ShadingNormal, v1, v2);
         if (dot(dir, hit.GeometricNormal) <= 0.0)
             break; // the smooth normal tilted the lobe under the true surface
+        if (MatDiffuse != 0u)
+            throughput = before * Brdf(surface, hit.ShadingNormal, dir, wo) / (bounce >= RrStartBounce ? survive : 1.0);
         bsdfPdf = bsdfScale * dot(hit.ShadingNormal, dir);
         origin = next;
     }
@@ -792,7 +841,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
                 normalSum.xyz += r.Normal;
             }
             if (s == 0u && (AovMask & AOV_FIRST_HIT) != 0u)
-                FirstHit[pixel] = float2(r.Depth, r.HitSurface ? float(TerrainMaterial) : -1.0);
+                FirstHit[pixel] = float2(r.Depth, r.HitSurface ? float(r.Material) : -1.0);
         }
 
         XyzSum[pixel] = xyzSum;
@@ -1020,6 +1069,25 @@ void CSIncidentMeter(uint3 tid : SV_DispatchThreadID)
     SkyLuminanceOut[4u * item + 1u] = light.y;
     SkyLuminanceOut[4u * item + 2u] = light.z;
     SkyLuminanceOut[4u * item + 3u] = light.w;
+}
+
+// The ground's materials at chosen places, for --gpu-selftest's parity with MaterialField.Inputs and MaterialRules.Evaluate (M1.12):
+// probe i reads CheckDirection[i] (x and z: a world place, y: its height) and writes, with the world grid's normal there,
+// CheckSums[2i] = (rock, scree, soil, grass) and [2i + 1] = (wet, stony, the bed's hardness, the slope in degrees).
+[numthreads(64, 1, 1)]
+void CSMaterialProbe(uint3 tid : SV_DispatchThreadID)
+{
+    uint item = tid.x;
+    if (item >= CheckDirections)
+        return;
+    float4 q = CheckDirection[item];
+    float2 m = MapNormal(q.xz);
+    float3 n = float3(m.x, sqrt(max(1.0 - m.x * m.x - m.y * m.y, 0.0)), m.y);
+    MatSample s;
+    float slope;
+    MatWeights w = MaterialWeightsAt(q.xz, q.y, n, s, slope);
+    CheckSums[2u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
+    CheckSums[2u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
 }
 
 // The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads

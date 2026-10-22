@@ -69,6 +69,26 @@ public sealed record RenderSettings
     /// per-pixel comparison of two estimators needs (vista-plan §10 M1.5).
     /// </summary>
     public uint RandomStream { get; init; }
+
+    /// <summary>
+    /// How diffuse surfaces scatter (vista-plan §10 M1.12): rough, Oren–Nayar-style, each material at its own roughness, so a low sun
+    /// behind the camera lights them back toward it; or Lambert's, the same in every direction (every material's roughness 0).
+    /// </summary>
+    public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
+}
+
+/// <summary>How the integrator's diffuse surfaces scatter (vista-plan §10 M1.12).</summary>
+public enum DiffuseModel
+{
+    /// <summary>Not chosen.</summary>
+    None,
+    /// <summary>Lambert's: the same radiance in every direction.</summary>
+    Lambert,
+    /// <summary>
+    /// Oren and Nayar's rough diffuse surface in Fujii's form (<c>f = ρ·A·(1 + σ·s/t)</c>, Fujii 2012), each material at its
+    /// <see cref="Scene.VistaMaterial.Roughness"/>: brighter toward the light behind the viewer, flatter across a lit face.
+    /// </summary>
+    OrenNayar,
 }
 
 /// <summary>Which lights the integrator samples at a surface (vista-plan §5.1, §10 M1.5).</summary>
@@ -167,6 +187,12 @@ public sealed record VistaScene(
     AtmosphereModel Air,
     double GroundAltitudeMetres)
 {
+    /// <summary>
+    /// What the ground's materials read of the place (vista-plan §10 M1.12): its grass line and which way its pole lies. The world's
+    /// material field travels with the mesh (<see cref="TerrainMesh.Materials"/>).
+    /// </summary>
+    public GroundCover Ground { get; init; } = GroundCover.Default;
+
     /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
     public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Mesh);
 

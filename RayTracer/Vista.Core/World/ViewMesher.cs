@@ -53,6 +53,13 @@ public sealed record MeshSettings
     /// <summary>Add the detail below the grid (<see cref="TerrainDetail"/>).</summary>
     public bool Detail { get; init; } = true;
 
+    /// <summary>
+    /// The ground's materials by rule (vista-plan §10 M1.12): the detail below the grid follows the material (<see cref="MaterialDetail"/>)
+    /// and the mesh carries the world's <see cref="MaterialField"/> for the shader. Off renders M0's single material over M1.9's
+    /// smooth detail, as before M1.12.
+    /// </summary>
+    public bool Materials { get; init; } = true;
+
     /// <summary>Mesh the far field beyond the world grid, out to the horizon.</summary>
     public bool FarField { get; init; } = true;
 
@@ -123,6 +130,9 @@ public sealed record MeshInfo
 
     /// <summary>Whether the detail below the grid was added.</summary>
     public bool Detail { get; init; }
+
+    /// <summary>Whether the ground has its materials by rule, and the detail follows them (schema 17).</summary>
+    public bool Materials { get; init; }
 
     /// <summary>Whether the far field was meshed.</summary>
     public bool FarField { get; init; }
@@ -241,7 +251,7 @@ public static class ViewMesher
         double min = (far ? hierarchy.MinHeight : hierarchy.Surface.MinHeight) - amplitude;
         double max = (far ? hierarchy.MaxHeight : hierarchy.Surface.MaxHeight) + amplitude;
         double reach = far ? refiner.Reach : FarthestCorner(hierarchy.Surface, view.Camera);
-        var mesh = new TerrainMesh(positions, normals, indices, mapNormals, maps ? hierarchy.NormalMaps : null)
+        var mesh = new TerrainMesh(positions, normals, indices, mapNormals, maps ? hierarchy.NormalMaps : null, hierarchy.Materials)
         {
             Frame = frame,
             MinHeight = min,
@@ -254,6 +264,7 @@ public static class ViewMesher
             ErrorPixels = settings.Kind == MeshKind.View ? settings.ErrorPixels : 0.0,
             PixelsPerRadian = view.PixelsPerRadian,
             Detail = detail,
+            Materials = hierarchy.Materials is not null,
             FarField = far,
             Triangles = mesh.TriangleCount,
             DetailTriangles = refiner.DetailTriangles,
@@ -493,7 +504,9 @@ public static class ViewMesher
             {
                 float midpoint = (l.H + r.H) * 0.5f;
                 height = onGrid ? midpoint : _h.SubGridHeight(mi, mj, midpoint);
-                active = _uniform ? onGrid : Active(_h.AnalyticError(level), _h.AnalyticRadius(level), _edge[level], onGrid, mi, mj, height);
+                // Below the grid the detail's bound is its region's (M1.12: a meadow's smooth detail, not the rock's).
+                float bound = t < TerrainHierarchy.SubLevels ? _h.SubGridError(mi, mj, level, t, diagonal) : _h.AnalyticError(level);
+                active = _uniform ? onGrid : Active(bound, _h.AnalyticRadius(level), _edge[level], onGrid, mi, mj, height);
             }
 
             if (!active)

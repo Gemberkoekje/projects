@@ -119,7 +119,8 @@ public sealed class PreviewSession
         SliderState sliders = LinkedSliders.Resolve(recipe, pins, AtmosphereModel.Default);
         warnings.AddRange(sliders.Hints);
         Almanac almanac = sliders.Almanac;
-        IReadOnlyList<VistaMaterial> materials = MaterialCatalog.M0;
+        IReadOnlyList<VistaMaterial> materials = MaterialCatalog.For(request.Mesh.Materials);
+        GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees);
         AtmosphereModel air = sliders.Air(AtmosphereModel.Default);
         double groundAltitude = sliders.BaseAltitudeMetres;
         string altitudeFrom = sliders.Readings[Slider.Altitude].From;
@@ -142,6 +143,7 @@ public sealed class PreviewSession
             Atmosphere = request.Atmosphere,
             LightSampling = request.LightSampling,
             RussianRouletteStart = request.RussianRouletteStart,
+            Diffuse = request.Diffuse,
         };
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
@@ -154,6 +156,7 @@ public sealed class PreviewSession
 
         RenderInfo? renderInfo = null;
         ExposureInfo? exposure = null;
+        MaterialShares? shares = null;
         DenoiseInfo? denoised = null;
         if (_renderer is null || request.DryRun)
         {
@@ -172,11 +175,20 @@ public sealed class PreviewSession
                 PngEncoder.Write(Sibling(".hardness.png"), hardness, hardnessSize, hardnessSize, PngColor.Rgb);
                 outputs["hardnessMap"] = baseName + ".hardness.png";
             }
+            if (mesh.Materials is { } field)
+            {
+                // The ground's materials from above (M1.12): every sample of the world grid under this place's grass line.
+                MaterialWeights[] weights = field.SampleWeights(terrain, MaterialConstantsOf(field, ground), (float)groundAltitude);
+                (byte[] cover, int coverSize) = DebugImages.MaterialMap(terrain, field, weights, camera);
+                PngEncoder.Write(Sibling(".materials.png"), cover, coverSize, coverSize, PngColor.Rgb);
+                outputs["materialMap"] = baseName + ".materials.png";
+                shares = SharesOf(field, terrain, weights);
+            }
             timings["write"] = Lap(stopwatch);
         }
         else
         {
-            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude);
+            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude) { Ground = ground };
             var aovs = new HashSet<Aov>(PreviewPipeline.AovsFor(request.Debug));
             if (request.Denoise is not null)
                 aovs.UnionWith([Aov.Albedo, Aov.Normal]);
@@ -327,6 +339,7 @@ public sealed class PreviewSession
             {
                 LightSampling = ImageInfo.LightSamplingOf(settings),
                 RussianRouletteStart = settings.RussianRouletteStart,
+                Diffuse = settings.Diffuse,
                 Display = request.Display,
                 Look = DisplayTransform.LookOf(request.Display, request.Look),
                 Dither = DisplayTransform.DitherOf(request.BitDepth, request.Dither),
@@ -352,6 +365,7 @@ public sealed class PreviewSession
             Exposure = exposure,
             Denoise = denoised,
             DataTiers = MaterialCatalog.TiersOf(materials),
+            Materials = MaterialsInfoOf(materials, mesh, ground, sliders.Climate, shares),
             Render = renderInfo,
             Stages = new StageInfo([.. stages.Where(s => !s.Value).Select(s => s.Key)], [.. stages.Where(s => s.Value).Select(s => s.Key)]),
             Watch = watch is null ? null : watch with { RunSeconds = total.Elapsed.TotalSeconds },
@@ -454,10 +468,67 @@ public sealed class PreviewSession
             DebugOutput.Albedo => DebugImages.Albedo(Buffer(Aov.Albedo)),
             DebugOutput.Normal => DebugImages.Normal(Buffer(Aov.Normal)),
             DebugOutput.Depth => DebugImages.Depth(Buffer(Aov.Depth)),
-            DebugOutput.Material => DebugImages.Material(Buffer(Aov.MaterialId)),
+            DebugOutput.Material => DebugImages.Material(Buffer(Aov.MaterialId), materials),
             DebugOutput.Tier => DebugImages.Tier(Buffer(Aov.MaterialId), materials),
             DebugOutput.Variance => DebugImages.Variance(Buffer(Aov.Variance)),
             _ => throw new ArgumentOutOfRangeException(nameof(debug), debug, "Unknown debug output."),
+        };
+    }
+
+    /// <summary>The material constants of a render of <paramref name="field"/> under <paramref name="ground"/>'s grass line and pole.</summary>
+    private static MaterialConstants MaterialConstantsOf(MaterialField field, GroundCover ground) =>
+        field.Apply(MaterialRules.Default.Constants((float)ground.GrassLineMetres, ground.Poleward, field.NoiseSeed));
+
+    /// <summary>The shares of the world grid each material covers, from every sample's weights (schema 17).</summary>
+    private static MaterialShares SharesOf(MaterialField field, HeightField terrain, MaterialWeights[] weights)
+    {
+        double hard = 0.0, soft = 0.0, scree = 0.0, soil = 0.0, grass = 0.0, wet = 0.0;
+        int n = terrain.Size;
+        for (int j = 0; j < n; j++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                MaterialWeights w = weights[j * n + i];
+                float x = (float)(field.Origin + i * field.Cell), z = (float)(field.Origin + j * field.Cell);
+                if (field.BedAt(x, z, terrain[i, j]).Hardness >= 0.5f)
+                    hard += w.Rock;
+                else
+                    soft += w.Rock;
+                scree += w.Scree;
+                soil += w.Soil;
+                grass += w.Grass;
+                wet += w.Wet;
+            }
+        }
+        double count = (double)n * n;
+        return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count);
+    }
+
+    /// <summary>What the sidecar says of the ground's materials (schema 17).</summary>
+    private static MaterialsInfo MaterialsInfoOf(IReadOnlyList<VistaMaterial> materials, TerrainMesh mesh, GroundCover ground, Weather.ClimateNormals climate,
+        MaterialShares? shares)
+    {
+        var table = materials.Select(m => new MaterialEntry(m.Key, m.Tier, m.Roughness, [m.LinearRgbAlbedo.R, m.LinearRgbAlbedo.G, m.LinearRgbAlbedo.B])).ToList();
+        if (mesh.Materials is null)
+            return new MaterialsInfo { ByRule = false, Table = table };
+        MaterialDetailInfo? detail = null;
+        if (mesh.Info.Detail)
+        {
+            var kinds = new MaterialDetail(0, mesh.Materials);
+            detail = new MaterialDetailInfo(kinds.Rock.MaxAmplitude, kinds.Scree.MaxAmplitude, kinds.Smooth.MaxAmplitude,
+                mesh.Materials.RockGradient, mesh.Materials.ScreeGradient, mesh.Materials.SmoothGradient);
+        }
+        return new MaterialsInfo
+        {
+            ByRule = true,
+            Table = table,
+            Rules = MaterialRules.Default,
+            GrassLineMetres = ground.GrassLineMetres,
+            GrassLineFrom = string.Create(CultureInfo.InvariantCulture,
+                $"where {climate.Station}'s warmest month averages {Weather.GrassLine.WarmestMonthCelsius:0.#} °C along the lapse rate"),
+            Poleward = ground.Poleward,
+            Detail = detail,
+            Shares = shares,
         };
     }
 
@@ -491,6 +562,7 @@ public sealed class PreviewSession
         IReadOnlyList<VistaMaterial> Materials,
         AtmosphereModel Air,
         double GroundAltitudeMetres,
+        GroundCover Ground,
         RenderSettings Settings)
     {
         /// <summary>The <see cref="VistaScene"/> fields the key leaves out, because the renderer does not read them.</summary>
@@ -501,7 +573,8 @@ public sealed class PreviewSession
 
         /// <summary>The key of rendering <paramref name="scene"/> with <paramref name="settings"/>.</summary>
         public static RenderKey Of(VistaScene scene, RenderSettings settings) => new(
-            scene.Mesh, scene.Terrain, scene.Camera with { ExposureEv = 0.0 }, scene.Sun, scene.Materials, scene.Air, scene.GroundAltitudeMetres, settings);
+            scene.Mesh, scene.Terrain, scene.Camera with { ExposureEv = 0.0 }, scene.Sun, scene.Materials, scene.Air, scene.GroundAltitudeMetres, scene.Ground,
+            settings);
     }
 
     /// <summary>What a denoised image is made from: the render, the settings and the input scale (its bits; NaN lets the filter choose).</summary>

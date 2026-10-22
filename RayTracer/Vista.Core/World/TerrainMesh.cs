@@ -13,13 +13,15 @@ namespace Vista.World;
 /// </summary>
 public sealed class TerrainMesh
 {
-    internal TerrainMesh(float[] positions, float[] normals, uint[] indices, uint[]? mapNormals = null, IReadOnlyList<NormalMap>? normalMaps = null)
+    internal TerrainMesh(float[] positions, float[] normals, uint[] indices, uint[]? mapNormals = null, IReadOnlyList<NormalMap>? normalMaps = null,
+        MaterialField? materials = null)
     {
         Positions = positions;
         Normals = normals;
         Indices = indices;
         MapNormals = mapNormals ?? [];
         NormalMaps = normalMaps ?? [];
+        Materials = materials;
     }
 
     /// <summary>Vertex positions, three floats (x, y, z) per vertex, in <see cref="Frame"/>.</summary>
@@ -40,6 +42,12 @@ public sealed class TerrainMesh
 
     /// <summary>The smooth normals of the world's grids, finest first (shared by every mesh of the world); empty for none.</summary>
     public IReadOnlyList<NormalMap> NormalMaps { get; }
+
+    /// <summary>
+    /// The world's material field (vista-plan §10 M1.12; shared by every mesh of the world): what the shader reads to put rock, scree,
+    /// soil and grass where the rules say. Null for M0's single material everywhere (<see cref="MeshSettings.Materials"/> off).
+    /// </summary>
+    public MaterialField? Materials { get; }
 
     /// <summary>Number of vertices.</summary>
     public int VertexCount => Positions.Length / 3;

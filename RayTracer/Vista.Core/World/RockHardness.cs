@@ -30,10 +30,11 @@ public sealed class RockHardness
     private readonly double _dipX, _dipZ;
     private readonly double _mottle;
 
-    private RockHardness(ulong seed, float[] table, double dipX, double dipZ, double mottle)
+    private RockHardness(ulong seed, float[] table, float[] tints, double dipX, double dipZ, double mottle)
     {
         _seed = seed;
         Table = table;
+        Tints = tints;
         _dipX = dipX;
         _dipZ = dipZ;
         _mottle = mottle;
@@ -41,6 +42,13 @@ public sealed class RockHardness
 
     /// <summary>The hardness of the beds by stratigraphic height: entry <c>k</c> at <see cref="TableOrigin"/> + k·<see cref="TableSpacingMetres"/>.</summary>
     public float[] Table { get; }
+
+    /// <summary>
+    /// Each bed's own tint by stratigraphic height, two values per <see cref="Table"/> entry, each from −1 to 1 (vista-plan §10
+    /// M1.12): how much lighter or darker, and how much warmer or cooler, the bed's rock is than its hardness alone makes it, so
+    /// beds of like hardness still read as different rocks. From the beds' own stream; it changes no hardness.
+    /// </summary>
+    public float[] Tints { get; }
 
     /// <summary>
     /// The field of <paramref name="seed"/> (the user's seed; the strata take their own stream of it) with the beds, dip and
@@ -54,6 +62,7 @@ public sealed class RockHardness
         // The beds: from stratigraphic height 0 upward and downward, each with its own thickness (a quarter to two and a half times
         // the mean, thin beds more common) and hardness (pushed toward hard or soft by a smoothstep, so beds read as distinct rocks).
         var table = new float[TableEntries];
+        var tints = new float[2 * TableEntries];
         double mean = settings.StrataThickness;
         (double Thickness, float Hardness) Bed(long index)
         {
@@ -61,6 +70,12 @@ public sealed class RockHardness
             double u = (h >> 11) * (1.0 / (1ul << 53));
             double v = (StableHash.Mix(h) >> 11) * (1.0 / (1ul << 53));
             return (mean * (0.2 + 1.8 * u * u) / 0.8, (float)(v * v * (3.0 - 2.0 * v)));
+        }
+        void Tint(int k, long index)
+        {
+            ulong h = StableHash.Lattice(strata, index, 0x7147);
+            tints[2 * k] = (float)((h >> 11) * (2.0 / (1ul << 53)) - 1.0);
+            tints[2 * k + 1] = (float)((StableHash.Mix(h) >> 11) * (2.0 / (1ul << 53)) - 1.0);
         }
         double origin = TableOrigin, spacing = TableSpacingMetres;
         // Beds at or above 0, then below it.
@@ -76,6 +91,7 @@ public sealed class RockHardness
                 (thickness, hardness) = Bed(++bed);
             }
             table[k] = hardness;
+            Tint(k, bed);
         }
         bed = -1;
         (thickness, hardness) = Bed(bed);
@@ -89,6 +105,7 @@ public sealed class RockHardness
                 (thickness, hardness) = Bed(--bed);
             }
             table[k] = hardness;
+            Tint(k, bed);
         }
 
         // The dip: a direction from the seed (a rational point on the circle, so no transcendental function moves its bits) and
@@ -99,7 +116,7 @@ public sealed class RockHardness
         if ((StableHash.Mix(d) & 1ul) != 0ul)
             (c, s) = (-c, -s);
         double slope = (float)Math.Tan(settings.StrataDipDegrees * Math.PI / 180.0) * ((StableHash.Mix(d + 1ul) >> 11) * (1.0 / (1ul << 53)));
-        return new RockHardness(strata, table, c * slope, s * slope, settings.HardnessMottle);
+        return new RockHardness(strata, table, tints, c * slope, s * slope, settings.HardnessMottle);
     }
 
     /// <summary>

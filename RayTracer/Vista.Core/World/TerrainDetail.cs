@@ -16,7 +16,7 @@ namespace Vista.World;
 /// gradient and value was up to 1.8 times looser near a unit, which cost the mesh two to three times the triangles below the
 /// grid; a test pins the envelope over fresh segments.</para>
 /// </summary>
-public sealed class TerrainDetail
+public sealed class TerrainDetail : ISurfaceDetail
 {
     /// <summary>The largest |<see cref="GradientNoise.Sample"/>|: √2·√(2/4) for unit gradients (0.934 measured).</summary>
     public const double NoiseMax = 1.0;

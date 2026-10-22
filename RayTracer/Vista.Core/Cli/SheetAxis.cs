@@ -118,6 +118,8 @@ public sealed class SheetAxis
                 "meshError" => Checked(values, MeshError, (r, v) => r with { Mesh = r.Mesh with { ErrorPixels = MeshError(v) } }),
                 "detail" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { Detail = OnOff(v) } }),
                 "farField" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { FarField = OnOff(v) } }),
+                "materials" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { Materials = OnOff(v) } }),
+                "diffuse" => Checked(values, DiffuseOf, (r, v) => r with { Diffuse = DiffuseOf(v) }),
                 "meter" => Checked(values, Meter, (r, v) => r with { Meter = Meter(v) }),
                 "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "look" => Checked(values, Look, (r, v) => r with { Look = Look(v) }),
@@ -177,6 +179,9 @@ public sealed class SheetAxis
         "off" => false,
         _ => throw new ArgumentException($"'{text}' is not on or off."),
     };
+
+    private static Rendering.DiffuseModel DiffuseOf(string text) =>
+        PreviewCommandLine.TryParseDiffuse(text, out Rendering.DiffuseModel diffuse) ? diffuse : throw new ArgumentException($"'{text}' is not orenNayar or lambert.");
 
     private static World.MeshKind MeshKindOf(string text) =>
         PreviewCommandLine.TryParseMeshKind(text, out World.MeshKind kind) ? kind : throw new ArgumentException($"'{text}' is not view or uniform.");

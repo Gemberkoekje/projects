@@ -54,9 +54,11 @@ public static class SheetLabels
         ("exposure.meter", "meter"),
         ("exposure.meterCompensationEv", "compensation"),
         ("image.lightSampling", "lights"),
+        ("image.diffuse", "diffuse"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
         ("mesh", "mesh"),
+        ("materials", "materials"),
         ("build", "build"),
     ];
 
@@ -154,7 +156,12 @@ public static class SheetLabels
             // How the PNG was quantised (schema 15); every build before it rounded to 8 bits with no dither.
             fields["image.dither"] = image["dither"] is JsonValue dither ? Display(dither) : "off";
             fields["image.bitDepth"] = image["bitDepth"] is JsonValue bits ? Display(bits) : "8";
+            // How diffuse surfaces scattered (schema 17); every build before it was Lambert's.
+            fields["image.diffuse"] = image["diffuse"] is JsonValue diffuse ? Display(diffuse) : "lambert";
         }
+
+        // The ground's materials (schema 17): by rule, or M0's single one, as every build before it.
+        fields["materials"] = root["materials"]?["byRule"] is JsonValue byRule && byRule.GetValueKind() == JsonValueKind.True ? "by rule" : "M0";
 
         // How the PNG was metered (schema 11); every build before it used the average meter.
         if (root["exposure"] is JsonObject exposure)
@@ -282,6 +289,8 @@ public static class SheetLabels
                 "image.maxBounces" => $"{value} bounces",
                 "build" => $"build {value}",
                 "mesh" => $"{value} mesh",
+                "materials" => value == "by rule" ? null : "M0 material",
+                "image.diffuse" => value == "orenNayar" ? null : $"{value} diffuse",
                 _ => $"{Short(key)} {value}",
             };
             if (part is not null)

@@ -51,6 +51,10 @@ namespace Vista.App.Gpu;
 ///
 /// <para>Then the denoiser (M1.6), when Open Image Denoise has been fetched: the reference render denoised twice on the CPU is
 /// bit-identical, sane and as bright as the raw image; on CUDA, bit-identical twice and as bright as the CPU's.</para>
+///
+/// <para>Since M1.12 the scene has the ground's materials by rule and their detail, so every check above renders them; and the
+/// materials themselves (<see cref="MaterialChecks"/>): the world's material field is the same twice, the shader's rules match the
+/// C# reference at random places of the world, and the reference render shows several materials.</para>
 /// </summary>
 internal static class GpuSelfTest
 {
@@ -81,15 +85,20 @@ internal static class GpuSelfTest
         const ulong seed = 42;
         using var renderer = new D3D12VistaRenderer();
         log.WriteLine($"Device: {renderer.DeviceName}, driver {renderer.DriverVersion}");
-        bool pass = ErosionChecks(renderer, recipe, seed, log, out HeightField terrain);
+        bool pass = ErosionChecks(renderer, recipe, seed, log, out ErosionResult eroded);
+        HeightField terrain = eroded.Surface;
         pass &= ViewChecks(terrain, log);
         Almanac almanac = Almanac.For(recipe);
         double ground = Places.BaseAltitude(recipe, almanac.Place).Metres;
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         CameraSpec camera = SelfTestCamera;
-        TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new TerrainDetail(seed, terrain.CellSize));
+        MaterialField materials = MaterialFieldOf(recipe, seed, eroded);
+        TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new MaterialDetail(seed, materials), materials);
         TerrainMesh mesh = MeshFor(hierarchy, camera, settings, ground);
-        var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.M0, AtmosphereModel.Default, ground);
+        var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.Ground, AtmosphereModel.Default, ground)
+        {
+            Ground = GroundCover.For(Weather.Climate.For(almanac.Place), almanac.Place.LatitudeDegrees),
+        };
         pass &= MeshChecks(hierarchy, scene, settings, log);
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
 
@@ -110,6 +119,7 @@ internal static class GpuSelfTest
                 : $"{reference.Stats.Dispatches} and {split.Stats.Dispatches} dispatches for {settings.SamplesPerPixel} samples");
         pass &= Check(log, "0.05 ms budget is bit-identical", Same(reference, split, compareAovs: true));
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
+        pass &= MaterialChecks(renderer, recipe, seed, eroded, materials, hierarchy, scene, reference, log);
 
         // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.11d's pose the range's skyline crosses it
         // near row 190, a third of it sky).
@@ -134,9 +144,9 @@ internal static class GpuSelfTest
     /// reference (<see cref="ErosionParity"/>); then the self-test's world eroded on the GPU, stored in a fresh cache, eroded
     /// again and read back from the cache — all three the same bits; then, when the default cache holds this world, whether
     /// this GPU and driver still erode it to the bits the cache holds (a driver update that moves the world fails here instead of
-    /// passing silently). <paramref name="terrain"/> is the eroded surface.
+    /// passing silently). <paramref name="eroded"/> is the erosion's result: the surface and its maps.
     /// </summary>
-    private static bool ErosionChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, TextWriter log, out HeightField terrain)
+    private static bool ErosionChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, TextWriter log, out ErosionResult eroded)
     {
         WorldGrid grid = WorldGrid.Default;
         TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
@@ -149,7 +159,7 @@ internal static class GpuSelfTest
             var cache = new ErosionCache(folder);
             TerrainWorld world = WorldBuilder.Build(recipe, seed, grid, renderer, cache);
             ErosionResult first = world.Erosion!;
-            terrain = first.Surface;
+            eroded = first;
             ErosionStats stats = world.Info.Stats!;
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  eroded {grid.Size}\u00b2 \u00d7 {grid.CellSize} m in {stats.Seconds:0.00} s GPU ({stats.WallSeconds:0.00} s wall, {stats.Submissions} submissions, " +
@@ -183,6 +193,72 @@ internal static class GpuSelfTest
             if (Directory.Exists(folder))
                 Directory.Delete(folder, recursive: true);
         }
+        return pass;
+    }
+
+    /// <summary>The material field of the self-test's world (vista-plan §10 M1.12), as a preview session builds it.</summary>
+    private static MaterialField MaterialFieldOf(Recipe recipe, ulong seed, ErosionResult eroded)
+    {
+        StrataGrid strata = WorldBuilder.StrataOf(recipe, seed, eroded.Surface, eroded.Strata, out RockHardness rock);
+        return MaterialField.For(eroded.Surface, eroded, strata, rock.Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed));
+    }
+
+    /// <summary>
+    /// The ground's materials (vista-plan §10 M1.12): the world's material field built again is the same bits (its maps, its beds and
+    /// its detail weights); the shader's rules (<c>CSMaterialProbe</c>) match the C# reference (<see cref="MaterialField.Inputs"/>,
+    /// <see cref="MaterialRules.Evaluate"/>) at 4096 random places of the world grid, each on its ground and up to 40 m off it, within
+    /// 0.002 of a weight and of the hardness and 0.02° of slope (single-precision transcendentals on both sides; the shader's arc cosine
+    /// is an approximation, worst on nearly flat ground, where a weight barely follows the slope); and the reference render shows at
+    /// least three materials.
+    /// </summary>
+    private static bool MaterialChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, ErosionResult eroded, MaterialField materials,
+        TerrainHierarchy hierarchy, VistaScene scene, RenderOutput reference, TextWriter log)
+    {
+        MaterialField again = MaterialFieldOf(recipe, seed, eroded);
+        var probe = new double[] { 0.0, 0.25, 0.5, 0.75, 1.0 };
+        bool sameDetail = probe.All(u => probe.All(v =>
+            again.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)
+            == materials.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)));
+        bool pass = Check(log, "the material field built twice is bit-identical",
+            again.Packed.SequenceEqual(materials.Packed) && again.Beds.SequenceEqual(materials.Beds) && sameDetail
+            && again.RockGradient == materials.RockGradient && again.ScreeGradient == materials.ScreeGradient ? null : "the two builds differ");
+
+        var random = new Random(1212);
+        HeightField surface = eroded.Surface;
+        var places = new List<(float X, float Z, float Height)>();
+        for (int i = 0; i < 4096; i++)
+        {
+            double x = surface.OriginX + random.NextDouble() * surface.Extent, z = surface.OriginZ + random.NextDouble() * surface.Extent;
+            places.Add(((float)x, (float)z, (float)(surface.HeightAt(x, z) + (i % 2 == 0 ? 0.0 : random.NextDouble() * 40.0))));
+        }
+        float[] gpu = renderer.RunMaterialProbe(scene, places);
+        MaterialConstants k = D3D12VistaRenderer.MaterialConstantsFor(scene, DiffuseModel.OrenNayar, 1080);
+        double worstWeight = 0.0, worstHardness = 0.0, worstSlope = 0.0;
+        for (int i = 0; i < places.Count; i++)
+        {
+            (float x, float z, float height) = places[i];
+            (float nx, float nz) = hierarchy.MapNormal(x, z);
+            MaterialInputs inputs = materials.Inputs(x, z, height, nx, nz, (float)scene.GroundAltitudeMetres, k);
+            MaterialWeights w = MaterialRules.Evaluate(inputs, k);
+            ReadOnlySpan<float> g = gpu.AsSpan(i * 8, 8);
+            foreach ((float a, float b) in new[] { (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]) })
+                worstWeight = Math.Max(worstWeight, Math.Abs(a - b));
+            worstHardness = Math.Max(worstHardness, Math.Abs(inputs.Hardness - g[6]));
+            worstSlope = Math.Max(worstSlope, Math.Abs(inputs.SlopeDegrees - g[7]));
+        }
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  materials at {places.Count} places: worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
+        pass &= Check(log, "the shader's material rules match the C# reference", worstWeight <= 2e-3 && worstHardness <= 2e-3 && worstSlope <= 0.02 ? null
+            : string.Create(CultureInfo.InvariantCulture, $"worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
+
+        var seen = new HashSet<int>();
+        foreach (float id in reference.Aovs[Aov.MaterialId])
+        {
+            if (id >= 0f)
+                seen.Add((int)id);
+        }
+        pass &= Check(log, "the reference render shows several materials", seen.Count >= 3 ? null
+            : $"only {string.Join(", ", seen.Order().Select(id => MaterialCatalog.Ground[id].Key))}");
         return pass;
     }
 

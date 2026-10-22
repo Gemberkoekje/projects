@@ -140,6 +140,9 @@ public sealed record PreviewRequest
 
     /// <summary>The beauty's and the denoised beauty's bits per channel (vista-plan §10 M1.11c): 8, or 16 with <c>--png16</c>.</summary>
     public int BitDepth { get; init; } = DisplayTransform.DefaultBitDepth;
+
+    /// <summary>How diffuse surfaces scatter (vista-plan §10 M1.12): <c>--diffuse orenNayar</c> (the default) or <c>lambert</c>.</summary>
+    public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
 }
 
 /// <summary>
@@ -153,6 +156,7 @@ public sealed record PreviewRequest
 ///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
+///           [--materials on | off] [--diffuse orenNayar | lambert]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--dither on | off] [--png16]
 /// </code>
@@ -173,6 +177,8 @@ public sealed record PreviewRequest
 /// side × metres between them): another world, for measurements. <c>--mesh-error</c> sets the view-dependent mesh's error target in
 /// pixels (M1.9), <c>--detail off</c> leaves out the detail below the world grid, <c>--far-field off</c> the terrain beyond it, and
 /// <c>--mesh uniform</c> meshes every sample of the world grid and nothing else (M1.7's mesh, bent onto the Earth), for comparisons.
+/// <c>--materials off</c> renders M0's single material over M1.9's smooth detail instead of the ground's materials by rule and
+/// their detail (M1.12), and <c>--diffuse lambert</c> scatters light as Lambert's surfaces do instead of rough ones.
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
@@ -199,6 +205,8 @@ public static class PreviewCommandLine
         "--erosion off renders the world un-eroded; --grid SIZExCELL makes it on another grid (another world, for measurements).\n" +
         "--mesh-error <px>: the view-dependent mesh's error target (default 1); --detail off leaves out the detail below the grid,\n" +
         "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
+        "--materials on (default) | off: the ground's rock, scree, soil and grass by rule and their detail, or M0's single grey material\n" +
+        "  over smooth detail. --diffuse orenNayar (default) | lambert: rough diffuse surfaces, or Lambert's.\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
@@ -275,7 +283,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither",
+        "--dither", "--materials", "--diffuse",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -361,6 +369,7 @@ public static class PreviewCommandLine
         DisplayLook look = Look(values.GetValueOrDefault("--look"), problems);
         double? compensation = Compensation(values.GetValueOrDefault("--compensation"), problems);
         PngDither dither = Dither(values.GetValueOrDefault("--dither"), problems);
+        DiffuseModel diffuse = Diffuse(values.GetValueOrDefault("--diffuse"), problems);
 
         if (problems.Count > before)
             return null;
@@ -393,7 +402,22 @@ public static class PreviewCommandLine
             MeterCompensationEv = compensation,
             Dither = dither,
             BitDepth = flags.Contains("--png16") ? 16 : DisplayTransform.DefaultBitDepth,
+            Diffuse = diffuse,
         };
+    }
+
+    /// <summary>Parses a <c>--diffuse</c> value (<c>orenNayar</c> or <c>lambert</c>).</summary>
+    internal static bool TryParseDiffuse(string text, out DiffuseModel diffuse) =>
+        Enum.TryParse(text, ignoreCase: true, out diffuse) && diffuse != DiffuseModel.None && Enum.IsDefined(diffuse) && !int.TryParse(text, out _);
+
+    private static DiffuseModel Diffuse(string? text, List<string> problems)
+    {
+        if (text is null)
+            return DiffuseModel.OrenNayar;
+        if (TryParseDiffuse(text, out DiffuseModel diffuse))
+            return diffuse;
+        problems.Add($"--diffuse must be orenNayar or lambert, got '{text}'.");
+        return DiffuseModel.OrenNayar;
     }
 
     /// <summary>Parses a <c>--dither</c> value: <c>on</c> (the triangular dither) or <c>off</c>.</summary>
@@ -551,7 +575,10 @@ public static class PreviewCommandLine
     internal static bool TryParseMeshError(string text, out double pixels) =>
         double.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out pixels) && pixels is >= 0.01 and <= 1000.0;
 
-    /// <summary>The mesh settings of <c>--mesh</c>, <c>--mesh-error</c>, <c>--detail</c> and <c>--far-field</c> (vista-plan §10 M1.9).</summary>
+    /// <summary>
+    /// The mesh settings of <c>--mesh</c>, <c>--mesh-error</c>, <c>--detail</c> and <c>--far-field</c> (vista-plan §10 M1.9), and
+    /// <c>--materials</c> (M1.12).
+    /// </summary>
     private static MeshSettings Mesh(Dictionary<string, string> values, List<string> problems)
     {
         var settings = new MeshSettings();
@@ -573,6 +600,7 @@ public static class PreviewCommandLine
         {
             ("--detail", (s, on) => s with { Detail = on }),
             ("--far-field", (s, on) => s with { FarField = on }),
+            ("--materials", (s, on) => s with { Materials = on }),
         })
         {
             switch (values.GetValueOrDefault(option))

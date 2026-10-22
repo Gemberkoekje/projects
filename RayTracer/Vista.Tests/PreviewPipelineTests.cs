@@ -54,8 +54,11 @@ public sealed class PreviewPipelineTests
         Assert.IsTrue(sidecar.DefaultCamera);
         Assert.AreEqual("mountains", sidecar.World.TerrainProfile);
         Assert.AreEqual(TestWorlds.Grid.Size, sidecar.World.GridSize);
-        Assert.AreEqual(DataTier.BuiltIn, sidecar.DataTiers["terrain"]);
-        CollectionAssert.AreEquivalent(new[] { "heightMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
+        // The ground's five materials by rule (M1.12), all built in; a dry run shows them from above.
+        CollectionAssert.AreEquivalent(new[] { "grass", "rock.hard", "rock.soft", "scree", "soil" }, sidecar.DataTiers.Keys.ToArray());
+        Assert.IsTrue(sidecar.DataTiers.Values.All(t => t == DataTier.BuiltIn));
+        CollectionAssert.AreEquivalent(new[] { "heightMap", "materialMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
+        Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.materials.png")));
         Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.heightmap.png")));
         Assert.IsFalse(File.Exists(Path.Combine(_dir, "p.png")));
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("worldGen"));
@@ -85,7 +88,7 @@ public sealed class PreviewPipelineTests
         Assert.IsTrue(sidecar.Recipe.ContentEquals(back.Recipe));
         Assert.AreEqual(sidecar.Render!.Stats.RaysTraced, back.Render!.Stats.RaysTraced);
         using JsonDocument doc = JsonDocument.Parse(json);
-        Assert.AreEqual("builtIn", doc.RootElement.GetProperty("dataTiers").GetProperty("terrain").GetString());
+        Assert.AreEqual("builtIn", doc.RootElement.GetProperty("dataTiers").GetProperty("rock.hard").GetString());
         Assert.AreEqual(7ul, doc.RootElement.GetProperty("seed").GetUInt64());
     }
 
