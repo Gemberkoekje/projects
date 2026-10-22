@@ -26,6 +26,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.11b | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11c | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11d | 0.26 | 3.79 | 2.63 | 5.82 |
+| M1.12 | 0.25 | 5.64 | 4.08 | 8.15 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -98,3 +99,14 @@ rounds, on a GPU shared with other programs: median ratios 1.170, 0.938, 0.977 a
 view traces 4% fewer rays per sample and costs 6% less. The sky view's +17% is likely its new height: its rays still all escape (one per
 sample) but now start 3 m above the ground, among the terrain's finest triangles, where before they started 550 m up (not measured).
 Making a world costs what it did (the incision 13–14 s, the GPU erosion 19–21 s, the maps 8–9 s; `vista-log/M1.11d.md`).
+M1.12 gives the ground its materials, evaluated at every surface a path meets: the rules' inputs (four samples of the material
+map, two entries of the bed table, the world grid's normal), five noises and five spectra, and on the camera's hit the bump. Measured
+as M1.11d was: this slice and `main` (29ac138a) rendered alternately, view by view, three rounds, on a GPU shared with other programs:
+median ratios 0.966, 1.489, 1.551 and 1.401 (0.964–1.125, 1.477–1.490, 1.549–1.557, 1.387–1.401). The views trace 1.00, 3.03, 2.60
+and 3.62 rays per sample (M1.11d: 1.00, 3.03, 2.60, 3.69): down the slope the rough ground's lower ρ·A ends a few more paths by
+Russian roulette. The sky view hits no ground, so its ratio is noise. Where the time goes, from two more rounds of the sky, aerial and
+default views against `main`: this build with `--materials off` (the same kernel, M0's single material) 1.00, 1.03 and 1.02; with
+`--diffuse lambert` 0.99, 1.47 and 1.58; as built 0.99, 1.48 and 1.57. The larger kernel costs 2–3% and the rough BRDF nothing
+measurable; the materials' evaluation costs 45–55% a sample. If that matters, the levers are fewer reads and noises per hit (the
+codes, the bed's entry and the normal packed into one read; the sharpening's and the meadow's noises folded into the breakup's),
+with the self-test's parity probe keeping C# and the shader in step.

@@ -238,3 +238,20 @@ dry run writes `<out>.hardness.png` beside `<out>.drainage.png` when its world i
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/relief/render.ps1 [-Before ..\main\Vista.App.dll] [-CellWidth 400] [-Spp 64] [-MapSize 256] [-Out folder]
 ```
+
+## Materials checks (M1.12)
+
+`materials/render.ps1` makes the M1.12 sheets: the four seeds from the aerial camera on a summer afternoon with their material-id and
+tier outputs (`ids.png`; the renders erode any seed the cache lacks), each seed's materials from above with the shares of the world
+each covers (`maps.png`, from dry runs: a dry run writes `<out>.materials.png` and the sidecar's `materials.shares`), with `-Before` (a
+`main` build) the seed-42 views from both builds (`views.png`), Lambert's ground against rough ground at golden hour
+(`diffuse.png`, from `--diffuse-compare`), and windows of 3840×2160 frames near the camera (`loupes.png`). `-Sheets` makes only some
+of them (`ids,maps,views,diffuse,loupes`); `-Worlds` names another world cache.
+
+`materials/scree-cone.camera.json`, `rock-face.camera.json` and `meadow.camera.json` stand 2 m above the eroded seed-42 ground (CI checks
+them over the incised ground, which the GPU erosion's sediment buried 10–53 m deep there; the self-test over the eroded ground), looking
+east and south-east at a scree cone below cliffs, a stratified face over a meadow, and a meadow among outcrops.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/materials/render.ps1 [-Before ..\main\Vista.App.dll] [-Sheets ids,maps,views,diffuse,loupes] [-CellWidth 400] [-Spp 64] [-Out folder]
+```
