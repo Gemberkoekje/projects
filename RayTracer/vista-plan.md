@@ -5,11 +5,12 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-three slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-four slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness) and M1.12 (materials by
-rule) are done, M1.12a (the colour quadrature, found in M1.12) is next, then M1.13 (snow and glaciers). It sits
+rule) are done, M1.12a (the colour quadrature, found in M1.12) is next, then M1.12b (forest as material) and
+M1.13 (snow and glaciers). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -811,7 +812,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Twenty-two slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-four slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -842,6 +843,12 @@ channel at 0, is the punchy look's own colour for that sky (held back just enoug
 Rec.709's edge), not the clamp's. Whether it keeps some red (a margin or a knee short of the edge)
 is a change of look, so it is one line of M1.17's re-judgement, not a slice: only the darkest part
 of a clear sky is on the edge, and M1.11d and M1.12 tune the terrain and the materials, not the sky.
+
+*Added 2026-10-22, after a review of the M1.12 sheets against the user's own photos of the Alps
+(agreed with the user):* **M1.12b — Forest as material**, before the snow. From altitude a forest
+is dark, rough texture rather than trees, and it stays dark among snow-covered open ground, so the
+snow (M1.13) must be tuned with the forest in place. It is M5's distant-forest representation,
+built early; M5 adds real trees near the camera and keeps the material beyond them.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1318,6 +1325,29 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   `--gpu-selftest` with the atmosphere's checks at the new wavelengths; a cost-ledger row (expected
   unchanged: only the tables change).
 
+**M1.12b — Forest as material.**
+- *Goal:* forested lower slopes that read as forest from a distance, so the aerial and range views
+  get their dark depth and colour before M5's trees, and the snow (M1.13) is tuned with the forest in
+  place.
+- *Why (the review of 2026-10-22):* from altitude a forest is texture, not trees. In the user's
+  photos over the Alps (11 April 2025, about 10 km up) the lower slopes are dark blue-black and rough,
+  and stay dark among snow-covered open ground, because snow falls through or off the canopy. Vista's
+  ground below the grass line is grass or soil today.
+- *Deliverable:* **where forest grows**, by rules `MaterialRules` shares between C# and the shader:
+  below a tree line from the place's climate (its warmest month, as M1.12's grass line), on slopes
+  gentle enough for trees, favouring moister ground (M1.11a's drainage), with seeded clearings and
+  ragged edges; above the tree line M1.12's grass, soil and rock as before. A **canopy spectrum**
+  (tier 5): conifer forest's low visible reflectance with a small green peak, recorded per material.
+  **Canopy shading:** very rough, since a canopy is mostly gaps and shadow, measured against M1.12's
+  rough diffuse in a sheet. **Crowns as near-camera detail**, a detail kind with its bound measured
+  as M1.9's, so a forest edge on a ridge shows a bumpy silhouette; close up it is still not trees
+  (M5, which keeps this material beyond the distance where its trees take over).
+- *Verify:* CI: the placement rules (the tree line from the climate; steep ground bare; moist ground
+  favoured; deterministic). 3070: material-id previews over four seeds with the forest's share; a
+  before/after sheet of the ledger and M1.12 views; the aerial view beside one of the user's April
+  photos, judged on how forest and open ground relate rather than on the phone's colours; a 4K loupe
+  of a forest edge on a ridge; a cost-ledger row.
+
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
 - *Deliverable:* snow cover from slope (shed above ~35–40°), aspect (poleward faces keep more,
@@ -1332,7 +1362,9 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   precipitation for every place, so maritime snowlines (Fiordland, Lofoten) come out too high and dry
   ones (Yellowstone) too low (M1.11's known limits); the climate table gains monthly precipitation per
   place, hand-entered with a source like the normals, and the snowline default uses it. A dry / wet /
-  melting state by altitude against the freezing level. A built-in snow spectrum from ice absorption
+  melting state by altitude against the freezing level. **Snow and the forest:** forested ground
+  (M1.12b) stays dark under snow cover, the canopy shedding or hiding the snow, with at most a
+  light dusting in its texture, as in the user's April photos. A built-in snow spectrum from ice absorption
   and grain size (tier 5). Russian roulette is re-measured on bright snow (M0 note). Close-up snow
   stays in M7.
 - *Verify:* CI: the placement rules; the snowline default moving with each place's precipitation. 3070:
@@ -1439,7 +1471,8 @@ than winter from the defaults alone.
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
 bark, grass, ferns, shrubs, leaf litter; ecosystem placement; mass TLAS instancing;
 leaf translucency; PROSPECT-D leaves driven by the season slider; leaf-off in winter;
-distant-forest representation (measured decision). Verify: **"autumn lake, dawn, fog"**
+distant-forest representation (measured decision; M1.12b's forest material is its starting point,
+kept beyond the distance where the trees take over). Verify: **"autumn lake, dawn, fog"**
 renders at 4K within the 8 GB budget; backlit leaves glow; M1.12a's colour check gains PROSPECT's
 leaf spectra, green and autumn (reflectance and transmittance), whose sharp red edge lies past the
 last wavelength (661 nm), each within 1 ΔE₇₆ of dense integration or the miss recorded with its fix.
