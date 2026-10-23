@@ -1346,8 +1346,8 @@ schema 18). Every spectrum the CI checks (flat, M1.12's ground, water, the sun t
 0.93 ΔE₇₆ and 0.44% in luminance of dense 1 nm integration, where the engine's table missed by 2.3–8.3 and up to 2.7%, each colour
 judged at the luminance of white (stricter than M1.12's figures above; at a grey of half that luminance the two agree). The twilight
 light on a 0.9 reflector misses by 1.08, the last wavelength standing for everything past 650 nm; a last bin of three quarters of a
-bin's mass (665 nm) would take it to 0.92 and the sky stays 0.09 (measured, not taken: the bins stay equal until the user decides, and
-M1.13 re-runs the case with snow's spectrum). In the renders each view moves as its light predicts and always away from green: the sky
+bin's mass (665 nm) would take it to 0.92 and the sky stays 0.09 (measured, not taken: the user kept the bins equal on 2026-10-23,
+and the red end is decided in M1.13, whose attention point holds the options measured since). In the renders each view moves as its light predicts and always away from green: the sky
 4.16 ΔE₇₆ (a Rayleigh sky predicts 4.14), the daylit ground 3.25–3.32, down the slope at golden hour 3.96, M1.12's close-ups 2.06–2.60
 (`m1-12a-ledger.png`, `m1-12a-closeups.png`); the incident meter's exposure moves 0.001 EV; the sky view's red channel at 0 falls from
 95.3% of its pixels to 86.2%. `--quadrature engine` renders `main`'s images byte for byte, denoised and albedo too, and a sample costs
@@ -1400,6 +1400,26 @@ Log: [`vista-log/M1.12a.md`](vista-log/M1.12a.md).
   light dusting in its texture, as in the user's April photos. A built-in snow spectrum from ice absorption
   and grain size (tier 5). Russian roulette is re-measured on bright snow (M0 note). Close-up snow
   stays in M7.
+- *Attention: the colour quadrature's red end* (from M1.12a; the user's ideas, 2026-10-23). M1.12a's 50 equal bins put one
+  wavelength (661 nm) in for everything from 650 to 830 nm, and the light alpenglow is made of lives there: the sun 1° below
+  the horizon from 4000 m misses dense integration by 1.08 ΔE₇₆, at −1.5° by 2.6, at −1.8° by 6.8, and grass lit by light already
+  bounced off grass by 1.3 (`vista-log/M1.12a.md`; ΔE₇₆ at the luminance of white). Decide how to cover the red end here, with
+  snow's spectrum and the alpenglow sheet in hand, not before. What a throwaway comparison on `QuadratureCheck`'s spectra
+  measured (2026-10-23; to be redone on this slice's own check):
+  - *More equal wavelengths:* 64 bins take −1.8° to 5.6, 100 to 3.8 (twice-bounced grass 1.13): a weak return, and costly, since the
+    atmosphere's per-wavelength LUTs grow in proportion, a pixel needs that many samples to complete a cycle, and the shader's
+    50 and its companion stride of 12 change.
+  - *The same 50, more of them in the red tail* (46 bins of equal mass to 650 nm and 4 sharing the tail, the last at 682 nm): −1° 0.36,
+    −1.5° 0.81, −1.8° 2.3, twice-bounced grass 0.86, the sun at air mass 20 0.31; a flat spectrum still exact, a Rayleigh sky
+    0.35 (from 0.08), no cost per sample. A three-quarter last bin, the patch M1.12a named, only gets −1° to 0.92 and −1.8° to 6.1.
+  - *A table tuned to the scene's light:* exact for that light, but one table serves every path in a frame, and a table tuned to
+    deep twilight keeps no wavelength under 530 nm: the blue sky beside the alpenglow then misses by 180 ΔE₇₆ (tuned to the sun at
+    air mass 20, by 41). Unusable as one table per render. Per path it is spectral importance sampling (each path draws its hero
+    wavelength by the light it sees and weighs it by that probability): unbiased, but noisier and a change to the integrator.
+  - *One fixed table tuned to a blend* (half white light, half the −1.5° twilight sun, by colour-matching mass): every case within
+    0.62, −1.8° included; a flat spectrum 0.13 off (no longer exact), a Rayleigh sky 0.39.
+  The red-tail split and the blend are the candidates; choose between them on spectra that were not used to tune them (this
+  slice's snow, the alpenglow sheet's light), so the table is not fitted to its own test.
 - *Verify:* CI: the placement rules; the snowline default moving with each place's precipitation. 3070:
   a glacier valley's cross-section measured U-shaped (its floor's width at half depth against the
   incised V's); **bare steep faces**, because on the test views the snow
@@ -1407,7 +1427,9 @@ Log: [`vista-log/M1.12a.md`](vista-log/M1.12a.md).
   recorded here while ledges and gullies hold snow. **Alpenglow**, because a dawn sheet from −4° to
   +4° shows the peaks pink and red while the valley is in shadow, with no code that knows about
   alpenglow. A season sheet moves the snowline from the defaults alone. CI: M1.12a's twilight check
-  re-run with the snow spectrum in place of its flat stand-in, within 1 ΔE₇₆ of dense integration.
+  re-run with the snow spectrum in place of its flat stand-in, within 1 ΔE₇₆ of dense integration, and
+  the check grown by the deeper twilight (the sun at −1.5° and −1.8°) and twice-bounced grass; the
+  red end's table (the attention point above) chosen and its before/after on the alpenglow sheet.
   The brown "stony ground above the grass line" (M1.12's soil), which dominates some views and reads
   as desert (seed 42 in `m1-12-ids.png`), is judged again once snow covers the high ground, before
   any retuning of the soil rule.
@@ -1628,8 +1650,8 @@ style.
   per sample. The hero table is the maze's too (§9.2), so M1.12a gives Vista its own, gated, before snow, ice and water (M1.13, M3)
   and the M1.17 look; the maze keeps the cast (the engine's `plan.md` could take the same fix). *Done (M1.12a):* every checked
   spectrum within 0.93 ΔE₇₆ at the luminance of white but **light past 650 nm**: the twilight light on snow misses by 1.08, since one
-  wavelength (661 nm) stands for the whole last bin; a last bin of three quarters of a bin's mass takes it to 0.92 if M1.13's snow
-  or the alpenglow needs it (`vista-log/M1.12a.md`).
+  wavelength (661 nm) stands for the whole last bin, and deeper twilight misses by more (−1.8°: 6.8). How to cover the red end
+  (more of the 50 in the tail, or a table tuned to a blend of white and twilight light) is decided in M1.13, its attention point.
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus
