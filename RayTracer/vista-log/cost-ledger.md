@@ -28,6 +28,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.11d | 0.26 | 3.79 | 2.63 | 5.82 |
 | M1.12 | 0.25 | 5.64 | 4.08 | 8.15 |
 | M1.12a | 0.25 | 5.63 | 4.08 | 8.17 |
+| M1.12b | 0.25 | 5.87 | 4.32 | 8.65 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -116,3 +117,10 @@ are the same. Measured as M1.12 was: this slice and `main` (3f75fcff) rendered a
 with other programs: median ratios 1.012, 0.998, 0.999 and 1.003 (1.001–1.154, 0.995–1.008, 0.961–1.001, 0.855–1.004; the first
 round's spread was the other load settling), at the same rays per sample (1.00, 3.03, 2.60, 3.62). The row is M1.12's times those
 medians: no change beyond the noise.
+M1.12b adds the forest to the ground's rules: a third noise per hit (the forest's 250 m stands and clearings), the forest's rule
+and, where it grows, its colour, its tone of stands and its canopy's kernels at every light the surface samples. Measured as M1.12a
+was: this slice and `main` (51b32b06) rendered alternately, view by view, three rounds, on a GPU shared with other programs (desktop
+programs only, 20% busy): median ratios 0.999, 1.043, 1.059 and 1.059 (0.976–1.034, 1.030–1.055, 1.044–1.059, 1.037–1.074), at the
+same rays per sample (1.00, 3.03, 2.60, 3.62). The row is M1.12a's times those medians. These views, at Zermatt's valley floor, hold
+little forest (3% of the world), so the 4–6% is mostly the third noise and the larger surface every hit pays; `--forest off` skips the
+noise (not timed). Measured before the forest's thresholds were tuned (vista-log/M1.12b.md), which moved only constants.

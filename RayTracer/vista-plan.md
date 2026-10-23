@@ -9,8 +9,8 @@ twenty-five slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astrono
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
-rule) and M1.12a (the colour quadrature) are done, M1.12b (forest as material) is next, then
-M1.13 (snow and glaciers). It sits
+rule), M1.12a (the colour quadrature) and M1.12b (forest as material) are done, and M1.13 (snow and glaciers) is next, after the
+user's call on where the world sits against the place's altitude (§11). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -350,6 +350,15 @@ What makes snow-capped mountains read as real is **where the snow sticks**:
   instances (static, sphere, dynamic parts), so mass instancing is new work.
 - **Distant forests** may need impostors or a volumetric canopy representation — a
   measured decision in M5.
+- **Forest as a material (built in M1.12b):** before any tree exists, forest is a material of the ground's rules
+  (`MaterialRules`): below the place's tree line (its warmest month at 10 °C along the lapse rate, Körner and Paulsen 2004;
+  Zermatt 2276 m, 100 m lower on a poleward face, ragged by the breakup noise), on slopes under 38–48° (past where grass thins
+  out), where no water stands, and away from the clearings a 250 m noise opens, a few more of them on dry spurs and fewer in moist
+  hollows (the drainage's upstream area). Its spectrum is a conifer canopy's as a whole (a few percent in the visible, a small green peak, tier 5), shaded by MODIS's
+  kernel-driven BRDF (RossThick volume scattering and LiSparse-Reciprocal crowns casting shadows on the gaps, normalised to the
+  spectrum's white-sky albedo) or, with `--canopy rough`, as very rough diffuse ground. Its crowns are a detail kind of the mesh
+  (domes 8 m apart and 2 m high, bounded only where forest grows), so a forested ridge bumps the skyline; below them the shading
+  adds the branches' texture and a 40 m tone of stands. M5's trees replace it near the camera and keep it beyond.
 
 ### 4.7 Props
 
@@ -1381,6 +1390,22 @@ Log: [`vista-log/M1.12a.md`](vista-log/M1.12a.md).
   photos, judged on how forest and open ground relate rather than on the phone's colours; a 4K loupe
   of a forest edge on a ridge; a cost-ledger row.
 
+*Status (2026-10-23): done.* Forest grows below the place's tree line (its warmest month at 10 °C: Zermatt 2276 m) as a material of
+the ground's rules, on slopes under 38–48°, away from standing water and from the clearings its own noise opens, taking only the
+open ground; its spectrum is a conifer canopy's as a whole, shaded by MODIS's kernel-driven BRDF (`--canopy kernels|rough`: 3–5%
+brighter than very rough diffuse on the forest), and its crowns are a detail kind of the mesh (domes 8 m apart, 2 m high, bounded only
+where forest grows: the largest 4K view 38.2 M triangles). `--forest off` renders `main` byte for byte, meshes included. **Seed 42's
+world sits high:** its lowest ground stands 391 m above Zermatt's valley floor, so only 3.2% of it lies below the tree line and the
+committed views barely change (`m1-12b-views.png`); with the world's base at 1000 m a third of it is forest (`m1-12b-maps.png`,
+`m1-12b-low.png`), and the over-forest view reads like the user's April photo (`m1-12b-photo.png`). Where the world should sit is the
+user's call (§11). A sample costs 4–6% more on the ground (the cost ledger). *Judge this:* the forest where it shows, against the
+photo (`m1-12b-photo.png`, bottom) and in the low world (`m1-12b-low.png`, right): dark rough lower slopes under pale open ground;
+the forested crest's skyline in `m1-12b-loupe.png`. *Ignore this:* no snow (M1.13); rounded bumps, not trees, close up (M5); one
+conifer forest in July (later); warm greys and saturated greens (M1.17); forested valley floors where real ones are farmland.
+*Questions:* does the bottom cell's forest read like the dark lower slopes in the photo, or too dark, blue or patchy? Does the
+forest's upper edge sit where you would expect, ragged rather than a contour line? Does the crest read as trees on a skyline or as a
+dark carpet? And should the world's lowest valleys sit at the place's valley floor? Log: [`vista-log/M1.12b.md`](vista-log/M1.12b.md).
+
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
 - *Deliverable:* snow cover from slope (shed above ~35–40°), aspect (poleward faces keep more,
@@ -1652,6 +1677,13 @@ style.
   spectrum within 0.93 ΔE₇₆ at the luminance of white but **light past 650 nm**: the twilight light on snow misses by 1.08, since one
   wavelength (661 nm) stands for the whole last bin, and deeper twilight misses by more (−1.8°: 6.8). How to cover the red end
   (more of the 50 in the tail, or a table tuned to a blend of white and twilight light) is decided in M1.13, its attention point.
+- **Where the world sits against the place's climate (found in M1.12b, open).** Height 0 of the world is the place's valley floor
+  (Zermatt 1608 m), but since M1.11d's uplift the eroded seed-42 world's lowest ground stands 391 m above it and its peaks 2387 m:
+  at Zermatt the valleys lie near 2000 m, above most of the real valley's forest. So M1.12b's forest covers 3.2% of that world at
+  the valley floor's altitude, and 9.5%, 20.4%, 34.5% and 42.9% with the base at 1400, 1200, 1000 and 800 m (the Swiss Alps are
+  about 30% forest). The grass line, the snowline and the freezing level are read against the same altitudes. Whether the world's
+  floor should meet the place's valley floor (anchoring its lowest valleys, not its height 0, to the base altitude) is the user's
+  call; until then M1.12b's sheets show both.
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus
@@ -1662,7 +1694,10 @@ style.
 - **Detail near the camera costs triangles.** M1.12's rock crests and scree stones raised a 4K mesh standing on the ground from
   7–13 M triangles to 14–24 M (`vista-log/M1.12.md`), with the bound already taken per region (a vertex below the grid takes only the
   kinds around it): sharp detail's bound shrinks only linearly with an edge. Below 2 m the shading carries the roughness instead; finer
-  crests or stones in the mesh took the default view to 72 M, past the 48 M one acceleration structure takes here.
+  crests or stones in the mesh took the default view to 72 M, past the 48 M one acceleration structure takes here. M1.12b's crowns
+  cover far more ground than rock or scree near the camera: pointed crowns 3.6 m high took a forested crest 2 km off at 4K to 78 M
+  (35 M without forest); domes 2 m high, bounded only where forest grows, take it to 38 M (`vista-log/M1.12b.md`). Taller crowns
+  (M5) need trees as instances, not detail.
 - **8 GB VRAM** limits forest density; instancing, procedural materials and measured LOD
   decisions are the levers.
 - **Render times are unknown beyond M0.** Bare M0 terrain costs 0.24–1.4 ns per pixel-sample
