@@ -5,12 +5,12 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-five slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-six slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
-rule), M1.12a (the colour quadrature) and M1.12b (forest as material) are done, and M1.13 (snow and glaciers) is next, after the
-user's call on where the world sits against the place's altitude (§11). It sits
+rule), M1.12a (the colour quadrature) and M1.12b (forest as material) are done; M1.12c (the world anchored to the place's
+valley floor, and folded strata) is next, then M1.13 (snow and glaciers). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -828,7 +828,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Twenty-five slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-six slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -873,6 +873,13 @@ layers in front of it." It is also physics: haze is densest in the lowest air, a
 mornings an inversion traps it under a lid (the white band with a crisp top in the user's photos
 over the Alps). A layer that depends on altitude alone fits the atmosphere's existing tables, so it
 comes long before M4's volumes, and M1.14 judges compositions with it available.
+
+*Added 2026-10-23, after a review of the M1.12a–M1.12b sheets (agreed with the user):* **M1.12c — The
+world's footing and folded strata**, before the snow. The user's call on where the world sits (§11):
+its lowest valleys meet the place's valley floor, so the tree line, grass line, snowline and freezing
+level read against true altitudes. And the photo sheet (`m1-12b-photo.png`) shows M1.11d's strata as
+contour lines: every hill ringed by level benches like a topographic map, the most artificial thing
+beside the user's photo. Both change the world itself, so they land before the snow is tuned on it.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1406,6 +1413,36 @@ conifer forest in July (later); warm greys and saturated greens (M1.17); foreste
 forest's upper edge sit where you would expect, ragged rather than a contour line? Does the crest read as trees on a skyline or as a
 dark carpet? And should the world's lowest valleys sit at the place's valley floor? Log: [`vista-log/M1.12b.md`](vista-log/M1.12b.md).
 
+**M1.12c — The world's footing and folded strata.**
+- *Goal:* a world that stands at the place's real altitudes, and rock layers that read as geology,
+  not as contour lines, before the snow (M1.13) is tuned on it.
+- *Why (the review of 2026-10-23):* **footing:** height 0 is the place's valley floor, but the eroded
+  seed-42 world's lowest ground stands 391 m above it, so at Zermatt its valleys lie near 2000 m and
+  only 3.2% of it falls below the tree line (§11). **Strata:** M1.11d's hard and soft bands follow
+  altitude, so they make level benches around every hill at the same heights; beside the user's photo
+  (`m1-12b-photo.png`, and the aerial and layered-ridges cells of `m1-12b-low.png`) they read as a
+  topographic map's contour lines or rice terraces. Real alpine strata are tilted and folded, vary in
+  thickness, break off, and are absent in crystalline massifs.
+- *Deliverable:* **the world anchored to the place's valley floor:** the default base altitude puts
+  a low percentile of the eroded ground (the 5th, so a single pit cannot move the world) at the
+  place's valley floor (Zermatt 1608 m, which would put seed 42's peaks near 3600 m); the altitude
+  slider's auto value becomes this anchor, a pinned altitude stays pinned, and the sidecar records
+  the anchor and the percentile's height. **Folded strata:** the hardness field becomes a field in
+  three dimensions, its bedding planes tilted (a dip and a strike per region), folded (a gentle
+  long-wavelength fold, warped), with uneven bed thickness, and faded out over regions (a seeded mask
+  of where the rock is layered and where it is massive). The incision, the GPU erosion and M1.12's
+  rock bands read the new field, so cliffs, ledges and material bands still line up, now across the
+  contours instead of along them. Its dip, fold and fade ranges are chosen by sheet.
+- *Verify:* CI: the anchor (the 5th percentile at the valley floor for any seed; a pinned altitude
+  untouched; deterministic); the strata field (a pure function of seed and position; dip and fold
+  within their ranges; the mask's share). 3070, before and after on four seeds: **the contour-line
+  measure**, the share of ledge length (lines of high curvature on rock) that runs within 10° of the
+  local contour, which level benches drive toward one and folded strata pull down, its target recorded
+  here; the forest's, grass's and rock's shares at the anchored altitude against M1.12b's
+  1000 m-base figures (the Swiss Alps are about 30% forest); the photo sheet redone beside the user's
+  April photo; M1.11d's drainage numbers and facet measure holding; the world bit-identical twice and
+  through the cache, the self-test's driver check re-baselined deliberately; a cost-ledger row.
+
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
 - *Deliverable:* snow cover from slope (shed above ~35–40°), aspect (poleward faces keep more,
@@ -1513,6 +1550,10 @@ dark carpet? And should the world's lowest valleys sit at the place's valley flo
   seeds × both set pieces against the default camera, every pick's near ground under the recorded
   share and its focal length recorded; the picks beside the user's paintings in a sheet, judged on
   composition rather than on colour or style; the same pick twice; the scoring time recorded.
+  **Triangle headroom:** each pick's 4K mesh triangle count recorded with its focal length (M1.12b's
+  largest 4K view is 38.2 M against the 48 M one acceleration structure takes); a candidate whose
+  final mesh would pass a recorded margin under 48 M is penalised, so a long lens on a busy view
+  cannot reach the ceiling unnoticed.
 
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
@@ -1677,13 +1718,14 @@ style.
   spectrum within 0.93 ΔE₇₆ at the luminance of white but **light past 650 nm**: the twilight light on snow misses by 1.08, since one
   wavelength (661 nm) stands for the whole last bin, and deeper twilight misses by more (−1.8°: 6.8). How to cover the red end
   (more of the 50 in the tail, or a table tuned to a blend of white and twilight light) is decided in M1.13, its attention point.
-- **Where the world sits against the place's climate (found in M1.12b, open).** Height 0 of the world is the place's valley floor
+- **Where the world sits against the place's climate (found in M1.12b; decided 2026-10-23: the
+  world's lowest valleys, its 5th percentile, meet the place's valley floor, built in M1.12c).** Height 0 of the world is the place's valley floor
   (Zermatt 1608 m), but since M1.11d's uplift the eroded seed-42 world's lowest ground stands 391 m above it and its peaks 2387 m:
   at Zermatt the valleys lie near 2000 m, above most of the real valley's forest. So M1.12b's forest covers 3.2% of that world at
   the valley floor's altitude, and 9.5%, 20.4%, 34.5% and 42.9% with the base at 1400, 1200, 1000 and 800 m (the Swiss Alps are
   about 30% forest). The grass line, the snowline and the freezing level are read against the same altitudes. Whether the world's
-  floor should meet the place's valley floor (anchoring its lowest valleys, not its height 0, to the base altitude) is the user's
-  call; until then M1.12b's sheets show both.
+  floor should meet the place's valley floor (anchoring its lowest valleys, not its height 0, to the base altitude) was the user's
+  call: yes, at the ground's 5th percentile, built in M1.12c; M1.12b's sheets show both.
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus
@@ -1781,5 +1823,6 @@ style.
 | Scope | Stills only |
 | Style | Photoreal target; anything else via filters / camera settings |
 | Painterly filter (2026-10-22) | Welcome as later feature creep (an oil look after the user's Bob Ross paintings), but only after photorealism is reached or the user is done pushing it |
+| World footing (2026-10-23) | The world's lowest valleys (the 5th percentile of its eroded ground) meet the place's valley floor, so every altitude rule reads against true altitudes (M1.12c) |
 | Composition (2026-10-22) | The user's own paintings are the composition references for the auto camera: depth layers, a framing mass at one edge, the peak on a third, a leading line, focal length searched, the squint test |
 | M1 strategy (2026-10-19) | All of the sky before the terrain; contact sheets + loupe first, tweak window last; erosion on the GPU, cached per seed with its hash in the sidecar; climate normals hand-entered for M1 (§10, M1 plan) |
