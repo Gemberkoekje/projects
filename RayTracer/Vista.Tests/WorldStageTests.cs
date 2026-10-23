@@ -196,7 +196,7 @@ public sealed class WorldStageTests
         Sidecar rendered = PreviewPipeline.Run(Request(dryRun: false), renderer, eroder: new CountingEroder(), erosionCache: cache);
         ErosionInfo erosion = rendered.World.Erosion!;
         Assert.AreEqual(ErosionSource.Eroded, erosion.Source);
-        Assert.AreEqual(18, rendered.Schema);
+        Assert.AreEqual(19, rendered.Schema);
         Assert.AreEqual(renderer.Scene!.Terrain.ContentHash().ToString("x16"), rendered.World.HeightFieldHash, "the sidecar hashes the eroded surface");
         Assert.AreNotEqual(erosion.BaseHeightFieldHash, rendered.World.HeightFieldHash);
         Assert.AreEqual(0, rendered.Warnings.Count);

@@ -16,12 +16,18 @@
 // Rough diffuse reflection
 // (Oren–Nayar in Fujii's form) is ρ·A·(1 + σ·s/t): per material A = 1/(1 + (1/2 − 2/(3π))·σ) folds into the reflectance it is
 // shaded with, σ·A into the backscatter's; Lambert is σ = 0.
+//
+// Forest (M1.12b) takes the open ground below the tree line, on slopes trees hold to, away from standing water and from the clearings
+// its own noise opens (more on dry ridges, fewer in moist hollows). Its canopy is shaded by the kernels of MODIS's BRDF
+// (CanopyKernels): ρ_iso·(1 + kv·K_vol + kg·K_geo), the needles' volume scattering and the crowns' shadows on the gaps between them,
+// with ρ_iso the spectrum scaled so the albedo under a white sky is the spectrum's; or (--canopy rough) as rough diffuse ground.
 
 #define MAT_ROCK_HARD 0u
 #define MAT_ROCK_SOFT 1u
 #define MAT_SCREE     2u
 #define MAT_SOIL      3u
 #define MAT_GRASS     4u
+#define MAT_FOREST    5u
 
 StructuredBuffer<uint2>  MaterialMap : register(t22); // MaterialField.Packed: the bed-table offset's bits; loose, area, wet, mottle codes
 StructuredBuffer<float4> BedTable    : register(t23); // MaterialField.Beds: hardness, tint u, tint v, 0 per entry
@@ -44,6 +50,11 @@ cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
     float MatRoughRock;       float MatRoughScree;       float MatRoughSoil;       float MatRoughGrass;
     int   MatCamCellX;        int   MatCamCellZ;         float MatCamFracX;        float MatCamFracZ;
     float MatStoneTilt;       float MatStoneGap;         float MatPad6;            float MatPad7;
+    float MatTreeLine;        float MatTreeBand;         float MatTreeAspectShift; float MatTreeNoise;
+    float MatTreeEdge;        float MatTreeSlopeFrom;    float MatTreeSlopeTo;     float MatBreakup3;
+    float MatClearingFrom;    float MatClearingTo;       float MatMoistLogFrom;    float MatMoistLogTo;
+    float MatMoistShift;      uint  MatForest;           uint  MatCanopy;          float MatRoughCanopy;
+    float MatCanopyVolume;    float MatCanopyGeometric;  float MatCanopyIso;       float MatPad8;
 };
 
 // HLSL's smoothstep is not defined for a falling edge, which the rules use; this is MaterialRules.SmoothStep.
@@ -194,10 +205,11 @@ struct MatWeights
     float Grass;
     float Wet;
     float Stony;
+    float Forest;
 };
 
 MatWeights MaterialWeightsOf(float slope, float poleward, float altitude, float loose, float log10Area, float waterDepth, float hardness,
-    float b1, float b2)
+    float b1, float b2, float b3)
 {
     MatWeights w;
     float cover = MatSmoothStep(MatCoverFrom, MatCoverTo, loose);
@@ -211,17 +223,30 @@ MatWeights MaterialWeightsOf(float slope, float poleward, float altitude, float 
     float talus = MatSmoothStep(MatScreeSlopeFrom, MatScreeSlopeTo, slope + MatSlopeNoise * b2);
     float scree = rest * cover * max(talus, channel);
     float ground = rest - scree;
+    float pond = MatSmoothStep(MatWetDepthFrom, MatWetDepthTo, waterDepth);
+    float forest = 0.0;
+    if (MatForest != 0u)
+    {
+        float treeAt = MatTreeLine - MatTreeAspectShift * poleward + MatTreeNoise * b1 + MatTreeEdge * b2;
+        float below = 1.0 - MatSmoothStep(treeAt - MatTreeBand, treeAt + MatTreeBand, altitude);
+        float gentle = 1.0 - MatSmoothStep(MatTreeSlopeFrom, MatTreeSlopeTo, slope);
+        float moist = MatSmoothStep(MatMoistLogFrom, MatMoistLogTo, log10Area);
+        float stand = MatSmoothStep(MatClearingFrom, MatClearingTo, b3 + MatMoistShift * (moist - 0.5));
+        forest = ground * (below * gentle * stand * (1.0 - pond));
+    }
+    float open = ground - forest;
     float limit = MatGrassLine - MatAspectShift * poleward + MatGrassNoise * b1;
     float high = MatSmoothStep(limit - MatGrassBand, limit + MatGrassBand, altitude);
     float tooSteep = MatSmoothStep(MatGrassSlopeFrom, MatGrassSlopeTo, slope);
     float bare = MatSmoothStep(MatBareFrom, MatBareTo, b2);
-    float grass = ground * ((1.0 - high) * (1.0 - tooSteep) * (1.0 - bare));
+    float grass = open * ((1.0 - high) * (1.0 - tooSteep) * (1.0 - bare));
     w.Rock = rock;
     w.Scree = scree;
-    w.Soil = ground - grass;
+    w.Soil = open - grass;
     w.Grass = grass;
-    w.Wet = max(channel * (1.0 - steep), MatSmoothStep(MatWetDepthFrom, MatWetDepthTo, waterDepth) * (1.0 - talus));
+    w.Wet = max(channel * (1.0 - steep), pond * (1.0 - talus));
     w.Stony = max(high, tooSteep);
+    w.Forest = forest;
     return w;
 }
 
@@ -245,16 +270,18 @@ MatWeights MaterialWeightsAt(float2 world, float height, float3 normal, out MatS
     slope = acos(min(normal.y, 1.0)) * (180.0 / PI);
     float b1 = MaterialNoise(MatNoiseSeed, world.x / MatBreakup1, world.y / MatBreakup1);
     float b2 = MaterialNoise(PcgHash(MatNoiseSeed ^ 0x9E3779B9u), world.x / MatBreakup2, world.y / MatBreakup2);
+    float b3 = MatForest != 0u ? MaterialNoise(PcgHash(MatNoiseSeed ^ 0x7F4A7C15u), world.x / MatBreakup3, world.y / MatBreakup3) : 0.0;
     s = MaterialSampleAt(world, height);
-    return MaterialWeightsOf(slope, normal.z * MatPoleward, GroundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2);
+    return MaterialWeightsOf(slope, normal.z * MatPoleward, GroundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3);
 }
 
 // ── The surface at a hit ───────────────────────────────────────────────────────────────────────────
 
 struct GroundSurface
 {
-    float4 Refl;   // π × the diffuse part of the BRDF, per companion wavelength (ρ·A)
+    float4 Refl;   // π × the diffuse part of the BRDF, per companion wavelength (ρ·A; the canopy's ρ_iso)
     float4 Back;   // π × the backscatter's coefficient (ρ·A·σ); 0 for Lambert
+    float4 Canopy; // π × the canopy kernels' coefficient (ρ_iso, by the forest's weight); 0 without them
     float3 Albedo; // linear-sRGB albedo, for the albedo output
     float3 Normal; // the shading normal, with the bump on a path's first surface
     uint   Id;     // the material with the largest weight
@@ -346,7 +373,7 @@ float3 MaterialBump(float3 ns, float3 wo, float2 o, float height, MatWeights w, 
         float fade = MatSmoothStep(2.0 * footprint, 4.0 * footprint, wavelength);
         if (fade <= 0.0)
             continue;
-        float smooth = smoothRough + (k < 2u ? w.Grass * MatRoughGrass : 0.0);
+        float smooth = smoothRough + (k < 2u ? w.Grass * MatRoughGrass : w.Forest * MatRoughCanopy);
         uint seed = PcgHash(MatNoiseSeed ^ (0xB0B0u + k));
         int bx, bz;
         float lx, lz;
@@ -412,6 +439,28 @@ float OrenNayarG(float3 n, float3 wi, float3 wo)
     return s > 0.0 ? s / max(max(ni, no), 1.0e-4) : s;
 }
 
+// The canopy's kernels for light from `wi` seen along `wo` about `n` (vista-plan §10 M1.12b; Wanner, Li and Strahler 1995; Lucht,
+// Schaaf and Strahler 2000): kv·K_vol + kg·K_geo, RossThick's volume scattering and LiSparse-Reciprocal's crowns (height over width
+// h/b = 2, round b/r = 1), so the factor on ρ_iso is one more than this, and never below 0 (looking into the shadowed side of the
+// crowns toward a low sun). Both zeniths are held within 70°, where MODIS fits them; beyond it the kernels run away.
+float CanopyKernels(float3 n, float3 wi, float3 wo)
+{
+    float ci = max(dot(n, wi), 0.342), cv = max(dot(n, wo), 0.342);
+    float cosXi = clamp(dot(wi, wo), -1.0, 1.0);
+    float xi = acos(cosXi);
+    float vol = ((0.5 * PI - xi) * cosXi + sin(xi)) / (ci + cv) - 0.25 * PI;
+    float secI = 1.0 / ci, secV = 1.0 / cv;
+    float ti2 = secI * secI - 1.0, tv2 = secV * secV - 1.0;
+    float ttCos = (cosXi - ci * cv) * (secI * secV);           // tan θi · tan θv · cos φ
+    float d2 = max(ti2 + tv2 - 2.0 * ttCos, 0.0);
+    float cross2 = max(ti2 * tv2 - ttCos * ttCos, 0.0);         // (tan θi · tan θv · sin φ)²
+    float cosT = min(2.0 * sqrt(d2 + cross2) / (secI + secV), 1.0);
+    float t = acos(cosT);
+    float overlap = (t - sin(t) * cosT) * (secI + secV) * (1.0 / PI);
+    float geo = overlap - secI - secV + 0.5 * (1.0 + cosXi) * secI * secV;
+    return max(MatCanopyVolume * vol + MatCanopyGeometric * geo, -1.0);
+}
+
 // The ground at frame point `p` with shading normal `ns`, seen along `wo` (toward the ray's origin), for the companion wavelengths
 // `idx`; a camera hit passes the metres its pixel covers there as `footprint` (the bump and the laminae's steps), any later surface
 // 0 (none).
@@ -430,15 +479,28 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     float2 offset = WorldOffset(p);
     float fine = MaterialNoise(PcgHash(MatNoiseSeed ^ 0xED6Eu), world.x / 2.5, world.y / 2.5)
                + 0.5 * MaterialNoise(PcgHash(MatNoiseSeed ^ 0xED6Fu), world.x / 0.6, world.y / 0.6);
+    // The forest's edge breaks into crowns (a 4 m noise pushes it against the open ground), and its stands differ in tone (a 40 m
+    // noise, ±25%: denser and sparser, older and younger), which is the texture a forest shows from afar.
+    float forestSharp = 0.0, forestTone = 1.0;
+    if (w.Forest > 0.0)
+    {
+        float crown = MaterialNoise(PcgHash(MatNoiseSeed ^ 0xF0E5u), world.x / 4.0, world.y / 4.0);
+        forestSharp = max(w.Forest * (1.0 + 0.6 * crown), 0.0);
+        forestSharp *= forestSharp * forestSharp;
+        forestSharp *= forestSharp;
+        forestTone = 1.0 + 0.25 * MaterialNoise(PcgHash(MatNoiseSeed ^ 0xF0E6u), world.x / 40.0, world.y / 40.0);
+    }
     float4 sharp = float4(w.Rock * (1.0 + 0.5 * fine), w.Scree * (1.0 - 0.5 * fine), w.Soil * (1.0 - 0.3 * fine), w.Grass * (1.0 - 0.5 * fine));
     sharp = max(sharp, 0.0);
     sharp *= sharp * sharp;
     sharp *= sharp;
-    sharp /= max(sharp.x + sharp.y + sharp.z + sharp.w, 1.0e-12);
+    float total = max(sharp.x + sharp.y + sharp.z + sharp.w + forestSharp, 1.0e-12);
+    sharp /= total;
     w.Rock = sharp.x;
     w.Scree = sharp.y;
     w.Soil = sharp.z;
     w.Grass = sharp.w;
+    w.Forest = forestSharp / total;
     float dryGrass = 0.4 * MatSmoothStep(-0.1, 0.7, MaterialNoise(PcgHash(MatNoiseSeed ^ 0xD27u), world.x / 7.0, world.y / 7.0));
 
     // The rock of the bed the hit cuts: soft mixed into hard by its hardness, tinted by the bed, each lamina (thicker or thinner by
@@ -466,23 +528,40 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     float soilA = lerp(aSoil, aScree, stony), soilB = lerp(aSoil * sSoil, aScree * sScree, stony);
     g.Refl = saturate((w.Rock * rockA + w.Scree * aScree * scree + w.Soil * soilA * soil + w.Grass * aGrass * grass) * dry);
     g.Back = saturate((w.Rock * rockB + w.Scree * (aScree * sScree) * scree + w.Soil * soilB * soil + w.Grass * (aGrass * sGrass) * grass) * dry);
+    g.Canopy = 0.0;
 
     float3 rockRgb = lerp(MaterialAlbedo[MAT_ROCK_SOFT].xyz, MaterialAlbedo[MAT_ROCK_HARD].xyz, hs) * bright;
     float3 soilRgb = lerp(MaterialAlbedo[MAT_SOIL].xyz, MaterialAlbedo[MAT_SCREE].xyz, stony);
     float3 grassRgb = lerp(MaterialAlbedo[MAT_GRASS].xyz, MaterialAlbedo[MAT_SOIL].xyz * 1.4, dryGrass);
     g.Albedo = (w.Rock * rockRgb + w.Scree * MaterialAlbedo[MAT_SCREE].xyz + w.Soil * soilRgb + w.Grass * grassRgb) * dry;
 
+    // The forest: by the canopy's kernels, its isotropic part ρ_iso in Refl and the same in Canopy for the kernels; or as rough
+    // diffuse ground at its own roughness (and as Lambert's under --diffuse lambert, where ρ_iso would only brighten it).
+    if (w.Forest > 0.0)
+    {
+        float4 forest = MaterialReflectance(MAT_FOREST, idx) * (forestTone * w.Forest * dry);
+        bool kernels = MatDiffuse != 0u && MatCanopy != 0u;
+        float sForest;
+        float aForest = MatRoughA(MAT_FOREST, sForest);
+        g.Refl = saturate(g.Refl + forest * (kernels ? MatCanopyIso : aForest));
+        g.Back = saturate(g.Back + forest * (kernels ? 0.0 : aForest * sForest));
+        g.Canopy = kernels ? saturate(forest * MatCanopyIso) : 0.0;
+        g.Albedo += MaterialAlbedo[MAT_FOREST].xyz * (forestTone * w.Forest * dry);
+    }
+
     float gaps = 1.0;
     g.Normal = footprint > 0.0 ? MaterialBump(ns, wo, offset, height, w, hs, lamina, laminaMetres, footprint, gaps) : ns;
     g.Refl *= gaps;
     g.Back *= gaps;
+    g.Canopy *= gaps;
     g.Albedo *= gaps;
 
     uint id = s.Hardness >= 0.5 ? MAT_ROCK_HARD : MAT_ROCK_SOFT;
     float best = w.Rock;
     if (w.Scree > best) { best = w.Scree; id = MAT_SCREE; }
     if (w.Soil > best) { best = w.Soil; id = MAT_SOIL; }
-    if (w.Grass > best) { id = MAT_GRASS; }
+    if (w.Grass > best) { best = w.Grass; id = MAT_GRASS; }
+    if (w.Forest > best) { id = MAT_FOREST; }
     g.Id = id;
     return g;
 }

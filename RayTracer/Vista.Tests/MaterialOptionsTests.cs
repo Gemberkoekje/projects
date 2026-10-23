@@ -98,10 +98,10 @@ public sealed class MaterialOptionsTests
             Erosion = false,
         };
         Sidecar rule = PreviewPipeline.Run(request, new FakeRenderer());
-        Assert.AreEqual(18, rule.Schema);
+        Assert.AreEqual(19, rule.Schema);
         MaterialsInfo materials = rule.Materials!;
         Assert.IsTrue(materials.ByRule);
-        CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass" }, materials.Table.Select(m => m.Key).ToArray());
+        CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass", "forest" }, materials.Table.Select(m => m.Key).ToArray());
         Assert.AreEqual(2892.0, materials.GrassLineMetres!.Value, 1.0, "Zermatt's, the default place");
         StringAssert.Contains(materials.GrassLineFrom, "Zermatt");
         Assert.AreEqual(1, materials.Poleward);
@@ -110,6 +110,12 @@ public sealed class MaterialOptionsTests
         Assert.AreEqual(DiffuseModel.OrenNayar, rule.Image.Diffuse);
         Assert.IsTrue(rule.World.Mesh!.Materials);
         Assert.IsNull(materials.Shares, "only a dry run measures the shares");
+        // The forest (M1.12b): below Zermatt's tree line, its canopy by the kernels, its crowns in the mesh.
+        Assert.IsTrue(materials.Forest);
+        Assert.AreEqual(2276.0, materials.TreeLineMetres!.Value, 1.0, "July's 14.15 °C at 1638 m, 10 °C 638 m higher");
+        StringAssert.Contains(materials.TreeLineFrom, "Zermatt");
+        Assert.AreEqual(CanopyModel.Kernels, rule.Image.Canopy);
+        Assert.AreEqual(new CanopyDetail(0).MaxAmplitude, materials.Detail.CanopyAmplitudeMetres);
 
         Sidecar off = PreviewPipeline.Run(request with { Mesh = new MeshSettings { Materials = false }, Diffuse = DiffuseModel.Lambert }, new FakeRenderer());
         Assert.IsFalse(off.Materials!.ByRule);
@@ -117,9 +123,18 @@ public sealed class MaterialOptionsTests
         Assert.IsFalse(off.World.Mesh!.Materials);
         Assert.AreEqual(DiffuseModel.Lambert, off.Image.Diffuse);
 
+        Sidecar bare = PreviewPipeline.Run(request with { Forest = false, Canopy = CanopyModel.Rough }, new FakeRenderer());
+        Assert.IsFalse(bare.Materials!.Forest);
+        Assert.AreEqual(0.0, bare.Materials.Detail!.CanopyAmplitudeMetres, "no crowns without forest");
+        Assert.AreEqual(CanopyModel.Rough, bare.Image.Canopy);
+
         Sidecar dry = PreviewPipeline.Run(request with { DryRun = true }, renderer: null);
         MaterialShares shares = dry.Materials!.Shares!;
-        Assert.AreEqual(1.0, shares.RockHard + shares.RockSoft + shares.Scree + shares.Soil + shares.Grass, 1e-6);
+        Assert.AreEqual(1.0, shares.RockHard + shares.RockSoft + shares.Scree + shares.Soil + shares.Grass + shares.Forest, 1e-6);
+        MaterialShares noForest = PreviewPipeline.Run(request with { DryRun = true, Forest = false }, renderer: null).Materials!.Shares!;
+        Assert.AreEqual(0.0, noForest.Forest);
+        Assert.AreEqual(shares.RockHard + shares.RockSoft + shares.Scree, noForest.RockHard + noForest.RockSoft + noForest.Scree, 1e-9,
+            "the forest takes only the open ground");
     }
 
     [TestMethod]

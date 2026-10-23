@@ -118,7 +118,7 @@ public sealed class QuadratureTests
             Assert.IsTrue(bins.DeltaE76 < 1.0, $"{spectrum.Name}: {bins.DeltaE76:0.00} ΔE76");
             Assert.IsTrue(Math.Abs(bins.LuminanceError) < 0.01, $"{spectrum.Name}: luminance {bins.LuminanceError:P2}");
         }
-        Assert.AreEqual(15, QuadratureCheck.Cases.Count, string.Join(Environment.NewLine, report));
+        Assert.AreEqual(16, QuadratureCheck.Cases.Count, string.Join(Environment.NewLine, report));
     }
 
     [TestMethod]
@@ -205,7 +205,7 @@ public sealed class QuadratureTests
                 Erosion = false,
             };
             Sidecar bins = PreviewPipeline.Run(request, new FakeRenderer());
-            Assert.AreEqual(18, bins.Schema);
+            Assert.AreEqual(19, bins.Schema);
             Assert.AreEqual(Quadrature.Bins, bins.Image.Quadrature);
             Assert.AreEqual(new WavelengthsInfo(50, 413, 661), bins.Image.Wavelengths);
             Sidecar engine = PreviewPipeline.Run(request with { Quadrature = Quadrature.Engine }, new FakeRenderer());

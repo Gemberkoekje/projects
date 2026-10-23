@@ -49,6 +49,10 @@ public static class MaterialNoise
     public static (float B1, float B2) Breakup(uint seed, float x, float z, float wavelength1, float wavelength2) =>
         (Sample(seed, x / wavelength1, z / wavelength1), Sample(Hash(seed ^ 0x9E3779B9u), x / wavelength2, z / wavelength2));
 
+    /// <summary>The forest's breakup value at world <c>(x, z)</c>, m (vista-plan §10 M1.12b): the noise at <paramref name="wavelength"/>, from its own stream.</summary>
+    public static float ForestBreakup(uint seed, float x, float z, float wavelength) =>
+        Sample(Hash(seed ^ 0x7F4A7C15u), x / wavelength, z / wavelength);
+
     private static float Corner(uint seed, int ix, int iy, float dx, float dy)
     {
         uint g = Hash(seed ^ Hash(unchecked((uint)ix) ^ Hash(unchecked((uint)iy)))) >> 29;

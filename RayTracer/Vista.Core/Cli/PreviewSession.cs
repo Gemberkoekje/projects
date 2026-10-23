@@ -126,15 +126,15 @@ public sealed class PreviewSession
         warnings.AddRange(sliders.Hints);
         Almanac almanac = sliders.Almanac;
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.For(request.Mesh.Materials);
-        GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees);
+        GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees) with { Forest = request.Forest };
         AtmosphereModel air = sliders.Air(AtmosphereModel.Default);
         double groundAltitude = sliders.BaseAltitudeMetres;
         string altitudeFrom = sliders.Readings[Slider.Altitude].From;
 
         // The mesh follows the camera's position and the frame (vista-plan §10 M1.9), never the loupe: a loupe is a crop of the
-        // frame's own render.
+        // frame's own render; and the forest's crowns follow the place's tree line and the altitude of the world (M1.12b).
         var meshView = MeshView.For(camera, request.Width, request.Height, air.PlanetRadiusMetres + groundAltitude);
-        TerrainMesh mesh = _worlds.Mesh(meshView, request.Mesh, out bool meshReused);
+        TerrainMesh mesh = _worlds.Mesh(meshView, request.Mesh with { Forest = ForestOf(ground, groundAltitude) }, out bool meshReused);
         stages[PreviewStage.Mesh] = meshReused;
         timings["mesh"] = Lap(stopwatch);
         AtmosphereFrame frame = VistaScene.FrameFor(air, groundAltitude, almanac.Sun, camera, mesh);
@@ -150,6 +150,7 @@ public sealed class PreviewSession
             LightSampling = request.LightSampling,
             RussianRouletteStart = request.RussianRouletteStart,
             Diffuse = request.Diffuse,
+            Canopy = request.Canopy,
         };
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
@@ -351,6 +352,7 @@ public sealed class PreviewSession
                 LightSampling = ImageInfo.LightSamplingOf(settings),
                 RussianRouletteStart = settings.RussianRouletteStart,
                 Diffuse = settings.Diffuse,
+                Canopy = settings.Canopy,
                 Quadrature = request.Quadrature,
                 Wavelengths = WavelengthsInfo.Of(WavelengthTable.For(request.Quadrature)),
                 Display = request.Display,
@@ -488,14 +490,21 @@ public sealed class PreviewSession
         };
     }
 
-    /// <summary>The material constants of a render of <paramref name="field"/> under <paramref name="ground"/>'s grass line and pole.</summary>
+    /// <summary>The material constants of a render of <paramref name="field"/> under <paramref name="ground"/>'s grass line, tree line and pole.</summary>
     private static MaterialConstants MaterialConstantsOf(MaterialField field, GroundCover ground) =>
-        field.Apply(MaterialRules.Default.Constants((float)ground.GrassLineMetres, ground.Poleward, field.NoiseSeed));
+        field.Apply(MaterialRules.Default.Constants((float)ground.GrassLineMetres, ground.Poleward, field.NoiseSeed, (float)ground.TreeLineMetres, ground.Forest));
 
-    /// <summary>The shares of the world grid each material covers, from every sample's weights (schema 17).</summary>
+    /// <summary>
+    /// Where the forest of <paramref name="ground"/> stands on a world whose height 0 lies <paramref name="groundAltitude"/> above sea
+    /// level (vista-plan §10 M1.12b): what the mesh's crowns follow; none with <c>--forest off</c>.
+    /// </summary>
+    public static ForestPlacement ForestOf(GroundCover ground, double groundAltitude) =>
+        ground.Forest ? new ForestPlacement(true, (float)ground.TreeLineMetres, ground.Poleward, (float)groundAltitude) : ForestPlacement.None;
+
+    /// <summary>The shares of the world grid each material covers, from every sample's weights (schema 17; the forest's since schema 19).</summary>
     private static MaterialShares SharesOf(MaterialField field, HeightField terrain, MaterialWeights[] weights)
     {
-        double hard = 0.0, soft = 0.0, scree = 0.0, soil = 0.0, grass = 0.0, wet = 0.0;
+        double hard = 0.0, soft = 0.0, scree = 0.0, soil = 0.0, grass = 0.0, wet = 0.0, forest = 0.0;
         int n = terrain.Size;
         for (int j = 0; j < n; j++)
         {
@@ -510,11 +519,12 @@ public sealed class PreviewSession
                 scree += w.Scree;
                 soil += w.Soil;
                 grass += w.Grass;
+                forest += w.Forest;
                 wet += w.Wet;
             }
         }
         double count = (double)n * n;
-        return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count);
+        return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count) { Forest = forest / count };
     }
 
     /// <summary>
@@ -533,7 +543,11 @@ public sealed class PreviewSession
         {
             var kinds = new MaterialDetail(0, mesh.Materials);
             detail = new MaterialDetailInfo(kinds.Rock.MaxAmplitude, kinds.Scree.MaxAmplitude, kinds.Smooth.MaxAmplitude,
-                mesh.Materials.RockGradient, mesh.Materials.ScreeGradient, mesh.Materials.SmoothGradient);
+                mesh.Materials.RockGradient, mesh.Materials.ScreeGradient, mesh.Materials.SmoothGradient)
+            {
+                CanopyAmplitudeMetres = mesh.Materials.Forest.Grows ? kinds.Canopy.MaxAmplitude : 0.0,
+                CanopyGradientPerMetre = mesh.Materials.CanopyGradient,
+            };
         }
         return new MaterialsInfo
         {
@@ -544,6 +558,10 @@ public sealed class PreviewSession
             GrassLineFrom = string.Create(CultureInfo.InvariantCulture,
                 $"where {climate.Station}'s warmest month averages {Weather.GrassLine.WarmestMonthCelsius:0.#} °C along the lapse rate"),
             Poleward = ground.Poleward,
+            Forest = ground.Forest,
+            TreeLineMetres = ground.TreeLineMetres,
+            TreeLineFrom = string.Create(CultureInfo.InvariantCulture,
+                $"where {climate.Station}'s warmest month averages {Weather.TreeLine.WarmestMonthCelsius:0.#} °C along the lapse rate"),
             Detail = detail,
             Shares = shares,
         };

@@ -44,12 +44,14 @@ namespace Vista.Output;
 /// material covers; <see cref="ImageInfo.Diffuse"/>, how diffuse surfaces scattered; and in <see cref="WorldInfo.Mesh"/>,
 /// whether the detail followed the materials. Schema 18 (M1.12a) added <see cref="ImageInfo.Quadrature"/>, which hero wavelengths
 /// the render traced and how they weighed into colour, and <see cref="ImageInfo.Wavelengths"/>, the table's span; each material's
-/// albedo is now its colour through that quadrature.</para>
+/// albedo is now its colour through that quadrature. Schema 19 (M1.12b) added, in <see cref="Materials"/>, whether forest grows, the
+/// tree line and where it came from, the canopy's detail and, for a dry run, the forest's share; and <see cref="ImageInfo.Canopy"/>,
+/// how the canopy scattered.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 18;
+    public const int CurrentSchema = 19;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -178,6 +180,9 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>How diffuse surfaces scattered (schema 17, vista-plan §10 M1.12).</summary>
     public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
+
+    /// <summary>How the forest's canopy scattered (schema 19, vista-plan §10 M1.12b).</summary>
+    public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
 
     /// <summary>Which hero wavelengths the render traced and how they weighed into colour (schema 18, vista-plan §10 M1.12a).</summary>
     public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
@@ -489,6 +494,15 @@ public sealed record MaterialsInfo
     /// <summary>1 when the pole lies toward +z (north), −1 when toward −z.</summary>
     public int Poleward { get; init; }
 
+    /// <summary>Whether forest grew below the tree line (schema 19, vista-plan §10 M1.12b; <c>--forest off</c>: none).</summary>
+    public bool Forest { get; init; }
+
+    /// <summary>The tree line above sea level, m (schema 19); null without the rules.</summary>
+    public double? TreeLineMetres { get; init; }
+
+    /// <summary>Where the tree line came from (schema 19).</summary>
+    public string? TreeLineFrom { get; init; }
+
     /// <summary>The detail kinds below the grid and how fast their weights change; null without the rules or without detail.</summary>
     public MaterialDetailInfo? Detail { get; init; }
 
@@ -511,7 +525,14 @@ public sealed record MaterialEntry(string Key, DataTier Tier, float Roughness, f
 /// <param name="ScreeGradientPerMetre">The scree's.</param>
 /// <param name="SmoothGradientPerMetre">The smooth detail's.</param>
 public sealed record MaterialDetailInfo(double RockAmplitudeMetres, double ScreeAmplitudeMetres, double SmoothAmplitudeMetres,
-    double RockGradientPerMetre, double ScreeGradientPerMetre, double SmoothGradientPerMetre);
+    double RockGradientPerMetre, double ScreeGradientPerMetre, double SmoothGradientPerMetre)
+{
+    /// <summary>The most the canopy's crowns move a point, m (schema 19); 0 without forest.</summary>
+    public double CanopyAmplitudeMetres { get; init; }
+
+    /// <summary>The steepest the canopy detail's weight changes, per metre (schema 19).</summary>
+    public double CanopyGradientPerMetre { get; init; }
+}
 
 /// <summary>The shares of the world grid's samples each material covers (their weights summed), and the mean wetness.</summary>
 /// <param name="RockHard">Hard rock (rock on beds of hardness 0.5 and up).</param>
@@ -520,4 +541,8 @@ public sealed record MaterialDetailInfo(double RockAmplitudeMetres, double Scree
 /// <param name="Soil">Soil.</param>
 /// <param name="Grass">Grass.</param>
 /// <param name="Wet">The mean wetness.</param>
-public sealed record MaterialShares(double RockHard, double RockSoft, double Scree, double Soil, double Grass, double Wet);
+public sealed record MaterialShares(double RockHard, double RockSoft, double Scree, double Soil, double Grass, double Wet)
+{
+    /// <summary>Forest (schema 19, vista-plan §10 M1.12b).</summary>
+    public double Forest { get; init; }
+}

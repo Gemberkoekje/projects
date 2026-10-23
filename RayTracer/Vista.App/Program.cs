@@ -42,7 +42,7 @@ internal static class Program
             return RunGpu(() => ErosionMeasure.Run(args, Console.Out));
         if (args.FirstOrDefault() == MeshMeasure.Flag)
             return RunGpu(() => MeshMeasure.Run(args, Console.Out));
-        if (args.FirstOrDefault() == DiffuseCompare.Flag)
+        if (args.FirstOrDefault() is DiffuseCompare.Flag or DiffuseCompare.CanopyFlag)
             return RunGpu(() => DiffuseCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == QuadratureCompare.Flag)
             return RunGpu(() => QuadratureCompare.Run(args, Console.Out));

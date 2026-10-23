@@ -75,6 +75,27 @@ public sealed record RenderSettings
     /// behind the camera lights them back toward it; or Lambert's, the same in every direction (every material's roughness 0).
     /// </summary>
     public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
+
+    /// <summary>
+    /// How the forest's canopy scatters (vista-plan §10 M1.12b): by the kernels of a canopy's volume and its crowns' shadows, or as
+    /// rough diffuse ground at the forest's own roughness. Lambert's diffuse (<see cref="Diffuse"/>) shades it as Lambert's too.
+    /// </summary>
+    public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
+}
+
+/// <summary>How the integrator shades the forest's canopy (vista-plan §10 M1.12b).</summary>
+public enum CanopyModel
+{
+    /// <summary>Not chosen.</summary>
+    None,
+    /// <summary>
+    /// The kernel-driven BRDF of MODIS (RossThick–LiSparse-Reciprocal; Wanner, Li and Strahler 1995): the isotropic part, the
+    /// volume scattering of the needles, and the crowns' shadows on the gaps between them, dark looking toward the sun and bright in
+    /// the hot spot with the sun behind the viewer.
+    /// </summary>
+    Kernels,
+    /// <summary>M1.12's rough diffuse surface (<see cref="DiffuseModel.OrenNayar"/>) at the forest's own roughness.</summary>
+    Rough,
 }
 
 /// <summary>How the integrator's diffuse surfaces scatter (vista-plan §10 M1.12).</summary>

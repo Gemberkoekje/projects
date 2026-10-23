@@ -60,6 +60,12 @@ public sealed record MeshSettings
     /// </summary>
     public bool Materials { get; init; } = true;
 
+    /// <summary>
+    /// Where the scene's forest stands (vista-plan §10 M1.12b), for its crowns below the grid and the field the mesh carries; none by
+    /// default. A session sets it from the scene's place and altitude; it counts only with <see cref="Materials"/>.
+    /// </summary>
+    public ForestPlacement Forest { get; init; } = ForestPlacement.None;
+
     /// <summary>Mesh the far field beyond the world grid, out to the horizon.</summary>
     public bool FarField { get; init; } = true;
 

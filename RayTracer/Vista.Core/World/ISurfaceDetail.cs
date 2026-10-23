@@ -35,6 +35,18 @@ public interface ISurfaceDetail
     /// never less in a box than in any box inside it.
     /// </summary>
     double MidpointBoundIn(double length, double[] kindBounds, double x0, double z0, double x1, double z1) => MidpointBound(length);
+
+    /// <summary>
+    /// True when the detail holds a kind that stands only in some places and whose bound the world grid's vertices take only there
+    /// (vista-plan §10 M1.12b: a forest's crowns, <see cref="CanopyIn"/>); false for a detail bounded alike everywhere.
+    /// </summary>
+    bool Regional => false;
+
+    /// <summary>The bound for a segment <paramref name="length"/> metres long anywhere that kind does not lie.</summary>
+    double OpenBound(double length) => MidpointBound(length);
+
+    /// <summary>Whether that kind lies anywhere in the box from world <c>(x0, z0)</c> to <c>(x1, z1)</c>.</summary>
+    bool CanopyIn(double x0, double z0, double x1, double z1) => false;
 }
 
 /// <summary>

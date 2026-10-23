@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 namespace Vista.World;
 
 /// <summary>
-/// Where the ground's materials lie (vista-plan §4.3, §10 M1.12): rock, scree, soil and grass, and how wet the ground is, from
-/// the slope, the altitude, the aspect and the erosion's maps — the loose material it left (the deposition map), the land that
+/// Where the ground's materials lie (vista-plan §4.3, §10 M1.12, M1.12b): rock, scree, soil, grass and forest, and how wet the
+/// ground is, from the slope, the altitude, the aspect and the erosion's maps — the loose material it left (the deposition map), the land that
 /// drains through a place (the flow accumulation) and the water that stood there (the wetness map) — and from the hardness of
 /// the bed the surface cuts (M1.11d's strata), so the bare rock follows the beds that shaped the cliffs. These are the thresholds
 /// in degrees, metres and the hardness's own units; <see cref="Evaluate"/> is the rule, which the shader evaluates per hit
@@ -87,6 +87,57 @@ public sealed record MaterialRules
     /// <summary>The slope above which no grass holds, degrees.</summary>
     public float GrassSlopeToDegrees { get; init; } = 46f;
 
+    /// <summary>
+    /// Half the width of the change from forest to open ground across the tree line, m (vista-plan §10 M1.12b): the forest thins
+    /// into groups and single trees over some 150 m of height before it ends.
+    /// </summary>
+    public float TreeBandMetres { get; init; } = 80f;
+
+    /// <summary>How much lower the tree line lies on a fully poleward face (and higher on an equator-facing one), m per unit of slope.</summary>
+    public float TreeAspectShiftMetres { get; init; } = 100f;
+
+    /// <summary>How far the coarse breakup noise moves the tree line, m.</summary>
+    public float TreeNoiseMetres { get; init; } = 80f;
+
+    /// <summary>How far the fine breakup noise moves it, m: the forest's ragged upper edge, groups of trees above closed forest.</summary>
+    public float TreeEdgeMetres { get; init; } = 30f;
+
+    /// <summary>
+    /// The slope from which forest thins out, degrees: past where grass does (36°), so a steep wooded slope is forest or crag, not
+    /// meadow flecks (with 33° the eroded slopes' gully walls broke the forest into grass).
+    /// </summary>
+    public float TreeSlopeFromDegrees { get; init; } = 38f;
+
+    /// <summary>The slope above which no forest holds, degrees (steeper ground is avalanche track and crag).</summary>
+    public float TreeSlopeToDegrees { get; init; } = 48f;
+
+    /// <summary>The wavelength of the forest's own breakup noise, m: its stands and clearings (pastures, avalanche tracks, old burns).</summary>
+    public float ForestBreakupWavelengthMetres { get; init; } = 250f;
+
+    /// <summary>
+    /// The forest noise (shifted by the moisture) below which the ground is a clearing, at its edge: the edge is narrow, so the
+    /// forest is closed or open rather than half of each over wide areas (which the shading's sharpening breaks into flecks).
+    /// </summary>
+    public float ClearingFrom { get; init; } = -0.5f;
+
+    /// <summary>The forest noise at which the ground is closed forest.</summary>
+    public float ClearingTo { get; init; } = -0.35f;
+
+    /// <summary>
+    /// The upstream area below which ground counts as dry for the forest, m² (a spur or a ridge's crest, under two cells' runoff);
+    /// a typical hillside cell (about 10³ m²) is neither, so the moisture moves the clearings only at the extremes.
+    /// </summary>
+    public float MoistAreaFromSquareMetres { get; init; } = 100f;
+
+    /// <summary>The upstream area at which it is fully moist, m² (a hollow or a gully).</summary>
+    public float MoistAreaToSquareMetres { get; init; } = 1e4f;
+
+    /// <summary>
+    /// How far moisture moves the forest noise's clearing threshold, from dry spurs (more clearings) to moist hollows (fewer), ±half
+    /// of it. Larger, it opened clearings along every spur of the drainage's texture: flecks again.
+    /// </summary>
+    public float MoistShift { get; init; } = 0.2f;
+
     /// <summary>The fine breakup noise below which a meadow shows bare soil (erosion scars, paths), starting.</summary>
     public float BareFrom { get; init; } = -0.35f;
 
@@ -136,6 +187,38 @@ public sealed record MaterialRules
     /// <summary>Scree's bump: ridged noise, each octave's height over its wavelength.</summary>
     public float RoughScree { get; init; } = 0.08f;
 
+    /// <summary>
+    /// The forest's bump: smooth noise in the three coarsest octaves (0.4–1.6 m, branches and the crowns' own texture), each octave's
+    /// height over its wavelength; the crowns themselves are the mesh's (<see cref="CanopyDetail"/>).
+    /// </summary>
+    public float RoughCanopy { get; init; } = 0.3f;
+
+    /// <summary>
+    /// The canopy's volume scattering (vista-plan §10 M1.12b): the weight of the RossThick kernel over the isotropic one in the
+    /// kernel-driven BRDF of MODIS (Wanner, Li and Strahler 1995; Lucht, Schaaf and Strahler 2000).
+    /// </summary>
+    public float CanopyVolume { get; init; } = 0.5f;
+
+    /// <summary>
+    /// The canopy's shadowing: the weight of the LiSparse-Reciprocal kernel over the isotropic one (crowns of height twice their
+    /// width casting shadows on the ground between them). With <see cref="CanopyVolume"/> typical of conifer forest in the visible,
+    /// not fitted to a site: the crowns' shadows darken the forest looking toward the sun and the hot spot brightens it with the
+    /// sun behind the camera.
+    /// </summary>
+    public float CanopyGeometric { get; init; } = 0.25f;
+
+    /// <summary>The white-sky albedo of the volume kernel (Lucht, Schaaf and Strahler 2000).</summary>
+    public const float VolumeKernelAlbedo = 0.189184f;
+
+    /// <summary>The white-sky albedo of the geometric kernel.</summary>
+    public const float GeometricKernelAlbedo = -1.377622f;
+
+    /// <summary>
+    /// The canopy's isotropic weight over its albedo: the forest's spectrum is its albedo under a white sky, which the kernels'
+    /// own albedos (<see cref="VolumeKernelAlbedo"/>, <see cref="GeometricKernelAlbedo"/>) would otherwise move.
+    /// </summary>
+    public float CanopyAlbedoScale => 1f / (1f + VolumeKernelAlbedo * CanopyVolume + GeometricKernelAlbedo * CanopyGeometric);
+
     /// <summary>Soil's bump: smooth noise, each octave's height over its wavelength.</summary>
     public float RoughSoil { get; init; } = 0.03f;
 
@@ -182,17 +265,26 @@ public sealed record MaterialRules
         Rising("Wet depth", WetDepthFromMetres, WetDepthToMetres);
         Rising("Grass slope", GrassSlopeFromDegrees, GrassSlopeToDegrees);
         Rising("Bare soil", BareTo, BareFrom);
+        Rising("Tree slope", TreeSlopeFromDegrees, TreeSlopeToDegrees);
+        Rising("Clearing", ClearingFrom, ClearingTo);
+        Rising("Moist area", MoistAreaFromSquareMetres, MoistAreaToSquareMetres);
         foreach ((string name, float value) in new[]
         {
             (nameof(RockSlopeDegrees), RockSlopeDegrees), (nameof(HardnessSlopeShiftDegrees), HardnessSlopeShiftDegrees),
             (nameof(RockNoiseDegrees), RockNoiseDegrees), (nameof(SlopeNoiseDegrees), SlopeNoiseDegrees), (nameof(AspectShiftMetres), AspectShiftMetres),
-            (nameof(GrassNoiseMetres), GrassNoiseMetres),
+            (nameof(GrassNoiseMetres), GrassNoiseMetres), (nameof(TreeAspectShiftMetres), TreeAspectShiftMetres), (nameof(TreeNoiseMetres), TreeNoiseMetres),
+            (nameof(TreeEdgeMetres), TreeEdgeMetres), (nameof(MoistShift), MoistShift), (nameof(CanopyVolume), CanopyVolume),
+            (nameof(CanopyGeometric), CanopyGeometric),
         })
         {
             NotNegative(name, value);
         }
-        if (!(RockSlopeWidthDegrees > 0f) || !(GrassBandMetres > 0f))
-            errors.Add("The rock's slope width and the grass band must be positive.");
+        if (!(RockSlopeWidthDegrees > 0f) || !(GrassBandMetres > 0f) || !(TreeBandMetres > 0f))
+            errors.Add("The rock's slope width, the grass band and the tree band must be positive.");
+        if (!(MoistAreaFromSquareMetres > 0f) || !(ForestBreakupWavelengthMetres > 0f))
+            errors.Add("The moist area and the forest's breakup wavelength must be positive.");
+        if (!(CanopyAlbedoScale > 0f && CanopyAlbedoScale < 10f))
+            errors.Add($"The canopy's kernels leave it no albedo (volume {CanopyVolume}, geometric {CanopyGeometric}).");
         if (!(CoverOnSteep is >= 0f and <= 1f) || !(WetDarkening is >= 0f and < 1f))
             errors.Add("The cover on steep slopes must be in [0, 1] and the wet darkening in [0, 1).");
         if (!(BreakupWavelengthMetres > 0f) || !(FineBreakupWavelengthMetres > 0f))
@@ -203,7 +295,7 @@ public sealed record MaterialRules
         {
             (nameof(HardColourMid), HardColourMid), (nameof(BedBrightness), BedBrightness), (nameof(BedWarmth), BedWarmth), (nameof(LaminaContrast), LaminaContrast),
             (nameof(StepStrength), StepStrength), (nameof(RoughRock), RoughRock), (nameof(RoughScree), RoughScree), (nameof(RoughSoil), RoughSoil),
-            (nameof(RoughGrass), RoughGrass), (nameof(StoneTilt), StoneTilt), (nameof(StoneGap), StoneGap),
+            (nameof(RoughGrass), RoughGrass), (nameof(StoneTilt), StoneTilt), (nameof(StoneGap), StoneGap), (nameof(RoughCanopy), RoughCanopy),
         })
         {
             if (!(value is >= 0f and < 1f))
@@ -215,9 +307,10 @@ public sealed record MaterialRules
     /// <summary>
     /// The constants the shader and the mesh evaluate these rules with, for a scene whose grass line stands at
     /// <paramref name="grassLineMetres"/> above sea level, with the pole toward +z (<paramref name="poleward"/> 1, the northern
-    /// hemisphere) or −z (−1), and the material noise of <paramref name="noiseSeed"/>.
+    /// hemisphere) or −z (−1), and the material noise of <paramref name="noiseSeed"/>; with forest below
+    /// <paramref name="treeLineMetres"/> when <paramref name="forest"/> (vista-plan §10 M1.12b), else none.
     /// </summary>
-    public MaterialConstants Constants(float grassLineMetres, float poleward, uint noiseSeed) => new()
+    public MaterialConstants Constants(float grassLineMetres, float poleward, uint noiseSeed, float treeLineMetres, bool forest) => new()
     {
         RockSlope = RockSlopeDegrees,
         RockWidth = RockSlopeWidthDegrees,
@@ -265,6 +358,25 @@ public sealed record MaterialRules
         RoughGrass = RoughGrass,
         StoneTilt = StoneTilt,
         StoneGap = StoneGap,
+        TreeLine = treeLineMetres,
+        TreeBand = TreeBandMetres,
+        TreeAspectShift = TreeAspectShiftMetres,
+        TreeNoise = TreeNoiseMetres,
+        TreeEdge = TreeEdgeMetres,
+        TreeSlopeFrom = TreeSlopeFromDegrees,
+        TreeSlopeTo = TreeSlopeToDegrees,
+        Breakup3 = ForestBreakupWavelengthMetres,
+        ClearingFrom = ClearingFrom,
+        ClearingTo = ClearingTo,
+        MoistLogFrom = MathF.Log10(MoistAreaFromSquareMetres),
+        MoistLogTo = MathF.Log10(MoistAreaToSquareMetres),
+        MoistShift = MoistShift,
+        Forest = forest ? 1u : 0u,
+        Canopy = 1u,
+        RoughCanopy = RoughCanopy,
+        CanopyVolume = CanopyVolume,
+        CanopyGeometric = CanopyGeometric,
+        CanopyIso = CanopyAlbedoScale,
     };
 
     /// <summary>
@@ -274,7 +386,10 @@ public sealed record MaterialRules
     ///   <item>bare rock where the slope is steeper than loose material lies, earlier for hard beds (and later, by
     ///   <see cref="CoverOnSteep"/>, under thick loose material), and outcrops of hard rock through thin cover on moderate slopes;</item>
     ///   <item>of the rest, scree where loose material lies at the talus angle (deposition below the faces) or in a channel (gravel);</item>
-    ///   <item>the remaining ground is meadow below the grass line (lower on poleward faces), on slopes grass holds to, and away from
+    ///   <item>of the remaining ground, forest (vista-plan §10 M1.12b) below the tree line (lower on poleward faces, ragged), on slopes
+    ///   trees hold to, where no water stands, and away from the clearings the forest's own noise opens, more of them on dry ridges
+    ///   and fewer in moist hollows;</item>
+    ///   <item>the open ground is meadow below the grass line (lower on poleward faces), on slopes grass holds to, and away from
     ///   the bare patches the fine noise opens in it; else soil, which is stony (<see cref="MaterialWeights.Stony"/>: frost-shattered
     ///   debris, coloured toward scree) above the grass line and on slopes too steep for grass;</item>
     ///   <item>the ground is wet in channels that are not rock faces and where the erosion's water stood deep.</item>
@@ -293,14 +408,26 @@ public sealed record MaterialRules
         float talus = SmoothStep(k.ScreeSlopeFrom, k.ScreeSlopeTo, p.SlopeDegrees + k.SlopeNoise * p.Breakup2);
         float scree = rest * cover * MathF.Max(talus, channel);
         float ground = rest - scree;
+        float pond = SmoothStep(k.WetDepthFrom, k.WetDepthTo, p.WaterDepthMetres);
+        float forest = 0f;
+        if (k.Forest != 0u)
+        {
+            float treeAt = k.TreeLine - k.TreeAspectShift * p.Poleward + k.TreeNoise * p.Breakup1 + k.TreeEdge * p.Breakup2;
+            float below = 1f - SmoothStep(treeAt - k.TreeBand, treeAt + k.TreeBand, p.AltitudeMetres);
+            float gentle = 1f - SmoothStep(k.TreeSlopeFrom, k.TreeSlopeTo, p.SlopeDegrees);
+            float moist = SmoothStep(k.MoistLogFrom, k.MoistLogTo, p.Log10Area);
+            float stand = SmoothStep(k.ClearingFrom, k.ClearingTo, p.Breakup3 + k.MoistShift * (moist - 0.5f));
+            forest = ground * (below * gentle * stand * (1f - pond));
+        }
+        float open = ground - forest;
         float line = k.GrassLine - k.AspectShift * p.Poleward + k.GrassNoise * p.Breakup1;
         float high = SmoothStep(line - k.GrassBand, line + k.GrassBand, p.AltitudeMetres);
         float tooSteep = SmoothStep(k.GrassSlopeFrom, k.GrassSlopeTo, p.SlopeDegrees);
         float bare = SmoothStep(k.BareFrom, k.BareTo, p.Breakup2);
-        float grass = ground * ((1f - high) * (1f - tooSteep) * (1f - bare));
-        float soil = ground - grass;
-        float wet = MathF.Max(channel * (1f - steep), SmoothStep(k.WetDepthFrom, k.WetDepthTo, p.WaterDepthMetres) * (1f - talus));
-        return new MaterialWeights(rock, scree, soil, grass, wet, MathF.Max(high, tooSteep));
+        float grass = open * ((1f - high) * (1f - tooSteep) * (1f - bare));
+        float soil = open - grass;
+        float wet = MathF.Max(channel * (1f - steep), pond * (1f - talus));
+        return new MaterialWeights(rock, scree, soil, grass, wet, MathF.Max(high, tooSteep)) { Forest = forest };
     }
 
     /// <summary>HLSL's <c>smoothstep</c>: 0 below <paramref name="a"/>, 1 above <paramref name="b"/>, the cubic between.</summary>
@@ -321,6 +448,7 @@ public sealed record MaterialRules
 /// <param name="Hardness">The hardness of the bed the surface cuts, 0 (softest) to 1 (hardest).</param>
 /// <param name="Breakup1">The coarse breakup noise, about −1 to 1.</param>
 /// <param name="Breakup2">The fine breakup noise, about −1 to 1.</param>
+/// <param name="Breakup3">The forest's breakup noise (its stands and clearings), about −1 to 1.</param>
 public readonly record struct MaterialInputs(
     float SlopeDegrees,
     float Poleward,
@@ -330,11 +458,12 @@ public readonly record struct MaterialInputs(
     float WaterDepthMetres,
     float Hardness,
     float Breakup1,
-    float Breakup2);
+    float Breakup2,
+    float Breakup3);
 
 /// <summary>
-/// The materials at a place: rock, scree, soil and grass sum to 1; <paramref name="Wet"/> (0 to 1) darkens whichever lies there, and
-/// <paramref name="Stony"/> (0 to 1) turns the soil's colour toward scree's.
+/// The materials at a place: rock, scree, soil, grass and <see cref="Forest"/> sum to 1; <paramref name="Wet"/> (0 to 1) darkens
+/// whichever lies there, and <paramref name="Stony"/> (0 to 1) turns the soil's colour toward scree's.
 /// </summary>
 /// <param name="Rock">Bare rock (hard or soft by the bed, <see cref="MaterialField"/>).</param>
 /// <param name="Scree">Loose rock: talus below faces and channel gravel.</param>
@@ -344,6 +473,9 @@ public readonly record struct MaterialInputs(
 /// <param name="Stony">How stony the soil is: above the grass line and on slopes too steep for grass, frost-shattered debris.</param>
 public readonly record struct MaterialWeights(float Rock, float Scree, float Soil, float Grass, float Wet, float Stony)
 {
+    /// <summary>Forest (vista-plan §10 M1.12b): conifer canopy, seen from afar as a dark, rough material.</summary>
+    public float Forest { get; init; }
+
     /// <summary>The weight of the smooth ground, soil and grass together (<see cref="DetailKind.Smooth"/>).</summary>
     public float Smooth => Soil + Grass;
 }
@@ -352,8 +484,8 @@ public readonly record struct MaterialWeights(float Rock, float Scree, float Soi
 /// The material rules' constants as the shader's <c>MaterialConstants</c> cbuffer holds them (16-byte rows; vista-plan §10 M1.12),
 /// derived once from <see cref="MaterialRules"/> and the scene, so the shader and the mesh compute with the same floats. The later
 /// rows carry what the shader needs besides the rules: the material map's place and the bed table (<see cref="MaterialField.Apply"/>),
-/// the rocks' colours by bed, the shading's bump and the camera's place for it (<see cref="ForCamera"/>), and which shading runs. Sixteen
-/// rows: the 256-byte buffer is full.
+/// the rocks' colours by bed, the shading's bump and the camera's place for it (<see cref="ForCamera"/>), and which shading runs; then
+/// (vista-plan §10 M1.12b) the forest's rules and its canopy's shading. Twenty-one rows, 336 bytes (the buffer holds 512).
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct MaterialConstants
@@ -552,6 +684,66 @@ public struct MaterialConstants
 
     /// <summary>Padding to a 16-byte row.</summary>
     public float Pad7;
+
+    /// <summary>The tree line above sea level, m (<see cref="Weather.TreeLine"/>).</summary>
+    public float TreeLine;
+
+    /// <summary><see cref="MaterialRules.TreeBandMetres"/>.</summary>
+    public float TreeBand;
+
+    /// <summary><see cref="MaterialRules.TreeAspectShiftMetres"/>.</summary>
+    public float TreeAspectShift;
+
+    /// <summary><see cref="MaterialRules.TreeNoiseMetres"/>.</summary>
+    public float TreeNoise;
+
+    /// <summary><see cref="MaterialRules.TreeEdgeMetres"/>.</summary>
+    public float TreeEdge;
+
+    /// <summary><see cref="MaterialRules.TreeSlopeFromDegrees"/>.</summary>
+    public float TreeSlopeFrom;
+
+    /// <summary><see cref="MaterialRules.TreeSlopeToDegrees"/>.</summary>
+    public float TreeSlopeTo;
+
+    /// <summary><see cref="MaterialRules.ForestBreakupWavelengthMetres"/>.</summary>
+    public float Breakup3;
+
+    /// <summary><see cref="MaterialRules.ClearingFrom"/>.</summary>
+    public float ClearingFrom;
+
+    /// <summary><see cref="MaterialRules.ClearingTo"/>.</summary>
+    public float ClearingTo;
+
+    /// <summary>log₁₀ of <see cref="MaterialRules.MoistAreaFromSquareMetres"/>.</summary>
+    public float MoistLogFrom;
+
+    /// <summary>log₁₀ of <see cref="MaterialRules.MoistAreaToSquareMetres"/>.</summary>
+    public float MoistLogTo;
+
+    /// <summary><see cref="MaterialRules.MoistShift"/>.</summary>
+    public float MoistShift;
+
+    /// <summary>1 when forest grows below the tree line; 0 for none (<c>--forest off</c>).</summary>
+    public uint Forest;
+
+    /// <summary>1 when the canopy is shaded by its kernels; 0 as rough diffuse ground of its own roughness (<c>--canopy</c>).</summary>
+    public uint Canopy;
+
+    /// <summary><see cref="MaterialRules.RoughCanopy"/>.</summary>
+    public float RoughCanopy;
+
+    /// <summary><see cref="MaterialRules.CanopyVolume"/>.</summary>
+    public float CanopyVolume;
+
+    /// <summary><see cref="MaterialRules.CanopyGeometric"/>.</summary>
+    public float CanopyGeometric;
+
+    /// <summary><see cref="MaterialRules.CanopyAlbedoScale"/>.</summary>
+    public float CanopyIso;
+
+    /// <summary>Padding to a 16-byte row.</summary>
+    public float Pad8;
 
     /// <summary>
     /// These constants for a camera at world <c>(x, z)</c> whose frame's centre pixel covers <paramref name="pixelAngle"/> radians:

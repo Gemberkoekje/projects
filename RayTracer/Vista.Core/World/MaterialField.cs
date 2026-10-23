@@ -14,6 +14,9 @@ public enum DetailKind
 
     /// <summary>Soil and grass: M1.9's smooth noise (<see cref="TerrainDetail"/>).</summary>
     Smooth,
+
+    /// <summary>Forest: the crowns of its canopy (<see cref="CanopyDetail"/>, vista-plan §10 M1.12b).</summary>
+    Canopy,
 }
 
 /// <summary>
@@ -27,6 +30,10 @@ public enum DetailKind
 /// <para>The maps fade into the defaults over the grid's outer <see cref="TerrainHierarchy.BlendCells"/> cells, where the world
 /// grid's surface fades into the base terrain's; beyond the grid the ground reads the defaults, with rock of middling hardness.
 /// Built once per world; immutable afterwards.</para>
+///
+/// <para>The forest's detail weights (vista-plan §10 M1.12b) are the scene's, not the world's: where the forest stands depends on the
+/// place's tree line and on the altitude of the world's height 0. A field built per world has none; <see cref="WithForest"/> makes a
+/// field that shares this one's maps and adds them, which the mesh of a scene with forest carries.</para>
 /// </summary>
 public sealed class MaterialField
 {
@@ -66,17 +73,25 @@ public sealed class MaterialField
     /// <summary>The bit of the smooth ground's detail (soil and grass).</summary>
     public const int SmoothKind = 4;
 
+    /// <summary>The bit of the forest's detail (its crowns).</summary>
+    public const int CanopyKind = 8;
+
     /// <summary>Every kind.</summary>
-    public const int AllKinds = RockKind | ScreeKind | SmoothKind;
+    public const int AllKinds = RockKind | ScreeKind | SmoothKind | CanopyKind;
 
     private readonly uint[] _packed;
     private readonly float[] _beds;
     private readonly byte[] _rock;
     private readonly byte[] _scree;
+    private readonly byte[] _forest;
     private readonly byte[] _cellKinds;
     private readonly byte[] _cellSteps;
 
-    private MaterialField(int size, double cell, uint[] packed, float[] beds, float tableScale, byte[] rock, byte[] scree, bool eroded, uint noiseSeed)
+    /// <summary>The summed-area table of the cells holding forest, (size)² entries from the corner (0, 0); empty without forest.</summary>
+    private readonly int[] _canopyCells;
+
+    private MaterialField(int size, double cell, uint[] packed, float[] beds, float tableScale, byte[] rock, byte[] scree, byte[] forest, bool eroded,
+        uint noiseSeed, ForestPlacement forestPlacement)
     {
         Size = size;
         NoiseSeed = noiseSeed;
@@ -87,9 +102,12 @@ public sealed class MaterialField
         TableScale = tableScale;
         _rock = rock;
         _scree = scree;
-        (_cellKinds, _cellSteps) = CellKinds(size, rock, scree);
+        _forest = forest;
+        (_cellKinds, _cellSteps) = CellKinds(size, rock, scree, forest);
+        _canopyCells = forestPlacement.Grows ? CanopyTable(size, _cellKinds) : [];
         Eroded = eroded;
-        (RockGradient, ScreeGradient, SmoothGradient) = Gradients(size, cell, rock, scree);
+        Forest = forestPlacement;
+        (RockGradient, ScreeGradient, SmoothGradient, CanopyGradient, OpenSmoothGradient) = Gradients(size, cell, rock, scree, forest);
     }
 
     /// <summary>Samples a side (the world grid's).</summary>
@@ -106,6 +124,9 @@ public sealed class MaterialField
 
     /// <summary>Whether the maps come from an erosion (else the ground reads the defaults everywhere but for its beds).</summary>
     public bool Eroded { get; }
+
+    /// <summary>Where the forest whose detail weights this field holds stands (<see cref="ForestPlacement.None"/>: none, a world's own field).</summary>
+    public ForestPlacement Forest { get; }
 
     /// <summary>
     /// Two words per sample, row-major: the bed-table coordinate of world height 0 (a float's bits), then the codes, a byte each from
@@ -130,6 +151,15 @@ public sealed class MaterialField
 
     /// <summary>The steepest the smooth detail's weight changes, per metre.</summary>
     public double SmoothGradient { get; }
+
+    /// <summary>The steepest the canopy detail's weight changes, per metre (0 without forest).</summary>
+    public double CanopyGradient { get; }
+
+    /// <summary>
+    /// The steepest the smooth detail's weight changes where no forest lies, per metre: that of one less rock and scree, the world's
+    /// own <see cref="SmoothGradient"/> before a scene's forest (vista-plan §10 M1.12b).
+    /// </summary>
+    public double OpenSmoothGradient { get; }
 
     /// <summary>Upload size, bytes.</summary>
     public long ByteSize => (long)_packed.Length * sizeof(uint) + (long)_beds.Length * sizeof(float);
@@ -186,7 +216,57 @@ public sealed class MaterialField
         });
 
         (byte[] rock, byte[] scree) = DetailWeights(surface, packed, beds, strata.TableScale, rules, noiseSeed);
-        return new MaterialField(n, surface.CellSize, packed, beds, strata.TableScale, rock, scree, erosion is not null, noiseSeed);
+        return new MaterialField(n, surface.CellSize, packed, beds, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
+            ForestPlacement.None);
+    }
+
+    /// <summary>
+    /// This world's field with the detail weights of the forest that <paramref name="forest"/> places under <paramref name="rules"/>
+    /// (vista-plan §10 M1.12b), on the world whose surface is <paramref name="surface"/>: the rules' forest at each sample, with its own
+    /// slope, aspect, altitude and maps, averaged as rock's and scree's are and never more than they leave. Shares this field's maps;
+    /// <see cref="ForestPlacement.None"/> gives the world's own field back.
+    /// </summary>
+    public MaterialField WithForest(HeightField surface, ForestPlacement forest, MaterialRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(forest);
+        ArgumentNullException.ThrowIfNull(rules);
+        if (surface.Size != Size)
+            throw new ArgumentException("The surface is not on the field's grid.", nameof(surface));
+        if (forest == Forest)
+            return this;
+        int n = Size;
+        var forestBytes = new byte[n * n];
+        if (forest.Grows)
+        {
+            MaterialConstants k = Apply(rules.Constants(0f, forest.Poleward, NoiseSeed, forest.TreeLineMetres, true));
+            var weights = new float[n * n];
+            Parallel.For(0, n, j =>
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    (float nx, float nz) = SampleNormal(surface, i, j);
+                    float x = (float)(Origin + i * Cell), z = (float)(Origin + j * Cell);
+                    weights[j * n + i] = MaterialRules.Evaluate(Inputs(x, z, surface[i, j], nx, nz, forest.GroundAltitudeMetres, k), k).Forest;
+                }
+            });
+            float[] smooth = BoxAverage(weights, n, DetailSmoothing);
+            // The crowns fade out over the grid's outer band, where its surface fades into the base terrain's: beyond the grid the
+            // detail reads the edge's weights, and crowns there would refine the far field as forest out to the horizon.
+            int band = Math.Max(Math.Min(TerrainHierarchy.BlendCells, (n - 1) / 8), 1);
+            Parallel.For(0, n, j =>
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    int c = j * n + i;
+                    int edge = Math.Min(Math.Min(i, n - 1 - i), Math.Min(j, n - 1 - j));
+                    float e = edge >= band ? 1f : (float)edge / band;
+                    int f = (int)MathF.Round(Math.Clamp(smooth[c], 0f, 1f) * (e * e * (3f - 2f * e)) * 255f);
+                    forestBytes[c] = (byte)Math.Min(f < DetailFloor ? 0 : f, 255 - _rock[c] - _scree[c]);
+                }
+            });
+        }
+        return new MaterialField(n, Cell, _packed, _beds, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest);
     }
 
     /// <summary>
@@ -199,8 +279,9 @@ public sealed class MaterialField
         float ny = MathF.Sqrt(MathF.Max(1f - normalX * normalX - normalZ * normalZ, 0f));
         float slope = MathF.Acos(MathF.Min(ny, 1f)) * (180f / MathF.PI);
         (float b1, float b2) = MaterialNoise.Breakup(k.NoiseSeed, x, z, k.Breakup1, k.Breakup2);
+        float b3 = MaterialNoise.ForestBreakup(k.NoiseSeed, x, z, k.Breakup3);
         Sample s = At(x, z, height, k.TableScale, k.TableLast);
-        return new MaterialInputs(slope, normalZ * k.Poleward, groundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2);
+        return new MaterialInputs(slope, normalZ * k.Poleward, groundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3);
     }
 
     /// <summary>
@@ -214,14 +295,14 @@ public sealed class MaterialField
     }
 
     /// <summary>The detail kinds' weights at world <c>(x, z)</c>: bilinear between the samples around it, the edge's outside the grid.</summary>
-    public (double Rock, double Scree) DetailWeightsAt(double x, double z)
+    public (double Rock, double Scree, double Forest) DetailWeightsAt(double x, double z)
     {
         double u = Math.Clamp((x - Origin) / Cell, 0.0, Size - 1), v = Math.Clamp((z - Origin) / Cell, 0.0, Size - 1);
         int i = Math.Min((int)u, Size - 2), j = Math.Min((int)v, Size - 2);
         double fu = u - i, fv = v - j;
         int c = j * Size + i;
         double Bilinear(byte[] w) => ((w[c] + (w[c + 1] - w[c]) * fu) * (1.0 - fv) + (w[c + Size] + (w[c + Size + 1] - w[c + Size]) * fu) * fv) * (1.0 / 255.0);
-        return (Bilinear(_rock), Bilinear(_scree));
+        return (Bilinear(_rock), Bilinear(_scree), Bilinear(_forest));
     }
 
     /// <summary>
@@ -234,21 +315,37 @@ public sealed class MaterialField
         int last = Size - 2;
         int i0 = Math.Clamp((int)Math.Floor((x0 - Origin) / Cell), 0, last), i1 = Math.Clamp((int)Math.Floor((x1 - Origin) / Cell), 0, last);
         int j0 = Math.Clamp((int)Math.Floor((z0 - Origin) / Cell), 0, last), j1 = Math.Clamp((int)Math.Floor((z1 - Origin) / Cell), 0, last);
-        int kinds = 0, rock = 0, scree = 0, smooth = 0;
+        int kinds = 0, rock = 0, scree = 0, smooth = 0, canopy = 0;
         for (int j = j0; j <= j1; j++)
         {
             for (int i = i0; i <= i1; i++)
             {
                 int c = j * (Size - 1) + i;
                 kinds |= _cellKinds[c];
-                rock = Math.Max(rock, _cellSteps[3 * c]);
-                scree = Math.Max(scree, _cellSteps[3 * c + 1]);
-                smooth = Math.Max(smooth, _cellSteps[3 * c + 2]);
+                rock = Math.Max(rock, _cellSteps[4 * c]);
+                scree = Math.Max(scree, _cellSteps[4 * c + 1]);
+                smooth = Math.Max(smooth, _cellSteps[4 * c + 2]);
+                canopy = Math.Max(canopy, _cellSteps[4 * c + 3]);
             }
         }
         // Bilinear in a cell, a weight's gradient is at most √2 times its largest step between neighbouring corners over the cell.
         double perStep = Math.Sqrt(2.0) / (255.0 * Cell);
-        return new DetailRegion(kinds, rock * perStep, scree * perStep, smooth * perStep);
+        return new DetailRegion(kinds, rock * perStep, scree * perStep, smooth * perStep) { CanopyGradient = canopy * perStep };
+    }
+
+    /// <summary>
+    /// Whether forest's detail is weighted in any cell the box from world <c>(x0, z0)</c> to <c>(x1, z1)</c> reaches into (vista-plan
+    /// §10 M1.12b), the edge cells' outside the grid: in constant time, from a summed-area table of the cells.
+    /// </summary>
+    public bool CanopyIn(double x0, double z0, double x1, double z1)
+    {
+        if (_canopyCells.Length == 0)
+            return false;
+        int last = Size - 2;
+        int i0 = Math.Clamp((int)Math.Floor((x0 - Origin) / Cell), 0, last), i1 = Math.Clamp((int)Math.Floor((x1 - Origin) / Cell), 0, last);
+        int j0 = Math.Clamp((int)Math.Floor((z0 - Origin) / Cell), 0, last), j1 = Math.Clamp((int)Math.Floor((z1 - Origin) / Cell), 0, last);
+        int n = Size;
+        return _canopyCells[(j1 + 1) * n + i1 + 1] - _canopyCells[j0 * n + i1 + 1] - _canopyCells[(j1 + 1) * n + i0] + _canopyCells[j0 * n + i0] > 0;
     }
 
     /// <summary>These constants with the material map's place and the bed table.</summary>
@@ -359,8 +456,9 @@ public sealed class MaterialField
         int n = surface.Size;
         double cell = surface.CellSize;
         float origin = (float)(-0.5 * (n - 1) * cell);
-        // The grass line does not move the detail (soil and grass are both smooth), so any will do.
-        MaterialConstants k = rules.Constants(0f, 1f, noiseSeed) with { TableScale = tableScale, TableLast = beds.Length / 4 - 1.001f };
+        // The grass line does not move the detail (soil and grass are both smooth), so any will do; nor does the forest move rock and
+        // scree (it takes only the ground they leave), whose weights it adds per scene (WithForest).
+        MaterialConstants k = rules.Constants(0f, 1f, noiseSeed, 0f, false) with { TableScale = tableScale, TableLast = beds.Length / 4 - 1.001f };
         var rock = new float[n * n];
         var scree = new float[n * n];
         Parallel.For(0, n, j =>
@@ -377,7 +475,7 @@ public sealed class MaterialField
                 int e = (int)MathF.Floor(t);
                 float hard = Math.Clamp(beds[4 * e] + (beds[4 * e + 4] - beds[4 * e]) * (t - e) + MottleOf(codes >> 24), 0f, 1f);
                 var inputs = new MaterialInputs(MathF.Acos(MathF.Min(ny, 1f)) * (180f / MathF.PI), 0f, 0f, DepthOf(codes & 0xFF),
-                    AreaOf((codes >> 8) & 0xFF), DepthOf((codes >> 16) & 0xFF), hard, b1, b2);
+                    AreaOf((codes >> 8) & 0xFF), DepthOf((codes >> 16) & 0xFF), hard, b1, b2, 0f);
                 MaterialWeights w = MaterialRules.Evaluate(inputs, k);
                 rock[c] = w.Rock;
                 scree[c] = w.Scree;
@@ -403,14 +501,15 @@ public sealed class MaterialField
     }
 
     /// <summary>Per cell, the kinds weighted at any of its four corners, and per kind the largest step of its weight along the cell's four edges.</summary>
-    private static (byte[] Kinds, byte[] Steps) CellKinds(int n, byte[] rock, byte[] scree)
+    private static (byte[] Kinds, byte[] Steps) CellKinds(int n, byte[] rock, byte[] scree, byte[] forest)
     {
         var kinds = new byte[(n - 1) * (n - 1)];
-        var steps = new byte[3 * (n - 1) * (n - 1)];
+        var steps = new byte[4 * (n - 1) * (n - 1)];
         Parallel.For(0, n - 1, j =>
         {
             Span<int> r = stackalloc int[4];
             Span<int> s = stackalloc int[4];
+            Span<int> f = stackalloc int[4];
             for (int i = 0; i < n - 1; i++)
             {
                 int k = 0;
@@ -419,29 +518,53 @@ public sealed class MaterialField
                 {
                     r[q] = rock[corners[q]];
                     s[q] = scree[corners[q]];
+                    f[q] = forest[corners[q]];
                     if (r[q] > 0)
                         k |= RockKind;
                     if (s[q] > 0)
                         k |= ScreeKind;
-                    if (r[q] + s[q] < 255)
+                    if (f[q] > 0)
+                        k |= CanopyKind;
+                    if (r[q] + s[q] + f[q] < 255)
                         k |= SmoothKind;
                 }
                 int c = j * (n - 1) + i;
                 kinds[c] = (byte)k;
-                int rockStep = 0, screeStep = 0, smoothStep = 0;
+                int rockStep = 0, screeStep = 0, smoothStep = 0, canopyStep = 0;
                 for (int q = 0; q < 4; q++)
                 {
                     int p = (q + 1) % 4;
                     rockStep = Math.Max(rockStep, Math.Abs(r[p] - r[q]));
                     screeStep = Math.Max(screeStep, Math.Abs(s[p] - s[q]));
-                    smoothStep = Math.Max(smoothStep, Math.Abs(r[p] + s[p] - r[q] - s[q]));
+                    canopyStep = Math.Max(canopyStep, Math.Abs(f[p] - f[q]));
+                    smoothStep = Math.Max(smoothStep, Math.Abs(r[p] + s[p] + f[p] - r[q] - s[q] - f[q]));
                 }
-                steps[3 * c] = (byte)rockStep;
-                steps[3 * c + 1] = (byte)screeStep;
-                steps[3 * c + 2] = (byte)smoothStep;
+                steps[4 * c] = (byte)rockStep;
+                steps[4 * c + 1] = (byte)screeStep;
+                steps[4 * c + 2] = (byte)smoothStep;
+                steps[4 * c + 3] = (byte)canopyStep;
             }
         });
         return (kinds, steps);
+    }
+
+    /// <summary>
+    /// The summed-area table of the cells whose kinds include the canopy: entry <c>(j, i)</c> of the <c>n × n</c> table counts those in
+    /// the cells before column <c>i</c> and row <c>j</c>.
+    /// </summary>
+    private static int[] CanopyTable(int n, byte[] cellKinds)
+    {
+        var table = new int[n * n];
+        for (int j = 0; j < n - 1; j++)
+        {
+            int row = 0;
+            for (int i = 0; i < n - 1; i++)
+            {
+                row += (cellKinds[j * (n - 1) + i] & CanopyKind) != 0 ? 1 : 0;
+                table[(j + 1) * n + i + 1] = table[j * n + i + 1] + row;
+            }
+        }
+        return table;
     }
 
     /// <summary>The world grid's normal at sample (i, j): central differences, one-sided at the edges (as <see cref="NormalMap"/>'s).</summary>
@@ -490,27 +613,33 @@ public sealed class MaterialField
     /// The steepest each kind's weight changes, per metre: bilinear between samples, its gradient is at most the largest step between
     /// neighbours along x and along z, combined, over the cell.
     /// </summary>
-    private static (double Rock, double Scree, double Smooth) Gradients(int n, double cell, byte[] rock, byte[] scree)
+    private static (double Rock, double Scree, double Smooth, double Canopy, double OpenSmooth) Gradients(int n, double cell, byte[] rock, byte[] scree,
+        byte[] forest)
     {
-        var steps = new int[6]; // rock x, rock z, scree x, scree z, smooth x, smooth z
+        var steps = new int[10]; // rock x, rock z, scree x, scree z, smooth x, smooth z, canopy x, canopy z, open smooth x, open smooth z
         object gate = new();
-        Parallel.For(0, n, () => new int[6], (j, _, local) =>
+        Parallel.For(0, n, () => new int[10], (j, _, local) =>
         {
             for (int i = 0; i < n; i++)
             {
                 int c = j * n + i;
-                int smooth = 255 - rock[c] - scree[c];
+                int open = 255 - rock[c] - scree[c];
+                int smooth = open - forest[c];
                 if (i + 1 < n)
                 {
                     local[0] = Math.Max(local[0], Math.Abs(rock[c + 1] - rock[c]));
                     local[2] = Math.Max(local[2], Math.Abs(scree[c + 1] - scree[c]));
-                    local[4] = Math.Max(local[4], Math.Abs(255 - rock[c + 1] - scree[c + 1] - smooth));
+                    local[4] = Math.Max(local[4], Math.Abs(255 - rock[c + 1] - scree[c + 1] - forest[c + 1] - smooth));
+                    local[6] = Math.Max(local[6], Math.Abs(forest[c + 1] - forest[c]));
+                    local[8] = Math.Max(local[8], Math.Abs(255 - rock[c + 1] - scree[c + 1] - open));
                 }
                 if (j + 1 < n)
                 {
                     local[1] = Math.Max(local[1], Math.Abs(rock[c + n] - rock[c]));
                     local[3] = Math.Max(local[3], Math.Abs(scree[c + n] - scree[c]));
-                    local[5] = Math.Max(local[5], Math.Abs(255 - rock[c + n] - scree[c + n] - smooth));
+                    local[5] = Math.Max(local[5], Math.Abs(255 - rock[c + n] - scree[c + n] - forest[c + n] - smooth));
+                    local[7] = Math.Max(local[7], Math.Abs(forest[c + n] - forest[c]));
+                    local[9] = Math.Max(local[9], Math.Abs(255 - rock[c + n] - scree[c + n] - open));
                 }
             }
             return local;
@@ -523,7 +652,7 @@ public sealed class MaterialField
             }
         });
         double G(int x, int z) => Math.Sqrt((double)steps[x] * steps[x] + (double)steps[z] * steps[z]) / (255.0 * cell);
-        return (G(0, 1), G(2, 3), G(4, 5));
+        return (G(0, 1), G(2, 3), G(4, 5), G(6, 7), G(8, 9));
     }
 }
 
@@ -531,8 +660,26 @@ public sealed class MaterialField
 /// The detail below the grid in a box of the world (<see cref="MaterialField.RegionIn"/>): which kinds are weighted anywhere in it, as
 /// a mask, and how fast each one's weight changes there at most, per metre.
 /// </summary>
-/// <param name="Kinds">The kinds, as <see cref="MaterialField.RockKind"/>, <see cref="MaterialField.ScreeKind"/> and <see cref="MaterialField.SmoothKind"/> bits.</param>
+/// <param name="Kinds">The kinds, as <see cref="MaterialField.RockKind"/>, <see cref="MaterialField.ScreeKind"/>, <see cref="MaterialField.SmoothKind"/> and <see cref="MaterialField.CanopyKind"/> bits.</param>
 /// <param name="RockGradient">The steepest the rock detail's weight changes in the box, per metre.</param>
 /// <param name="ScreeGradient">The scree detail's.</param>
 /// <param name="SmoothGradient">The smooth detail's.</param>
-public readonly record struct DetailRegion(int Kinds, double RockGradient, double ScreeGradient, double SmoothGradient);
+public readonly record struct DetailRegion(int Kinds, double RockGradient, double ScreeGradient, double SmoothGradient)
+{
+    /// <summary>The canopy detail's (vista-plan §10 M1.12b).</summary>
+    public double CanopyGradient { get; init; }
+}
+
+/// <summary>
+/// Where a scene's forest stands, as the mesh's detail reads it (vista-plan §10 M1.12b): the forest is the scene's, not the world's,
+/// because its tree line comes from the place's climate and is compared with the altitude the scene gives the world's height 0.
+/// </summary>
+/// <param name="Grows">Whether there is forest at all (<see cref="None"/>: none).</param>
+/// <param name="TreeLineMetres">The tree line above sea level, m.</param>
+/// <param name="Poleward">1 when the pole lies toward +z, −1 when toward −z.</param>
+/// <param name="GroundAltitudeMetres">The altitude of world height 0 above sea level, m.</param>
+public sealed record ForestPlacement(bool Grows, float TreeLineMetres, int Poleward, float GroundAltitudeMetres)
+{
+    /// <summary>No forest: a world's own field, and the mesh of a scene with <c>--forest off</c>.</summary>
+    public static ForestPlacement None { get; } = new(false, 0f, 1, 0f);
+}

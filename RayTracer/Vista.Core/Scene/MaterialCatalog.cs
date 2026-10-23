@@ -49,6 +49,9 @@ public sealed record VistaMaterial(int Id, string Key, DataTier Tier, (float R, 
 /// (gneiss and schist debris is grey; the beds' own tints warm or cool them), soil rising toward the red (its iron oxides), grass with
 /// chlorophyll's absorption in the blue and the red, its green peak and its red edge (which no hero wavelength reaches: they lie
 /// between 419 and 651 nm) — not fitted to any one sample; measured spectra arrive in M2. The sidecar records each one's tier.
+/// Since M1.12b a sixth, forest: a conifer canopy as a whole seen from above, needles, shadowed crowns and the gaps between them
+/// together, so its reflectance is far below a leaf's (a few percent in the visible, the green peak small, the red edge past the
+/// hero wavelengths), the albedo under a white sky that the canopy's kernels are normalised to (<see cref="World.MaterialRules.CanopyAlbedoScale"/>).
 /// </summary>
 public static class MaterialCatalog
 {
@@ -66,6 +69,9 @@ public static class MaterialCatalog
 
     /// <summary>Id of the grass.</summary>
     public const int GrassId = 4;
+
+    /// <summary>Id of the forest (vista-plan §10 M1.12b).</summary>
+    public const int ForestId = 5;
 
     /// <summary>The M0 terrain material.</summary>
     public static VistaMaterial Terrain { get; } = new(0, "terrain", DataTier.BuiltIn, (0.18f, 0.16f, 0.14f));
@@ -87,6 +93,9 @@ public static class MaterialCatalog
         Spectral(GrassId, "grass", 0.4f,
             [380, 0.032, 420, 0.035, 450, 0.04, 480, 0.046, 500, 0.058, 520, 0.092, 540, 0.122, 550, 0.128, 560, 0.123, 580, 0.1, 600, 0.07,
              620, 0.052, 640, 0.042, 660, 0.033, 680, 0.032, 700, 0.08, 720, 0.25, 750, 0.40]),
+        Spectral(ForestId, "forest", 1.0f,
+            [380, 0.018, 400, 0.019, 450, 0.021, 480, 0.023, 500, 0.026, 520, 0.034, 540, 0.043, 550, 0.045, 560, 0.044, 580, 0.038, 600, 0.031,
+             620, 0.026, 640, 0.023, 660, 0.021, 680, 0.02, 700, 0.045, 720, 0.12, 750, 0.20]),
     ];
 
     /// <summary>The materials a render shades: the ground's by rule, or M0's one.</summary>

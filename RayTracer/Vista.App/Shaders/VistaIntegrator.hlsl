@@ -368,16 +368,23 @@ GroundSurface SurfaceAt(Hit hit, float3 wo, uint4 idx, float footprint)
     GroundSurface g;
     g.Refl = MaterialReflectance(TerrainMaterial, idx);
     g.Back = 0.0;
+    g.Canopy = 0.0;
     g.Albedo = MaterialAlbedo[TerrainMaterial].xyz;
     g.Normal = hit.ShadingNormal;
     g.Id = TerrainMaterial;
     return g;
 }
 
-// π × the BRDF for light from `wi` seen along `wo`: the reflectance alone for Lambert, which stays exactly M1.11d's product.
+// π × the BRDF for light from `wi` seen along `wo`: the reflectance alone for Lambert, which stays exactly M1.11d's product; the
+// forest's canopy adds its kernels (vista-plan §10 M1.12b).
 float4 Brdf(GroundSurface g, float3 n, float3 wi, float3 wo)
 {
-    return MatDiffuse != 0u ? g.Refl + g.Back * OrenNayarG(n, wi, wo) : g.Refl;
+    if (MatDiffuse == 0u)
+        return g.Refl;
+    float4 f = g.Refl + g.Back * OrenNayarG(n, wi, wo);
+    if (any(g.Canopy > 0.0))
+        f += g.Canopy * CanopyKernels(n, wi, wo);
+    return f;
 }
 
 // ── The reference atmosphere (--atmosphere reference) ─────────────────────────────────────────────
@@ -1074,7 +1081,8 @@ void CSIncidentMeter(uint3 tid : SV_DispatchThreadID)
 
 // The ground's materials at chosen places, for --gpu-selftest's parity with MaterialField.Inputs and MaterialRules.Evaluate (M1.12):
 // probe i reads CheckDirection[i] (x and z: a world place, y: its height) and writes, with the world grid's normal there,
-// CheckSums[2i] = (rock, scree, soil, grass) and [2i + 1] = (wet, stony, the bed's hardness, the slope in degrees).
+// CheckSums[3i] = (rock, scree, soil, grass), [3i + 1] = (wet, stony, the bed's hardness, the slope in degrees) and [3i + 2] =
+// (forest, 0, 0, 0) (M1.12b).
 [numthreads(64, 1, 1)]
 void CSMaterialProbe(uint3 tid : SV_DispatchThreadID)
 {
@@ -1087,8 +1095,9 @@ void CSMaterialProbe(uint3 tid : SV_DispatchThreadID)
     MatSample s;
     float slope;
     MatWeights w = MaterialWeightsAt(q.xz, q.y, n, s, slope);
-    CheckSums[2u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
-    CheckSums[2u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
+    CheckSums[3u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
+    CheckSums[3u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
+    CheckSums[3u * item + 2u] = float4(w.Forest, 0.0, 0.0, 0.0);
 }
 
 // The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads

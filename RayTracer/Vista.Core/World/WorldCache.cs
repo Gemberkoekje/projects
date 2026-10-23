@@ -7,7 +7,8 @@ namespace Vista.World;
 /// world, its <see cref="TerrainHierarchy"/> and its last mesh, so renders that share them — a contact sheet across time of day
 /// or cameras, or a watch session whose camera turned — build and mesh the world once. The world's key is what the world stage
 /// reads: the recipe's <see cref="TerrainProfile"/>, the seed, the grid, and whether it is eroded (and could be); time, season,
-/// name and camera never move the world. The hierarchy follows the world and the detail; the mesh follows the hierarchy, the
+/// name and camera never move the world. The hierarchy follows the world, the detail and the forest's placement (the scene's tree
+/// line and altitude, vista-plan §10 M1.12b); the mesh follows the hierarchy, the
 /// camera's position, the frame's pixels per radian, the ground sphere and the mesh settings, never the camera's heading
 /// (<see cref="ViewMesher"/>). The same mesh instance also lets a renderer keep its acceleration structure. One world is kept,
 /// not several: a seed the session saw before comes back from the erosion cache on disk in about a second.
@@ -18,8 +19,9 @@ public sealed class WorldCache
     private Recipe? _recipe;
     private TerrainWorld? _world;
     private MaterialField? _materials;
+    private MaterialField? _forested;
     private TerrainHierarchy? _hierarchy;
-    private (bool Detail, bool Materials)? _hierarchyKey;
+    private (bool Detail, bool Materials, ForestPlacement Forest)? _hierarchyKey;
     private (MeshView View, MeshSettings Settings)? _meshKey;
     private TerrainMesh? _mesh;
 
@@ -41,7 +43,7 @@ public sealed class WorldCache
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
             (_key, _recipe) = (key, recipe);
-            (_materials, _hierarchy, _hierarchyKey, _meshKey, _mesh) = (null, null, null, null, null);
+            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh) = (null, null, null, null, null, null);
         }
         return _world!;
     }
@@ -88,18 +90,34 @@ public sealed class WorldCache
     }
 
     /// <summary>
+    /// The cached world's material field with the detail weights of the forest <paramref name="forest"/> places (vista-plan §10
+    /// M1.12b; <see cref="MaterialField.WithForest"/>), kept for the last placement; the world's own field without forest.
+    /// </summary>
+    public MaterialField Materials(ForestPlacement forest)
+    {
+        ArgumentNullException.ThrowIfNull(forest);
+        MaterialField field = Materials();
+        if (!forest.Grows)
+            return field;
+        if (_forested is null || _forested.Forest != forest)
+            _forested = field.WithForest(_world!.Surface, forest, MaterialRules.Default);
+        return _forested;
+    }
+
+    /// <summary>
     /// The cached world's hierarchy with the detail and the materials <paramref name="settings"/> ask for, built when it is missing:
-    /// the detail by material (<see cref="MaterialDetail"/>) with the materials, M1.9's smooth detail without them.
+    /// the detail by material (<see cref="MaterialDetail"/>) with the materials and the scene's forest, M1.9's smooth detail without them.
     /// </summary>
     private TerrainHierarchy Hierarchy(MeshSettings settings, ref double seconds)
     {
         (TerrainProfile profile, ulong seed, _, _, _) = _key!.Value;
         bool detail = settings.Kind == MeshKind.View && settings.Detail;
-        var key = (detail, settings.Materials);
+        ForestPlacement forest = settings.Materials ? settings.Forest : ForestPlacement.None;
+        var key = (detail, settings.Materials, forest);
         if (_hierarchy is null || _hierarchyKey != key)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            MaterialField? materials = settings.Materials ? Materials() : null;
+            MaterialField? materials = settings.Materials ? Materials(forest) : null;
             ISurfaceDetail wanted = !detail ? TerrainDetail.None
                 : materials is not null ? new MaterialDetail(seed, materials)
                 : new TerrainDetail(seed, _world!.Surface.CellSize);

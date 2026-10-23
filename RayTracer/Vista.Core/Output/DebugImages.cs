@@ -87,8 +87,8 @@ public static class DebugImages
     }
 
     /// <summary>
-    /// The legend colour of the ground's materials (vista-plan §10 M1.12): hard rock pale blue-grey, soft rock dark slate, scree sand,
-    /// soil brown, grass green; any other key a palette colour by its id.
+    /// The legend colour of the ground's materials (vista-plan §10 M1.12, M1.12b): hard rock pale blue-grey, soft rock dark slate, scree
+    /// sand, soil brown, grass green, forest dark green; any other key a palette colour by its id.
     /// </summary>
     public static (byte R, byte G, byte B) MaterialColor(string key, int id) => key switch
     {
@@ -97,6 +97,7 @@ public static class DebugImages
         "scree" => (214, 196, 156),
         "soil" => (150, 98, 56),
         "grass" => (88, 158, 62),
+        "forest" => (24, 72, 40),
         _ => PaletteColor(id),
     };
 
@@ -132,12 +133,13 @@ public static class DebugImages
                 float hardness = materials.BedAt((float)field.XOf(i), (float)field.ZOf(j), field[i, j]).Hardness;
                 (byte R, byte G, byte B) rock = MaterialColor(hardness >= 0.5f ? "rock.hard" : "rock.soft", 0);
                 (byte R, byte G, byte B) scree = MaterialColor("scree", 0), loam = MaterialColor("soil", 0), grass = MaterialColor("grass", 0);
+                (byte R, byte G, byte B) forest = MaterialColor("forest", 0);
                 double stony = 0.65 * w.Stony;
                 (double R, double G, double B) soil = (loam.R + (scree.R - loam.R) * stony, loam.G + (scree.G - loam.G) * stony, loam.B + (scree.B - loam.B) * stony);
                 double dry = 1.0 - 0.45 * w.Wet;
-                double r = (w.Rock * rock.R + w.Scree * scree.R + w.Soil * soil.R + w.Grass * grass.R) * dry;
-                double g = (w.Rock * rock.G + w.Scree * scree.G + w.Soil * soil.G + w.Grass * grass.G) * dry;
-                double b = (w.Rock * rock.B + w.Scree * scree.B + w.Soil * soil.B + w.Grass * grass.B) * dry + 60.0 * w.Wet;
+                double r = (w.Rock * rock.R + w.Scree * scree.R + w.Soil * soil.R + w.Grass * grass.R + w.Forest * forest.R) * dry;
+                double g = (w.Rock * rock.G + w.Scree * scree.G + w.Soil * soil.G + w.Grass * grass.G + w.Forest * forest.G) * dry;
+                double b = (w.Rock * rock.B + w.Scree * scree.B + w.Soil * soil.B + w.Grass * grass.B + w.Forest * forest.B) * dry + 60.0 * w.Wet;
                 Put(bytes, row * size + col, (
                     (byte)Math.Round(Math.Clamp(light * r, 0.0, 255.0)),
                     (byte)Math.Round(Math.Clamp(light * g, 0.0, 255.0)),

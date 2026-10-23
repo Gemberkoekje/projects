@@ -92,12 +92,13 @@ internal static class GpuSelfTest
         double ground = Places.BaseAltitude(recipe, almanac.Place).Metres;
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         CameraSpec camera = SelfTestCamera;
-        MaterialField materials = MaterialFieldOf(recipe, seed, eroded);
+        GroundCover cover = GroundCover.For(Weather.Climate.For(almanac.Place), almanac.Place.LatitudeDegrees);
+        MaterialField materials = MaterialFieldOf(recipe, seed, eroded, cover, ground);
         TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new MaterialDetail(seed, materials), materials);
         TerrainMesh mesh = MeshFor(hierarchy, camera, settings, ground);
         var scene = new VistaScene(recipe, seed, camera, terrain, mesh, almanac.Sun, MaterialCatalog.Ground, AtmosphereModel.Default, ground)
         {
-            Ground = GroundCover.For(Weather.Climate.For(almanac.Place), almanac.Place.LatitudeDegrees),
+            Ground = cover,
         };
         pass &= MeshChecks(hierarchy, scene, settings, log);
         var allAovs = new HashSet<Aov>(Enum.GetValues<Aov>());
@@ -196,11 +197,15 @@ internal static class GpuSelfTest
         return pass;
     }
 
-    /// <summary>The material field of the self-test's world (vista-plan §10 M1.12), as a preview session builds it.</summary>
-    private static MaterialField MaterialFieldOf(Recipe recipe, ulong seed, ErosionResult eroded)
+    /// <summary>
+    /// The material field of the self-test's world (vista-plan §10 M1.12), as a preview session builds it, with the detail weights of
+    /// <paramref name="cover"/>'s forest on a world whose height 0 lies <paramref name="groundAltitude"/> above sea level (M1.12b).
+    /// </summary>
+    private static MaterialField MaterialFieldOf(Recipe recipe, ulong seed, ErosionResult eroded, GroundCover cover, double groundAltitude)
     {
         StrataGrid strata = WorldBuilder.StrataOf(recipe, seed, eroded.Surface, eroded.Strata, out RockHardness rock);
-        return MaterialField.For(eroded.Surface, eroded, strata, rock.Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed));
+        return MaterialField.For(eroded.Surface, eroded, strata, rock.Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed))
+            .WithForest(eroded.Surface, Cli.PreviewSession.ForestOf(cover, groundAltitude), MaterialRules.Default);
     }
 
     /// <summary>
@@ -214,14 +219,15 @@ internal static class GpuSelfTest
     private static bool MaterialChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, ErosionResult eroded, MaterialField materials,
         TerrainHierarchy hierarchy, VistaScene scene, RenderOutput reference, TextWriter log)
     {
-        MaterialField again = MaterialFieldOf(recipe, seed, eroded);
+        MaterialField again = MaterialFieldOf(recipe, seed, eroded, scene.Ground, scene.GroundAltitudeMetres);
         var probe = new double[] { 0.0, 0.25, 0.5, 0.75, 1.0 };
         bool sameDetail = probe.All(u => probe.All(v =>
             again.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)
             == materials.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)));
         bool pass = Check(log, "the material field built twice is bit-identical",
             again.Packed.SequenceEqual(materials.Packed) && again.Beds.SequenceEqual(materials.Beds) && sameDetail
-            && again.RockGradient == materials.RockGradient && again.ScreeGradient == materials.ScreeGradient ? null : "the two builds differ");
+            && again.RockGradient == materials.RockGradient && again.ScreeGradient == materials.ScreeGradient
+            && again.CanopyGradient == materials.CanopyGradient ? null : "the two builds differ");
 
         var random = new Random(1212);
         HeightField surface = eroded.Surface;
@@ -232,24 +238,29 @@ internal static class GpuSelfTest
             places.Add(((float)x, (float)z, (float)(surface.HeightAt(x, z) + (i % 2 == 0 ? 0.0 : random.NextDouble() * 40.0))));
         }
         float[] gpu = renderer.RunMaterialProbe(scene, places);
-        MaterialConstants k = D3D12VistaRenderer.MaterialConstantsFor(scene, DiffuseModel.OrenNayar, 1080);
+        MaterialConstants k = D3D12VistaRenderer.MaterialConstantsFor(scene, DiffuseModel.OrenNayar, CanopyModel.Kernels, 1080);
         double worstWeight = 0.0, worstHardness = 0.0, worstSlope = 0.0;
+        int forested = 0;
         for (int i = 0; i < places.Count; i++)
         {
             (float x, float z, float height) = places[i];
             (float nx, float nz) = hierarchy.MapNormal(x, z);
             MaterialInputs inputs = materials.Inputs(x, z, height, nx, nz, (float)scene.GroundAltitudeMetres, k);
             MaterialWeights w = MaterialRules.Evaluate(inputs, k);
-            ReadOnlySpan<float> g = gpu.AsSpan(i * 8, 8);
-            foreach ((float a, float b) in new[] { (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]) })
+            ReadOnlySpan<float> g = gpu.AsSpan(i * 12, 12);
+            foreach ((float a, float b) in new[] { (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]), (w.Forest, g[8]) })
                 worstWeight = Math.Max(worstWeight, Math.Abs(a - b));
             worstHardness = Math.Max(worstHardness, Math.Abs(inputs.Hardness - g[6]));
             worstSlope = Math.Max(worstSlope, Math.Abs(inputs.SlopeDegrees - g[7]));
+            forested += w.Forest > 0.5f ? 1 : 0;
         }
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"  materials at {places.Count} places: worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
+            $"  materials at {places.Count} places ({forested} mostly forest): worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
         pass &= Check(log, "the shader's material rules match the C# reference", worstWeight <= 2e-3 && worstHardness <= 2e-3 && worstSlope <= 0.02 ? null
             : string.Create(CultureInfo.InvariantCulture, $"worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
+        // Seed 42's lowest valleys stand some 400 m above Zermatt's valley floor: 2.1% of its places are mostly forest (vista-log/M1.12b.md).
+        pass &= Check(log, "the parity check reaches the forest", forested >= places.Count / 100 ? null
+            : string.Create(CultureInfo.InvariantCulture, $"only {forested} of {places.Count} places are mostly forest"));
 
         var seen = new HashSet<int>();
         foreach (float id in reference.Aovs[Aov.MaterialId])

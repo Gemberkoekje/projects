@@ -56,10 +56,12 @@ public static class SheetLabels
         ("image.lightSampling", "lights"),
         ("image.diffuse", "diffuse"),
         ("image.quadrature", "quadrature"),
+        ("image.canopy", "canopy"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
         ("mesh", "mesh"),
         ("materials", "materials"),
+        ("forest", "forest"),
         ("build", "build"),
     ];
 
@@ -161,10 +163,14 @@ public static class SheetLabels
             fields["image.diffuse"] = image["diffuse"] is JsonValue diffuse ? Display(diffuse) : "lambert";
             // The hero wavelengths and their weights (schema 18); every build before it used the engine's.
             fields["image.quadrature"] = image["quadrature"] is JsonValue quadrature ? Display(quadrature) : "engine";
+            // How the forest's canopy scattered (schema 19); no build before it grew a forest.
+            fields["image.canopy"] = image["canopy"] is JsonValue canopy ? Display(canopy) : "none";
         }
 
         // The ground's materials (schema 17): by rule, or M0's single one, as every build before it.
         fields["materials"] = root["materials"]?["byRule"] is JsonValue byRule && byRule.GetValueKind() == JsonValueKind.True ? "by rule" : "M0";
+        // Forest below the tree line (schema 19); none before it.
+        fields["forest"] = root["materials"]?["forest"] is JsonValue forest && forest.GetValueKind() == JsonValueKind.True ? "on" : "off";
 
         // How the PNG was metered (schema 11); every build before it used the average meter.
         if (root["exposure"] is JsonObject exposure)
@@ -295,6 +301,8 @@ public static class SheetLabels
                 "materials" => value == "by rule" ? null : "M0 material",
                 "image.diffuse" => value == "orenNayar" ? null : $"{value} diffuse",
                 "image.quadrature" => value == "bins" ? null : $"{value} wavelengths",
+                "image.canopy" => value is "kernels" or "none" ? null : $"{value} canopy",
+                "forest" => value == "on" ? null : "no forest",
                 _ => $"{Short(key)} {value}",
             };
             if (part is not null)

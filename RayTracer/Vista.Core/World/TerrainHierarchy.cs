@@ -198,8 +198,9 @@ public sealed class TerrainHierarchy
         int levels = 2 * rootLog;
         (float[] analyticError, float[] analyticRadius) = AnalyticBounds(levels, rootLog, subUnit, detail, slope);
         double[][] kindBounds = KindBounds(levels, rootLog, subUnit, detail);
+        float[] openError = OpenBounds(levels, rootLog, subUnit, detail, analyticError);
 
-        var builder = new Builder(stores, data, analyticError, analyticRadius, root, subUnit, detail);
+        var builder = new Builder(stores, data, analyticError, openError, analyticRadius, root, subUnit, rootOrigin, detail);
         builder.Heights(rootLog);
         builder.Saturate(rootLog);
 
@@ -558,6 +559,24 @@ public sealed class TerrainHierarchy
         return (error, radius);
     }
 
+    /// <summary>
+    /// The detail's bound for every level's edge where its regional kind does not lie (<see cref="ISurfaceDetail.OpenBound"/>, vista-plan
+    /// §10 M1.12b): what a grid-level vertex with no forest in its box takes. The analytic error itself for a detail alike everywhere.
+    /// </summary>
+    private static float[] OpenBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail, float[] analyticError)
+    {
+        if (!detail.Regional)
+            return analyticError;
+        var error = new float[levels];
+        for (int level = 0; level < levels; level++)
+        {
+            int t = rootLog - 1 - level / 2;
+            double s = (1 << t) * subUnit;
+            error[level] = Math.Min(RoundUp(detail.OpenBound(level % 2 == 0 ? 2.0 * s * Math.Sqrt(2.0) : 2.0 * s)), analyticError[level]);
+        }
+        return error;
+    }
+
     /// <summary>The detail's kinds' bounds for every level's edge (<see cref="ISurfaceDetail.KindBounds"/>), for <see cref="SubGridError"/>.</summary>
     private static double[][] KindBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail)
     {
@@ -584,23 +603,41 @@ public sealed class TerrainHierarchy
         private readonly Store[] _stores;
         private readonly (Grid Grid, float[] Heights)[] _data;
         private readonly float[] _analyticError;
+        private readonly float[] _openError;
         private readonly float[] _analyticRadius;
         private readonly int _root;
         private readonly double _subUnit;
+        private readonly double _rootOrigin;
         private readonly ISurfaceDetail _detail;
         private readonly int _rootLog;
 
-        public Builder(Store[] stores, (Grid, float[])[] data, float[] analyticError, float[] analyticRadius, int root, double subUnit,
-            ISurfaceDetail detail)
+        public Builder(Store[] stores, (Grid, float[])[] data, float[] analyticError, float[] openError, float[] analyticRadius, int root,
+            double subUnit, double rootOrigin, ISurfaceDetail detail)
         {
             _stores = stores;
             _data = data;
             _analyticError = analyticError;
+            _openError = openError;
             _analyticRadius = analyticRadius;
             _root = root;
             _subUnit = subUnit;
+            _rootOrigin = rootOrigin;
             _detail = detail;
             _rootLog = BitOperations.Log2((uint)root);
+        }
+
+        /// <summary>
+        /// The detail's bound for grid-level vertex (<paramref name="i"/>, <paramref name="j"/>) of level <paramref name="level"/>
+        /// (vista-plan §10 M1.12b): the bound everywhere where its box, which holds its edge and every descendant's, holds forest, and the
+        /// bound without the canopy elsewhere; a detail alike everywhere has the one.
+        /// </summary>
+        private double DetailError(int i, int j, int level, int t, bool diagonal)
+        {
+            if (!_detail.Regional)
+                return _analyticError[level];
+            double half = ((diagonal ? 3L << t : 2L << t) - 1) * _subUnit;
+            double x = _rootOrigin + i * _subUnit, z = _rootOrigin + j * _subUnit;
+            return _detail.CanopyIn(x - half, z - half, x + half, z + half) ? _analyticError[level] : _openError[level];
         }
 
         /// <summary>The root's corners, then every level from the coarsest down: a sample's height, or its edge's mean.</summary>
@@ -636,7 +673,7 @@ public sealed class TerrainHierarchy
                     (int i0, int j0, int i1, int j1) = SplitEdge(i, j, t, diagonal);
                     float h = store.Height[k];
                     double own = Math.Abs(h - (HeightAnywhere(i0, j0) + HeightAnywhere(i1, j1)) * 0.5f);
-                    double error = own + _analyticError[levelIndex];
+                    double error = own + DetailError(i, j, levelIndex, t, diagonal);
                     double radius = _detail.MaxAmplitude;
                     Span<(int I, int J)> children = stackalloc (int, int)[4];
                     int count = Children(i, j, t, diagonal, children);

@@ -144,6 +144,12 @@ public sealed record PreviewRequest
     /// <summary>How diffuse surfaces scatter (vista-plan §10 M1.12): <c>--diffuse orenNayar</c> (the default) or <c>lambert</c>.</summary>
     public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
 
+    /// <summary>Whether forest grows below the place's tree line (vista-plan §10 M1.12b): <c>--forest on</c> (the default) or <c>off</c>.</summary>
+    public bool Forest { get; init; } = true;
+
+    /// <summary>How the forest's canopy scatters (vista-plan §10 M1.12b): <c>--canopy kernels</c> (the default) or <c>rough</c>.</summary>
+    public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
+
     /// <summary>
     /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a): <c>--quadrature bins</c> (the
     /// default) or <c>engine</c>.
@@ -163,6 +169,7 @@ public sealed record PreviewRequest
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature bins | engine]
+///           [--forest on | off] [--canopy kernels | rough]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--dither on | off] [--png16]
 /// </code>
@@ -187,6 +194,8 @@ public sealed record PreviewRequest
 /// their detail (M1.12), and <c>--diffuse lambert</c> scatters light as Lambert's surfaces do instead of rough ones.
 /// <c>--quadrature engine</c> traces the engine's hero wavelengths with the engine's weights instead of Vista's own bins (M1.12a):
 /// <c>main</c>'s colours before M1.12a, cast and all.
+/// <c>--forest off</c> grows no forest below the tree line (M1.12's ground: meadow and soil there), and <c>--canopy rough</c> shades
+/// the forest as rough diffuse ground instead of by its canopy's kernels (M1.12b).
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
@@ -217,6 +226,8 @@ public static class PreviewCommandLine
         "  over smooth detail. --diffuse orenNayar (default) | lambert: rough diffuse surfaces, or Lambert's.\n" +
         "--quadrature bins (default) | engine: the hero wavelengths and their weights, Vista's own 50 bins of equal colour mass,\n" +
         "  or the engine's table (before M1.12a; every colour 1.7-4 dE off).\n" +
+        "--forest on (default) | off: forest below the place's tree line, or M1.12's meadow and soil there.\n" +
+        "  --canopy kernels (default) | rough: the canopy's own scattering (its crowns' shadows and hot spot), or rough diffuse ground.\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
@@ -293,7 +304,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature",
+        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -381,6 +392,8 @@ public static class PreviewCommandLine
         PngDither dither = Dither(values.GetValueOrDefault("--dither"), problems);
         DiffuseModel diffuse = Diffuse(values.GetValueOrDefault("--diffuse"), problems);
         Quadrature quadrature = QuadratureOf(values.GetValueOrDefault("--quadrature"), problems);
+        bool forest = OnOff(values.GetValueOrDefault("--forest"), "--forest", problems);
+        CanopyModel canopy = CanopyOf(values.GetValueOrDefault("--canopy"), problems);
 
         if (problems.Count > before)
             return null;
@@ -415,7 +428,38 @@ public static class PreviewCommandLine
             BitDepth = flags.Contains("--png16") ? 16 : DisplayTransform.DefaultBitDepth,
             Diffuse = diffuse,
             Quadrature = quadrature,
+            Forest = forest,
+            Canopy = canopy,
         };
+    }
+
+    /// <summary>Parses an on/off option's value; on when it is not given.</summary>
+    private static bool OnOff(string? text, string option, List<string> problems)
+    {
+        switch (text)
+        {
+            case null or "on":
+                return true;
+            case "off":
+                return false;
+            default:
+                problems.Add($"{option} must be on or off, got '{text}'.");
+                return true;
+        }
+    }
+
+    /// <summary>Parses a <c>--canopy</c> value (<c>kernels</c> or <c>rough</c>).</summary>
+    internal static bool TryParseCanopy(string text, out CanopyModel canopy) =>
+        Enum.TryParse(text, ignoreCase: true, out canopy) && canopy != CanopyModel.None && Enum.IsDefined(canopy) && !int.TryParse(text, out _);
+
+    private static CanopyModel CanopyOf(string? text, List<string> problems)
+    {
+        if (text is null)
+            return CanopyModel.Kernels;
+        if (TryParseCanopy(text, out CanopyModel canopy))
+            return canopy;
+        problems.Add($"--canopy must be kernels or rough, got '{text}'.");
+        return CanopyModel.Kernels;
     }
 
     /// <summary>Parses a <c>--diffuse</c> value (<c>orenNayar</c> or <c>lambert</c>).</summary>

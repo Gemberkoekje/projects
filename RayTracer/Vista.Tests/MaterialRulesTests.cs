@@ -12,12 +12,13 @@ namespace Vista.Tests;
 [TestClass]
 public sealed class MaterialRulesTests
 {
-    private static readonly MaterialConstants K = MaterialRules.Default.Constants(2900f, 1f, 1234u);
+    /// <summary>M1.12's rules: no forest (<see cref="ForestTests"/> has the forest's).</summary>
+    private static readonly MaterialConstants K = MaterialRules.Default.Constants(2900f, 1f, 1234u, 2300f, false);
 
     /// <summary>A place on bare, dry ground of middling rock below the grass line, with no breakup.</summary>
     private static MaterialInputs Place(float slope = 10f, float loose = 0f, float hardness = 0.5f, float altitude = 2000f, float poleward = 0f,
         float area = 1000f, float water = 0f, float b1 = 0f, float b2 = 0f) =>
-        new(slope, poleward, altitude, loose, MathF.Log10(area), water, hardness, b1, b2);
+        new(slope, poleward, altitude, loose, MathF.Log10(area), water, hardness, b1, b2, 0f);
 
     private static MaterialWeights Weigh(MaterialInputs p) => MaterialRules.Evaluate(p, K);
 
@@ -86,12 +87,13 @@ public sealed class MaterialRulesTests
         {
             var p = new MaterialInputs((float)(random.NextDouble() * 90.0), (float)(random.NextDouble() * 2.0 - 1.0), (float)(random.NextDouble() * 5000.0),
                 (float)(random.NextDouble() * 50.0), (float)(1.0 + random.NextDouble() * 8.0), (float)(random.NextDouble() * 3.0), (float)random.NextDouble(),
-                (float)(random.NextDouble() * 2.0 - 1.0), (float)(random.NextDouble() * 2.0 - 1.0));
+                (float)(random.NextDouble() * 2.0 - 1.0), (float)(random.NextDouble() * 2.0 - 1.0), (float)(random.NextDouble() * 2.0 - 1.0));
             MaterialWeights w = Weigh(p);
             foreach (float v in new[] { w.Rock, w.Scree, w.Soil, w.Grass, w.Wet, w.Stony })
                 Assert.IsTrue(v is >= -1e-6f and <= 1f + 1e-6f, $"{w} at {p}");
             Assert.AreEqual(1f, w.Rock + w.Scree + w.Soil + w.Grass, 1e-5f, $"{w} at {p}");
             Assert.AreEqual(w.Soil + w.Grass, w.Smooth, 1e-6f);
+            Assert.AreEqual(0f, w.Forest, "no forest without it");
         }
     }
 
@@ -120,11 +122,16 @@ public sealed class MaterialRulesTests
     {
         int size = Unsafe.SizeOf<MaterialConstants>();
         Assert.AreEqual(0, size % 16);
-        Assert.IsTrue(size <= 256, $"{size} bytes");
+        Assert.AreEqual(336, size, "twenty-one rows since M1.12b's forest; the shader's buffer holds 512 bytes");
         Assert.AreEqual(MathF.Log10(MaterialRules.Default.ChannelAreaFromSquareMetres), K.ChannelLogFrom);
         Assert.AreEqual(2900f, K.GrassLine);
         Assert.AreEqual(1234u, K.NoiseSeed);
         Assert.AreEqual(MaterialRules.Default.LaminaePerMetre * RockHardness.TableSpacingMetres, K.LaminaePerEntry);
+        Assert.AreEqual(2300f, K.TreeLine);
+        Assert.AreEqual(0u, K.Forest);
+        Assert.AreEqual(1u, MaterialRules.Default.Constants(2900f, 1f, 1234u, 2300f, true).Forest);
+        Assert.AreEqual(MathF.Log10(MaterialRules.Default.MoistAreaToSquareMetres), K.MoistLogTo);
+        Assert.AreEqual(MaterialRules.Default.CanopyAlbedoScale, K.CanopyIso);
     }
 
     [TestMethod]

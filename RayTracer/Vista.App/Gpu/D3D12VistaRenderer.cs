@@ -180,18 +180,18 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     /// </summary>
     private static void CheckConstantLayouts()
     {
-        foreach ((string name, int size) in new[]
+        foreach ((string name, int size, int capacity) in new[]
         {
-            (nameof(IntegratorConstants), Unsafe.SizeOf<IntegratorConstants>()),
-            (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>()),
-            (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>()),
-            (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>()),
-            (nameof(ErosionConstants), Unsafe.SizeOf<ErosionConstants>()),
-            (nameof(MaterialConstants), Unsafe.SizeOf<MaterialConstants>()),
+            (nameof(IntegratorConstants), Unsafe.SizeOf<IntegratorConstants>(), ConstantBufferBytes),
+            (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>(), ConstantBufferBytes),
+            (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>(), ConstantBufferBytes),
+            (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>(), ConstantBufferBytes),
+            (nameof(ErosionConstants), Unsafe.SizeOf<ErosionConstants>(), ConstantBufferBytes),
+            (nameof(MaterialConstants), Unsafe.SizeOf<MaterialConstants>(), MaterialConstantBytes),
         })
         {
-            if (size > ConstantBufferBytes || size % 16 != 0)
-                throw new InvalidOperationException($"{name} is {size} bytes; constant buffers here hold {ConstantBufferBytes} in 16-byte rows.");
+            if (size > capacity || size % 16 != 0)
+                throw new InvalidOperationException($"{name} is {size} bytes; its constant buffer holds {capacity} in 16-byte rows.");
         }
     }
 
@@ -279,7 +279,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         }
 
         IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask, skySampling);
-        Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Height));
+        Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Canopy, settings.Height));
         double traceSeconds = 0.0;
         double longest = 0.0;
         double maxCostNs = 0.0;

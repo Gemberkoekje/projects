@@ -52,7 +52,7 @@ public sealed class MaterialFieldTests
     public void AtASample_TheMapsDecodeToWhatWasStored_AndTheBedToTheStrata()
     {
         (HeightField surface, ErosionResult erosion, StrataGrid strata, _, MaterialField field) = World.Value;
-        MaterialConstants k = field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed));
+        MaterialConstants k = field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed, 0f, false));
         int n = surface.Size;
         foreach ((int i, int j) in new[] { (10, 32), (32, 23), (50, 40) })
         {
@@ -72,7 +72,7 @@ public sealed class MaterialFieldTests
     public void TheMapsFadeAtTheGridsEdge_AndAwayFromItTheGroundReadsTheDefaults()
     {
         (HeightField surface, _, _, _, MaterialField field) = World.Value;
-        MaterialConstants k = field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed));
+        MaterialConstants k = field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed, 0f, false));
         MaterialInputs edge = field.Inputs((float)surface.XOf(0), (float)surface.ZOf(32), 500f, 0f, 0f, 0f, k);
         Assert.AreEqual(0f, edge.LooseMetres, 1e-3f, "scree stored at the edge fades with the surface");
         MaterialInputs away = field.Inputs(1e5f, 0f, 500f, 0f, 0f, 0f, k);
@@ -109,9 +109,9 @@ public sealed class MaterialFieldTests
         {
             double x = surface.OriginX + random.NextDouble() * extent, z = surface.OriginZ + random.NextDouble() * extent;
             double length = random.NextDouble() * 300.0, a = random.NextDouble() * 2.0 * Math.PI;
-            (double rock, double scree) = field.DetailWeightsAt(x, z);
+            (double rock, double scree, _) = field.DetailWeightsAt(x, z);
             Assert.IsTrue(rock is >= 0.0 and <= 1.0 && scree is >= 0.0 and <= 1.0 && rock + scree <= 1.0 + 1e-12);
-            (double rock2, double scree2) = field.DetailWeightsAt(x + length * Math.Cos(a), z + length * Math.Sin(a));
+            (double rock2, double scree2, _) = field.DetailWeightsAt(x + length * Math.Cos(a), z + length * Math.Sin(a));
             Assert.IsTrue(Math.Abs(rock2 - rock) <= field.RockGradient * length + 1e-9, "rock");
             Assert.IsTrue(Math.Abs(scree2 - scree) <= field.ScreeGradient * length + 1e-9, "scree");
             Assert.IsTrue(Math.Abs(rock2 + scree2 - rock - scree) <= field.SmoothGradient * length + 1e-9, "smooth");
@@ -122,7 +122,7 @@ public sealed class MaterialFieldTests
     public void TheSamplesWeights_CoverEverySample()
     {
         (HeightField surface, _, _, _, MaterialField field) = World.Value;
-        MaterialWeights[] weights = field.SampleWeights(surface, field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed)), 1000f);
+        MaterialWeights[] weights = field.SampleWeights(surface, field.Apply(MaterialRules.Default.Constants(2900f, 1f, field.NoiseSeed, 0f, false)), 1000f);
         Assert.AreEqual(surface.Size * surface.Size, weights.Length);
         Assert.IsTrue(weights.All(w => Math.Abs(w.Rock + w.Scree + w.Soil + w.Grass - 1f) < 1e-5f));
         Assert.IsTrue(weights.Any(w => w.Scree > 0.5f) && weights.Any(w => w.Rock > 0.5f) && weights.Any(w => w.Grass > 0.5f));
@@ -182,7 +182,7 @@ public sealed class MaterialFieldTests
         for (int i = 0; i < 2000; i++)
         {
             double x = surface.OriginX + random.NextDouble() * surface.Extent, z = surface.OriginZ + random.NextDouble() * surface.Extent;
-            (double rock, double scree) = field.DetailWeightsAt(x, z);
+            (double rock, double scree, _) = field.DetailWeightsAt(x, z);
             double expected = (1.0 - rock - scree) * detail.Smooth.Height(x, z) + rock * detail.Rock.Height(x, z) + scree * detail.Scree.Height(x, z);
             Assert.AreEqual(expected, detail.Height(x, z), 1e-9);
         }
