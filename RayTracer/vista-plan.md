@@ -8,8 +8,8 @@ render a recipe + seed end to end on the RTX 3070 through offline integrator v0.
 twenty-five slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
-M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness) and M1.12 (materials by
-rule) are done, M1.12a (the colour quadrature, found in M1.12) is next, then M1.12b (forest as material) and
+M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
+rule) and M1.12a (the colour quadrature) are done, M1.12b (forest as material) is next, then
 M1.13 (snow and glaciers). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
@@ -531,9 +531,13 @@ local cache, never redistributed.
 
 ### 6.4 Wavelength grid
 
-All tables are resampled once (into the cache) onto the engine's wavelength grid, so the
+All tables are resampled once (into the cache) onto one wavelength grid, so the
 integrator only ever sees one grid. The visible range drives the image; measured data
-outside it is dropped at import.
+outside it is dropped at import. Since M1.12a the grid is Vista's own (`WavelengthTable`): 50 bins of
+equal x̄ + ȳ + z̄ mass, each wavelength the whole nanometre at its bin's median (413–661 nm), weighted by
+the bin's own integrals of x̄, ȳ and z̄, so colour integrates true to within 1 ΔE₇₆ of dense integration.
+The engine's grid (419–651 nm, weighted by the inverse of x̄ + ȳ + z̄ at each point) stays the maze's, and
+Vista's with `--quadrature engine`, for `main`'s images before M1.12a.
 
 ---
 
@@ -667,7 +671,10 @@ integrator v0, see the end of this list):**
   (the M0 sun), `JobSystem.ToSRGB` (XYZ → linear sRGB, so Vista and the maze agree on
   colour), and `LensOptions`' focal-length convention (pinned by a test). Integrator v0
   added `WavelengthLookup` / `SpectralResources` (hero wavelengths, `DeterXYZ`), a port of
-  `Sky.DomeRadiance`, and `RgbToReflectanceBasis` for built-in-tier materials.
+  `Sky.DomeRadiance`, and `RgbToReflectanceBasis` for built-in-tier materials. Since M1.12a Vista
+  integrates colour on its own wavelength table (§6.4) and upsamples colours with its own port of
+  the basis (`ReflectanceBasis`, the engine's arithmetic for any table); `WavelengthLookup` and
+  `SpectralResources` remain for `--quadrature engine` only, and the CIE data is still the engine's file.
 
 **Confirmed at runtime (2026-10-19).** The assessment held with no surprises: `ShaderCompiler`
 compiles `VistaIntegrator.hlsl` (SM 6.5, inline `RayQuery`, wave intrinsics) unchanged, behind the
@@ -1333,6 +1340,24 @@ Log: [`vista-log/M1.12.md`](vista-log/M1.12.md).
   `--gpu-selftest` with the atmosphere's checks at the new wavelengths; a cost-ledger row (expected
   unchanged: only the tables change).
 
+*Status (2026-10-23): done.* Colour integrates true: Vista traces its own 50 wavelengths, the medians of 50 bins of equal
+colour-matching mass (413–661 nm), each weighted by its bin's own integrals (`WavelengthTable`, `--quadrature bins|engine`, sidecar
+schema 18). Every spectrum the CI checks (flat, M1.12's ground, water, the sun through 1 to 20 air masses, a Rayleigh sky) lands within
+0.93 ΔE₇₆ and 0.44% in luminance of dense 1 nm integration, where the engine's table missed by 2.3–8.3 and up to 2.7%, each colour
+judged at the luminance of white (stricter than M1.12's figures above; at a grey of half that luminance the two agree). The twilight
+light on a 0.9 reflector misses by 1.08, the last wavelength standing for everything past 650 nm; a last bin of three quarters of a
+bin's mass (665 nm) would take it to 0.92 and the sky stays 0.09 (measured, not taken: the bins stay equal until the user decides, and
+M1.13 re-runs the case with snow's spectrum). In the renders each view moves as its light predicts and always away from green: the sky
+4.16 ΔE₇₆ (a Rayleigh sky predicts 4.14), the daylit ground 3.25–3.32, down the slope at golden hour 3.96, M1.12's close-ups 2.06–2.60
+(`m1-12a-ledger.png`, `m1-12a-closeups.png`); the incident meter's exposure moves 0.001 EV; the sky view's red channel at 0 falls from
+95.3% of its pixels to 86.2%. `--quadrature engine` renders `main`'s images byte for byte, denoised and albedo too, and a sample costs
+what it did (the cost ledger). *Judge this:* truer colour, not a new look: the sky a shade less teal, sunlit bare rock less
+green-grey, grass nearly unchanged (the middle columns of the two sheets against the left; the maps show where). *Ignore this:* warm
+greys (no white balance yet, M1.17); the sky's deep cobalt and the close-ups' saturated greens (the look, M1.17); grass as a carpet and
+no forest (M5, M1.12b). *Questions:* does the middle column's sky read more like a clear alpine sky than the left one, or can you not
+tell them apart? Does the bare rock read as plain grey stone or still faintly green (against a photo of limestone at midday)?
+Log: [`vista-log/M1.12a.md`](vista-log/M1.12a.md).
+
 **M1.12b — Forest as material.**
 - *Goal:* forested lower slopes that read as forest from a distance, so the aerial and range views
   get their dark depth and colour before M5's trees, and the snow (M1.13) is tuned with the forest in
@@ -1601,7 +1626,10 @@ style.
   419–651 nm, leaves only 1.8–1.9% of the functions' mass out at each end and is not the cause). 50 equal-mass bins with each
   wavelength at its bin's median, weighted by the bin's own integrals of x̄, ȳ and z̄, give 0.0–0.9 ΔE₇₆ on every one, for no cost
   per sample. The hero table is the maze's too (§9.2), so M1.12a gives Vista its own, gated, before snow, ice and water (M1.13, M3)
-  and the M1.17 look; the maze keeps the cast (the engine's `plan.md` could take the same fix).
+  and the M1.17 look; the maze keeps the cast (the engine's `plan.md` could take the same fix). *Done (M1.12a):* every checked
+  spectrum within 0.93 ΔE₇₆ at the luminance of white but **light past 650 nm**: the twilight light on snow misses by 1.08, since one
+  wavelength (661 nm) stands for the whole last bin; a last bin of three quarters of a bin's mass takes it to 0.92 if M1.13's snow
+  or the alpenglow needs it (`vista-log/M1.12a.md`).
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus

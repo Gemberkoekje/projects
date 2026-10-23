@@ -33,4 +33,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.11c.md`](M1.11c.md) | Output finish |
 | [`M1.11d.md`](M1.11d.md) | Uplift & rock hardness |
 | [`M1.12.md`](M1.12.md) | Materials by rule |
+| [`M1.12a.md`](M1.12a.md) | Colour quadrature |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

@@ -27,6 +27,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.11c | 0.22 | 4.04 | 2.69 | 6.44 |
 | M1.11d | 0.26 | 3.79 | 2.63 | 5.82 |
 | M1.12 | 0.25 | 5.64 | 4.08 | 8.15 |
+| M1.12a | 0.25 | 5.63 | 4.08 | 8.17 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -110,3 +111,8 @@ default views against `main`: this build with `--materials off` (the same kernel
 measurable; the materials' evaluation costs 45–55% a sample. If that matters, the levers are fewer reads and noises per hit (the
 codes, the bed's entry and the normal packed into one read; the sharpening's and the meadow's noises folded into the breakup's),
 with the self-test's parity probe keeping C# and the shader in step.
+M1.12a changes only the spectral tables (Vista's own 50 wavelengths and their weights; vista-log/M1.12a.md): the shader and the rays
+are the same. Measured as M1.12 was: this slice and `main` (3f75fcff) rendered alternately, view by view, three rounds, on a GPU shared
+with other programs: median ratios 1.012, 0.998, 0.999 and 1.003 (1.001–1.154, 0.995–1.008, 0.961–1.001, 0.855–1.004; the first
+round's spread was the other load settling), at the same rays per sample (1.00, 3.03, 2.60, 3.62). The row is M1.12's times those
+medians: no change beyond the noise.
