@@ -1,4 +1,5 @@
 using Vista.Atmosphere;
+using Vista.Rendering;
 
 namespace Vista.Tests;
 
@@ -44,12 +45,15 @@ public sealed class AtmosphereScatteringTests
     [TestMethod]
     public void TableWavelengths_AreHeroesAndInterpolateInOrder()
     {
-        IReadOnlyList<float> positions = AtmosphereScattering.MsPositions;
-        Assert.AreEqual(50, positions.Count);
-        for (int l = 0; l < AtmosphereScattering.MsWavelengths; l++)
-            Assert.AreEqual(l, positions[AtmosphereScattering.HeroOf(l)], 1e-6, $"table wavelength {l}");
-        for (int i = 1; i < positions.Count; i++)
-            Assert.IsTrue(positions[i] >= positions[i - 1], "the hero cycle is in ascending wavelength");
+        foreach (WavelengthTable table in new[] { WavelengthTable.Bins, WavelengthTable.Engine })
+        {
+            IReadOnlyList<float> positions = table.MsPositions;
+            Assert.AreEqual(50, positions.Count);
+            for (int l = 0; l < AtmosphereScattering.MsWavelengths; l++)
+                Assert.AreEqual(l, positions[AtmosphereScattering.HeroOf(l)], 1e-6, $"{table.Quadrature}: table wavelength {l}");
+            for (int i = 1; i < positions.Count; i++)
+                Assert.IsTrue(positions[i] > positions[i - 1], $"{table.Quadrature}: the hero cycle is in ascending wavelength");
+        }
         Assert.AreEqual(49, AtmosphereScattering.HeroOf(AtmosphereScattering.MsWavelengths - 1));
     }
 

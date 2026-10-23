@@ -118,7 +118,7 @@ public sealed class IncidentMeterTests
     [TestMethod]
     public void TheExposure_PutsTheGreyCardAtMiddleGrey()
     {
-        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0);
+        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, WavelengthTable.Bins);
         double[] Flat(double v) => [.. Enumerable.Repeat(v, AtmosphereLuts.Wavelengths)];
         Assert.AreEqual(1.0, IncidentMeter.Luminous(Flat(1.0), tables), 1e-6, "a flat spectrum's Y is its value, as in the image");
 

@@ -246,7 +246,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
         // Each part of the air is rebuilt only when the frame changed what it depends on (M1.8 reports which).
         AtmosphereFrame frame = scene.AirFrame();
-        LutBuild luts = EnsureAtmosphere(frame);
+        WavelengthTable wavelengths = scene.Wavelengths();
+        LutBuild luts = EnsureAtmosphere(frame, wavelengths);
         if (luts.Any)
         {
             stages["atmosphereLuts"] = Lap(stopwatch);
@@ -258,7 +259,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
                 stages[RenderStageKeys.SkyView] = luts.SkyViewSeconds;
         }
 
-        IntegratorTables tables = IntegratorTables.Build(scene.Materials);
+        IntegratorTables tables = IntegratorTables.Build(scene.Materials, wavelengths);
         UploadTables(tables);
         uint mask = MaskFor(aovs);
         EnsureImageBuffers(window.Width, window.Height, mask);

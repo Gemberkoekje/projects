@@ -26,7 +26,7 @@ internal sealed partial class D3D12VistaRenderer
 
         // The camera's sky view and the columns LUT of this frame: the render before it has usually built them.
         AtmosphereFrame frame = scene.AirFrame();
-        LutBuild luts = EnsureAtmosphere(frame);
+        LutBuild luts = EnsureAtmosphere(frame, scene.Wavelengths());
         if (luts.Any)
         {
             stages["atmosphereLuts"] = Lap(stopwatch);

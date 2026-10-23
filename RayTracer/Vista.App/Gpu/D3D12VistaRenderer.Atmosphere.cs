@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Vista.Atmosphere;
+using Vista.Rendering;
 using Vortice.Direct3D12;
 
 namespace Vista.App.Gpu;
@@ -71,12 +72,12 @@ internal sealed partial class D3D12VistaRenderer
     private ID3D12Resource _groundLut = null!;
     private ID3D12Resource _skyViewLut = null!;
 
-    // Per model: the wavelength tables. Rebuilt when the model changes, with everything after them.
+    // Per model and wavelength table (M1.12a): the wavelength tables. Rebuilt when either changes, with everything after them.
     private ID3D12Resource? _atmCoefficients;
     private ID3D12Resource? _atmSun;
-    private AtmosphereModel? _tablesModel;
-    private (AtmosphereModel Model, double Ground)? _ordersKey;
-    private AtmosphereFrame? _skyFrame;
+    private (AtmosphereModel Model, Quadrature Quadrature)? _tablesKey;
+    private (AtmosphereModel Model, double Ground, Quadrature Quadrature)? _ordersKey;
+    private (AtmosphereFrame Frame, Quadrature Quadrature)? _skyFrame;
 
     // A sky check's inputs and sums, alive only during the check.
     private ID3D12Resource? _checkDirections;
@@ -136,46 +137,49 @@ internal sealed partial class D3D12VistaRenderer
     }
 
     /// <summary>
-    /// Makes the LUTs match <paramref name="frame"/>, rebuilding only what it changed: the wavelength tables and the
-    /// columns LUT follow the model; the scattering orders and the ground irradiance also follow the ground altitude;
-    /// the sky view follows everything (the sun above all). Returns what was built and its GPU seconds.
-    /// <paramref name="capture"/> receives the first iteration's tables when the orders are rebuilt.
+    /// Makes the LUTs match <paramref name="frame"/> on <paramref name="wavelengths"/>, rebuilding only what they changed: the
+    /// wavelength tables and the columns LUT follow the model and the wavelengths; the scattering orders and the ground irradiance
+    /// also follow the ground altitude; the sky view follows everything (the sun above all). Returns what was built and its GPU
+    /// seconds. <paramref name="capture"/> receives the first iteration's tables when the orders are rebuilt.
     /// </summary>
-    private LutBuild EnsureAtmosphere(AtmosphereFrame frame, Action<ScatteringOrder2>? capture = null)
+    private LutBuild EnsureAtmosphere(AtmosphereFrame frame, WavelengthTable wavelengths, Action<ScatteringOrder2>? capture = null)
     {
+        ArgumentNullException.ThrowIfNull(wavelengths);
         IReadOnlyList<string> errors = frame.Validate();
         if (errors.Count > 0)
             throw new ArgumentException("Invalid atmosphere: " + string.Join(" ", errors), nameof(frame));
         WriteAtmosphereConstants(frame);
 
         var built = new LutBuild();
-        if (!Equals(_tablesModel, frame.Model))
+        Quadrature quadrature = wavelengths.Quadrature;
+        if (_tablesKey != (frame.Model, quadrature))
         {
-            AtmosphereTables tables = AtmosphereTables.Build(frame.Model);
+            AtmosphereTables tables = AtmosphereTables.Build(frame.Model, wavelengths);
             _atmCoefficients?.Dispose();
             _atmSun?.Dispose();
             _atmCoefficients = CreateDefaultBuffer<float>(tables.Coefficients);
             _atmSun = CreateDefaultBuffer<float>(tables.Sun);
             double seconds = BuildLut(_columnsPipeline, AtmosphereLuts.ColumnsMuSize * AtmosphereLuts.ColumnsAltitudeSize, 0, new() { [LutSlot.Output] = _columnsLut });
             built = built with { Tables = true, TablesSeconds = seconds };
-            _tablesModel = frame.Model;
+            _tablesKey = (frame.Model, quadrature);
             _ordersKey = null;
             _skyFrame = null;
+            _skyLightFrame = null; // its weights are the tables' too
         }
-        if (_ordersKey != (frame.Model, frame.GroundAltitudeMetres))
+        if (_ordersKey != (frame.Model, frame.GroundAltitudeMetres, quadrature))
         {
             built = built with { Orders = true, OrdersSeconds = BuildScatteringOrders(capture) };
-            _ordersKey = (frame.Model, frame.GroundAltitudeMetres);
+            _ordersKey = (frame.Model, frame.GroundAltitudeMetres, quadrature);
             _skyFrame = null;
         }
-        if (!Equals(_skyFrame, frame))
+        if (_skyFrame != (frame, quadrature))
         {
             double seconds = BuildLut(_skyViewPipeline, AtmosphereLuts.SkyViewFloats / 2, 0, new()
             {
                 [LutSlot.Columns] = _columnsLut, [LutSlot.Weighted] = _scatterSum, [LutSlot.Ground] = _groundLut, [LutSlot.Output] = _skyViewLut,
             });
             built = built with { SkyView = true, SkyViewSeconds = seconds };
-            _skyFrame = frame;
+            _skyFrame = (frame, quadrature);
         }
         return built;
     }
@@ -276,16 +280,16 @@ internal sealed partial class D3D12VistaRenderer
     }
 
     /// <summary>
-    /// Builds the LUTs for <paramref name="frame"/> (if they are not already) and reads them back; with
-    /// <paramref name="captureOrder2"/> the orders are rebuilt and the first iteration's tables kept too.
+    /// Builds the LUTs for <paramref name="frame"/> on <paramref name="wavelengths"/> (if they are not already) and reads them back;
+    /// with <paramref name="captureOrder2"/> the orders are rebuilt and the first iteration's tables kept too.
     /// </summary>
-    public AtmosphereLutData BuildAtmosphere(AtmosphereFrame frame, bool captureOrder2, out double gpuSeconds)
+    public AtmosphereLutData BuildAtmosphere(AtmosphereFrame frame, WavelengthTable wavelengths, bool captureOrder2, out double gpuSeconds)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ScatteringOrder2? order2 = null;
         if (captureOrder2)
             _ordersKey = null;
-        gpuSeconds = EnsureAtmosphere(frame, captureOrder2 ? o => order2 = o : null).Seconds;
+        gpuSeconds = EnsureAtmosphere(frame, wavelengths, captureOrder2 ? o => order2 = o : null).Seconds;
         return new AtmosphereLutData(
             ReadFloats(_columnsLut, AtmosphereLuts.ColumnsFloats),
             ReadFloats(_scatterSum, AtmosphereScattering.FloatsPerChannel * 2),
@@ -298,24 +302,24 @@ internal sealed partial class D3D12VistaRenderer
     /// Forces the next <see cref="BuildAtmosphere"/> or render to rebuild every LUT and the sky distribution, so a
     /// determinism check really builds twice.
     /// </summary>
-    public void ForgetAtmosphere() => (_tablesModel, _ordersKey, _skyFrame, _skyLightFrame) = (null, null, null, null);
+    public void ForgetAtmosphere() => (_tablesKey, _ordersKey, _skyFrame, _skyLightFrame) = (null, null, null, null);
 
     /// <summary>
     /// The LUT air against the reference (<c>--atmosphere-check</c>): for each of <paramref name="directions"/>
-    /// from the camera of <paramref name="frame"/> and each wavelength, the LUT's radiance and
+    /// from the camera of <paramref name="frame"/> and each wavelength of <paramref name="wavelengths"/>, the LUT's radiance and
     /// <paramref name="chunks"/> × <paramref name="pathsPerThread"/> reference paths, summed per chunk, in
     /// dispatches of <paramref name="pathsPerDispatch"/> paths per thread (far below the TDR). A positive
     /// <paramref name="segmentLength"/> compares the light scattered toward the camera along a segment that long in
     /// each direction (ending on the ground sphere if it gets there first, M1.4) instead of the whole sky.
     /// </summary>
-    public SkyCheckRaw RunSkyCheck(AtmosphereFrame frame, IReadOnlyList<Vector3> directions, int chunks, int pathsPerThread, int pathsPerDispatch,
-        double segmentLength = 0.0)
+    public SkyCheckRaw RunSkyCheck(AtmosphereFrame frame, WavelengthTable wavelengths, IReadOnlyList<Vector3> directions, int chunks, int pathsPerThread,
+        int pathsPerDispatch, double segmentLength = 0.0)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(directions);
         if (directions.Count == 0 || chunks <= 0 || pathsPerThread <= 0 || pathsPerDispatch <= 0 || !(segmentLength >= 0.0))
             throw new ArgumentException("A sky check needs directions, chunks, paths and a length of zero or more.");
-        EnsureAtmosphere(frame);
+        EnsureAtmosphere(frame, wavelengths);
         _checkPipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine), "CSSkyCheck", ShaderFile);
 
         var packed = new float[directions.Count * 4];
@@ -360,16 +364,16 @@ internal sealed partial class D3D12VistaRenderer
     /// <summary>
     /// The aerial perspective of world segments on the GPU (<c>CSAerialProbe</c>), for the self-test's parity with
     /// <see cref="AerialPerspective"/>: each probe's segment from its start to its end, bent around a camera at
-    /// <paramref name="camera"/>, at its wavelength. Returns, per probe, (transmittance, in-scattered light per unit
+    /// <paramref name="camera"/>, at its wavelength of <paramref name="wavelengths"/>. Returns, per probe, (transmittance, in-scattered light per unit
     /// solar irradiance, μ, length, height, μ_s, ν, 0).
     /// </summary>
-    public float[] RunAerialProbe(AtmosphereFrame frame, Vector3 camera, IReadOnlyList<(Vector3 Start, Vector3 End, int Lambda)> probes)
+    public float[] RunAerialProbe(AtmosphereFrame frame, WavelengthTable wavelengths, Vector3 camera, IReadOnlyList<(Vector3 Start, Vector3 End, int Lambda)> probes)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(probes);
         if (probes.Count == 0)
             throw new ArgumentException("No probes.", nameof(probes));
-        EnsureAtmosphere(frame);
+        EnsureAtmosphere(frame, wavelengths);
         _probePipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSAerialProbe", ShaderFile);
 
         var packed = new float[probes.Count * 8];

@@ -98,7 +98,7 @@ public sealed class MaterialOptionsTests
             Erosion = false,
         };
         Sidecar rule = PreviewPipeline.Run(request, new FakeRenderer());
-        Assert.AreEqual(17, rule.Schema);
+        Assert.AreEqual(18, rule.Schema);
         MaterialsInfo materials = rule.Materials!;
         Assert.IsTrue(materials.ByRule);
         CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass" }, materials.Table.Select(m => m.Key).ToArray());
@@ -138,19 +138,23 @@ public sealed class MaterialOptionsTests
                 Assert.IsTrue(material.Spectrum[k + 1] is > 0.0 and < 1.0, material.Key);
                 Assert.IsTrue(k == 0 || material.Spectrum[k] > material.Spectrum[k - 2], $"{material.Key}: wavelengths rise");
             }
-            Assert.AreEqual(IntegratorTables.LinearRgbOf(material.Spectrum), material.LinearRgbAlbedo, $"{material.Key}: its albedo is its spectrum's colour");
+            Assert.AreEqual(WavelengthTable.Bins.LinearRgbOf(material.Spectrum), material.LinearRgbAlbedo, $"{material.Key}: its albedo is its spectrum's colour");
         }
         Assert.AreEqual(MaterialCatalog.RockHardId, ground.Single(m => m.Key == "rock.hard").Id);
         Assert.AreEqual(MaterialCatalog.GrassId, ground.Single(m => m.Key == "grass").Id);
 
-        IntegratorTables tables = IntegratorTables.Build(ground);
+        IntegratorTables tables = IntegratorTables.Build(ground, WavelengthTable.Bins);
         for (int i = 0; i < tables.Count; i++)
         {
             double nm = tables.WavelengthNm(i);
             Assert.AreEqual(IntegratorTables.ReflectanceAt(ground[MaterialCatalog.SoilId].Spectrum!, nm), tables.Reflectance[MaterialCatalog.SoilId * tables.Count + i], 1e-6);
         }
         Assert.AreEqual(ground[MaterialCatalog.ScreeId].Roughness, tables.Albedo[MaterialCatalog.ScreeId * 4 + 3], "the roughness rides in the albedo's fourth float");
-        Assert.AreEqual(0f, IntegratorTables.Build(MaterialCatalog.M0).Albedo[3], "M0's terrain is Lambert's");
+        Assert.AreEqual(0f, IntegratorTables.Build(MaterialCatalog.M0, WavelengthTable.Bins).Albedo[3], "M0's terrain is Lambert's");
+        IntegratorTables engine = IntegratorTables.Build(ground, WavelengthTable.Engine);
+        (float er, float eg, float eb) = WavelengthTable.Engine.LinearRgbOf(ground[MaterialCatalog.GrassId].Spectrum!);
+        CollectionAssert.AreEqual(new[] { er, eg, eb }, engine.Albedo[(MaterialCatalog.GrassId * 4)..(MaterialCatalog.GrassId * 4 + 3)],
+            "a spectrum's albedo is its colour through the render's own quadrature");
 
         // Green in the green, more than in the red: chlorophyll's absorption.
         (float r, float g, float b) = ground[MaterialCatalog.GrassId].LinearRgbAlbedo;

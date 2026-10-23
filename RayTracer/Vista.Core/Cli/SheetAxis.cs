@@ -14,7 +14,8 @@ namespace Vista.Cli;
 ///   <c>detail=off,on</c>, <c>farField=off,on</c> — how the terrain is meshed (M1.9); <c>meter=average,incident</c>,
 ///   <c>display=aces,agx</c> — how the PNG is exposed and display-encoded (M1.10a), <c>look=base,punchy</c> and
 ///   <c>compensation=0,0.5,1</c> — AgX's look and the meter's own stops (M1.11b; one render serves every cell), <c>dither=off,on</c> —
-///   the 8-bit PNG's dither (M1.11c; one render too);</item>
+///   the 8-bit PNG's dither (M1.11c; one render too); <c>materials=off,on</c>, <c>diffuse=lambert,orenNayar</c> — the ground's
+///   materials and how they scatter (M1.12); <c>quadrature=engine,bins</c> — the hero wavelengths and their weights (M1.12a);</item>
 ///   <item><c>camera.&lt;field&gt;=…</c> — one camera field, e.g. <c>camera.yawDegrees=0,90,180,270</c>;</item>
 ///   <item><c>sliders=a.json,b.json</c> — whole slider files; a slider-file field — one slider, pinned per cell (M1.11), e.g.
 ///   <c>time=dawn,day,goldenHour,dusk</c>, <c>sunElevation=2,4,6</c>, <c>date=2026-01-15,2026-07-15</c> or <c>visibility=20,80</c>
@@ -120,6 +121,7 @@ public sealed class SheetAxis
                 "farField" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { FarField = OnOff(v) } }),
                 "materials" => Checked(values, OnOff, (r, v) => r with { Mesh = r.Mesh with { Materials = OnOff(v) } }),
                 "diffuse" => Checked(values, DiffuseOf, (r, v) => r with { Diffuse = DiffuseOf(v) }),
+                "quadrature" => Checked(values, QuadratureOf, (r, v) => r with { Quadrature = QuadratureOf(v) }),
                 "meter" => Checked(values, Meter, (r, v) => r with { Meter = Meter(v) }),
                 "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "look" => Checked(values, Look, (r, v) => r with { Look = Look(v) }),
@@ -182,6 +184,9 @@ public sealed class SheetAxis
 
     private static Rendering.DiffuseModel DiffuseOf(string text) =>
         PreviewCommandLine.TryParseDiffuse(text, out Rendering.DiffuseModel diffuse) ? diffuse : throw new ArgumentException($"'{text}' is not orenNayar or lambert.");
+
+    private static Rendering.Quadrature QuadratureOf(string text) =>
+        PreviewCommandLine.TryParseQuadrature(text, out Rendering.Quadrature quadrature) ? quadrature : throw new ArgumentException($"'{text}' is not bins or engine.");
 
     private static World.MeshKind MeshKindOf(string text) =>
         PreviewCommandLine.TryParseMeshKind(text, out World.MeshKind kind) ? kind : throw new ArgumentException($"'{text}' is not view or uniform.");

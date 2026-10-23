@@ -43,7 +43,7 @@ public sealed class AirOpticsTests
     [TestMethod]
     public void Ozone_PeaksInTheChappuisBandNear600nm()
     {
-        IReadOnlyList<float> grid = AtmosphereTables.Build(AtmosphereModel.Default).WavelengthsNm;
+        IReadOnlyList<float> grid = AtmosphereTables.Build(AtmosphereModel.Default, WavelengthTable.Bins).WavelengthsNm;
         float peak = grid.MaxBy(nm => AirOptics.OzoneCrossSection(nm));
         Assert.IsTrue(peak is >= 590f and <= 610f, $"peak at {peak} nm");
         // 300 DU: about 0.04 at the Chappuis peak (5.0·10⁻²¹ cm² times 8.06·10¹⁸ molecules/cm²).
@@ -106,7 +106,7 @@ public sealed class AirOpticsTests
     {
         // The ȳ-weighted mean spectral radiance of the disk times 683 · ∫ȳ: the sun's luminance is ≈ 1.6·10⁹ cd/m².
         double sum = 0.0, weight = 0.0;
-        IntegratorTables tables = IntegratorTables.Build(Scene.MaterialCatalog.M0);
+        IntegratorTables tables = IntegratorTables.Build(Scene.MaterialCatalog.M0, WavelengthTable.Bins);
         for (int i = 0; i < tables.Count; i++)
         {
             sum += tables.Cie[i * 4 + 1] * SolarSpectrum.Radiance(tables.WavelengthNm(i));

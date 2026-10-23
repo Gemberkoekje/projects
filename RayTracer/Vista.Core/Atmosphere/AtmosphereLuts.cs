@@ -2,7 +2,7 @@ namespace Vista.Atmosphere;
 
 /// <summary>
 /// The C# reference of the atmosphere LUTs (vista-plan §5.2, §9: a small reference and a parity test for shared
-/// shader maths): their sizes, texel mappings, samplers and integrands, per wavelength of the engine's 50, in the
+/// shader maths): their sizes, texel mappings, samplers and integrands, per wavelength of a render's 50, in the
 /// style of Hillaire 2020 ("A Scalable and Production Ready Sky and Atmosphere Rendering Technique") with the
 /// multiple scattering of Bruneton 2017 (<see cref="AtmosphereScattering"/>). <c>Shaders/VistaAtmosphere.hlsli</c>
 /// computes exactly these in float; <c>--gpu-selftest</c> checks texels of each GPU LUT against these functions
@@ -30,7 +30,7 @@ namespace Vista.Atmosphere;
 /// </summary>
 public static class AtmosphereLuts
 {
-    /// <summary>Wavelengths per table (the engine's deterministic cycle).</summary>
+    /// <summary>Wavelengths per table (the hero cycle of a <see cref="Rendering.WavelengthTable"/>).</summary>
     public const int Wavelengths = 50;
 
     /// <summary>Columns LUT: view-angle texels.</summary>
@@ -255,9 +255,11 @@ public static class AtmosphereLuts
     /// <summary>
     /// The sky's irradiance on the ground sphere, per unit solar irradiance, with the sun at
     /// <see cref="GroundIrradianceMuS"/> (no direct sun): π times the mean sky radiance over a cosine-weighted
-    /// grid of directions, each from <see cref="SkyMarch"/> with the summed scattering orders <paramref name="orders"/>.
+    /// grid of directions, each from <see cref="SkyMarch"/> with the summed scattering orders <paramref name="orders"/>
+    /// at table position <paramref name="position"/> (<see cref="Rendering.WavelengthTable.MsPositions"/>).
     /// </summary>
-    public static double GroundIrradianceEntry(ReadOnlySpan<float> columns, ReadOnlySpan<float> orders, AtmosphereFrame frame, in AtmosphereCoefficients k, int lambda, int entry)
+    public static double GroundIrradianceEntry(ReadOnlySpan<float> columns, ReadOnlySpan<float> orders, AtmosphereFrame frame, in AtmosphereCoefficients k, int lambda,
+        double position, int entry)
     {
         ArgumentNullException.ThrowIfNull(frame);
         double muS = GroundIrradianceMuS(frame, entry);
@@ -274,7 +276,7 @@ public static class AtmosphereLuts
                 double phi = 2.0 * Math.PI * u2;
                 double cosTheta = Math.Sqrt(1.0 - u1);
                 double nu = radial * Math.Cos(phi) * sinS + cosTheta * muS;
-                (double smooth, double mie) = SkyMarch(columns, orders, [], frame, k, lambda, AtmosphereScattering.MinimumHeight, cosTheta, muS, nu, toGround: false);
+                (double smooth, double mie) = SkyMarch(columns, orders, [], frame, k, lambda, position, AtmosphereScattering.MinimumHeight, cosTheta, muS, nu, toGround: false);
                 sum += smooth + AirOptics.HenyeyGreenstein(nu, g) * mie;
             }
         }
@@ -333,11 +335,12 @@ public static class AtmosphereLuts
 
     /// <summary>
     /// Sky-view texel (<paramref name="slice"/>, <paramref name="row"/>, <paramref name="column"/>) for wavelength
-    /// <paramref name="lambda"/>: (light without the haze phase, haze single scattering without its phase).
+    /// <paramref name="lambda"/> at table position <paramref name="position"/>: (light without the haze phase, haze single
+    /// scattering without its phase).
     /// </summary>
     public static (double Smooth, double Mie) SkyViewTexel(
         ReadOnlySpan<float> columns, ReadOnlySpan<float> orders, ReadOnlySpan<float> ground, AtmosphereFrame frame, in AtmosphereCoefficients k,
-        int lambda, int slice, int row, int column)
+        int lambda, double position, int slice, int row, int column)
     {
         ArgumentNullException.ThrowIfNull(frame);
         double height = frame.SliceAltitude(slice) - frame.GroundAltitudeMetres;
@@ -347,7 +350,7 @@ public static class AtmosphereLuts
         double sinS = Math.Sqrt(Math.Max(1.0 - muS * muS, 0.0));
         double mu = Math.Cos(zenith);
         double nu = Math.Sin(zenith) * Math.Cos(phi) * sinS + mu * muS;
-        return SkyMarch(columns, orders, ground, frame, k, lambda, height, mu, muS, nu, toGround);
+        return SkyMarch(columns, orders, ground, frame, k, lambda, position, height, mu, muS, nu, toGround);
     }
 
     /// <summary>
@@ -356,11 +359,12 @@ public static class AtmosphereLuts
     /// columns LUT (the Earth's shadow included), multiple scattering from the summed scattering orders
     /// (<paramref name="orders"/>, the phase-weighted radiance of <see cref="AtmosphereScattering"/>), and, for a ray that
     /// ends on the ground (<paramref name="toGround"/>), the ground lit by the sun and the sky, seen through the air.
-    /// Each step integrates its emission exactly for a constant extinction over the step (Hillaire 2020).
+    /// Each step integrates its emission exactly for a constant extinction over the step (Hillaire 2020). The wavelength is
+    /// <paramref name="lambda"/> in the ground's table and <paramref name="position"/> among the orders' table wavelengths.
     /// </summary>
     public static (double Smooth, double Mie) SkyMarch(
         ReadOnlySpan<float> columns, ReadOnlySpan<float> orders, ReadOnlySpan<float> ground, AtmosphereFrame frame, in AtmosphereCoefficients k,
-        int lambda, double height, double mu, double muS, double nu, bool toGround)
+        int lambda, double position, double height, double mu, double muS, double nu, bool toGround)
     {
         ArgumentNullException.ThrowIfNull(frame);
         AtmosphereModel model = frame.Model;
@@ -383,7 +387,7 @@ public static class AtmosphereLuts
             double step = transmittance * StepIntegral(extinction, dt);
             rayleigh += step * sun * rayleighScattering;
             mie += step * sun * mieScattering;
-            multiple += step * AtmosphereScattering.Density(orders, frame, k, AtmosphereScattering.MsPositions[lambda], point);
+            multiple += step * AtmosphereScattering.Density(orders, frame, k, position, point);
             transmittance *= Math.Exp(-extinction * dt);
         }
         double smooth = AirOptics.RayleighPhase(nu) * rayleigh + multiple;

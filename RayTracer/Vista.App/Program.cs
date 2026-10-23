@@ -44,6 +44,8 @@ internal static class Program
             return RunGpu(() => MeshMeasure.Run(args, Console.Out));
         if (args.FirstOrDefault() == DiffuseCompare.Flag)
             return RunGpu(() => DiffuseCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == QuadratureCompare.Flag)
+            return RunGpu(() => QuadratureCompare.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -218,6 +220,7 @@ internal static class Program
         Console.Error.WriteLine(ErosionMeasure.Usage);
         Console.Error.WriteLine(MeshMeasure.Usage);
         Console.Error.WriteLine(DiffuseCompare.Usage);
+        Console.Error.WriteLine(QuadratureCompare.Usage);
         return 1;
     }
 

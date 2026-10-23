@@ -55,13 +55,13 @@ public sealed class PreviewSession
     private RenderOutput? _render;
     private RenderKey? _meterKey;
     private RenderOutput? _meter;
-    private AtmosphereFrame? _incidentKey;
+    private (AtmosphereFrame Frame, Quadrature Quadrature)? _incidentKey;
     private IncidentLight? _incident;
     private DenoiseKey? _denoiseKey;
     private (DenoiseResult Result, long Clamped)? _denoised;
 
-    // The spectral tables the incident meter weighs its card's light with, for the materials they were built from.
-    private (IReadOnlyList<VistaMaterial> Materials, IntegratorTables Tables)? _tables;
+    // The spectral tables the incident meter weighs its card's light with, for the materials and the wavelengths they were built on.
+    private (IReadOnlyList<VistaMaterial> Materials, WavelengthTable Wavelengths, IntegratorTables Tables)? _tables;
 
     /// <summary>
     /// A session rendering on <paramref name="renderer"/> (null for dry runs only), denoising on <paramref name="denoiser"/> (needed
@@ -79,6 +79,12 @@ public sealed class PreviewSession
 
     /// <summary>True when the session can render (it has a renderer); false for a dry-run session.</summary>
     public bool CanRender => _renderer is not null;
+
+    /// <summary>
+    /// The image the last run rendered or reused (null before one, and after a run that failed or rendered nothing), for tools that
+    /// compare two renders by their colour (vista-plan §10 M1.12a's <c>--quadrature-compare</c>).
+    /// </summary>
+    public RenderOutput? LastRender => _render;
 
     /// <summary>
     /// Runs <paramref name="request"/>, reusing every stage the session's last render left whose inputs are the same; returns the
@@ -188,7 +194,11 @@ public sealed class PreviewSession
         }
         else
         {
-            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude) { Ground = ground };
+            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude)
+            {
+                Ground = ground,
+                Quadrature = request.Quadrature,
+            };
             var aovs = new HashSet<Aov>(PreviewPipeline.AovsFor(request.Debug));
             if (request.Denoise is not null)
                 aovs.UnionWith([Aov.Albedo, Aov.Normal]);
@@ -228,9 +238,10 @@ public sealed class PreviewSession
                 ?? (request.Meter == Metering.Incident ? IncidentMeter.DefaultCompensationEv : 0.0);
             if (request.Meter == Metering.Incident)
             {
-                // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air.
+                // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air; and the
+                // wavelengths it is measured at (M1.12a).
                 IncidentLight light;
-                if (_incident is not null && Equals(frame, _incidentKey))
+                if (_incident is not null && _incidentKey == (frame, request.Quadrature))
                 {
                     light = _incident;
                     stages[PreviewStage.ExposureMeter] = true;
@@ -239,12 +250,12 @@ public sealed class PreviewSession
                 {
                     (_incident, _incidentKey) = (null, null);
                     light = _renderer.MeasureIncidentLight(scene);
-                    (_incident, _incidentKey) = (light, frame);
+                    (_incident, _incidentKey) = (light, (frame, request.Quadrature));
                     built.UnionWith(light.StageSeconds.Keys);
                     rendered = true;
                     stages[PreviewStage.ExposureMeter] = false;
                 }
-                exposure = IncidentMeter.Measure(light, frame, Tables(materials), camera.ExposureEv + meterCompensation);
+                exposure = IncidentMeter.Measure(light, frame, Tables(materials, scene.Wavelengths()), camera.ExposureEv + meterCompensation);
             }
             else
             {
@@ -340,6 +351,8 @@ public sealed class PreviewSession
                 LightSampling = ImageInfo.LightSamplingOf(settings),
                 RussianRouletteStart = settings.RussianRouletteStart,
                 Diffuse = settings.Diffuse,
+                Quadrature = request.Quadrature,
+                Wavelengths = WavelengthsInfo.Of(WavelengthTable.For(request.Quadrature)),
                 Display = request.Display,
                 Look = DisplayTransform.LookOf(request.Display, request.Look),
                 Dither = DisplayTransform.DitherOf(request.BitDepth, request.Dither),
@@ -365,7 +378,7 @@ public sealed class PreviewSession
             Exposure = exposure,
             Denoise = denoised,
             DataTiers = MaterialCatalog.TiersOf(materials),
-            Materials = MaterialsInfoOf(materials, mesh, ground, sliders.Climate, shares),
+            Materials = MaterialsInfoOf(Tables(materials, WavelengthTable.For(request.Quadrature)), materials, mesh, ground, sliders.Climate, shares),
             Render = renderInfo,
             Stages = new StageInfo([.. stages.Where(s => !s.Value).Select(s => s.Key)], [.. stages.Where(s => s.Value).Select(s => s.Key)]),
             Watch = watch is null ? null : watch with { RunSeconds = total.Elapsed.TotalSeconds },
@@ -504,11 +517,15 @@ public sealed class PreviewSession
         return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count);
     }
 
-    /// <summary>What the sidecar says of the ground's materials (schema 17).</summary>
-    private static MaterialsInfo MaterialsInfoOf(IReadOnlyList<VistaMaterial> materials, TerrainMesh mesh, GroundCover ground, Weather.ClimateNormals climate,
-        MaterialShares? shares)
+    /// <summary>
+    /// What the sidecar says of the ground's materials (schema 17): each one's albedo as the render's tables have it (<paramref name="tables"/>,
+    /// a spectrum's colour through the render's quadrature since M1.12a).
+    /// </summary>
+    private static MaterialsInfo MaterialsInfoOf(IntegratorTables tables, IReadOnlyList<VistaMaterial> materials, TerrainMesh mesh, GroundCover ground,
+        Weather.ClimateNormals climate, MaterialShares? shares)
     {
-        var table = materials.Select(m => new MaterialEntry(m.Key, m.Tier, m.Roughness, [m.LinearRgbAlbedo.R, m.LinearRgbAlbedo.G, m.LinearRgbAlbedo.B])).ToList();
+        var table = materials.Select(m => new MaterialEntry(m.Key, m.Tier, m.Roughness,
+            [tables.Albedo[m.Id * 4], tables.Albedo[m.Id * 4 + 1], tables.Albedo[m.Id * 4 + 2]])).ToList();
         if (mesh.Materials is null)
             return new MaterialsInfo { ByRule = false, Table = table };
         MaterialDetailInfo? detail = null;
@@ -532,11 +549,11 @@ public sealed class PreviewSession
         };
     }
 
-    /// <summary>The integrator's spectral tables for <paramref name="materials"/>, built once per material list.</summary>
-    private IntegratorTables Tables(IReadOnlyList<VistaMaterial> materials)
+    /// <summary>The integrator's spectral tables for <paramref name="materials"/> on <paramref name="wavelengths"/>, built once per pair.</summary>
+    private IntegratorTables Tables(IReadOnlyList<VistaMaterial> materials, WavelengthTable wavelengths)
     {
-        if (_tables is not { } kept || !ReferenceEquals(kept.Materials, materials))
-            _tables = kept = (materials, IntegratorTables.Build(materials));
+        if (_tables is not { } kept || !ReferenceEquals(kept.Materials, materials) || !ReferenceEquals(kept.Wavelengths, wavelengths))
+            _tables = kept = (materials, wavelengths, IntegratorTables.Build(materials, wavelengths));
         return kept.Tables;
     }
 
@@ -563,6 +580,7 @@ public sealed class PreviewSession
         AtmosphereModel Air,
         double GroundAltitudeMetres,
         GroundCover Ground,
+        Quadrature Quadrature,
         RenderSettings Settings)
     {
         /// <summary>The <see cref="VistaScene"/> fields the key leaves out, because the renderer does not read them.</summary>
@@ -574,7 +592,7 @@ public sealed class PreviewSession
         /// <summary>The key of rendering <paramref name="scene"/> with <paramref name="settings"/>.</summary>
         public static RenderKey Of(VistaScene scene, RenderSettings settings) => new(
             scene.Mesh, scene.Terrain, scene.Camera with { ExposureEv = 0.0 }, scene.Sun, scene.Materials, scene.Air, scene.GroundAltitudeMetres, scene.Ground,
-            settings);
+            scene.Quadrature, settings);
     }
 
     /// <summary>What a denoised image is made from: the render, the settings and the input scale (its bits; NaN lets the filter choose).</summary>

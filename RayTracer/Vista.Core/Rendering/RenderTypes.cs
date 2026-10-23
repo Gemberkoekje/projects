@@ -193,6 +193,15 @@ public sealed record VistaScene(
     /// </summary>
     public GroundCover Ground { get; init; } = GroundCover.Default;
 
+    /// <summary>
+    /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a): Vista's own bins, or the
+    /// engine's table for <c>main</c>'s images before M1.12a. Every spectral table of the render is laid out on it.
+    /// </summary>
+    public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
+
+    /// <summary>The wavelength table of <see cref="Quadrature"/>.</summary>
+    public WavelengthTable Wavelengths() => WavelengthTable.For(Quadrature);
+
     /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
     public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Mesh);
 

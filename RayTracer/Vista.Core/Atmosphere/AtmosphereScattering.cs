@@ -20,7 +20,7 @@ namespace Vista.Atmosphere;
 ///
 /// <para><b>Wavelengths.</b> Multiple scattering is smooth in wavelength, so the tables hold <see cref="MsWavelengths"/>
 /// of the 50 hero wavelengths (<see cref="HeroOf"/>) and a lookup for any of the 50 interpolates between the two around
-/// it (<see cref="MsPositions"/>): a fifth of the time and memory, for an error measured in the plan.</para>
+/// it (<see cref="WavelengthTable.MsPositions"/>): a fifth of the time and memory, for an error measured in the plan.</para>
 ///
 /// <para><b>Tables</b>, per table wavelength (index <c>texel · MsWavelengths + l</c>, texel
 /// <c>((h · Nμ + μ) · Nμs + μs) · Nν + ν</c>):</para>
@@ -99,15 +99,11 @@ public static class AtmosphereScattering
     /// <summary>The hero wavelength index of table wavelength <paramref name="l"/>: every fifth, and the last.</summary>
     public static int HeroOf(int l) => l == MsWavelengths - 1 ? AtmosphereLuts.Wavelengths - 1 : 5 * l;
 
-    private static readonly Lazy<float[]> SharedPositions = new(() => PositionsFor(i => IntegratorTables.Wavelengths.GetDeterministicWavelength(i)));
-
     /// <summary>
-    /// For each of the 50 hero wavelengths, its place among the table wavelengths: <c>l + f</c> means between table
-    /// wavelengths <c>l</c> and <c>l + 1</c>, a fraction <c>f</c> of the way in nanometres.
+    /// For each of the 50 hero wavelengths of the table <paramref name="nm"/> (in ascending wavelength), its place among the table
+    /// wavelengths: <c>l + f</c> means between table wavelengths <c>l</c> and <c>l + 1</c>, a fraction <c>f</c> of the way in
+    /// nanometres (<see cref="WavelengthTable.MsPositions"/>).
     /// </summary>
-    public static IReadOnlyList<float> MsPositions => SharedPositions.Value;
-
-    /// <summary><see cref="MsPositions"/> for a wavelength table <paramref name="nm"/> (the hero cycle is in ascending wavelength).</summary>
     public static float[] PositionsFor(Func<int, double> nm)
     {
         ArgumentNullException.ThrowIfNull(nm);
@@ -419,7 +415,7 @@ public static class AtmosphereScattering
 
     /// <summary>
     /// The scattering density of a phase-weighted radiance table (2 channels) at a sample, for a wavelength at
-    /// <paramref name="position"/> among the table wavelengths (<see cref="MsPositions"/>, or an integer inside the
+    /// <paramref name="position"/> among the table wavelengths (<see cref="WavelengthTable.MsPositions"/>, or an integer inside the
     /// iteration) with coefficients <paramref name="k"/>: <c>σ_R(h)·A_R + σ_M(h)·A_M</c>. Below the tables' lowest sun
     /// (<see cref="MuSMin"/>, 30° down, long after astronomical twilight's −18°) it is zero rather than the edge texel's
     /// last glimmer, which auto exposure would otherwise lift into a blue night sky.

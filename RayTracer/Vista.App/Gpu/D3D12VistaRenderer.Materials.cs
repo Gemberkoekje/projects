@@ -62,7 +62,7 @@ internal sealed partial class D3D12VistaRenderer
             throw new ArgumentException("No places.", nameof(places));
         if (scene.Mesh.Materials is null)
             throw new ArgumentException("The scene's mesh carries no material field.", nameof(scene));
-        EnsureAtmosphere(scene.AirFrame());
+        EnsureAtmosphere(scene.AirFrame(), scene.Wavelengths());
         EnsureNormalMaps(scene.Mesh.NormalMaps);
         EnsureMaterials(scene.Mesh.Materials);
         _materialProbePipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMaterialProbe", ShaderFile);

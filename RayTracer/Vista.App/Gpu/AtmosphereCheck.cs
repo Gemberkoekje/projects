@@ -72,8 +72,9 @@ internal static class AtmosphereCheck
             model = model with { GroundAlbedo = Number(albedo, problems) };
         if (values.TryGetValue("--aerosol-depth", out string? haze))
             model = model with { AerosolOpticalDepth550 = Number(haze, problems) };
-        AtmosphereTables tables = AtmosphereTables.Build(model);
-        float[] weights = SkyCheck.LuminanceWeights(IntegratorTables.Build(MaterialCatalog.M0));
+        WavelengthTable wavelengths = WavelengthTable.For(WavelengthTable.DefaultQuadrature);
+        AtmosphereTables tables = AtmosphereTables.Build(model, wavelengths);
+        float[] weights = SkyCheck.LuminanceWeights(IntegratorTables.Build(MaterialCatalog.M0, wavelengths));
         bool below = values.ContainsKey("--below-horizon");
         IReadOnlyList<Vector3> directions = [.. SkyCheck.Directions(below).Select(d => d.Direction)];
 
@@ -88,7 +89,7 @@ internal static class AtmosphereCheck
             {
                 // The terrain slices span the observer's height, so a segment's far end has a sky view to difference against.
                 AtmosphereFrame frame = AtmosphereFrame.For(model, ground, SkyCheck.SunDirection(elevation), observer, 0.0, observer);
-                SkyCheckRaw raw = renderer.RunSkyCheck(frame, directions, Chunks, paths / Chunks, PathsPerDispatch, length);
+                SkyCheckRaw raw = renderer.RunSkyCheck(frame, wavelengths, directions, Chunks, paths / Chunks, PathsPerDispatch, length);
                 SkyCheckElevation result = SkyCheck.Aggregate(elevation, raw.Sums, Chunks, paths / Chunks, tables.WavelengthsNm, weights, below)
                     with { SegmentLengthMetres = length };
                 results.Add(result);

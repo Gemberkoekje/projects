@@ -34,11 +34,12 @@ public sealed class SheetLabelsTests
         IReadOnlyDictionary<string, string> id = Id(Sidecar());
         CollectionAssert.AreEquivalent(
             new[] { "recipe.name", "recipe.setPieces", "sliders.time", "sliders.season", "seed", "camera", "image.size",
-                    "image.samplesPerPixel", "image.maxBounces", "image.display", "image.dither", "image.bitDepth", "image.diffuse", "materials", "build" },
+                    "image.samplesPerPixel", "image.maxBounces", "image.display", "image.dither", "image.bitDepth", "image.diffuse", "image.quadrature", "materials", "build" },
             id.Keys.ToArray());
         Assert.AreEqual("aces", id["image.display"], "every sidecar before schema 11 is the ACES fit's");
         Assert.AreEqual(("off", "8"), (id["image.dither"], id["image.bitDepth"]), "every sidecar before schema 15 rounded to 8 bits");
         Assert.AreEqual(("lambert", "M0"), (id["image.diffuse"], id["materials"]), "every sidecar before schema 17 shaded M0's one Lambert material");
+        Assert.AreEqual("engine", id["image.quadrature"], "every sidecar before schema 18 traced the engine's wavelengths");
         Assert.AreEqual("default", id["camera"], "the default camera's pose follows the terrain, so it is not compared");
         Assert.AreEqual("320×180", id["image.size"]);
         Assert.AreEqual("566b68d", id["build"]);
@@ -72,9 +73,9 @@ public sealed class SheetLabelsTests
         wide["image"]!["bitDepth"] = 16;
         CollectionAssert.AreEqual(new[] { "bits=8 dither=off", "bits=8 dither=triangular", "bits=16 dither=none" },
             SheetLabels.Differences([Id(old), Id(dithered), Id(wide)]).ToArray(), "the bit depth, with fewer values, leads");
-        StringAssert.Contains(SheetLabels.Title([Id(old)]), "aces curve · no dither · lambert diffuse · M0 material · build");
+        StringAssert.Contains(SheetLabels.Title([Id(old)]), "aces curve · no dither · lambert diffuse · engine wavelengths · M0 material · build");
         Assert.IsFalse(SheetLabels.Title([Id(dithered)]).Contains("dither", StringComparison.Ordinal), "the dither, the default, goes without saying");
-        StringAssert.Contains(SheetLabels.Title([Id(wide)]), "aces curve · 16-bit · lambert diffuse · M0 material · build");
+        StringAssert.Contains(SheetLabels.Title([Id(wide)]), "aces curve · 16-bit · lambert diffuse · engine wavelengths · M0 material · build");
     }
 
     [TestMethod]
@@ -145,8 +146,8 @@ public sealed class SheetLabelsTests
     public void Title_ListsWhatEveryCellShares()
     {
         string title = SheetLabels.Title([Id(Sidecar(seed: "1")), Id(Sidecar(seed: "2"))]);
-        Assert.AreEqual("alpine range · snowCappedMountains · goldenHour · summer · default camera · 320×180 · 64 spp · 6 bounces · aces curve · no dither · lambert diffuse · M0 material · build 566b68d", title,
-            "AgX, the incident meter, the dither, rough diffuse surfaces and the materials by rule, the defaults since M1.10a, M1.11c and M1.12, go without saying; an older sidecar's ACES, undithered PNG, Lambert surfaces and one material do not");
+        Assert.AreEqual("alpine range · snowCappedMountains · goldenHour · summer · default camera · 320×180 · 64 spp · 6 bounces · aces curve · no dither · lambert diffuse · engine wavelengths · M0 material · build 566b68d", title,
+            "AgX, the incident meter, the dither, rough diffuse surfaces, the materials by rule and the bins, the defaults since M1.10a, M1.11c, M1.12 and M1.12a, go without saying; an older sidecar's ACES, undithered PNG, Lambert surfaces, one material and the engine's wavelengths do not");
 
         string supplied = SheetLabels.Title([Id(Sidecar(defaultCamera: false))]);
         StringAssert.Contains(supplied, "seed 42 · camera at 0,1692.21,-5734.4 · yaw 20° · pitch -30° · 24 mm · 320×180");

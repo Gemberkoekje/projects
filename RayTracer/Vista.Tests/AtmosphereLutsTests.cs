@@ -161,7 +161,7 @@ public sealed class AtmosphereLutsTests
         AtmosphereCoefficients k = Model.CoefficientsAt(450.0);
         foreach ((int row, int column) in new[] { (10, 0), (40, 32), (63, 63), (55, 5) })
         {
-            (double smooth, double mie) = AtmosphereLuts.SkyViewTexel(Columns, orders, [], Frame, k, 0, 0, row, column);
+            (double smooth, double mie) = AtmosphereLuts.SkyViewTexel(Columns, orders, [], Frame, k, 0, 0.0, 0, row, column);
             double height = Frame.SliceAltitude(0) - Frame.GroundAltitudeMetres;
             (double zenith, _) = AtmosphereLuts.SkyRowToZenith(Frame.GroundRadius, height, row);
             double phi = AtmosphereLuts.SkyColumnToAzimuth(column);

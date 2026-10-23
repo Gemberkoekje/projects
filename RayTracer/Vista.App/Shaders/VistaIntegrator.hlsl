@@ -1,8 +1,9 @@
 // Vista offline integrator (vista-plan §5.1, §10 M0, M1.3) — DXR 1.1 inline ray tracing, Shader Model 6.5.
 //
 // A spectral path tracer for stills: multi-bounce Lambertian terrain, next-event estimation on a real-size sun
-// disk, Russian roulette, and hero-wavelength sampling over the engine's 50-wavelength deterministic cycle (a hero
-// plus three companions that share its path, so the throughput is a float4). Since M1.3 the light comes from a
+// disk, Russian roulette, and hero-wavelength sampling over a 50-wavelength deterministic cycle (a hero plus three
+// companions that share its path, so the throughput is a float4; since M1.12a the wavelengths and weights in Cie are Vista's
+// own bins, or the engine's table with --quadrature engine). Since M1.3 the light comes from a
 // spectral atmosphere on a spherical Earth (VistaAtmosphere.hlsli): the sun reaches a surface through the
 // transmittance of the air from that point, the Earth's shadow included, and rays that leave the terrain read the
 // sky-view LUT. Since M1.4 every segment that ends on the terrain, camera and bounce, carries the air between its ends

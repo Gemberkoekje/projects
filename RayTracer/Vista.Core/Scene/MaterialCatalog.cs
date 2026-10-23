@@ -25,7 +25,7 @@ public enum DataTier
 /// <param name="Key">Stable name recorded in the sidecar.</param>
 /// <param name="Tier">Where its spectrum comes from.</param>
 /// <param name="LinearRgbAlbedo">Its linear-sRGB albedo: for a material without a <see cref="Spectrum"/>, the colour
-/// <c>RgbToReflectanceBasis</c> upsamples to a spectrum; for one with, the spectrum's own colour (the albedo output).</param>
+/// <c>ReflectanceBasis</c> upsamples to a spectrum; for one with, the spectrum's own colour (the albedo output).</param>
 public sealed record VistaMaterial(int Id, string Key, DataTier Tier, (float R, float G, float B) LinearRgbAlbedo)
 {
     /// <summary>
@@ -96,10 +96,13 @@ public static class MaterialCatalog
     public static SortedDictionary<string, DataTier> TiersOf(IEnumerable<VistaMaterial> materials) =>
         new(materials.ToDictionary(m => m.Key, m => m.Tier), StringComparer.Ordinal);
 
-    /// <summary>A built-in spectral material: its albedo is its spectrum's colour.</summary>
+    /// <summary>
+    /// A built-in spectral material: its albedo is its spectrum's colour through the default quadrature (a render's own tables take
+    /// it through the render's, <see cref="IntegratorTables.Build"/>).
+    /// </summary>
     private static VistaMaterial Spectral(int id, string key, float roughness, double[] spectrum)
     {
-        (float r, float g, float b) = IntegratorTables.LinearRgbOf(spectrum);
+        (float r, float g, float b) = WavelengthTable.For(WavelengthTable.DefaultQuadrature).LinearRgbOf(spectrum);
         return new VistaMaterial(id, key, DataTier.BuiltIn, (r, g, b)) { Spectrum = spectrum, Roughness = roughness };
     }
 }

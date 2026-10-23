@@ -143,6 +143,12 @@ public sealed record PreviewRequest
 
     /// <summary>How diffuse surfaces scatter (vista-plan §10 M1.12): <c>--diffuse orenNayar</c> (the default) or <c>lambert</c>.</summary>
     public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
+
+    /// <summary>
+    /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a): <c>--quadrature bins</c> (the
+    /// default) or <c>engine</c>.
+    /// </summary>
+    public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
 }
 
 /// <summary>
@@ -156,7 +162,7 @@ public sealed record PreviewRequest
 ///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
-///           [--materials on | off] [--diffuse orenNayar | lambert]
+///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature bins | engine]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--dither on | off] [--png16]
 /// </code>
@@ -179,6 +185,8 @@ public sealed record PreviewRequest
 /// <c>--mesh uniform</c> meshes every sample of the world grid and nothing else (M1.7's mesh, bent onto the Earth), for comparisons.
 /// <c>--materials off</c> renders M0's single material over M1.9's smooth detail instead of the ground's materials by rule and
 /// their detail (M1.12), and <c>--diffuse lambert</c> scatters light as Lambert's surfaces do instead of rough ones.
+/// <c>--quadrature engine</c> traces the engine's hero wavelengths with the engine's weights instead of Vista's own bins (M1.12a):
+/// <c>main</c>'s colours before M1.12a, cast and all.
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
@@ -207,6 +215,8 @@ public static class PreviewCommandLine
         "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
         "--materials on (default) | off: the ground's rock, scree, soil and grass by rule and their detail, or M0's single grey material\n" +
         "  over smooth detail. --diffuse orenNayar (default) | lambert: rough diffuse surfaces, or Lambert's.\n" +
+        "--quadrature bins (default) | engine: the hero wavelengths and their weights, Vista's own 50 bins of equal colour mass,\n" +
+        "  or the engine's table (before M1.12a; every colour 1.7-4 dE off).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
@@ -283,7 +293,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse",
+        "--dither", "--materials", "--diffuse", "--quadrature",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -370,6 +380,7 @@ public static class PreviewCommandLine
         double? compensation = Compensation(values.GetValueOrDefault("--compensation"), problems);
         PngDither dither = Dither(values.GetValueOrDefault("--dither"), problems);
         DiffuseModel diffuse = Diffuse(values.GetValueOrDefault("--diffuse"), problems);
+        Quadrature quadrature = QuadratureOf(values.GetValueOrDefault("--quadrature"), problems);
 
         if (problems.Count > before)
             return null;
@@ -403,6 +414,7 @@ public static class PreviewCommandLine
             Dither = dither,
             BitDepth = flags.Contains("--png16") ? 16 : DisplayTransform.DefaultBitDepth,
             Diffuse = diffuse,
+            Quadrature = quadrature,
         };
     }
 
@@ -418,6 +430,20 @@ public static class PreviewCommandLine
             return diffuse;
         problems.Add($"--diffuse must be orenNayar or lambert, got '{text}'.");
         return DiffuseModel.OrenNayar;
+    }
+
+    /// <summary>Parses a <c>--quadrature</c> value (<c>bins</c> or <c>engine</c>).</summary>
+    internal static bool TryParseQuadrature(string text, out Quadrature quadrature) =>
+        Enum.TryParse(text, ignoreCase: true, out quadrature) && quadrature != Quadrature.None && Enum.IsDefined(quadrature) && !int.TryParse(text, out _);
+
+    private static Quadrature QuadratureOf(string? text, List<string> problems)
+    {
+        if (text is null)
+            return WavelengthTable.DefaultQuadrature;
+        if (TryParseQuadrature(text, out Quadrature quadrature))
+            return quadrature;
+        problems.Add($"--quadrature must be bins or engine, got '{text}'.");
+        return WavelengthTable.DefaultQuadrature;
     }
 
     /// <summary>Parses a <c>--dither</c> value: <c>on</c> (the triangular dither) or <c>off</c>.</summary>

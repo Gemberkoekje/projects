@@ -361,15 +361,15 @@ internal static class GpuSelfTest
         bool pass = true;
         AtmosphereFrame air = scene.AirFrame();
         renderer.ForgetAtmosphere();
-        AtmosphereLutData luts = renderer.BuildAtmosphere(air, captureOrder2: true, out double seconds);
+        AtmosphereLutData luts = renderer.BuildAtmosphere(air, scene.Wavelengths(), captureOrder2: true, out double seconds);
         log.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  atmosphere LUTs: {seconds * 1e3:0.0} ms GPU"));
         renderer.ForgetAtmosphere();
-        AtmosphereLutData rebuilt = renderer.BuildAtmosphere(air, captureOrder2: false, out _);
+        AtmosphereLutData rebuilt = renderer.BuildAtmosphere(air, scene.Wavelengths(), captureOrder2: false, out _);
         pass &= Check(log, "the LUT build is bit-identical twice",
             Differs(luts.Columns, rebuilt.Columns) ?? Differs(luts.Orders, rebuilt.Orders)
             ?? Differs(luts.GroundIrradiance, rebuilt.GroundIrradiance) ?? Differs(luts.SkyView, rebuilt.SkyView));
 
-        AtmosphereTables tables = AtmosphereTables.Build(air.Model);
+        AtmosphereTables tables = AtmosphereTables.Build(air.Model, scene.Wavelengths());
         ScatteringOrder2 order2 = luts.Order2!;
         pass &= Check(log, "columns LUT texels match the C# reference", ColumnsParity(air, luts));
         pass &= Check(log, "direct and order-1 ground irradiance match the C# reference", IrradianceParity(air, luts, order2, tables));
@@ -415,7 +415,8 @@ internal static class GpuSelfTest
     /// distribution), a camera 400 m higher (the same; the mesh kept, as the LUTs are all this checks), the base altitude (the
     /// scattering orders too, and since M1.9 the mesh, bent onto the new ground sphere) — each rendered as the watch would, then again
     /// after <see cref="D3D12VistaRenderer.ForgetAtmosphere"/>; each pair must be bit-identical, and each render must report rebuilding
-    /// only what its change touched.
+    /// only what its change touched. Since M1.12a two more: the engine's wavelengths and back to the bins (the wavelength tables and
+    /// everything after them), and the engine's image must differ from the bins' (the quadrature reached the GPU).
     /// </summary>
     private static bool WatchChecks(D3D12VistaRenderer renderer, TerrainHierarchy hierarchy, VistaScene scene, RenderSettings settings, TextWriter log)
     {
@@ -425,16 +426,23 @@ internal static class GpuSelfTest
         VistaScene day = scene with { Sun = Almanac.For(scene.Recipe with { Time = TimeOfDay.Day }).Sun };
         VistaScene higher = day with { Camera = day.Camera with { Position = day.Camera.Position with { Y = day.Camera.Position.Y + 400.0 } } };
         VistaScene altitude = higher with { GroundAltitudeMetres = 3000.0, Mesh = MeshFor(hierarchy, scene.Camera, settings, 3000.0) };
+        VistaScene engine = altitude with { Quadrature = Quadrature.Engine };
+        VistaScene bins = engine with { Quadrature = Quadrature.Bins };
         string[] sky = [RenderStageKeys.SkyView, RenderStageKeys.SkyDistribution];
+        string[] air = [RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
         string[] keys = [RenderStageKeys.DeviceInit, RenderStageKeys.AccelerationBuild, RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
+        var warms = new Dictionary<string, RenderOutput>(StringComparer.Ordinal);
         foreach ((string label, VistaScene view, string[] rebuilds) in new[]
         {
             ("time of day", day, sky),
             ("camera 400 m higher", higher, sky),
             ("base altitude 3000 m", altitude, [RenderStageKeys.AccelerationBuild, RenderStageKeys.ScatteringOrders, .. sky]),
+            ("engine's wavelengths", engine, air),
+            ("bins again", bins, air),
         })
         {
             RenderOutput warm = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}");
+            warms[label] = warm;
             string[] built = [.. keys.Where(warm.Stats.StageSeconds.ContainsKey)];
             renderer.ForgetAtmosphere();
             RenderOutput cold = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}, every LUT rebuilt");
@@ -442,6 +450,9 @@ internal static class GpuSelfTest
                 (built.SequenceEqual(keys.Where(rebuilds.Contains)) ? null : $"rebuilt {string.Join(", ", built)}")
                 ?? Same(warm, cold, compareAovs: false));
         }
+        pass &= Check(log, "watch: the engine's wavelengths change the image, and the bins bring it back",
+            (Same(warms["base altitude 3000 m"], warms["engine's wavelengths"], compareAovs: false) is null ? "the same image" : null)
+            ?? Same(warms["base altitude 3000 m"], warms["bins again"], compareAovs: false));
         return pass;
     }
 
@@ -512,7 +523,7 @@ internal static class GpuSelfTest
             foreach (int lambda in ParityWavelengths)
                 probes.Add((InFrame(a), InFrame(b), lambda));
         }
-        float[] gpu = renderer.RunAerialProbe(air, InFrame(c), probes);
+        float[] gpu = renderer.RunAerialProbe(air, scene.Wavelengths(), InFrame(c), probes);
         var worst = new Worst();
         var geometry = new Worst();
         for (int i = 0; i < probes.Count; i++)
@@ -554,8 +565,8 @@ internal static class GpuSelfTest
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  sky distribution: {again.Stats.StageSeconds.GetValueOrDefault(RenderStageKeys.SkyDistribution) * 1e3:0.00} ms GPU, {again.Stats.StageSeconds.GetValueOrDefault("skyDistribution") * 1e3:0.0} ms in all"));
 
-        AtmosphereTables atmosphere = AtmosphereTables.Build(air.Model);
-        IntegratorTables integrator = IntegratorTables.Build(scene.Materials);
+        AtmosphereTables atmosphere = AtmosphereTables.Build(air.Model, scene.Wavelengths());
+        IntegratorTables integrator = IntegratorTables.Build(scene.Materials, scene.Wavelengths());
         var weights = new float[AtmosphereLuts.Wavelengths];
         for (int l = 0; l < weights.Length; l++)
             weights[l] = (float)SkyDistribution.LuminanceWeight(integrator, atmosphere, l);
@@ -611,7 +622,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "the incident meter measured again on rebuilt LUTs is bit-identical",
             Differs(raw, renderer.IncidentRaw!) ?? (again.StageSeconds.ContainsKey(RenderStageKeys.SkyView) ? null : "the LUTs were not rebuilt"));
 
-        IntegratorTables integrator = IntegratorTables.Build(scene.Materials);
+        IntegratorTables integrator = IntegratorTables.Build(scene.Materials, scene.Wavelengths());
         double sunY = IncidentMeter.Luminous(golden.Sun, integrator), skyY = IncidentMeter.Luminous(golden.Sky, integrator);
         IncidentLight dusk = renderer.MeasureIncidentLight(twilight);
         double duskSun = IncidentMeter.Luminous(dusk.Sun, integrator), duskSky = IncidentMeter.Luminous(dusk.Sky, integrator);
@@ -808,7 +819,8 @@ internal static class GpuSelfTest
         {
             foreach (int lambda in new[] { 0, 49 })
             {
-                double expected = AtmosphereLuts.GroundIrradianceEntry(luts.Columns, luts.Orders, air, tables.AsUploaded(lambda), lambda, entry);
+                double expected = AtmosphereLuts.GroundIrradianceEntry(luts.Columns, luts.Orders, air, tables.AsUploaded(lambda), lambda, tables.Sun[lambda * 4 + 3],
+                    entry);
                 worst.Add($"entry {entry} λ{lambda}", luts.GroundIrradiance[entry * AtmosphereLuts.Wavelengths + lambda], expected, 1e-12);
             }
         }
@@ -827,7 +839,7 @@ internal static class GpuSelfTest
             foreach (int lambda in new[] { 0, 27, 49 })
             {
                 (double smooth, double mie) = AtmosphereLuts.SkyViewTexel(luts.Columns, luts.Orders, luts.GroundIrradiance, air,
-                    tables.AsUploaded(lambda), lambda, slice, row, column);
+                    tables.AsUploaded(lambda), lambda, tables.Sun[lambda * 4 + 3], slice, row, column);
                 int at = ((((slice * AtmosphereLuts.SkyRows) + row) * AtmosphereLuts.SkyAzimuthSize + column) * AtmosphereLuts.Wavelengths + lambda) * 2;
                 worst.Add($"texel ({slice}, {row}, {column}) λ{lambda} smooth", luts.SkyView[at], smooth, 1e-12);
                 worst.Add($"texel ({slice}, {row}, {column}) λ{lambda} haze", luts.SkyView[at + 1], mie, 1e-12);

@@ -55,6 +55,7 @@ public static class SheetLabels
         ("exposure.meterCompensationEv", "compensation"),
         ("image.lightSampling", "lights"),
         ("image.diffuse", "diffuse"),
+        ("image.quadrature", "quadrature"),
         ("output", "output"),
         ("atmosphere", "atmosphere"),
         ("mesh", "mesh"),
@@ -158,6 +159,8 @@ public static class SheetLabels
             fields["image.bitDepth"] = image["bitDepth"] is JsonValue bits ? Display(bits) : "8";
             // How diffuse surfaces scattered (schema 17); every build before it was Lambert's.
             fields["image.diffuse"] = image["diffuse"] is JsonValue diffuse ? Display(diffuse) : "lambert";
+            // The hero wavelengths and their weights (schema 18); every build before it used the engine's.
+            fields["image.quadrature"] = image["quadrature"] is JsonValue quadrature ? Display(quadrature) : "engine";
         }
 
         // The ground's materials (schema 17): by rule, or M0's single one, as every build before it.
@@ -291,6 +294,7 @@ public static class SheetLabels
                 "mesh" => $"{value} mesh",
                 "materials" => value == "by rule" ? null : "M0 material",
                 "image.diffuse" => value == "orenNayar" ? null : $"{value} diffuse",
+                "image.quadrature" => value == "bins" ? null : $"{value} wavelengths",
                 _ => $"{Short(key)} {value}",
             };
             if (part is not null)

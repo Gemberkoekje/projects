@@ -1,13 +1,12 @@
 using System.Numerics;
-using RayTracer;
 using Vista.Scene;
 
 namespace Vista.Rendering;
 
 /// <summary>
 /// The spectral tables the integrator uploads besides the atmosphere's (vista-plan §5.1 / §6.4), one entry per
-/// hero wavelength of the engine's deterministic cycle (<see cref="WavelengthLookup"/>, 50 wavelengths). The
-/// integrator samples hero wavelengths exactly as the maze does: hero index <c>(pixelHash + sampleIndex) mod 50</c>
+/// hero wavelength of a <see cref="WavelengthTable"/> (50 wavelengths; Vista's own bins since M1.12a, or the engine's). The
+/// integrator samples hero wavelengths as the maze does: hero index <c>(pixelHash + sampleIndex) mod 50</c>
 /// plus <see cref="CompanionCount"/> − 1 companions at a stride of <see cref="CompanionStride"/>, so 50 consecutive
 /// samples of a pixel visit every wavelength <see cref="CompanionCount"/> times. Surfaces are not dispersive, so
 /// all companions share the hero's path and the throughput is a float4 (the reference atmosphere is the
@@ -15,13 +14,13 @@ namespace Vista.Rendering;
 ///
 /// <para>Layouts (all <c>float</c>, row-major; the HLSL reads them as <c>StructuredBuffer</c>s):</para>
 /// <list type="bullet">
-///   <item><see cref="Cie"/>: 4 per entry — the white-balanced CIE x̄ȳz̄ (<see cref="WavelengthLookup.TryGet"/>)
+///   <item><see cref="Cie"/>: 4 per entry — the table's tristimulus weights (<see cref="WavelengthTable.Cie"/>)
 ///   and the wavelength in nm, the engine's <c>DeterXYZ</c> layout.</item>
 ///   <item><see cref="Reflectance"/>: <c>[material · Count + entry]</c>, the built-in-tier spectrum of each
-///   material: its own (<see cref="VistaMaterial.Spectrum"/>, M1.12), else <see cref="RgbToReflectanceBasis"/> applied to its
+///   material: its own (<see cref="VistaMaterial.Spectrum"/>, M1.12), else <see cref="ReflectanceBasis"/> applied to its
 ///   linear-sRGB albedo.</item>
-///   <item><see cref="Albedo"/>: 4 per material — its linear-sRGB albedo, for the albedo output, and its roughness
-///   (<see cref="VistaMaterial.Roughness"/>, M1.12).</item>
+///   <item><see cref="Albedo"/>: 4 per material — its linear-sRGB albedo, for the albedo output (a spectrum's colour through the
+///   table, <see cref="WavelengthTable.LinearRgbOf"/>), and its roughness (<see cref="VistaMaterial.Roughness"/>, M1.12).</item>
 /// </list>
 /// A pixel-sample's XYZ is <c>Σₖ Cie[iₖ].xyz · L(λᵢₖ) / CompanionCount · DeterministicCorrection</c>, which
 /// maps a flat spectrum of 1 to luminance 1: Y is the ȳ-weighted mean spectral radiance, in W·m⁻²·sr⁻¹·nm⁻¹, and
@@ -32,22 +31,24 @@ public sealed class IntegratorTables
     /// <summary>Wavelengths traced together per sample (the hero plus three companions, as in the engine).</summary>
     public const int CompanionCount = 4;
 
-    private static readonly Lazy<WavelengthLookup> SharedLookup = new(() => new WavelengthLookup());
-
     /// <summary>
     /// Luminance in cd/m² per unit of Y: 683 lm/W times the integral of the CIE 1931 ȳ over 360–830 nm in 1 nm
     /// steps (106.857 nm, from the engine's own table), since Y is the ȳ-weighted mean spectral radiance.
     /// </summary>
     public const double LuminancePerY = 683.0 * 106.857;
 
-    private IntegratorTables(int count, float correction, float[] cie, float[] reflectance, float[] albedo)
+    private IntegratorTables(WavelengthTable wavelengths, int count, float correction, float[] cie, float[] reflectance, float[] albedo)
     {
+        Wavelengths = wavelengths;
         Count = count;
         DeterministicCorrection = correction;
         Cie = cie;
         Reflectance = reflectance;
         Albedo = albedo;
     }
+
+    /// <summary>The wavelength table the tables are laid out on.</summary>
+    public WavelengthTable Wavelengths { get; }
 
     /// <summary>Hero wavelengths in the cycle (50).</summary>
     public int Count { get; }
@@ -58,7 +59,7 @@ public sealed class IntegratorTables
     /// <summary>Normalises a flat-white spectrum to luminance 1 through the hero sum.</summary>
     public float DeterministicCorrection { get; }
 
-    /// <summary>White-balanced CIE response and wavelength, 4 floats per entry.</summary>
+    /// <summary>Tristimulus weight and wavelength, 4 floats per entry.</summary>
     public float[] Cie { get; }
 
     /// <summary>Reflectance per material per entry.</summary>
@@ -70,29 +71,26 @@ public sealed class IntegratorTables
     /// <summary>The wavelength in nm of entry <paramref name="index"/>.</summary>
     public float WavelengthNm(int index) => Cie[index * 4 + 3];
 
-    /// <summary>The engine's wavelength table, built once per process (it parses the embedded CIE data).</summary>
-    public static WavelengthLookup Wavelengths => SharedLookup.Value;
-
     /// <summary>
-    /// Builds the tables for <paramref name="materials"/> (indexed by <see cref="VistaMaterial.Id"/>). Reflectance
-    /// is clamped to [0, 1]: the basis is a minimum-norm fit that can dip below zero for saturated colours, which
-    /// a multi-bounce path must never see.
+    /// Builds the tables for <paramref name="materials"/> (indexed by <see cref="VistaMaterial.Id"/>) on
+    /// <paramref name="wavelengths"/>. Reflectance is clamped to [0, 1]: the basis is a minimum-norm fit that can dip below
+    /// zero for saturated colours, which a multi-bounce path must never see. A material with a spectrum gets its colour
+    /// through this table as its albedo, so the albedo output shows what it renders with.
     /// </summary>
-    public static IntegratorTables Build(IReadOnlyList<VistaMaterial> materials)
+    public static IntegratorTables Build(IReadOnlyList<VistaMaterial> materials, WavelengthTable wavelengths)
     {
         ArgumentNullException.ThrowIfNull(materials);
+        ArgumentNullException.ThrowIfNull(wavelengths);
         for (int m = 0; m < materials.Count; m++)
         {
             if (materials[m].Id != m)
                 throw new ArgumentException($"Material ids must equal their index; material {m} has id {materials[m].Id}.", nameof(materials));
         }
 
-        WavelengthLookup lookup = Wavelengths;
-        SpectralResources spectral = SpectralResourceBaker.Bake(lookup, []);
-        int n = spectral.DeterministicCount;
-        RgbToReflectanceBasis basis = RgbToReflectanceBasis.Build(spectral);
+        int n = WavelengthTable.Count;
+        ReflectanceBasis basis = ReflectanceBasis.Build(wavelengths);
 
-        var cie = (float[])spectral.DeterXYZ.Clone();
+        var cie = (float[])wavelengths.Cie.Clone();
         var reflectance = new float[materials.Count * n];
         var albedo = new float[materials.Count * 4];
         for (int m = 0; m < materials.Count; m++)
@@ -102,6 +100,7 @@ public sealed class IntegratorTables
             {
                 for (int i = 0; i < n; i++)
                     reflectance[m * n + i] = Math.Clamp((float)ReflectanceAt(spectrum, cie[i * 4 + 3]), 0f, 1f);
+                (r, g, b) = wavelengths.LinearRgbOf(spectrum);
             }
             else
             {
@@ -115,7 +114,7 @@ public sealed class IntegratorTables
             albedo[m * 4 + 3] = materials[m].Roughness;
         }
 
-        return new IntegratorTables(n, spectral.DeterministicCorrection, cie, reflectance, albedo);
+        return new IntegratorTables(wavelengths, n, wavelengths.DeterministicCorrection, cie, reflectance, albedo);
     }
 
     /// <summary>
@@ -135,27 +134,6 @@ public sealed class IntegratorTables
                 return spectrum[k - 1] + (spectrum[k + 1] - spectrum[k - 1]) * (nm - spectrum[k - 2]) / (spectrum[k] - spectrum[k - 2]);
         }
         return spectrum[^1];
-    }
-
-    /// <summary>
-    /// The linear-sRGB colour of a reflectance spectrum (pairs as <see cref="ReflectanceAt"/>) under light of equal energy: the
-    /// integrator's own quadrature over the hero wavelengths, so a material's albedo output is the colour it renders with.
-    /// </summary>
-    public static (float R, float G, float B) LinearRgbOf(IReadOnlyList<double> spectrum)
-    {
-        ArgumentNullException.ThrowIfNull(spectrum);
-        WavelengthLookup lookup = Wavelengths;
-        int n = lookup.DeterministicCount;
-        Vector3 xyz = Vector3.Zero;
-        for (int i = 0; i < n; i++)
-        {
-            int nm = lookup.GetDeterministicWavelength(i);
-            if (lookup.TryGet(nm, out Vector3 cmf))
-                xyz += cmf * (float)ReflectanceAt(spectrum, nm);
-        }
-        xyz *= lookup.DeterministicCorrection / n;
-        float[] rgb = Output.DisplayTransform.XyzToLinearRec709([xyz.X, xyz.Y, xyz.Z]);
-        return (rgb[0], rgb[1], rgb[2]);
     }
 
     /// <summary>

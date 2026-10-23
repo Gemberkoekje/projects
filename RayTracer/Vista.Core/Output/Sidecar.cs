@@ -42,12 +42,14 @@ namespace Vista.Output;
 /// (M1.12) added <see cref="Materials"/>: whether the ground has its materials by rule, the rules, the grass line and where it came
 /// from, each material's roughness and albedo, the detail kinds below the grid and, for a dry run, the shares of the world grid each
 /// material covers; <see cref="ImageInfo.Diffuse"/>, how diffuse surfaces scattered; and in <see cref="WorldInfo.Mesh"/>,
-/// whether the detail followed the materials.</para>
+/// whether the detail followed the materials. Schema 18 (M1.12a) added <see cref="ImageInfo.Quadrature"/>, which hero wavelengths
+/// the render traced and how they weighed into colour, and <see cref="ImageInfo.Wavelengths"/>, the table's span; each material's
+/// albedo is now its colour through that quadrature.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 17;
+    public const int CurrentSchema = 18;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -177,11 +179,31 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
     /// <summary>How diffuse surfaces scattered (schema 17, vista-plan §10 M1.12).</summary>
     public DiffuseModel Diffuse { get; init; } = DiffuseModel.OrenNayar;
 
+    /// <summary>Which hero wavelengths the render traced and how they weighed into colour (schema 18, vista-plan §10 M1.12a).</summary>
+    public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
+
+    /// <summary>The span of the quadrature's wavelength table (schema 18).</summary>
+    public WavelengthsInfo? Wavelengths { get; init; }
+
     /// <summary>The light sampling a render with <paramref name="settings"/> actually does.</summary>
     public static LightSampling LightSamplingOf(RenderSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         return settings.Atmosphere == AtmosphereMode.Luts ? settings.LightSampling : LightSampling.SunOnly;
+    }
+}
+
+/// <summary>The span of a render's wavelength table (vista-plan §10 M1.12a).</summary>
+/// <param name="Count">Hero wavelengths in the cycle.</param>
+/// <param name="FirstNm">The shortest, nm.</param>
+/// <param name="LastNm">The longest, nm.</param>
+public sealed record WavelengthsInfo(int Count, int FirstNm, int LastNm)
+{
+    /// <summary>The span of <paramref name="table"/>.</summary>
+    public static WavelengthsInfo Of(WavelengthTable table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        return new WavelengthsInfo(WavelengthTable.Count, table.FirstNm, table.LastNm);
     }
 }
 

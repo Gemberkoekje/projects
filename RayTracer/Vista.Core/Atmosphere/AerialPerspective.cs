@@ -89,7 +89,7 @@ public static class AerialPerspective
 
     /// <summary>
     /// The phase-weighted radiance of the summed orders (<paramref name="orders"/>, 2 channels) at a point, for a wavelength
-    /// at table position <paramref name="position"/> (<see cref="AtmosphereScattering.MsPositions"/>): each corner blended in
+    /// at table position <paramref name="position"/> (<see cref="Rendering.WavelengthTable.MsPositions"/>): each corner blended in
     /// wavelength, then the corners summed, as the shader's <c>LookupWeighted4</c> does. Zero below the tables' lowest sun.
     /// </summary>
     public static (double Rayleigh, double Mie) Weighted(ReadOnlySpan<float> orders, AtmosphereFrame frame, double position, in AtmosphereScattering.Sample sample)
