@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "position": {
-    "x": -3120,
-    "y": 1051.2,
-    "z": 5536
+    "x": -920,
+    "y": 1322.41,
+    "z": 5836
   },
-  "yawDegrees": 135,
+  "yawDegrees": 30,
   "pitchDegrees": -4,
   "rollDegrees": 0,
   "focalLengthMm": 35,

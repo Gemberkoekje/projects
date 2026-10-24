@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using Vista.Output;
 using Vista.Recipes;
+using Vista.Scene;
+using Vista.Sliders;
 using Vista.World;
 
 namespace Vista.App.Gpu;
@@ -199,7 +201,31 @@ internal static class ErosionMeasure
             double tanSoft = Math.Tan(settings.RockTalusDegrees * Math.PI / 180.0), tanHard = Math.Tan(settings.RockTalusHardDegrees * Math.PI / 180.0);
             log.WriteLine("  " + Describe("eroded", ReliefStats.Measure(r.Surface, c => Math.Atan(tanSoft + (tanHard - tanSoft) * r.Hardness[c]) * 180.0 / Math.PI)));
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  hardness at the surface: mean {r.Hardness.Average():0.000}, soft (< 0.3) {r.Hardness.Count(v => v < 0.3f) * 100.0 / r.Hardness.Length:0}%, hard (> 0.7) {r.Hardness.Count(v => v > 0.7f) * 100.0 / r.Hardness.Length:0}%"));
+                $"  hardness at the surface: mean {r.Hardness.Average():0.000}, soft (< 0.3) {r.Hardness.Count(v => v < 0.3f) * 100.0 / r.Hardness.Length:0}%, hard (> 0.7) {r.Hardness.Count(v => v > 0.7f) * 100.0 / r.Hardness.Length:0}%, " +
+                $"massive (> 0.5) {strata.Massive.Count(v => v > 0.5f) * 100.0 / strata.Massive.Length:0}%"));
+            // M1.12c: where the world stands, and how much of its rock's lines run along the contours (the materials' rock, by the
+            // rules): the beds' outcrops (the measure) and the lines of high curvature.
+            WorldFooting footing = WorldFooting.Of(r.Surface);
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  footing: the {footing.Percentile:0}th percentile at {footing.HeightMetres:0.0} m, lowest {footing.LowestMetres:0.0} m, highest {r.Surface.MaxHeight:0.0} m"));
+            MaterialField field = MaterialField.For(r.Surface, r, strata, RockHardness.For(seed, settings).Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed));
+            MaterialWeights[] weights = field.SampleWeights(r.Surface, field.Apply(MaterialRules.Default.Constants(3000f, 1f, field.NoiseSeed, 0f, false)), 0f);
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  rock (the rules' weight ≥ 0.5): {weights.Count(w => w.Rock >= 0.5f) * 100.0 / weights.Length:0.0}% of the grid"));
+            foreach (int stride in new[] { 1, 2 })
+            {
+                log.WriteLine("  " + Describe(LedgeStats.Bands(r.Surface, r.Hardness, c => weights[c].Rock >= 0.5f, stride)));
+                log.WriteLine("  " + Describe(LedgeStats.Ledges(r.Surface, c => weights[c].Rock >= 0.5f, stride)));
+            }
+            // The ground's materials at the altitude the sliders anchor this world at (the recipe's place, the world's lowest valleys
+            // at its valley floor), as a dry run's shares: rock, scree, soil, meadow and forest.
+            SliderState sliders = LinkedSliders.Resolve(recipe, SliderPins.FromRecipe(recipe), footing: footing);
+            GroundCover cover = GroundCover.For(sliders.Climate, sliders.Almanac.Place.LatitudeDegrees);
+            MaterialWeights[] anchored = field.SampleWeights(r.Surface, field.Apply(MaterialRules.Default.Constants((float)cover.GrassLineMetres, cover.Poleward,
+                field.NoiseSeed, (float)cover.TreeLineMetres, cover.Forest)), (float)sliders.BaseAltitudeMetres);
+            double Share(Func<MaterialWeights, float> of) => anchored.Sum(w => (double)of(w)) / anchored.Length;
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  at {sliders.Almanac.Place.Name}, base {sliders.BaseAltitudeMetres:0} m (valley floor {sliders.ValleyFloorMetres:0} m, tree line {cover.TreeLineMetres:0} m, grass line {cover.GrassLineMetres:0} m): " +
+                $"rock {Share(w => w.Rock):0.0%}, scree {Share(w => w.Scree):0.0%}, soil {Share(w => w.Soil):0.0%}, meadow {Share(w => w.Grass):0.0%}, forest {Share(w => w.Forest):0.0%}"));
             if (outDir is not null)
             {
                 string stem = Path.Combine(outDir, $"seed{seed}");
@@ -238,6 +264,11 @@ internal static class ErosionMeasure
             $"5 km {s.Relief5Km.P10:0}/{s.Relief5Km.P50:0}/{s.Relief5Km.P90:0} m (spread {s.Relief5Km.Spread:0.00}); summits {s.Summits1Km.P10:0}/{s.Summits1Km.P50:0}/{s.Summits1Km.P90:0} m; " +
             $"slopes {Slopes(s.Slopes)}; {Slopes(s.CoarseSlopes)}");
     }
+
+    /// <summary>One line of the contour-line measure (vista-plan §10 M1.12c).</summary>
+    internal static string Describe(LedgeStats s) => string.Create(CultureInfo.InvariantCulture,
+        $"{s.Kind} at {s.SpacingMetres:0} m: {s.AlongContour:0.0%} along the contour (within {LedgeStats.AlongContourDegrees:0}°) of {s.LineCells} line cells " +
+        $"({s.RockCells} steep rock); by 10° from the contour {string.Join('/', s.AngleShares.Select(v => (100.0 * v).ToString("0.0", CultureInfo.InvariantCulture)))}%");
 
     /// <summary>Cells that stand more than <paramref name="metres"/> above all eight neighbours.</summary>
     internal static int Spikes(HeightField field, float metres)

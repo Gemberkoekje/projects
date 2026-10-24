@@ -4,8 +4,8 @@ namespace Vista.World;
 /// The state of an erosion run, laid out as the GPU's buffers are (vista-plan §10 M1.7), so a test or the self-test can feed
 /// both sides the same numbers: per cell, the ground as (bedrock, loose) heights, the water depth, the suspended sediment,
 /// the outflow to the four neighbours (−x, +x, −z, +z) in m³/s, the thermal move of the last step, and the flow sums; and,
-/// since M1.11d, the rock's strata (per cell the bed-table offset and the mottle, and the bed table), from which the passes
-/// read the hardness of the rock at its current height. Cell <c>(i, j)</c> is index <c>j·Size + i</c>, as in <see cref="HeightField"/>.
+/// since M1.11d, the rock's strata (per cell the bed-table offset, the mottle and, since M1.12c, how massive the rock is; and the
+/// bed table with massive rock's beside it), from which the passes read the hardness of the rock at its current height. Cell <c>(i, j)</c> is index <c>j·Size + i</c>, as in <see cref="HeightField"/>.
 /// </summary>
 public sealed class ErosionState
 {
@@ -29,28 +29,32 @@ public sealed class ErosionState
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
         Strata = Interleave(strata, cells);
-        Bands = strata?.Table ?? NoBeds;
+        Bands = strata?.Bands ?? NoBeds;
         TableScale = strata?.TableScale ?? 0f;
     }
 
-    /// <summary>The bed table without strata: every rock the softest.</summary>
-    public static float[] NoBeds => [0f, 0f];
+    /// <summary>The bed tables without strata (two entries, each a bed and massive rock): every rock the softest.</summary>
+    public static float[] NoBeds => [0f, 0f, 0f, 0f];
+
+    /// <summary>Floats per cell of <see cref="Strata"/>: the offset, the mottle and how massive the rock is.</summary>
+    public const int StrataFloats = 3;
 
     /// <summary>
-    /// <paramref name="strata"/> laid out as <see cref="Strata"/> is, per cell (offset, mottle), for <paramref name="cells"/> cells;
-    /// zeros without strata.
+    /// <paramref name="strata"/> laid out as <see cref="Strata"/> is, per cell (offset, mottle, massive), for <paramref name="cells"/>
+    /// cells; zeros without strata.
     /// </summary>
     public static float[] Interleave(StrataGrid? strata, int cells)
     {
-        var interleaved = new float[cells * 2];
+        var interleaved = new float[cells * StrataFloats];
         if (strata is null)
             return interleaved;
         if (strata.Offset.Length != cells)
             throw new ArgumentException("The strata are not on the ground's grid.", nameof(strata));
         for (int c = 0; c < cells; c++)
         {
-            interleaved[c * 2] = strata.Offset[c];
-            interleaved[c * 2 + 1] = strata.Mottle[c];
+            interleaved[c * StrataFloats] = strata.Offset[c];
+            interleaved[c * StrataFloats + 1] = strata.Mottle[c];
+            interleaved[c * StrataFloats + 2] = strata.Massive[c];
         }
         return interleaved;
     }
@@ -85,10 +89,10 @@ public sealed class ErosionState
     /// <summary>Per cell, the sums of (outflow in m³/s, water depth in m) over the steps that averaged.</summary>
     public float[] Flow { get; }
 
-    /// <summary>Per cell, the rock's (bed-table coordinate at height 0, mottle) (<see cref="StrataGrid"/>).</summary>
+    /// <summary>Per cell, the rock's (bed-table coordinate at height 0, mottle, massive) (<see cref="StrataGrid"/>).</summary>
     public float[] Strata { get; }
 
-    /// <summary>The bed table (<see cref="RockHardness.Table"/>; two zeros without strata).</summary>
+    /// <summary>The bed tables interleaved, per entry a bed's hardness and massive rock's (<see cref="StrataGrid.Bands"/>; <see cref="NoBeds"/> without strata).</summary>
     public float[] Bands { get; private init; }
 
     /// <summary>Bed-table entries per metre of rock height (0 without strata).</summary>
@@ -125,7 +129,7 @@ public sealed class ErosionState
         Flux = new float[cells * 4];
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
-        Strata = new float[cells * 2];
+        Strata = new float[cells * StrataFloats];
         Bands = NoBeds;
     }
 
@@ -275,12 +279,17 @@ public static class ErosionReference
     private static float Ground(float[] terrain, int c) => terrain[c * 2] + terrain[c * 2 + 1];
 
     // The hardness of the rock at height `rock` in cell c (RockHardness.Of, with the clamp's bound in the constants).
+    // M1.12c: the bed moved toward massive rock's by how massive the cell's rock is (exactly the bed's where it is not).
     private static float Hardness(ErosionConstants k, float[] strata, float[] bands, int c, float rock)
     {
-        float t = Math.Clamp(rock * k.TableScale + strata[c * 2], 0f, k.TableLast);
+        int s = c * ErosionState.StrataFloats;
+        float t = Math.Clamp(rock * k.TableScale + strata[s], 0f, k.TableLast);
         int b = (int)MathF.Floor(t);
         float f = t - b;
-        return Math.Clamp(bands[b] + (bands[b + 1] - bands[b]) * f + strata[c * 2 + 1], 0f, 1f);
+        float bed = bands[2 * b] + (bands[2 * b + 2] - bands[2 * b]) * f;
+        float massive = bands[2 * b + 1] + (bands[2 * b + 3] - bands[2 * b + 1]) * f;
+        float mixed = bed + (massive - bed) * strata[s + 2];
+        return Math.Clamp(mixed + strata[s + 1], 0f, 1f);
     }
 
     private static void FluxCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] water, float[] flux)

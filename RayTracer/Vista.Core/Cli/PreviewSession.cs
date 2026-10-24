@@ -122,7 +122,7 @@ public sealed class PreviewSession
 
         // The linked sliders (vista-plan §10 M1.11): the pins, resolved with the set pieces into the place, the sun and the weather.
         (SliderPins pins, string pinsFrom) = ReadPins(recipe, request);
-        SliderState sliders = LinkedSliders.Resolve(recipe, pins, AtmosphereModel.Default);
+        SliderState sliders = LinkedSliders.Resolve(recipe, pins, AtmosphereModel.Default, world.Footing);
         warnings.AddRange(sliders.Hints);
         Almanac almanac = sliders.Almanac;
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.For(request.Mesh.Materials);
@@ -372,6 +372,7 @@ public sealed class PreviewSession
             {
                 Erosion = world.Info,
                 Mesh = mesh.Info,
+                Footing = world.Footing,
             },
             Place = almanac.Place,
             Sliders = SlidersInfo.From(sliders, request.SlidersPath, pinsFrom),

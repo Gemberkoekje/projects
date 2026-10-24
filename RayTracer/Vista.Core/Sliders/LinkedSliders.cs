@@ -4,6 +4,7 @@ using Vista.Astronomy;
 using Vista.Atmosphere;
 using Vista.Recipes;
 using Vista.Weather;
+using Vista.World;
 
 namespace Vista.Sliders;
 
@@ -14,7 +15,10 @@ namespace Vista.Sliders;
 /// <param name="Pins">The pins it was resolved from.</param>
 /// <param name="Pushes">What the recipe's set pieces pushed.</param>
 /// <param name="Almanac">The place, date, time and sun.</param>
-/// <param name="BaseAltitudeMetres">The scene's base altitude above sea level (world <c>y = 0</c>, the valley floor).</param>
+/// <param name="BaseAltitudeMetres">
+/// The scene's base altitude above sea level (world <c>y = 0</c>); since M1.12c the world's lowest valleys stand
+/// <see cref="FootingMetres"/> above it, at <see cref="ValleyFloorMetres"/>.
+/// </param>
 /// <param name="Climate">The place's climate normals.</param>
 /// <param name="StationDay">The date's normal low and high at the climate's station.</param>
 /// <param name="Day">The date's normal low and high at the scene's valley floor (the station's, along the lapse rate).</param>
@@ -55,6 +59,18 @@ public sealed record SliderState(
 {
     /// <summary>Every hint for the user: the almanac's (a preset height the sun never reaches), the implausible ones, the notes.</summary>
     public IReadOnlyList<string> Hints => [.. Almanac.Hints, .. Implausible, .. Notes];
+
+    /// <summary>
+    /// How far the world's lowest valleys stand above its height 0, m (vista-plan §10 M1.12c, <see cref="WorldFooting"/>); 0 when
+    /// resolved without a world.
+    /// </summary>
+    public double FootingMetres { get; init; }
+
+    /// <summary>
+    /// The altitude of the scene's valley floor above sea level, m: the base altitude plus <see cref="FootingMetres"/>, where the
+    /// weather chain reads the air (the temperature, the humidity, the visibility).
+    /// </summary>
+    public double ValleyFloorMetres { get; init; }
 
     /// <summary><paramref name="model"/> with the haze the sliders settled on.</summary>
     public AtmosphereModel Air(AtmosphereModel model)
@@ -109,8 +125,13 @@ public static class LinkedSliders
     /// <summary>Seasonal snow lying more than this far below the freezing level, m, is implausible.</summary>
     public const double SnowBelowFreezingLevelImplausibleMetres = 1500.0;
 
-    /// <summary>Resolves <paramref name="pins"/> for <paramref name="recipe"/>'s set pieces, the haze in <paramref name="air"/> (the default model when null).</summary>
-    public static SliderState Resolve(Recipe recipe, SliderPins pins, AtmosphereModel? air = null)
+    /// <summary>
+    /// Resolves <paramref name="pins"/> for <paramref name="recipe"/>'s set pieces, the haze in <paramref name="air"/> (the default
+    /// model when null), on a world standing on <paramref name="footing"/> (vista-plan §10 M1.12c): the auto altitude puts the world's
+    /// lowest valleys, not its height 0, at the place's valley floor, and the weather is read there. Without a footing height 0 is the
+    /// valley floor, as before M1.12c.
+    /// </summary>
+    public static SliderState Resolve(Recipe recipe, SliderPins pins, AtmosphereModel? air = null, WorldFooting? footing = null)
     {
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(pins);
@@ -135,11 +156,29 @@ public static class LinkedSliders
             readings[Slider.Location] = new SliderReading(JsonName(chosen.ToString()), pinned, from);
         }
 
-        // The scene's base altitude.
-        double altitude = pins.Altitude ?? place.ValleyAltitudeMetres;
-        readings[Slider.Altitude] = new SliderReading(Invariant($"{altitude:0.#} m"), pins.Altitude is not null,
-            pins.Altitude is not null ? "pinned" : place.IsCustom ? "auto: sea level (custom latitude)" : $"auto: the valley floor of {place.Name} ({place.Spot})")
-        { Number = altitude, Unit = "m" };
+        // The scene's base altitude: pinned, or where it puts the world's lowest valleys at the place's valley floor (never below sea
+        // level); the weather is read at the valley floor, the world's footing above it.
+        double lift = footing?.HeightMetres ?? 0.0;
+        double altitude;
+        string altitudeFrom;
+        if (pins.Altitude is double pinnedAltitude)
+        {
+            altitude = pinnedAltitude;
+            altitudeFrom = "pinned";
+        }
+        else
+        {
+            altitude = Math.Max(place.ValleyAltitudeMetres - lift, 0.0);
+            altitudeFrom = place.IsCustom ? "auto: sea level (custom latitude)" : $"auto: the valley floor of {place.Name} ({place.Spot})";
+            if (footing is not null)
+            {
+                altitudeFrom += Invariant($", where the world's lowest valleys stand (its {footing.Percentile:0.#}th percentile, {lift:0} m above its height 0)");
+                if (place.ValleyAltitudeMetres - lift < 0.0)
+                    altitudeFrom += ", held at sea level";
+            }
+        }
+        readings[Slider.Altitude] = new SliderReading(Invariant($"{altitude:0.#} m"), pins.Altitude is not null, altitudeFrom) { Number = altitude, Unit = "m" };
+        double floor = altitude + lift;
 
         // Season and date, each deciding the other's auto value.
         Season season;
@@ -180,7 +219,7 @@ public static class LinkedSliders
         // The climate's day at the valley floor, and the temperature at the hour.
         ClimateNormals climate = Weather.Climate.For(place);
         DayNormals stationDay = climate.On(date);
-        DayNormals day = stationDay.Raised(altitude - climate.StationAltitudeMetres);
+        DayNormals day = stationDay.Raised(floor - climate.StationAltitudeMetres);
         double climateTemperature = DailyTemperature.At(day, almanac.SolarHours, DailyTemperature.MinimumHours(almanac.Daylight));
         double temperature;
         string temperatureFrom;
@@ -192,7 +231,7 @@ public static class LinkedSliders
         else
         {
             temperature = climateTemperature;
-            temperatureFrom = Invariant($"auto: {climate.Station} normals ({climate.Period}) for {Iso(date)}, low {stationDay.LowCelsius:0.0} / high {stationDay.HighCelsius:0.0} °C at {climate.StationAltitudeMetres:0} m, at {altitude:0} m on the daily curve at {Almanac.FormatHours(almanac.SolarHours)}");
+            temperatureFrom = Invariant($"auto: {climate.Station} normals ({climate.Period}) for {Iso(date)}, low {stationDay.LowCelsius:0.0} / high {stationDay.HighCelsius:0.0} °C at {climate.StationAltitudeMetres:0} m, at {floor:0} m on the daily curve at {Almanac.FormatHours(almanac.SolarHours)}");
             if (pushes.TemperatureCeilingCelsius is double ceiling && temperature > ceiling)
             {
                 temperature = ceiling;
@@ -210,7 +249,7 @@ public static class LinkedSliders
         { Number = humidity, Unit = "%" };
 
         // The freezing level, and the snowline: the climate's season, nudged by a temperature off the climate's.
-        double freezingLevel = Lapse.FreezingLevel(altitude, temperature);
+        double freezingLevel = Lapse.FreezingLevel(floor, temperature);
         double climateSnowline = SnowCover.Snowline(climate, date, SliderPins.MaxSnowlineMetres);
         double nudge = SnowFollowsFreezingLevel * (temperature - climateTemperature) / Lapse.RateCelsiusPerMetre;
         double snowline = pins.Snowline ?? Math.Clamp(climateSnowline + nudge, 0.0, SliderPins.MaxSnowlineMetres);
@@ -232,16 +271,16 @@ public static class LinkedSliders
         if (pins.Visibility is double pinnedVisibility)
         {
             visibility = pinnedVisibility;
-            opticalDepth = Haze.OpticalDepthForVisibility(model, visibility, altitude);
+            opticalDepth = Haze.OpticalDepthForVisibility(model, visibility, floor);
             hazeFrom = Invariant($"pinned; haze optical depth {opticalDepth:0.000} at 550 nm");
-            double clean = Haze.CleanAirVisibilityKm(model, altitude);
+            double clean = Haze.CleanAirVisibilityKm(model, floor);
             if (visibility > clean)
-                notes.Add(Invariant($"Clean air limits the view to {clean:0} km at {altitude:0} m, so the pinned {visibility:0} km renders as air without haze."));
+                notes.Add(Invariant($"Clean air limits the view to {clean:0} km at {floor:0} m, so the pinned {visibility:0} km renders as air without haze."));
         }
         else
         {
             opticalDepth = Haze.OpticalDepth(hazeHumidity);
-            visibility = Haze.VisibilityKm(model with { AerosolOpticalDepth550 = opticalDepth }, altitude);
+            visibility = Haze.VisibilityKm(model with { AerosolOpticalDepth550 = opticalDepth }, floor);
             hazeFrom = pins.Humidity is not null
                 ? Invariant($"auto: haze grown by the pinned {hazeHumidity:0.#}% humidity, optical depth {opticalDepth:0.000} at 550 nm")
                 : Invariant($"auto: haze grown by the day's {hazeHumidity:0.#}% humidity (at {dayTemperature:0.0} °C), optical depth {opticalDepth:0.000} at 550 nm");
@@ -258,7 +297,11 @@ public static class LinkedSliders
             implausible.Add(Invariant($"Implausible: seasonal snow down to {snowline:0} m with the freezing level at {freezingLevel:0} m."));
 
         return new SliderState(pins, pushes, almanac, altitude, climate, stationDay, day, climateTemperature, temperature, dewPoint, humidity,
-            freezingLevel, climateSnowline, snowline, hazeHumidity, opticalDepth, visibility, readings, implausible, notes);
+            freezingLevel, climateSnowline, snowline, hazeHumidity, opticalDepth, visibility, readings, implausible, notes)
+        {
+            FootingMetres = lift,
+            ValleyFloorMetres = floor,
+        };
     }
 
     /// <summary>A temperature as shown: °C, or °F with °C when the unit asks for it.</summary>

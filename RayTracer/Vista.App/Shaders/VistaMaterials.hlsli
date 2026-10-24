@@ -7,7 +7,8 @@
 //
 // Rock takes its colour from its bed (M1.11d's strata): the bed table's hardness at the hit's height mixes the soft rock's spectrum
 // into the hard rock's, the bed's own two tints brighten or darken it and warm or cool it, and its laminae (about a metre thick)
-// are each a little lighter or darker. Soil turns toward scree's colour where it is stony; wet ground is darker.
+// are each a little lighter or darker. Where the rock is massive (M1.12c) its hardness moves toward massive rock's and the beds'
+// tints and laminae fade. Soil turns toward scree's colour where it is stony; wet ground is darker.
 //
 // Below the mesh's detail the shading carries the ground's roughness, on a path's first surface only (MaterialBump): a bump of
 // ridged noise on rock and scree and of smooth noise on soil and grass, in octaves from 1.6 m down to 10 cm, each fading out where
@@ -29,8 +30,8 @@
 #define MAT_GRASS     4u
 #define MAT_FOREST    5u
 
-StructuredBuffer<uint2>  MaterialMap : register(t22); // MaterialField.Packed: the bed-table offset's bits; loose, area, wet, mottle codes
-StructuredBuffer<float4> BedTable    : register(t23); // MaterialField.Beds: hardness, tint u, tint v, 0 per entry
+StructuredBuffer<uint3>  MaterialMap : register(t22); // MaterialField.Packed: the bed-table offset's bits; loose, area, wet, mottle codes; massive code
+StructuredBuffer<float4> BedTable    : register(t23); // MaterialField.Beds: hardness, tint u, tint v, massive rock's hardness per entry
 
 cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
 {
@@ -134,6 +135,7 @@ struct MatSample
     float TintU;
     float TintV;
     float Table;
+    float Massive; // how massive the rock is (M1.12c): 0 layered, 1 massive
 };
 
 float MatMix(float v00, float v10, float v01, float v11, float2 f)
@@ -167,31 +169,37 @@ MatSample MaterialSampleAt(float2 world, float height)
         s.TintU = 0.0;
         s.TintV = 0.0;
         s.Table = 0.0;
+        s.Massive = 0.0;
         return s;
     }
     float2 uv = clamp((world - origin) / MatMapCell, 0.0, float(MatMapSize - 1u));
     uint2 c = min(uint2(uv), uint2(MatMapSize - 2u, MatMapSize - 2u));
     float2 f = uv - float2(c);
     uint k = c.y * MatMapSize + c.x;
-    uint2 p00 = MaterialMap[k];
-    uint2 p10 = MaterialMap[k + 1u];
-    uint2 p01 = MaterialMap[k + MatMapSize];
-    uint2 p11 = MaterialMap[k + MatMapSize + 1u];
+    uint3 p00 = MaterialMap[k];
+    uint3 p10 = MaterialMap[k + 1u];
+    uint3 p01 = MaterialMap[k + MatMapSize];
+    uint3 p11 = MaterialMap[k + MatMapSize + 1u];
     float4 c00 = MatCodes(p00.y), c10 = MatCodes(p10.y), c01 = MatCodes(p01.y), c11 = MatCodes(p11.y);
     float offset = MatMix(asfloat(p00.x), asfloat(p10.x), asfloat(p01.x), asfloat(p11.x), f);
     s.Loose = MatDepthOf(MatMix(c00.x, c10.x, c01.x, c11.x, f));
     s.Log10Area = MatMix(c00.y, c10.y, c01.y, c11.y, f) * (8.0 / 255.0) + 1.0;
     s.Wet = MatDepthOf(MatMix(c00.z, c10.z, c01.z, c11.z, f));
     float mottle = (MatMix(c00.w, c10.w, c01.w, c11.w, f) - 128.0) * (0.25 / 127.0);
+    float massive = MatMix(float(p00.z & 0xFFu), float(p10.z & 0xFFu), float(p01.z & 0xFFu), float(p11.z & 0xFFu), f) * (1.0 / 255.0);
     float t = clamp(height * MatTableScale + offset, 0.0, MatTableLast);
     uint e = uint(floor(t));
     float fe = t - float(e);
     float4 bed = BedTable[e];
     float4 next = BedTable[e + 1u];
-    s.Hardness = clamp(bed.x + (next.x - bed.x) * fe + mottle, 0.0, 1.0);
-    s.TintU = bed.y + (next.y - bed.y) * fe;
-    s.TintV = bed.z + (next.z - bed.z) * fe;
+    float hard = bed.x + (next.x - bed.x) * fe;
+    hard += (bed.w + (next.w - bed.w) * fe - hard) * massive;
+    float layered = 1.0 - massive;
+    s.Hardness = clamp(hard + mottle, 0.0, 1.0);
+    s.TintU = (bed.y + (next.y - bed.y) * fe) * layered;
+    s.TintV = (bed.z + (next.z - bed.z) * fe) * layered;
     s.Table = t;
+    s.Massive = massive;
     return s;
 }
 
@@ -504,14 +512,15 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     float dryGrass = 0.4 * MatSmoothStep(-0.1, 0.7, MaterialNoise(PcgHash(MatNoiseSeed ^ 0xD27u), world.x / 7.0, world.y / 7.0));
 
     // The rock of the bed the hit cuts: soft mixed into hard by its hardness, tinted by the bed, each lamina (thicker or thinner by
-    // bed) a little lighter or darker, fading where a pixel covers more than half a lamina.
+    // bed) a little lighter or darker, fading where a pixel covers more than half a lamina, and where the rock is massive (M1.12c).
     float hs = MatSmoothStep(MatHardColourMid - MatHardColourWidth, MatHardColourMid + MatHardColourWidth, s.Hardness);
     float4 lambda = float4(Cie[idx.x].w, Cie[idx.y].w, Cie[idx.z].w, Cie[idx.w].w);
     float laminaePerEntry = MatLaminaePerEntry * (1.0 + 0.4 * s.TintU);
     float lamina = s.Table * laminaePerEntry + 0.5 * s.TintV;
     float laminaMetres = 1.0 / max(laminaePerEntry * MatTableScale, 1.0e-4);
     float shade = float(PcgHash(asuint(int(floor(lamina))) ^ MatNoiseSeed) >> 8) * (2.0 / 16777216.0) - 1.0;
-    float layered = 1.0 + MatLaminaContrast * shade * (footprint > 0.0 ? MatSmoothStep(laminaMetres, 0.5 * laminaMetres, footprint) : 0.0);
+    float bedded = 1.0 - s.Massive;
+    float layered = 1.0 + MatLaminaContrast * bedded * shade * (footprint > 0.0 ? MatSmoothStep(laminaMetres, 0.5 * laminaMetres, footprint) : 0.0);
     float bright = (1.0 + MatBedBrightness * s.TintU) * layered;
     float4 tint = bright * (1.0 + MatBedWarmth * s.TintV * (lambda - 550.0) / 150.0);
     float sHard, sSoft, sScree, sSoil, sGrass;
@@ -550,7 +559,7 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     }
 
     float gaps = 1.0;
-    g.Normal = footprint > 0.0 ? MaterialBump(ns, wo, offset, height, w, hs, lamina, laminaMetres, footprint, gaps) : ns;
+    g.Normal = footprint > 0.0 ? MaterialBump(ns, wo, offset, height, w, hs * bedded, lamina, laminaMetres, footprint, gaps) : ns;
     g.Refl *= gaps;
     g.Back *= gaps;
     g.Canopy *= gaps;

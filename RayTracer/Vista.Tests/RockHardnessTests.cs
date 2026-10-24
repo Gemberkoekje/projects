@@ -12,8 +12,9 @@ public sealed class RockHardnessTests
 {
     private static readonly Recipe Alpine = new() { SetPieces = [SetPiece.AlpineRange] };
 
-    // Hardness that matters: the hardest rock a tenth as erodible as the softest and standing much steeper.
-    private static readonly ErosionSettings Rock = ErosionSettings.Mountains with
+    // Hardness that matters: the hardest rock a tenth as erodible as the softest and standing much steeper. M1.11d's even beds
+    // (M1.12c's folds have tests of their own, StrataFieldTests).
+    private static readonly ErosionSettings Rock = StrataFieldTests.Even with
     {
         HardErodibility = 0.1f,
         IncisionTalusDegrees = 30f,
@@ -36,9 +37,9 @@ public sealed class RockHardnessTests
     [TestMethod]
     public void Hardness_IsAPureFunctionOfSeedAndPosition_AndPinned()
     {
-        RockHardness a = RockHardness.For(42, ErosionSettings.Mountains), b = RockHardness.For(42, ErosionSettings.Mountains);
+        RockHardness a = RockHardness.For(42, StrataFieldTests.Even), b = RockHardness.For(42, StrataFieldTests.Even);
         Assert.AreEqual(a.ContentHash(), b.ContentHash());
-        Assert.AreNotEqual(a.ContentHash(), RockHardness.For(43, ErosionSettings.Mountains).ContentHash(), "another seed, other beds");
+        Assert.AreNotEqual(a.ContentHash(), RockHardness.For(43, StrataFieldTests.Even).ContentHash(), "another seed, other beds");
         foreach ((double x, double y, double z) in new[] { (0.0, 1200.0, 0.0), (-9000.5, 300.25, 15000.0), (16000.0, 2400.0, -16000.0) })
         {
             Assert.AreEqual(a.At(x, y, z), b.At(x, y, z));
@@ -54,7 +55,7 @@ public sealed class RockHardnessTests
     [TestMethod]
     public void TheBeds_AreHardOrSoft_AndAsThickAsTheSettingsSay()
     {
-        RockHardness rock = RockHardness.For(7, ErosionSettings.Mountains with { StrataThickness = 40f });
+        RockHardness rock = RockHardness.For(7, StrataFieldTests.Even with { StrataThickness = 40f });
         // A bed is a run of equal entries; its thickness is a quarter to two and a half times the mean.
         var runs = new List<double>();
         int start = 0;
@@ -79,17 +80,17 @@ public sealed class RockHardnessTests
     [TestMethod]
     public void TheBeds_FollowTheDip_AndTheMottleStaysWithinItsAmplitude()
     {
-        ErosionSettings flat = ErosionSettings.Mountains with { StrataDipDegrees = 0f, HardnessMottle = 0f };
+        ErosionSettings flat = StrataFieldTests.Even with { StrataDipDegrees = 0f, HardnessMottle = 0f };
         RockHardness level = RockHardness.For(5, flat);
         // Without dip, mottle or fold amplitude beyond its own, a bed's height varies only by the fold's slow warp.
         for (double x = -10000; x <= 10000; x += 2500)
             Assert.IsTrue(Math.Abs(level.Fold(x, 0) - level.Fold(0, 0)) <= 240.0, $"fold at {x}");
-        RockHardness tilted = RockHardness.For(5, ErosionSettings.Mountains with { StrataDipDegrees = 20f, HardnessMottle = 0f });
+        RockHardness tilted = RockHardness.For(5, StrataFieldTests.Even with { StrataDipDegrees = 20f, HardnessMottle = 0f });
         double spread = 0;
         for (double x = -10000; x <= 10000; x += 2500)
             spread = Math.Max(spread, Math.Abs(tilted.Fold(x, 0) - tilted.Fold(-x, 0)));
         Assert.IsTrue(spread <= 2 * 10000 * Math.Tan(20 * Math.PI / 180) + 480, "the dip is at most the settings'");
-        RockHardness mottled = RockHardness.For(5, ErosionSettings.Mountains with { HardnessMottle = 0.2f });
+        RockHardness mottled = RockHardness.For(5, StrataFieldTests.Even with { HardnessMottle = 0.2f });
         for (double x = -16000; x <= 16000; x += 777)
             Assert.IsTrue(Math.Abs(mottled.Mottle(x, 0.37 * x)) <= 0.2 * 1.0001, $"mottle at {x}");
     }
@@ -97,7 +98,7 @@ public sealed class RockHardnessTests
     [TestMethod]
     public void TheGridLayout_AgreesWithTheField_ThroughTheFrame()
     {
-        RockHardness rock = RockHardness.For(11, ErosionSettings.Mountains);
+        RockHardness rock = RockHardness.For(11, StrataFieldTests.Even);
         var frame = new StrataFrame(Low: 400.0, Bottom: 650.0, Scale: 1.25, UpliftSteps: 300);
         static double Uplift(double x, double z) => 2.0 + 0.0001 * x;
         const int n = 33;
@@ -221,7 +222,7 @@ public sealed class RockHardnessTests
         StrataGrid Uniform(float hardness)
         {
             // One bed of the given hardness everywhere: a two-entry table, no mottle.
-            return new StrataGrid([hardness, hardness], 0f, new float[n * n], new float[n * n], StrataFrame.Identity);
+            return new StrataGrid([hardness, hardness], [0f, 0f], 0f, new float[n * n], new float[n * n], new float[n * n], StrataFrame.Identity);
         }
         float Loose(StrataGrid strata)
         {
@@ -285,7 +286,7 @@ public sealed class RockHardnessTests
         }
         RockHardness rock = RockHardness.For(1, Rock);
         (HeightField incised, StrataFrame frame) = StreamPower.Incise(ground, Rock, uplift,
-            (c, y) => rock.AtSigma(y + rock.Fold(ground.XOf(c % n), ground.ZOf(c / n)), 0f));
+            (c, y) => rock.AtSigma(y + rock.Fold(ground.XOf(c % n), ground.ZOf(c / n)), 0f, 0f));
         DrainageStats after = DrainageStats.Measure(DrainageMap.Of(incised), channelAreaKm2: 0.1);
         Assert.AreEqual(0.0, after.BasinShare, "the crater drains");
         Assert.AreEqual(ground.MinHeight, incised.MinHeight, 1e-3f);

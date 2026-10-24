@@ -70,7 +70,11 @@ public sealed record ErosionInfo
 /// <param name="Erosion">The erosion result (the maps later stages read); null when not eroded.</param>
 /// <param name="Info">Provenance for the sidecar.</param>
 /// <param name="Warnings">Things the user should know (an un-eroded stand-in, a damaged cache file).</param>
-public sealed record TerrainWorld(HeightField Surface, ErosionResult? Erosion, ErosionInfo Info, IReadOnlyList<string> Warnings);
+public sealed record TerrainWorld(HeightField Surface, ErosionResult? Erosion, ErosionInfo Info, IReadOnlyList<string> Warnings)
+{
+    /// <summary>Where the world stands (vista-plan §10 M1.12c): the height of its lowest valleys, which the altitude slider puts at the place's valley floor.</summary>
+    public WorldFooting Footing { get; } = WorldFooting.Of(Surface);
+}
 
 /// <summary>
 /// The world stage (vista-plan §4.1, §10 M1.7): the base terrain of the recipe and seed on the global grid, then its erosion —

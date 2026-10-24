@@ -46,6 +46,7 @@ public sealed record SlidersInfo(
 /// <param name="HazeHumidityPercent">The humidity the haze grew by: pinned, or the day's (at its mean temperature), %.</param>
 /// <param name="AerosolOpticalDepth550">The haze rendered: vertical optical depth at 550 nm from sea level.</param>
 /// <param name="Models">How each step was modelled.</param>
+/// <remarks>Since schema 20 (vista-plan §10 M1.12c) the valley floor is the world's lowest valleys, <see cref="FootingMetres"/> above the base altitude.</remarks>
 public sealed record WeatherInfo(
     string Station,
     double StationAltitudeMetres,
@@ -63,6 +64,12 @@ public sealed record WeatherInfo(
     double AerosolOpticalDepth550,
     string Models)
 {
+    /// <summary>The valley floor's altitude the weather was read at, m above sea level (schema 20).</summary>
+    public double ValleyFloorMetres { get; init; }
+
+    /// <summary>How far the valley floor stands above the base altitude, the world's footing, m (schema 20).</summary>
+    public double FootingMetres { get; init; }
+
     /// <summary>Recorded in <see cref="Models"/>.</summary>
     public static readonly string ModelNotes = string.Create(System.Globalization.CultureInfo.InvariantCulture,
         $"monthly normals interpolated from mid-month; lapse rate {Lapse.RateCelsiusPerMetre * 1000.0:0.0} °C/km; daily curve: two half cosines, low at sunrise, high at {DailyTemperature.MaximumHours:0}:00 solar; " +
@@ -89,6 +96,10 @@ public sealed record WeatherInfo(
             state.ClimateSnowlineMetres,
             state.HazeHumidityPercent,
             state.AerosolOpticalDepth550,
-            ModelNotes);
+            ModelNotes)
+        {
+            ValleyFloorMetres = state.ValleyFloorMetres,
+            FootingMetres = state.FootingMetres,
+        };
     }
 }

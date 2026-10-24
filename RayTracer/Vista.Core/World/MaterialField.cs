@@ -22,8 +22,8 @@ public enum DetailKind
 /// <summary>
 /// What the ground's materials read on the world grid (vista-plan §10 M1.12): per sample, the erosion's loose material, the land
 /// that drains through it and its water (the deposition, flow-accumulation and wetness maps of M1.11a), and where the rock's beds
-/// lie (M1.11d's strata: the bed-table coordinate of height 0 and the mottle), packed for the GPU, two words a sample; the bed table
-/// with each bed's hardness and tint; and per sample the weights of the detail kinds the mesh adds below the grid. The shader and
+/// lie (M1.11d's strata: the bed-table coordinate of height 0 and the mottle; since M1.12c how massive the rock is), packed for
+/// the GPU, three words a sample; the bed table with each bed's hardness and tint, and massive rock's hardness beside it; and per sample the weights of the detail kinds the mesh adds below the grid. The shader and
 /// <see cref="Inputs"/> read the maps alike: bilinear between the samples around a place, then the rules
 /// (<see cref="MaterialRules.Evaluate"/>). A world that was not eroded has no maps (bare ground everywhere), but still its beds.
 ///
@@ -54,6 +54,9 @@ public sealed class MaterialField
 
     /// <summary>The hardness the ground reads away from the maps.</summary>
     public const float DefaultHardness = 0.5f;
+
+    /// <summary>Words per sample in <see cref="Packed"/>.</summary>
+    public const int Words = 3;
 
     /// <summary>The side of the box the detail kinds' weights are averaged over, in samples, so they change slowly enough to bound (see <see cref="MaterialDetail"/>).</summary>
     public const int DetailSmoothing = 7;
@@ -129,12 +132,16 @@ public sealed class MaterialField
     public ForestPlacement Forest { get; }
 
     /// <summary>
-    /// Two words per sample, row-major: the bed-table coordinate of world height 0 (a float's bits), then the codes, a byte each from
-    /// the low end: the loose depth, the upstream area, the water depth and the mottle. What the GPU reads as <c>uint2</c>.
+    /// Three words per sample (<see cref="Words"/>), row-major: the bed-table coordinate of world height 0 (a float's bits), then the
+    /// codes, a byte each from the low end: the loose depth, the upstream area, the water depth and the mottle; then how massive the
+    /// rock is (vista-plan §10 M1.12c), a byte from the low end (0 layered, 255 massive). What the GPU reads as <c>uint3</c>.
     /// </summary>
     public ReadOnlySpan<uint> Packed => _packed;
 
-    /// <summary>Four floats per bed-table entry: the hardness, the bed's two tints and 0. What the GPU reads as <c>float4</c>.</summary>
+    /// <summary>
+    /// Four floats per bed-table entry: the hardness, the bed's two tints and massive rock's hardness (vista-plan §10 M1.12c). What
+    /// the GPU reads as <c>float4</c>.
+    /// </summary>
     public ReadOnlySpan<float> Beds => _beds;
 
     /// <summary>Bed-table entries per metre of world height.</summary>
@@ -190,9 +197,10 @@ public sealed class MaterialField
             beds[4 * k] = strata.Table[k];
             beds[4 * k + 1] = tints[2 * k];
             beds[4 * k + 2] = tints[2 * k + 1];
+            beds[4 * k + 3] = strata.MassiveTable[k];
         }
 
-        var packed = new uint[2 * n * n];
+        var packed = new uint[Words * n * n];
         int band = Math.Min(TerrainHierarchy.BlendCells, (n - 1) / 8);
         Parallel.For(0, n, j =>
         {
@@ -210,8 +218,9 @@ public sealed class MaterialField
                     wet = erosion.WaterDepth[c] * w;
                     logArea = AreaLogFloor + ((float)Math.Log10(Math.Max(erosion.Drainage.Area(c), 10.0)) - AreaLogFloor) * w;
                 }
-                packed[2 * c] = BitConverter.SingleToUInt32Bits(strata.Offset[c]);
-                packed[2 * c + 1] = DepthCode(loose) | (AreaCode(logArea) << 8) | (DepthCode(wet) << 16) | (MottleCode(strata.Mottle[c]) << 24);
+                packed[Words * c] = BitConverter.SingleToUInt32Bits(strata.Offset[c]);
+                packed[Words * c + 1] = DepthCode(loose) | (AreaCode(logArea) << 8) | (DepthCode(wet) << 16) | (MottleCode(strata.Mottle[c]) << 24);
+                packed[Words * c + 2] = MassiveCode(strata.Massive[c]);
             }
         });
 
@@ -285,13 +294,13 @@ public sealed class MaterialField
     }
 
     /// <summary>
-    /// The bed at world <c>(x, z)</c> and height <paramref name="height"/>: its hardness (with the mottle), its two tints, and its
-    /// bed-table coordinate (for its laminae); the defaults away from the map.
+    /// The bed at world <c>(x, z)</c> and height <paramref name="height"/>: its hardness (with the mottle), its two tints (faded where
+    /// the rock is massive), its bed-table coordinate (for its laminae) and how massive the rock is; the defaults away from the map.
     /// </summary>
-    public (float Hardness, float TintU, float TintV, float Table) BedAt(float x, float z, float height)
+    public (float Hardness, float TintU, float TintV, float Table, float Massive) BedAt(float x, float z, float height)
     {
         Sample s = At(x, z, height, TableScale, TableLast);
-        return (s.Hardness, s.TintU, s.TintV, s.Table);
+        return (s.Hardness, s.TintU, s.TintV, s.Table, s.Massive);
     }
 
     /// <summary>The detail kinds' weights at world <c>(x, z)</c>: bilinear between the samples around it, the edge's outside the grid.</summary>
@@ -383,23 +392,26 @@ public sealed class MaterialField
 
     // ── The GPU's reads, in its float operations ─────────────────────────────────────────────────────
 
-    private readonly record struct Sample(float Loose, float Log10Area, float Wet, float Hardness, float TintU, float TintV, float Table);
+    private readonly record struct Sample(float Loose, float Log10Area, float Wet, float Hardness, float TintU, float TintV, float Table, float Massive);
 
-    /// <summary>The decoded maps and the bed at a place: bilinear on the codes and the offsets, then decoded (the shader's <c>MaterialSampleAt</c>).</summary>
+    /// <summary>
+    /// The decoded maps and the bed at a place: bilinear on the codes and the offsets, then decoded (the shader's <c>MaterialSampleAt</c>);
+    /// where the rock is massive (vista-plan §10 M1.12c) its hardness moves toward massive rock's and the beds' tints fade.
+    /// </summary>
     private Sample At(float x, float z, float height, float tableScale, float tableLast)
     {
         float extent = (float)Cell * (Size - 1);
         float ox = (float)Origin;
         if (!(x >= ox && x <= ox + extent && z >= ox && z <= ox + extent))
-            return new Sample(0f, AreaLogFloor, 0f, DefaultHardness, 0f, 0f, 0f);
+            return new Sample(0f, AreaLogFloor, 0f, DefaultHardness, 0f, 0f, 0f, 0f);
         float u = Math.Clamp((x - ox) / (float)Cell, 0f, Size - 1), v = Math.Clamp((z - ox) / (float)Cell, 0f, Size - 1);
         int i = Math.Min((int)u, Size - 2), j = Math.Min((int)v, Size - 2);
         float fu = u - i, fv = v - j;
         int c = j * Size + i;
-        (float o00, float l00, float a00, float w00, float m00) = Unpack(c);
-        (float o10, float l10, float a10, float w10, float m10) = Unpack(c + 1);
-        (float o01, float l01, float a01, float w01, float m01) = Unpack(c + Size);
-        (float o11, float l11, float a11, float w11, float m11) = Unpack(c + Size + 1);
+        (float o00, float l00, float a00, float w00, float m00, float s00) = Unpack(c);
+        (float o10, float l10, float a10, float w10, float m10, float s10) = Unpack(c + 1);
+        (float o01, float l01, float a01, float w01, float m01, float s01) = Unpack(c + Size);
+        (float o11, float l11, float a11, float w11, float m11, float s11) = Unpack(c + Size + 1);
         float Mix(float v00, float v10, float v01, float v11)
         {
             float bottom = v00 + (v10 - v00) * fu, top = v01 + (v11 - v01) * fu;
@@ -410,19 +422,24 @@ public sealed class MaterialField
         float logArea = AreaOf(Mix(a00, a10, a01, a11));
         float wet = DepthOf(Mix(w00, w10, w01, w11));
         float mottle = MottleOf(Mix(m00, m10, m01, m11));
+        float massive = Mix(s00, s10, s01, s11) * (1f / 255f);
         float t = Math.Clamp(height * tableScale + offset, 0f, tableLast);
         int k = (int)MathF.Floor(t);
         float f = t - k;
         float hard = _beds[4 * k] + (_beds[4 * k + 4] - _beds[4 * k]) * f;
         float tintU = _beds[4 * k + 1] + (_beds[4 * k + 5] - _beds[4 * k + 1]) * f;
         float tintV = _beds[4 * k + 2] + (_beds[4 * k + 6] - _beds[4 * k + 2]) * f;
-        return new Sample(loose, logArea, wet, Math.Clamp(hard + mottle, 0f, 1f), tintU, tintV, t);
+        float massiveHard = _beds[4 * k + 3] + (_beds[4 * k + 7] - _beds[4 * k + 3]) * f;
+        hard += (massiveHard - hard) * massive;
+        float layered = 1f - massive;
+        return new Sample(loose, logArea, wet, Math.Clamp(hard + mottle, 0f, 1f), tintU * layered, tintV * layered, t, massive);
     }
 
-    private (float Offset, float Loose, float Area, float Wet, float Mottle) Unpack(int c)
+    private (float Offset, float Loose, float Area, float Wet, float Mottle, float Massive) Unpack(int c)
     {
-        uint codes = _packed[2 * c + 1];
-        return (BitConverter.UInt32BitsToSingle(_packed[2 * c]), codes & 0xFF, (codes >> 8) & 0xFF, (codes >> 16) & 0xFF, codes >> 24);
+        uint codes = _packed[Words * c + 1];
+        return (BitConverter.UInt32BitsToSingle(_packed[Words * c]), codes & 0xFF, (codes >> 8) & 0xFF, (codes >> 16) & 0xFF, codes >> 24,
+            _packed[Words * c + 2] & 0xFF);
     }
 
     /// <summary>The code of a loose depth or water depth, m: log₁₀(d + 0.01) over four decades in a byte.</summary>
@@ -443,6 +460,9 @@ public sealed class MaterialField
 
     /// <summary>The mottle of a (bilinear) code.</summary>
     public static float MottleOf(float code) => (code - 128f) * (MottleRange / 127f);
+
+    /// <summary>The code of how massive the rock is (vista-plan §10 M1.12c): 0 layered to 255 massive.</summary>
+    public static uint MassiveCode(float massive) => (uint)MathF.Round(Math.Clamp(massive, 0f, 1f) * 255f);
 
     // ── The detail kinds' weights ───────────────────────────────────────────────────────────────────
 
@@ -470,10 +490,13 @@ public sealed class MaterialField
                 float ny = MathF.Sqrt(MathF.Max(1f - nx * nx - nz * nz, 0f));
                 float x = origin + (float)(i * cell), z = origin + (float)(j * cell);
                 (float b1, float b2) = MaterialNoise.Breakup(k.NoiseSeed, x, z, k.Breakup1, k.Breakup2);
-                uint codes = packed[2 * c + 1];
-                float t = Math.Clamp(surface[i, j] * tableScale + BitConverter.UInt32BitsToSingle(packed[2 * c]), 0f, k.TableLast);
+                uint codes = packed[Words * c + 1];
+                float t = Math.Clamp(surface[i, j] * tableScale + BitConverter.UInt32BitsToSingle(packed[Words * c]), 0f, k.TableLast);
                 int e = (int)MathF.Floor(t);
-                float hard = Math.Clamp(beds[4 * e] + (beds[4 * e + 4] - beds[4 * e]) * (t - e) + MottleOf(codes >> 24), 0f, 1f);
+                float bed = beds[4 * e] + (beds[4 * e + 4] - beds[4 * e]) * (t - e);
+                float massiveHard = beds[4 * e + 3] + (beds[4 * e + 7] - beds[4 * e + 3]) * (t - e);
+                bed += (massiveHard - bed) * ((packed[Words * c + 2] & 0xFF) * (1f / 255f));
+                float hard = Math.Clamp(bed + MottleOf(codes >> 24), 0f, 1f);
                 var inputs = new MaterialInputs(MathF.Acos(MathF.Min(ny, 1f)) * (180f / MathF.PI), 0f, 0f, DepthOf(codes & 0xFF),
                     AreaOf((codes >> 8) & 0xFF), DepthOf((codes >> 16) & 0xFF), hard, b1, b2, 0f);
                 MaterialWeights w = MaterialRules.Evaluate(inputs, k);

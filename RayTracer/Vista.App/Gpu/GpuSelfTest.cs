@@ -64,11 +64,12 @@ internal static class GpuSelfTest
     /// <summary>
     /// The camera every render here uses: the default measurement view for seed 42 (<c>vista-views/default.camera.json</c>), 3 m
     /// above rock, looking north-north-west at the range with the sky above it. <see cref="DefaultCamera.For"/>'s pose has stood on a
-    /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world).
+    /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world), and
+    /// M1.12c again (M1.11d's is underground on the world its folded strata shape).
     /// </summary>
     private static readonly CameraSpec SelfTestCamera = new()
     {
-        Position = new WorldPoint(2625.0, 1607.42, -4375.0),
+        Position = new WorldPoint(-250.0, 1645.29, -5125.0),
         YawDegrees = -20.0,
         PitchDegrees = 3.0,
     };
@@ -122,10 +123,10 @@ internal static class GpuSelfTest
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
         pass &= MaterialChecks(renderer, recipe, seed, eroded, materials, hierarchy, scene, reference, log);
 
-        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.11d's pose the range's skyline crosses it
-        // near row 190, a third of it sky).
+        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.12c's pose the range's skyline crosses it
+        // near row 160, two fifths of it sky).
         var frame = settings with { Width = 640, Height = 360 };
-        var window = new PixelWindow(291, 171, 64, 64);
+        var window = new PixelWindow(291, 139, 64, 64);
         RenderOutput full = Render(renderer, scene, frame, allAovs, new BatchPlannerOptions(), log, "640×360 frame");
         RenderOutput loupe = Render(renderer, scene, frame with { Window = window }, allAovs, new BatchPlannerOptions(), log, $"loupe {window}");
         RenderOutput loupeSplit = Render(renderer, scene, frame with { Window = window }, allAovs, tight, log, $"loupe {window}, 0.05 ms budget");

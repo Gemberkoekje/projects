@@ -91,7 +91,9 @@ public sealed class PreviewSessionTests
             ("camera move", r => Camera(r, "position.y", "3000"), [.. Mesh, .. Sky, .. Image]),
             // The haze follows the day's humidity (M1.11), which the lapse rate moves a little with the altitude: the air's tables too.
             ("base altitude", r => Recipe(r, "altitude", "3000"), [.. Mesh, PreviewStage.AtmosphereTables, PreviewStage.ScatteringOrders, .. Sky, .. Image]),
-            ("seed", r => r with { Seed = 8 }, [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, .. Sky, .. Image]),
+            // Another world stands on another footing (M1.12c): the valley floor moves, where the weather is read, and the air with it.
+            ("seed", r => r with { Seed = 8 }, [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, PreviewStage.AtmosphereTables,
+                PreviewStage.ScatteringOrders, .. Sky, .. Image]),
             ("width", r => r with { Width = 48, Height = 27 }, [.. Mesh, .. Render]),
             ("width back", r => r with { Width = 32, Height = 18 }, [.. Mesh, .. Render]),
             ("average meter", r => r with { Meter = Metering.Average }, [PreviewStage.ExposureMeter]),
@@ -307,6 +309,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(19, back.Schema);
+        Assert.AreEqual(20, back.Schema);
     }
 }

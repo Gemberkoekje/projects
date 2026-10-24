@@ -100,7 +100,7 @@ internal static class DiffuseCompare
         var worlds = new WorldCache();
         TerrainWorld world = worlds.World(recipe, seed, WorldGrid.Default, renderer, ErosionCache.Default);
         SliderPins pins = SliderPins.FromRecipe(recipe);
-        SliderState sliders = LinkedSliders.Resolve(recipe, pins with { Altitude = altitude ?? pins.Altitude, SunElevation = sunElevation ?? pins.SunElevation }, AtmosphereModel.Default);
+        SliderState sliders = LinkedSliders.Resolve(recipe, pins with { Altitude = altitude ?? pins.Altitude, SunElevation = sunElevation ?? pins.SunElevation }, AtmosphereModel.Default, world.Footing);
         Almanac almanac = sliders.Almanac;
         double ground = sliders.BaseAltitudeMetres;
         AtmosphereModel air = sliders.Air(AtmosphereModel.Default);

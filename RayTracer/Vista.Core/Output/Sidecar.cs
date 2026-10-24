@@ -46,12 +46,14 @@ namespace Vista.Output;
 /// the render traced and how they weighed into colour, and <see cref="ImageInfo.Wavelengths"/>, the table's span; each material's
 /// albedo is now its colour through that quadrature. Schema 19 (M1.12b) added, in <see cref="Materials"/>, whether forest grows, the
 /// tree line and where it came from, the canopy's detail and, for a dry run, the forest's share; and <see cref="ImageInfo.Canopy"/>,
-/// how the canopy scattered.</para>
+/// how the canopy scattered. Schema 20 (M1.12c) added <see cref="WorldInfo.Footing"/>, the height of the world's lowest valleys that
+/// the auto altitude puts at the place's valley floor, and, in <see cref="SlidersInfo.Weather"/>, the valley floor's altitude the
+/// weather was read at and that footing; the erosion's settings gained the strata's regional dip, folds, formations and massive share.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 19;
+    public const int CurrentSchema = 20;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -236,6 +238,12 @@ public sealed record WorldInfo(
 
     /// <summary>The view's terrain mesh (schema 10): how it was refined, how big it is, how far it reaches, what it cost.</summary>
     public MeshInfo? Mesh { get; init; }
+
+    /// <summary>
+    /// Where the world stands (schema 20, vista-plan §10 M1.12c): the percentile of its ground taken as its lowest valleys, their
+    /// height above its height 0 (which the auto altitude puts at the place's valley floor) and its lowest point.
+    /// </summary>
+    public WorldFooting? Footing { get; init; }
 }
 
 /// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>

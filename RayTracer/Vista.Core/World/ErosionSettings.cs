@@ -134,6 +134,41 @@ public sealed record ErosionSettings
     public float HardnessMottle { get; init; } = 0.15f;
 
     /// <summary>
+    /// The beds' dip at the centre of each region, in degrees (vista-plan §10 M1.12c): the beds tilt by a dip and a strike of
+    /// their own in every region <see cref="StrataRegionMetres"/> across, turning between them (<see cref="RockHardness"/>). 0: no
+    /// regional dip, as M1.11d.
+    /// </summary>
+    public float StrataRegionalDipDegrees { get; init; }
+
+    /// <summary>The size of the regions the beds keep one dip and strike over, in metres.</summary>
+    public float StrataRegionMetres { get; init; } = 10000f;
+
+    /// <summary>
+    /// The height of the beds' long folds, in metres from the middle to a crest (vista-plan §10 M1.12c): anticlines and synclines
+    /// whose axes wander. 0: none, as M1.11d.
+    /// </summary>
+    public float StrataFoldMetres { get; init; }
+
+    /// <summary>The distance from one fold's crest to the next, in metres.</summary>
+    public float StrataFoldWavelengthMetres { get; init; } = 6000f;
+
+    /// <summary>
+    /// The mean thickness of a formation, a package of beds with its own bed thickness and hardness, in metres (vista-plan §10
+    /// M1.12c): thin-bedded, thick-bedded and massive units stacked unevenly. 0: M1.11d's even beds.
+    /// </summary>
+    public float StrataFormationMetres { get; init; }
+
+    /// <summary>
+    /// The share of the ground where the rock is massive, not layered (vista-plan §10 M1.12c): a seeded mask of regions where the
+    /// beds fade into one rock whose hardness changes only slowly with height. 0: layered everywhere, as M1.11d.
+    /// </summary>
+    public float StrataMassiveShare { get; init; }
+
+    /// <summary>True when the rock is M1.11d's: none of M1.12c's regional dip, folds, formations or massive regions.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EvenStrata => StrataRegionalDipDegrees == 0f && StrataFoldMetres == 0f && StrataFormationMetres == 0f && StrataMassiveShare == 0f;
+
+    /// <summary>
     /// The share of a lake's depth that fills with sediment per incision step (1: a lake fills to its outlet at once; 0: only
     /// the outlet cutting down drains it).
     /// </summary>
@@ -152,7 +187,9 @@ public sealed record ErosionSettings
     /// sediment keep the water from drilling needles into the valley floors and rippling the loose slopes; rock stands to 50°.
     /// The incision (vista-plan §10 M1.11a) was chosen by drainage measures and sheets of seed 42: 300 steps on a 64 m grid drain
     /// every closed basin (a coarser step rate leaves lakes; filling the lakes at once leaves them as plains; more uplift flattens
-    /// the hillslopes into talus planes; a second, 32 m level grooves the faces).
+    /// the hillslopes into talus planes; a second, 32 m level grooves the faces). The strata's regional dip, folds, formations and
+    /// massive share (vista-plan §10 M1.12c) were chosen by the contour-line measure and sheets of seed 42 seen from the user's
+    /// photo's height: dips like the hillsides' own take the beds' bands off the contours.
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -186,6 +223,12 @@ public sealed record ErosionSettings
         StrataThickness = 60.0f,
         StrataDipDegrees = 8.0f,
         HardnessMottle = 0.08f,
+        StrataRegionalDipDegrees = 40.0f,
+        StrataRegionMetres = 10000.0f,
+        StrataFoldMetres = 600.0f,
+        StrataFoldWavelengthMetres = 5000.0f,
+        StrataFormationMetres = 300.0f,
+        StrataMassiveShare = 0.3f,
         IncisionLakeFill = 0.05f,
         PoolFillMetres = 100.0f,
     };
@@ -294,6 +337,14 @@ public sealed record ErosionSettings
         if (!(StrataDipDegrees >= 0f && StrataDipDegrees < 45f))
             errors.Add($"StrataDipDegrees must be in [0, 45) (got {StrataDipDegrees}°).");
         Fraction(nameof(HardnessMottle), HardnessMottle);
+        if (!(StrataRegionalDipDegrees >= 0f && StrataRegionalDipDegrees < 60f))
+            errors.Add($"StrataRegionalDipDegrees must be in [0, 60) (got {StrataRegionalDipDegrees}°).");
+        Positive(nameof(StrataRegionMetres), StrataRegionMetres);
+        Fraction(nameof(StrataFoldMetres), StrataFoldMetres, float.MaxValue);
+        Positive(nameof(StrataFoldWavelengthMetres), StrataFoldWavelengthMetres);
+        Fraction(nameof(StrataFormationMetres), StrataFormationMetres, float.MaxValue);
+        if (!(StrataMassiveShare >= 0f && StrataMassiveShare < 1f))
+            errors.Add($"StrataMassiveShare must be in [0, 1) (got {StrataMassiveShare}).");
         return errors;
     }
 
@@ -312,6 +363,11 @@ public sealed record ErosionSettings
                 LooseTalusDegrees, RockTalusDegrees, ThermalRate, IncisionCell, IncisionRate, ChannelAreaKm2, IncisionTalusDegrees, IncisionUplift, IncisionLakeFill, PoolFillMetres,
                 RockTalusHardDegrees, IncisionTalusHardDegrees, UpliftContrast, HardErodibility, StrataThickness, StrataDipDegrees, HardnessMottle,
             }.Select(BitConverter.SingleToInt32Bits),
+            // M1.12c's strata only when they are on, so M1.11d's rock keeps its key and the worlds it eroded are found in the cache.
+            .. (EvenStrata ? [] : new[]
+            {
+                StrataRegionalDipDegrees, StrataRegionMetres, StrataFoldMetres, StrataFoldWavelengthMetres, StrataFormationMetres, StrataMassiveShare,
+            }.Select(BitConverter.SingleToInt32Bits)),
         ];
         Span<byte> buffer = stackalloc byte[4];
         ulong hash = StableHash.FnvStart;
@@ -470,11 +526,11 @@ public struct ErosionConstants
         };
     }
 
-    /// <summary>These constants with the bed table of <paramref name="state"/>.</summary>
+    /// <summary>These constants with the bed table of <paramref name="state"/> (two floats an entry: the bed, massive rock).</summary>
     public readonly ErosionConstants WithStrata(ErosionState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        return WithStrata(state.TableScale, state.Bands.Length);
+        return WithStrata(state.TableScale, state.Bands.Length / 2);
     }
 
     /// <summary>These constants with a bed table of <paramref name="entries"/> entries read at <paramref name="tableScale"/> per metre.</summary>

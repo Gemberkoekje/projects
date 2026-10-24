@@ -12,7 +12,8 @@ namespace Vista.App.Gpu;
 /// schedule's first steps from the bare ground and their surfaces are compared. Differences come from float rounding alone (the
 /// GPU may fuse a multiply and an add, and its square root and division round differently), so a pass agrees to a few units in
 /// the last place, and a run of steps a little less, since erosion amplifies differences. The patch's rock has the seed's strata
-/// (M1.11d), so the passes that read its hardness are compared with it.
+/// (M1.11d), so the passes that read its hardness are compared with it, and runs from layered on its west edge to massive on its
+/// east (M1.12c), so the blend toward massive rock is compared at every weight.
 /// </summary>
 internal static class ErosionParity
 {
@@ -38,6 +39,8 @@ internal static class ErosionParity
         ArgumentNullException.ThrowIfNull(settings);
         HeightField patch = TerrainGenerator.Generate(new Recipe { SetPieces = [SetPiece.AlpineRange] }, 42, new WorldGrid(Size, cellSize));
         StrataGrid strata = StrataGrid.For(RockHardness.For(42, settings), Size, cellSize, StrataFrame.Identity, (_, _) => 0.0);
+        for (int c = 0; c < strata.Massive.Length; c++)
+            strata.Massive[c] = (c % Size) / (float)(Size - 1);
         var warm = new ErosionState(patch, strata);
         ErosionSettings averaging = settings with { AverageFrom = 0 };
         ErosionReference.Run(warm, averaging, WarmUpSteps);

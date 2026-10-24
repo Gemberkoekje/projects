@@ -5,6 +5,7 @@ using Vista.Cli;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
+using Vista.World;
 
 namespace Vista.Tests;
 
@@ -142,7 +143,8 @@ public sealed class SunElevationAndAtmosphereTests
     {
         var renderer = new FakeRenderer();
         PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"], "location": "yellowstone" }"""), renderer);
-        Assert.AreEqual(Places.Get(Place.Yellowstone).ValleyAltitudeMetres, renderer.Scene!.GroundAltitudeMetres);
+        // The world's lowest valleys at the place's valley floor (M1.12c).
+        Assert.AreEqual(Places.Get(Place.Yellowstone).ValleyAltitudeMetres, renderer.Scene!.GroundAltitudeMetres + WorldFooting.Of(renderer.Scene.Terrain).HeightMetres, 1e-9);
         Assert.AreEqual(AtmosphereModel.Default with { AerosolOpticalDepth550 = renderer.Scene.Air.AerosolOpticalDepth550 }, renderer.Scene.Air,
             "the default air, its haze grown by the day's humidity (M1.11)");
         PreviewPipeline.Run(Request("""{ "latitude": 10 }"""), renderer);
@@ -167,7 +169,7 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (reading.MeterWidth, reading.MeterHeight, reading.MeterSamplesPerPixel));
         Assert.AreEqual(AtmosphereMode.Luts, sidecar.Atmosphere.Mode);
         Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
-        Assert.AreEqual(19, Sidecar.CurrentSchema);
+        Assert.AreEqual(20, Sidecar.CurrentSchema);
         Assert.AreEqual(ImageInfo.RadianceUnits, sidecar.Image.Units);
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("exposureMeter"));
     }
@@ -201,9 +203,10 @@ public sealed class SunElevationAndAtmosphereTests
     {
         Sidecar sidecar = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
         Assert.IsNull(sidecar.Exposure);
-        Assert.AreEqual(1608.0, sidecar.Atmosphere.GroundAltitudeMetres, "Zermatt's valley floor");
+        Assert.AreEqual(1608.0, sidecar.Atmosphere.GroundAltitudeMetres + sidecar.World.Footing!.HeightMetres, 1e-9, "the world's lowest valleys at Zermatt's valley floor");
         Assert.AreEqual(0.097, sidecar.Atmosphere.ZenithFromSeaLevel.Rayleigh550, 0.001);
-        Assert.IsTrue(sidecar.Atmosphere.ZenithFromGround.Aerosol550 < 0.5 * sidecar.Atmosphere.ZenithFromSeaLevel.Aerosol550, "most haze lies below the valley");
+        Assert.IsTrue(sidecar.Atmosphere.ZenithFromGround.Aerosol550 < 0.6 * sidecar.Atmosphere.ZenithFromSeaLevel.Aerosol550,
+            "the haze thins with height: much of it lies below the world's height 0, which since M1.12c stands below the valley floor");
     }
 
     [TestMethod]

@@ -6,7 +6,8 @@
 //   CSThermalOut     how much loose material and rock leaves each cell               (Terrain B → Thermal)
 //   CSThermalApply   each cell loses what it sent, gains its share of its neighbours' (Terrain B, Thermal → Terrain A)
 // Since M1.11d the rock has strata (Vista.World.RockHardness): CSWater's rock erodibility and CSThermalOut's rock talus follow
-// the hardness of the rock at its current height, looked up in the bed table as the reference does. Plus CSClear, which
+// the hardness of the rock at its current height, looked up in the bed table as the reference does (since M1.12c, faded toward
+// massive rock's where the cell's rock is massive). Plus CSClear, which
 // zeroes a buffer. Each thread computes one cell and writes only it (gather-only, no atomics), so a run
 // is bit-identical every time on one driver. Every buffer is a UAV: passes are separated by UAV barriers, never state
 // transitions. The C# reference is Vista.World.ErosionReference, mirrored line for line; amounts that move between layers are
@@ -58,8 +59,8 @@ RWStructuredBuffer<float>  SedimentOut : register(u6);
 RWStructuredBuffer<float2> Flow        : register(u7); // sums of (outflow, water depth)
 RWStructuredBuffer<float4> Thermal     : register(u8); // (loose moved, rock moved, sum of the loose excess, 0)
 RWByteAddressBuffer        ClearTarget : register(u9);
-RWStructuredBuffer<float2> Strata      : register(u10); // per cell (bed-table coordinate at height 0, mottle)
-RWStructuredBuffer<float>  Bands       : register(u11); // the bed table: hardness by stratigraphic height
+RWStructuredBuffer<float3> Strata      : register(u10); // per cell (bed-table coordinate at height 0, mottle, massive)
+RWStructuredBuffer<float2> Bands       : register(u11); // the bed tables by stratigraphic height: (a bed's hardness, massive rock's)
 
 float Ground(uint c)
 {
@@ -67,18 +68,21 @@ float Ground(uint c)
     return t.x + t.y;
 }
 
-// The hardness of the rock at height `rock` in cell c: the bed table interpolated at the rock's table coordinate, plus the mottle.
+// The hardness of the rock at height `rock` in cell c: the bed table interpolated at the rock's table coordinate, moved toward
+// massive rock's by how massive the cell's rock is (M1.12c; exactly the bed where it is not), plus the mottle.
 float Hardness(uint c, float rock)
 {
-    float2 s = Strata[c];
+    float3 s = Strata[c];
     precise float scaled = rock * TableScale;
     precise float t = clamp(scaled + s.x, 0.0, TableLast);
     precise float b = floor(t);
     uint k = uint(b);
     precise float f = t - b;
-    float lo = Bands[k], hi = Bands[k + 1u];
-    precise float bed = lo + (hi - lo) * f;
-    return clamp(bed + s.y, 0.0, 1.0);
+    float2 lo = Bands[k], hi = Bands[k + 1u];
+    precise float bed = lo.x + (hi.x - lo.x) * f;
+    precise float massive = lo.y + (hi.y - lo.y) * f;
+    precise float mixed = bed + (massive - bed) * s.z;
+    return clamp(mixed + s.y, 0.0, 1.0);
 }
 
 // The eight neighbours, in the order both sides sum them.

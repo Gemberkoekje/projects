@@ -71,17 +71,22 @@ public sealed class StreamPowerTests
     public void Prepare_IsAPureFunction_AndPinned()
     {
         // The world grid 4× finer than the incision grid, so the transfer (upsampling, carving, the detail) runs too.
+        // M1.11d's even beds keep M1.11d's pin; M1.12c's folded strata have their own.
         var grid = new WorldGrid(129, 16.0);
-        ErosionSettings settings = ErosionSettings.Mountains with { IncisionSteps = 60 };
         HeightField ground = TerrainGenerator.Generate(Alpine, 9, grid);
-        HeightField a = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
-        HeightField b = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
-        Assert.AreEqual(a.ContentHash(), b.ContentHash());
-        Assert.AreNotEqual(ground.ContentHash(), a.ContentHash());
-        Assert.AreEqual(PinnedPreparedHash, a.ContentHash().ToString("x16"));
+        foreach ((ErosionSettings rock, string pinned) in new[] { (StrataFieldTests.Even, PinnedPreparedHash), (ErosionSettings.Mountains, PinnedFoldedPreparedHash) })
+        {
+            ErosionSettings settings = rock with { IncisionSteps = 60 };
+            HeightField a = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
+            HeightField b = StreamPower.Prepare(ground, Alpine, 9, settings).Ground;
+            Assert.AreEqual(a.ContentHash(), b.ContentHash());
+            Assert.AreNotEqual(ground.ContentHash(), a.ContentHash());
+            Assert.AreEqual(pinned, a.ContentHash().ToString("x16"), $"got {a.ContentHash():x16}");
+        }
     }
 
     private const string PinnedPreparedHash = "6607fcdede7e57c0";
+    private const string PinnedFoldedPreparedHash = "9be358012488f2ea";
 
     [TestMethod]
     public void Upsampling_KeepsTheCoarseSamples_AndInterpolatesBetweenThem()

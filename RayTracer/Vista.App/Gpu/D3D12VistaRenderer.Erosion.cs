@@ -62,15 +62,16 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
 
     /// <summary>
     /// The erosion state's buffers on the device: A and B sides of the double-buffered layers, the rest, and the rock's strata
-    /// (per cell, and the bed table of <paramref name="bands"/> entries, read at <paramref name="tableScale"/> entries per metre).
+    /// (per cell, and the bed tables of <paramref name="bandFloats"/> floats, a bed and massive rock an entry, read at
+    /// <paramref name="tableScale"/> entries per metre).
     /// </summary>
-    private sealed class ErosionBuffers(Func<ulong, ID3D12Resource> create, int size, int bands, float tableScale) : IDisposable
+    private sealed class ErosionBuffers(Func<ulong, ID3D12Resource> create, int size, int bandFloats, float tableScale) : IDisposable
     {
         public readonly int Size = size;
-        public readonly int BandEntries = bands;
+        public readonly int BandEntries = bandFloats / 2;
         public readonly float TableScale = tableScale;
-        public readonly ID3D12Resource Strata = create(Bytes(size, 2));
-        public readonly ID3D12Resource Bands = create(((ulong)bands * sizeof(float) + 15ul) & ~15ul);
+        public readonly ID3D12Resource Strata = create(Bytes(size, ErosionState.StrataFloats));
+        public readonly ID3D12Resource Bands = create(((ulong)bandFloats * sizeof(float) + 15ul) & ~15ul);
         public readonly ID3D12Resource[] Terrain = [create(Bytes(size, 2)), create(Bytes(size, 2))];
         public readonly ID3D12Resource[] Water = [create(Bytes(size, 1)), create(Bytes(size, 1))];
         public readonly ID3D12Resource[] Sediment = [create(Bytes(size, 1)), create(Bytes(size, 1))];
@@ -83,7 +84,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         /// <summary>Bytes of a buffer of <paramref name="floats"/> floats per cell, rounded up to 16 for the clear kernel.</summary>
         public static ulong Bytes(int size, int floats) => ((ulong)size * (ulong)size * (ulong)floats * sizeof(float) + 15ul) & ~15ul;
 
-        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 4 + Bytes(Size, 4) * 2 + Bytes(Size, 2) * 2 + Bands.Description.Width);
+        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 4 + Bytes(Size, 4) * 2 + Bytes(Size, 2) + Bytes(Size, ErosionState.StrataFloats) + Bands.Description.Width);
 
         public IEnumerable<ID3D12Resource> All => Terrain.Concat(Water).Concat(Sediment).Concat([Flux, Flow, Thermal, Strata, Bands]);
 
@@ -136,7 +137,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         int submissions;
         long memory, stateBytes;
         // The state is freed before the maps and the drainage are worked out on the CPU.
-        float[] bands = strata?.Table ?? ErosionState.NoBeds;
+        float[] bands = strata?.Bands ?? ErosionState.NoBeds;
         using (var buffers = new ErosionBuffers(bytes => CreateUavBuffer(bytes), n, bands.Length, strata?.TableScale ?? 0f))
         {
             var terrain = new float[cells * 2];

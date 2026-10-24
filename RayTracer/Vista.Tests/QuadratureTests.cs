@@ -205,7 +205,7 @@ public sealed class QuadratureTests
                 Erosion = false,
             };
             Sidecar bins = PreviewPipeline.Run(request, new FakeRenderer());
-            Assert.AreEqual(19, bins.Schema);
+            Assert.AreEqual(20, bins.Schema);
             Assert.AreEqual(Quadrature.Bins, bins.Image.Quadrature);
             Assert.AreEqual(new WavelengthsInfo(50, 413, 661), bins.Image.Wavelengths);
             Sidecar engine = PreviewPipeline.Run(request with { Quadrature = Quadrature.Engine }, new FakeRenderer());

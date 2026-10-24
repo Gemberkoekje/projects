@@ -17,7 +17,11 @@ warns. M1.11a's incision left it and the down-slope view 532 and 552 m above a v
 83 m underground, so M1.11d re-placed both on the eroded seed-42 ground, 3 m above rock the GPU erosion barely moves (CI checks
 them over the incised ground, the self-test over the eroded one): the default at (2625, −4375) looking 20° west of north at the
 range, down the slope on a lit 37° face at (−2850, 0) looking down it toward the golden-hour sun. The sky view stands at the
-default's spot, pitched up 45°. Ledger rows from before M1.11d measured other poses.
+default's spot, pitched up 45°. On M1.12c's world (folded strata) that spot is 184 m underground and the down-slope one 90 m, so
+M1.12c re-placed them by the same search: the default 3 m above rock at (−250, −5125), 1645.3 m, again looking 20° west of north at
+the range (45% sky, the range 1.4–3.8 km away), down the slope 3 m above a lit 35° face at (−6725, −375), 1510.8 m, looking down it
+toward the golden-hour sun across a valley whose far side shows folded beds; the sky view at the new default's spot. Ledger rows
+from before M1.11d, and from before M1.12c, measured other poses.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
 defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
@@ -249,8 +253,10 @@ each covers (`maps.png`, from dry runs: a dry run writes `<out>.materials.png` a
 of them (`ids,maps,views,diffuse,loupes`); `-Worlds` names another world cache.
 
 `materials/scree-cone.camera.json`, `rock-face.camera.json` and `meadow.camera.json` stand 2 m above the eroded seed-42 ground (CI checks
-them over the incised ground, which the GPU erosion's sediment buried 10–53 m deep there; the self-test over the eroded ground), looking
-east and south-east at a scree cone below cliffs, a stratified face over a meadow, and a meadow among outcrops.
+them over the incised ground, which the GPU erosion's sediment buried 1.5–39 m deep there; the self-test over the eroded ground). M1.12c
+re-placed them on its world, chosen by the rules' materials where rays from the frame's middle land 40–500 m off: north at a pale scree
+slope above meadow (−7400, 2400), south at a face with its talus below (6332, −3948), north-east over a meadow toward rocky slopes
+(−920, 5836).
 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/materials/render.ps1 [-Before ..\main\Vista.App.dll] [-Sheets ids,maps,views,diffuse,loupes] [-CellWidth 400] [-Spp 64] [-Out folder]
@@ -270,8 +276,24 @@ off and on (`photo.png`); the canopy's kernels against rough diffuse ground (`ca
 `forest/over-forest.camera.json` stands 7 km above the base over the seed-42 range's east side, looking north-west across the valleys
 that are forest when the base is 1000 m; `toward-sun.camera.json` and `away-from-sun.camera.json` stand 5 km up looking toward and
 away from an afternoon sun 25° up; `forest-crest.camera.json` stands 2 m above a valley floor, looking up with a 50 mm lens at a
-forested crest about 2 km off against the sky.
+forested crest about 2 km off against the sky (on M1.12c's world it stands 28 m up, clear of the incised ground, and the crest is
+0.5–1.8 km off).
 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/forest/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Sheets same,mesh,maps,ids,views,low,photo,canopy,loupe,cost] [-LowAltitude 1000] [-Out folder]
+```
+
+## Strata checks (M1.12c)
+
+`strata/render.ps1` makes the M1.12c sheets and checks: `--erosion-measure` on four seeds with M1.12b's rock (this build with M1.12c's
+strata off, the same bits as `main`) and M1.12c's, one seed at a time (`measures`: the footing, the contour-line measure, the relief,
+facets and drainage, and the materials' shares at the anchored altitude, in `strata.log`); each seed's rock hardness from above
+(`maps.png`); the over-forest view in April light for the strata variants the defaults were chosen from (`choice.png`); with
+`-Before` (a `main` build) the seed-42 views at each build's own altitude (`views.png`); with `-Photo` (the user's photo over the
+Alps) the photo above the over-forest view by `main` at its own altitude and at 1000 m and by this build at its anchored altitude
+(`photo.png`); and the cost against `main` (`cost`). Worlds for the measures and the variants go to `-Worlds` one at a time and are
+deleted after (a world is 285 MB).
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/strata/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Sheets measures,maps,choice,views,photo,cost] [-Out folder]
 ```

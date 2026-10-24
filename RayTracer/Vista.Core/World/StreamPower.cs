@@ -54,20 +54,22 @@ public static class StreamPower
         ArgumentNullException.ThrowIfNull(settings);
         HeightField coarse = CoarseBase(recipe, seed, grid, settings);
         float[] uplift = UpliftMap.On(recipe, seed, settings, coarse);
-        // The rock on the coarse grid: per cell its beds' fold and its mottle, so a lookup per step is one table read.
+        // The rock on the coarse grid: per cell its beds' fold, its mottle and how massive it is, so a lookup per step is a table read.
         RockHardness rock = RockHardness.For(seed, settings);
         int n = coarse.Size;
         var fold = new double[n * n];
         var mottle = new float[n * n];
+        var massive = new float[n * n];
         Parallel.For(0, n, j =>
         {
             for (int i = 0; i < n; i++)
             {
                 fold[j * n + i] = rock.Fold(coarse.XOf(i), coarse.ZOf(j));
                 mottle[j * n + i] = (float)rock.Mottle(coarse.XOf(i), coarse.ZOf(j));
+                massive[j * n + i] = (float)rock.Massive(coarse.XOf(i), coarse.ZOf(j));
             }
         });
-        (HeightField incised, StrataFrame frame) = Incise(coarse, settings, uplift, (c, y) => rock.AtSigma(y + fold[c], mottle[c]));
+        (HeightField incised, StrataFrame frame) = Incise(coarse, settings, uplift, (c, y) => rock.AtSigma(y + fold[c], mottle[c], massive[c]));
         return (coarse, incised, frame, new HeightField(n, coarse.CellSize, uplift));
     }
 

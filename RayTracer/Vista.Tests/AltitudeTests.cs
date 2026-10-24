@@ -97,8 +97,10 @@ public sealed class AltitudeTests
         Assert.IsTrue(sidecar.Atmosphere.ZenithFromGround.Rayleigh550 < 0.07, "thinner air above 3 km");
 
         Sidecar valley = PreviewPipeline.Run(Request("""{ "setPieces": ["alpineRange"] }""", dryRun: true), renderer: null);
-        Assert.AreEqual("auto: the valley floor of Zermatt (Zermatt village)", valley.Atmosphere.GroundAltitudeFrom);
-        Assert.AreEqual(19, valley.Schema);
+        // The world's lowest valleys, not its height 0, at the valley floor (M1.12c).
+        StringAssert.StartsWith(valley.Atmosphere.GroundAltitudeFrom, "auto: the valley floor of Zermatt (Zermatt village), where the world's lowest valleys stand (its 5th percentile");
+        Assert.AreEqual(1608.0, valley.Atmosphere.GroundAltitudeMetres + valley.World.Footing!.HeightMetres, 1e-9);
+        Assert.AreEqual(20, valley.Schema);
     }
 
     [TestMethod]
