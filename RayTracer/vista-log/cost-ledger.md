@@ -29,6 +29,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.12 | 0.25 | 5.64 | 4.08 | 8.15 |
 | M1.12a | 0.25 | 5.63 | 4.08 | 8.17 |
 | M1.12b | 0.25 | 5.87 | 4.32 | 8.65 |
+| M1.12c | 0.31 | 6.12 | 5.39 | 9.56 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -124,3 +125,12 @@ programs only, 20% busy): median ratios 0.999, 1.043, 1.059 and 1.059 (0.976–1
 same rays per sample (1.00, 3.03, 2.60, 3.62). The row is M1.12a's times those medians. These views, at Zermatt's valley floor, hold
 little forest (3% of the world), so the 4–6% is mostly the third noise and the larger surface every hit pays; `--forest off` skips the
 noise (not timed). Measured before the forest's thresholds were tuned (vista-log/M1.12b.md), which moved only constants.
+M1.12c changes the world under three of the four views and the altitude it stands at: the folded strata erode another seed-42 world,
+the sky, default and down-slope views are re-placed on it (M1.11d's spots are underground), and the anchor puts its height 0 at
+912 m instead of 1608 m, so the valleys in view are forest. Per hit the materials read a third word of the map and massive rock's
+hardness. Measured as M1.12b was: this slice and `main` (065e2c67) rendered alternately, view by view, three rounds, on a GPU
+shared with desktop programs (about 30% busy): median ratios 1.227, 1.043, 1.248 and 1.105 (1.189–1.232, 1.036–1.053,
+1.230–1.255, 1.017–1.107), at 1.00, 3.09, 2.64 and 3.44 rays per sample against `main`'s 1.00, 3.03, 2.39 and 3.43. The row is
+M1.12b's times those medians. Only the aerial view keeps its pose: +4% for 2% more rays and the forest now in its valleys. The
+default view's +25% is a new pose with 10% more rays and forest in frame; the sky view's +23% the same new spot, its camera rays
+now starting 3 m above other ground (as M1.11d's +17%); the per-hit cost of the massive weight was not separated.

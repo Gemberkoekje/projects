@@ -9,8 +9,8 @@ twenty-six slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronom
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
-rule), M1.12a (the colour quadrature) and M1.12b (forest as material) are done; M1.12c (the world anchored to the place's
-valley floor, and folded strata) is next, then M1.13 (snow and glaciers). It sits
+rule), M1.12a (the colour quadrature), M1.12b (forest as material) and M1.12c (the world anchored to the place's valley floor,
+and folded strata) are done, and M1.13 (snow and glaciers) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -222,6 +222,12 @@ visibility at the valley floor (the WMO's meteorological optical range); its aut
 haze grown by the **day's** humidity, (1 − RH)^−0.4, so moving the time of day does not rebuild
 the air's tables. Only the frozen lake pushes defaults so far (winter, ≤ −5 °C).
 
+*Since M1.12c ([`vista-log/M1.12c.md`](vista-log/M1.12c.md)):* the scene's valley floor is the world's own lowest valleys, the
+5th percentile of its ground. The altitude slider is still the altitude of the world's height 0, but its auto value puts that
+footing, not height 0, at the place's valley floor (never below sea level), and the weather chain reads the air there: the
+temperature, the humidity and the visibility at the valley floor, whatever the world's footing. A pinned altitude stays the
+altitude of height 0; the valley floor then stands the footing above it.
+
 ---
 
 ## 4. World generation
@@ -275,6 +281,16 @@ change.
   stand as cliffs and ledges and soft ones weather back, instead of uniform 45° facets. The field is a pure function of the
   seed and a position in the rock's frame (the uplift carries the beds up with the ground); every eroded world stores the hardness
   at its bedrock surface and the frame, so the materials' strata (M1.12) are the beds that shaped its cliffs.
+- **Folded strata** (M1.12c, [`vista-log/M1.12c.md`](vista-log/M1.12c.md)): M1.11d's beds lay nearly level, so every hill wore
+  them as benches at the same heights, a topographic map's contour lines. Now the beds keep a dip and a strike of their own over
+  each region about 10 km across (40° at each region's centre, turning between regions) and fold into long anticlines and
+  synclines (600 m high, 5 km apart, their axes wandering); they come in **formations** about 300 m thick, each its own kind of
+  rock (thin- or thick-bedded, leaning hard or soft, banded or uniform, its own tint); and over a seeded 30% of the ground they
+  fade into **massive rock**, one rock whose hardness changes only slowly with height and varies from place to place, without beds,
+  bands or laminae. The incision, the GPU erosion and the materials read the same field. Measured by the share of the beds'
+  outcrop lines on rock that run within 10° of the contour (the angle on the slope): M1.12b's nearly level beds 15.1–16.6% on four
+  seeds, the folded ones 11.7–12.6% (lines in random directions would give 11.1%). The worlds are steeper for it (the 8 m slopes'
+  most crowded ±2° window 12.4–13.8% against 8.6–10.8%).
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -1442,6 +1458,31 @@ dark carpet? And should the world's lowest valleys sit at the place's valley flo
   1000 m-base figures (the Swiss Alps are about 30% forest); the photo sheet redone beside the user's
   April photo; M1.11d's drainage numbers and facet measure holding; the world bit-identical twice and
   through the cache, the self-test's driver check re-baselined deliberately; a cost-ledger row.
+  *The measure's target (recorded in M1.12c):* lines of high curvature read below random whatever the
+  beds do (they are the erosion's gullies, running down the slope), so the measure is the beds' own
+  outcrop lines on rock, where the hardness at the surface changes fastest, the angle taken on the slope;
+  level beds put all of them on contours, folded ones keep a little lean toward the contour (an outcrop's
+  direction is the slope's plus the dip), so random (11.1%) is a floor: **within 1.5 points of random,
+  at most 12.6%, on all four seeds**.
+
+*Status (2026-10-24): done.* The auto altitude puts each world's lowest valleys (the 5th percentile of its ground) at the place's
+valley floor, and the weather is read there: seed 42's height 0 sits at 912 m at Zermatt, and 28–31% of the four seeds' worlds is
+forest (M1.12b's 2.4–3.9%; the Swiss Alps about 30%). The beds dip 40° at the centre of each region about 10 km across and turn
+between regions, fold 600 m high every 5 km, come in formations about 300 m thick, and over 30% of the ground fade into massive rock:
+11.7–12.6% of their outcrop lines on the rock run within 10° of the contour (M1.12b 15.1–16.6%; the target, within 1.5 points of
+random, met on all four seeds), and seen from the user's photo's height the slopes no longer wear rings at one height
+(`m1-12c-photo.png`; the variants in `m1-12c-choice.png`, the hardness from above in `m1-12c-maps.png`). The drainage holds; the facet
+measure does not: 12.4–13.8% against 8.6–10.8%, the slopes steeper and more alike, though not at their talus angle (the log). With
+the new strata off this build erodes `main`'s world bit for bit (seed 42). The default, sky, down-slope and materials views are re-placed on
+the new world (`m1-12c-views.png`). The aerial view, the one ledger view that keeps its pose, costs 4% more a sample (the
+cost ledger). *Judge this:* the bottom cell of the photo sheet against the photo and M1.12b's cell
+above it: tilted, folded layers rather than contour lines; in the views (right column) forested valleys and the tilted beds as diagonal
+bands of rock and meadow; the choice sheet for the dip and the share of massive rock. *Ignore this:* no snow (M1.13); warm greys and
+saturated greens (M1.17); one forest of rounded crowns (M5); new poses for the near views; upright folds without faults (a height
+field's beds). *Questions:* does the bottom cell read as tilted, folded layers, or still as contour lines or rice terraces? Do the
+diagonal stripes in the aerial view read as tilted beds, or too regular, like corduroy? Should the beds dip more gently, as shipped
+or more steeply, and do the calm patches of massive rock look like granite massifs or blank spots? Log:
+[`vista-log/M1.12c.md`](vista-log/M1.12c.md).
 
 **M1.13 — Snow & glaciers.**
 - *Goal:* snowcaps that read as real because of where the snow sticks (§4.5).
@@ -1725,7 +1766,9 @@ style.
   the valley floor's altitude, and 9.5%, 20.4%, 34.5% and 42.9% with the base at 1400, 1200, 1000 and 800 m (the Swiss Alps are
   about 30% forest). The grass line, the snowline and the freezing level are read against the same altitudes. Whether the world's
   floor should meet the place's valley floor (anchoring its lowest valleys, not its height 0, to the base altitude) was the user's
-  call: yes, at the ground's 5th percentile, built in M1.12c; M1.12b's sheets show both.
+  call: yes, at the ground's 5th percentile, built in M1.12c; M1.12b's sheets show both. Anchored, the four seeds' height 0 sits at
+  895–1009 m at Zermatt and 28–31% of each world is forest; a coastal place whose valley floor lies below a world's footing keeps
+  its height 0 at sea level, its valleys some hundreds of metres up (M1.12c).
 - **Vegetation is the biggest risk.** Procedural trees that survive close inspection at
   4K+ take many iterations; procedural purity rules out the shortcut of scanned assets.
 - **Composition.** Generators produce mediocre images; shot-first generation plus

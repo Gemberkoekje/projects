@@ -35,4 +35,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.12.md`](M1.12.md) | Materials by rule |
 | [`M1.12a.md`](M1.12a.md) | Colour quadrature |
 | [`M1.12b.md`](M1.12b.md) | Forest as material |
+| [`M1.12c.md`](M1.12c.md) | The world's footing and folded strata |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |
