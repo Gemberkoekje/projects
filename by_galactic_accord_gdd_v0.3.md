@@ -484,6 +484,21 @@ Contract and negotiation views are panels beside the map, not modal dialogs, so 
 
 The interface teaches by being legible, not with tutorial text. Every stat carries its cause on inspection; every signal the player needs can be surfaced; terms read as plain sentences; and the event log reads like a captain's log. The first hour (§13) is designed so each new idea arrives when the player needs it.
 
+
+### 11.5 How text is made
+
+Every sentence the interface shows is a template filled from structured data. Nothing is written free-hand at runtime, and no sentence states anything the simulation doesn't know. A template may draw on three sources only:
+
+1. **The event's own fields.** A supply-failure proposal carries its kind, the part, the grades, the price change and the new date: "Grade B instead of A. On time. ₵600 off."
+2. **Values computed from what the player's actor knows,** using the same formulas as the engine: the stat changes between two sets of parts, keep-times, travel times, take-home, price history from the player's own readings. "Medicine keeps 8.6 days instead of 10.0."
+3. **Explicit references:** the contract's own terms, the player's own contracts and posts, and fixed facts about the world such as the longest trip in the sector. "Longest trip in the sector at this ship's speed: 6.9 days (Verdant → Edge Station)."
+
+Text never states intent ("still enough for the run you want"), never another actor's hidden state, and never a prediction the game can't compute. The information rules of §7 apply to text exactly as they apply to numbers: a producer's warehouse is internal state, so from one jump away the player reads "asking ₵8.00, 23% below your readings", not "warehouse full".
+
+Templates live in resource files keyed by event type and fact type, which also makes them translatable.
+
+**A language model, later, may only restyle.** It can turn a fact list into livelier prose, but its input is that fact list and nothing else, its output never feeds back into the simulation, and the template text stays canonical in the log and on hover. Contracts, prices and outcomes are always deterministic.
+
 ---
 
 # Part II — Slice 1
@@ -902,6 +917,7 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | D33 | Private offers to named actors exist, from Slice 2. | v0.3 | Natural for builds; symmetric. Not needed for the first hour. | — |
 | D34 | In Slice 1, every contract is public and may make the next day's news. From Slice 2, a visibility term chooses public (publicity, reputation) or private (an NDA: nobody can act on it or undercut it). | v0.3 | Gives the news something to report now and makes secrecy a negotiable term later. | — |
 | D35 | Slice 1 yards build one ship at a time. Later, boutique yards build custom ships a few at a time, and large yards build batches of near-identical standard ships. | v0.3 | Enough for queues now; yard kinds add a real market for ships later. | — |
+| D36 | Interface text is templates filled from event fields, computed values and explicit references; never intent, hidden state or prediction. A language model may later restyle the fact list, nothing more. | v0.3 | Determinism and legibility: text that claims more than the simulation knows misleads the player. | Free prose in the v0.3 mockup |
 
 ## A.2 Open questions
 

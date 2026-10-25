@@ -51,6 +51,9 @@ foundation is sound; most of the game logic on top of it changes shape.
   and explainable in the client.
 - **Symmetric by construction.** Every player action is a command that goes through the same engine path
   an AI decision uses. No player-only code paths in the engine.
+- **Text is data.** Every interface sentence is a template over event fields, computed values and explicit
+  references (design §11.5). Each step that adds an event adds its templates; no free prose, no claims
+  about intent or hidden state.
 - **Every failure path gets a test,** for an AI actor and for the player.
 - **Invariants on, always.** Fast tests check them on short runs; soak runs check them over a million ticks.
 - **Checked in a browser.** The client is driven by Playwright scripts that screenshot key screens and
@@ -80,6 +83,7 @@ foundation is sound; most of the game logic on top of it changes shape.
     danger with colour plus line style, ships interpolated along paths), the time bar (pause, 1×, 4×, 16×),
     the board, the contract panel, and the event log.
   - Colour tokens with light and dark themes.
+  - The template layer for interface text (§11.5): resource files keyed by event and fact type.
   - A Playwright script that loads the client, runs time forward and screenshots it.
 - **Verify:** the client runs locally; the script reports no console errors; screenshots match the
   mockup's layout and visual language.
