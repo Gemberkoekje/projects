@@ -7,9 +7,9 @@
 ## How to read this document
 
 - **Part I — The game** describes the full vision. It should change slowly.
-- **Part II — Slice 0** is the spec for the first playable build. It stands on its own: if you read one part before writing code, read this one.
+- **Part II — Slice 1** is the spec for the first playable build. It stands on its own: if you read one part before writing code, read this one.
 - **Part III — Technical design** covers the engine, the client, determinism and testing.
-- **Part IV — Roadmap** orders the slices after Slice 0.
+- **Part IV — Roadmap** orders the slices after Slice 1.
 - **Appendix A — Decisions** records what was decided, when and why, including everything carried over from v0.1 and v0.2, plus the questions still open. The body states decisions plainly; the appendix holds the history.
 - Appendices B and C hold the glossary and the idea bank.
 
@@ -76,11 +76,11 @@ The **Galactic Accord** is the multilateral human treaty, with a handful of prag
 
 **Accord standing is reputation** (§9). Honour Accord contracts and the Accord trusts you. Breach them flagrantly inside Accord space and you can be sanctioned: locked out of Accord contracts and pushed toward the frontier. The frontier is not just the edge of the map; it is life outside the Accord, with all the freedom and exposure that implies.
 
-The aliens never signed. As humanity expands, whether the Accord can be extended to them, imposed on them, or simply ends at their border becomes the long-term political pressure, expressed through the contract and reputation systems the player already uses (Slice 7, §22).
+The aliens never signed. As humanity expands, whether the Accord can be extended to them, imposed on them, or simply ends at their border becomes the long-term political pressure, expressed through the contract and reputation systems the player already uses (Slice 8, §22).
 
 ### 2.2 Future layers: FTL and the aliens
 
-Neither is in Slice 0; both shape the long-term design.
+Neither is in Slice 1; both shape the long-term design.
 
 - **FTL as an economic driver.** Drives need exotic materials from dangerous space. Lane cartography is a profession, and a newly mapped stable route is valuable, temporarily, until competitors use it too. A jump that goes wrong is a cascade waiting to happen, and FTL cargo insurance is an industry priced by route history.
 - **The alien indifference.** Alien factions are actors with personalities but no contracts. Their equivalent is threshold behaviour: when human expansion into a region crosses a trigger point, they shift: more interference, restricted access, diplomatic equivalents of contracts. The result is emergent political pressure without a scripted storyline.
@@ -145,6 +145,7 @@ Every contract carries terms that define failure and remedy. They are part of th
 | Cargo liability | Haul | What the carrier owes for lost or damaged goods, up to a cap. |
 | Performance bond | All, in Accord space | A sum the performer locks in escrow, drawn on for late fees and forfeited on default. |
 | Partial delivery | Sale, Haul | Accept pro rata, or treat as a failure. |
+| Visibility *(later)* | All | **Public:** the contract may make the news, giving both parties free publicity and a reputation boost. **Private (NDA):** nobody else learns of it, so nobody can act on it or undercut it. Until this term exists, every contract is public and may make the next day's news (§7.4). |
 
 Terms come in three ready-made packages, **strict**, **standard** and **lenient**, so posting a contract takes seconds. Stricter terms protect the payer and cost more; lenient terms are cheaper and riskier. Packages are a starting point: a haggle (§3.6) can move individual terms.
 
@@ -166,6 +167,8 @@ On the frontier, terms still exist; nobody enforces them. A frontier buyer who d
 **Posting.** Anyone can post a contract of any kind. A post is seen by whoever can see it (§7): post at a busy core station and many actors see it quickly; post at a remote outpost and few do. Responses arrive over time, each either an acceptance of the posted terms or a counter-offer. The poster can accept a response, counter it, or withdraw the post.
 
 **Responding.** Anyone who can see an open contract can accept it as posted, which is immediate, or counter.
+
+**Private offers** *(later)*. Instead of posting publicly, a contract can be offered to named actors only, for example asking two yards for a quote on the same build.
 
 **Haggling.** A counter can change the price and a small set of terms: the deadline, the late fee, the term package. Each side has a hidden reservation point derived from its own costs and personality (§4.3). Each round, the side that concedes moves part of the way toward its reservation point. A side accepts when the standing offer crosses that point, and walks away when the gap is too wide or the rounds run out.
 
@@ -228,6 +231,8 @@ and the actor takes the best action if it clears a commit threshold set by its l
 
 **Same information, same rules.** Actors decide only on what they can see (§7), exactly like the player, so an AI trader far from a market reads it as late as you do. The interface shows the player the same inputs the AI weighs (§11.2). A player who understands the rule can predict the AI, and that is the point.
 
+**Old information.** Actors should be aware of how old their information is without being unexploitable. In Slice 1 they act on what they last saw as if it were current, which a sharp player can exploit: a yard bidding on part prices it hasn't seen for a week will misjudge. Later, an actor's risk tolerance decides how far it trusts old information: a risk-tolerant actor bids on week-old prices, a cautious one discounts them or waits for fresher news.
+
 ---
 
 ## 5. Economy
@@ -253,7 +258,7 @@ There is no price list. A good's price at a location is what contracts there are
 
 **Production is decoupled from throughput.** A farming world that receives luxuries does not grow more food; each actor at a location runs independently.
 
-Slice 0 has factories only for ship parts (§15.4). Long term any good can have a processing chain, such as raw food to food, and any actor, the player included, can own the factory.
+Slice 1 has factories only for ship parts (§15.4). Long term any good can have a processing chain, such as raw food to food, and any actor, the player included, can own the factory.
 
 ### 5.4 Debt and bankruptcy
 
@@ -279,7 +284,7 @@ Unmet demand should have consequences beyond price. A location whose consumers s
 
 Every ship is built from three parts:
 
-| Part | Determines | Variants (Slice 0) |
+| Part | Determines | Variants (Slice 1) |
 |---|---|---|
 | Frame | Cargo space, mass, toughness (how badly incidents hurt) | Light, Bulk, Courier |
 | Drive | Power (speed = power ÷ mass), reliability (how often incidents happen), whether it runs hot when pushed | Standard, Fast |
@@ -325,6 +330,13 @@ Every ship costs credits per day whether or not it earns. An idle fleet bleeds, 
 
 Parts wear with use and incidents. Repair is a Build contract on an existing ship, with all the usual terms, substitution included; this is where the support-beam patch that cost you five units of cargo comes from. A refit swaps one part for another. Insurance can cover a build or a ship.
 
+### 6.7 Later: kinds of shipyard
+
+Slice 1 has two yards that each build one ship at a time. Long term, yards differ in kind as well as character:
+
+- **Boutique yards** build to your specification, a few at a time, like custom yachts for billionaires: high grades, close attention, slow and expensive.
+- **Large yards** build a dozen of a standard design at once. Every ship in the batch is very similar but not exactly the same, because each one got whatever parts were on hand that week. Cheap, quick, and a reason to read a ship's history even when it's new.
+
 ---
 
 ## 7. Information
@@ -337,7 +349,7 @@ You know what your presence lets you see. How much you know about a place depend
 |---|---|---|
 | **Here** | A location where you have a presence | Every contract the moment it's posted; live prices and stock levels; who is idle and who is running short; full details on every actor there |
 | **Near** | One jump from such a location | Contracts a few hours after posting; prices updated daily; no internal state |
-| **Far** | Anywhere else | Contracts about a day after posting; prices as of the last time you had a presence there |
+| **Far** | Anywhere else | No contracts, except those that make the news (§7.4); prices as of the last time you had a presence there |
 
 The same rules apply to every actor. A company with five ships knows more than a pilot with one; that is what scale buys. Your own posts reach others by the same rules (§3.6).
 
@@ -349,8 +361,14 @@ Everything you know has an age, and the interface shows it (§11.1). A price see
 
 Outcomes of Accord contracts are public: on-time rate, cancellations and defaults, per actor. Anyone can look them up from anywhere, which is how you judge a yard you've never dealt with. Frontier deals leave no record beyond each party's own experience.
 
-### 7.4 Later
+### 7.4 The news
 
+Once a game day, **The Daily Accord** reports a handful of contracts signed, fulfilled or failed the day before, sector-wide: "Rust Belt Camp pays a premium for food", "Coreward Logistics orders a Bulk Hauler from Tycho Yards", "Juno Okafor two days late on a Verdant food run". Which contracts make the news is a weighted chance: large, unusual and failed contracts are likelier. The news is how distant markets reach you, a day late and incomplete, and it can tip you off to a queue at a yard or a shortage before you see it yourself.
+
+### 7.5 Later
+
+- **Market news:** "Yesterday the price of Fuel at Halcyon skyrocketed."
+- **Visibility terms:** public contracts may make the news, private ones never do (§3.4).
 - **Scouting** as a deliberate act: fly somewhere to learn it.
 - **Information as a contract kind:** data brokers sell price snapshots, route danger histories and idle-producer indices. Information is perishable, and it moves through the same contract primitive as cargo.
 - **Reputation networks:** standing in a region surfaces more intel there; trusted partners introduce you to their partners.
@@ -378,7 +396,7 @@ Every location has a station operator who charges docking fees and rents storage
 
 Routes are weighted edges: a distance in hours at standard speed, a danger rating, and a law coverage (the Accord reach along it). Routes need not form a complete graph; some places are reachable only through others, which gives chokepoints strategic value.
 
-**Danger is two channels.** The geographic channel is the static hazard of the route itself (black-hole margins, unstable phenomena). It is slow to change and drives transit incidents (§8.4). The predation channel arrives with pirates (Slice 4): live, spiking and decaying with actor activity. The map shows the two separately, permanently. A single merged danger colour would keep re-teaching the static reading every time the player glanced at the map (see §22.2).
+**Danger is two channels.** The geographic channel is the static hazard of the route itself (black-hole margins, unstable phenomena). It is slow to change and drives transit incidents (§8.4). The predation channel arrives with pirates (Slice 5): live, spiking and decaying with actor activity. The map shows the two separately, permanently. A single merged danger colour would keep re-teaching the static reading every time the player glanced at the map (see §22.2).
 
 ### 8.3 Time
 
@@ -402,7 +420,7 @@ Incidents are abstract and actor-free, fully consistent with the discrete-event 
 
 ## 9. Reputation
 
-Reputation is how actors decide whom to trust. There are two layers in Slice 0:
+Reputation is how actors decide whom to trust. There are two layers in Slice 1:
 
 - **Accord standing.** Game-wide, earned and lost on Accord contracts. Low standing means larger bonds demanded, fewer actors willing to deal (their trust thresholds), and eventually sanction.
 - **Counterparty record.** What each actor remembers of its own dealings with you, plus the public record for Accord contracts (§7.3).
@@ -468,13 +486,13 @@ The interface teaches by being legible, not with tutorial text. Every stat carri
 
 ---
 
-# Part II — Slice 0
+# Part II — Slice 1
 
 ## 12. Goal and definition of done
 
-Slice 0 is the smallest version of the game worth playing for an hour. It has to show the contract web, not just a hauling loop: posting as well as taking, failure with consequences, and a ship built from parts that were sourced through contracts.
+Slice 1 is the smallest version of the game worth playing for an hour. It has to show the contract web, not just a hauling loop: posting as well as taking, failure with consequences, and a ship built from parts that were sourced through contracts.
 
-Slice 0 is **done** when:
+Slice 1 is **done** when:
 
 1. A first-time player gets through the first hour (§13) without outside help: in playtests, three out of four testers.
 2. The start state guarantees the first three beats of §13. The last two (a supply-failure decision, and a custom ship arriving with a story) happen in at least 70% of first hours, measured with scripted bot players in the soak harness (§20.3).
@@ -490,8 +508,8 @@ The player starts at **Meridian Station**, an Accord-edge industrial colony, as 
 | Minutes | What happens | What it teaches |
 |---|---|---|
 | 0–10 | The local board offers a few Hauls and delivered Sales. One is a trap: a fat fee on a red route, a harsh late fee, and a deadline the freighter can only meet by pushing. The player runs two or three contracts. | Reading a contract: price, route, deadline, terms |
-| 10–20 | Verdant's food producer, its warehouse full, is posting food cheap: visible from Meridian, one jump away. The Rust Belt camp has posted a delivered Wanted Sale for food at a high price. The player posts their own Wanted Sale at Verdant, haggles the price down, carries the food, and fills the camp's contract. | Posting, haggling and acting on a signal: the first edge you found yourself |
-| 20–35 | The best money nearby is medicine to Edge Station, which needs refrigeration and crosses a red route. The freighter is wrong for it. Three options: a second-hand refrigerated ship at Edge Salvage (cheap, unarmoured, a frontier sale with no escrow, and a history worth reading), a stock Refrigerated Transport at Tycho Yards, or a custom refrigerated, armoured build. | Off the shelf vs built to order |
+| 10–20 | Verdant's food producer, its warehouse full, is posting food cheap: visible from Meridian, one jump away. The Daily Accord reports that the Rust Belt camp is paying a premium for delivered food. The player posts their own Wanted Sale at Verdant, haggles the price down, carries the food, and fills the camp's contract. | Posting, haggling and acting on a signal: the first edge you found yourself |
+| 20–35 | The best money nearby is medicine to Edge Station, which needs refrigeration and crosses a red route. The freighter is wrong for it. Three options: a second-hand refrigerated ship at Edge Salvage (cheap, unarmoured, a frontier sale with no escrow, and a history worth reading), a stock Refrigerated Transport at Tycho Yards, or a custom build that is no standard design: a Light frame with a Fast drive and refrigeration, quick enough to beat both the spoilage and the deadlines. | Off the shelf vs built to order |
 | 35–50 | If the player commissions, the yards bid, and the player picks one and its terms. The yard's parts contracts appear on the board, and the player can haul one. Upstream, a parts haul hits an incident, and the yard invokes its supply-failure term: wait with compensation, take a grade-B substitute at a discount, or cancel with a refund. | Contracts depend on contracts; failure is settled by terms |
 | 50–60 | The ship arrives, its stats telling the story of its parts. With two ships the player can't fly every run, so they post a Haul for an AI pilot to carry what they can't. | The loop closes: the player is a client now, too |
 
@@ -501,7 +519,7 @@ The start state is seeded to guarantee the first three beats. The last two emerg
 
 ## 14. Scope
 
-**In Slice 0:**
+**In Slice 1:**
 
 | Feature | Why |
 |---|---|
@@ -517,23 +535,24 @@ The start state is seeded to guarantee the first three beats. The last two emerg
 | One sector: seven locations, danger-rated routes, multi-hop paths | Meaningful routing |
 | Transit incidents and the throttle choice | Danger with teeth |
 | Information tiers, information age, the Accord public record | Judging needs uncertain, ageing information |
+| The Daily Accord: a daily digest of some of yesterday's contracts | How distant markets reach you |
 | Accord standing and counterparty records | Trust |
 | Debt, insolvency, liquidation; game over and legacy | Real consequences |
 | Discrete-event engine, seeded RNG, invariants, soak harness with bot players | A trustworthy, tunable economy |
 | The browser client, with the interface of §11 | The interface is the game |
 
-**Not in Slice 0:**
+**Not in Slice 1:**
 
 | Feature | Lands in (§22) |
 |---|---|
-| Standing contracts, bonding agents, data brokers, scouting, demand starvation, reputation by region and trade | Slice 1 |
-| Player-owned facilities, service contracts (hiring pilots), the player as contractor | Slice 2 |
-| Wear, maintenance, refits, insurance | Slice 3 |
-| Pirates, enforcement, blockades | Slice 4 |
-| Processing chains for ordinary goods (raw food to food, and so on) | Slice 5 |
-| FTL, exotics, cartography | Slice 6 |
-| Aliens and Accord politics | Slice 7 |
-| Multiplayer | Slice 8 |
+| Standing contracts, bonding agents, data brokers, market news, private offers, visibility terms, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | Slice 2 |
+| Player-owned facilities, service contracts (hiring pilots), the player as contractor | Slice 3 |
+| Wear, maintenance, refits, insurance | Slice 4 |
+| Pirates, enforcement, blockades | Slice 5 |
+| Processing chains for ordinary goods (raw food to food, and so on); boutique and large shipyards | Slice 6 |
+| FTL, exotics, cartography | Slice 7 |
+| Aliens and Accord politics | Slice 8 |
+| Multiplayer | Slice 9 |
 
 ## 15. Content
 
@@ -803,7 +822,7 @@ These are checked continuously in debug builds and asserted in tests:
 
 ## 21. Persistence
 
-In Slice 0, state is in memory. A save is the seed, the configuration and the player's command log; loading replays it, and determinism makes that exact. Snapshots get added if replay grows slow.
+In Slice 1, state is in memory. A save is the seed, the configuration and the player's command log; loading replays it, and determinism makes that exact. Snapshots get added if replay grows slow.
 
 Later, for long campaigns or multiplayer, a persistent event store fits the event-sourced model naturally. Marten on PostgreSQL was the original plan. Snapshots would be semantic: a ship at build, sale or repair; an actor at major capital events; a location at intervals.
 
@@ -819,19 +838,19 @@ Each slice is a thin, end-to-end cut through data, simulation and interface that
 
 | Slice | Theme | Adds | Fantasy it unlocks |
 |---|---|---|---|
-| **0** | **The contract web** | Part II of this document | *"I judge contracts, post my own, and live with the consequences."* |
-| 1 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, scouting, demand starvation, reputation by region and trade | *"I read the market, run a logistics business, and the world reacts to me."* |
-| 2 | Ownership and services | Facilities as assets (factories, warehouses, yards) bought or built through contracts; service contracts (hire pilots and operators); the player as contractor; multinationals | *"I own a piece of the supply chain."* |
-| 3 | Wear and insurance | Part wear, maintenance and repair contracts, refits, insurance | *"Every ship has a history I can read and price."* |
-| 4 | Piracy and enforcement | Pirate actors as a source of incidents, fences, escorts, police contracts, blockades and chokepoint control | *"The frontier is dangerous and I choose how to face it."* |
-| 5 | Production depth | Processing chains for any good, multi-tier supply chains, quality flowing through them | *"I'm a link in a real supply chain, not just a courier."* |
-| 6 | The FTL frontier | Exotic materials, FTL routes and risk, cartography, route-access contracts | *"I open the map and own what I discover."* |
-| 7 | The Accord and the aliens | Alien threshold actors, Accord sanction and extension politics | *"My economy has consequences at the scale of civilisations."* |
-| 8 | Multiplayer | Network actors, server-authoritative replay, a multiplayer pause model | *"The other operators are people."* |
+| **1** | **The contract web** | Part II of this document | *"I judge contracts, post my own, and live with the consequences."* |
+| 2 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, market news, private offers, visibility terms (public or NDA), scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | *"I read the market, run a logistics business, and the world reacts to me."* |
+| 3 | Ownership and services | Facilities as assets (factories, warehouses, yards) bought or built through contracts; service contracts (hire pilots and operators); the player as contractor; multinationals | *"I own a piece of the supply chain."* |
+| 4 | Wear and insurance | Part wear, maintenance and repair contracts, refits, insurance | *"Every ship has a history I can read and price."* |
+| 5 | Piracy and enforcement | Pirate actors as a source of incidents, fences, escorts, police contracts, blockades and chokepoint control | *"The frontier is dangerous and I choose how to face it."* |
+| 6 | Production depth | Processing chains for any good, multi-tier supply chains, quality flowing through them, boutique and large shipyards | *"I'm a link in a real supply chain, not just a courier."* |
+| 7 | The FTL frontier | Exotic materials, FTL routes and risk, cartography, route-access contracts | *"I open the map and own what I discover."* |
+| 8 | The Accord and the aliens | Alien threshold actors, Accord sanction and extension politics | *"My economy has consequences at the scale of civilisations."* |
+| 9 | Multiplayer | Network actors, server-authoritative replay, a multiplayer pause model | *"The other operators are people."* |
 
-### 22.2 Onboarding piracy (binding on Slice 4)
+### 22.2 Onboarding piracy (binding on Slice 5)
 
-Transit incidents teach two things. **Spatial:** some routes are physically hazardous. That stays true when pirates arrive. **Temporal:** a route's hazard is stable. Predation breaks that, because pirates look specifically for quiet, historically safe lanes. The heuristic Slice 0 trains, *a quiet lane is a safe lane*, is exactly what the Slice 4 adversary punishes. That is mild negative transfer on the dimension the player is most confident about.
+Transit incidents teach two things. **Spatial:** some routes are physically hazardous. That stays true when pirates arrive. **Temporal:** a route's hazard is stable. Predation breaks that, because pirates look specifically for quiet, historically safe lanes. The heuristic Slice 1 trains, *a quiet lane is a safe lane*, is exactly what the Slice 5 adversary punishes. That is mild negative transfer on the dimension the player is most confident about.
 
 Two consequences:
 
@@ -861,8 +880,8 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | D11 | The game is the contract web. Hauling is a supporting activity, not the core. | v0.3 | The interesting layer is contracts depending on contracts, most clearly in ship building. | The hauling-centred Slice 0 of v0.2 |
 | D12 | Symmetry: anything an AI can do, the player can do, and vice versa. | v0.3 | Core to the thesis. | "Player and actor are the same type" (v0.2), strengthened |
 | D13 | Players post contracts of every kind, not only take them. | v0.3 | If nothing on the board fits, post your own. This also gives market signals a verb. | — |
-| D14 | Contract kinds are Sale, Haul, Build and Storage in Slice 0; Service, Insurance, Bond and Information later. | v0.3 | v0.2's bundled "buy and haul" contract hid the web. | v0.2's Haul / Procure / Brokered split |
-| D15 | Ships are built from parts with grades. Custom builds sub-contract their parts; stock and second-hand ships exist. | v0.3 | Off the shelf vs built to order is the signature decision. | Ship variance (v0.2 Slice 2) and factories (v0.2 Slice 4), partly pulled into Slice 0 |
+| D14 | Contract kinds are Sale, Haul, Build and Storage in Slice 1; Service, Insurance, Bond and Information later. | v0.3 | v0.2's bundled "buy and haul" contract hid the web. | v0.2's Haul / Procure / Brokered split |
+| D15 | Ships are built from parts with grades. Custom builds sub-contract their parts; stock and second-hand ships exist. | v0.3 | Off the shelf vs built to order is the signature decision. | Ship variance (v0.2 Slice 2) and factories (v0.2 Slice 4), partly pulled into Slice 1 |
 | D16 | Failure is content. Every contract states deadline, grace, late fee, cancellation, substitution and warranty terms, and both sides can fail. | v0.3 | Failure states are a large part of the game, for player and AI alike. | v0.2's clause schema (expanded) |
 | D17 | The core skill is judging whether a contract is worth signing. The game computes certain costs and shows uncertain inputs as ranges, never a single expected value. | v0.3 | Keeps the judgment with the player while keeping the books legible. | — |
 | D18 | Information falls off with distance from your presence, and every piece of information shows its age. | v0.3 | Nearby markets known in detail, distant ones roughly; it makes presence valuable. | v0.2's visibility model |
@@ -871,20 +890,24 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | D21 | One tick is one game hour; the interface shows dates and durations. | v0.3 | Ticks had no meaning, so pacing couldn't be designed. | "1 tick ≈ 1 second" |
 | D22 | The interface is schematic, not ASCII, organised around the player's questions, and every outcome is traceable to its cause. | v0.3 | ASCII stood in for "no art pipeline"; schematic keeps that and gains layout, motion and hover. | "Character / ASCII-forward" UI |
 | D23 | The client is Blazor WebAssembly. The WPF client and the console play mode are retired; the soak harness stays. | v0.3 | Suits a document-heavy interface, reuses the engine directly, and can be tested in a browser. | WPF client, console client |
-| D24 | Persistence in Slice 0 is in memory, with saves as seed plus command log. A persistent event store comes later. | v0.3 | Zero infrastructure; determinism makes replay exact. | Marten + PostgreSQL in Slice 0 |
-| D25 | Slice 0 reputation is Accord standing plus counterparty records, and Accord contracts are public record. | v0.3 | Enough to judge counterparties; region and trade contexts wait for Slice 1. | v0.2's fully contextual reputation in Slice 0 |
-| D26 | Debt and insolvency are in Slice 0. Player insolvency ends the game with a legacy screen. | v0.3 | Risk needs a downside. | Bankruptcy as optional (v0.2) |
+| D24 | Persistence in Slice 1 is in memory, with saves as seed plus command log. A persistent event store comes later. | v0.3 | Zero infrastructure; determinism makes replay exact. | Marten + PostgreSQL from the start |
+| D25 | Slice 1 reputation is Accord standing plus counterparty records, and Accord contracts are public record. | v0.3 | Enough to judge counterparties; region and trade contexts wait for Slice 2. | v0.2's fully contextual reputation from the first slice |
+| D26 | Debt and insolvency are in Slice 1. Player insolvency ends the game with a legacy screen. | v0.3 | Risk needs a downside. | Bankruptcy as optional (v0.2) |
 | D27 | A new first hour; the start state guarantees its first three beats. | v0.3 | Built around posting and the ship decision. | v0.2's §3.3 walkthrough |
-| D28 | Player-owned facilities and the player as contractor are designed for, but land in Slice 2. | v0.3 | Keeps Slice 0 shippable without closing the door. | — |
-| D29 | Storage contracts are in Slice 0. | v0.3 *(proposed)* | Lets goods wait for a buyer and lets sell orders be filled from storage. | — |
+| D28 | Player-owned facilities and the player as contractor are designed for, but land in Slice 3. | v0.3 | Keeps Slice 1 shippable without closing the door. | — |
+| D29 | Storage contracts are in Slice 1. | v0.3 | Lets goods wait for a buyer and lets sell orders be filled from storage. | — |
+| D30 | Slices are numbered from 1: the first playable slice is Slice 1. | v0.3 | Matches how the slice is talked about. | v0.2's "Slice 0" |
+| D31 | Without a presence you see no distant contracts. In Slice 1 the news reports some of them a day late; market news and data brokers come later. | v0.3 | Distant markets should be known roughly and late, and knowing them better should cost something. | Far contracts visible after a delay |
+| D32 | In Slice 1, actors trust what they last saw. Later, risk tolerance decides how far each actor trusts old information. | v0.3 | Aware without being unexploitable, eventually; simple and exploitable first. | — |
+| D33 | Private offers to named actors exist, from Slice 2. | v0.3 | Natural for builds; symmetric. Not needed for the first hour. | — |
+| D34 | In Slice 1, every contract is public and may make the next day's news. From Slice 2, a visibility term chooses public (publicity, reputation) or private (an NDA: nobody can act on it or undercut it). | v0.3 | Gives the news something to report now and makes secrecy a negotiable term later. | — |
+| D35 | Slice 1 yards build one ship at a time. Later, boutique yards build custom ships a few at a time, and large yards build batches of near-identical standard ships. | v0.3 | Enough for queues now; yard kinds add a real market for ships later. | — |
 
 ## A.2 Open questions
 
-- **Storage in Slice 0 (D29).** Proposed; confirm or cut.
-- **Far-tier visibility.** Should distant contracts be visible at all without a presence or reputation there, or only through the public record and (later) brokers?
-- **How AI values stale information** when bidding: does it discount for age, or trust what it last saw? The second is simpler and creates more mistakes for a player to exploit.
 - **Grade steps and substitution discounts:** tuning, but they decide how much substitution stings.
-- **Yard capacity:** one build at a time per yard is simple; is it enough to create queues worth judging?
+- **What makes the news:** the weights for size, novelty and failure, and how many items a day. Too few and the frontier starves for lack of information; too many and presence stops mattering.
+- **Can an actor pay to be in the news?** An advertising contract with the paper would be symmetric and useful for a poster at a remote outpost; it may belong with the visibility terms in Slice 2.
 
 ---
 
@@ -913,9 +936,11 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | Insolvency | Debt too large for an actor's assets; leads to liquidation. |
 | Late fee | Paid per day late, up to a cap. |
 | Legacy | The story the game renders from your record when you retire or go under. |
+| News (The Daily Accord) | A daily digest reporting some of the previous day's contracts, sector-wide; how distant markets reach you. |
 | Part | Frame, drive or module; ships are built from them. |
 | Personality | Multipliers biasing an actor's decisions: risk tolerance, liquidity preference, quality bias, growth ambition, trust threshold, eagerness. |
 | Presence | Where you can see from: your ships' locations (or destinations), and anywhere you rent storage or own a facility. |
+| Private offer | A contract offered to named actors only, instead of posted publicly *(later)*. |
 | Public record | The published outcomes of Accord contracts. |
 | Reservation point | An actor's hidden walk-away price or terms in a haggle. |
 | Sale contract | A contract for goods or an asset to change hands at a named place. |
@@ -929,6 +954,7 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | Throttle | Cruise or push, chosen at departure. |
 | Tick | One game hour. |
 | Transit incident | An abstract, danger-weighted mishap in transit: delay, damage, loss or cost. |
+| Visibility term | Public (may make the news) or private (an NDA) *(later)*. |
 
 ---
 
@@ -936,7 +962,7 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 
 Unscheduled ideas consistent with the design. Keep, cut or promote.
 
-- **Chokepoint control and blockades.** An actor stations escorts or pirates on a route and taxes or denies passage. A standing-contract trade lane is precisely the thing worth blockading. The Rust Belt — Edge route is the obvious first candidate. Natural fit for Slice 4.
+- **Chokepoint control and blockades.** An actor stations escorts or pirates on a route and taxes or denies passage. A standing-contract trade lane is precisely the thing worth blockading. The Rust Belt — Edge route is the obvious first candidate. Natural fit for Slice 5.
 - **Sub-contracting as a positive cascade.** A company that wins more than it can fly sub-contracts part of it to the player: the player's first taste of being trusted by an institution. Already expressible with Haul contracts; it just needs surfacing.
 - **Reputation as an introduction graph.** High standing with an actor makes its trusted partners' contracts visible to you. Belonging compounds.
 - **Grades for all goods.** Extend part grades to ordinary goods, so where the high-grade ore is becomes information worth selling.
