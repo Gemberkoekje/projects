@@ -6,7 +6,7 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-25):** planned. No step started. The UI mockup is at
+**Status (2026-10-25):** S1 done ([log](log/S1.md)); S2 is next. The UI mockup is at
 <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -41,7 +41,7 @@ foundation is sound; most of the game logic on top of it changes shape.
 | Food decays below its warranty on even the shortest run | S3 (the §15.3 targets) |
 | Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 |
 | Incident outcomes don't shift with danger, despite the comment saying they do | S8 |
-| The test suite is slow: `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
+| The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
 
 ## 2. How we work
 
@@ -72,7 +72,9 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Rewrite the README for the new direction.
 - **Verify:** `dotnet test --filter "Category!=Soak"` finishes in under a minute; the soak category still
   passes; the solution builds on Linux.
-- **Status:** not started.
+- **Status (2026-10-25):** done. Fast tests run in about 2 s by default (they took 6 min 49 s as one suite),
+  the soak category in 36 s, and a million-tick soak 8–13 times faster with identical results; see
+  [`log/S1.md`](log/S1.md).
 
 ### S2 — The Blazor client, on the current engine
 

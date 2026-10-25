@@ -1,0 +1,2 @@
+# The repository .gitignore ignores every log/ folder (build logs). This one holds plan.md's step logs.
+!/log/
