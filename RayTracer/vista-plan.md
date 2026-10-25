@@ -5,12 +5,13 @@ and the risks (§11). What each finished slice built, checked and measured is in
 [`vista-log/`](vista-log/README.md); its entry in §10 keeps the goal, deliverable and verify plus one
 status line that links there. **M0 is done** (2026-10-19): `Vista.Core` / `Vista.App` / `Vista.Tests`
 render a recipe + seed end to end on the RTX 3070 through offline integrator v0. M1 is planned as
-twenty-six slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
+twenty-seven slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronomy, the spectral atmosphere, aerial
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
-and folded strata), M1.13 (snow and glaciers) and M1.13a (the valley haze layer) are done, and M1.14 (the auto camera) is next. It sits
+and folded strata), M1.13 (snow and glaciers) and M1.13a (the valley haze layer) are done, and M1.13b (terrain-following valley
+mist) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -902,7 +903,7 @@ Verify: alpenglow appears at dawn/dusk without any
 special-casing; snowcaps show bare steep faces; the estimate lands within its own
 stated range on a set of test views; goldens added.
 
-**M1 plan (agreed with the user 2026-10-19).** Twenty-six slices in the order below, each under the
+**M1 plan (agreed with the user 2026-10-19).** Twenty-seven slices in the order below, each under the
 "every slice" rules at the top of this section. (M1.1 went through a PR; from M1.2 on, slices land
 directly on `main`.)
 
@@ -954,6 +955,18 @@ its lowest valleys meet the place's valley floor, so the tree line, grass line, 
 level read against true altitudes. And the photo sheet (`m1-12b-photo.png`) shows M1.11d's strata as
 contour lines: every hill ringed by level benches like a topographic map, the most artificial thing
 beside the user's photo. Both change the world itself, so they land before the snow is tuned on it.
+
+*Added 2026-10-25, after the M1.13a review (agreed with the user):* **M1.13b — Terrain-following valley mist**, before the auto
+camera. M1.13a's layer depends on altitude alone, so it lies across every view at one height: "it reads like mist, but it feels too
+much like a line and not enough like peaks hidden in the mist". Photorealism comes before likeness to the paintings, which guide
+composition only. Each valley's pool on its own floor, mist where the pool's air saturates, and the terrain's shadow on it are
+pulled forward from M4. The user's answers: mist as well as haze (droplets on humid dawns, from per-place humidity normals);
+pools by the valleys' shape; terrain shadows on the mist in this slice; up to twice the cost on views with mist in them.
+
+*What M1 has taken from later milestones (2026-10-25, the user's concern that M2 should not find everything folded into M1):*
+M5's distant-forest representation (M1.12b's forest material); M4's valley haze and mist (M1.13a, M1.13b) and the terrain's shadow
+in the low air (M1.13b's sunlight volume). Those milestones keep the rest of their work and fine-tune what came early. M1.13b does not
+take fog proper, clouds, steam fog, the daytime haze lid or the seasonal aerosol load: they stay M4's.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1662,6 +1675,46 @@ cost 3–4% more a sample (the larger tables), a strong layer nothing more (the 
 crisp? Should the auto layer lean stronger than physics, or leave that to a pinned one? Should a daytime haze lid come before M4?
 Keep the larger tables (3 s more per atmosphere build), or the old speed? Log: [`vista-log/M1.13a.md`](vista-log/M1.13a.md).
 
+**M1.13b — Terrain-following valley mist.**
+- *Goal:* mist and haze that lie in the valleys, each pool on its own floor, thinning upward and lapping the slopes, patchy, lit and
+  shadowed by the terrain: peaks rising out of mist, not standing above a line.
+- *Why (the user's review of M1.13a, 2026-10-25):* the flat lid "reads like mist, but it feels too much like a line and not enough
+  like peaks hidden in the mist"; photorealism comes before likeness to the paintings. An altitude-only layer lies at one height in
+  every valley and across every view; real dawn pools sit on their own floors, fill some valleys and not others, thin upward,
+  saturate into mist where the air is humid, and lie dim in a ridge's shadow. The review's other answers: the auto strength stays
+  physical (a painted look is a pinned one), the daytime haze lid stays M4's, M1.13a's larger tables stay unless this slice's checks
+  say otherwise.
+- *Deliverable:*
+  - **Pools by the valleys' shape:** a pool map per world, cached with it: where cold air is trapped (flat floors, basins, narrow
+    outlets, from the drainage and the relief) a pool fills to its own surface above its own floor; out of steep, open valleys it
+    drains. M1.13a's chain sets the night's depth and the sun's break-up; each valley's shape scales them, so some fill and others
+    stay clear.
+  - **A density, not a lid:** densest at the pool's floor and thinning upward to a soft top, continuous across valley sides, with a
+    3D noise for patches and wisps (its strength and scale chosen by a sheet). M1.13a's flat layer becomes the altitude average the
+    LUTs carry.
+  - **Mist where the pool saturates:** per-place monthly humidity normals (dew point or relative humidity, from each place's station
+    with a source per place, like the temperatures) give the dawn's dew-point depression; where the pool's air cools to its dew
+    point, droplets form: a mist spectrum (water droplets: flat in wavelength, strongly forward-scattering, nearly white), visibility
+    down to a few hundred metres, the haze above and around it. Fog proper (under about 200 m, ground fog that buries the camera,
+    a sea of clouds) stays M4's.
+  - **Through the march, not the tables:** the pools are a 3D density (the map as a texture plus the noise) that the aerial march
+    and the reference sample; the march takes more steps inside the mist, so its edges and patches neither band nor blur; its
+    multiple scattering comes from a stand-in (the tables' altitude average, scaled by the local density), checked against the
+    reference.
+  - **The terrain's shadow:** a sunlight volume over the low air, built once per render (the terrain's shadow and the mist's own
+    transmittance toward the sun), which the march reads below its top: mist in a ridge's shadow is dim and blue-grey, its sunlit
+    tops glow. It also lifts M1.4's lit-air limit for the low air.
+  - **Sliders:** `valleyHaze` keeps its meaning (the visibility in the densest pool, auto or pinned), and the mist joins it (auto
+    from the humidity, or pinned); the sidecar records the pools and the mist.
+  - **Cost:** up to twice the time a sample on views with mist in them; views without mist near unchanged.
+- *Verify:* CI: the pool map (a closed basin fills, a steep open valley does not, deterministic, cached with the world), the density
+  (graded, continuous, the noise bounded), the mist chain (a humid autumn dawn saturates, a dry summer one stays haze; every place's
+  humidity normals sourced), the sunlight volume on a synthetic ridge. 3070: the march with mist against the reference (as M1.13a's
+  image check), with and without the shadow; the self-test's parity for the pool map, the density and the volume; a dawn sheet in
+  which peaks rise out of mist lying in the valleys, judged against real photos (the user's own; others stay local) rather than the
+  paintings; a shadow sheet (mist in a ridge's shadow, against the shadowed reference); a morning from formation to break-up; a
+  sheet of the noise's strength; a cost-ledger row and the cost of a misty view (at most 2×).
+
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
   §4.8).
@@ -1774,9 +1827,11 @@ in winter (M1.11's known limits), where a real alpine summer is hazier from conv
 winter inversions trap the haze below the peaks. **Mist at the foot of the mountains comes
 first** (added 2026-10-22): low valley mist and haze layers, the base of a range fading into
 them, appear in nearly every one of the user's paintings, so when M4 is sliced they lead,
-ahead of the cumulus (M1.13a's altitude-only inversion layer comes first; M4 adds the
-terrain-following, patchy mist that fills some valleys and not others); then cloud shadows on the terrain, then cumulus fields with full
-multiple scattering checked against a reference, then the optical effects (fogbows, glories).
+ahead of the cumulus (M1.13a's altitude-only inversion layer comes first; *since 2026-10-25* M1.13b builds the
+terrain-following, patchy mist that fills some valleys and not others, and the terrain's shadow on the low air, so M4 fine-tunes
+them and adds fog proper: ground fog that reaches the camera, a sea of clouds over the peaks' feet, the daytime haze lid); then cloud
+shadows on the terrain, then cumulus fields with full multiple scattering checked against a reference, then the optical effects
+(fogbows, glories).
 Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
 sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
 fades into valley mist from the defaults of a cool, still morning.
