@@ -37,4 +37,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.12b.md`](M1.12b.md) | Forest as material |
 | [`M1.12c.md`](M1.12c.md) | The world's footing and folded strata |
 | [`M1.13.md`](M1.13.md) | Snow & glaciers |
+| [`M1.13a.md`](M1.13a.md) | Valley haze layer |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

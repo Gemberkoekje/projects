@@ -10,7 +10,7 @@ perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
-and folded strata) and M1.13 (snow and glaciers) are done, and M1.13a (the valley haze layer) is next. It sits
+and folded strata), M1.13 (snow and glaciers) and M1.13a (the valley haze layer) are done, and M1.14 (the auto camera) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -129,7 +129,8 @@ or inside a tree.
 For fine-tuning a scene to look like a specific place at a specific time:
 
 - **Place:** location dropdown or custom latitude (§3.5), altitude, date.
-- **Weather:** temperature (°C, with a small °C/°F toggle), humidity.
+- **Weather:** temperature (°C, with a small °C/°F toggle), humidity, and since M1.13a the valley haze (the visibility under
+  the lid of the haze a cold pool holds in the valleys, §3.6).
 - **Lens & exposure** details (reusing the engine's `LensOptions`: f-stop, focus, lens
   presets, ISO/shutter once the exposure triangle exists).
 
@@ -235,6 +236,19 @@ station's), snowfall counted 1.2 times what the gauge caught (gauges miss snow).
 line 1733 → 1098 m, Lofoten's July line 1193 → 835 m), dry ones go up (Banff's April line 966 → 1316 m); a custom latitude keeps
 M1.11's one rate. The season's snow and the freezing level now show: snow lies above the snowline by the material rules, wet below
 the freezing level and dry above it (§4.5).
+
+*Since M1.13a ([`vista-log/M1.13a.md`](vista-log/M1.13a.md)):* the **valley haze** slider (advanced), the visibility under the lid
+of the haze a cold pool holds in the valleys, auto or pinned. Its auto value is a chain of its own from the climate's day: the
+night's cooling at the valley floor below the free air is 0.75 of the day's normal range (the night before a clear sky was clear;
+a cloudy or windy coast has a small range), and the pool is as deep as that cooling, undone at its top by the inversion's
+10 °C/km rise and the lapse rate (at most half the world's relief): 480 m at Zermatt in April, under 200 m at Lofoten, 800 m at
+Yosemite in July. The morning sun breaks it up: what is left is the share of its heat deficit the clear-sky sun since sunrise has
+not made up (Whiteman and McKee 1982's model, simplified: 0.3 of the sunlight the floor absorbs heats the air, twice as fast in a
+valley; snow on the floor turns most of it away, so a snowy valley keeps its pool all day), and its lid sinks as it goes, about
+four hours after sunrise in April; after the day's high it forms again as the air cools. Under the lid the valley's own haze is
+held (up to twice as much by dawn) and grown by the hour's humidity against the day's; the layer is what that adds. A pinned
+visibility under the lid takes the night's whole pool at any hour; `off` (500 km) adds nothing. Because the auto layer follows the
+hour, the time of day now moves the air's tables (about 1 s more per change in watch mode); a pinned valley haze does not.
 
 ---
 
@@ -460,6 +474,14 @@ maze's real-time path):
   of Venus**, the reddened low sun.
 - Replaces the engine's single-scattering Rayleigh `Sky` for Vista (which stays as the
   M0 placeholder).
+- *Since M1.13a:* a **valley haze** layer in the haze's profile: more of the same haze under an inversion's lid, uniform below
+  it and falling off over a logistic of 30 m above it (90% to 10% in 132 m), set by the weather chain (§3.6). It depends on
+  altitude alone, so the LUTs, the aerial march and the reference take it in unchanged in kind; because its lid is sharper than
+  any march's steps, every march takes the layer's exact mean over each step (its integral through the altitudes the step
+  spans), never a sample, which would band the picture where the lid crosses a step's middle. A dense layer holds light through
+  more scatterings than the clear air did, and its lid stood at the multiple-scattering tables' first height texel, so the
+  tables grew with it: ten orders instead of five, 24 heights instead of 16 and 12 view-to-sun texels instead of 8 (their build
+  1.0 → 3.7 s, their memory 2.25×), which took a strong layer's light from 10.5% dark against the reference to 1.1%.
 
 ### 5.3 Fog & clouds
 
@@ -1621,6 +1643,25 @@ height, or is seed 7's shallower carving the variety you want? Log: [`vista-log/
   a valley-haze sheet (off, auto, strong); a cost-ledger row (expected near unchanged: the profile
   changes, not the number of lookups).
 
+*Status (2026-10-25): done.* A valley haze in the air: the haze under an inversion's lid, uniform below it and gone within 132 m
+above it, each march taking its exact mean over every step (a sample per step would band a slope by up to 3%); without it the air is
+M1.13's bit for bit. The weather chain sets it from the night's cold pool: its depth from the night's cooling and the inversion's
+rise (446 m at Zermatt on an October dawn, under 200 m at Lofoten, up to half the world's relief), broken up by the sun's heat since
+sunrise (about four hours in spring, past noon over a snowy floor), forming again after the day's high, its haze the valley's own
+held and grown under the lid (25 km to see under it at that dawn); `valleyHaze` pinned stands at any hour. From shoulders just above
+the pool (two new views) the ranges' feet fade into the layer while the peaks stay crisp (`m1-13a-morning.png`,
+`m1-13a-paintings.png`); the committed views stand above it. A dense layer exposed the scattering orders: a strong layer's view was
+10.5% dark against the reference, so the tables grew to ten orders, 24 heights and 12 view-to-sun texels (1.1% dark; the LUT build
+1.0 → 4.0 s), and the segment check is closer everywhere, still 6–8% inside a strong layer toward a low sun. The photo's band is the
+lowlands' daytime haze, which the chain does not make and the far field's mountains break up (`m1-13a-photo.png`). Terrain views
+cost 3–4% more a sample (the larger tables), a strong layer nothing more (the cost ledger).
+*Judge this:* the mist at the mountains' foot beside your paintings (`m1-13a-paintings.png`); the October morning from the defaults
+(`m1-13a-morning.png`); off, auto and strong (`m1-13a-strengths.png`); winter and the places; the band from 10 km against your photo.
+*Ignore this:* one lid for every valley and the haze in a ridge's shadow still lit (M4); no daytime lid or lowlands at the horizon
+(M4); the colours (M1.17); the high views barely changing. *Questions:* does the mist read like your paintings' and is its top too
+crisp? Should the auto layer lean stronger than physics, or leave that to a pinned one? Should a daytime haze lid come before M4?
+Keep the larger tables (3 s more per atmosphere build), or the old speed? Log: [`vista-log/M1.13a.md`](vista-log/M1.13a.md).
+
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
   §4.8).
@@ -1645,7 +1686,9 @@ height, or is seed 7's shallower carving the variety you want? Log: [`vista-log/
   **Focal length is part of the search** (about 24–135 mm): a long lens stacks the layers and makes
   the peak loom behind them, where 28 mm leaves it a small bump on a wide landscape. **The squint
   test as a score:** the frame's value structure at thumbnail size (a blurred, downscaled luminance
-  image falling into a few distinct groups rather than muddy mid-tones).
+  image falling into a few distinct groups rather than muddy mid-tones). *Added 2026-10-25 (M1.13a):* the valley haze shows from
+  a viewpoint just above its lid looking across a valley at a range (`vista-views/haze/`), where the committed views, 3–4 km up,
+  see little of it; candidates on such shoulders are worth having among the searched ones when a pool stands.
 - *Verify:* CI: scoring tests on synthetic G-buffers, the near-field penalty, the layers, the
   framing, the leading line and the squint score among them. 3070: an auto-camera sheet over eight
   seeds × both set pieces against the default camera, every pick's near ground under the recorded

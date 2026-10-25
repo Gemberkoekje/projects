@@ -31,6 +31,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.12b | 0.25 | 5.87 | 4.32 | 8.65 |
 | M1.12c | 0.31 | 6.12 | 5.39 | 9.56 |
 | M1.13 | 0.45 | 6.75 | 5.75 | 10.90 |
+| M1.13a | 0.45 | 7.03 | 5.94 | 11.30 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -144,3 +145,12 @@ default and sky views are raised on the re-carved ground (the default 6 m above 
 The row is M1.12c's times those medians. The aerial view keeps its pose: +10% for the rules every hit pays, with 1% more rays (the
 snow's high albedo keeps a few more paths alive). The default's +7% is a new spot with 4% fewer rays; down the slope +14% a new pose;
 the sky view's +46% is 0.1 ns a sample at its raised spot, where camera rays start over other ground.
+M1.13a adds the valley haze to the air and grows the multiple-scattering tables (ten orders, 24 heights, 12 view-to-sun texels:
+2.25× their memory); every step of the aerial march finds one altitude more and, with a layer, its means. Measured as M1.13 was:
+this slice and `main` (080a7918) rendered alternately, view by view, three rounds, on a GPU shared with desktop programs: median
+ratios 0.997, 1.042, 1.033 and 1.037 (0.936–1.008, 0.962–1.051, 1.012–1.044, 1.034–1.049), at the same rays per sample (1.00,
+3.12, 2.53 and 3.43). The row is M1.13's times those medians. These views at their own hours hold almost no valley haze (a July
+noon; the golden hour's forming pool), so the 3–4% on terrain is the larger tables' lookups and the march's extra altitude, not
+separated. With a strong layer pinned (6 km under the lid) the same views ran 0.992, 1.054, 1.027 and 1.044 times `main`, at
+1.00, 3.21, 2.59 and 3.45 rays per sample (a hazier valley keeps a few more paths alive): the layer itself costs nothing more. The
+LUT build is not in these numbers: 3.7–4.0 s per atmosphere instead of 1.0.
