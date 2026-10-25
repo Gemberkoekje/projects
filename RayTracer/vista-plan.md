@@ -1694,7 +1694,13 @@ height, or is seed 7's shallower carving the variety you want? Log: [`vista-log/
   `m1-11b-before-after.png` and `m1-11c-before-after.png`. And a white balance (M1.12): the display has none, so a spectrally
   flat grey, which is what gneiss debris is, renders warm (equal-energy white comes out as Rec.709 1.20, 0.95, 0.91) and the
   materials' greys read beige under a high sun; keep it (the sun's colour, unbalanced) or balance for daylight, judged on
-  `m1-12-views.png`.
+  `m1-12-views.png`. *Added 2026-10-25, after the M1.13 review (the user's call):* both the white balance and the look are also
+  judged against the user's April photo (`m1-13-photo.png`). Its snow-free mountains read much darker than the renders', yet
+  measure lighter (median L* 64 below the horizon, against 51 for M1.13's cell with the snowline at 2400 m): they are a cold,
+  saturated blue-grey under thick haze beside bright snow, where the renders' rock is warm beige-grey (the built-in rocks reflect
+  8–19%, so the rock is not too bright). Re-render that sheet's cells under each candidate, with the visibility slider lowered to the
+  photo's haze, so the comparison is of the ground's colour and not the air's; the forest's share (the photo's ground lies lower,
+  most of it forest) stays M5's.
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).
