@@ -242,7 +242,7 @@ foundation is sound; most of the game logic on top of it changes shape.
 
 ## 5. Answers from the 2026-10-25 review
 
-Recorded in the design as D29–D35; summarised here with where each lands.
+Recorded in the design as D29–D37; summarised here with where each lands.
 
 | Question | Answer | Slice 1 | Later |
 |---|---|---|---|
@@ -251,4 +251,5 @@ Recorded in the design as D29–D35; summarised here with where each lands.
 | Private offers to named actors? | Yes. | No | From Slice 2 (D33) |
 | Signed contracts public? | Contracts can make the next day's news. Long term, a visibility term: public (publicity, reputation) or private (NDA). | Every contract public; a chance to make the news (D34) | Visibility term (Slice 2) |
 | One build at a time per yard? | Yes for Slice 1. Long term, boutique yards build to spec and large yards build batches of near-identical standard ships. | One at a time (D35) | Yard kinds (Slice 6) |
+| A "planned use" field on build orders, for text to compare against? | Yes, but maybe not in Slice 1. | No; text compares against fixed references (§11.5) | Tentatively Slice 2 (D37) |
 | Storage in Slice 1? | Kept (it was in the doc and not struck). | Yes (D29) | — |

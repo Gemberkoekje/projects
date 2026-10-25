@@ -495,6 +495,8 @@ Every sentence the interface shows is a template filled from structured data. No
 
 Text never states intent ("still enough for the run you want"), never another actor's hidden state, and never a prediction the game can't compute. The information rules of §7 apply to text exactly as they apply to numbers: a producer's warehouse is internal state, so from one jump away the player reads "asking ₵8.00, 23% below your readings", not "warehouse full".
 
+**Planned use** *(later)*. A build order can carry an optional planned use: routes and goods the player names. Text may then compare against it, because the player said so ("Medicine on Helios Prime → Edge Station: 5.6 days of 8.6"). Until then, comparisons use fixed references only.
+
 Templates live in resource files keyed by event type and fact type, which also makes them translatable.
 
 **A language model, later, may only restyle.** It can turn a fact list into livelier prose, but its input is that fact list and nothing else, its output never feeds back into the simulation, and the template text stays canonical in the log and on hover. Contracts, prices and outcomes are always deterministic.
@@ -560,7 +562,7 @@ The start state is seeded to guarantee the first three beats. The last two emerg
 
 | Feature | Lands in (§22) |
 |---|---|
-| Standing contracts, bonding agents, data brokers, market news, private offers, visibility terms, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | Slice 2 |
+| Standing contracts, bonding agents, data brokers, market news, private offers, visibility terms, planned use on build orders, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | Slice 2 |
 | Player-owned facilities, service contracts (hiring pilots), the player as contractor | Slice 3 |
 | Wear, maintenance, refits, insurance | Slice 4 |
 | Pirates, enforcement, blockades | Slice 5 |
@@ -854,7 +856,7 @@ Each slice is a thin, end-to-end cut through data, simulation and interface that
 | Slice | Theme | Adds | Fantasy it unlocks |
 |---|---|---|---|
 | **1** | **The contract web** | Part II of this document | *"I judge contracts, post my own, and live with the consequences."* |
-| 2 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, market news, private offers, visibility terms (public or NDA), scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | *"I read the market, run a logistics business, and the world reacts to me."* |
+| 2 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, market news, private offers, visibility terms (public or NDA), planned use on build orders, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | *"I read the market, run a logistics business, and the world reacts to me."* |
 | 3 | Ownership and services | Facilities as assets (factories, warehouses, yards) bought or built through contracts; service contracts (hire pilots and operators); the player as contractor; multinationals | *"I own a piece of the supply chain."* |
 | 4 | Wear and insurance | Part wear, maintenance and repair contracts, refits, insurance | *"Every ship has a history I can read and price."* |
 | 5 | Piracy and enforcement | Pirate actors as a source of incidents, fences, escorts, police contracts, blockades and chokepoint control | *"The frontier is dangerous and I choose how to face it."* |
@@ -918,6 +920,7 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | D34 | In Slice 1, every contract is public and may make the next day's news. From Slice 2, a visibility term chooses public (publicity, reputation) or private (an NDA: nobody can act on it or undercut it). | v0.3 | Gives the news something to report now and makes secrecy a negotiable term later. | — |
 | D35 | Slice 1 yards build one ship at a time. Later, boutique yards build custom ships a few at a time, and large yards build batches of near-identical standard ships. | v0.3 | Enough for queues now; yard kinds add a real market for ships later. | — |
 | D36 | Interface text is templates filled from event fields, computed values and explicit references; never intent, hidden state or prediction. A language model may later restyle the fact list, nothing more. | v0.3 | Determinism and legibility: text that claims more than the simulation knows misleads the player. | Free prose in the v0.3 mockup |
+| D37 | Build orders get an optional planned use (routes, goods) that interface text may compare against. Not in Slice 1; tentatively Slice 2. | v0.3 | Lets the game relate a ship to the player's plans without guessing them. | — |
 
 ## A.2 Open questions
 
