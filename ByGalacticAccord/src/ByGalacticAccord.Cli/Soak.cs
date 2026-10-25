@@ -15,7 +15,7 @@ internal static class Soak
 {
     public static int Run(long seed, long ticks)
     {
-        Console.WriteLine($"== By Galactic Accord — soak run ==  seed={seed}  ticks={ticks:N0}");
+        Console.WriteLine($"== By Galactic Accord — soak run ==  seed={seed}  ticks={ticks:N0} (to {GameTime.FormatDate(ticks)})");
         WorldHandles handles = WorldGenerator.Generate(seed, withPlayer: false);
         SimulationContext ctx = handles.Context;
         Console.WriteLine($"World: {ctx.Actors.Count} actors, {ctx.Locations.Count} locations, {ctx.Routes.Count} routes. Baseline supply {ctx.InitialCredits}.");
@@ -31,7 +31,7 @@ internal static class Soak
             IReadOnlyList<InvariantViolation> violations = Invariants.Check(ctx);
             if (violations.Count > 0)
             {
-                Console.WriteLine($"INVARIANT VIOLATION at tick {ctx.CurrentTick}:");
+                Console.WriteLine($"INVARIANT VIOLATION at tick {ctx.CurrentTick} ({GameTime.FormatDate(ctx.CurrentTick)}):");
                 foreach (InvariantViolation v in violations)
                 {
                     Console.WriteLine($"  [{v.Name}] {v.Detail}");
@@ -54,7 +54,7 @@ internal static class Soak
         decimal drift = baseline <= 0 ? 0 : (total - baseline) / baseline;
 
         Console.WriteLine("---- telemetry ----");
-        Line("Tick", ctx.CurrentTick.ToString("N0", CultureInfo.InvariantCulture));
+        Line("Tick", $"{ctx.CurrentTick.ToString("N0", CultureInfo.InvariantCulture)} ({GameTime.FormatDate(ctx.CurrentTick)})");
         Line("Total credit supply", $"{ctx.TotalCredits()}  (drift {drift:P1} from baseline)");
         Line("  in actor hands", ctx.TotalActorCredits().ToString());
         Line("  held in escrow", ctx.TotalEscrowHeld().ToString());

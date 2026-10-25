@@ -13,17 +13,19 @@ public sealed class EconomyTests
     [InlineData(1L)]
     [InlineData(20260619L)]
     [InlineData(42L)]
-    public void The_economy_comes_alive(long seed)
-    {
-        SimulationContext context = TestWorld.RunHeadless(seed, 200_000);
-
-        Assert.True(context.ContractsFulfilled > 500, $"only {context.ContractsFulfilled} hauls fulfilled — the world is too quiet.");
-        Assert.True(context.CargoDelivered > 0m);
-        // Most posted contracts should clear, not rot on the board.
-        Assert.True(context.ContractsFulfilled > context.ContractsBreached * 10);
-    }
+    public void The_economy_comes_alive(long seed) =>
+        AssertEconomyAlive(TestWorld.RunHeadless(seed, TestWorld.FastTicks));
 
     [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
+    [InlineData(1L)]
+    [InlineData(20260619L)]
+    [InlineData(42L)]
+    public void The_economy_stays_alive_over_200k_ticks(long seed) =>
+        AssertEconomyAlive(TestWorld.RunHeadless(seed, 200_000));
+
+    [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
     [InlineData(1L)]
     [InlineData(20260619L)]
     [InlineData(42L)]
@@ -39,6 +41,7 @@ public sealed class EconomyTests
     }
 
     [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
     [InlineData(1L)]
     [InlineData(20260619L)]
     public void No_single_actor_monopolises_the_whole_economy(long seed)
@@ -62,7 +65,7 @@ public sealed class EconomyTests
     public void Goods_actually_reach_the_frontier()
     {
         // Regression guard for the multi-hop supply chain: the frontier must be reachable and supplied.
-        SimulationContext context = TestWorld.RunHeadless(20260619L, 200_000);
+        SimulationContext context = TestWorld.RunHeadless(20260619L, TestWorld.FastTicks);
 
         Location? edge = null;
         foreach (Location loc in context.Locations.Values)
@@ -87,5 +90,13 @@ public sealed class EconomyTests
 
         Assert.NotNull(foodSource);
         Assert.NotNull(context.FindPath(foodSource!.Value, edge!.Id));
+    }
+
+    private static void AssertEconomyAlive(SimulationContext context)
+    {
+        Assert.True(context.ContractsFulfilled > 500, $"only {context.ContractsFulfilled} hauls fulfilled — the world is too quiet.");
+        Assert.True(context.CargoDelivered > 0m);
+        // Most posted contracts should clear, not rot on the board.
+        Assert.True(context.ContractsFulfilled > context.ContractsBreached * 10);
     }
 }

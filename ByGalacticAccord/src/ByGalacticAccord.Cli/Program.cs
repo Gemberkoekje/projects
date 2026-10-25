@@ -2,15 +2,13 @@ using System;
 using System.Globalization;
 using ByGalacticAccord.Cli;
 
-string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "play";
+// The soak harness (design §18, §20.3). The game itself is played in the browser client; this
+// console app only runs the world headless, prints telemetry and asserts the invariants.
+string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "soak";
 long seed = ArgValue(args, "--seed", 20260619L, s => long.Parse(s, CultureInfo.InvariantCulture));
 
 switch (mode)
 {
-    case "play":
-        Game.Run(seed);
-        return 0;
-
     case "soak":
         long ticks = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long t)
             ? t
@@ -31,16 +29,15 @@ switch (mode)
 
 static void PrintHelp()
 {
-    Console.WriteLine("By Galactic Accord — vertical slice (Slice 0)");
+    Console.WriteLine("By Galactic Accord — soak harness");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  play  [--seed N]            Play the interactive console game (default).");
-    Console.WriteLine("  soak  [ticks] [--seed N]    Run headless, print economy telemetry, assert invariants.");
+    Console.WriteLine("  soak  [ticks] [--seed N]    Run headless, print economy telemetry, assert invariants (default).");
     Console.WriteLine("  help                        Show this help.");
     Console.WriteLine();
-    Console.WriteLine("Examples:");
-    Console.WriteLine("  dotnet run --project src/ByGalacticAccord.Cli -- play");
-    Console.WriteLine("  dotnet run --project src/ByGalacticAccord.Cli -- soak 500000 --seed 42");
+    Console.WriteLine("One tick is one game hour. Examples:");
+    Console.WriteLine("  dotnet run --project src/ByGalacticAccord.Cli -- soak");
+    Console.WriteLine("  dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42");
 }
 
 static T ArgValue<T>(string[] arguments, string flag, T fallback, Func<string, T> parse)

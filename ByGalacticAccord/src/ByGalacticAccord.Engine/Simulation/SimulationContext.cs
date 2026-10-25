@@ -23,6 +23,14 @@ public sealed class SimulationContext
     private readonly List<Route> _routes = new();
     private readonly Dictionary<(ActorId Actor, LocationId Location), long> _scoutedUntil = new();
 
+    // Shortest paths are a pure function of the static route graph, so each pair is solved once.
+    // Adding a location or a route clears the cache.
+    private readonly Dictionary<(LocationId From, LocationId To), RoutePlan?> _pathCache = new();
+
+    // Contracts that were open when last looked at, in id order. A contract never returns to Open once
+    // it leaves it, so OpenContracts prunes this list instead of scanning every contract ever posted.
+    private readonly List<Contract> _openCandidates = new();
+
     private readonly List<string> _playerAlerts = new();
 
     private long _nextActorId = 1;
@@ -109,11 +117,35 @@ public sealed class SimulationContext
 
     public void Add(Ship ship) => _ships[ship.Id] = ship;
 
-    public void Add(Location location) => _locations[location.Id] = location;
+    public void Add(Location location)
+    {
+        _locations[location.Id] = location;
+        _pathCache.Clear();
+    }
 
-    public void Add(Route route) => _routes.Add(route);
+    public void Add(Route route)
+    {
+        _routes.Add(route);
+        _pathCache.Clear();
+    }
 
-    public void Add(Contract contract) => _contracts[contract.Id] = contract;
+    public void Add(Contract contract)
+    {
+        _contracts[contract.Id] = contract;
+
+        // Keep the open list in id order. Contracts arrive in id order, so this is usually an append.
+        int index = _openCandidates.FindLastIndex(c => c.Id.Value <= contract.Id.Value);
+        if (index >= 0 && _openCandidates[index].Id == contract.Id)
+        {
+            _openCandidates.RemoveAt(index);
+            index--;
+        }
+
+        if (IsOpen(contract))
+        {
+            _openCandidates.Insert(index + 1, contract);
+        }
+    }
 
     public ActorState Actor(ActorId id) => _actors[id];
 
@@ -176,9 +208,20 @@ public sealed class SimulationContext
     /// <summary>
     /// Shortest path (by total travel ticks) between two locations, or null if unreachable. Returns the
     /// summed distance and the single most dangerous leg, so a Helios→frontier haul correctly inherits
-    /// the red leg's risk. Deterministic: ties break by location id.
+    /// the red leg's risk. Deterministic: ties break by location id. Cached per pair, since routes are static.
     /// </summary>
     public RoutePlan? FindPath(LocationId from, LocationId to)
+    {
+        if (!_pathCache.TryGetValue((from, to), out RoutePlan? plan))
+        {
+            plan = SolvePath(from, to);
+            _pathCache[(from, to)] = plan;
+        }
+
+        return plan;
+    }
+
+    private RoutePlan? SolvePath(LocationId from, LocationId to)
     {
         if (from == to)
         {
@@ -236,12 +279,24 @@ public sealed class SimulationContext
         }
 
         path.Reverse();
-        return path;
+        return path.ToArray();
     }
 
-    public IEnumerable<Contract> OpenContracts =>
-        _contracts.Values.Where(c => c.Status is ContractStatus.Open or ContractStatus.Negotiating)
-                         .OrderBy(c => c.Id.Value);
+    /// <summary>Open and negotiating contracts in id order, as they stand when enumeration starts.</summary>
+    public IEnumerable<Contract> OpenContracts => EnumerateOpenContracts();
+
+    private IEnumerable<Contract> EnumerateOpenContracts()
+    {
+        _openCandidates.RemoveAll(c => !IsOpen(c));
+        Contract[] snapshot = _openCandidates.ToArray();
+        foreach (Contract contract in snapshot)
+        {
+            yield return contract;
+        }
+    }
+
+    private static bool IsOpen(Contract contract) =>
+        contract.Status is ContractStatus.Open or ContractStatus.Negotiating;
 
     public IEnumerable<ActorState> ActorsOrdered =>
         _actors.Values.OrderBy(a => a.Id.Value);

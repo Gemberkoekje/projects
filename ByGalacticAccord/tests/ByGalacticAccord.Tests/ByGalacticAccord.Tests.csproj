@@ -4,6 +4,9 @@
     <AssemblyName>ByGalacticAccord.Tests</AssemblyName>
     <RootNamespace>ByGalacticAccord.Tests</RootNamespace>
     <IsPackable>false</IsPackable>
+    <!-- Fast by default (design §20.3): plain `dotnet test` skips soak-length tests. Run those with a
+         command-line filter of Category=Soak; any filter given on the command line replaces this one. -->
+    <VSTestTestCaseFilter Condition="'$(VSTestTestCaseFilter)' == ''">Category!=Soak</VSTestTestCaseFilter>
   </PropertyGroup>
 
   <ItemGroup>

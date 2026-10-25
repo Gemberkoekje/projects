@@ -1,153 +1,77 @@
-# By Galactic Accord — Vertical Slice (Slice 0)
+# By Galactic Accord
 
-A contract-based space-trading simulation in a living, player-agnostic universe — the **Slice 0
-"core loop"** from the v0.2 design document.
+> *A space economy where everything is a contract, and the player is just another party to them.*
 
-> **Note:** the design has moved on to [`by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md),
-> which redefines Slice 0 around the contract web (posting as well as taking contracts, ships built
-> from parts, failure terms) and retires the WPF and console clients in favour of a Blazor client.
-> This README still describes the current build, which implements the v0.2 slice.
+Buying food, moving it, storing it, building a ship: each is a contract with parties, terms, and a
+defined outcome for when it goes wrong. The world runs whether or not you act, driven by AI actors
+using the same contracts you do. The skill is judging contracts: is this haul worth running, is this
+yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
-> *You take contracts to earn credits. Credits let you upgrade your ship and take better contracts.
-> The universe shifts around you based on forces you can influence but not control.*
+## Where things are
 
-The world runs whether or not you do. Prices move, companies thrive and bleed out, the frontier gets
-supplied or starves — all driven by AI actors pursuing goals through the same contract system you use.
+| Document | What it holds |
+|---|---|
+| [`../by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md) | The design. Part II is the spec for **Slice 1, the contract web**: Sale, Haul, Build and Storage contracts, posted and taken by anyone; terms and failure; haggling over game time; ships built from graded parts; information that ages with distance; the browser client. |
+| [`plan.md`](plan.md) | How the current build becomes Slice 1, in ten steps (S1–S10), each with a goal, a deliverable, a check and a status line. |
+| [`log/`](log/README.md) | One log per finished step: what was built, checked and measured, and what the next step should know. |
 
----
+## The current build
 
-## What this is (and isn't)
+**S1 (groundwork) is done; S2 is next.** The engine still implements the earlier v0.2 slice: consumers
+post haul contracts, AI haulers negotiate, carry the goods and settle through escrow, and transit
+incidents make dangerous routes cost something. Most of that game logic changes shape in S3–S8; the
+foundation it stands on (the event queue, the seeded random numbers, the money primitives, the
+invariants and the soak harness) stays.
 
-This implements **Slice 0** as defined by the GDD's own roadmap (§8) — *"the smallest version of the
-game worth playing for an hour."* It is a complete, runnable, deterministic simulation with an
-ASCII-forward console UI and a headless soak harness.
-
-**In scope (per §6.1):** haul contracts + the clause schema · negotiation with soft tells · 7 goods
-with perishable quality decay · 5 ship types · a 7-location sector across a green Accord core and an
-amber/red frontier · producers & consumers with a faucet/sink economy · AI shipping companies and
-independent pilots · the greedy-utility actor decision algorithm · danger-rated routes with
-multi-hop path-finding · **Transit Incidents** (danger ratings with teeth, §6.3) · the discrete-event
-engine with a seeded, replayable PRNG · contextual reputation · an information/visibility model ·
-an inflation monitor · invariant checks + a soak harness.
-
-**Deferred (per §6.2, §8):** ship variance & degradation · full piracy actors · FTL/exotics · alien
-factions · factory chains · bonding agents · the data-broker information market · standing contracts ·
-insurance · multiplayer. The architecture is built so these slot in as *elaborations* (e.g. the
-Transit-Incident hook is exactly where pirate interdiction lands in Slice 3).
-
-### One deliberate deviation from the GDD
-
-The GDD names **Marten + PostgreSQL** for event storage (§5.1). To keep the slice runnable with zero
-infrastructure, this build keeps the *architecture* faithful — an append-only event journal, aggregates
-projected from events, a seeded PRNG whose draws are re-derivable, and deterministic replay (§5.5) —
-but backs it with an **in-memory event store** instead of Marten/Postgres. Swapping in Marten is a
-persistence concern that does not touch the simulation logic. Everything else follows the document.
-
----
+There is no client to play yet. The WPF client and the console game were retired in S1 (design D23);
+the Blazor WebAssembly client arrives in S2.
 
 ## Running it
 
-Requires the **.NET 10 SDK** (the GUI also needs the Windows Desktop runtime, included with the SDK on Windows).
-
-### The graphical client (recommended)
+Requires the **.NET 10 SDK**. Builds and runs on Linux, macOS and Windows.
 
 ```bash
-dotnet run --project src/ByGalacticAccord.Wpf
-dotnet run --project src/ByGalacticAccord.Wpf -- --seed 42
-```
+dotnet build
 
-![The 2D client](docs/screenshot.png)
-
-A live 2D view of the whole sector on top of the same simulation. Ships move along their routes
-carrying labelled cargo, producer **prices** and **▲idle** tells update on the map, the contract
-board and your in-flight hauls sit on the right, and a colour-coded event log streams the sector's
-life along the bottom.
-
-- **Time control** — `❚❚ Pause`, `▶ Play` (1×), `▶▶ Fast`. The sim **hard-pauses** on an alert such as a transit incident hitting your ship (§3.4).
-- **Click** a location to inspect its prices, stock, and demands; click a ship to see what it's hauling and where.
-- **Negotiate** — select a contract on the board and hit *Negotiate* to counter / accept / walk against soft tells (§4.1.6); a deal locks escrow and your ship departs.
-- Routes are coloured by danger (green / amber / red-dashed); your ship is the ringed marker.
-- `--shot out.png [--ticks N]` renders a single still headlessly (no window) — handy for screenshots.
-
-### The console client & headless soak
-
-```bash
-# Interactive text client (board / map / ship sheet / ledger / negotiation / log)
-dotnet run --project src/ByGalacticAccord.Cli -- play
-
-# Headless soak: simulate N ticks, print economy telemetry, assert all invariants (§5.6)
-dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42
-
-# Tests: invariants, deterministic replay, economy health, negotiation, incidents
+# Fast tests (the default): unit tests plus short world runs. A few seconds.
 dotnet test
+
+# Soak-length tests: million-tick invariant runs, money supply, monopoly checks. Under a minute.
+dotnet test --filter Category=Soak
+
+# The soak harness: run the world headless, print economy telemetry, assert every invariant.
+dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42
 ```
 
-Console commands: `board`, `take <#>` (negotiate), `run [ticks]`, `map`, `ship`, `ledger`, `log`, `retire`.
+Any `--filter` on the command line replaces the default one, so a filter that matches soak tests runs them.
 
-The skill is reading the economy: an **idle producer** (full warehouse, the ▲ tell) asks less,
-widening the haul spread — spot that before the AI haulers do and the lucrative run is yours. Push
-into the amber/red frontier for fatter fees and real risk, or grind safe green core hauls.
-
----
-
-## Architecture
+## Layout
 
 ```
-src/ByGalacticAccord.Engine/      the whole simulation (no UI, no I/O)
-  Domain/        value objects & aggregates: Credits, Goods, Ship, Location, Route,
-                 Contract, ContractClause, Reputation, Personality, typed Ids
-  Random/        DeterministicRandom — a stable, seeded, journaled PRNG (§5.5)
-  Events/        ISimEvent + the discrete-event types (ShipDeparted, TransitIncident*,
-                 ShipArrived, ActorHeartbeat, InflationCheck, ...) and the min-heap queue
-  Actors/        ActorState, the greedy-utility DecisionEngine (§4.5.3), Negotiation (§4.1.6)
-  Economy/       PriceModel, Visibility (§4.6), InflationMonitor (§5.8)
-  Simulation/    SimulationContext (the world), Settlement, Invariants (§5.6),
-                 IncidentResolver (§6.3), WorldGenerator, EventJournal
-src/ByGalacticAccord.Cli/         console front-end: interactive Game + headless Soak harness
-src/ByGalacticAccord.Wpf/         2D graphical client (WPF): animated map, board, hauls, event log
-tests/ByGalacticAccord.Tests/     xUnit: invariants, determinism, economy, negotiation, incidents
+src/ByGalacticAccord.Engine/   the whole simulation: no UI, no I/O, deterministic
+  Domain/        value objects and aggregates: Credits, goods, ships, locations, routes, contracts, typed ids
+  Random/        DeterministicRandom: the seeded, counted PRNG
+  Events/        the discrete events and the stable min-heap queue they run from
+  Actors/        actor state, the greedy-utility decision engine, negotiation
+  Economy/       prices, visibility, the inflation monitor
+  Simulation/    the world (SimulationContext), settlement, invariants, incidents, world
+                 generation, the journal, game time
+src/ByGalacticAccord.Cli/      the soak harness
+tests/ByGalacticAccord.Tests/  xUnit: fast by default; soak-length tests carry [Trait("Category", "Soak")]
 ```
 
-### How the loop runs (§4.7.3, §5.4)
+## How it works
 
-The world is a **priority queue of future events** ordered by game tick. "Running" means dequeuing
-events as the clock advances; "paused" means stop dequeuing. Nothing happens between events — a ship
-in transit has no position, only a scheduled arrival, and position is interpolated only when something
-forces it. When an event raises a player decision, the loop **hard-pauses** and hands control to the UI.
+- **Discrete events** (design §19). The world is a priority queue of future events ordered by tick, with
+  stable tie-breaking. Running means processing events as the clock advances; nothing happens between them.
+- **One tick is one game hour** (§8.3). Text shows dates and durations, never ticks:
+  `GameTime.FormatDate` gives "Day 4 · 14:00", `GameTime.FormatRelative` gives "in 1d 6h".
+- **Determinism** (§20.1). Every random draw comes from the seeded PRNG, and everything that consumes
+  randomness iterates in a stable order, so a seed reproduces a run exactly. The tests check it.
+- **Invariants** (§20.2), checked by the soak harness and the tests: credits are conserved to the cent
+  (total = initial + faucet − sinks), escrow reconciles and is never negative, cargo picked up equals
+  cargo delivered, lost or still aboard, and no contract is left active without a ship carrying it.
+- **Money is `decimal`**, never floating point, so conservation is exact.
 
-A contract's life: a consumer posts a demand → a hauler reads its board, scores candidates by
-`utility = expected_credit_delta × risk × personality − opportunity_cost`, negotiates, and commits a
-ship → `ShipDeparted` (goods picked up, escrow settled) → `TransitIncidentCheck` (danger-weighted) →
-`ShipArrived` → `ContractFulfilled`/`Breached` (escrow released, reputation updated). Everything is a
-contract; clauses (late penalty, quality warranty) are evaluated at settlement.
-
-### Determinism & invariants
-
-Every stochastic draw comes from a seeded, stable PRNG and every iteration that consumes randomness is
-over a stably-ordered collection, so **a seed fully reproduces a run** (`DeterminismTests`). The soak
-harness and test suite continuously assert the §5.6 invariants:
-
-- **Credit conservation** — `total == initial + Σfaucet − Σsink`, exact to the cent.
-- **Escrow reconciliation** — `Σheld == Σlocked − Σreleased − Σforfeited`, never negative.
-- **Cargo conservation** — goods picked up == delivered + lost + in transit.
-- **No orphan contracts** — every active contract is carried by an in-transit ship that will arrive.
-
-### Tuning
-
-Balance lives in [`SimulationConfig`](src/ByGalacticAccord.Engine/Simulation/SimulationConfig.cs) and
-the canonical good/ship/world tables — *tuning, not design* (§3.6, §5.6), meant to be moved while
-reading soak telemetry. A representative `soak 1000000` run keeps total credit supply within a few
-percent of baseline, fulfils tens of thousands of hauls, supplies the frontier, and holds every
-invariant — the economy neither collapses nor runs away.
-
----
-
-## Mapping to the GDD
-
-Nearly every Slice-0 system cites its section in code comments. Highlights: the Galactic Accord as the
-enforcement-context spine (§2.3, §4.1.3) lives in `AccordReach`; the contract data model and clause
-schema (§4.1.1, §4.1.5) in `Contract`/`ContractClause`; the negotiation reservation-price model
-(§4.1.6) in `Negotiation`; the actor decision algorithm (§4.5.3) in `DecisionEngine`; the
-information/visibility model (§4.6) in `Visibility`; the time model and hard-pause (§3.4) in the run
-loop; the Transit-Incident resolution of the danger-rating contradiction (§6.3) in `IncidentResolver`;
-and the legibility-first UI (§5.7) in the console screens.
+Balance values live in [`SimulationConfig`](src/ByGalacticAccord.Engine/Simulation/SimulationConfig.cs)
+and in world generation. They are tuning, moved by reading soak telemetry.

@@ -1,3 +1,4 @@
+using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 
@@ -86,6 +87,66 @@ public sealed class DomainTests
         ctx.Add(island);
 
         Assert.Null(ctx.FindPath(a.Id, island.Id));
+    }
+
+    [Fact]
+    public void FindPath_is_cached_until_the_route_graph_changes()
+    {
+        var ctx = new SimulationContext(1L);
+        var a = new Location(ctx.NextLocationId(), "A", LocationType.CoreWorld, "R", AccordReach.DeepAccord);
+        var b = new Location(ctx.NextLocationId(), "B", LocationType.IndustrialWorld, "R", AccordReach.AccordEdge);
+        var c = new Location(ctx.NextLocationId(), "C", LocationType.FrontierOutpost, "R", AccordReach.OutsideAccord);
+        ctx.Add(a);
+        ctx.Add(b);
+        ctx.Add(c);
+        ctx.Add(new Route(a.Id, b.Id, 10, 0.05m, AccordReach.AccordEdge));
+        ctx.Add(new Route(b.Id, c.Id, 20, 0.40m, AccordReach.OutsideAccord));
+
+        RoutePlan? first = ctx.FindPath(a.Id, c.Id);
+        Assert.Same(first, ctx.FindPath(a.Id, c.Id));
+
+        // A direct shortcut must invalidate the cached two-hop plan.
+        ctx.Add(new Route(a.Id, c.Id, 25, 0.10m, AccordReach.AccordEdge));
+        RoutePlan? shortcut = ctx.FindPath(a.Id, c.Id);
+
+        Assert.NotNull(shortcut);
+        Assert.Equal(25, shortcut!.DistanceTicks);
+        Assert.Equal(1, shortcut.Hops);
+    }
+
+    [Fact]
+    public void OpenContracts_lists_open_contracts_in_id_order_and_drops_closed_ones()
+    {
+        var ctx = new SimulationContext(1L);
+        var here = new Location(ctx.NextLocationId(), "Here", LocationType.CoreWorld, "R", AccordReach.DeepAccord);
+        ctx.Add(here);
+        ContractId first = ctx.NextContractId();
+        ContractId second = ctx.NextContractId();
+        ContractId third = ctx.NextContractId();
+
+        // Added out of id order on purpose: the board is still in id order.
+        Contract c3 = AddHaul(ctx, third, here);
+        Contract c1 = AddHaul(ctx, first, here);
+        Contract c2 = AddHaul(ctx, second, here);
+        Assert.Equal(new[] { first, second, third }, ctx.OpenContracts.Select(c => c.Id));
+
+        c2.BeginNegotiation();
+        c1.MarkExpired();
+        Assert.Equal(new[] { second, third }, ctx.OpenContracts.Select(c => c.Id));
+
+        c3.MarkExpired();
+        c2.MarkExpired();
+        Assert.Empty(ctx.OpenContracts);
+        Assert.Equal(3, ctx.Contracts.Count);
+    }
+
+    private static Contract AddHaul(SimulationContext ctx, ContractId id, Location at)
+    {
+        var contract = new Contract(
+            id, ContractType.Haul, new ActorId(1), GoodType.Ore, 10m, at.Id, at.Id, Credits.Of(10m), Credits.Of(20m),
+            Credits.Of(40m), 0.04m, 100, at.Reach, at.Region, System.Array.Empty<ContractClause>());
+        ctx.Add(contract);
+        return contract;
     }
 
     [Fact]
