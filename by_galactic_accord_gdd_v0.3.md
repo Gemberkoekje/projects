@@ -363,7 +363,7 @@ Outcomes of Accord contracts are public: on-time rate, cancellations and default
 
 ### 7.4 The news
 
-Once a game day, **The Daily Accord** reports a handful of contracts signed, fulfilled or failed the day before, sector-wide: "Rust Belt Camp pays a premium for food", "Coreward Logistics orders a Bulk Hauler from Tycho Yards", "Juno Okafor two days late on a Verdant food run". Which contracts make the news is a weighted chance: large, unusual and failed contracts are likelier. The news is how distant markets reach you, a day late and incomplete, and it can tip you off to a queue at a yard or a shortage before you see it yourself.
+Once a game day, **The Daily Accord** reports a handful of the previous day's contracts, sector-wide: newly posted, signed, fulfilled or failed. For example: "Rust Belt Camp pays a premium for food", "Coreward Logistics orders a Bulk Hauler from Tycho Yards", "Juno Okafor two days late on a Verdant food run". Which contracts make the news is a weighted chance: large, unusual and failed contracts are likelier. The news is how distant markets reach you, a day late and incomplete, and it can tip you off to a queue at a yard or a shortage before you see it yourself.
 
 ### 7.5 Later
 
@@ -907,6 +907,7 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 
 - **Grade steps and substitution discounts:** tuning, but they decide how much substitution stings.
 - **What makes the news:** the weights for size, novelty and failure, and how many items a day. Too few and the frontier starves for lack of information; too many and presence stops mattering.
+- **Which board does a post go on?** The poster's location, or the place the contract is performed? The mockup assumes the handover place for Sales and Hauls (a Wanted post for food at Verdant is seen from Verdant outward), and the poster's location for Builds. This decides whether you can post somewhere you have no presence.
 - **Can an actor pay to be in the news?** An advertising contract with the paper would be symmetric and useful for a poster at a remote outpost; it may belong with the visibility terms in Slice 2.
 
 ---
