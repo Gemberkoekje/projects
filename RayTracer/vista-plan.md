@@ -870,7 +870,12 @@ for a slice hold for every milestone.
   two or three questions the sheets answer without any rendering knowledge ("do the snowcaps read as
   real, or as icing?"), naming a real photo to compare against where one helps. Real photos are for
   judging only: the user's own may be committed beside a sheet (downscaled to the size rule, metadata
-  stripped); anyone else's stay local.
+  stripped); anyone else's stay local. **Questions are about what the user sees, never about
+  geography, geology or physics** (since 2026-10-25; the user lives in the Netherlands, and "should
+  glaciers follow the place?" says nothing in words): ask "which of these looks more like real
+  mountains?" or "does this look like the photo?", with the options in a sheet. A choice that needs
+  knowledge of places or physics is made in the slice, from data, written into the log with its reason,
+  and shown to the user as a picture for a yes or no on how it looks.
 - **Findings go to the parked list** (since 2026-10-25): a new idea from a review that the current
   milestone's own checks do not need is written into the parked list (the end of this section) with
   the milestone it belongs to, not added as a slice. A milestone takes its parked items when its
@@ -1933,9 +1938,15 @@ any of them.
   8.6–10.8% to 12.4–13.8%, though not at the talus angle. *Belongs:* watched at M1.17; acted on only
   if the hero render shows it.
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
-  Lofoten and Fiordland, in every season. *Belongs:* M7 (winter), after the user's call.
-- **Carving sized to each world's height** (M1.13): seed 7's shallower carving is either variety or a
-  world the glaciers under-carve. *Belongs:* the user's call, then M7.
+  Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
+  the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
+  the place's temperatures and precipitation, the same numbers as the snowline. *Belongs:* M7.
+  *The user's check:* Lofoten's render beside a real photo of Lofoten.
+- **Carving sized to each world's height** (M1.13): seed 7 came out more shallowly carved than seed
+  42 by how its numbers fell, not by design. *Decided (2026-10-25):* every snow-capped world's carving
+  glaciers are sized to its own height, so each gets real U-valleys, with a seeded variation within a
+  range so worlds still differ. *Belongs:* M7. *The user's check:* seed 7 beside seed 42: do both read
+  as alpine valleys?
 - **Cornices on ridges** (M1.13): not in M7's list of close-up snow. *Belongs:* M7.
 
 ---
