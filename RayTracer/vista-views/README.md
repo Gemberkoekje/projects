@@ -20,8 +20,16 @@ range, down the slope on a lit 37° face at (−2850, 0) looking down it toward 
 default's spot, pitched up 45°. On M1.12c's world (folded strata) that spot is 184 m underground and the down-slope one 90 m, so
 M1.12c re-placed them by the same search: the default 3 m above rock at (−250, −5125), 1645.3 m, again looking 20° west of north at
 the range (45% sky, the range 1.4–3.8 km away), down the slope 3 m above a lit 35° face at (−6725, −375), 1510.8 m, looking down it
-toward the golden-hour sun across a valley whose far side shows folded beds; the sky view at the new default's spot. Ledger rows
-from before M1.11d, and from before M1.12c, measured other poses.
+toward the golden-hour sun across a valley whose far side shows folded beds; the sky view at the new default's spot. On M1.13's
+world (glacial carving) that spot is 15 m underground and the down-slope one 75 m, so M1.13 re-placed them by the same search, now
+kept 300 m off the glaciers and, down the slope, out of the ridges' golden-hour shadow: the default on a meadow at (4450, −8825),
+again looking 20° west of north, at the glaciated range (48% sky, the range 2.5 km away, glaciers in 8% of the frame), down the slope
+3 m above a lit 37° face at (−3025, 3325), 1551.4 m; the sky view at the default's spot. When the carving's glaciers grew (their line
+from 1500 to 1200 m above height 0) the default's ground rose 17 m, and the default and sky views now stand at 1698.5 m, 6 m above
+the eroded ground and 2 m above the incised ground CI checks. The rock-face view stands 2 m above its old place's new ground; the
+meadow view moved to (605, 6161), 2 m up, looking 240° (south-west) up a meadow with scree fans above it, and the scree-cone view
+to the same spot, looking 285° and 10° up at one of those fans; the forested crest is kept 20 m above the incised ground. Ledger
+rows from before M1.11d, from before M1.12c, and from before M1.13, measured other poses.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
 defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
@@ -296,4 +304,22 @@ deleted after (a world is 285 MB).
 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/strata/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Sheets measures,maps,choice,views,photo,cost] [-Out folder]
+```
+
+## Snow and glacier checks (M1.13)
+
+`snow/render.ps1` makes the M1.13 sheets and checks: `--erosion-measure` on four seeds with M1.12c's world (this build with the
+glaciers off, M1.12c's settings) and M1.13's (`measures`: the footing, relief, facets, drainage, the glaciers, and the
+materials' shares at Zermatt in July, snow, firn and ice among them, in `snow.log`); `--valley-measure` (`valleys`: the troughs
+where glaciers run, carved against the rivers' alone, and `valleys.png` of their sections); each seed's materials from above
+(`maps.png`); with `-Before` (a `main` build) the seed-42 views in July (`views.png`); the default and aerial views on the 15th of
+January, April, July and October from the defaults alone (`seasons.png`); M1.10a's alpenglow sweep, the range view on a July
+evening with the sun setting from +4° to −3° (`alpenglow.png`), and the same at 0°, −0.5° and −1° with M1.12a's equal bins against
+the blend (`redend.png`); four April views with their material ids and each one's share of white ground by slope (`slopes`, the bare
+steep faces); with `-Photo` the user's photo beside the over-forest view in its light, `main`'s, this build's and this build's with
+the snowline at 2400 m (`photo.png`); Russian roulette swept on the April default view's bright snow (`rr`); and
+the cost against `main` (`cost`). `snow/mountains-april.recipe.json` is the day recipe on 15 April.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/snow/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Sheets measures,valleys,maps,views,seasons,alpenglow,redend,slopes,photo,rr,cost] [-Out folder]
 ```

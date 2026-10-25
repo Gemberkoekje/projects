@@ -59,7 +59,9 @@ public sealed class StreamPowerTests
         DrainageStats before = DrainageStats.Measure(DrainageMap.Of(ground), channelAreaKm2: 0.1);
         Assert.IsTrue(before.BasinShare > 0.02, $"the crater is a closed basin ({before.BasinShare:0.0%} of the grid)");
 
-        HeightField incised = StreamPower.Incise(ground, ErosionSettings.Mountains, UpliftMap.On(Alpine, 1, ErosionSettings.Mountains, ground)).Incised;
+        // The rivers alone (M1.13's glacial carving after them lowers what its ice covers, the summit's cap here).
+        ErosionSettings rivers = ErosionSettings.Mountains with { GlacialSteps = 0 };
+        HeightField incised = StreamPower.Incise(ground, rivers, UpliftMap.On(Alpine, 1, rivers, ground)).Incised;
         DrainageStats after = DrainageStats.Measure(DrainageMap.Of(incised), channelAreaKm2: 0.1);
         Assert.AreEqual(0.0, after.BasinShare, "the rim is cut and the crater drains");
         Assert.IsTrue(after.LakeShare < before.LakeShare / 4, $"lakes {before.LakeShare:0.0%} → {after.LakeShare:0.0%}");
@@ -86,7 +88,7 @@ public sealed class StreamPowerTests
     }
 
     private const string PinnedPreparedHash = "6607fcdede7e57c0";
-    private const string PinnedFoldedPreparedHash = "9be358012488f2ea";
+    private const string PinnedFoldedPreparedHash = "28519918935bca8b";
 
     [TestMethod]
     public void Upsampling_KeepsTheCoarseSamples_AndInterpolatesBetweenThem()

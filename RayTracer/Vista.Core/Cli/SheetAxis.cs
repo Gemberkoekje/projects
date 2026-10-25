@@ -16,7 +16,8 @@ namespace Vista.Cli;
 ///   <c>compensation=0,0.5,1</c> — AgX's look and the meter's own stops (M1.11b; one render serves every cell), <c>dither=off,on</c> —
 ///   the 8-bit PNG's dither (M1.11c; one render too); <c>materials=off,on</c>, <c>diffuse=lambert,orenNayar</c> — the ground's
 ///   materials and how they scatter (M1.12); <c>quadrature=engine,bins</c> — the hero wavelengths and their weights (M1.12a);
-///   <c>forest=off,on</c>, <c>canopy=rough,kernels</c> — the forest and how its canopy scatters (M1.12b);</item>
+///   <c>forest=off,on</c>, <c>canopy=rough,kernels</c> — the forest and how its canopy scatters (M1.12b); <c>snow=off,on</c> — the
+///   season's snow (M1.13);</item>
 ///   <item><c>camera.&lt;field&gt;=…</c> — one camera field, e.g. <c>camera.yawDegrees=0,90,180,270</c>;</item>
 ///   <item><c>sliders=a.json,b.json</c> — whole slider files; a slider-file field — one slider, pinned per cell (M1.11), e.g.
 ///   <c>time=dawn,day,goldenHour,dusk</c>, <c>sunElevation=2,4,6</c>, <c>date=2026-01-15,2026-07-15</c> or <c>visibility=20,80</c>
@@ -125,6 +126,7 @@ public sealed class SheetAxis
                 "quadrature" => Checked(values, QuadratureOf, (r, v) => r with { Quadrature = QuadratureOf(v) }),
                 "forest" => Checked(values, OnOff, (r, v) => r with { Forest = OnOff(v) }),
                 "canopy" => Checked(values, CanopyOf, (r, v) => r with { Canopy = CanopyOf(v) }),
+                "snow" => Checked(values, OnOff, (r, v) => r with { Snow = OnOff(v) }),
                 "meter" => Checked(values, Meter, (r, v) => r with { Meter = Meter(v) }),
                 "display" => Checked(values, Display, (r, v) => r with { Display = Display(v) }),
                 "look" => Checked(values, Look, (r, v) => r with { Look = Look(v) }),
@@ -192,7 +194,7 @@ public sealed class SheetAxis
         PreviewCommandLine.TryParseCanopy(text, out Rendering.CanopyModel canopy) ? canopy : throw new ArgumentException($"'{text}' is not kernels or rough.");
 
     private static Rendering.Quadrature QuadratureOf(string text) =>
-        PreviewCommandLine.TryParseQuadrature(text, out Rendering.Quadrature quadrature) ? quadrature : throw new ArgumentException($"'{text}' is not bins or engine.");
+        PreviewCommandLine.TryParseQuadrature(text, out Rendering.Quadrature quadrature) ? quadrature : throw new ArgumentException($"'{text}' is not blend, bins, redTail or engine.");
 
     private static World.MeshKind MeshKindOf(string text) =>
         PreviewCommandLine.TryParseMeshKind(text, out World.MeshKind kind) ? kind : throw new ArgumentException($"'{text}' is not view or uniform.");

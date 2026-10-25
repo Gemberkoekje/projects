@@ -43,6 +43,9 @@ public sealed record ErosionStats(double Seconds, double WallSeconds, int Submis
 
     /// <summary>Seconds the maps and the drainage took on the CPU after the passes (part of <see cref="WallSeconds"/>).</summary>
     public double MapsSeconds { get; init; }
+
+    /// <summary>Seconds laying today's glaciers took on the CPU after the erosion (<see cref="Glaciers"/>, M1.13); 0 without them.</summary>
+    public double GlacierSeconds { get; init; }
 }
 
 /// <summary>The C# reference as an <see cref="ITerrainEroder"/>: exact, but some 10⁴ times slower than the GPU, so for small grids.</summary>

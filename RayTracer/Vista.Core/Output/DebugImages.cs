@@ -88,7 +88,8 @@ public static class DebugImages
 
     /// <summary>
     /// The legend colour of the ground's materials (vista-plan §10 M1.12, M1.12b): hard rock pale blue-grey, soft rock dark slate, scree
-    /// sand, soil brown, grass green, forest dark green; any other key a palette colour by its id.
+    /// sand, soil brown, grass green, forest dark green; since M1.13 snow white (wet snow a little grey), firn cream and glacier ice
+    /// light blue; any other key a palette colour by its id.
     /// </summary>
     public static (byte R, byte G, byte B) MaterialColor(string key, int id) => key switch
     {
@@ -98,6 +99,10 @@ public static class DebugImages
         "soil" => (150, 98, 56),
         "grass" => (88, 158, 62),
         "forest" => (24, 72, 40),
+        "snow" => (250, 250, 252),
+        "snow.wet" => (214, 218, 226),
+        "firn" => (236, 228, 200),
+        "ice" => (120, 188, 232),
         _ => PaletteColor(id),
     };
 
@@ -137,9 +142,14 @@ public static class DebugImages
                 double stony = 0.65 * w.Stony;
                 (double R, double G, double B) soil = (loam.R + (scree.R - loam.R) * stony, loam.G + (scree.G - loam.G) * stony, loam.B + (scree.B - loam.B) * stony);
                 double dry = 1.0 - 0.45 * w.Wet;
-                double r = (w.Rock * rock.R + w.Scree * scree.R + w.Soil * soil.R + w.Grass * grass.R + w.Forest * forest.R) * dry;
-                double g = (w.Rock * rock.G + w.Scree * scree.G + w.Soil * soil.G + w.Grass * grass.G + w.Forest * forest.G) * dry;
-                double b = (w.Rock * rock.B + w.Scree * scree.B + w.Soil * soil.B + w.Grass * grass.B + w.Forest * forest.B) * dry + 60.0 * w.Wet;
+                // Snow, firn and ice (M1.13) lie on top, and the wet ground's darkening is the ground's.
+                (byte R, byte G, byte B) snow = MaterialColor(w.SnowWet >= 0.5f ? "snow.wet" : "snow", 0), firn = MaterialColor("firn", 0), ice = MaterialColor("ice", 0);
+                double r = (w.Rock * rock.R + w.Scree * scree.R + w.Soil * soil.R + w.Grass * grass.R + w.Forest * forest.R) * dry
+                    + w.Snow * snow.R + w.Firn * firn.R + w.Ice * ice.R;
+                double g = (w.Rock * rock.G + w.Scree * scree.G + w.Soil * soil.G + w.Grass * grass.G + w.Forest * forest.G) * dry
+                    + w.Snow * snow.G + w.Firn * firn.G + w.Ice * ice.G;
+                double b = (w.Rock * rock.B + w.Scree * scree.B + w.Soil * soil.B + w.Grass * grass.B + w.Forest * forest.B) * dry + 60.0 * w.Wet
+                    + w.Snow * snow.B + w.Firn * firn.B + w.Ice * ice.B;
                 Put(bytes, row * size + col, (
                     (byte)Math.Round(Math.Clamp(light * r, 0.0, 255.0)),
                     (byte)Math.Round(Math.Clamp(light * g, 0.0, 255.0)),

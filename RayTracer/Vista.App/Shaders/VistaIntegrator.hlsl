@@ -1097,7 +1097,7 @@ void CSMaterialProbe(uint3 tid : SV_DispatchThreadID)
     MatWeights w = MaterialWeightsAt(q.xz, q.y, n, s, slope);
     CheckSums[3u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
     CheckSums[3u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
-    CheckSums[3u * item + 2u] = float4(w.Forest, 0.0, 0.0, 0.0);
+    CheckSums[3u * item + 2u] = float4(w.Forest, w.Snow, w.Firn, w.Ice);
 }
 
 // The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads

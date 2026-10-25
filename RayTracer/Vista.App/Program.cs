@@ -49,6 +49,8 @@ internal static class Program
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
+        if (args.FirstOrDefault() == ValleyMeasure.Flag)
+            return ValleyMeasure.Run(args, Console.Out);
 
         try
         {
@@ -221,6 +223,7 @@ internal static class Program
         Console.Error.WriteLine(MeshMeasure.Usage);
         Console.Error.WriteLine(DiffuseCompare.Usage);
         Console.Error.WriteLine(QuadratureCompare.Usage);
+        Console.Error.WriteLine(ValleyMeasure.Usage);
         return 1;
     }
 

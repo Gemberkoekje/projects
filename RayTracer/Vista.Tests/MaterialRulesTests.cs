@@ -122,7 +122,7 @@ public sealed class MaterialRulesTests
     {
         int size = Unsafe.SizeOf<MaterialConstants>();
         Assert.AreEqual(0, size % 16);
-        Assert.AreEqual(336, size, "twenty-one rows since M1.12b's forest; the shader's buffer holds 512 bytes");
+        Assert.AreEqual(448, size, "twenty-eight rows since M1.13's snow and glaciers; the shader's buffer holds 512 bytes");
         Assert.AreEqual(MathF.Log10(MaterialRules.Default.ChannelAreaFromSquareMetres), K.ChannelLogFrom);
         Assert.AreEqual(2900f, K.GrassLine);
         Assert.AreEqual(1234u, K.NoiseSeed);

@@ -143,7 +143,11 @@ public static class StreamPower
     /// Runs <see cref="ErosionSettings.IncisionSteps"/> steps of stream-power incision on <paramref name="ground"/>, lifting each
     /// cell by <paramref name="uplift"/> (metres per step, row-major on the ground's grid) every step. <paramref name="hardness"/>
     /// gives the hardness of the rock in cell <c>c</c> at a height in the rock's frame (the height less the uplift so far); without
-    /// it every rock is the softest. Returns the incised ground mapped back to the base terrain's range, and that map as the rock's frame.
+    /// it every rock is the softest. The incised ground is mapped back to the base terrain's range, and that map is the rock's frame.
+    /// Then (vista-plan §10 M1.13) <see cref="ErosionSettings.GlacialSteps"/> steps of glacial carving on the finished world, in its
+    /// own metres: the ice cuts where it covers the ground and the rivers where it does not, without uplift (the glacial cycles are
+    /// short beside the uplift's time) and without a second map, so the carving deepens the valleys under the peaks it leaves.
+    /// Returns the ground and the rock's frame.
     /// </summary>
     public static (HeightField Incised, StrataFrame Frame) Incise(HeightField ground, ErosionSettings settings, float[] uplift,
         Func<int, double, float>? hardness = null)
@@ -161,37 +165,46 @@ public static class StreamPower
         double talusSoft = (float)Math.Tan(settings.IncisionTalusDegrees * Math.PI / 180.0);
         double talusHard = (float)Math.Tan(settings.IncisionTalusHardDegrees * Math.PI / 180.0);
         float low = ground.MinHeight, span = Math.Max(ground.MaxHeight - low, 1e-3f);
-        for (int step = 0; step < settings.IncisionSteps; step++)
+        var iced = new bool[cells];
+
+        // One step of the rivers: outlets first, so each cell's receiver already has this step's height (the implicit solve), with
+        // the rock's hardness at each cell's height in the rock's frame; the cells under ice (the carving's) only keep their talus.
+        void Rivers(Func<int, double> rockHeight)
         {
-            for (int c = 0; c < cells; c++)
-                h[c] += uplift[c];
             DrainageMap drainage = DrainageMap.Of(new HeightField(n, ground.CellSize, (float[])h.Clone()));
-            int lifted = step + 1;
-            // Outlets first, so each cell's receiver already has this step's height (the implicit solve).
             for (int k = cells - 1; k >= 0; k--)
             {
                 int c = drainage.Order[k];
                 int r = drainage.Receiver(c);
                 if (r < 0)
                     continue;
-                if (drainage.FillDepth[c] > 0f)
+                if (drainage.FillDepth[c] > 0f && !iced[c])
                 {
-                    // A lake fills with sediment toward its outlet's height while the outlet cuts down.
+                    // A lake fills with sediment toward its outlet's height while the outlet cuts down (not under ice).
                     h[c] += settings.IncisionLakeFill * drainage.FillDepth[c];
                     continue;
                 }
                 double length = drainage.StepLength(c);
                 double height = h[c];
                 // The rock at the cell's surface: harder rock cuts more slowly and stands steeper.
-                double hard = hardness is null ? 0.0 : hardness(c, h[c] - lifted * (double)uplift[c]);
-                if (drainage.Upstream[c] >= channel)
+                double hard = hardness is null ? 0.0 : hardness(c, rockHeight(c));
+                if (drainage.Upstream[c] >= channel && !iced[c])
                 {
                     double f = settings.IncisionRate * (1.0 + (settings.HardErodibility - 1.0) * hard) * Math.Sqrt(drainage.Area(c)) / length;
                     height = (height + f * h[r]) / (1.0 + f);
                 }
+                // Under the ice the glacier cut the bed this step (Carve); the walls keep to their talus all the same.
                 double talus = talusSoft + (talusHard - talusSoft) * hard;
                 h[c] = (float)Math.Min(height, h[r] + talus * length);
             }
+        }
+
+        for (int step = 0; step < settings.IncisionSteps; step++)
+        {
+            for (int c = 0; c < cells; c++)
+                h[c] += uplift[c];
+            int lifted = step + 1;
+            Rivers(c => h[c] - lifted * (double)uplift[c]);
         }
         // Back to the base terrain's range of heights, so the uplift does not lift the world under the cameras: a linear map,
         // which changes no drainage direction and no lake.
@@ -199,8 +212,107 @@ public static class StreamPower
         double scale = span / Math.Max(top - bottom, 1e-3);
         for (int c = 0; c < cells; c++)
             h[c] = (float)(low + (h[c] - bottom) * scale);
-        return (new HeightField(n, ground.CellSize, h), new StrataFrame(low, bottom, scale, settings.IncisionSteps));
+        var frame = new StrataFrame(low, bottom, scale, settings.IncisionSteps);
+
+        // The glacial carving on the finished world.
+        float[]? ice = null;
+        for (int step = 0; step < settings.GlacialSteps; step++)
+        {
+            ice = Carve(h, n, ground.CellSize, settings, step, ice, iced, hardness is null ? null : c => hardness(c, frame.RockHeight(h[c], uplift[c])));
+            Rivers(c => frame.RockHeight(h[c], uplift[c]));
+        }
+        return (new HeightField(n, ground.CellSize, h), frame);
     }
+
+    /// <summary>
+    /// One step of glacial carving (vista-plan §10 M1.13) on the world's heights <paramref name="h"/>, carving step
+    /// <paramref name="carving"/>: the steady ice of the step's climate (<see cref="ErosionSettings.CarvingClimate"/>, its line in the
+    /// world's metres; <see cref="GlacierFlow"/>, from <paramref name="previous"/>'s), and the bed under it lowered by
+    /// <see cref="ErosionSettings.GlacialErosionMetres"/> per 100 m a year of sliding (half the ice's mean speed), times the erodibility of
+    /// the rock there. Marks the cells the ice covers in <paramref name="iced"/>; returns the ice's thickness.
+    /// </summary>
+    private static float[] Carve(float[] h, int n, double cell, ErosionSettings settings, int carving, float[]? previous, bool[] iced,
+        Func<int, double>? hardness)
+    {
+        IceField field = GlacierFlow.Solve(new HeightField(n, cell, (float[])h.Clone()), settings.CarvingClimate(carving), GlacierFlowSettings.Default,
+            previous, previous is null ? FirstIterations : StepIterations);
+        double perSpeed = settings.GlacialErosionMetres * SlidingShare / 100.0;
+        double most = MaxCutShare * settings.GlacialErosionMetres;
+        // Every cut from this step's heights first (a wall's slope reads its neighbours), then the cuts. Below the spill of the hollow it
+        // has dug the ice must climb out again, which slows its sliding: the cut fades out over OverdeepeningMetres of depth, so the
+        // troughs keep basins the erosion's pools fill with sediment (flat floors), not pits.
+        double[] spill = DrainageMap.Flood(new HeightField(n, cell, (float[])h.Clone()));
+        var cuts = new float[n * n];
+        Parallel.For(0, n, j =>
+        {
+            for (int c = j * n; c < (j + 1) * n; c++)
+            {
+                iced[c] = field.Thickness[c] >= IcedMetres;
+                if (!iced[c])
+                    continue;
+                double hard = hardness is null ? 0.0 : hardness(c);
+                // Thin ice is frozen to its bed (the summits' caps and the snowfields): only a thick glacier, warm at its bed, slides and
+                // abrades, so the carving cuts the valleys the glaciers fill and spares the tops they cover; its walls are as warm as its
+                // middle. The ice abrades its bed across the bed's slope, which lowers a wall by that over the slope's cosine: the walls
+                // retreat sideways as the floor deepens.
+                double warm = Math.Min(field.Body[c] / WarmBedMetres, 1.0);
+                double across = Math.Min(Math.Sqrt(1.0 + BedSlopeSquared(h, n, cell, c)), MaxWallFactor);
+                double deep = Math.Clamp((spill[c] - h[c]) / OverdeepeningMetres, 0.0, 1.0);
+                // The grid's edge is every water's and ice's outlet, where no hollow can form to stop the cut: it fades out there.
+                int i = c % n, edge = Math.Min(Math.Min(i, n - 1 - i), Math.Min(j, n - 1 - j));
+                double inside = Math.Clamp((double)edge / EdgeCells, 0.0, 1.0);
+                double cut = perSpeed * field.Speed[c] * warm * across * (1.0 + (settings.HardErodibility - 1.0) * hard) * (1.0 - deep * deep * (3.0 - 2.0 * deep))
+                    * inside;
+                cuts[c] = (float)Math.Min(cut, most);
+            }
+        });
+        for (int c = 0; c < n * n; c++)
+            h[c] -= cuts[c];
+        return field.Thickness;
+    }
+
+    /// <summary>The square of the slope (rise over run) of heights <paramref name="h"/> at cell <paramref name="c"/>: central differences, one-sided at the edges.</summary>
+    private static double BedSlopeSquared(float[] h, int n, double cell, int c)
+    {
+        int i = c % n, j = c / n;
+        int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1), j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
+        double dx = (h[j * n + i1] - (double)h[j * n + i0]) / ((i1 - i0) * cell);
+        double dz = (h[j1 * n + i] - (double)h[j0 * n + i]) / ((j1 - j0) * cell);
+        return dx * dx + dz * dz;
+    }
+
+    /// <summary>
+    /// How deep below its spill a glacier's hollow may be dug, m: less than the pools the erosion fills with sediment
+    /// (<see cref="ErosionSettings.PoolFillMetres"/>), so a glacial trough's basin ends as a flat floor.
+    /// </summary>
+    public const double OverdeepeningMetres = 80.0;
+
+    /// <summary>The cells from the grid's edge over which the carving fades in.</summary>
+    public const int EdgeCells = 8;
+
+    /// <summary>The most a wall's slope multiplies the carving's cut (a 60° wall's 1 / cos).</summary>
+    public const double MaxWallFactor = 2.0;
+
+    /// <summary>The ice solve's iterations at the carving's first step, from no ice.</summary>
+    public const int FirstIterations = 40;
+
+    /// <summary>The ice solve's iterations at every later carving step, from the last step's ice (the climate moves slowly).</summary>
+    public const int StepIterations = 4;
+
+    /// <summary>The ice that counts as covering a cell in the carving, m: thinner is a snowfield, which does not slide.</summary>
+    public const float IcedMetres = 10f;
+
+    /// <summary>
+    /// The ice over which a glacier's bed warms to melting, m: thinner ice is frozen to its bed and does not slide, so the carving's
+    /// abrasion grows with the thickness up to this (the summits' thin caps cut nothing; Sugden's selective linear erosion).
+    /// </summary>
+    public const double WarmBedMetres = 150.0;
+
+    /// <summary>The share of a glacier's mean speed that is sliding on its bed, which is what abrades it.</summary>
+    public const double SlidingShare = 0.5;
+
+    /// <summary>The most a carving step lowers the bed, in <see cref="ErosionSettings.GlacialErosionMetres"/> (an icefall's speed is not abrasion).</summary>
+    public const double MaxCutShare = 4.0;
 
     /// <summary>
     /// Lowers <paramref name="fine"/> (<paramref name="coarse"/> upsampled by <see cref="Upsample"/>) along every flow link of the

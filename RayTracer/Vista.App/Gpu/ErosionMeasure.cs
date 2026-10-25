@@ -165,7 +165,10 @@ internal static class ErosionMeasure
             StrataGrid strata = StrataGrid.For(RockHardness.For(seed, settings), grid.Size, grid.CellSize, frame,
                 (x, z) => upliftField is null ? 0.0 : upliftField.HeightAt(x, z));
             ErosionRun run = renderer.Erode(incised, settings, strata);
-            ErosionResult r = run.Result;
+            // Today's glaciers on the eroded ground, as the world builder lays them (M1.13), so the cache holds the world a render reads.
+            var laying = Stopwatch.StartNew();
+            ErosionResult r = Glaciers.Lay(run.Result, settings);
+            double laidSeconds = laying.Elapsed.TotalSeconds;
             ErosionStats s = run.Stats;
             if (grid == WorldGrid.Default)
             {
@@ -219,13 +222,27 @@ internal static class ErosionMeasure
             // The ground's materials at the altitude the sliders anchor this world at (the recipe's place, the world's lowest valleys
             // at its valley floor), as a dry run's shares: rock, scree, soil, meadow and forest.
             SliderState sliders = LinkedSliders.Resolve(recipe, SliderPins.FromRecipe(recipe), footing: footing);
-            GroundCover cover = GroundCover.For(sliders.Climate, sliders.Almanac.Place.LatitudeDegrees);
+            // Since M1.13 the season's snow of the recipe's date lies too, and the world's glaciers at this altitude.
+            GroundCover cover = GroundCover.For(sliders.Climate, sliders.Almanac.Place.LatitudeDegrees) with
+            {
+                Snow = true,
+                SnowlineMetres = sliders.SnowlineMetres,
+                FreezingLevelMetres = sliders.FreezingLevelMetres,
+                GlacierLineMetres = settings.GlacierElaMetres + sliders.BaseAltitudeMetres,
+            };
             MaterialWeights[] anchored = field.SampleWeights(r.Surface, field.Apply(MaterialRules.Default.Constants((float)cover.GrassLineMetres, cover.Poleward,
-                field.NoiseSeed, (float)cover.TreeLineMetres, cover.Forest)), (float)sliders.BaseAltitudeMetres);
+                field.NoiseSeed, (float)cover.TreeLineMetres, cover.Forest)).WithSnow(cover.SnowPlacement), (float)sliders.BaseAltitudeMetres);
             double Share(Func<MaterialWeights, float> of) => anchored.Sum(w => (double)of(w)) / anchored.Length;
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  at {sliders.Almanac.Place.Name}, base {sliders.BaseAltitudeMetres:0} m (valley floor {sliders.ValleyFloorMetres:0} m, tree line {cover.TreeLineMetres:0} m, grass line {cover.GrassLineMetres:0} m): " +
-                $"rock {Share(w => w.Rock):0.0%}, scree {Share(w => w.Scree):0.0%}, soil {Share(w => w.Soil):0.0%}, meadow {Share(w => w.Grass):0.0%}, forest {Share(w => w.Forest):0.0%}"));
+                $"  at {sliders.Almanac.Place.Name}, base {sliders.BaseAltitudeMetres:0} m (valley floor {sliders.ValleyFloorMetres:0} m, tree line {cover.TreeLineMetres:0} m, grass line {cover.GrassLineMetres:0} m, " +
+                $"snowline {cover.SnowlineMetres:0} m, glaciers' line {cover.GlacierLineMetres:0} m): " +
+                $"rock {Share(w => w.Rock):0.0%}, scree {Share(w => w.Scree):0.0%}, soil {Share(w => w.Soil):0.0%}, meadow {Share(w => w.Grass):0.0%}, forest {Share(w => w.Forest):0.0%}, " +
+                $"snow {Share(w => w.Snow):0.0%}, firn {Share(w => w.Firn):0.0%}, ice {Share(w => w.Ice):0.0%}"));
+            if (Output.GlacierInfo.Of(r, settings) is { } glaciers)
+            {
+                log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"  glaciers: line {glaciers.ElaMetres:0} m above height 0, {glaciers.Share:0.0%} of the grid under ice, {glaciers.VolumeKm3:0.00} km³, thickest {glaciers.MaxThicknessMetres:0} m; laid in {laidSeconds:0.0} s"));
+            }
             if (outDir is not null)
             {
                 string stem = Path.Combine(outDir, $"seed{seed}");
@@ -235,6 +252,8 @@ internal static class ErosionMeasure
                 PngEncoder.Write(stem + ".eroded.png", after, size, size, PngColor.Rgb);
                 (byte[] maps, _) = DebugImages.ErosionMap(r, null, 1024);
                 PngEncoder.Write(stem + ".maps.png", maps, size, size, PngColor.Rgb);
+                (byte[] cover2, int coverSize) = DebugImages.MaterialMap(r.Surface, field, anchored, null);
+                PngEncoder.Write(stem + ".materials.png", cover2, coverSize, coverSize, PngColor.Rgb);
                 (byte[] drainage, _) = DebugImages.DrainageImage(ground, baseDrainage, null, 1024);
                 PngEncoder.Write(stem + ".base.drainage.png", drainage, size, size, PngColor.Rgb);
                 (drainage, _) = DebugImages.DrainageImage(r.Surface, r.Drainage, null, 1024);

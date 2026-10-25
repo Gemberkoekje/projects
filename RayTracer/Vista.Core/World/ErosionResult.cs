@@ -9,7 +9,8 @@ namespace Vista.World;
 /// flow accumulation that the materials and the rivers read, where the simulation's mean discharge only follows the water of
 /// its last steps. Since M1.11d it holds the hardness of the bedrock at its surface (<see cref="RockHardness"/>) and the frame
 /// that maps the world's heights to the rock's (<see cref="StrataFrame"/>), so the materials (M1.12) can place the same beds at
-/// any height. Every map is row-major on the grid of <see cref="Surface"/>.
+/// any height. Since M1.13 it may hold today's glaciers (<see cref="Ice"/>, <see cref="Glaciers"/>), whose ice is part of the
+/// surface; the drainage then stays the ground's under it. Every map is row-major on the grid of <see cref="Surface"/>.
 /// </summary>
 public sealed class ErosionResult
 {
@@ -41,8 +42,25 @@ public sealed class ErosionResult
         Strata = strata;
     }
 
-    /// <summary>The ground surface (bedrock plus loose material).</summary>
+    /// <summary>The ground surface (bedrock plus loose material, plus the glaciers' ice since M1.13).</summary>
     public HeightField Surface { get; }
+
+    /// <summary>
+    /// Today's glaciers (vista-plan §10 M1.13, <see cref="Glaciers"/>): the ice per cell over the ground under it, m, in half precision
+    /// and already part of <see cref="Surface"/>; null for a world without them.
+    /// </summary>
+    public float[]? Ice
+    {
+        get => _ice;
+        init
+        {
+            if (value is not null && value.Length != Surface.Size * Surface.Size)
+                throw new ArgumentException($"Expected {Surface.Size * Surface.Size} ice thicknesses, got {value.Length}.", nameof(value));
+            _ice = value;
+        }
+    }
+
+    private readonly float[]? _ice;
 
     /// <summary>Loose material on the bedrock per cell, in metres.</summary>
     public float[] Loose { get; }
@@ -59,7 +77,10 @@ public sealed class ErosionResult
     /// <summary>Steps the erosion ran.</summary>
     public int Steps { get; }
 
-    /// <summary>The surface's drainage: each cell's way down, its upstream area, and how deep its hollow would fill.</summary>
+    /// <summary>
+    /// The ground's drainage: each cell's way down, its upstream area, and how deep its hollow would fill. Under today's glaciers it
+    /// is their bed's (the water runs under the ice, <see cref="Glaciers"/>).
+    /// </summary>
     public DrainageMap Drainage { get; }
 
     /// <summary>
@@ -160,7 +181,8 @@ public sealed class ErosionResult
         foreach (double v in new[] { Strata.Low, Strata.Bottom, Strata.Scale, Strata.UpliftSteps })
             hash = StableHash.Combine(hash, BitConverter.DoubleToUInt64Bits(v));
         Span<byte> buffer = stackalloc byte[4];
-        foreach (float[] map in new[] { Loose, Discharge, WaterDepth, StandingWater, Hardness })
+        // The ice only when the world has glaciers, so a world without them keeps its hash.
+        foreach (float[] map in Ice is null ? new[] { Loose, Discharge, WaterDepth, StandingWater, Hardness } : [Loose, Discharge, WaterDepth, StandingWater, Hardness, Ice])
         {
             foreach (float v in map)
             {

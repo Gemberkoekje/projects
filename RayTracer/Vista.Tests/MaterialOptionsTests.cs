@@ -98,10 +98,11 @@ public sealed class MaterialOptionsTests
             Erosion = false,
         };
         Sidecar rule = PreviewPipeline.Run(request, new FakeRenderer());
-        Assert.AreEqual(20, rule.Schema);
+        Assert.AreEqual(21, rule.Schema);
         MaterialsInfo materials = rule.Materials!;
         Assert.IsTrue(materials.ByRule);
-        CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass", "forest" }, materials.Table.Select(m => m.Key).ToArray());
+        CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass", "forest", "snow", "ice", "firn", "snow.wet" },
+            materials.Table.Select(m => m.Key).ToArray());
         Assert.AreEqual(2892.0, materials.GrassLineMetres!.Value, 1.0, "Zermatt's, the default place");
         StringAssert.Contains(materials.GrassLineFrom, "Zermatt");
         Assert.AreEqual(1, materials.Poleward);
@@ -130,7 +131,7 @@ public sealed class MaterialOptionsTests
 
         Sidecar dry = PreviewPipeline.Run(request with { DryRun = true }, renderer: null);
         MaterialShares shares = dry.Materials!.Shares!;
-        Assert.AreEqual(1.0, shares.RockHard + shares.RockSoft + shares.Scree + shares.Soil + shares.Grass + shares.Forest, 1e-6);
+        Assert.AreEqual(1.0, shares.RockHard + shares.RockSoft + shares.Scree + shares.Soil + shares.Grass + shares.Forest + shares.Snow + shares.Firn + shares.Ice, 1e-6);
         MaterialShares noForest = PreviewPipeline.Run(request with { DryRun = true, Forest = false }, renderer: null).Materials!.Shares!;
         Assert.AreEqual(0.0, noForest.Forest);
         Assert.AreEqual(shares.RockHard + shares.RockSoft + shares.Scree, noForest.RockHard + noForest.RockSoft + noForest.Scree, 1e-9,
@@ -147,13 +148,15 @@ public sealed class MaterialOptionsTests
             Assert.AreEqual(m, material.Id);
             Assert.AreEqual(DataTier.BuiltIn, material.Tier);
             Assert.IsNotNull(material.Spectrum);
-            Assert.IsTrue(material.Roughness is > 0f and <= 1f);
+            // Snow is Lambertian (M1.13); every other ground is rough.
+            Assert.IsTrue(material.Roughness is > 0f and <= 1f || material.Key.StartsWith("snow", StringComparison.Ordinal) && material.Roughness == 0f, material.Key);
             for (int k = 0; k < material.Spectrum.Count; k += 2)
             {
                 Assert.IsTrue(material.Spectrum[k + 1] is > 0.0 and < 1.0, material.Key);
                 Assert.IsTrue(k == 0 || material.Spectrum[k] > material.Spectrum[k - 2], $"{material.Key}: wavelengths rise");
             }
-            Assert.AreEqual(WavelengthTable.Bins.LinearRgbOf(material.Spectrum), material.LinearRgbAlbedo, $"{material.Key}: its albedo is its spectrum's colour");
+            Assert.AreEqual(WavelengthTable.For(WavelengthTable.DefaultQuadrature).LinearRgbOf(material.Spectrum), material.LinearRgbAlbedo,
+                $"{material.Key}: its albedo is its spectrum's colour");
         }
         Assert.AreEqual(MaterialCatalog.RockHardId, ground.Single(m => m.Key == "rock.hard").Id);
         Assert.AreEqual(MaterialCatalog.GrassId, ground.Single(m => m.Key == "grass").Id);

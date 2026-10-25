@@ -22,6 +22,12 @@
 // its own noise opens (more on dry ridges, fewer in moist hollows). Its canopy is shaded by the kernels of MODIS's BRDF
 // (CanopyKernels): ρ_iso·(1 + kv·K_vol + kg·K_geo), the needles' volume scattering and the crowns' shadows on the gaps between them,
 // with ρ_iso the spectrum scaled so the albedo under a white sky is the spectrum's; or (--canopy rough) as rough diffuse ground.
+//
+// Snow and glaciers (M1.13): the world's glacier ice covers the ground (firn above the glaciers' own equilibrium line, bare ice below,
+// grey with debris where it thins), and the season's snow lies above the snowline, lower on poleward faces, in hollows and in the
+// wind's lee, shed from slopes steeper than snow holds on (less in gullies) and scoured from ridges; it covers the open ground and the
+// glaciers, and shows in the forest's texture only as a dusting in its gaps. Wet below the freezing level, dry above it. Where a
+// glacier flows over steeper ground its firn and ice crack into crevasse fields across the flow (a shading effect, like the laminae).
 
 #define MAT_ROCK_HARD 0u
 #define MAT_ROCK_SOFT 1u
@@ -29,8 +35,12 @@
 #define MAT_SOIL      3u
 #define MAT_GRASS     4u
 #define MAT_FOREST    5u
+#define MAT_SNOW      6u
+#define MAT_ICE       7u
+#define MAT_FIRN      8u
+#define MAT_SNOW_WET  9u
 
-StructuredBuffer<uint3>  MaterialMap : register(t22); // MaterialField.Packed: the bed-table offset's bits; loose, area, wet, mottle codes; massive code
+StructuredBuffer<uint3>  MaterialMap : register(t22); // MaterialField.Packed: the bed-table offset's bits; loose, area, wet, mottle codes; massive, hollow, ice codes
 StructuredBuffer<float4> BedTable    : register(t23); // MaterialField.Beds: hardness, tint u, tint v, massive rock's hardness per entry
 
 cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
@@ -56,6 +66,13 @@ cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
     float MatClearingFrom;    float MatClearingTo;       float MatMoistLogFrom;    float MatMoistLogTo;
     float MatMoistShift;      uint  MatForest;           uint  MatCanopy;          float MatRoughCanopy;
     float MatCanopyVolume;    float MatCanopyGeometric;  float MatCanopyIso;       float MatPad8;
+    float MatSnowLine;        float MatSnowBand;         float MatSnowAspectShift; float MatSnowNoise;
+    float MatSnowEdge;        float MatSnowSlopeFrom;    float MatSnowSlopeTo;     float MatSnowGully;
+    float MatHollow;          float MatSnowHollowShift;  float MatSnowRidgeScour;  float MatSnowWindShift;
+    float MatWindX;           float MatWindZ;            float MatFreezingLevel;   float MatSnowWetBand;
+    float MatSnowPatch;       float MatForestDusting;    uint  MatSnow;            uint  MatGlaciers;
+    float MatIceFrom;         float MatIceTo;            float MatGlacierLine;     float MatFirnBand;
+    float MatFirnNoise;       float MatDebris;           float MatRoughSnow;       float MatPad9;
 };
 
 // HLSL's smoothstep is not defined for a falling edge, which the rules use; this is MaterialRules.SmoothStep.
@@ -136,6 +153,8 @@ struct MatSample
     float TintV;
     float Table;
     float Massive; // how massive the rock is (M1.12c): 0 layered, 1 massive
+    float Hollow;  // how far the ground lies below its surroundings, m (M1.13): + hollows, − ridges
+    float Ice;     // the glacier ice on the ground, m (M1.13)
 };
 
 float MatMix(float v00, float v10, float v01, float v11, float2 f)
@@ -170,6 +189,8 @@ MatSample MaterialSampleAt(float2 world, float height)
         s.TintV = 0.0;
         s.Table = 0.0;
         s.Massive = 0.0;
+        s.Hollow = 0.0;
+        s.Ice = 0.0;
         return s;
     }
     float2 uv = clamp((world - origin) / MatMapCell, 0.0, float(MatMapSize - 1u));
@@ -187,6 +208,10 @@ MatSample MaterialSampleAt(float2 world, float height)
     s.Wet = MatDepthOf(MatMix(c00.z, c10.z, c01.z, c11.z, f));
     float mottle = (MatMix(c00.w, c10.w, c01.w, c11.w, f) - 128.0) * (0.25 / 127.0);
     float massive = MatMix(float(p00.z & 0xFFu), float(p10.z & 0xFFu), float(p01.z & 0xFFu), float(p11.z & 0xFFu), f) * (1.0 / 255.0);
+    float hollow = (MatMix(float((p00.z >> 8) & 0xFFu), float((p10.z >> 8) & 0xFFu), float((p01.z >> 8) & 0xFFu), float((p11.z >> 8) & 0xFFu), f) - 128.0)
+        * (20.0 / 127.0);
+    float ice = pow(10.0, MatMix(float((p00.z >> 16) & 0xFFu), float((p10.z >> 16) & 0xFFu), float((p01.z >> 16) & 0xFFu), float((p11.z >> 16) & 0xFFu), f)
+        * (3.0 / 255.0)) - 1.0;
     float t = clamp(height * MatTableScale + offset, 0.0, MatTableLast);
     uint e = uint(floor(t));
     float fe = t - float(e);
@@ -200,6 +225,8 @@ MatSample MaterialSampleAt(float2 world, float height)
     s.TintV = (bed.z + (next.z - bed.z) * fe) * layered;
     s.Table = t;
     s.Massive = massive;
+    s.Hollow = hollow;
+    s.Ice = ice;
     return s;
 }
 
@@ -214,10 +241,15 @@ struct MatWeights
     float Wet;
     float Stony;
     float Forest;
+    float Snow;    // the season's snow (M1.13)
+    float Firn;    // a glacier's old snow above its equilibrium line
+    float Ice;     // bare glacier ice below it
+    float SnowWet; // how wet the snow is: 0 dry, 1 wet
+    float Dusting; // the share of the forest's texture that shows snow
 };
 
 MatWeights MaterialWeightsOf(float slope, float poleward, float altitude, float loose, float log10Area, float waterDepth, float hardness,
-    float b1, float b2, float b3)
+    float b1, float b2, float b3, float hollowMetres, float iceMetres, float windward)
 {
     MatWeights w;
     float cover = MatSmoothStep(MatCoverFrom, MatCoverTo, loose);
@@ -248,13 +280,59 @@ MatWeights MaterialWeightsOf(float slope, float poleward, float altitude, float 
     float tooSteep = MatSmoothStep(MatGrassSlopeFrom, MatGrassSlopeTo, slope);
     float bare = MatSmoothStep(MatBareFrom, MatBareTo, b2);
     float grass = open * ((1.0 - high) * (1.0 - tooSteep) * (1.0 - bare));
-    w.Rock = rock;
-    w.Scree = scree;
-    w.Soil = open - grass;
-    w.Grass = grass;
+    float soil = open - grass;
     w.Wet = max(channel * (1.0 - steep), pond * (1.0 - talus));
     w.Stony = max(high, tooSteep);
+
+    // The glaciers (M1.13): the world's ice covers the ground, firn above their equilibrium line, bare ice below.
+    float firn = 0.0, ice = 0.0;
+    if (MatGlaciers != 0u)
+    {
+        float glacier = MatSmoothStep(MatIceFrom, MatIceTo, iceMetres);
+        float firnAt = MatGlacierLine + MatFirnNoise * b1;
+        float above = MatSmoothStep(firnAt - MatFirnBand, firnAt + MatFirnBand, altitude);
+        float uncovered = 1.0 - glacier;
+        rock *= uncovered;
+        scree *= uncovered;
+        soil *= uncovered;
+        grass *= uncovered;
+        forest *= uncovered;
+        firn = glacier * above;
+        ice = glacier - firn;
+    }
+
+    // The season's snow (MaterialRules.Evaluate).
+    float snow = 0.0, snowWet = 0.0, dusting = 0.0;
+    if (MatSnow != 0u)
+    {
+        float hollow = clamp(hollowMetres / MatHollow, -1.0, 1.0);
+        snowWet = 1.0 - MatSmoothStep(MatFreezingLevel - MatSnowWetBand, MatFreezingLevel + MatSnowWetBand, altitude);
+        float snowAt = MatSnowLine - MatSnowAspectShift * poleward - MatSnowHollowShift * hollow + MatSnowWindShift * windward
+            + MatSnowNoise * b1 + MatSnowEdge * (1.0 + MatSnowPatch * snowWet) * b2;
+        float season = MatSmoothStep(snowAt - MatSnowBand, snowAt + MatSnowBand, altitude);
+        float shedAt = MatSnowSlopeFrom + MatSnowGully * max(hollow, 0.0);
+        float hold = 1.0 - MatSmoothStep(shedAt, shedAt + (MatSnowSlopeTo - MatSnowSlopeFrom), slope + MatSlopeNoise * b2);
+        float lying = season * hold * (1.0 - MatSnowRidgeScour * max(-hollow, 0.0));
+        float covered = 1.0 - lying;
+        snow = lying * (rock + scree + soil + grass + firn + ice);
+        rock *= covered;
+        scree *= covered;
+        soil *= covered;
+        grass *= covered;
+        firn *= covered;
+        ice *= covered;
+        dusting = season * MatForestDusting;
+    }
+    w.Rock = rock;
+    w.Scree = scree;
+    w.Soil = soil;
+    w.Grass = grass;
     w.Forest = forest;
+    w.Snow = snow;
+    w.Firn = firn;
+    w.Ice = ice;
+    w.SnowWet = snowWet;
+    w.Dusting = dusting;
     return w;
 }
 
@@ -280,7 +358,8 @@ MatWeights MaterialWeightsAt(float2 world, float height, float3 normal, out MatS
     float b2 = MaterialNoise(PcgHash(MatNoiseSeed ^ 0x9E3779B9u), world.x / MatBreakup2, world.y / MatBreakup2);
     float b3 = MatForest != 0u ? MaterialNoise(PcgHash(MatNoiseSeed ^ 0x7F4A7C15u), world.x / MatBreakup3, world.y / MatBreakup3) : 0.0;
     s = MaterialSampleAt(world, height);
-    return MaterialWeightsOf(slope, normal.z * MatPoleward, GroundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3);
+    return MaterialWeightsOf(slope, normal.z * MatPoleward, GroundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3,
+        s.Hollow, s.Ice, -(normal.x * MatWindX + normal.z * MatWindZ));
 }
 
 // ── The surface at a hit ───────────────────────────────────────────────────────────────────────────
@@ -370,7 +449,7 @@ float3 MaterialBump(float3 ns, float3 wo, float2 o, float height, MatWeights w, 
     }
 
     float ridged = w.Rock * MatRoughRock + w.Scree * MatRoughScree;
-    float smoothRough = w.Soil * MatRoughSoil;
+    float smoothRough = w.Soil * MatRoughSoil + (w.Snow + w.Firn + w.Ice) * MatRoughSnow;
     float3 weights = n * n;
     weights *= weights;
     weights /= weights.x + weights.y + weights.z;
@@ -479,7 +558,8 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     float height = HeightAbove(p);
     MatSample s;
     float slope;
-    MatWeights w = MaterialWeightsAt(world, height, GroundNormal(world, p, ns), s, slope);
+    float3 gridNormal = GroundNormal(world, p, ns);
+    MatWeights w = MaterialWeightsAt(world, height, gridNormal, s, slope);
 
     // The rules blend over the 8 m maps' cells; on the ground a boundary is sharper and ragged. So the shading sharpens the blend
     // (each weight to the sixth power, then normalised: a pure material stays pure) after a fine noise (2.5 m and 0.6 m) has pushed
@@ -502,13 +582,24 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     sharp = max(sharp, 0.0);
     sharp *= sharp * sharp;
     sharp *= sharp;
-    float total = max(sharp.x + sharp.y + sharp.z + sharp.w + forestSharp, 1.0e-12);
+    // Snow (M1.13) drifts against the ground's bumps (the fine noise pushes it into the low spots), and its edge is as sharp.
+    float3 white = 0.0;
+    if (w.Snow + w.Firn + w.Ice > 0.0)
+    {
+        white = max(float3(w.Snow * (1.0 - 0.6 * fine), w.Firn * (1.0 - 0.3 * fine), w.Ice), 0.0);
+        white *= white * white;
+        white *= white;
+    }
+    float total = max(sharp.x + sharp.y + sharp.z + sharp.w + forestSharp + white.x + white.y + white.z, 1.0e-12);
     sharp /= total;
     w.Rock = sharp.x;
     w.Scree = sharp.y;
     w.Soil = sharp.z;
     w.Grass = sharp.w;
     w.Forest = forestSharp / total;
+    w.Snow = white.x / total;
+    w.Firn = white.y / total;
+    w.Ice = white.z / total;
     float dryGrass = 0.4 * MatSmoothStep(-0.1, 0.7, MaterialNoise(PcgHash(MatNoiseSeed ^ 0xD27u), world.x / 7.0, world.y / 7.0));
 
     // The rock of the bed the hit cuts: soft mixed into hard by its hardness, tinted by the bed, each lamina (thicker or thinner by
@@ -549,13 +640,57 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     if (w.Forest > 0.0)
     {
         float4 forest = MaterialReflectance(MAT_FOREST, idx) * (forestTone * w.Forest * dry);
+        float dust = 0.0;
+        if (w.Dusting > 0.0)
+        {
+            // Snow in the gaps between the crowns (the 4 m noise's low spots), at most the dusting's share of the forest's texture.
+            float gap = MatSmoothStep(0.1, -0.5, MaterialNoise(PcgHash(MatNoiseSeed ^ 0xF0E5u), world.x / 4.0, world.y / 4.0));
+            dust = w.Dusting * gap;
+            float4 dusted = lerp(MaterialReflectance(MAT_SNOW, idx), MaterialReflectance(MAT_SNOW_WET, idx), w.SnowWet) * (dust * w.Forest);
+            forest *= 1.0 - dust;
+            g.Refl = saturate(g.Refl + dusted);
+            g.Albedo += lerp(MaterialAlbedo[MAT_SNOW].xyz, MaterialAlbedo[MAT_SNOW_WET].xyz, w.SnowWet) * (dust * w.Forest);
+        }
         bool kernels = MatDiffuse != 0u && MatCanopy != 0u;
         float sForest;
         float aForest = MatRoughA(MAT_FOREST, sForest);
         g.Refl = saturate(g.Refl + forest * (kernels ? MatCanopyIso : aForest));
         g.Back = saturate(g.Back + forest * (kernels ? 0.0 : aForest * sForest));
         g.Canopy = kernels ? saturate(forest * MatCanopyIso) : 0.0;
-        g.Albedo += MaterialAlbedo[MAT_FOREST].xyz * (forestTone * w.Forest * dry);
+        g.Albedo += MaterialAlbedo[MAT_FOREST].xyz * (forestTone * w.Forest * dry * (1.0 - dust));
+    }
+
+    // Snow, firn and glacier ice (M1.13), Lambertian at their own roughness (MatRoughA: 0 for snow); the season's snow wet or dry,
+    // the bare ice grey with debris where it thins toward its edges and snout.
+    if (w.Snow + w.Firn + w.Ice > 0.0)
+    {
+        float sSnow, sIce, sFirn;
+        float aSnow = MatRoughA(MAT_SNOW, sSnow), aIce = MatRoughA(MAT_ICE, sIce), aFirn = MatRoughA(MAT_FIRN, sFirn);
+        float4 snowRefl = lerp(MaterialReflectance(MAT_SNOW, idx), MaterialReflectance(MAT_SNOW_WET, idx), w.SnowWet);
+        float debris = 1.0 - MatSmoothStep(0.0, MatDebris, s.Ice);
+        float4 iceRefl = lerp(MaterialReflectance(MAT_ICE, idx), scree, debris);
+        // Crevasses: where a glacier flows over steeper ground its surface stretches and cracks across the flow, in fields of
+        // fissures some 30 m apart and a few metres wide whose depths hold blue shadow. A fissure darkens what lies there to a fifth;
+        // where a pixel spans more than a quarter of their spacing (or on a path's later surfaces) the field shows as its mean tone.
+        float crevasse = 0.0;
+        float2 downhill = gridNormal.xz;
+        if (w.Firn + w.Ice > 0.0 && dot(downhill, downhill) > 1.0e-6)
+        {
+            downhill = normalize(downhill);
+            float field = MatSmoothStep(8.0, 14.0, slope) * (1.0 - MatSmoothStep(32.0, 40.0, slope));
+            float along = dot(world, downhill) / 30.0 + 0.8 * MaterialNoise(PcgHash(MatNoiseSeed ^ 0xC2E1u), world.x / 90.0, world.y / 90.0);
+            float across = dot(world, float2(-downhill.y, downhill.x)) / 45.0;
+            float broken = MatSmoothStep(-0.25, 0.15, MaterialNoise(PcgHash(MatNoiseSeed ^ 0xC2E2u), across, along * 0.7));
+            float resolved = footprint > 0.0 ? 1.0 - MatSmoothStep(3.0, 7.5, footprint) : 0.0;
+            float fissure = MatSmoothStep(0.86, 0.9, frac(along)) * (1.0 - MatSmoothStep(0.97, 0.995, frac(along)));
+            crevasse = field * broken * lerp(0.1, fissure, resolved);
+        }
+        float open = 1.0 - 0.8 * crevasse;
+        g.Refl = saturate(g.Refl + w.Snow * aSnow * snowRefl + (w.Firn * aFirn * MaterialReflectance(MAT_FIRN, idx) + w.Ice * aIce * iceRefl) * open);
+        g.Back = saturate(g.Back + w.Snow * (aSnow * sSnow) * snowRefl + (w.Firn * (aFirn * sFirn) * MaterialReflectance(MAT_FIRN, idx)
+            + w.Ice * (aIce * sIce) * iceRefl) * open);
+        g.Albedo += w.Snow * lerp(MaterialAlbedo[MAT_SNOW].xyz, MaterialAlbedo[MAT_SNOW_WET].xyz, w.SnowWet) + (w.Firn * MaterialAlbedo[MAT_FIRN].xyz
+            + w.Ice * lerp(MaterialAlbedo[MAT_ICE].xyz, MaterialAlbedo[MAT_SCREE].xyz, debris)) * open;
     }
 
     float gaps = 1.0;
@@ -570,7 +705,10 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     if (w.Scree > best) { best = w.Scree; id = MAT_SCREE; }
     if (w.Soil > best) { best = w.Soil; id = MAT_SOIL; }
     if (w.Grass > best) { best = w.Grass; id = MAT_GRASS; }
-    if (w.Forest > best) { id = MAT_FOREST; }
+    if (w.Forest > best) { best = w.Forest; id = MAT_FOREST; }
+    if (w.Snow > best) { best = w.Snow; id = MAT_SNOW; }
+    if (w.Firn > best) { best = w.Firn; id = MAT_FIRN; }
+    if (w.Ice > best) { id = MAT_ICE; }
     g.Id = id;
     return g;
 }

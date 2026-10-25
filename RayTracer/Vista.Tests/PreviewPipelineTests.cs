@@ -54,8 +54,9 @@ public sealed class PreviewPipelineTests
         Assert.IsTrue(sidecar.DefaultCamera);
         Assert.AreEqual("mountains", sidecar.World.TerrainProfile);
         Assert.AreEqual(TestWorlds.Grid.Size, sidecar.World.GridSize);
-        // The ground's six materials by rule (M1.12, M1.12b's forest), all built in; a dry run shows them from above.
-        CollectionAssert.AreEquivalent(new[] { "forest", "grass", "rock.hard", "rock.soft", "scree", "soil" }, sidecar.DataTiers.Keys.ToArray());
+        // The ground's ten materials by rule (M1.12, M1.12b's forest, M1.13's snow and ice), all built in; a dry run shows them from above.
+        CollectionAssert.AreEquivalent(new[] { "firn", "forest", "grass", "ice", "rock.hard", "rock.soft", "scree", "snow", "snow.wet", "soil" },
+            sidecar.DataTiers.Keys.ToArray());
         Assert.IsTrue(sidecar.DataTiers.Values.All(t => t == DataTier.BuiltIn));
         CollectionAssert.AreEquivalent(new[] { "heightMap", "materialMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
         Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.materials.png")));

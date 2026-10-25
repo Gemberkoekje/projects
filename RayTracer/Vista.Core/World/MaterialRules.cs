@@ -234,6 +234,75 @@ public sealed record MaterialRules
     /// <summary>How much darker the gap between two stones is, at most, per size (a fraction): their shadowed joints.</summary>
     public float StoneGap { get; init; } = 0.12f;
 
+    /// <summary>
+    /// Half the width of the change from bare ground to snow across the snowline, m (vista-plan §10 M1.13): the seasonal snowline is
+    /// the snow slider's (<see cref="Sliders.SliderState.SnowlineMetres"/>), where seasonal snow begins.
+    /// </summary>
+    public float SnowBandMetres { get; init; } = 60f;
+
+    /// <summary>How much lower the snowline lies on a fully poleward face (and higher on an equator-facing one), m per unit of slope.</summary>
+    public float SnowAspectShiftMetres { get; init; } = 250f;
+
+    /// <summary>How far the coarse breakup noise moves the snowline, m.</summary>
+    public float SnowNoiseMetres { get; init; } = 120f;
+
+    /// <summary>How far the fine breakup noise moves it, m: the snowline's ragged edge, patches above and below it.</summary>
+    public float SnowEdgeMetres { get; init; } = 40f;
+
+    /// <summary>How much more the fine noise moves the snowline where the snow is wet (patchy melt near the freezing level), a factor.</summary>
+    public float SnowPatchShare { get; init; } = 2f;
+
+    /// <summary>The slope from which snow sheds, degrees: steeper faces stay dark rock between white ledges and gullies (§4.5).</summary>
+    public float SnowSlopeFromDegrees { get; init; } = 35f;
+
+    /// <summary>The slope above which no snow holds, degrees.</summary>
+    public float SnowSlopeToDegrees { get; init; } = 45f;
+
+    /// <summary>How much steeper a full hollow holds its snow, degrees: couloirs and gullies keep snow that avalanches fill.</summary>
+    public float SnowGullyDegrees { get; init; } = 8f;
+
+    /// <summary>
+    /// The depth of a full hollow, m: how far the ground lies below its surroundings' mean (<see cref="MaterialField"/>'s hollow map,
+    /// the mean over 72 m less the height); as high above it is a full ridge.
+    /// </summary>
+    public float HollowMetres { get; init; } = 6f;
+
+    /// <summary>How much lower the snowline lies in a full hollow (and higher on a full ridge), m: wind fills hollows and lee slopes.</summary>
+    public float SnowHollowShiftMetres { get; init; } = 150f;
+
+    /// <summary>The share of the snow the wind scours from a full ridge.</summary>
+    public float SnowRidgeScour { get; init; } = 0.6f;
+
+    /// <summary>How much higher the snowline lies on a face fully into the prevailing wind (and lower in its lee), m per unit of slope.</summary>
+    public float SnowWindShiftMetres { get; init; } = 100f;
+
+    /// <summary>Half the width of the change from wet snow below the freezing level to dry snow above it, m.</summary>
+    public float SnowWetBandMetres { get; init; } = 300f;
+
+    /// <summary>
+    /// The most of a forest's texture that shows snow (vista-plan §10 M1.13): the canopy sheds or hides the snow, so snow-covered
+    /// forest stays dark, as in the user's April photos, with snow only in its gaps.
+    /// </summary>
+    public float ForestDusting { get; init; } = 0.15f;
+
+    /// <summary>The glacier ice from which the ground is glacier, m (thinner is the ground at the glacier's edge).</summary>
+    public float IceFromMetres { get; init; } = 0.5f;
+
+    /// <summary>The glacier ice at which the ground is all glacier, m.</summary>
+    public float IceToMetres { get; init; } = 4f;
+
+    /// <summary>Half the width of the change from bare glacier ice to firn across the glaciers' equilibrium line, m.</summary>
+    public float FirnBandMetres { get; init; } = 40f;
+
+    /// <summary>How far the coarse breakup noise moves the firn line, m.</summary>
+    public float FirnNoiseMetres { get; init; } = 60f;
+
+    /// <summary>The ice below which a glacier's tongue is covered by its own debris, m: its thin edges and snout are grey with rock.</summary>
+    public float DebrisMetres { get; init; } = 60f;
+
+    /// <summary>Snow's bump: smooth noise, each octave's height over its wavelength (wind-packed snow is smooth).</summary>
+    public float RoughSnow { get; init; } = 0.02f;
+
     /// <summary>The wavelength of the coarse breakup noise, m.</summary>
     public float BreakupWavelengthMetres { get; init; } = 60f;
 
@@ -268,17 +337,25 @@ public sealed record MaterialRules
         Rising("Tree slope", TreeSlopeFromDegrees, TreeSlopeToDegrees);
         Rising("Clearing", ClearingFrom, ClearingTo);
         Rising("Moist area", MoistAreaFromSquareMetres, MoistAreaToSquareMetres);
+        Rising("Snow slope", SnowSlopeFromDegrees, SnowSlopeToDegrees);
+        Rising("Glacier ice", IceFromMetres, IceToMetres);
         foreach ((string name, float value) in new[]
         {
             (nameof(RockSlopeDegrees), RockSlopeDegrees), (nameof(HardnessSlopeShiftDegrees), HardnessSlopeShiftDegrees),
             (nameof(RockNoiseDegrees), RockNoiseDegrees), (nameof(SlopeNoiseDegrees), SlopeNoiseDegrees), (nameof(AspectShiftMetres), AspectShiftMetres),
             (nameof(GrassNoiseMetres), GrassNoiseMetres), (nameof(TreeAspectShiftMetres), TreeAspectShiftMetres), (nameof(TreeNoiseMetres), TreeNoiseMetres),
             (nameof(TreeEdgeMetres), TreeEdgeMetres), (nameof(MoistShift), MoistShift), (nameof(CanopyVolume), CanopyVolume),
-            (nameof(CanopyGeometric), CanopyGeometric),
+            (nameof(CanopyGeometric), CanopyGeometric), (nameof(SnowAspectShiftMetres), SnowAspectShiftMetres), (nameof(SnowNoiseMetres), SnowNoiseMetres),
+            (nameof(SnowEdgeMetres), SnowEdgeMetres), (nameof(SnowPatchShare), SnowPatchShare), (nameof(SnowGullyDegrees), SnowGullyDegrees),
+            (nameof(SnowHollowShiftMetres), SnowHollowShiftMetres), (nameof(SnowWindShiftMetres), SnowWindShiftMetres), (nameof(FirnNoiseMetres), FirnNoiseMetres),
         })
         {
             NotNegative(name, value);
         }
+        if (!(SnowBandMetres > 0f) || !(HollowMetres > 0f) || !(SnowWetBandMetres > 0f) || !(FirnBandMetres > 0f) || !(DebrisMetres > 0f))
+            errors.Add("The snow band, the hollow's depth, the wet snow's band, the firn band and the debris' ice must be positive.");
+        if (!(SnowRidgeScour is >= 0f and <= 1f) || !(ForestDusting is >= 0f and <= 1f) || !(RoughSnow is >= 0f and < 1f))
+            errors.Add("The ridges' scour and the forest's dusting must be in [0, 1], snow's roughness in [0, 1).");
         if (!(RockSlopeWidthDegrees > 0f) || !(GrassBandMetres > 0f) || !(TreeBandMetres > 0f))
             errors.Add("The rock's slope width, the grass band and the tree band must be positive.");
         if (!(MoistAreaFromSquareMetres > 0f) || !(ForestBreakupWavelengthMetres > 0f))
@@ -377,6 +454,26 @@ public sealed record MaterialRules
         CanopyVolume = CanopyVolume,
         CanopyGeometric = CanopyGeometric,
         CanopyIso = CanopyAlbedoScale,
+        SnowBand = SnowBandMetres,
+        SnowAspectShift = SnowAspectShiftMetres,
+        SnowNoise = SnowNoiseMetres,
+        SnowEdge = SnowEdgeMetres,
+        SnowSlopeFrom = SnowSlopeFromDegrees,
+        SnowSlopeTo = SnowSlopeToDegrees,
+        SnowGully = SnowGullyDegrees,
+        Hollow = HollowMetres,
+        SnowHollowShift = SnowHollowShiftMetres,
+        SnowRidgeScour = SnowRidgeScour,
+        SnowWindShift = SnowWindShiftMetres,
+        SnowWetBand = SnowWetBandMetres,
+        SnowPatch = SnowPatchShare,
+        ForestDusting = ForestDusting,
+        IceFrom = IceFromMetres,
+        IceTo = IceToMetres,
+        FirnBand = FirnBandMetres,
+        FirnNoise = FirnNoiseMetres,
+        Debris = DebrisMetres,
+        RoughSnow = RoughSnow,
     };
 
     /// <summary>
@@ -427,7 +524,57 @@ public sealed record MaterialRules
         float grass = open * ((1f - high) * (1f - tooSteep) * (1f - bare));
         float soil = open - grass;
         float wet = MathF.Max(channel * (1f - steep), pond * (1f - talus));
-        return new MaterialWeights(rock, scree, soil, grass, wet, MathF.Max(high, tooSteep)) { Forest = forest };
+
+        // The glaciers (vista-plan §10 M1.13): the world's ice covers the ground, firn above their equilibrium line, bare ice below.
+        float firn = 0f, ice = 0f;
+        if (k.Glaciers != 0u)
+        {
+            float glacier = SmoothStep(k.IceFrom, k.IceTo, p.IceMetres);
+            float firnAt = k.GlacierLine + k.FirnNoise * p.Breakup1;
+            float above = SmoothStep(firnAt - k.FirnBand, firnAt + k.FirnBand, p.AltitudeMetres);
+            float uncovered = 1f - glacier;
+            rock *= uncovered;
+            scree *= uncovered;
+            soil *= uncovered;
+            grass *= uncovered;
+            forest *= uncovered;
+            firn = glacier * above;
+            ice = glacier - firn;
+        }
+
+        // The season's snow: above the snowline, lower on poleward faces, in hollows and in the wind's lee, higher on ridges and
+        // windward faces, ragged (more so where it is wet and melting); shed from slopes steeper than snow lies on (less in gullies)
+        // and scoured from ridges. It covers the open ground and the glaciers; the forest keeps it out of sight but for a dusting.
+        float snow = 0f, snowWet = 0f, dusting = 0f;
+        if (k.Snow != 0u)
+        {
+            float hollow = Math.Clamp(p.Hollow / k.Hollow, -1f, 1f);
+            snowWet = 1f - SmoothStep(k.FreezingLevel - k.SnowWetBand, k.FreezingLevel + k.SnowWetBand, p.AltitudeMetres);
+            float snowAt = k.SnowLine - k.SnowAspectShift * p.Poleward - k.SnowHollowShift * hollow + k.SnowWindShift * p.Windward
+                + k.SnowNoise * p.Breakup1 + k.SnowEdge * (1f + k.SnowPatch * snowWet) * p.Breakup2;
+            float season = SmoothStep(snowAt - k.SnowBand, snowAt + k.SnowBand, p.AltitudeMetres);
+            float shedAt = k.SnowSlopeFrom + k.SnowGully * MathF.Max(hollow, 0f);
+            float hold = 1f - SmoothStep(shedAt, shedAt + (k.SnowSlopeTo - k.SnowSlopeFrom), p.SlopeDegrees + k.SlopeNoise * p.Breakup2);
+            float lying = season * hold * (1f - k.SnowRidgeScour * MathF.Max(-hollow, 0f));
+            float covered = 1f - lying;
+            snow = lying * (rock + scree + soil + grass + firn + ice);
+            rock *= covered;
+            scree *= covered;
+            soil *= covered;
+            grass *= covered;
+            firn *= covered;
+            ice *= covered;
+            dusting = season * k.ForestDusting;
+        }
+        return new MaterialWeights(rock, scree, soil, grass, wet, MathF.Max(high, tooSteep))
+        {
+            Forest = forest,
+            Snow = snow,
+            Firn = firn,
+            Ice = ice,
+            SnowWet = snowWet,
+            Dusting = dusting,
+        };
     }
 
     /// <summary>HLSL's <c>smoothstep</c>: 0 below <paramref name="a"/>, 1 above <paramref name="b"/>, the cubic between.</summary>
@@ -459,7 +606,20 @@ public readonly record struct MaterialInputs(
     float Hardness,
     float Breakup1,
     float Breakup2,
-    float Breakup3);
+    float Breakup3)
+{
+    /// <summary>
+    /// How far the ground lies below the mean of its surroundings, m (vista-plan §10 M1.13, <see cref="MaterialField"/>'s hollow map):
+    /// positive in hollows and gullies, negative on ridges.
+    /// </summary>
+    public float Hollow { get; init; }
+
+    /// <summary>The glacier ice on the ground, m (<see cref="ErosionResult.Ice"/>).</summary>
+    public float IceMetres { get; init; }
+
+    /// <summary>How much the surface faces into the prevailing wind: its normal's horizontal component against the wind (−1 to 1).</summary>
+    public float Windward { get; init; }
+}
 
 /// <summary>
 /// The materials at a place: rock, scree, soil, grass and <see cref="Forest"/> sum to 1; <paramref name="Wet"/> (0 to 1) darkens
@@ -476,6 +636,21 @@ public readonly record struct MaterialWeights(float Rock, float Scree, float Soi
     /// <summary>Forest (vista-plan §10 M1.12b): conifer canopy, seen from afar as a dark, rough material.</summary>
     public float Forest { get; init; }
 
+    /// <summary>The season's snow (vista-plan §10 M1.13).</summary>
+    public float Snow { get; init; }
+
+    /// <summary>Firn: a glacier's old snow above its equilibrium line.</summary>
+    public float Firn { get; init; }
+
+    /// <summary>Bare glacier ice below the equilibrium line.</summary>
+    public float Ice { get; init; }
+
+    /// <summary>How wet the snow is (0 dry, 1 wet): wet below the freezing level, dry above it.</summary>
+    public float SnowWet { get; init; }
+
+    /// <summary>The share of the forest's texture that shows snow, under snow cover.</summary>
+    public float Dusting { get; init; }
+
     /// <summary>The weight of the smooth ground, soil and grass together (<see cref="DetailKind.Smooth"/>).</summary>
     public float Smooth => Soil + Grass;
 }
@@ -485,7 +660,8 @@ public readonly record struct MaterialWeights(float Rock, float Scree, float Soi
 /// derived once from <see cref="MaterialRules"/> and the scene, so the shader and the mesh compute with the same floats. The later
 /// rows carry what the shader needs besides the rules: the material map's place and the bed table (<see cref="MaterialField.Apply"/>),
 /// the rocks' colours by bed, the shading's bump and the camera's place for it (<see cref="ForCamera"/>), and which shading runs; then
-/// (vista-plan §10 M1.12b) the forest's rules and its canopy's shading. Twenty-one rows, 336 bytes (the buffer holds 512).
+/// (vista-plan §10 M1.12b) the forest's rules and its canopy's shading; then (M1.13) the snow's and the glaciers'. Twenty-eight rows,
+/// 448 bytes (the buffer holds 512).
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct MaterialConstants
@@ -745,6 +921,108 @@ public struct MaterialConstants
     /// <summary>Padding to a 16-byte row.</summary>
     public float Pad8;
 
+    /// <summary>The seasonal snowline above sea level, m (the snow slider; vista-plan §10 M1.13).</summary>
+    public float SnowLine;
+
+    /// <summary><see cref="MaterialRules.SnowBandMetres"/>.</summary>
+    public float SnowBand;
+
+    /// <summary><see cref="MaterialRules.SnowAspectShiftMetres"/>.</summary>
+    public float SnowAspectShift;
+
+    /// <summary><see cref="MaterialRules.SnowNoiseMetres"/>.</summary>
+    public float SnowNoise;
+
+    /// <summary><see cref="MaterialRules.SnowEdgeMetres"/>.</summary>
+    public float SnowEdge;
+
+    /// <summary><see cref="MaterialRules.SnowSlopeFromDegrees"/>.</summary>
+    public float SnowSlopeFrom;
+
+    /// <summary><see cref="MaterialRules.SnowSlopeToDegrees"/>.</summary>
+    public float SnowSlopeTo;
+
+    /// <summary><see cref="MaterialRules.SnowGullyDegrees"/>.</summary>
+    public float SnowGully;
+
+    /// <summary><see cref="MaterialRules.HollowMetres"/>.</summary>
+    public float Hollow;
+
+    /// <summary><see cref="MaterialRules.SnowHollowShiftMetres"/>.</summary>
+    public float SnowHollowShift;
+
+    /// <summary><see cref="MaterialRules.SnowRidgeScour"/>.</summary>
+    public float SnowRidgeScour;
+
+    /// <summary><see cref="MaterialRules.SnowWindShiftMetres"/>.</summary>
+    public float SnowWindShift;
+
+    /// <summary>The prevailing wind's direction of travel, x (east).</summary>
+    public float WindX;
+
+    /// <summary>The prevailing wind's direction of travel, z (north).</summary>
+    public float WindZ;
+
+    /// <summary>The freezing level above sea level, m (the weather chain's).</summary>
+    public float FreezingLevel;
+
+    /// <summary><see cref="MaterialRules.SnowWetBandMetres"/>.</summary>
+    public float SnowWetBand;
+
+    /// <summary><see cref="MaterialRules.SnowPatchShare"/>.</summary>
+    public float SnowPatch;
+
+    /// <summary><see cref="MaterialRules.ForestDusting"/>.</summary>
+    public float ForestDusting;
+
+    /// <summary>1 when the season's snow lies; 0 for none (<c>--snow off</c>).</summary>
+    public uint Snow;
+
+    /// <summary>1 when the world has glaciers (its ice map is in the material map); 0 when it has none.</summary>
+    public uint Glaciers;
+
+    /// <summary><see cref="MaterialRules.IceFromMetres"/>.</summary>
+    public float IceFrom;
+
+    /// <summary><see cref="MaterialRules.IceToMetres"/>.</summary>
+    public float IceTo;
+
+    /// <summary>The glaciers' equilibrium line above sea level, m: the world's own (<see cref="ErosionSettings.GlacierElaMetres"/>) at the scene's altitude.</summary>
+    public float GlacierLine;
+
+    /// <summary><see cref="MaterialRules.FirnBandMetres"/>.</summary>
+    public float FirnBand;
+
+    /// <summary><see cref="MaterialRules.FirnNoiseMetres"/>.</summary>
+    public float FirnNoise;
+
+    /// <summary><see cref="MaterialRules.DebrisMetres"/>.</summary>
+    public float Debris;
+
+    /// <summary><see cref="MaterialRules.RoughSnow"/>.</summary>
+    public float RoughSnow;
+
+    /// <summary>Padding to a 16-byte row.</summary>
+    public float Pad9;
+
+    /// <summary>
+    /// These constants with the season's snow of <paramref name="snow"/> (vista-plan §10 M1.13): its snowline, the freezing level, the
+    /// wind and the glaciers' line at the scene's altitude, or none (<see cref="SnowPlacement.None"/>).
+    /// </summary>
+    public readonly MaterialConstants WithSnow(SnowPlacement snow)
+    {
+        ArgumentNullException.ThrowIfNull(snow);
+        return this with
+        {
+            Snow = snow.Falls ? 1u : 0u,
+            SnowLine = snow.SnowlineMetres,
+            FreezingLevel = snow.FreezingLevelMetres,
+            WindX = snow.WindX,
+            WindZ = snow.WindZ,
+            GlacierLine = snow.GlacierLineMetres,
+        };
+    }
+
     /// <summary>
     /// These constants for a camera at world <c>(x, z)</c> whose frame's centre pixel covers <paramref name="pixelAngle"/> radians:
     /// its place split into whole bump cells and the rest (in double precision, then each part rounded).
@@ -762,4 +1040,21 @@ public struct MaterialConstants
             CamFracZ = (float)(z - cz * cell),
         };
     }
+}
+
+/// <summary>
+/// The season's snow and the glaciers' line as a scene places them (vista-plan §10 M1.13): the snowline and the freezing level are the
+/// sliders', the wind the place's prevailing westerlies, the glaciers' line their world's own at the altitude the scene gives the world's
+/// height 0.
+/// </summary>
+/// <param name="Falls">Whether the season's snow lies at all (<see cref="None"/>: none; the glaciers stay).</param>
+/// <param name="SnowlineMetres">The seasonal snowline above sea level, m.</param>
+/// <param name="FreezingLevelMetres">The freezing level above sea level, m.</param>
+/// <param name="WindX">The prevailing wind's direction of travel, x (east).</param>
+/// <param name="WindZ">The prevailing wind's direction of travel, z (north).</param>
+/// <param name="GlacierLineMetres">The glaciers' equilibrium line above sea level, m.</param>
+public sealed record SnowPlacement(bool Falls, float SnowlineMetres, float FreezingLevelMetres, float WindX, float WindZ, float GlacierLineMetres)
+{
+    /// <summary>No seasonal snow (<c>--snow off</c>), the glaciers' line at sea level.</summary>
+    public static SnowPlacement None { get; } = new(false, 0f, 0f, 1f, 0f, 0f);
 }

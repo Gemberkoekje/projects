@@ -5,8 +5,9 @@ namespace Vista.Weather;
 
 /// <summary>
 /// A place's climate normals (vista-plan §3.6, §10 M1.11): the monthly means of the daily low and high at one station, entered by
-/// hand from a published normals table and treated as constants, like the CIE tables (tier 5 until M2's manifest, §6.2). A custom
-/// latitude has no station; its normals come from <see cref="LatitudeClimate"/> instead.
+/// hand from a published normals table and treated as constants, like the CIE tables (tier 5 until M2's manifest, §6.2). Since
+/// M1.13 a dropdown place's normals also hold its monthly precipitation (<see cref="Precipitation"/>), which the season's snowline
+/// reads. A custom latitude has no station; its normals come from <see cref="LatitudeClimate"/> instead, without precipitation.
 /// </summary>
 /// <param name="Station">The station, e.g. "Zermatt (MeteoSwiss)", or the latitude model.</param>
 /// <param name="StationAltitudeMetres">The station's altitude above sea level: where these temperatures apply (others follow the lapse rate).</param>
@@ -22,6 +23,13 @@ public sealed record ClimateNormals(string Station, double StationAltitudeMetres
     /// and interpolated linearly between months, across the new year too. The year's length is the date's own.
     /// </summary>
     public DayNormals On(DateOnly date)
+    {
+        (int before, int after, double t) = Between(date);
+        return new DayNormals(Lerp(Lows[before], Lows[after], t), Lerp(Highs[before], Highs[after], t));
+    }
+
+    /// <summary>The months whose middles <paramref name="date"/> lies between, and how far it lies from the first to the second.</summary>
+    private static (int Before, int After, double T) Between(DateOnly date)
     {
         int year = date.Year;
         int days = DateTime.IsLeapYear(year) ? 366 : 365;
@@ -46,9 +54,38 @@ public sealed record ClimateNormals(string Station, double StationAltitudeMetres
             before = Array.FindLastIndex(middles, m => m <= day);
             (from, to) = (middles[before], middles[before + 1]);
         }
-        int after = (before + 1) % 12;
-        double t = (day - from) / (to - from);
-        return new DayNormals(Lerp(Lows[before], Lows[after], t), Lerp(Highs[before], Highs[after], t));
+        return (before, (before + 1) % 12, (day - from) / (to - from));
+    }
+
+    /// <summary>
+    /// The mean precipitation of each month, January first, mm (vista-plan §10 M1.13), from <see cref="PrecipitationSource"/>; null
+    /// when the normals have none (a custom latitude), and the snowline assumes one rate for every day (<see cref="SnowCover"/>).
+    /// </summary>
+    public IReadOnlyList<double>? Precipitation { get; init; }
+
+    /// <summary>
+    /// The station and the table the precipitation comes from: the temperatures' own station unless that one publishes none.
+    /// </summary>
+    public string? PrecipitationSource { get; init; }
+
+    /// <summary>The altitude of the precipitation's station above sea level, m (<see cref="StationAltitudeMetres"/> unless set).</summary>
+    public double? PrecipitationAltitudeMetres { get; init; }
+
+    /// <summary>
+    /// The day's normal precipitation at the precipitation's station on <paramref name="date"/>, mm: each month's total spread over
+    /// its days and taken at the middle of the month, interpolated linearly between months as the temperatures are (so a year's
+    /// sum is close to, not exactly, the normals' annual total); null without precipitation.
+    /// </summary>
+    public double? PrecipitationOn(DateOnly date)
+    {
+        if (Precipitation is null)
+            return null;
+        int year = date.Year;
+        var daily = new double[12];
+        for (int m = 0; m < 12; m++)
+            daily[m] = Precipitation[m] / DateTime.DaysInMonth(year, m + 1);
+        (int before, int after, double t) = Between(date);
+        return Lerp(daily[before], daily[after], t);
     }
 
     /// <summary>The month's mean of the daily mean (the average of its low and high), °C.</summary>
@@ -70,6 +107,13 @@ public sealed record ClimateNormals(string Station, double StationAltitudeMetres
         }
         if (string.IsNullOrWhiteSpace(Source) || string.IsNullOrWhiteSpace(Period))
             errors.Add($"{Station}: the source and the period must be given.");
+        if (Precipitation is not null)
+        {
+            if (Precipitation.Count != 12 || Precipitation.Any(p => !(p >= 0.0) || !double.IsFinite(p)))
+                errors.Add($"{Station}: twelve monthly precipitation totals, none negative, are needed.");
+            if (string.IsNullOrWhiteSpace(PrecipitationSource))
+                errors.Add($"{Station}: the precipitation's source must be given.");
+        }
         return errors;
     }
 

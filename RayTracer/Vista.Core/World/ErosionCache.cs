@@ -42,9 +42,10 @@ public sealed class ErosionCache
 
     /// <summary>
     /// The file format version. 2 (M1.11a) added the drainage: its directions (a byte a cell) and fill depths (halves). 3 (M1.11d)
-    /// added the hardness (halves) and the strata frame.
+    /// added the hardness (halves) and the strata frame. 4 (M1.13) added today's glaciers: a flag, then their ice (halves) when the
+    /// world has them. Version 3 files are still read, as worlds without glaciers.
     /// </summary>
-    public const int FormatVersion = 3;
+    public const int FormatVersion = 4;
 
     /// <summary>The file extension.</summary>
     public const string Extension = ".vworld";
@@ -105,7 +106,10 @@ public sealed class ErosionCache
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
             using var reader = new BinaryReader(stream, Encoding.UTF8);
-            if (!reader.ReadBytes(Magic.Length).AsSpan().SequenceEqual(Magic) || reader.ReadInt32() != FormatVersion)
+            if (!reader.ReadBytes(Magic.Length).AsSpan().SequenceEqual(Magic))
+                throw new InvalidDataException("not a Vista world file");
+            int version = reader.ReadInt32();
+            if (version is not (3 or FormatVersion))
                 throw new InvalidDataException("not a Vista world file of this version");
             if (reader.ReadUInt64() != Key(profile, seed, grid, settings) || reader.ReadInt32() != grid.Size || reader.ReadDouble() != grid.CellSize)
                 throw new InvalidDataException("it holds another world");
@@ -121,8 +125,12 @@ public sealed class ErosionCache
             stream.ReadExactly(directions);
             var drainage = new DrainageMap(grid.Size, grid.CellSize, directions, ReadHalves(stream, cells));
             float[] hardness = ReadHalves(stream, cells);
+            float[]? ice = version >= 4 && stream.ReadByte() == 1 ? ReadHalves(stream, cells) : null;
             var result = new ErosionResult(new HeightField(grid.Size, grid.CellSize, heights), maps[0], maps[1], maps[2], maps[3], steps, drainage,
-                hardness, strata);
+                hardness, strata)
+            {
+                Ice = ice,
+            };
             if (result.ContentHash() != hash)
                 throw new InvalidDataException("its contents do not match its hash");
             Touch(path);
@@ -170,6 +178,9 @@ public sealed class ErosionCache
             stream.Write(result.Drainage.Direction);
             WriteHalves(stream, result.Drainage.FillDepth);
             WriteHalves(stream, result.Hardness);
+            stream.WriteByte(result.Ice is null ? (byte)0 : (byte)1);
+            if (result.Ice is not null)
+                WriteHalves(stream, result.Ice);
         }
         File.Move(temporary, path, overwrite: true);
         Trim(keep: path);

@@ -52,6 +52,15 @@ public sealed class MaterialField
     /// <summary>The largest |mottle| the codes hold.</summary>
     public const float MottleRange = 0.25f;
 
+    /// <summary>The largest |hollow| the codes hold, m (vista-plan §10 M1.13).</summary>
+    public const float HollowRange = 20f;
+
+    /// <summary>The side of the box a sample's surroundings are averaged over for its hollow, in samples (72 m on the 8 m grid).</summary>
+    public const int HollowBox = 9;
+
+    /// <summary>The decades of glacier ice the codes span: log₁₀(1 + ice) up to 3 (1000 m).</summary>
+    public const float IceLogSpan = 3f;
+
     /// <summary>The hardness the ground reads away from the maps.</summary>
     public const float DefaultHardness = 0.5f;
 
@@ -94,8 +103,9 @@ public sealed class MaterialField
     private readonly int[] _canopyCells;
 
     private MaterialField(int size, double cell, uint[] packed, float[] beds, float tableScale, byte[] rock, byte[] scree, byte[] forest, bool eroded,
-        uint noiseSeed, ForestPlacement forestPlacement)
+        uint noiseSeed, ForestPlacement forestPlacement, bool glaciated)
     {
+        Glaciated = glaciated;
         Size = size;
         NoiseSeed = noiseSeed;
         Cell = cell;
@@ -128,13 +138,17 @@ public sealed class MaterialField
     /// <summary>Whether the maps come from an erosion (else the ground reads the defaults everywhere but for its beds).</summary>
     public bool Eroded { get; }
 
+    /// <summary>Whether the world has glaciers, whose ice the maps carry (vista-plan §10 M1.13).</summary>
+    public bool Glaciated { get; }
+
     /// <summary>Where the forest whose detail weights this field holds stands (<see cref="ForestPlacement.None"/>: none, a world's own field).</summary>
     public ForestPlacement Forest { get; }
 
     /// <summary>
     /// Three words per sample (<see cref="Words"/>), row-major: the bed-table coordinate of world height 0 (a float's bits), then the
-    /// codes, a byte each from the low end: the loose depth, the upstream area, the water depth and the mottle; then how massive the
-    /// rock is (vista-plan §10 M1.12c), a byte from the low end (0 layered, 255 massive). What the GPU reads as <c>uint3</c>.
+    /// codes, a byte each from the low end: the loose depth, the upstream area, the water depth and the mottle; then a byte each from
+    /// the low end, how massive the rock is (vista-plan §10 M1.12c; 0 layered, 255 massive), how far the ground lies below its
+    /// surroundings (M1.13, signed about 128) and the glacier ice on it (M1.13). What the GPU reads as <c>uint3</c>.
     /// </summary>
     public ReadOnlySpan<uint> Packed => _packed;
 
@@ -202,6 +216,8 @@ public sealed class MaterialField
 
         var packed = new uint[Words * n * n];
         int band = Math.Min(TerrainHierarchy.BlendCells, (n - 1) / 8);
+        float[] around = BoxAverage(surface.Heights.ToArray(), n, HollowBox);
+        float[]? ice = erosion?.Ice;
         Parallel.For(0, n, j =>
         {
             for (int i = 0; i < n; i++)
@@ -220,13 +236,23 @@ public sealed class MaterialField
                 }
                 packed[Words * c] = BitConverter.SingleToUInt32Bits(strata.Offset[c]);
                 packed[Words * c + 1] = DepthCode(loose) | (AreaCode(logArea) << 8) | (DepthCode(wet) << 16) | (MottleCode(strata.Mottle[c]) << 24);
-                packed[Words * c + 2] = MassiveCode(strata.Massive[c]);
+                // The hollow and the ice fade with the maps; the hollow is the surface's own, the glaciers' too where they lie.
+                float hollow = erosion is null ? 0f : around[c] - surface.Heights[c];
+                float fade = 1f;
+                if (erosion is not null)
+                {
+                    int edge = Math.Min(Math.Min(i, n - 1 - i), Math.Min(j, n - 1 - j));
+                    float x = edge >= band ? 1f : (float)edge / band;
+                    fade = x * x * (3f - 2f * x);
+                }
+                packed[Words * c + 2] = MassiveCode(strata.Massive[c]) | (HollowCode(hollow * fade) << 8) | (IceCode(ice is null ? 0f : ice[c] * fade) << 16);
             }
         });
 
-        (byte[] rock, byte[] scree) = DetailWeights(surface, packed, beds, strata.TableScale, rules, noiseSeed);
+        bool glaciated = ice is not null;
+        (byte[] rock, byte[] scree) = DetailWeights(surface, packed, beds, strata.TableScale, rules, noiseSeed, glaciated);
         return new MaterialField(n, surface.CellSize, packed, beds, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
-            ForestPlacement.None);
+            ForestPlacement.None, glaciated);
     }
 
     /// <summary>
@@ -275,7 +301,7 @@ public sealed class MaterialField
                 }
             });
         }
-        return new MaterialField(n, Cell, _packed, _beds, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest);
+        return new MaterialField(n, Cell, _packed, _beds, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest, Glaciated);
     }
 
     /// <summary>
@@ -290,7 +316,12 @@ public sealed class MaterialField
         (float b1, float b2) = MaterialNoise.Breakup(k.NoiseSeed, x, z, k.Breakup1, k.Breakup2);
         float b3 = MaterialNoise.ForestBreakup(k.NoiseSeed, x, z, k.Breakup3);
         Sample s = At(x, z, height, k.TableScale, k.TableLast);
-        return new MaterialInputs(slope, normalZ * k.Poleward, groundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3);
+        return new MaterialInputs(slope, normalZ * k.Poleward, groundAltitude + height, s.Loose, s.Log10Area, s.Wet, s.Hardness, b1, b2, b3)
+        {
+            Hollow = s.Hollow,
+            IceMetres = s.Ice,
+            Windward = -(normalX * k.WindX + normalZ * k.WindZ),
+        };
     }
 
     /// <summary>
@@ -357,9 +388,10 @@ public sealed class MaterialField
         return _canopyCells[(j1 + 1) * n + i1 + 1] - _canopyCells[j0 * n + i1 + 1] - _canopyCells[(j1 + 1) * n + i0] + _canopyCells[j0 * n + i0] > 0;
     }
 
-    /// <summary>These constants with the material map's place and the bed table.</summary>
+    /// <summary>These constants with the material map's place and the bed table, and whether the world has glaciers.</summary>
     public MaterialConstants Apply(MaterialConstants k) => k with
     {
+        Glaciers = Glaciated ? 1u : 0u,
         TableScale = TableScale,
         TableLast = TableLast,
         MapOriginX = (float)Origin,
@@ -392,7 +424,8 @@ public sealed class MaterialField
 
     // ── The GPU's reads, in its float operations ─────────────────────────────────────────────────────
 
-    private readonly record struct Sample(float Loose, float Log10Area, float Wet, float Hardness, float TintU, float TintV, float Table, float Massive);
+    private readonly record struct Sample(float Loose, float Log10Area, float Wet, float Hardness, float TintU, float TintV, float Table, float Massive,
+        float Hollow, float Ice);
 
     /// <summary>
     /// The decoded maps and the bed at a place: bilinear on the codes and the offsets, then decoded (the shader's <c>MaterialSampleAt</c>);
@@ -403,15 +436,15 @@ public sealed class MaterialField
         float extent = (float)Cell * (Size - 1);
         float ox = (float)Origin;
         if (!(x >= ox && x <= ox + extent && z >= ox && z <= ox + extent))
-            return new Sample(0f, AreaLogFloor, 0f, DefaultHardness, 0f, 0f, 0f, 0f);
+            return new Sample(0f, AreaLogFloor, 0f, DefaultHardness, 0f, 0f, 0f, 0f, 0f, 0f);
         float u = Math.Clamp((x - ox) / (float)Cell, 0f, Size - 1), v = Math.Clamp((z - ox) / (float)Cell, 0f, Size - 1);
         int i = Math.Min((int)u, Size - 2), j = Math.Min((int)v, Size - 2);
         float fu = u - i, fv = v - j;
         int c = j * Size + i;
-        (float o00, float l00, float a00, float w00, float m00, float s00) = Unpack(c);
-        (float o10, float l10, float a10, float w10, float m10, float s10) = Unpack(c + 1);
-        (float o01, float l01, float a01, float w01, float m01, float s01) = Unpack(c + Size);
-        (float o11, float l11, float a11, float w11, float m11, float s11) = Unpack(c + Size + 1);
+        (float o00, float l00, float a00, float w00, float m00, float s00, float h00, float i00) = Unpack(c);
+        (float o10, float l10, float a10, float w10, float m10, float s10, float h10, float i10) = Unpack(c + 1);
+        (float o01, float l01, float a01, float w01, float m01, float s01, float h01, float i01) = Unpack(c + Size);
+        (float o11, float l11, float a11, float w11, float m11, float s11, float h11, float i11) = Unpack(c + Size + 1);
         float Mix(float v00, float v10, float v01, float v11)
         {
             float bottom = v00 + (v10 - v00) * fu, top = v01 + (v11 - v01) * fu;
@@ -423,6 +456,8 @@ public sealed class MaterialField
         float wet = DepthOf(Mix(w00, w10, w01, w11));
         float mottle = MottleOf(Mix(m00, m10, m01, m11));
         float massive = Mix(s00, s10, s01, s11) * (1f / 255f);
+        float hollow = HollowOf(Mix(h00, h10, h01, h11));
+        float ice = IceOf(Mix(i00, i10, i01, i11));
         float t = Math.Clamp(height * tableScale + offset, 0f, tableLast);
         int k = (int)MathF.Floor(t);
         float f = t - k;
@@ -432,14 +467,15 @@ public sealed class MaterialField
         float massiveHard = _beds[4 * k + 3] + (_beds[4 * k + 7] - _beds[4 * k + 3]) * f;
         hard += (massiveHard - hard) * massive;
         float layered = 1f - massive;
-        return new Sample(loose, logArea, wet, Math.Clamp(hard + mottle, 0f, 1f), tintU * layered, tintV * layered, t, massive);
+        return new Sample(loose, logArea, wet, Math.Clamp(hard + mottle, 0f, 1f), tintU * layered, tintV * layered, t, massive, hollow, ice);
     }
 
-    private (float Offset, float Loose, float Area, float Wet, float Mottle, float Massive) Unpack(int c)
+    private (float Offset, float Loose, float Area, float Wet, float Mottle, float Massive, float Hollow, float Ice) Unpack(int c)
     {
         uint codes = _packed[Words * c + 1];
+        uint more = _packed[Words * c + 2];
         return (BitConverter.UInt32BitsToSingle(_packed[Words * c]), codes & 0xFF, (codes >> 8) & 0xFF, (codes >> 16) & 0xFF, codes >> 24,
-            _packed[Words * c + 2] & 0xFF);
+            more & 0xFF, (more >> 8) & 0xFF, (more >> 16) & 0xFF);
     }
 
     /// <summary>The code of a loose depth or water depth, m: log₁₀(d + 0.01) over four decades in a byte.</summary>
@@ -464,6 +500,18 @@ public sealed class MaterialField
     /// <summary>The code of how massive the rock is (vista-plan §10 M1.12c): 0 layered to 255 massive.</summary>
     public static uint MassiveCode(float massive) => (uint)MathF.Round(Math.Clamp(massive, 0f, 1f) * 255f);
 
+    /// <summary>The code of a hollow, m (vista-plan §10 M1.13): signed about 128, ±<see cref="HollowRange"/>.</summary>
+    public static uint HollowCode(float hollow) => (uint)(MathF.Round(Math.Clamp(hollow / HollowRange, -1f, 1f) * 127f) + 128f);
+
+    /// <summary>The hollow of a (bilinear) code, m.</summary>
+    public static float HollowOf(float code) => (code - 128f) * (HollowRange / 127f);
+
+    /// <summary>The code of glacier ice, m (vista-plan §10 M1.13): log₁₀(1 + ice) over <see cref="IceLogSpan"/> decades in a byte.</summary>
+    public static uint IceCode(float metres) => (uint)MathF.Round(Math.Clamp(MathF.Log10(1f + Math.Max(metres, 0f)) / IceLogSpan, 0f, 1f) * 255f);
+
+    /// <summary>The glacier ice of a (bilinear) code, m.</summary>
+    public static float IceOf(float code) => MathF.Pow(10f, code * (IceLogSpan / 255f)) - 1f;
+
     // ── The detail kinds' weights ───────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -471,14 +519,20 @@ public sealed class MaterialField
     /// averaged over <see cref="DetailSmoothing"/>² samples and stored as bytes that never sum past 255.
     /// </summary>
     private static (byte[] Rock, byte[] Scree) DetailWeights(HeightField surface, uint[] packed, float[] beds, float tableScale, MaterialRules rules,
-        uint noiseSeed)
+        uint noiseSeed, bool glaciated)
     {
         int n = surface.Size;
         double cell = surface.CellSize;
         float origin = (float)(-0.5 * (n - 1) * cell);
         // The grass line does not move the detail (soil and grass are both smooth), so any will do; nor does the forest move rock and
-        // scree (it takes only the ground they leave), whose weights it adds per scene (WithForest).
-        MaterialConstants k = rules.Constants(0f, 1f, noiseSeed, 0f, false) with { TableScale = tableScale, TableLast = beds.Length / 4 - 1.001f };
+        // scree (it takes only the ground they leave), whose weights it adds per scene (WithForest). The glaciers smooth the ground they
+        // cover (vista-plan §10 M1.13); the season's snow is the scene's and leaves the rock's detail under it.
+        MaterialConstants k = rules.Constants(0f, 1f, noiseSeed, 0f, false) with
+        {
+            TableScale = tableScale,
+            TableLast = beds.Length / 4 - 1.001f,
+            Glaciers = glaciated ? 1u : 0u,
+        };
         var rock = new float[n * n];
         var scree = new float[n * n];
         Parallel.For(0, n, j =>
@@ -498,7 +552,10 @@ public sealed class MaterialField
                 bed += (massiveHard - bed) * ((packed[Words * c + 2] & 0xFF) * (1f / 255f));
                 float hard = Math.Clamp(bed + MottleOf(codes >> 24), 0f, 1f);
                 var inputs = new MaterialInputs(MathF.Acos(MathF.Min(ny, 1f)) * (180f / MathF.PI), 0f, 0f, DepthOf(codes & 0xFF),
-                    AreaOf((codes >> 8) & 0xFF), DepthOf((codes >> 16) & 0xFF), hard, b1, b2, 0f);
+                    AreaOf((codes >> 8) & 0xFF), DepthOf((codes >> 16) & 0xFF), hard, b1, b2, 0f)
+                {
+                    IceMetres = IceOf((packed[Words * c + 2] >> 16) & 0xFF),
+                };
                 MaterialWeights w = MaterialRules.Evaluate(inputs, k);
                 rock[c] = w.Rock;
                 scree[c] = w.Scree;

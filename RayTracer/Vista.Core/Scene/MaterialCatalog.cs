@@ -52,6 +52,9 @@ public sealed record VistaMaterial(int Id, string Key, DataTier Tier, (float R, 
 /// Since M1.12b a sixth, forest: a conifer canopy as a whole seen from above, needles, shadowed crowns and the gaps between them
 /// together, so its reflectance is far below a leaf's (a few percent in the visible, the green peak small, the red edge past the
 /// hero wavelengths), the albedo under a white sky that the canopy's kernels are normalised to (<see cref="World.MaterialRules.CanopyAlbedoScale"/>).
+/// Since M1.13 four more, snow and ice, each from ice's absorption and its grain size (<see cref="SnowSpectrum"/>, tier 5): the season's
+/// dry snow (grains 0.2 mm, nearly clean), its wet snow (1.5 mm grains, its dust gathered at the surface), a glacier's firn (2.5 mm,
+/// years of dust) and its bare ice (bubbles some 25 mm apart, grey with the dust and fine debris of its melt), all Lambertian or nearly so.
 /// </summary>
 public static class MaterialCatalog
 {
@@ -72,6 +75,18 @@ public static class MaterialCatalog
 
     /// <summary>Id of the forest (vista-plan §10 M1.12b).</summary>
     public const int ForestId = 5;
+
+    /// <summary>Id of the season's dry snow (vista-plan §10 M1.13).</summary>
+    public const int SnowId = 6;
+
+    /// <summary>Id of a glacier's bare ice.</summary>
+    public const int IceId = 7;
+
+    /// <summary>Id of a glacier's firn.</summary>
+    public const int FirnId = 8;
+
+    /// <summary>Id of the season's wet snow (blended with the dry by how wet it is; the material-id output shows both as snow).</summary>
+    public const int WetSnowId = 9;
 
     /// <summary>The M0 terrain material.</summary>
     public static VistaMaterial Terrain { get; } = new(0, "terrain", DataTier.BuiltIn, (0.18f, 0.16f, 0.14f));
@@ -96,6 +111,10 @@ public static class MaterialCatalog
         Spectral(ForestId, "forest", 1.0f,
             [380, 0.018, 400, 0.019, 450, 0.021, 480, 0.023, 500, 0.026, 520, 0.034, 540, 0.043, 550, 0.045, 560, 0.044, 580, 0.038, 600, 0.031,
              620, 0.026, 640, 0.023, 660, 0.021, 680, 0.02, 700, 0.045, 720, 0.12, 750, 0.20]),
+        Spectral(SnowId, "snow", 0f, SnowSpectrum.Spectrum(0.2e-3, 0.02, 3.0)),
+        Spectral(IceId, "ice", 0.1f, SnowSpectrum.Spectrum(25e-3, 1.2, 1.5)),
+        Spectral(FirnId, "firn", 0.05f, SnowSpectrum.Spectrum(2.5e-3, 0.8, 3.0)),
+        Spectral(WetSnowId, "snow.wet", 0f, SnowSpectrum.Spectrum(1.5e-3, 0.4, 3.0)),
     ];
 
     /// <summary>The materials a render shades: the ground's by rule, or M0's one.</summary>

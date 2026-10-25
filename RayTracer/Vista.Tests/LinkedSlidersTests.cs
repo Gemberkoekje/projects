@@ -152,7 +152,12 @@ public sealed class LinkedSlidersTests
             Assert.AreEqual("latitude model", latitude.Climate.Station);
             Assert.IsTrue(lofoten.TemperatureCelsius > latitude.TemperatureCelsius + 5.0,
                 $"{season}: Lofoten {lofoten.TemperatureCelsius:0.0} °C against its latitude's {latitude.TemperatureCelsius:0.0} °C");
-            Assert.IsTrue(lofoten.SnowlineMetres > latitude.SnowlineMetres, $"{season}: less snow at the coast");
+            // Since M1.13 Lofoten's own 1300 mm a year snows down to the sea in winter, as the colder latitude model's does; in autumn
+            // the coast's snow still lies higher.
+            if (season == Season.Winter)
+                Assert.IsTrue(lofoten.SnowlineMetres >= latitude.SnowlineMetres, $"{season}: no more snow at the coast");
+            else
+                Assert.IsTrue(lofoten.SnowlineMetres > latitude.SnowlineMetres, $"{season}: less snow at the coast");
         }
     }
 

@@ -62,17 +62,21 @@ internal static class GpuSelfTest
     private const double LutTolerance = 2e-3;
 
     /// <summary>
-    /// The camera every render here uses: the default measurement view for seed 42 (<c>vista-views/default.camera.json</c>), 3 m
-    /// above rock, looking north-north-west at the range with the sky above it. <see cref="DefaultCamera.For"/>'s pose has stood on a
-    /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world), and
-    /// M1.12c again (M1.11d's is underground on the world its folded strata shape).
+    /// The camera every render here uses: the default measurement view for seed 42 (<c>vista-views/default.camera.json</c>), 6 m
+    /// above a meadow, looking north-north-west at the range with the sky above it. <see cref="DefaultCamera.For"/>'s pose has stood on a
+    /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world), M1.12c
+    /// again (M1.11d's is underground on the world its folded strata shape), and M1.13 once more (the glaciers' carving left M1.12c's
+    /// 24 m over new fill): on a meadow facing the glaciated range, 2 m above the incised ground CI checks it over.
     /// </summary>
     private static readonly CameraSpec SelfTestCamera = new()
     {
-        Position = new WorldPoint(-250.0, 1645.29, -5125.0),
+        Position = new WorldPoint(4450.0, 1698.5, -8825.0),
         YawDegrees = -20.0,
         PitchDegrees = 3.0,
     };
+
+    /// <summary>The seasonal snowline of the self-test's scene, m above sea level: spring snow over the upper half of the range (M1.13).</summary>
+    private const double SelfTestSnowlineMetres = 2600.0;
 
     /// <summary>Runs the checks, writing a report to <paramref name="log"/>; returns 0 when every check passes.</summary>
     public static int Run(TextWriter log)
@@ -93,7 +97,14 @@ internal static class GpuSelfTest
         double ground = Places.BaseAltitude(recipe, almanac.Place).Metres;
         var settings = new RenderSettings { Width = 320, Height = 180, SamplesPerPixel = 16, MaxBounces = 6 };
         CameraSpec camera = SelfTestCamera;
-        GroundCover cover = GroundCover.For(Weather.Climate.For(almanac.Place), almanac.Place.LatitudeDegrees);
+        // Spring snow down to SelfTestSnowlineMetres and the world's glaciers (vista-plan §10 M1.13), so the parity check reaches both.
+        GroundCover cover = GroundCover.For(Weather.Climate.For(almanac.Place), almanac.Place.LatitudeDegrees) with
+        {
+            Snow = true,
+            SnowlineMetres = SelfTestSnowlineMetres,
+            FreezingLevelMetres = SelfTestSnowlineMetres + 300.0,
+            GlacierLineMetres = ErosionSettings.For(TerrainProfile.For(recipe.SetPieces)).GlacierElaMetres + ground,
+        };
         MaterialField materials = MaterialFieldOf(recipe, seed, eroded, cover, ground);
         TerrainHierarchy hierarchy = TerrainHierarchy.Build(terrain, TerrainProfile.For(recipe.SetPieces), seed, new MaterialDetail(seed, materials), materials);
         TerrainMesh mesh = MeshFor(hierarchy, camera, settings, ground);
@@ -123,8 +134,8 @@ internal static class GpuSelfTest
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
         pass &= MaterialChecks(renderer, recipe, seed, eroded, materials, hierarchy, scene, reference, log);
 
-        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.12c's pose the range's skyline crosses it
-        // near row 160, two fifths of it sky).
+        // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.13's pose the range's skyline crosses it
+        // near row 175, half of it sky).
         var frame = settings with { Width = 640, Height = 360 };
         var window = new PixelWindow(291, 139, 64, 64);
         RenderOutput full = Render(renderer, scene, frame, allAovs, new BatchPlannerOptions(), log, "640×360 frame");
@@ -172,7 +183,8 @@ internal static class GpuSelfTest
 
             HeightField ground = TerrainGenerator.Generate(recipe, seed, grid);
             (HeightField prepared, StrataGrid strata) = WorldBuilder.Prepare(ground, recipe, seed, erosion);
-            ErosionResult second = renderer.Erode(prepared, erosion, strata).Result;
+            // The builder lays today's glaciers on what the eroder returns (M1.13); so does this second erosion.
+            ErosionResult second = Glaciers.Lay(renderer.Erode(prepared, erosion, strata).Result, erosion);
             pass &= Check(log, "the world eroded twice is bit-identical", SameWorld(first, second));
 
             (ErosionResult Result, WorldOrigin Origin)? loaded = cache.TryLoad(profile, seed, grid, erosion, out string? problem);
@@ -241,7 +253,7 @@ internal static class GpuSelfTest
         float[] gpu = renderer.RunMaterialProbe(scene, places);
         MaterialConstants k = D3D12VistaRenderer.MaterialConstantsFor(scene, DiffuseModel.OrenNayar, CanopyModel.Kernels, 1080);
         double worstWeight = 0.0, worstHardness = 0.0, worstSlope = 0.0;
-        int forested = 0;
+        int forested = 0, snowy = 0, glaciated = 0;
         for (int i = 0; i < places.Count; i++)
         {
             (float x, float z, float height) = places[i];
@@ -249,19 +261,28 @@ internal static class GpuSelfTest
             MaterialInputs inputs = materials.Inputs(x, z, height, nx, nz, (float)scene.GroundAltitudeMetres, k);
             MaterialWeights w = MaterialRules.Evaluate(inputs, k);
             ReadOnlySpan<float> g = gpu.AsSpan(i * 12, 12);
-            foreach ((float a, float b) in new[] { (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]), (w.Forest, g[8]) })
+            foreach ((float a, float b) in new[]
+            {
+                (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]), (w.Forest, g[8]), (w.Snow, g[9]),
+                (w.Firn, g[10]), (w.Ice, g[11]),
+            })
                 worstWeight = Math.Max(worstWeight, Math.Abs(a - b));
             worstHardness = Math.Max(worstHardness, Math.Abs(inputs.Hardness - g[6]));
             worstSlope = Math.Max(worstSlope, Math.Abs(inputs.SlopeDegrees - g[7]));
             forested += w.Forest > 0.5f ? 1 : 0;
+            snowy += w.Snow > 0.5f ? 1 : 0;
+            glaciated += w.Firn + w.Ice > 0.5f ? 1 : 0;
         }
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"  materials at {places.Count} places ({forested} mostly forest): worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
+            $"  materials at {places.Count} places ({forested} mostly forest, {snowy} mostly snow, {glaciated} mostly glacier): worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
         pass &= Check(log, "the shader's material rules match the C# reference", worstWeight <= 2e-3 && worstHardness <= 2e-3 && worstSlope <= 0.02 ? null
             : string.Create(CultureInfo.InvariantCulture, $"worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
         // Seed 42's lowest valleys stand some 400 m above Zermatt's valley floor: 2.1% of its places are mostly forest (vista-log/M1.12b.md).
         pass &= Check(log, "the parity check reaches the forest", forested >= places.Count / 100 ? null
             : string.Create(CultureInfo.InvariantCulture, $"only {forested} of {places.Count} places are mostly forest"));
+        pass &= Check(log, "the parity check reaches the snow and the glaciers",
+            snowy >= places.Count / 100 && (!materials.Glaciated || glaciated >= places.Count / 200) ? null
+            : string.Create(CultureInfo.InvariantCulture, $"{snowy} places mostly snow and {glaciated} mostly glacier of {places.Count}"));
 
         var seen = new HashSet<int>();
         foreach (float id in reference.Aovs[Aov.MaterialId])
@@ -439,7 +460,7 @@ internal static class GpuSelfTest
         VistaScene higher = day with { Camera = day.Camera with { Position = day.Camera.Position with { Y = day.Camera.Position.Y + 400.0 } } };
         VistaScene altitude = higher with { GroundAltitudeMetres = 3000.0, Mesh = MeshFor(hierarchy, scene.Camera, settings, 3000.0) };
         VistaScene engine = altitude with { Quadrature = Quadrature.Engine };
-        VistaScene bins = engine with { Quadrature = Quadrature.Bins };
+        VistaScene bins = engine with { Quadrature = WavelengthTable.DefaultQuadrature };
         string[] sky = [RenderStageKeys.SkyView, RenderStageKeys.SkyDistribution];
         string[] air = [RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
         string[] keys = [RenderStageKeys.DeviceInit, RenderStageKeys.AccelerationBuild, RenderStageKeys.AtmosphereTables, RenderStageKeys.ScatteringOrders, .. sky];
@@ -450,7 +471,7 @@ internal static class GpuSelfTest
             ("camera 400 m higher", higher, sky),
             ("base altitude 3000 m", altitude, [RenderStageKeys.AccelerationBuild, RenderStageKeys.ScatteringOrders, .. sky]),
             ("engine's wavelengths", engine, air),
-            ("bins again", bins, air),
+            ("default wavelengths again", bins, air),
         })
         {
             RenderOutput warm = Render(renderer, view, settings, aovs, new BatchPlannerOptions(), log, $"watch: {label}");
@@ -462,9 +483,9 @@ internal static class GpuSelfTest
                 (built.SequenceEqual(keys.Where(rebuilds.Contains)) ? null : $"rebuilt {string.Join(", ", built)}")
                 ?? Same(warm, cold, compareAovs: false));
         }
-        pass &= Check(log, "watch: the engine's wavelengths change the image, and the bins bring it back",
+        pass &= Check(log, "watch: the engine's wavelengths change the image, and the default's bring it back",
             (Same(warms["base altitude 3000 m"], warms["engine's wavelengths"], compareAovs: false) is null ? "the same image" : null)
-            ?? Same(warms["base altitude 3000 m"], warms["bins again"], compareAovs: false));
+            ?? Same(warms["base altitude 3000 m"], warms["default wavelengths again"], compareAovs: false));
         return pass;
     }
 

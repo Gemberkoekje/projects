@@ -151,8 +151,14 @@ public sealed record PreviewRequest
     public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
 
     /// <summary>
-    /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a): <c>--quadrature bins</c> (the
-    /// default) or <c>engine</c>.
+    /// Whether the season's snow lies above the snow slider's snowline (vista-plan §10 M1.13): <c>--snow on</c> (the default) or
+    /// <c>off</c>; the world's glaciers lie either way.
+    /// </summary>
+    public bool Snow { get; init; } = true;
+
+    /// <summary>
+    /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a, M1.13): <c>--quadrature blend</c>
+    /// (the default since M1.13), <c>bins</c> (M1.12a's), <c>redTail</c> or <c>engine</c>.
     /// </summary>
     public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
 }
@@ -168,8 +174,8 @@ public sealed record PreviewRequest
 ///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
-///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature bins | engine]
-///           [--forest on | off] [--canopy kernels | rough]
+///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
+///           [--forest on | off] [--canopy kernels | rough] [--snow on | off]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--dither on | off] [--png16]
 /// </code>
@@ -195,7 +201,8 @@ public sealed record PreviewRequest
 /// <c>--quadrature engine</c> traces the engine's hero wavelengths with the engine's weights instead of Vista's own bins (M1.12a):
 /// <c>main</c>'s colours before M1.12a, cast and all.
 /// <c>--forest off</c> grows no forest below the tree line (M1.12's ground: meadow and soil there), and <c>--canopy rough</c> shades
-/// the forest as rough diffuse ground instead of by its canopy's kernels (M1.12b).
+/// the forest as rough diffuse ground instead of by its canopy's kernels (M1.12b). <c>--snow off</c> lays no seasonal snow, whatever
+/// the snow slider says; the world's glaciers stay (M1.13).
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
@@ -224,10 +231,12 @@ public static class PreviewCommandLine
         "  --far-field off the terrain beyond it; --mesh uniform meshes every grid sample and nothing else (for comparisons).\n" +
         "--materials on (default) | off: the ground's rock, scree, soil and grass by rule and their detail, or M0's single grey material\n" +
         "  over smooth detail. --diffuse orenNayar (default) | lambert: rough diffuse surfaces, or Lambert's.\n" +
-        "--quadrature bins (default) | engine: the hero wavelengths and their weights, Vista's own 50 bins of equal colour mass,\n" +
-        "  or the engine's table (before M1.12a; every colour 1.7-4 dE off).\n" +
+        "--quadrature blend (default) | bins | redTail | engine: the hero wavelengths and their weights: 50 bins of equal colour mass\n" +
+        "  under white light with 30% of the twilight sun (M1.13), Vista's own equal bins (M1.12a to M1.12c), the bins with four in the\n" +
+        "  red tail, or the engine's table (before M1.12a; every colour 1.7-4 dE off).\n" +
         "--forest on (default) | off: forest below the place's tree line, or M1.12's meadow and soil there.\n" +
         "  --canopy kernels (default) | rough: the canopy's own scattering (its crowns' shadows and hot spot), or rough diffuse ground.\n" +
+        "--snow on (default) | off: the season's snow above the snow slider's snowline, or none (the world's glaciers stay).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
@@ -304,7 +313,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy",
+        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -394,6 +403,7 @@ public static class PreviewCommandLine
         Quadrature quadrature = QuadratureOf(values.GetValueOrDefault("--quadrature"), problems);
         bool forest = OnOff(values.GetValueOrDefault("--forest"), "--forest", problems);
         CanopyModel canopy = CanopyOf(values.GetValueOrDefault("--canopy"), problems);
+        bool snow = OnOff(values.GetValueOrDefault("--snow"), "--snow", problems);
 
         if (problems.Count > before)
             return null;
@@ -430,6 +440,7 @@ public static class PreviewCommandLine
             Quadrature = quadrature,
             Forest = forest,
             Canopy = canopy,
+            Snow = snow,
         };
     }
 
@@ -476,7 +487,7 @@ public static class PreviewCommandLine
         return DiffuseModel.OrenNayar;
     }
 
-    /// <summary>Parses a <c>--quadrature</c> value (<c>bins</c> or <c>engine</c>).</summary>
+    /// <summary>Parses a <c>--quadrature</c> value (<c>blend</c>, <c>bins</c>, <c>redTail</c> or <c>engine</c>).</summary>
     internal static bool TryParseQuadrature(string text, out Quadrature quadrature) =>
         Enum.TryParse(text, ignoreCase: true, out quadrature) && quadrature != Quadrature.None && Enum.IsDefined(quadrature) && !int.TryParse(text, out _);
 
@@ -486,7 +497,7 @@ public static class PreviewCommandLine
             return WavelengthTable.DefaultQuadrature;
         if (TryParseQuadrature(text, out Quadrature quadrature))
             return quadrature;
-        problems.Add($"--quadrature must be bins or engine, got '{text}'.");
+        problems.Add($"--quadrature must be blend, bins, redTail or engine, got '{text}'.");
         return WavelengthTable.DefaultQuadrature;
     }
 

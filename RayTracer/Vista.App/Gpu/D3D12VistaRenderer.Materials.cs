@@ -48,7 +48,7 @@ internal sealed partial class D3D12VistaRenderer
         if (field is null)
             return new MaterialConstants();
         MaterialConstants k = field.Apply(MaterialRules.Default.Constants((float)scene.Ground.GrassLineMetres, scene.Ground.Poleward, field.NoiseSeed,
-            (float)scene.Ground.TreeLineMetres, scene.Ground.Forest));
+            (float)scene.Ground.TreeLineMetres, scene.Ground.Forest)).WithSnow(scene.Ground.SnowPlacement);
         double pixelAngle = 2.0 * Math.Tan(0.5 * scene.Camera.VerticalFovRadians()) / frameHeight;
         return k.ForCamera(scene.Mesh.Frame.TangentX, scene.Mesh.Frame.TangentZ, pixelAngle) with
         {
@@ -62,7 +62,7 @@ internal sealed partial class D3D12VistaRenderer
     /// The ground's materials at world places on the GPU (<c>CSMaterialProbe</c>), for the self-test's parity with
     /// <see cref="MaterialField.Inputs"/> and <see cref="MaterialRules.Evaluate"/>: at each place's x, z and height, with the world
     /// grid's normal there, the weights of rock, scree, soil and grass, then the wetness, the stoniness, the bed's hardness and the
-    /// slope, then the forest's weight and three zeros, twelve floats a place.
+    /// slope, then the weights of the forest, the season's snow, firn and glacier ice (M1.13), twelve floats a place.
     /// </summary>
     public float[] RunMaterialProbe(VistaScene scene, IReadOnlyList<(float X, float Z, float Height)> places)
     {

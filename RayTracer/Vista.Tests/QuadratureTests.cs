@@ -109,16 +109,37 @@ public sealed class QuadratureTests
         foreach (QuadratureCase spectrum in QuadratureCheck.Cases)
         {
             QuadratureError bins = QuadratureCheck.Measure(WavelengthTable.Bins, spectrum.Spectrum);
+            QuadratureError blend = QuadratureCheck.Measure(WavelengthTable.Blend, spectrum.Spectrum);
             QuadratureError engine = QuadratureCheck.Measure(WavelengthTable.Engine, spectrum.Spectrum);
-            report.Add($"{spectrum.Name}: bins {bins.DeltaE76:0.00} ({bins.LuminanceError:P2}), engine {engine.DeltaE76:0.00} ({engine.LuminanceError:P2})");
+            report.Add($"{spectrum.Name}: blend {blend.DeltaE76:0.00} ({blend.LuminanceError:P2}), bins {bins.DeltaE76:0.00}, engine {engine.DeltaE76:0.00}");
             Assert.IsTrue(engine.DeltaE76 > 2.0, $"{spectrum.Name}: the engine's table misses by {engine.DeltaE76:0.00}");
-            Assert.IsTrue(bins.DeltaE76 < engine.DeltaE76 / 4.0, $"{spectrum.Name}: the bins' {bins.DeltaE76:0.00} against the engine's {engine.DeltaE76:0.00}");
+            // Since M1.13 the default table holds every case, the twilight on snow and the twice-bounced grass included (vista-plan §10).
+            Assert.IsTrue(blend.DeltaE76 < 1.0, $"{spectrum.Name}: {blend.DeltaE76:0.00} ΔE76");
+            Assert.IsTrue(Math.Abs(blend.LuminanceError) < 0.01, $"{spectrum.Name}: luminance {blend.LuminanceError:P2}");
             if (!QuadratureCheck.IsHeldToTheLimit(spectrum))
                 continue;
-            Assert.IsTrue(bins.DeltaE76 < 1.0, $"{spectrum.Name}: {bins.DeltaE76:0.00} ΔE76");
-            Assert.IsTrue(Math.Abs(bins.LuminanceError) < 0.01, $"{spectrum.Name}: luminance {bins.LuminanceError:P2}");
+            Assert.IsTrue(bins.DeltaE76 < 1.0, $"{spectrum.Name}: M1.12a's bins {bins.DeltaE76:0.00} ΔE76");
+            Assert.IsTrue(bins.DeltaE76 < engine.DeltaE76 / 4.0, $"{spectrum.Name}: the bins' {bins.DeltaE76:0.00} against the engine's {engine.DeltaE76:0.00}");
         }
-        Assert.AreEqual(16, QuadratureCheck.Cases.Count, string.Join(Environment.NewLine, report));
+        Assert.AreEqual(23, QuadratureCheck.Cases.Count, string.Join(Environment.NewLine, report));
+    }
+
+    [TestMethod]
+    public void TheRedEnd_TheBlendHoldsAlpenglow_WhereTheBinsAndTheRedTailMissIt()
+    {
+        QuadratureError Twilight(WavelengthTable table, string elevation) =>
+            QuadratureCheck.Measure(table, QuadratureCheck.Cases.Single(c => c.Name.StartsWith($"twilight on snow, sun {elevation}°", StringComparison.Ordinal)).Spectrum);
+        // The sun 1.8° below the horizontal, the last of the direct light on a 4000 m summit (vista-log/M1.13.md has the table).
+        Assert.IsTrue(Twilight(WavelengthTable.Bins, "-1.8").DeltaE76 > 5.0, "M1.12a's equal bins: one wavelength for the whole red tail");
+        Assert.IsTrue(Twilight(WavelengthTable.RedTail, "-1.8").DeltaE76 > 2.0, "four in the tail are not enough");
+        Assert.IsTrue(Twilight(WavelengthTable.Blend, "-1.0").DeltaE76 < 0.3, "the blend, held out at −1°");
+        Assert.IsTrue(Twilight(WavelengthTable.Blend, "-1.5").DeltaE76 < 0.3, "and at −1.5°");
+        Assert.AreEqual(Quadrature.Blend, WavelengthTable.DefaultQuadrature);
+        Assert.AreEqual(681, WavelengthTable.RedTail.LastNm);
+        Assert.AreEqual(701, WavelengthTable.Blend.LastNm, "its last wavelength in alpenglow's light");
+        // A flat spectrum is no longer exact, but close: its luminance exactly, its colour within a tenth of a ΔE.
+        QuadratureError flat = QuadratureCheck.Measure(WavelengthTable.Blend, _ => 1.0);
+        Assert.IsTrue(flat.DeltaE76 < 0.1 && Math.Abs(flat.LuminanceError) < 1e-6, flat.ToString());
     }
 
     [TestMethod]
@@ -128,8 +149,9 @@ public sealed class QuadratureTests
         Assert.IsTrue(airMass > 20.0, $"air mass {airMass:0.0}");
         Assert.IsTrue(sun(650.0) > 5.0 * sun(550.0), "mostly deep red");
         Assert.IsTrue(sun(450.0) < 0.03 * sun(650.0), "the blue a thirtieth of the red or less");
-        // The last wavelength stands for everything above it: the twilight case's error, recorded (vista-log/M1.12a.md).
-        QuadratureCase twilight = QuadratureCheck.Cases.Single(c => !QuadratureCheck.IsHeldToTheLimit(c));
+        // The last wavelength stands for everything above it: the twilight case's error, recorded (vista-log/M1.12a.md), now on snow's
+        // own spectrum (M1.13).
+        QuadratureCase twilight = QuadratureCheck.Cases.Single(c => c.Name.StartsWith("twilight on snow, sun -1.0°", StringComparison.Ordinal));
         QuadratureError bins = QuadratureCheck.Measure(WavelengthTable.Bins, twilight.Spectrum);
         Assert.IsTrue(bins.DeltaE76 is > 0.9 and < 1.3, $"{bins.DeltaE76:0.00} ΔE76: recorded in the log; a change moves it");
         Assert.ThrowsExactly<ArgumentException>(() => QuadratureCheck.SlantColumns(Atmosphere.AtmosphereModel.Default, 4000.0, -5.0), "that ray meets the ground");
@@ -162,19 +184,20 @@ public sealed class QuadratureTests
             Assert.IsTrue(PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors), string.Join(" | ", errors));
             return request!;
         }
-        Assert.AreEqual(Quadrature.Bins, Parse().Quadrature, "the bins by default");
+        Assert.AreEqual(Quadrature.Blend, Parse().Quadrature, "the blend by default since M1.13");
+        Assert.AreEqual(Quadrature.RedTail, Parse("--quadrature", "redTail").Quadrature);
         Assert.AreEqual(Quadrature.Engine, Parse("--quadrature", "engine").Quadrature);
         Assert.AreEqual(Quadrature.Bins, Parse("--quadrature", "bins").Quadrature);
         Assert.IsFalse(PreviewCommandLine.TryParse(["--preview", "--recipe", "r.json", "--seed", "1", "--out", "p.png", "--quadrature", "2"], out _,
             out IReadOnlyList<string> errors));
-        StringAssert.Contains(string.Join(" | ", errors), "--quadrature must be bins or engine");
+        StringAssert.Contains(string.Join(" | ", errors), "--quadrature must be blend, bins, redTail or engine");
 
         var request = new PreviewRequest { RecipePath = "r.json", Seed = 1, OutPath = "p.png" };
         Assert.IsTrue(SheetAxis.TryParse("quadrature=engine,bins", out SheetAxis? axis, out string? problem), problem);
         Assert.AreEqual(Quadrature.Engine, axis!.Apply(request, 0).Quadrature);
         Assert.AreEqual(Quadrature.Bins, axis.Apply(request, 1).Quadrature);
         Assert.IsFalse(SheetAxis.TryParse("quadrature=engine,gauss", out _, out problem));
-        StringAssert.Contains(problem, "not bins or engine");
+        StringAssert.Contains(problem, "not blend, bins, redTail or engine");
     }
 
     [TestMethod]
@@ -204,8 +227,11 @@ public sealed class QuadratureTests
                 Grid = TestWorlds.Grid,
                 Erosion = false,
             };
-            Sidecar bins = PreviewPipeline.Run(request, new FakeRenderer());
-            Assert.AreEqual(20, bins.Schema);
+            Sidecar blend = PreviewPipeline.Run(request, new FakeRenderer());
+            Assert.AreEqual(21, blend.Schema);
+            Assert.AreEqual(Quadrature.Blend, blend.Image.Quadrature);
+            Assert.AreEqual(new WavelengthsInfo(50, 416, 701), blend.Image.Wavelengths);
+            Sidecar bins = PreviewPipeline.Run(request with { Quadrature = Quadrature.Bins }, new FakeRenderer());
             Assert.AreEqual(Quadrature.Bins, bins.Image.Quadrature);
             Assert.AreEqual(new WavelengthsInfo(50, 413, 661), bins.Image.Wavelengths);
             Sidecar engine = PreviewPipeline.Run(request with { Quadrature = Quadrature.Engine }, new FakeRenderer());

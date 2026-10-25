@@ -48,12 +48,16 @@ namespace Vista.Output;
 /// tree line and where it came from, the canopy's detail and, for a dry run, the forest's share; and <see cref="ImageInfo.Canopy"/>,
 /// how the canopy scattered. Schema 20 (M1.12c) added <see cref="WorldInfo.Footing"/>, the height of the world's lowest valleys that
 /// the auto altitude puts at the place's valley floor, and, in <see cref="SlidersInfo.Weather"/>, the valley floor's altitude the
-/// weather was read at and that footing; the erosion's settings gained the strata's regional dip, folds, formations and massive share.</para>
+/// weather was read at and that footing; the erosion's settings gained the strata's regional dip, folds, formations and massive share.
+/// Schema 21 (M1.13) added <see cref="WorldInfo.Glaciers"/>, the world's glaciers; in <see cref="Materials"/>, whether the season's snow
+/// lay, the snowline, the freezing level and the glaciers' line it was placed by, for a dry run the shares of snow, firn and ice and,
+/// for a render with the material and normal outputs, the share of its ground that is white by slope;
+/// the erosion's settings gained the glacial carving's and today's glaciers' own.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 20;
+    public const int CurrentSchema = 21;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -244,6 +248,35 @@ public sealed record WorldInfo(
     /// height above its height 0 (which the auto altitude puts at the place's valley floor) and its lowest point.
     /// </summary>
     public WorldFooting? Footing { get; init; }
+
+    /// <summary>Today's glaciers (schema 21, vista-plan §10 M1.13): how much of the world they cover and how thick; null without them.</summary>
+    public GlacierInfo? Glaciers { get; init; }
+}
+
+/// <summary>A world's glaciers (vista-plan §10 M1.13, <see cref="World.Glaciers"/>).</summary>
+/// <param name="ElaMetres">Their equilibrium line, m above the world's height 0 (the recipe's own).</param>
+/// <param name="Share">The share of the world grid under glacier ice (at least 1 m of it).</param>
+/// <param name="VolumeKm3">The ice's volume, km³.</param>
+/// <param name="MaxThicknessMetres">The thickest ice, m.</param>
+public sealed record GlacierInfo(double ElaMetres, double Share, double VolumeKm3, double MaxThicknessMetres)
+{
+    /// <summary>The glaciers of <paramref name="erosion"/>, eroded with <paramref name="settings"/>; null when it has none.</summary>
+    public static GlacierInfo? Of(World.ErosionResult? erosion, World.ErosionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (erosion?.Ice is not { } ice)
+            return null;
+        double area = erosion.Surface.CellSize * erosion.Surface.CellSize;
+        int covered = 0;
+        double volume = 0.0, thickest = 0.0;
+        foreach (float metres in ice)
+        {
+            covered += metres >= 1f ? 1 : 0;
+            volume += metres * area;
+            thickest = Math.Max(thickest, metres);
+        }
+        return new GlacierInfo(settings.GlacierElaMetres, covered / (double)ice.Length, volume * 1e-9, thickest);
+    }
 }
 
 /// <summary>The sun (vista-plan §3.5): when, where in the sky, and how much of its light reaches the camera.</summary>
@@ -514,6 +547,24 @@ public sealed record MaterialsInfo
     /// <summary>The detail kinds below the grid and how fast their weights change; null without the rules or without detail.</summary>
     public MaterialDetailInfo? Detail { get; init; }
 
+    /// <summary>Whether the season's snow lay (schema 21, vista-plan §10 M1.13; <c>--snow off</c>: none).</summary>
+    public bool Snow { get; init; }
+
+    /// <summary>The snowline the snow was placed by, m above sea level (schema 21, the snow slider's); null without the rules.</summary>
+    public double? SnowlineMetres { get; init; }
+
+    /// <summary>The freezing level below which the snow was wet, m above sea level (schema 21); null without the rules.</summary>
+    public double? FreezingLevelMetres { get; init; }
+
+    /// <summary>The glaciers' equilibrium line above sea level at the scene's altitude, m (schema 21); null without glaciers.</summary>
+    public double? GlacierLineMetres { get; init; }
+
+    /// <summary>
+    /// For a render with the material and normal outputs, the share of its ground that is snow, firn or ice by slope (schema 21,
+    /// <see cref="SnowBySlope"/>); null otherwise.
+    /// </summary>
+    public IReadOnlyList<SlopeBand>? SnowBySlope { get; init; }
+
     /// <summary>For a dry run, the shares of the world grid's samples each material covers; null otherwise.</summary>
     public MaterialShares? Shares { get; init; }
 }
@@ -553,4 +604,13 @@ public sealed record MaterialShares(double RockHard, double RockSoft, double Scr
 {
     /// <summary>Forest (schema 19, vista-plan §10 M1.12b).</summary>
     public double Forest { get; init; }
+
+    /// <summary>The season's snow (schema 21, vista-plan §10 M1.13).</summary>
+    public double Snow { get; init; }
+
+    /// <summary>Glacier firn (schema 21).</summary>
+    public double Firn { get; init; }
+
+    /// <summary>Bare glacier ice (schema 21).</summary>
+    public double Ice { get; init; }
 }

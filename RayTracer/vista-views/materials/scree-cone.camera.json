@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "position": {
-    "x": -7400,
-    "y": 1484.59,
-    "z": 2400
+    "x": 605,
+    "y": 1504.2,
+    "z": 6161
   },
-  "yawDegrees": 0,
-  "pitchDegrees": -4,
+  "yawDegrees": 285,
+  "pitchDegrees": 10,
   "rollDegrees": 0,
   "focalLengthMm": 35,
   "sensorHeightMm": 24,

@@ -1,0 +1,10 @@
+{
+  "schema": 2,
+  "name": "snow-capped mountains, mid-April",
+  "setPieces": [
+    "snowCappedMountains"
+  ],
+  "time": "day",
+  "location": "zermatt",
+  "date": "2026-04-15"
+}

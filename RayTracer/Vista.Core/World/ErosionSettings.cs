@@ -164,6 +164,67 @@ public sealed record ErosionSettings
     /// </summary>
     public float StrataMassiveShare { get; init; }
 
+    /// <summary>
+    /// Steps of glacial carving after the incision (vista-plan §10 M1.13, <see cref="StreamPower"/>), on the finished world without
+    /// uplift: each step the steady ice of the step's climate (<see cref="GlacierFlow"/>) lowers its bed in proportion to how fast it
+    /// slides, where the rivers would have cut, and the slopes keep to their talus; 0: none, as M1.12c.
+    /// </summary>
+    public int GlacialSteps { get; init; }
+
+    /// <summary>
+    /// The mean equilibrium line of the glaciers that carve, in metres above the world's height 0: for the mountain set pieces 600 m
+    /// below today's glaciers' (<see cref="GlacierElaMetres"/>), so at a cycle's coldest it stands 900 m below it, as the Alps' stood
+    /// about a thousand metres lower at the last glacial maximum. Only glaciers that large carve troughs round (vista-log/M1.13.md).
+    /// </summary>
+    public float GlacialElaMetres { get; init; } = 1200f;
+
+    /// <summary>How far the carving glaciers' equilibrium line swings above and below <see cref="GlacialElaMetres"/> over a glacial cycle, m.</summary>
+    public float GlacialElaSwingMetres { get; init; } = 300f;
+
+    /// <summary>The carving steps of one glacial cycle: from the equilibrium line's lowest through its highest and back.</summary>
+    public int GlacialCycleSteps { get; init; } = 20;
+
+    /// <summary>The glaciers' mass-balance gradient, m of ice a year per m of height (<see cref="GlacierClimate"/>).</summary>
+    public float GlacialBalanceGradient { get; init; } = 0.007f;
+
+    /// <summary>The most a glacier's year adds above the equilibrium line, m of ice.</summary>
+    public float GlacialAccumulationMetres { get; init; } = 2f;
+
+    /// <summary>The most a glacier's year melts below it, m of ice.</summary>
+    public float GlacialAblationMetres { get; init; } = 10f;
+
+    /// <summary>
+    /// How deep a carving step lowers the bed under ice sliding at 100 m a year, m, in proportion to the sliding speed (Humphrey and
+    /// Raymond 1994), less on hard rock (<see cref="HardErodibility"/>).
+    /// </summary>
+    public float GlacialErosionMetres { get; init; } = 8f;
+
+    /// <summary>
+    /// The equilibrium line of today's glaciers, in metres above the world's height 0 (vista-plan §10 M1.13): the recipe's own, so
+    /// they stand whatever the place and the season (<see cref="Glaciers"/>); 0 lays none.
+    /// </summary>
+    public float GlacierElaMetres { get; init; }
+
+    /// <summary>True when the world has no glaciers: neither M1.13's carving nor today's ice.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Unglaciated => GlacialSteps == 0 && GlacierElaMetres == 0f;
+
+    /// <summary>The climate of the carving glaciers at carving step <paramref name="step"/> (0 first), in the world's metres.</summary>
+    public GlacierClimate CarvingClimate(int step)
+    {
+        // A smooth wave from the line's lowest at the cycle's start (a carving begins with its glaciers at their largest) to its
+        // highest half way: a smoothstep of the triangle wave, cosine-like but arithmetic alone, so no library's bit moves a world.
+        double t = (double)(step % GlacialCycleSteps) / GlacialCycleSteps;
+        double rise = 1.0 - Math.Abs(1.0 - 2.0 * t);
+        double wave = 1.0 - 2.0 * rise * rise * (3.0 - 2.0 * rise);
+        double ela = GlacialElaMetres - GlacialElaSwingMetres * wave;
+        return new GlacierClimate(ela, GlacialBalanceGradient, GlacialAccumulationMetres, GlacialAblationMetres);
+    }
+
+    /// <summary>The climate of today's glaciers, in the world's frame (<see cref="GlacierElaMetres"/>).</summary>
+    public GlacierClimate PresentClimate =>
+        new(GlacierElaMetres, GlacialBalanceGradient, GlacialAccumulationMetres, GlacialAblationMetres);
+
     /// <summary>True when the rock is M1.11d's: none of M1.12c's regional dip, folds, formations or massive regions.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool EvenStrata => StrataRegionalDipDegrees == 0f && StrataFoldMetres == 0f && StrataFormationMetres == 0f && StrataMassiveShare == 0f;
@@ -189,7 +250,9 @@ public sealed record ErosionSettings
     /// every closed basin (a coarser step rate leaves lakes; filling the lakes at once leaves them as plains; more uplift flattens
     /// the hillslopes into talus planes; a second, 32 m level grooves the faces). The strata's regional dip, folds, formations and
     /// massive share (vista-plan §10 M1.12c) were chosen by the contour-line measure and sheets of seed 42 seen from the user's
-    /// photo's height: dips like the hillsides' own take the beds' bands off the contours.
+    /// photo's height: dips like the hillsides' own take the beds' bands off the contours. The glaciers (vista-plan §10 M1.13) were
+    /// chosen by sheets and maps of seed 42: three glacial cycles of carving with the line swinging from 1200 to 1800 m above the world's
+    /// height 0 widen the valleys the ice fills, and today's line at 1800 m keeps glaciers on the high massif and in its valleys.
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -231,6 +294,15 @@ public sealed record ErosionSettings
         StrataMassiveShare = 0.3f,
         IncisionLakeFill = 0.05f,
         PoolFillMetres = 100.0f,
+        GlacialSteps = 60,
+        GlacialElaMetres = 1200.0f,
+        GlacialElaSwingMetres = 300.0f,
+        GlacialCycleSteps = 20,
+        GlacialBalanceGradient = 0.007f,
+        GlacialAccumulationMetres = 2.0f,
+        GlacialAblationMetres = 10.0f,
+        GlacialErosionMetres = 12.0f,
+        GlacierElaMetres = 1800.0f,
     };
 
     /// <summary>
@@ -239,6 +311,8 @@ public sealed record ErosionSettings
     /// </summary>
     public static ErosionSettings Hills { get; } = Mountains with
     {
+        GlacialSteps = 0,
+        GlacierElaMetres = 0.0f,
         Capacity = 1.0f,
         RockTalusDegrees = 45.0f,
         RockTalusHardDegrees = 45.0f,
@@ -345,6 +419,18 @@ public sealed record ErosionSettings
         Fraction(nameof(StrataFormationMetres), StrataFormationMetres, float.MaxValue);
         if (!(StrataMassiveShare >= 0f && StrataMassiveShare < 1f))
             errors.Add($"StrataMassiveShare must be in [0, 1) (got {StrataMassiveShare}).");
+        if (GlacialSteps < 0 || GlacialCycleSteps < 1)
+            errors.Add($"GlacialSteps must not be negative and GlacialCycleSteps must be positive (got {GlacialSteps}, {GlacialCycleSteps}).");
+        if (GlacialSteps > 0 && IncisionSteps == 0)
+            errors.Add("Glacial carving runs on the incision's grid: it needs IncisionSteps.");
+        Fraction(nameof(GlacialElaSwingMetres), GlacialElaSwingMetres, float.MaxValue);
+        Positive(nameof(GlacialBalanceGradient), GlacialBalanceGradient);
+        Positive(nameof(GlacialAccumulationMetres), GlacialAccumulationMetres);
+        Positive(nameof(GlacialAblationMetres), GlacialAblationMetres);
+        Fraction(nameof(GlacialErosionMetres), GlacialErosionMetres, float.MaxValue);
+        Fraction(nameof(GlacierElaMetres), GlacierElaMetres, float.MaxValue);
+        if (!float.IsFinite(GlacialElaMetres))
+            errors.Add($"GlacialElaMetres must be finite (got {GlacialElaMetres}).");
         return errors;
     }
 
@@ -367,6 +453,13 @@ public sealed record ErosionSettings
             .. (EvenStrata ? [] : new[]
             {
                 StrataRegionalDipDegrees, StrataRegionMetres, StrataFoldMetres, StrataFoldWavelengthMetres, StrataFormationMetres, StrataMassiveShare,
+            }.Select(BitConverter.SingleToInt32Bits)),
+            // M1.13's glaciers likewise only when there are any, so M1.12c's worlds keep their key.
+            .. (Unglaciated ? [] : new[] { GlacialSteps, GlacialCycleSteps }),
+            .. (Unglaciated ? [] : new[]
+            {
+                GlacialElaMetres, GlacialElaSwingMetres, GlacialBalanceGradient, GlacialAccumulationMetres, GlacialAblationMetres, GlacialErosionMetres,
+                GlacierElaMetres,
             }.Select(BitConverter.SingleToInt32Bits)),
         ];
         Span<byte> buffer = stackalloc byte[4];

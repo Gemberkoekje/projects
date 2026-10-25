@@ -139,6 +139,10 @@ public static class WorldBuilder
         (HeightField incised, StrataGrid strata) = Prepare(ground, recipe, seed, settings);
         double incisionSeconds = incision.Elapsed.TotalSeconds;
         ErosionRun run = eroder.Erode(incised, settings, strata);
+        // Today's glaciers (vista-plan §10 M1.13) lie on the eroded ground and are kept with it.
+        var laying = System.Diagnostics.Stopwatch.StartNew();
+        run = run with { Result = Glaciers.Lay(run.Result, settings) };
+        double glacierSeconds = settings.GlacierElaMetres > 0f ? laying.Elapsed.TotalSeconds : 0.0;
         string created = time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
         string? file = cache?.Store(profile, seed, grid, settings, run.Result, new WorldOrigin(eroder.DeviceName, eroder.DriverVersion, created, ground.ContentHash()));
         return new TerrainWorld(run.Result.Surface, run.Result, new ErosionInfo
@@ -151,7 +155,7 @@ public static class WorldBuilder
             Driver = eroder.DriverVersion,
             ErodedUtc = created,
             CacheFile = file,
-            Stats = run.Stats with { IncisionSeconds = incisionSeconds },
+            Stats = run.Stats with { IncisionSeconds = incisionSeconds, GlacierSeconds = glacierSeconds },
             Drainage = DrainageStats.Measure(run.Result.Drainage),
             Strata = run.Result.Strata,
         }, warnings);

@@ -126,9 +126,17 @@ public sealed class PreviewSession
         warnings.AddRange(sliders.Hints);
         Almanac almanac = sliders.Almanac;
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.For(request.Mesh.Materials);
-        GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees) with { Forest = request.Forest };
         AtmosphereModel air = sliders.Air(AtmosphereModel.Default);
         double groundAltitude = sliders.BaseAltitudeMetres;
+        // The season's snow from the sliders, and the world's glaciers' line at this altitude (vista-plan §10 M1.13).
+        GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees) with
+        {
+            Forest = request.Forest,
+            Snow = request.Snow,
+            SnowlineMetres = sliders.SnowlineMetres,
+            FreezingLevelMetres = sliders.FreezingLevelMetres,
+            GlacierLineMetres = world.Info.Settings.GlacierElaMetres + groundAltitude,
+        };
         string altitudeFrom = sliders.Readings[Slider.Altitude].From;
 
         // The mesh follows the camera's position and the frame (vista-plan §10 M1.9), never the loupe: a loupe is a crop of the
@@ -164,6 +172,7 @@ public sealed class PreviewSession
         RenderInfo? renderInfo = null;
         ExposureInfo? exposure = null;
         MaterialShares? shares = null;
+        IReadOnlyList<SlopeBand>? snowBySlope = null;
         DenoiseInfo? denoised = null;
         if (_renderer is null || request.DryRun)
         {
@@ -287,6 +296,9 @@ public sealed class PreviewSession
             timings["exposureMeter"] = Lap(stopwatch);
             MarkRendererStages(stages, rendered, built, settings);
 
+            if (output.Aovs.TryGetValue(Aov.MaterialId, out float[]? ids) && output.Aovs.TryGetValue(Aov.Normal, out float[]? normals) && mesh.Materials is not null)
+                snowBySlope = SnowBySlope.Measure(ids, normals);
+
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
             WriteDisplayPng(request.OutPath, linear, exposure.AppliedEv, request, window);
             outputs["beauty"] = Path.GetFileName(request.OutPath);
@@ -373,6 +385,7 @@ public sealed class PreviewSession
                 Erosion = world.Info,
                 Mesh = mesh.Info,
                 Footing = world.Footing,
+                Glaciers = GlacierInfo.Of(world.Erosion, world.Info.Settings),
             },
             Place = almanac.Place,
             Sliders = SlidersInfo.From(sliders, request.SlidersPath, pinsFrom),
@@ -381,7 +394,9 @@ public sealed class PreviewSession
             Exposure = exposure,
             Denoise = denoised,
             DataTiers = MaterialCatalog.TiersOf(materials),
-            Materials = MaterialsInfoOf(Tables(materials, WavelengthTable.For(request.Quadrature)), materials, mesh, ground, sliders.Climate, shares),
+            Materials = MaterialsInfoOf(Tables(materials, WavelengthTable.For(request.Quadrature)), materials, mesh, ground, sliders.Climate, shares) is { } info
+                ? info with { SnowBySlope = snowBySlope }
+                : null,
             Render = renderInfo,
             Stages = new StageInfo([.. stages.Where(s => !s.Value).Select(s => s.Key)], [.. stages.Where(s => s.Value).Select(s => s.Key)]),
             Watch = watch is null ? null : watch with { RunSeconds = total.Elapsed.TotalSeconds },
@@ -493,7 +508,8 @@ public sealed class PreviewSession
 
     /// <summary>The material constants of a render of <paramref name="field"/> under <paramref name="ground"/>'s grass line, tree line and pole.</summary>
     private static MaterialConstants MaterialConstantsOf(MaterialField field, GroundCover ground) =>
-        field.Apply(MaterialRules.Default.Constants((float)ground.GrassLineMetres, ground.Poleward, field.NoiseSeed, (float)ground.TreeLineMetres, ground.Forest));
+        field.Apply(MaterialRules.Default.Constants((float)ground.GrassLineMetres, ground.Poleward, field.NoiseSeed, (float)ground.TreeLineMetres, ground.Forest))
+            .WithSnow(ground.SnowPlacement);
 
     /// <summary>
     /// Where the forest of <paramref name="ground"/> stands on a world whose height 0 lies <paramref name="groundAltitude"/> above sea
@@ -505,7 +521,7 @@ public sealed class PreviewSession
     /// <summary>The shares of the world grid each material covers, from every sample's weights (schema 17; the forest's since schema 19).</summary>
     private static MaterialShares SharesOf(MaterialField field, HeightField terrain, MaterialWeights[] weights)
     {
-        double hard = 0.0, soft = 0.0, scree = 0.0, soil = 0.0, grass = 0.0, wet = 0.0, forest = 0.0;
+        double hard = 0.0, soft = 0.0, scree = 0.0, soil = 0.0, grass = 0.0, wet = 0.0, forest = 0.0, snow = 0.0, firn = 0.0, ice = 0.0;
         int n = terrain.Size;
         for (int j = 0; j < n; j++)
         {
@@ -521,11 +537,20 @@ public sealed class PreviewSession
                 soil += w.Soil;
                 grass += w.Grass;
                 forest += w.Forest;
+                snow += w.Snow;
+                firn += w.Firn;
+                ice += w.Ice;
                 wet += w.Wet;
             }
         }
         double count = (double)n * n;
-        return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count) { Forest = forest / count };
+        return new MaterialShares(hard / count, soft / count, scree / count, soil / count, grass / count, wet / count)
+        {
+            Forest = forest / count,
+            Snow = snow / count,
+            Firn = firn / count,
+            Ice = ice / count,
+        };
     }
 
     /// <summary>
@@ -565,6 +590,10 @@ public sealed class PreviewSession
                 $"where {climate.Station}'s warmest month averages {Weather.TreeLine.WarmestMonthCelsius:0.#} °C along the lapse rate"),
             Detail = detail,
             Shares = shares,
+            Snow = ground.Snow,
+            SnowlineMetres = ground.SnowlineMetres,
+            FreezingLevelMetres = ground.FreezingLevelMetres,
+            GlacierLineMetres = mesh.Materials.Glaciated ? ground.GlacierLineMetres : null,
         };
     }
 

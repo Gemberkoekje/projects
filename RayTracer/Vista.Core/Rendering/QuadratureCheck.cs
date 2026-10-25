@@ -8,18 +8,21 @@ namespace Vista.Rendering;
 /// integrated through the table and by dense 1 nm integration over the CIE 1931 functions (<see cref="CieObserver"/>), and the
 /// difference as ΔE₇₆ and as a luminance ratio. Each spectrum is scaled to luminance 1 by the dense integral and judged in CIELAB
 /// against equal-energy white (the flat spectrum's dense XYZ), so a light and a surface are judged alike: the cast a white card
-/// would show under that light, or a surface of that colour at the brightness of white.
+/// would show under that light, or a surface of that colour at the brightness of white. Since M1.13 the twilight cases light snow's
+/// own spectrum (<see cref="MaterialCatalog.SnowId"/>) in place of a flat 0.9, with the sun 1°, 1.5° and 1.8° below the horizontal,
+/// and grass lit by light already bounced off grass joins them.
 /// </summary>
 public static class QuadratureCheck
 {
     /// <summary>The sun's elevation for the twilight case, degrees: just below the horizon of the valley, still on the summits.</summary>
     public const double TwilightSunElevationDegrees = -1.0;
 
+    /// <summary>The sun's elevations of the twilight cases since M1.13, degrees: alpenglow, deepening.</summary>
+    public static IReadOnlyList<double> TwilightElevationsDegrees { get; } = [-1.0, -1.5, -1.8];
+
     /// <summary>Where the twilight case's light lands, m above sea level: a summit lit after the valley is in shadow.</summary>
     public const double TwilightSummitMetres = 4000.0;
 
-    /// <summary>The reflectance standing in for snow in the twilight case until M1.13 has snow's own spectrum.</summary>
-    public const double TwilightReflectance = 0.9;
 
     /// <summary>
     /// Pure water's absorption coefficient, m⁻¹, every 10 nm from 380 to 800 nm: Pope and Fry (1997) to 720 nm, Smith and Baker
@@ -35,11 +38,14 @@ public static class QuadratureCheck
     /// <summary>The spectra the check runs: a name and the spectrum as a function of the wavelength in nm.</summary>
     public static IReadOnlyList<QuadratureCase> Cases { get; } = BuildCases();
 
-    /// <summary>The spectra a table must integrate within 1 ΔE₇₆ and 1% in luminance: every case but the twilight one, which is recorded.</summary>
+    /// <summary>
+    /// The spectra M1.12a's equal bins integrate within 1 ΔE₇₆ and 1% in luminance: every case but the red end's (the twilight on snow
+    /// and the twice-bounced grass), which they miss and which the default table since M1.13 (<see cref="Quadrature.Blend"/>) holds too.
+    /// </summary>
     public static bool IsHeldToTheLimit(QuadratureCase spectrum)
     {
         ArgumentNullException.ThrowIfNull(spectrum);
-        return !spectrum.Name.StartsWith("twilight", StringComparison.Ordinal);
+        return !spectrum.Name.StartsWith("twilight", StringComparison.Ordinal) && !spectrum.Name.EndsWith("twice bounced", StringComparison.Ordinal);
     }
 
     /// <summary>How far <paramref name="table"/> integrates <paramref name="spectrum"/> from the dense integral.</summary>
@@ -86,41 +92,14 @@ public static class QuadratureCheck
     /// horizontal: the solar spectrum through the default air along the straight ray toward it over the curved Earth, which grazes the
     /// air about 3 km above sea level, and its optical depth in air masses of the sea-level zenith column at 550 nm.
     /// </summary>
-    public static (Func<double, double> Spectrum, double AirMass) TwilightSun()
-    {
-        AtmosphereModel model = AtmosphereModel.Default;
-        DensityColumns slant = SlantColumns(model, TwilightSummitMetres, TwilightSunElevationDegrees);
-        AtmosphereCoefficients k550 = model.CoefficientsAt(550.0);
-        double airMass = k550.OpticalDepth(slant) / k550.OpticalDepth(model.ZenithColumns(0.0));
-        return (nm => SolarSpectrum.Radiance(nm) * Math.Exp(-model.CoefficientsAt(nm).OpticalDepth(slant)), airMass);
-    }
+    public static (Func<double, double> Spectrum, double AirMass) TwilightSun() => TwilightLight.Sun(TwilightSunElevationDegrees, TwilightSummitMetres);
 
     /// <summary>
     /// Columns of relative density, m, along the straight ray from <paramref name="altitudeMetres"/> at <paramref name="elevationDegrees"/>
     /// to the top of the air, over the sphere of <paramref name="model"/> (midpoints of 20 m steps).
     /// </summary>
-    public static DensityColumns SlantColumns(AtmosphereModel model, double altitudeMetres, double elevationDegrees)
-    {
-        ArgumentNullException.ThrowIfNull(model);
-        double r0 = model.PlanetRadiusMetres + altitudeMetres;
-        double mu = Math.Sin(elevationDegrees * Math.PI / 180.0);
-        double top = model.TopRadiusMetres;
-        double length = -r0 * mu + Math.Sqrt(r0 * r0 * (mu * mu - 1.0) + top * top);
-        const double step = 20.0;
-        int steps = (int)Math.Ceiling(length / step);
-        double dt = length / steps, rayleigh = 0.0, aerosol = 0.0, ozone = 0.0;
-        for (int s = 0; s < steps; s++)
-        {
-            double t = (s + 0.5) * dt;
-            double h = Math.Sqrt(r0 * r0 + t * t + 2.0 * r0 * mu * t) - model.PlanetRadiusMetres;
-            if (h < 0.0)
-                throw new ArgumentException("The ray meets the ground.", nameof(elevationDegrees));
-            rayleigh += model.RayleighDensity(h) * dt;
-            aerosol += model.AerosolDensity(h) * dt;
-            ozone += model.OzoneDensity(h) * dt;
-        }
-        return new DensityColumns(rayleigh, aerosol, ozone);
-    }
+    public static DensityColumns SlantColumns(AtmosphereModel model, double altitudeMetres, double elevationDegrees) =>
+        TwilightLight.SlantColumns(model, altitudeMetres, elevationDegrees);
 
     /// <summary>Pure water's absorption at <paramref name="nm"/>, m⁻¹ (<see cref="WaterAbsorption"/>, linear between its points).</summary>
     public static double WaterAbsorptionAt(double nm)
@@ -148,9 +127,15 @@ public static class QuadratureCheck
         foreach (double airMass in (double[])[1.0, 2.0, 5.0, 10.0, 20.0])
             cases.Add(new QuadratureCase($"sun, air mass {airMass:0}", nm => SunThroughAirMass(nm, airMass)));
         cases.Add(new QuadratureCase("Rayleigh sky", nm => SolarSpectrum.Radiance(nm) * Math.Pow(550.0 / nm, 4.0)));
-        (Func<double, double> twilight, double mass) = TwilightSun();
-        cases.Add(new QuadratureCase(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"twilight on snow, air mass {mass:0}"),
-            nm => TwilightReflectance * twilight(nm)));
+        IReadOnlyList<double> grass = MaterialCatalog.Ground[MaterialCatalog.GrassId].Spectrum!;
+        cases.Add(new QuadratureCase("grass, twice bounced", nm => IntegratorTables.ReflectanceAt(grass, nm) * IntegratorTables.ReflectanceAt(grass, nm)));
+        IReadOnlyList<double> snow = MaterialCatalog.Ground[MaterialCatalog.SnowId].Spectrum!;
+        foreach (double elevation in TwilightElevationsDegrees)
+        {
+            (Func<double, double> twilight, double mass) = TwilightLight.Sun(elevation, TwilightSummitMetres);
+            cases.Add(new QuadratureCase(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"twilight on snow, sun {elevation:0.0#}°, air mass {mass:0}"),
+                nm => IntegratorTables.ReflectanceAt(snow, nm) * twilight(nm)));
+        }
         return cases;
     }
 
