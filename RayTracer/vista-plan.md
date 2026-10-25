@@ -9,8 +9,8 @@ twenty-six slices in §10 (**M1 plan**); M1.1–M1.10 (iteration tools, astronom
 perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch mode, the view-dependent terrain mesh and the
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
-rule), M1.12a (the colour quadrature), M1.12b (forest as material) and M1.12c (the world anchored to the place's valley floor,
-and folded strata) are done, and M1.13 (snow and glaciers) is next. It sits
+rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
+and folded strata) and M1.13 (snow and glaciers) are done, and M1.13a (the valley haze layer) is next. It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -228,6 +228,14 @@ footing, not height 0, at the place's valley floor (never below sea level), and 
 temperature, the humidity and the visibility at the valley floor, whatever the world's footing. A pinned altitude stays the
 altitude of height 0; the valley floor then stands the footing above it.
 
+*Since M1.13 ([`vista-log/M1.13.md`](vista-log/M1.13.md)):* each dropdown place carries its own monthly precipitation (1991–2020,
+from its temperatures' station but for Lofoten, whose is Leknes'), and the snowpack falls by it: each day the month's rate
+interpolated between the months' middles, 2.5% more per 100 m above the station (Huss and Hock 2015's upper value, up to twice the
+station's), snowfall counted 1.2 times what the gauge caught (gauges miss snow). Maritime snowlines come down (Fiordland's January
+line 1733 → 1098 m, Lofoten's July line 1193 → 835 m), dry ones go up (Banff's April line 966 → 1316 m); a custom latitude keeps
+M1.11's one rate. The season's snow and the freezing level now show: snow lies above the snowline by the material rules, wet below
+the freezing level and dry above it (§4.5).
+
 ---
 
 ## 4. World generation
@@ -291,6 +299,17 @@ change.
   outcrop lines on rock that run within 10° of the contour (the angle on the slope): M1.12b's nearly level beds 15.1–16.6% on four
   seeds, the folded ones 11.7–12.6% (lines in random directions would give 11.1%). The worlds are steeper for it (the 8 m slopes'
   most crowded ±2° window 12.4–13.8% against 8.6–10.8%).
+- **Glacial carving** (M1.13, [`vista-log/M1.13.md`](vista-log/M1.13.md)): after the incision, on the finished world and in its own
+  metres, three glacial cycles of 20 steps (the equilibrium line swinging between 900 and 1500 m above the world's height 0, up to
+  900 m below today's glaciers' line) each solve the steady ice of their climate (`GlacierFlow`: the balance flux routed over the
+  ice's surface to every lower neighbour, the thickness from the shallow-ice approximation, the surface smoothed over a few ice
+  thicknesses) and lower its bed by its sliding speed (averaged over the glacier's width, a plug), where the glacier is thick enough
+  to be warm at its bed, a wall's cut over its slope's cosine, less on hard rock, and never deeper than 80 m below the spill of the
+  hollow it digs (the erosion's pools then fill it with sediment: flat floors). The rivers cut where the ice is not, and every slope
+  keeps its talus. The valleys glaciers run in round from V's into U's (the troughs' width at half their bottom 100 m
+  over their width at 100 m, a V 0.5, a parabola 0.71: medians 0.80, 0.62, 0.69 and 0.84 on the four seeds against 0.44–0.48
+  uncarved), the relief grows and the summits nearly keep their height; the ice's water runs under it, along the ground's
+  drainage, which holds (95–97% of the grid into a 1 km² channel).
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -347,6 +366,19 @@ What makes snow-capped mountains read as real is **where the snow sticks**:
   below — the material changes spectrally too (grain size, liquid water).
 - Close-up snow (depth as geometry, snow on branches, sparkle, subsurface scattering)
   arrives with the winter milestone (M7).
+
+*Built in M1.13 ([`vista-log/M1.13.md`](vista-log/M1.13.md)):* **today's glaciers** are the recipe's: the steady ice of its own
+equilibrium line (1800 m above the world's height 0 for the mountain set pieces) solved on the eroded world's 64 m average and laid
+on the 8 m ground as a smooth surface without closed hollows (`Glaciers`), part of the world and cached with it, its water
+running under it along the ground's drainage; firn above that line, bare ice below it
+(grey, debris-covered where it thins toward its edges and snout, cracked into crevasse fields where it flows over ground steeper than
+8–14°), whatever the place, the season and the snow slider. **The season's snow** lies by the material rules (`MaterialRules`, the
+shader's twin): above the snow slider's snowline, 250 m lower on a fully poleward face, 150 m lower in a full hollow (the ground 6 m
+below its 72 m surroundings) and in the westerlies' lee, higher on ridges and windward faces, ragged by two noises; shed from slopes
+steeper than 35–45° (8° steeper in gullies), scoured from ridges; wet below the freezing level, dry above it. Forest keeps its ground
+and shows the snow only as a dusting in the gaps between its crowns. **The spectra** come from ice's absorption (Picard et al. 2016
+to 600 nm, Warren and Brandt 2008 beyond) and grain size, by Kokhanovsky and Zege's asymptotic radiative transfer, with dust:
+dry snow (0.2 mm grains), wet snow (1.5 mm), firn (2.5 mm) and glacier ice (25 mm, dusty), Lambertian or nearly.
 
 ### 4.6 Ecosystem & vegetation
 
@@ -562,7 +594,11 @@ outside it is dropped at import. Since M1.12a the grid is Vista's own (`Waveleng
 equal x̄ + ȳ + z̄ mass, each wavelength the whole nanometre at its bin's median (413–661 nm), weighted by
 the bin's own integrals of x̄, ȳ and z̄, so colour integrates true to within 1 ΔE₇₆ of dense integration.
 The engine's grid (419–651 nm, weighted by the inverse of x̄ + ȳ + z̄ at each point) stays the maze's, and
-Vista's with `--quadrature engine`, for `main`'s images before M1.12a.
+Vista's with `--quadrature engine`, for `main`'s images before M1.12a. *Since M1.13* the default is the **blend**
+(`--quadrature blend`; the equal bins stay as `--quadrature bins`): 50 bins of equal mass under white light with 30% of the
+twilight sun at −1.8° (by colour-matching mass), each weighted by its bin's own integrals of the functions times that light over the
+light at its wavelength (importance sampling, exact for the blend), so it reaches 701 nm and integrates alpenglow's light within
+1 ΔE₇₆ where the equal bins missed by up to 6.7; a flat spectrum's luminance stays exact and its colour 0.05 ΔE₇₆ off.
 
 ---
 
@@ -1537,6 +1573,30 @@ or more steeply, and do the calm patches of massive rock look like granite massi
   as desert (seed 42 in `m1-12-ids.png`), is judged again once snow covers the high ground, before
   any retuning of the soil rule.
 
+*Status (2026-10-25): done.* Glaciers carve the valleys they run in: after the incision, three glacial cycles of steady ice (balance
+flux, shallow-ice thickness; the line 900–1500 m above height 0, up to 900 m below today's) lower the bed by the ice's sliding speed
+where it is thick enough to slide, and the troughs round from V's into U's: the width at half a trough's bottom 100 m over its width
+at 100 m (a V 0.5, a parabola 0.71) has medians 0.80, 0.62, 0.69 and 0.84 on the four seeds against 0.44–0.48 uncarved
+(`m1-13-valleys.png`). The relief grows, the summits nearly keep their height, the drainage holds (95.2–96.7%, the ice's water
+running under it) and the footing drops 45–89 m. Today's glaciers are the recipe's (their line 1800 m above height 0), 2.4–10.8% of
+the worlds under ice: firn above the line, grey ice below it, crevassed where it steepens (`m1-13-maps.png`). The season's snow lies
+by rule (aspect, hollows, wind, shedding from steep faces, scoured ridges, wet below the freezing level; forest dark with a dusting):
+in April the range views' faces steeper than 50° are 12–17% white where flats are 78–86% (`m1-13-slopes.png`; the threshold recorded:
+at most 35% white over 40°, 20% over 50°). The snowline follows each place's monthly precipitation (Fiordland's January line 1733 →
+1098 m, Banff's April line 966 → 1316 m; Zermatt's year in `m1-13-seasons.png`). Snow and ice spectra come from ice's absorption and
+grain size. The red end is decided: the blend, now the default, holds every spectrum of the check within 0.90 ΔE₇₆ (the bins missed
+−1.8° by 6.7); in the renders the two agree within the noise: the summits in view are lit at −0.5° and dark by −1°. Alpenglow
+shows unprogrammed: summits orange to red at 0° and −0.5° over valleys in shadow (`m1-13-alpenglow.png`). The brown stony ground is
+1.9–2.3% at Zermatt in July, a thin fringe: not retuned. Russian roulette on bright snow: a start at bounce 1 would be 1.29× as
+efficient (M1.5 measured 0.49× at dawn); the start stays at 2. The aerial view costs 10% more a sample (the cost ledger). *Judge this:*
+the views (`m1-13-views.png`, right): the glaciated range in July, summer snow on ledges and in gullies, the troughs; the maps; the
+seasons; the photo sheet against your April photo, at Zermatt's line and at 2400 m; the alpenglow sweep. *Ignore this:* no depth,
+cornices or sparkle to the snow, no trees (M7, M5); warm greys and saturated greens (M1.17); the ranges' busy feet (M1.13a); new
+poses for the near views; the same glaciers in every season and place; the red end, which no frame here shows. *Questions:* do the
+valleys read as glacial troughs and the snow as lying where it would? Is Zermatt's mid-April world as white as you would expect?
+Should today's glaciers follow the place (lower at Lofoten and Fiordland)? Should every world's carving glaciers be sized to its own
+height, or is seed 7's shallower carving the variety you want? Log: [`vista-log/M1.13.md`](vista-log/M1.13.md).
+
 **M1.13a — Valley haze layer.**
 - *Goal:* the painter's mist at the foot of the mountains, from physics: a range's base fading into a
   pale layer that hides where it meets the valley and separates it from the layers in front.
@@ -1759,6 +1819,10 @@ style.
   spectrum within 0.93 ΔE₇₆ at the luminance of white but **light past 650 nm**: the twilight light on snow misses by 1.08, since one
   wavelength (661 nm) stands for the whole last bin, and deeper twilight misses by more (−1.8°: 6.8). How to cover the red end
   (more of the 50 in the tail, or a table tuned to a blend of white and twilight light) is decided in M1.13, its attention point.
+  *Decided (M1.13):* the blend. Four of the 50 in the red tail (46 + 4, the last at 681 nm) leave alpenglow at −1.8° 2.8 ΔE₇₆ off and
+  more in the tail does not help (6 + 44: 2.4); a table tuned to white light and 30% of the −1.8° twilight sun holds every case within
+  0.90 ΔE₇₆, those it was not tuned to too (twilight at −1° and −1.5°, the snow and ice spectra, twice-bounced grass), for no cost
+  per sample (`vista-log/M1.13.md` has the table).
 - **Where the world sits against the place's climate (found in M1.12b; decided 2026-10-23: the
   world's lowest valleys, its 5th percentile, meet the place's valley floor, built in M1.12c).** Height 0 of the world is the place's valley floor
   (Zermatt 1608 m), but since M1.11d's uplift the eroded seed-42 world's lowest ground stands 391 m above it and its peaks 2387 m:

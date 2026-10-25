@@ -30,6 +30,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.12a | 0.25 | 5.63 | 4.08 | 8.17 |
 | M1.12b | 0.25 | 5.87 | 4.32 | 8.65 |
 | M1.12c | 0.31 | 6.12 | 5.39 | 9.56 |
+| M1.13 | 0.45 | 6.75 | 5.75 | 10.90 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -134,3 +135,12 @@ shared with desktop programs (about 30% busy): median ratios 1.227, 1.043, 1.248
 M1.12b's times those medians. Only the aerial view keeps its pose: +4% for 2% more rays and the forest now in its valleys. The
 default view's +25% is a new pose with 10% more rays and forest in frame; the sky view's +23% the same new spot, its camera rays
 now starting 3 m above other ground (as M1.11d's +17%); the per-hit cost of the massive weight was not separated.
+M1.13 carves the world's valleys with glaciers, lays today's glaciers on it and lets the season's snow lie by rule: every hit
+evaluates the snow, firn and ice rules (two noises more, the ice map's word) and, where they lie, their spectra and crevasses. The
+default and sky views are raised on the re-carved ground (the default 6 m above a meadow), and the down-slope view re-placed
+(vista-log/M1.13.md). Measured as M1.12c was: this slice and `main` (844c8307) rendered alternately, view by view, three rounds,
+`main` at its own cameras, on a GPU shared with desktop programs: median ratios 1.457, 1.103, 1.067 and 1.140 (1.430–1.572,
+1.084–1.132, 1.057–1.075, 1.114–1.153), at 1.00, 3.12, 2.53 and 3.43 rays per sample against `main`'s 1.00, 3.09, 2.64 and 3.44.
+The row is M1.12c's times those medians. The aerial view keeps its pose: +10% for the rules every hit pays, with 1% more rays (the
+snow's high albedo keeps a few more paths alive). The default's +7% is a new spot with 4% fewer rays; down the slope +14% a new pose;
+the sky view's +46% is 0.1 ns a sample at its raised spot, where camera rays start over other ground.
