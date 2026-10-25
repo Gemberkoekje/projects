@@ -1,7 +1,12 @@
 # By Galactic Accord — Vertical Slice (Slice 0)
 
 A contract-based space-trading simulation in a living, player-agnostic universe — the **Slice 0
-"core loop"** from [`by_galactic_accord_gdd_v0.2.md`](../by_galactic_accord_gdd_v0.2.md).
+"core loop"** from the v0.2 design document.
+
+> **Note:** the design has moved on to [`by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md),
+> which redefines Slice 0 around the contract web (posting as well as taking contracts, ships built
+> from parts, failure terms) and retires the WPF and console clients in favour of a Blazor client.
+> This README still describes the current build, which implements the v0.2 slice.
 
 > *You take contracts to earn credits. Credits let you upgrade your ship and take better contracts.
 > The universe shifts around you based on forces you can influence but not control.*
