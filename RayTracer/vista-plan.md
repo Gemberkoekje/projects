@@ -11,7 +11,7 @@ measured decision to keep it for the far terrain), M1.10a (exposure and display)
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
 and folded strata), M1.13 (snow and glaciers) and M1.13a (the valley haze layer) are done, and M1.13b (terrain-following valley
-mist) is next. It sits
+mist) is next. M1's scope is frozen after M1.13b: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -871,6 +871,10 @@ for a slice hold for every milestone.
   real, or as icing?"), naming a real photo to compare against where one helps. Real photos are for
   judging only: the user's own may be committed beside a sheet (downscaled to the size rule, metadata
   stripped); anyone else's stay local.
+- **Findings go to the parked list** (since 2026-10-25): a new idea from a review that the current
+  milestone's own checks do not need is written into the parked list (the end of this section) with
+  the milestone it belongs to, not added as a slice. A milestone takes its parked items when its
+  slices are planned.
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
@@ -967,6 +971,13 @@ pools by the valleys' shape; terrain shadows on the mist in this slice; up to tw
 M5's distant-forest representation (M1.12b's forest material); M4's valley haze and mist (M1.13a, M1.13b) and the terrain's shadow
 in the low air (M1.13b's sunlight volume). Those milestones keep the rest of their work and fine-tune what came early. M1.13b does not
 take fog proper, clouds, steam fog, the daytime haze lid or the seasonal aerosol load: they stay M4's.
+
+*M1's scope is frozen (2026-10-25, the user's call):* M1.13b is the last slice added to M1, which grew from seventeen slices to
+twenty-seven (seven corrections that sheets and measurements showed were needed, three pulled forward from later milestones).
+What remains is M1.13b, M1.14, M1.15, M1.16 and M1.17, and nothing new enters M1 unless M1.17's own checks need it: the hero
+render "alpine range at golden hour", alpenglow, bare steep faces, the estimate inside its range, the goldens. A fix those checks
+need is made inside the slice that finds it, or in M1.17. Everything else a review finds goes to the parked list (the end of this
+section) with the milestone it belongs to.
 
 *Strategy decisions (the user's answers, 2026-10-19):*
 
@@ -1906,6 +1917,26 @@ user's own Bob Ross paintings, applied to the finished photoreal render as a dis
 filter (pillar 2). Welcome feature creep (the user, 2026-10-22), but only once photorealism is
 reached, or once the user is done pushing it; nothing before that bends the physics toward a
 style.
+
+**Parked** (since 2026-10-25): findings that no current milestone's checks need, each with where it
+belongs; a milestone takes its items when its slices are planned, and the user may promote or drop
+any of them.
+- **Farmland on the valley floors** (M1.12b): forest covers valley floors where real alpine ones are
+  fields and meadows. *Belongs:* M8 (fields beside the props), and Hamlet's fields.
+- **One forest for every place and season** (M1.12b): a single conifer canopy in July colours.
+  *Belongs:* M5 (deciduous and mixed forest, the season's colours).
+- **The meadow's regular banding** (M1.12's close-ups): wavy bands that look like a single-frequency
+  pattern. *Belongs:* M5 (grass), checked when grass geometry lands.
+- **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
+  *Belongs:* unscheduled; faults and overhangs need more than a height field.
+- **Steeper, more alike slopes since the folded strata** (M1.12c): the facet measure rose from
+  8.6–10.8% to 12.4–13.8%, though not at the talus angle. *Belongs:* watched at M1.17; acted on only
+  if the hero render shows it.
+- **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
+  Lofoten and Fiordland, in every season. *Belongs:* M7 (winter), after the user's call.
+- **Carving sized to each world's height** (M1.13): seed 7's shallower carving is either variety or a
+  world the glaciers under-carve. *Belongs:* the user's call, then M7.
+- **Cornices on ridges** (M1.13): not in M7's list of close-up snow. *Belongs:* M7.
 
 ---
 
