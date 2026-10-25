@@ -72,11 +72,16 @@ public sealed record SliderState(
     /// </summary>
     public double ValleyFloorMetres { get; init; }
 
-    /// <summary><paramref name="model"/> with the haze the sliders settled on.</summary>
+    /// <summary>The valley haze slider's layer (vista-plan §10 M1.13a); none when resolved before it existed.</summary>
+    public ValleyHazeLayer ValleyHaze { get; init; } = ValleyHazeLayer.None;
+
+    /// <summary><paramref name="model"/> with the haze the sliders settled on, the valley haze's too.</summary>
     public AtmosphereModel Air(AtmosphereModel model)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return model with { AerosolOpticalDepth550 = AerosolOpticalDepth550 };
+        return ValleyHaze.Any
+            ? model with { AerosolOpticalDepth550 = AerosolOpticalDepth550, ValleyHazeTopMetres = ValleyHaze.TopMetres, ValleyHazeExtinction550 = ValleyHaze.Extinction550 }
+            : model with { AerosolOpticalDepth550 = AerosolOpticalDepth550 };
     }
 }
 
@@ -96,7 +101,8 @@ public sealed record SliderReading(string Value, bool Pinned, string From)
 /// <summary>
 /// Resolves the linked sliders (vista-plan §3.4, §3.6, §10 M1.11): every slider is pinned (the slider file's value) or auto, and
 /// an auto slider follows the controls upstream of it, in this order — place → altitude → season ⇄ date → time of day → solar
-/// time → the climate's day at the valley floor → temperature → humidity → freezing level → snow; the day's humidity → haze. Pinning one
+/// time → the climate's day at the valley floor → temperature → humidity → freezing level → snow; the day's humidity → haze; the day's
+/// range, the hour, the snow and the haze → the valley haze. Pinning one
 /// slider stops only that one: a pinned temperature still moves the auto humidity, snow and haze. The set pieces push defaults
 /// onto auto sliders (<see cref="SliderPushes"/>). Contradictions are never errors: they render as asked, with an "implausible"
 /// hint.
@@ -110,7 +116,9 @@ public sealed record SliderReading(string Value, bool Pinned, string From)
 /// (<see cref="SnowCover"/>), and a temperature away from the climate's at the hour — pinned, or pushed by a frozen lake — moves
 /// it by <see cref="SnowFollowsFreezingLevel"/> of the freezing level's move, so temperature nudges the snow without deciding it.
 /// <b>Haze</b> grows with the day's humidity — at the day's mean temperature, so the hour does not move it (<see cref="Haze"/>);
-/// a pinned humidity grows it instead, and a pinned visibility sets it.</para>
+/// a pinned humidity grows it instead, and a pinned visibility sets it. <b>The valley haze</b> (since M1.13a, <see cref="Weather.ValleyHaze"/>)
+/// is the haze a night's cold pool holds under its lid: deepest at dawn, broken up by the morning's sun (slowly over a snowy floor),
+/// forming again in the evening; a pinned visibility under the lid sets it at any hour.</para>
 ///
 /// <para>Pure: the same recipe and pins give the same state, bit for bit.</para>
 /// </summary>
@@ -287,6 +295,45 @@ public static class LinkedSliders
         }
         readings[Slider.Haze] = new SliderReading(Invariant($"{visibility:0.#} km"), pins.Visibility is not null, hazeFrom) { Number = visibility, Unit = "km" };
 
+        // The valley haze (M1.13a): the night's cold pool from the day's range, what the sun has left of it, and the valley's haze held
+        // and grown under its lid; or a pinned visibility under the lid, with the night's whole pool.
+        AtmosphereModel valleyAir = model with { AerosolOpticalDepth550 = opticalDepth };
+        double hazeExtinction = valleyAir.CoefficientsAt(550.0).AerosolExtinction * valleyAir.AerosolDensity(floor);
+        double cooling = Weather.ValleyHaze.Cooling(day);
+        double? relief = footing is { } f && f.CrestMetres > f.HeightMetres ? f.ReliefMetres : null; // a footing without a crest: no cap
+        double dawnDepth = Weather.ValleyHaze.Depth(cooling, relief);
+        double deficit = Weather.ValleyHaze.HeatDeficit(cooling, dawnDepth, floor);
+        double absorbed = Weather.ValleyHaze.Absorbed(floor, snowline);
+        (double poolShare, bool morning, double heat) = Weather.ValleyHaze.PoolShare(place.LatitudeDegrees, date, almanac.SolarHours,
+            DailyTemperature.MinimumHours(almanac.Daylight), deficit, absorbed);
+        double depth, added;
+        string valleyFrom;
+        if (pins.ValleyHaze is double pinnedValley)
+        {
+            (depth, poolShare) = (dawnDepth, 1.0);
+            added = Math.Max(0.0, Haze.VisibilityConstant / (pinnedValley * 1000.0) - Haze.VisibilityConstant / (visibility * 1000.0));
+            valleyFrom = Invariant($"pinned; the night's whole pool, {dawnDepth:0} m deep");
+        }
+        else
+        {
+            depth = dawnDepth * poolShare;
+            added = depth > 0.0 ? Weather.ValleyHaze.AddedExtinction(hazeExtinction, poolShare, humidity, hazeHumidity) : 0.0;
+            string left = morning
+                ? Invariant($"{poolShare:0%} of it left at {Almanac.FormatHours(almanac.SolarHours)} after {heat / 1e6:0.00} of its {deficit / 1e6:0.00} MJ/m² from the sun on a floor absorbing {absorbed:0%} of it")
+                : Invariant($"{poolShare:0%} of it formed at {Almanac.FormatHours(almanac.SolarHours)} as the air cools after the day's high");
+            valleyFrom = Invariant($"auto: a cold pool {dawnDepth:0} m deep at dawn from the night's {cooling:0.0} °C of cooling ({Weather.ValleyHaze.CoolingShareOfRange:0.##} of the day's {day.HighCelsius - day.LowCelsius:0.0} °C range), {left}");
+        }
+        var layer = ValleyHazeLayer.None;
+        if (added > 0.0)
+        {
+            double under = Haze.VisibilityConstant / (Haze.VisibilityConstant / (visibility * 1000.0) + added) / 1000.0;
+            layer = new ValleyHazeLayer(floor + depth, depth, added, under, poolShare, dawnDepth, cooling);
+            valleyFrom += Invariant($"; under a lid at {floor + depth:0} m the haze adds {added * 1000.0:0.000}/km at 550 nm to the valley's {hazeExtinction * 1000.0:0.000}");
+        }
+        readings[Slider.ValleyHaze] = new SliderReading(layer.Any ? Invariant($"{layer.VisibilityKm:0.#} km under a lid at {layer.TopMetres:0} m") : "none",
+            pins.ValleyHaze is not null, valleyFrom)
+        { Number = layer.Any ? layer.VisibilityKm : visibility, Unit = "km" };
+
         // Contradictions: rendered as asked, with a hint.
         bool frozenLake = recipe.SetPieces.Contains(SetPiece.FrozenLake);
         if (frozenLake && pins.Temperature is not null && temperature > FrozenLakeImplausibleCelsius)
@@ -301,6 +348,7 @@ public static class LinkedSliders
         {
             FootingMetres = lift,
             ValleyFloorMetres = floor,
+            ValleyHaze = layer,
         };
     }
 

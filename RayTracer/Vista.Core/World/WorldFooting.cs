@@ -14,6 +14,19 @@ public sealed record WorldFooting(double Percentile, double HeightMetres, double
     /// <summary>The percentile of the ground the world's lowest valleys are taken at.</summary>
     public const double DefaultPercentile = 5.0;
 
+    /// <summary>The percentile of the ground the world's crest is taken at (<see cref="CrestMetres"/>).</summary>
+    public const double CrestPercentile = 95.0;
+
+    /// <summary>
+    /// The height of the world's crest above its height 0, m: the <see cref="CrestPercentile"/>th percentile of its ground, where its
+    /// high ridges stand (vista-plan §10 M1.13a: a valley's cold pool fills its valleys, not the peaks above them). <see cref="Of"/>
+    /// measures it; a footing made without it leaves it 0, and the valley haze then knows no relief.
+    /// </summary>
+    public double CrestMetres { get; init; }
+
+    /// <summary>How far the world's crest stands above its lowest valleys, m.</summary>
+    public double ReliefMetres => Math.Max(CrestMetres - HeightMetres, 0.0);
+
     /// <summary>
     /// The footing of the ground <paramref name="surface"/> at <paramref name="percentile"/>: the height of the sample of rank
     /// round(p/100·(n − 1)) from the lowest, exactly (a two-pass histogram select, no sort of the whole grid), so a pure function of
@@ -26,11 +39,18 @@ public sealed record WorldFooting(double Percentile, double HeightMetres, double
             throw new ArgumentOutOfRangeException(nameof(percentile), percentile, "A percentile is from 0 to 100.");
         ReadOnlySpan<float> heights = surface.Heights;
         float low = surface.MinHeight, high = surface.MaxHeight;
-        long rank = (long)Math.Round(percentile / 100.0 * (heights.Length - 1));
         if (!(high > low))
-            return new WorldFooting(percentile, low, low);
+            return new WorldFooting(percentile, low, low) { CrestMetres = low };
+        return new WorldFooting(percentile, Select(heights, low, high, percentile), low) { CrestMetres = Select(heights, low, high, CrestPercentile) };
+    }
 
-        // First pass: how many heights fall in each of 65536 bins; then the bin that holds the rank, and the heights in it, sorted.
+    /// <summary>
+    /// The height of rank round(p/100·(n − 1)) from the lowest of <paramref name="heights"/>, which lie in [<paramref name="low"/>,
+    /// <paramref name="high"/>]: how many heights fall in each of 65536 bins, then the bin that holds the rank, and the heights in it, sorted.
+    /// </summary>
+    private static float Select(ReadOnlySpan<float> heights, float low, float high, double percentile)
+    {
+        long rank = (long)Math.Round(percentile / 100.0 * (heights.Length - 1));
         const int Bins = 65536;
         double scale = (Bins - 1) / ((double)high - low);
         int Bin(float h) => (int)Math.Clamp((h - (double)low) * scale, 0.0, Bins - 1);
@@ -48,6 +68,6 @@ public sealed record WorldFooting(double Percentile, double HeightMetres, double
                 inBin.Add(h);
         }
         inBin.Sort();
-        return new WorldFooting(percentile, inBin[(int)(rank - below)], low);
+        return inBin[(int)(rank - below)];
     }
 }

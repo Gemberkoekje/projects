@@ -52,12 +52,14 @@ namespace Vista.Output;
 /// Schema 21 (M1.13) added <see cref="WorldInfo.Glaciers"/>, the world's glaciers; in <see cref="Materials"/>, whether the season's snow
 /// lay, the snowline, the freezing level and the glaciers' line it was placed by, for a dry run the shares of snow, firn and ice and,
 /// for a render with the material and normal outputs, the share of its ground that is white by slope;
-/// the erosion's settings gained the glacial carving's and today's glaciers' own.</para>
+/// the erosion's settings gained the glacial carving's and today's glaciers' own. Schema 22 (M1.13a) added the valley haze: its slider in
+/// <see cref="SlidersInfo.Values"/>, its layer in <see cref="SlidersInfo.Weather"/>, and in the atmosphere's model its lid, softness,
+/// extinction and the haze's unit.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 21;
+    public const int CurrentSchema = 22;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;

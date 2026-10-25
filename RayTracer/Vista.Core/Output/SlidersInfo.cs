@@ -8,7 +8,7 @@ namespace Vista.Output;
 /// <param name="File">The slider file read; null when none was given.</param>
 /// <param name="PinsFrom">Where the pins came from: "slider file", "recipe" (its own place and time fields), "none", each "and options" when slider options added pins.</param>
 /// <param name="Pins">The pins as resolved, options included: the sliders pinned and their values (the rest are null).</param>
-/// <param name="Values">Every slider's value, pin and origin, by slider (<c>location</c>, <c>altitude</c>, <c>season</c>, <c>date</c>, <c>time</c>, <c>solarTime</c>, <c>temperature</c>, <c>humidity</c>, <c>snow</c>, <c>haze</c>).</param>
+/// <param name="Values">Every slider's value, pin and origin, by slider (<c>location</c>, <c>altitude</c>, <c>season</c>, <c>date</c>, <c>time</c>, <c>solarTime</c>, <c>temperature</c>, <c>humidity</c>, <c>snow</c>, <c>haze</c>, <c>valleyHaze</c>).</param>
 /// <param name="Weather">What the weather chain worked out on the way.</param>
 /// <param name="Implausible">Contradictions between pins, or a pin and the set pieces: rendered as asked (also in the warnings).</param>
 public sealed record SlidersInfo(
@@ -70,11 +70,17 @@ public sealed record WeatherInfo(
     /// <summary>How far the valley floor stands above the base altitude, the world's footing, m (schema 20).</summary>
     public double FootingMetres { get; init; }
 
+    /// <summary>The valley haze's layer: its lid, its haze and the pool it came from (schema 22, vista-plan §10 M1.13a).</summary>
+    public ValleyHazeLayer ValleyHaze { get; init; } = ValleyHazeLayer.None;
+
     /// <summary>Recorded in <see cref="Models"/>.</summary>
     public static readonly string ModelNotes = string.Create(System.Globalization.CultureInfo.InvariantCulture,
         $"monthly normals interpolated from mid-month; lapse rate {Lapse.RateCelsiusPerMetre * 1000.0:0.0} °C/km; daily curve: two half cosines, low at sunrise, high at {DailyTemperature.MaximumHours:0}:00 solar; " +
         $"dew point = the day's low (FAO-56); Magnus (Alduchov & Eskridge 1996); snow: degree-day pack, the place's monthly precipitation (else {SnowCover.PrecipitationMillimetresPerDay:0.#} mm/day) rising {SnowCover.PrecipitationGradientPerMetre * 100.0 * 100.0:0.#}%/100 m to {SnowCover.MaxPrecipitationFactor:0.#}×, snowfall ×{SnowCover.SnowCatchFactor:0.##} for the gauges' undercatch, snow at ≤ {SnowCover.SnowfallCelsius:0.#} °C, {SnowCover.DegreeDayFactor:0.#} mm/°C/day melt, cover over {SnowCover.CoverMillimetres:0} mm, nudged by {LinkedSliders.SnowFollowsFreezingLevel:0.##} of the freezing level's move; " +
-        $"haze: the day's humidity (at its mean temperature), (1 − RH)^−{Haze.GrowthExponent:0.##} growth, optical depth {Haze.ReferenceOpticalDepth:0.###} at {Haze.ReferenceHumidityPercent:0}% RH, capped at {Haze.GrowthLimitPercent:0}%; visibility ln 20/β at 550 nm (the WMO's meteorological optical range)");
+        $"haze: the day's humidity (at its mean temperature), (1 − RH)^−{Haze.GrowthExponent:0.##} growth, optical depth {Haze.ReferenceOpticalDepth:0.###} at {Haze.ReferenceHumidityPercent:0}% RH, capped at {Haze.GrowthLimitPercent:0}%; visibility ln 20/β at 550 nm (the WMO's meteorological optical range); " +
+        $"valley haze: a cold pool cooled {Weather.ValleyHaze.CoolingShareOfRange:0.##} of the day's range below the free air, its top where the inversion's {Weather.ValleyHaze.InversionLapseCelsiusPerMetre * 1000.0:0} °C/km rise and the lapse rate close it (at most {Weather.ValleyHaze.ReliefShare:0.##} of the relief), " +
+        $"broken up by clear-sky sun (Meinel 1976) × {Weather.ValleyHaze.SensibleShare:0.##} sensible × {Weather.ValleyHaze.ValleyAmplification:0.#} valley amplification × the floor's absorption (albedo {Weather.ValleyHaze.GroundAlbedo:0.##}, snow {Weather.ValleyHaze.SnowAlbedo:0.##}) against its heat deficit, " +
+        $"forming again on the daily curve after the high; its haze the valley's, held up to ×{Weather.ValleyHaze.Trapping:0.#} by dawn and grown by the hour's humidity; a logistic lid {Vista.Atmosphere.AtmosphereModel.Default.ValleyHazeSoftnessMetres:0} m soft");
 
     /// <summary>The working of <paramref name="state"/>.</summary>
     public static WeatherInfo From(SliderState state)
@@ -100,6 +106,7 @@ public sealed record WeatherInfo(
         {
             ValleyFloorMetres = state.ValleyFloorMetres,
             FootingMetres = state.FootingMetres,
+            ValleyHaze = state.ValleyHaze,
         };
     }
 }

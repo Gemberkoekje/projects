@@ -8,7 +8,7 @@ namespace Vista.App.Gpu;
 
 /// <summary>The atmosphere LUTs of one build, read back from the GPU (for <c>--gpu-selftest</c>'s parity checks).</summary>
 /// <param name="Columns">The columns LUT (<see cref="AtmosphereLuts.ColumnsFloats"/> floats).</param>
-/// <param name="Orders">The phase-weighted radiance of orders 2 … 5 summed (2 floats per 4D value, 11 wavelengths).</param>
+/// <param name="Orders">The phase-weighted radiance of orders 2 … 10 summed (2 floats per 4D value, 11 wavelengths).</param>
 /// <param name="GroundIrradiance">The sky's irradiance on the ground (<see cref="AtmosphereLuts.GroundIrradianceFloats"/> floats).</param>
 /// <param name="SkyView">The sky-view LUT (<see cref="AtmosphereLuts.SkyViewFloats"/> floats).</param>
 /// <param name="Order2">The tables of the first iteration, when asked for.</param>
@@ -246,6 +246,10 @@ internal sealed partial class D3D12VistaRenderer
             TerrainLowAltitude = (float)frame.TerrainLowAltitudeMetres,
             TerrainHighAltitude = (float)frame.TerrainHighAltitudeMetres,
             SunOneMinusCos = (float)SolarSpectrum.OneMinusCosRadius,
+            ValleyHazeTop = (float)model.ValleyHazeTopMetres,
+            ValleyHazeSoftness = (float)model.ValleyHazeSoftnessMetres,
+            ValleyHazeDensity = (float)model.ValleyHazeDensity,
+            HazeScale = (float)model.HazeScale,
         });
     }
 

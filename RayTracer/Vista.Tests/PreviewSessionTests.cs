@@ -86,7 +86,8 @@ public sealed class PreviewSessionTests
             ("first render", r => r, Everything),
             ("the same again", r => r, []),
             ("exposure +1 EV", r => Camera(r, "exposureEv", "1"), []),
-            ("time of day", r => Recipe(r, "time", "\"goldenHour\""), [.. Sky, .. Image]),
+            // The valley haze follows the hour (M1.13a): by golden hour the evening's pool is forming, so the air's tables move too.
+            ("time of day", r => Recipe(r, "time", "\"goldenHour\""), [PreviewStage.AtmosphereTables, PreviewStage.ScatteringOrders, .. Sky, .. Image]),
             ("camera turn", r => Camera(r, "yawDegrees", "20"), [.. Mesh, .. Render]),
             ("camera move", r => Camera(r, "position.y", "3000"), [.. Mesh, .. Sky, .. Image]),
             // The haze follows the day's humidity (M1.11), which the lapse rate moves a little with the altitude: the air's tables too.
@@ -309,6 +310,6 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(21, back.Schema);
+        Assert.AreEqual(22, back.Schema);
     }
 }

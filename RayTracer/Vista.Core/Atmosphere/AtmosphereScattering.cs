@@ -39,8 +39,11 @@ namespace Vista.Atmosphere;
 /// </summary>
 public static class AtmosphereScattering
 {
-    /// <summary>Height texels.</summary>
-    public const int HeightSize = 16;
+    /// <summary>
+    /// Height texels. 24 since M1.13a (16 before): with a dense valley haze under a lid 450 m up, 16 left its multiply scattered light
+    /// 10–17% dark against the reference, the first texel above the ground at the lid itself (vista-plan §10 M1.13a).
+    /// </summary>
+    public const int HeightSize = 24;
 
     /// <summary>View-angle texels per half (rays to the top; rays to the ground).</summary>
     public const int MuHalfSize = 32;
@@ -51,8 +54,8 @@ public static class AtmosphereScattering
     /// <summary>Sun-angle texels.</summary>
     public const int MuSSize = 64;
 
-    /// <summary>View-to-sun texels.</summary>
-    public const int NuSize = 8;
+    /// <summary>View-to-sun texels: 12 since M1.13a (8 before), for the haze's forward lobe in its multiply scattered light.</summary>
+    public const int NuSize = 12;
 
     /// <summary>Texels in a table (per wavelength).</summary>
     public const int Texels = HeightSize * MuSize * MuSSize * NuSize;
@@ -69,8 +72,11 @@ public static class AtmosphereScattering
     /// <summary>The lowest sun cosine the tables hold (120° from the zenith, Bruneton's full-precision choice).</summary>
     public const double MuSMin = -0.5;
 
-    /// <summary>The highest scattering order summed.</summary>
-    public const int Orders = 5;
+    /// <summary>
+    /// The highest scattering order summed: 10 since M1.13a (5 before). A dense valley haze holds light through more scatterings;
+    /// at 5 its layer lost about 5% of its light, at 20 no more than at 10.
+    /// </summary>
+    public const int Orders = 10;
 
     /// <summary>Steps along each ray of the single and multiple scattering tables.</summary>
     public const int Steps = 40;
@@ -300,12 +306,11 @@ public static class AtmosphereScattering
         double transmittance = 1.0, rayleigh = 0.0, mie = 0.0;
         for (int s = 0; s < Steps; s++)
         {
-            (double t, double dt) = AtmosphereLuts.Segment(length, s, Steps, sample.Ground);
-            double hg = AtmosphereLuts.AltitudeAlong(rb, sample.Height, sample.Mu, t);
+            (double t, double dt, double hg, double aerosol) = StepAt(frame, sample, length, s);
             double rp = rb + hg;
             double muSp = (r0 * sample.MuS + t * sample.Nu) / rp;
             double altitude = frame.GroundAltitudeMetres + hg;
-            (_, double extinction, double rayleighScattering, double mieScattering) = AtmosphereLuts.Coefficients(model, k, altitude);
+            (_, double extinction, double rayleighScattering, double mieScattering) = AtmosphereLuts.Coefficients(model, k, altitude, aerosol);
             double sun = AtmosphereLuts.SunLight(columns, frame, k, hg, muSp);
             double step = transmittance * AtmosphereLuts.StepIntegral(extinction, dt);
             rayleigh += step * sun * rayleighScattering;
@@ -423,6 +428,14 @@ public static class AtmosphereScattering
     public static double Density(ReadOnlySpan<float> weighted, AtmosphereFrame frame, in AtmosphereCoefficients k, double position, in Sample sample)
     {
         ArgumentNullException.ThrowIfNull(frame);
+        return Density(weighted, frame, k, position, sample, frame.Model.AerosolDensity(frame.GroundAltitudeMetres + sample.Height));
+    }
+
+    /// <summary>The same with the haze's relative density given, as a march's step has it (<see cref="AtmosphereModel.AerosolStepDensity"/>).</summary>
+    public static double Density(ReadOnlySpan<float> weighted, AtmosphereFrame frame, in AtmosphereCoefficients k, double position, in Sample sample,
+        double aerosol)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
         if (sample.MuS < MuSMin)
             return 0.0;
         Cell cell = CellOf(frame, sample);
@@ -435,7 +448,23 @@ public static class AtmosphereScattering
             mie += f * (Lookup(weighted, cell, l0 + 1, 2, 1) - mie);
         }
         double altitude = frame.GroundAltitudeMetres + sample.Height;
-        return k.Rayleigh * frame.Model.RayleighDensity(altitude) * rayleigh + k.AerosolScattering * frame.Model.AerosolDensity(altitude) * mie;
+        return k.Rayleigh * frame.Model.RayleighDensity(altitude) * rayleigh + k.AerosolScattering * aerosol * mie;
+    }
+
+    /// <summary>
+    /// Step <paramref name="s"/> of a table ray of <paramref name="length"/> from <paramref name="sample"/>: its midpoint, length and
+    /// height above the ground sphere, and the haze's relative density over it (<see cref="AtmosphereModel.AerosolStepDensity"/>).
+    /// </summary>
+    private static (double T, double Dt, double Height, double Aerosol) StepAt(AtmosphereFrame frame, in Sample sample, double length, int s)
+    {
+        double rb = frame.GroundRadius;
+        (double t0, double t1) = AtmosphereLuts.SegmentEnds(length, s, Steps, sample.Ground);
+        double t = 0.5 * (t0 + t1);
+        double hg = AtmosphereLuts.AltitudeAlong(rb, sample.Height, sample.Mu, t);
+        double ground = frame.GroundAltitudeMetres;
+        double aerosol = frame.Model.AerosolStepDensity(ground + AtmosphereLuts.AltitudeAlong(rb, sample.Height, sample.Mu, t0), ground + hg,
+            ground + AtmosphereLuts.AltitudeAlong(rb, sample.Height, sample.Mu, t1));
+        return (t, t1 - t0, hg, aerosol);
     }
 
     /// <summary>The radiance of one order at table wavelength <paramref name="l"/> arriving at a texel's point along its ray: its density (<paramref name="weighted"/>, 2 channels) gathered through the air.</summary>
@@ -453,13 +482,12 @@ public static class AtmosphereScattering
         double transmittance = 1.0, radiance = 0.0;
         for (int s = 0; s < Steps; s++)
         {
-            (double t, double dt) = AtmosphereLuts.Segment(length, s, Steps, sample.Ground);
-            double hg = AtmosphereLuts.AltitudeAlong(rb, sample.Height, sample.Mu, t);
+            (double t, double dt, double hg, double aerosol) = StepAt(frame, sample, length, s);
             double rp = rb + hg;
             double muP = (r0 * sample.Mu + t) / rp;
             double muSp = (r0 * sample.MuS + t * sample.Nu) / rp;
-            double extinction = AtmosphereLuts.Coefficients(model, k, frame.GroundAltitudeMetres + hg).Extinction;
-            double density = Density(weighted, frame, k, l, new Sample(hg, muP, muSp, ClampNu(muP, muSp, sample.Nu), sample.Ground));
+            double extinction = AtmosphereLuts.Coefficients(model, k, frame.GroundAltitudeMetres + hg, aerosol).Extinction;
+            double density = Density(weighted, frame, k, l, new Sample(hg, muP, muSp, ClampNu(muP, muSp, sample.Nu), sample.Ground), aerosol);
             radiance += transmittance * density * AtmosphereLuts.StepIntegral(extinction, dt);
             transmittance *= Math.Exp(-extinction * dt);
         }

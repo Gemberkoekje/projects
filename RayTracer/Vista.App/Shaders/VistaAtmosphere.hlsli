@@ -10,11 +10,11 @@
 #define ATM_WAVELENGTHS          50u
 #define COLUMNS_MU_SIZE          256u
 #define COLUMNS_ALTITUDE_SIZE    256u
-#define SCATTER_HEIGHT_SIZE      16u
+#define SCATTER_HEIGHT_SIZE      24u
 #define SCATTER_MU_HALF_SIZE     32u
 #define SCATTER_MU_SIZE          64u
 #define SCATTER_MU_S_SIZE        64u
-#define SCATTER_NU_SIZE          8u
+#define SCATTER_NU_SIZE          12u
 #define SCATTER_MU_S_MIN         -0.5
 #define SCATTER_MS_WAVELENGTHS   11u
 #define SCATTER_MIN_HEIGHT       1.0
@@ -34,6 +34,7 @@ cbuffer AtmosphereConstants : register(b1)
     float  RayleighScaleHeight;  float  AerosolScaleHeight;  float OzonePeak;            float OzoneHalfWidth;
     float3 AtmToSun;             float  MieG;
     float  CameraAltitude;       float  TerrainLowAltitude;  float TerrainHighAltitude;  float AtmSunOneMinusCos;
+    float  ValleyHazeTop;        float  ValleyHazeSoftness;  float ValleyHazeDensity;    float HazeScale;
 };
 
 StructuredBuffer<float4> AtmCoefficients : register(t8);   // per wavelength: Rayleigh, haze scattering, haze extinction, ozone
@@ -82,29 +83,66 @@ float DistanceToShellAbove(float radius, float h, float hTop, float mu)
 // ── Densities and coefficients ────────────────────────────────────────────────────────────────────
 
 float RayleighDensity(float altitude) { return exp(-altitude / RayleighScaleHeight); }
-float AerosolDensity(float altitude)  { return exp(-altitude / AerosolScaleHeight); }
 float OzoneDensity(float altitude)    { return max(0.0, 1.0 - abs(altitude - OzonePeak) / OzoneHalfWidth); }
 
-// (total scattering, extinction, Rayleigh scattering, haze scattering) per metre at an altitude above sea level.
-float4 MediumAt(float4 k, float altitude)
+// The valley haze (vista-plan §10 M1.13a; C# reference: AtmosphereModel.ValleyHaze, ValleyHazeMean): more of the haze under
+// an inversion's logistic lid, its density in the haze's unit. A march takes its exact mean over each step, never a sample:
+// its lid is sharper than any march's steps.
+float Softplus(float x) { return max(x, 0.0) + log(1.0 + exp(-abs(x))); }
+
+float ValleyHaze(float altitude)
+{
+    return ValleyHazeDensity > 0.0 ? ValleyHazeDensity / (1.0 + exp((altitude - ValleyHazeTop) / ValleyHazeSoftness)) : 0.0;
+}
+
+float ValleyHazeMean(float a, float b)
+{
+    float xa = (ValleyHazeTop - a) / ValleyHazeSoftness, xb = (ValleyHazeTop - b) / ValleyHazeSoftness;
+    float dx = xa - xb;
+    if (abs(dx) < 1.0e-3)
+        return ValleyHazeDensity / (1.0 + exp(-0.5 * (xa + xb)));
+    return ValleyHazeDensity * (Softplus(xa) - Softplus(xb)) / dx;
+}
+
+float AerosolDensity(float altitude) { return HazeScale * exp(-altitude / AerosolScaleHeight) + ValleyHaze(altitude); }
+
+// The haze over one step whose altitudes are start, middle and end: its own profile at the middle, the valley haze's mean
+// along the two halves (C# reference: AtmosphereModel.AerosolStepDensity).
+float AerosolStepDensity(float start, float middle, float end)
+{
+    float own = HazeScale * exp(-middle / AerosolScaleHeight);
+    return ValleyHazeDensity > 0.0 ? own + 0.5 * (ValleyHazeMean(start, middle) + ValleyHazeMean(middle, end)) : own;
+}
+
+// (total scattering, extinction, Rayleigh scattering, haze scattering) per metre at an altitude above sea level, the haze's
+// relative density given (a step's, from AerosolStepDensity).
+float4 MediumWith(float4 k, float altitude, float aerosol)
 {
     float rayleigh = k.x * RayleighDensity(altitude);
-    float aerosol = AerosolDensity(altitude);
     float mie = k.y * aerosol;
     float extinction = rayleigh + k.z * aerosol + k.w * OzoneDensity(altitude);
     return float4(rayleigh + mie, extinction, rayleigh, mie);
 }
 
+// The same at a point.
+float4 MediumAt(float4 k, float altitude) { return MediumWith(k, altitude, AerosolDensity(altitude)); }
+
 float OpticalDepth(float4 k, float3 columns) { return k.x * columns.x + k.z * columns.y + k.w * columns.z; }
 
 // Step s of `steps` along a ray: (midpoint, length), growing quadratically away from the dense end — the start, or
 // the ground for a ray that ends there (C# reference: AtmosphereLuts.Segment).
-float2 Segment(float pathLength, uint s, uint steps, bool denseAtEnd)
+float2 SegmentEnds(float pathLength, uint s, uint steps, bool denseAtEnd)
 {
     float u0 = float(s) / float(steps), u1 = float(s + 1u) / float(steps);
     float t0 = pathLength * (denseAtEnd ? 1.0 - (1.0 - u0) * (1.0 - u0) : u0 * u0);
     float t1 = pathLength * (denseAtEnd ? 1.0 - (1.0 - u1) * (1.0 - u1) : u1 * u1);
-    return float2(0.5 * (t0 + t1), t1 - t0);
+    return float2(t0, t1);
+}
+
+float2 Segment(float pathLength, uint s, uint steps, bool denseAtEnd)
+{
+    float2 ends = SegmentEnds(pathLength, s, steps, denseAtEnd);
+    return float2(0.5 * (ends.x + ends.y), ends.y - ends.x);
 }
 
 // ∫₀^dt e^(−σt) dt = dt·(1 − e^(−x))/x with x = σ·dt; below x = 0.01 by its series, because 1 − e^(−x) cancels in float.
@@ -375,7 +413,8 @@ float2 Lookup2(StructuredBuffer<float2> table, ScatterCell c, uint l)
 // The scattering density of a phase-weighted radiance table at a point, for a wavelength at `position` among the
 // table wavelengths (an integer inside the iteration; AtmSun[λ].w for a hero wavelength): σ_R(h)·A_R + σ_M(h)·A_M.
 // Zero below the tables' lowest sun (30° down), not the edge texel's last glimmer.
-float ScatterDensity(StructuredBuffer<float2> weighted, float4 k, float position, ScatterPoint p)
+// The haze's relative density is given, as a march's step has it (AerosolStepDensity).
+float ScatterDensityWith(StructuredBuffer<float2> weighted, float4 k, float position, ScatterPoint p, float aerosol)
 {
     if (p.MuS < SCATTER_MU_S_MIN)
         return 0.0;
@@ -386,7 +425,7 @@ float ScatterDensity(StructuredBuffer<float2> weighted, float4 k, float position
     if (f > 0.0)
         a = lerp(a, Lookup2(weighted, c, l0 + 1u), f);
     float altitude = GroundAltitude + p.Height;
-    return k.x * RayleighDensity(altitude) * a.x + k.y * AerosolDensity(altitude) * a.y;
+    return k.x * RayleighDensity(altitude) * a.x + k.y * aerosol * a.y;
 }
 
 // ── Sky view ──────────────────────────────────────────────────────────────────────────────────────
@@ -584,14 +623,17 @@ void AerialSegment(AirSegment seg, uint4 idx, out float4 transmittance, out floa
     float phaseM = HenyeyGreenstein(seg.Nu, MieG);
     transmittance = 1.0;
     inscatter = 0.0;
+    float start = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, 0.0), 0.0);
     for (uint s = 0u; s < steps; s++)
     {
-        float2 step2 = Segment(seg.Length, s, steps, denseAtEnd);
-        float t = step2.x, dt = step2.y;
+        float2 ends = SegmentEnds(seg.Length, s, steps, denseAtEnd);
+        float t = 0.5 * (ends.x + ends.y), dt = ends.y - ends.x;
         float hg = max(AltitudeAlong(rb, seg.Height, seg.Mu, t), 0.0);
         float muSp = (r0 * seg.MuS + t * seg.Nu) / (rb + hg);
         float altitude = GroundAltitude + hg;
-        float aerosol = AerosolDensity(altitude);
+        float end = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, ends.y), 0.0);
+        float aerosol = AerosolStepDensity(start, altitude, end);
+        start = end;
         float4 sigmaR = kR * RayleighDensity(altitude);
         float4 sigmaM = kMs * aerosol;
         float4 extinction = sigmaR + kMe * aerosol + kO * OzoneDensity(altitude);
@@ -623,11 +665,14 @@ float4 AerialTransmittance(AirSegment seg, uint4 idx)
     bool denseAtEnd = AltitudeAlong(rb, seg.Height, seg.Mu, seg.Length) < seg.Height;
     uint steps = min(AERIAL_STEPS, 2u + uint(seg.Length / AERIAL_STEP_LENGTH));
     float4 depth = 0.0;
+    float start = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, 0.0), 0.0);
     for (uint s = 0u; s < steps; s++)
     {
-        float2 step2 = Segment(seg.Length, s, steps, denseAtEnd);
-        float altitude = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, step2.x), 0.0);
-        depth += (kR * RayleighDensity(altitude) + kMe * AerosolDensity(altitude) + kO * OzoneDensity(altitude)) * step2.y;
+        float2 ends = SegmentEnds(seg.Length, s, steps, denseAtEnd);
+        float altitude = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, 0.5 * (ends.x + ends.y)), 0.0);
+        float end = GroundAltitude + max(AltitudeAlong(rb, seg.Height, seg.Mu, ends.y), 0.0);
+        depth += (kR * RayleighDensity(altitude) + kMe * AerosolStepDensity(start, altitude, end) + kO * OzoneDensity(altitude)) * (ends.y - ends.x);
+        start = end;
     }
     return exp(-depth);
 }

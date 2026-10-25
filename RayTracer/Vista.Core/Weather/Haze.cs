@@ -18,7 +18,7 @@ namespace Vista.Weather;
 public static class Haze
 {
     /// <summary>The haze's vertical optical depth at 550 nm from sea level at <see cref="ReferenceHumidityPercent"/>: <see cref="AtmosphereModel"/>'s clear day.</summary>
-    public const double ReferenceOpticalDepth = 0.1;
+    public const double ReferenceOpticalDepth = AtmosphereModel.ClearDayOpticalDepth550;
 
     /// <summary>The humidity at which the haze is the model's clear day, %.</summary>
     public const double ReferenceHumidityPercent = 50.0;
@@ -48,22 +48,28 @@ public static class Haze
 
     /// <summary>
     /// The haze optical depth (550 nm, from sea level) that gives <paramref name="visibilityKm"/> at <paramref name="altitudeMetres"/>
-    /// in <paramref name="model"/>'s air, other things equal; 0 when clean air alone already limits the view to less.
+    /// in <paramref name="model"/>'s air without its valley haze, other things equal; 0 when clean air alone already limits the view to less.
     /// </summary>
     public static double OpticalDepthForVisibility(AtmosphereModel model, double visibilityKm, double altitudeMetres)
     {
         ArgumentNullException.ThrowIfNull(model);
-        AtmosphereModel clean = model with { AerosolOpticalDepth550 = 0.0 };
-        double haze = VisibilityConstant / (visibilityKm * 1000.0) - Extinction(clean, altitudeMetres);
-        // At 550 nm the haze's extinction per unit optical depth is 1 / its scale height, times its density here.
-        return Math.Max(0.0, haze * model.AerosolScaleHeightMetres / model.AerosolDensity(altitudeMetres));
+        double haze = VisibilityConstant / (visibilityKm * 1000.0) - Extinction(Clean(model), altitudeMetres);
+        // At 550 nm the haze's extinction per unit optical depth is 1 / its scale height, times its own profile here.
+        return Math.Max(0.0, haze * model.AerosolScaleHeightMetres / Math.Exp(-altitudeMetres / model.AerosolScaleHeightMetres));
     }
 
     /// <summary>The longest visibility clean air allows at <paramref name="altitudeMetres"/>, km.</summary>
     public static double CleanAirVisibilityKm(AtmosphereModel model, double altitudeMetres)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return VisibilityKm(model with { AerosolOpticalDepth550 = 0.0 }, altitudeMetres);
+        return VisibilityKm(Clean(model), altitudeMetres);
+    }
+
+    /// <summary><paramref name="model"/>'s air with no haze at all, its own or a valley's.</summary>
+    public static AtmosphereModel Clean(AtmosphereModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return model with { AerosolOpticalDepth550 = 0.0, ValleyHazeExtinction550 = 0.0 };
     }
 
     private static double Extinction(AtmosphereModel model, double altitudeMetres)

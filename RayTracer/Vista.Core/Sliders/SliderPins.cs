@@ -7,7 +7,7 @@ namespace Vista.Sliders;
 /// <summary>
 /// The linked sliders (vista-plan §3.4, §3.6, §10 M1.11). Each is <b>auto</b> — derived from the controls upstream of it — or
 /// <b>pinned</b> to a value the user chose; pinning one stops only that one, and resetting it re-links it. Basic: season, time of
-/// day, snow, fog/haze. Advanced: location, altitude, date, the solar time, temperature and humidity.
+/// day, snow, fog/haze. Advanced: location, altitude, date, the solar time, temperature, humidity and the valley haze.
 /// </summary>
 public enum Slider
 {
@@ -43,6 +43,12 @@ public enum Slider
 
     /// <summary>Fog / haze (basic): the visibility at the valley floor, km. Auto: from the humidity.</summary>
     Haze,
+
+    /// <summary>
+    /// Valley haze (advanced): the visibility under the lid of the haze an inversion holds in the valleys, km. Auto: from the night's
+    /// cold pool and what the sun has left of it (vista-plan §10 M1.13a).
+    /// </summary>
+    ValleyHaze,
 }
 
 /// <summary>How a temperature is shown (vista-plan §3.3: °C, with °F on request). Values are always stored in °C.</summary>
@@ -100,6 +106,7 @@ public sealed record SliderPins
         ["humidity"] = Slider.Humidity,
         ["snowline"] = Slider.Snow,
         ["visibility"] = Slider.Haze,
+        ["valleyHaze"] = Slider.ValleyHaze,
     };
 
     /// <summary>File format version.</summary>
@@ -151,6 +158,12 @@ public sealed record SliderPins
     /// <summary>The visibility at the valley floor, km (fog/haze); null for auto.</summary>
     public double? Visibility { get; init; }
 
+    /// <summary>
+    /// The visibility under the valley haze's lid, km; null for auto. The layer adds what the valley's own haze lacks to reach it, so a
+    /// visibility no shorter than the valley's (<see cref="MaxVisibilityKm"/>, say) means no valley haze.
+    /// </summary>
+    public double? ValleyHaze { get; init; }
+
     /// <summary>No pins: every slider auto.</summary>
     public static SliderPins None { get; } = new();
 
@@ -187,6 +200,7 @@ public sealed record SliderPins
         Slider.Humidity => Humidity is not null,
         Slider.Snow => Snowline is not null,
         Slider.Haze => Visibility is not null,
+        Slider.ValleyHaze => ValleyHaze is not null,
         _ => throw new ArgumentOutOfRangeException(nameof(slider), slider, "Unknown slider."),
     };
 
@@ -207,6 +221,7 @@ public sealed record SliderPins
         Slider.Humidity => this with { Humidity = null },
         Slider.Snow => this with { Snowline = null },
         Slider.Haze => this with { Visibility = null },
+        Slider.ValleyHaze => this with { ValleyHaze = null },
         _ => throw new ArgumentOutOfRangeException(nameof(slider), slider, "Unknown slider."),
     };
 
@@ -235,6 +250,7 @@ public sealed record SliderPins
         Range(Humidity, 0.0, 100.0, "The humidity", "%", errors);
         Range(Snowline, 0.0, MaxSnowlineMetres, "The snowline", "m above sea level", errors);
         Range(Visibility, MinVisibilityKm, MaxVisibilityKm, "The visibility", "km", errors);
+        Range(ValleyHaze, MinVisibilityKm, MaxVisibilityKm, "The visibility under the valley haze", "km", errors);
         return errors;
     }
 

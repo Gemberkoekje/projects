@@ -171,7 +171,8 @@ public sealed record PreviewRequest
 ///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
 ///           [--sliders s.json] [--location zermatt | --latitude 46.0] [--season autumn] [--date 2026-10-15]
 ///           [--time dawn | --time 17:30] [--sun-elevation -2] [--altitude 3000] [--temperature 5 | --temperature 41F]
-///           [--humidity 60] [--snowline 2400] [--visibility 80] [--atmosphere luts | reference | referenceShadowed]
+///           [--humidity 60] [--snowline 2400] [--visibility 80] [--valley-haze 12 | off]
+///           [--atmosphere luts | reference | referenceShadowed]
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
@@ -186,7 +187,7 @@ public sealed record PreviewRequest
 /// date, <c>--time</c> a time-of-day preset (clearing a pinned solar time) or a local solar time, and <c>--sun-elevation</c> the
 /// time at which the sun stands that high (rising when the time is dawn); <c>--altitude</c> the scene's base altitude,
 /// <c>--temperature</c> (°C, or °F with an <c>F</c>), <c>--humidity</c> (%), <c>--snowline</c> (m) and <c>--visibility</c> (km)
-/// the weather.
+/// the weather; <c>--valley-haze</c> the visibility under the valley haze's lid (km), or <c>off</c> for none (M1.13a).
 /// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
 /// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4). <c>--light-sampling
 /// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
@@ -251,6 +252,8 @@ public static class PreviewCommandLine
         "  --altitude <metres>: the scene's base altitude above sea level (default: the place's valley floor), 0 to 8000.\n" +
         "  --temperature <°C> (or <°F>F, e.g. 41F), --humidity <%>: the air at the valley floor (default: the climate's).\n" +
         "  --snowline <metres>: where seasonal snow begins, above sea level; --visibility <km>: the haze (default: the humidity's).\n" +
+        "  --valley-haze <km> | off: the visibility under the lid of the haze a cold pool holds in the valleys, or none\n" +
+        "  (default: the night's pool and what the sun has left of it).\n" +
         "--atmosphere luts (default) | reference | referenceShadowed: the precomputed air, or the air path-traced as a medium\n" +
         "  (slow, unbiased), optionally with the terrain's shadow in it.\n" +
         "--light-sampling mis (default) | sunOnly: sample the sun and the sky as lights, weighed against the bounce, or (M1.4)\n" +
@@ -280,6 +283,7 @@ public static class PreviewCommandLine
             ["--humidity"] = ["humidity"],
             ["--snowline"] = ["snowline"],
             ["--visibility"] = ["visibility"],
+            ["--valley-haze"] = ["valleyHaze"],
         };
 
     private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
@@ -311,7 +315,7 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
-        "--snowline", "--visibility", "--atmosphere", "--light-sampling",
+        "--snowline", "--visibility", "--valley-haze", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
         "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow",
     };
@@ -812,6 +816,10 @@ public static class PreviewCommandLine
         Number("--humidity", "humidity", 0.0, 100.0, "% relative humidity");
         Number("--snowline", "snowline", 0.0, SliderPins.MaxSnowlineMetres, "metres above sea level");
         Number("--visibility", "visibility", SliderPins.MinVisibilityKm, SliderPins.MaxVisibilityKm, "km");
+        if (values.TryGetValue("--valley-haze", out string? valleyText) && valleyText == "off")
+            overrides["valleyHaze"] = SliderPins.MaxVisibilityKm.ToString("R", CultureInfo.InvariantCulture);
+        else
+            Number("--valley-haze", "valleyHaze", SliderPins.MinVisibilityKm, SliderPins.MaxVisibilityKm, "km (or off)");
         return overrides;
 
         void Number(string option, string field, double min, double max, string unit)

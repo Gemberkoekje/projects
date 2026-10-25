@@ -439,6 +439,31 @@ internal static class GpuSelfTest
         RenderOutput shadB = Render(renderer, scene, shadowed, aovs, tight, log, "shadowed reference, 0.05 ms budget");
         pass &= Check(log, "the shadowed reference is sane", Sanity(shadA, shadowed));
         pass &= Check(log, "the shadowed reference under a 0.05 ms budget is bit-identical", Same(shadA, shadB, compareAovs: true));
+        return pass & ValleyHazeChecks(renderer, scene, air, log);
+    }
+
+    /// <summary>
+    /// The valley haze in the tables (M1.13a): the same parity with a strong layer under a lid 450 m above the ground sphere, so every
+    /// table's march takes the layer's exact means over its steps as the C# reference does; then the renderer forgets that air.
+    /// </summary>
+    private static bool ValleyHazeChecks(D3D12VistaRenderer renderer, VistaScene scene, AtmosphereFrame clear, TextWriter log)
+    {
+        AtmosphereFrame air = clear with
+        {
+            Model = clear.Model with { ValleyHazeTopMetres = clear.GroundAltitudeMetres + 450.0, ValleyHazeExtinction550 = 2e-4 },
+        };
+        renderer.ForgetAtmosphere();
+        AtmosphereLutData luts = renderer.BuildAtmosphere(air, scene.Wavelengths(), captureOrder2: true, out _);
+        AtmosphereTables tables = AtmosphereTables.Build(air.Model, scene.Wavelengths());
+        ScatteringOrder2 order2 = luts.Order2!;
+        bool pass = Check(log, "with a valley haze, columns LUT texels match the C# reference", ColumnsParity(air, luts));
+        pass &= Check(log, "with a valley haze, single-scattering texels match the C# reference", SingleParity(air, luts, order2, tables));
+        pass &= Check(log, "with a valley haze, order-2 density texels match the C# reference", DensityParity(air, luts, order2, tables));
+        pass &= Check(log, "with a valley haze, order-2 radiance texels match the C# reference", RadianceParity(air, order2, tables));
+        pass &= Check(log, "with a valley haze, ground-irradiance entries match the C# reference", GroundParity(air, luts, tables));
+        pass &= Check(log, "with a valley haze, sky-view LUT texels match the C# reference", SkyParity(air, luts, tables));
+        pass &= Check(log, "with a valley haze, aerial perspective matches the C# reference", AerialParity(renderer, scene, air, luts, tables));
+        renderer.ForgetAtmosphere();
         return pass;
     }
 

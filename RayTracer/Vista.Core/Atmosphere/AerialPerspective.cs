@@ -17,7 +17,9 @@ namespace Vista.Atmosphere;
 ///
 /// <para><b>The march</b> (chosen over the sky view's difference <c>L(a) − T·L(b)</c> by error and by cost; the numbers
 /// are in the plan): 2 steps plus one per <see cref="StepLengthMetres"/>, at most <see cref="MaxSteps"/>, dense at the
-/// segment's lower end. Extinction comes from the analytic densities; single scattering from the sun's transmittance in
+/// segment's lower end. Extinction comes from the analytic densities (the valley haze's by its exact mean over each step, since
+/// its lid is sharper than the steps: a sample would band where the lid crosses a step's middle, vista-plan §10 M1.13a); single
+/// scattering from the sun's transmittance in
 /// the columns LUT, seen through the Earth's shadow with its penumbra (<see cref="AtmosphereLuts.SunLight"/>) but not a
 /// mountain's; multiple scattering from the summed orders, whose phase-weighted radiance is smooth along a segment while
 /// the densities that turn it into emission are not — so it is read at the two ends and blended, or once in the middle
@@ -145,12 +147,18 @@ public static class AerialPerspective
         double phaseR = AirOptics.RayleighPhase(segment.Nu);
         double phaseM = AirOptics.HenyeyGreenstein(segment.Nu, model.AerosolAsymmetry);
         double transmittance = 1.0, inscatter = 0.0;
+        double ground = frame.GroundAltitudeMetres;
+        double start = ground + Math.Max(AtmosphereLuts.AltitudeAlong(rb, segment.Height, segment.Mu, 0.0), 0.0);
         for (int s = 0; s < steps; s++)
         {
-            (double t, double dt) = AtmosphereLuts.Segment(segment.Length, s, steps, denseAtEnd);
+            (double t0, double t1) = AtmosphereLuts.SegmentEnds(segment.Length, s, steps, denseAtEnd);
+            (double t, double dt) = (0.5 * (t0 + t1), t1 - t0);
             double hg = Math.Max(AtmosphereLuts.AltitudeAlong(rb, segment.Height, segment.Mu, t), 0.0);
+            double end = ground + Math.Max(AtmosphereLuts.AltitudeAlong(rb, segment.Height, segment.Mu, t1), 0.0);
             double muSp = (r0 * segment.MuS + t * segment.Nu) / (rb + hg);
-            (_, double extinction, double sigmaR, double sigmaM) = AtmosphereLuts.Coefficients(model, k, frame.GroundAltitudeMetres + hg);
+            double aerosol = model.AerosolStepDensity(start, ground + hg, end);
+            start = end;
+            (_, double extinction, double sigmaR, double sigmaM) = AtmosphereLuts.Coefficients(model, k, ground + hg, aerosol);
             double sun = AtmosphereLuts.SunLight(columns, frame, k, hg, muSp);
             double f = segment.Length > 0.0 ? t / segment.Length : 0.0;
             double emission = sun * (sigmaR * phaseR + sigmaM * phaseM)

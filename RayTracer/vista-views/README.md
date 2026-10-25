@@ -323,3 +323,20 @@ the cost against `main` (`cost`). `snow/mountains-april.recipe.json` is the day 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/snow/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Sheets measures,valleys,maps,views,seasons,alpenglow,redend,slopes,photo,rr,cost] [-Out folder]
 ```
+
+## Valley haze checks (M1.13a)
+
+`haze/render.ps1` makes the M1.13a sheets and checks: `--atmosphere-check --segments` with and without a valley haze (its lid 450 m
+above the ground sphere, 0.1/km and 0.5/km at 550 nm), up from inside the layer and down through it, with single scattering alone
+too (`check`, in `haze.log`); the two shoulder views over the valleys on 15 October from dawn to noon, the valley haze auto
+(`morning.png`); the misty ridges at 10:00, 12:00 and 14:00 in January, the valley floor snowy, against October (`winter.png`);
+four views with the valley haze off, auto and strong (`strengths.png`); the misty ridges in autumn at six places (`places.png`);
+with `-Photo` the user's photo over the Alps beside the layered ridges and the aerial view in its light (`photo.png`); with
+`-Paintings` the user's paintings beside the shoulder views with a strong layer (`paintings.png`); the misty ridges through the
+LUTs, the reference and the shadowed reference (`shadow.png`, the known limit); and with `-Before` (a `main` build) the cost
+against `main`, auto and strong (`cost`). `haze/misty-ridges.camera.json` and `haze/across-valley.camera.json` stand on shoulders
+just above the pool (about 500 m over the valley floor), looking across valleys at the ranges beyond: the painters' place.
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/haze/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Paintings <a.jpg,b.jpg>] [-Sheets check,morning,winter,strengths,places,photo,paintings,shadow,cost] [-Out folder]
+```

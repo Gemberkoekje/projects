@@ -172,6 +172,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public float RayleighScaleHeight, AerosolScaleHeight, OzonePeak, OzoneHalfWidth;
         public float ToSunX, ToSunY, ToSunZ, MieG;
         public float CameraAltitude, TerrainLowAltitude, TerrainHighAltitude, SunOneMinusCos;
+        public float ValleyHazeTop, ValleyHazeSoftness, ValleyHazeDensity, HazeScale;
     }
 
     /// <summary>

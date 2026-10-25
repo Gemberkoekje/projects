@@ -167,7 +167,10 @@ public static class AtmosphereLuts
         return (Math.Clamp(xMu, 0.0, 1.0), Math.Clamp(rho / bigH, 0.0, 1.0));
     }
 
-    /// <summary>The density columns along a ray from <paramref name="altitude"/> (above sea level) at <c>cos = mu</c> to the top, by <paramref name="steps"/> midpoint steps.</summary>
+    /// <summary>
+    /// The density columns along a ray from <paramref name="altitude"/> (above sea level) at <c>cos = mu</c> to the top, by <paramref name="steps"/>
+    /// midpoint steps (the valley haze by its mean over each step, <see cref="AtmosphereModel.AerosolStepDensity"/>).
+    /// </summary>
     public static DensityColumns ColumnsAlong(AtmosphereModel model, double altitude, double mu, int steps)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -175,12 +178,15 @@ public static class AtmosphereLuts
         double length = DistanceToShellAbove(radius, altitude, model.TopAltitudeMetres, mu);
         double dt = length / steps;
         double rayleigh = 0.0, aerosol = 0.0, ozone = 0.0;
+        double start = AltitudeAlong(radius, altitude, mu, 0.0);
         for (int k = 0; k < steps; k++)
         {
             double h = AltitudeAlong(radius, altitude, mu, (k + 0.5) * dt);
+            double end = AltitudeAlong(radius, altitude, mu, (k + 1) * dt);
             rayleigh += model.RayleighDensity(h);
-            aerosol += model.AerosolDensity(h);
+            aerosol += model.AerosolStepDensity(start, h, end);
             ozone += model.OzoneDensity(h);
+            start = end;
         }
         return new DensityColumns(rayleigh * dt, aerosol * dt, ozone * dt);
     }
@@ -375,19 +381,22 @@ public static class AtmosphereLuts
         double transmittance = 1.0, rayleigh = 0.0, mie = 0.0, multiple = 0.0;
         for (int s = 0; s < SkySteps; s++)
         {
-            (double t, double dt) = Segment(length, s, SkySteps, toGround);
+            (double t0, double t1) = SegmentEnds(length, s, SkySteps, toGround);
+            (double t, double dt) = (0.5 * (t0 + t1), t1 - t0);
             double hg = AltitudeAlong(groundRadius, height, mu, t);
             double rp = groundRadius + hg;
             double muP = (r0 * mu + t) / rp;
             double muSp = (r0 * muS + t * nu) / rp;
             double altitude = frame.GroundAltitudeMetres + hg;
-            (_, double extinction, double rayleighScattering, double mieScattering) = Coefficients(model, k, altitude);
+            double aerosol = model.AerosolStepDensity(frame.GroundAltitudeMetres + AltitudeAlong(groundRadius, height, mu, t0), altitude,
+                frame.GroundAltitudeMetres + AltitudeAlong(groundRadius, height, mu, t1));
+            (_, double extinction, double rayleighScattering, double mieScattering) = Coefficients(model, k, altitude, aerosol);
             double sun = SunLight(columns, frame, k, hg, muSp);
             var point = new AtmosphereScattering.Sample(hg, muP, muSp, AtmosphereScattering.ClampNu(muP, muSp, nu), toGround);
             double step = transmittance * StepIntegral(extinction, dt);
             rayleigh += step * sun * rayleighScattering;
             mie += step * sun * mieScattering;
-            multiple += step * AtmosphereScattering.Density(orders, frame, k, position, point);
+            multiple += step * AtmosphereScattering.Density(orders, frame, k, position, point, aerosol);
             transmittance *= Math.Exp(-extinction * dt);
         }
         double smooth = AirOptics.RayleighPhase(nu) * rayleigh + multiple;
@@ -440,8 +449,18 @@ public static class AtmosphereLuts
     public static (double Scattering, double Extinction, double Rayleigh, double Mie) Coefficients(AtmosphereModel model, in AtmosphereCoefficients k, double altitude)
     {
         ArgumentNullException.ThrowIfNull(model);
+        return Coefficients(model, k, altitude, model.AerosolDensity(altitude));
+    }
+
+    /// <summary>
+    /// The same with the haze's relative density given, as a march's step has it (<see cref="AtmosphereModel.AerosolStepDensity"/>):
+    /// the molecules and ozone at <paramref name="altitude"/>, the haze at <paramref name="aerosol"/>.
+    /// </summary>
+    public static (double Scattering, double Extinction, double Rayleigh, double Mie) Coefficients(AtmosphereModel model, in AtmosphereCoefficients k, double altitude,
+        double aerosol)
+    {
+        ArgumentNullException.ThrowIfNull(model);
         double rayleigh = k.Rayleigh * model.RayleighDensity(altitude);
-        double aerosol = model.AerosolDensity(altitude);
         double mie = k.AerosolScattering * aerosol;
         double extinction = rayleigh + k.AerosolExtinction * aerosol + k.Ozone * model.OzoneDensity(altitude);
         return (rayleigh + mie, extinction, rayleigh, mie);
@@ -456,10 +475,17 @@ public static class AtmosphereLuts
     /// </summary>
     public static (double T, double Dt) Segment(double length, int s, int steps, bool denseAtEnd)
     {
+        (double t0, double t1) = SegmentEnds(length, s, steps, denseAtEnd);
+        return (0.5 * (t0 + t1), t1 - t0);
+    }
+
+    /// <summary>The ends of step <paramref name="s"/> of <see cref="Segment"/>: a step's end is the next one's start, exactly.</summary>
+    public static (double T0, double T1) SegmentEnds(double length, int s, int steps, bool denseAtEnd)
+    {
         double u0 = (double)s / steps, u1 = (double)(s + 1) / steps;
         double t0 = length * (denseAtEnd ? 1.0 - (1.0 - u0) * (1.0 - u0) : u0 * u0);
         double t1 = length * (denseAtEnd ? 1.0 - (1.0 - u1) * (1.0 - u1) : u1 * u1);
-        return (0.5 * (t0 + t1), t1 - t0);
+        return (t0, t1);
     }
 
     /// <summary>

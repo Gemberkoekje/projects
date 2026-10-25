@@ -15,7 +15,9 @@ namespace Vista.App.Gpu;
 ///                              [--observer-height 2] [--out check.json]
 /// </code>
 /// The observer stands <c>--observer-height</c> above a ground sphere at <c>--ground-altitude</c> (Zermatt's valley
-/// floor by default) under the default atmosphere; see <see cref="SkyCheck"/> for the directions and bands.
+/// floor by default) under the default atmosphere; see <see cref="SkyCheck"/> for the directions and bands. <c>--valley-haze
+/// height,perKm</c> adds a valley haze (vista-plan §10 M1.13a): its lid that many metres above the ground sphere, its extinction at
+/// 550 nm that much per kilometre.
 /// </summary>
 internal static class AtmosphereCheck
 {
@@ -26,6 +28,7 @@ internal static class AtmosphereCheck
     public const string Usage =
         "       Vista.App --atmosphere-check [--sun-elevations 30,5,-2,-6] [--paths 65536] [--ground-altitude 1608]\n" +
         "                 [--observer-height 2] [--below-horizon] [--ground-albedo 0.2] [--aerosol-depth 0.1] [--segments 1000,4000]\n" +
+        "                 [--valley-haze 450,0.1]  (its lid's height above the ground sphere, m; its extinction at 550 nm, per km)\n" +
         "                 [--out check.json]  (the LUT sky, or with --segments the air along segments, against the reference)";
 
     private const int Chunks = 64;
@@ -39,7 +42,7 @@ internal static class AtmosphereCheck
         for (int i = 1; i < args.Count; i++)
         {
             if (i + 1 < args.Count && args[i] is "--sun-elevations" or "--paths" or "--ground-altitude" or "--observer-height" or "--out"
-                    or "--ground-albedo" or "--aerosol-depth" or "--segments")
+                    or "--ground-albedo" or "--aerosol-depth" or "--segments" or "--valley-haze")
                 values[args[i]] = args[++i];
             else if (args[i] == "--below-horizon")
                 values[args[i]] = "true";
@@ -72,6 +75,16 @@ internal static class AtmosphereCheck
             model = model with { GroundAlbedo = Number(albedo, problems) };
         if (values.TryGetValue("--aerosol-depth", out string? haze))
             model = model with { AerosolOpticalDepth550 = Number(haze, problems) };
+        if (values.TryGetValue("--valley-haze", out string? valley) && valley.Split(',') is [string lid, string perKm])
+            model = model with { ValleyHazeTopMetres = ground + Number(lid, problems), ValleyHazeExtinction550 = Number(perKm, problems) / 1000.0 };
+        else if (valley is not null)
+            problems.Add("--valley-haze takes the lid's height above the ground sphere and the extinction per km, e.g. 450,0.1.");
+        if (problems.Count > 0)
+        {
+            foreach (string problem in problems)
+                Console.Error.WriteLine(problem);
+            return 1;
+        }
         WavelengthTable wavelengths = WavelengthTable.For(WavelengthTable.DefaultQuadrature);
         AtmosphereTables tables = AtmosphereTables.Build(model, wavelengths);
         float[] weights = SkyCheck.LuminanceWeights(IntegratorTables.Build(MaterialCatalog.M0, wavelengths));

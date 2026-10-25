@@ -26,12 +26,23 @@ namespace Vista.Atmosphere;
 /// does. Since M1.11 the fog/haze slider sets <see cref="AerosolOpticalDepth550"/> (Weather.Haze: from the day's humidity, or a
 /// pinned visibility); this default is the clear day it is scaled from.</para>
 ///
+/// <para><b>The valley haze</b> (vista-plan §10 M1.13a) is more of the same haze trapped under an inversion: a layer of
+/// <see cref="ValleyHazeExtinction550"/> below <see cref="ValleyHazeTopMetres"/>, uniform under its lid and falling off over a
+/// logistic of scale <see cref="ValleyHazeSoftnessMetres"/> above it, added to the haze's own profile. It has the haze's optical
+/// properties, so the haze's coefficients serve it and its density is counted in the haze's unit (<see cref="ValleyHazeDensity"/>).
+/// It depends on altitude alone, so every table and march takes it in as they take the haze; because its lid is sharper than
+/// any march's steps, a march takes the layer's exact mean over each step (<see cref="AerosolStepDensity"/>), never a sample.
+/// None by default.</para>
+///
 /// <para>The <b>ground</b> is not part of the model: a scene puts it at its base altitude
 /// (<see cref="AtmosphereFrame"/>), a sphere that casts the Earth's shadow and stands in for the land beyond
 /// the terrain tile, with a flat <see cref="GroundAlbedo"/>.</para>
 /// </summary>
 public sealed record AtmosphereModel
 {
+    /// <summary>The clear day's haze: vertical optical depth at 550 nm from sea level (the default <see cref="AerosolOpticalDepth550"/>).</summary>
+    public const double ClearDayOpticalDepth550 = 0.1;
+
     /// <summary>Radius of the sea-level sphere, m (Bruneton 2017, Hillaire 2020).</summary>
     public double PlanetRadiusMetres { get; init; } = 6_360_000.0;
 
@@ -42,7 +53,7 @@ public sealed record AtmosphereModel
     public double RayleighScaleHeightMetres { get; init; } = AirOptics.RayleighScaleHeightMetres;
 
     /// <summary>Vertical optical depth of the haze from sea level at 550 nm.</summary>
-    public double AerosolOpticalDepth550 { get; init; } = 0.1;
+    public double AerosolOpticalDepth550 { get; init; } = ClearDayOpticalDepth550;
 
     /// <summary>Ångström exponent of the haze's extinction.</summary>
     public double AngstromExponent { get; init; } = 1.3;
@@ -68,11 +79,36 @@ public sealed record AtmosphereModel
     /// <summary>Lambertian albedo of the ground sphere (the land beyond the terrain tile), flat in wavelength.</summary>
     public double GroundAlbedo { get; init; } = 0.2;
 
+    /// <summary>Altitude above sea level of the valley haze's lid, m: the middle of its fall, where the layer is half as dense.</summary>
+    public double ValleyHazeTopMetres { get; init; }
+
+    /// <summary>
+    /// How soft the valley haze's lid is: the logistic's scale, m. The layer thins from 90% to 10% of its density over 4.4 times
+    /// this (132 m at the default 30 m): a lid that reads crisp from ten kilometres and more, as an inversion's does.
+    /// </summary>
+    public double ValleyHazeSoftnessMetres { get; init; } = 30.0;
+
+    /// <summary>The valley haze's extinction at 550 nm under its lid, per metre, on top of the haze's own; 0 for none.</summary>
+    public double ValleyHazeExtinction550 { get; init; }
+
     /// <summary>The default clear-day atmosphere.</summary>
     public static AtmosphereModel Default { get; } = new();
 
     /// <summary>Radius of the top of the atmosphere, m.</summary>
     public double TopRadiusMetres => PlanetRadiusMetres + TopAltitudeMetres;
+
+    /// <summary>
+    /// The optical depth the haze's coefficients are built from (<see cref="CoefficientsAt"/>): the haze's own, or the clear day's
+    /// when there is none but a valley haze, so the layer keeps its coefficients in air that is otherwise clean.
+    /// </summary>
+    public double HazeUnitOpticalDepth => AerosolOpticalDepth550 > 0.0 || !(ValleyHazeExtinction550 > 0.0) ? AerosolOpticalDepth550 : ClearDayOpticalDepth550;
+
+    /// <summary>The haze's own profile in the haze's unit: exactly 1, or 0 when only a valley haze set the unit.</summary>
+    public double HazeScale => HazeUnitOpticalDepth > 0.0 ? AerosolOpticalDepth550 / HazeUnitOpticalDepth : 0.0;
+
+    /// <summary>The valley haze's density under its lid, in the haze's unit (the haze's own density at sea level); 0 for none.</summary>
+    public double ValleyHazeDensity =>
+        ValleyHazeExtinction550 > 0.0 ? ValleyHazeExtinction550 * AerosolScaleHeightMetres / HazeUnitOpticalDepth : 0.0;
 
     /// <summary>Ozone number density at the peak, 1/m³: the column spread over the tent's area (one half-width).</summary>
     public double OzonePeakNumberDensity => OzoneDobsonUnits * AirOptics.DobsonUnit / OzoneHalfWidthMetres;
@@ -82,7 +118,7 @@ public sealed record AtmosphereModel
     {
         double rayleigh = AirOptics.RayleighCrossSection(nm) * AirOptics.StandardNumberDensity
             * (AirOptics.RayleighScaleHeightMetres / RayleighScaleHeightMetres);
-        double aerosolExtinction = AerosolOpticalDepth550 * Math.Pow(nm / 550.0, -AngstromExponent) / AerosolScaleHeightMetres;
+        double aerosolExtinction = HazeUnitOpticalDepth * Math.Pow(nm / 550.0, -AngstromExponent) / AerosolScaleHeightMetres;
         return new AtmosphereCoefficients(
             rayleigh,
             aerosolExtinction * AerosolSingleScatteringAlbedo,
@@ -93,8 +129,59 @@ public sealed record AtmosphereModel
     /// <summary>Relative density of the air molecules at <paramref name="altitudeMetres"/> above sea level.</summary>
     public double RayleighDensity(double altitudeMetres) => Math.Exp(-altitudeMetres / RayleighScaleHeightMetres);
 
-    /// <summary>Relative density of the haze at <paramref name="altitudeMetres"/> above sea level.</summary>
-    public double AerosolDensity(double altitudeMetres) => Math.Exp(-altitudeMetres / AerosolScaleHeightMetres);
+    /// <summary>Relative density of the haze at <paramref name="altitudeMetres"/> above sea level: its own profile and the valley haze.</summary>
+    public double AerosolDensity(double altitudeMetres) =>
+        HazeScale * Math.Exp(-altitudeMetres / AerosolScaleHeightMetres) + ValleyHaze(altitudeMetres);
+
+    /// <summary>The valley haze's relative density at <paramref name="altitudeMetres"/> above sea level: <see cref="ValleyHazeDensity"/> under a logistic lid.</summary>
+    public double ValleyHaze(double altitudeMetres)
+    {
+        double density = ValleyHazeDensity;
+        return density > 0.0 ? density / (1.0 + Math.Exp((altitudeMetres - ValleyHazeTopMetres) / ValleyHazeSoftnessMetres)) : 0.0;
+    }
+
+    /// <summary>
+    /// The valley haze's mean relative density between altitudes <paramref name="a"/> and <paramref name="b"/> (either order): its
+    /// integral over the altitudes, <c>w·(softplus(x_a) − softplus(x_b))</c> with <c>x = (top − h)/w</c>, over their difference, so
+    /// a straight path between them gets the layer's exact optical depth whatever its steps; within 10⁻³ w, the density in the middle.
+    /// </summary>
+    public double ValleyHazeMean(double a, double b)
+    {
+        double density = ValleyHazeDensity;
+        if (!(density > 0.0))
+            return 0.0;
+        double w = ValleyHazeSoftnessMetres;
+        double xa = (ValleyHazeTopMetres - a) / w, xb = (ValleyHazeTopMetres - b) / w;
+        double dx = xa - xb;
+        if (Math.Abs(dx) < 1e-3)
+            return density / (1.0 + Math.Exp(-0.5 * (xa + xb)));
+        return density * (Softplus(xa) - Softplus(xb)) / dx;
+    }
+
+    /// <summary>
+    /// The haze's relative density over one step of a march whose altitudes are <paramref name="start"/>, <paramref name="middle"/>
+    /// and <paramref name="end"/> above sea level: its own profile at the middle, as every march samples it, and the valley haze's
+    /// exact mean along the two halves (<see cref="ValleyHazeMean"/>), which also holds where a chord dips to its lowest inside the
+    /// step. Without a valley haze, exactly <see cref="AerosolDensity"/> at the middle.
+    /// </summary>
+    public double AerosolStepDensity(double start, double middle, double end)
+    {
+        double own = HazeScale * Math.Exp(-middle / AerosolScaleHeightMetres);
+        return ValleyHazeDensity > 0.0 ? own + 0.5 * (ValleyHazeMean(start, middle) + ValleyHazeMean(middle, end)) : own;
+    }
+
+    /// <summary>The valley haze's column from <paramref name="altitudeMetres"/> straight up to <paramref name="topMetres"/>, m of relative density.</summary>
+    public double ValleyHazeColumn(double altitudeMetres, double topMetres)
+    {
+        double density = ValleyHazeDensity;
+        if (!(density > 0.0))
+            return 0.0;
+        double w = ValleyHazeSoftnessMetres;
+        return density * w * (Softplus((ValleyHazeTopMetres - altitudeMetres) / w) - Softplus((ValleyHazeTopMetres - topMetres) / w));
+    }
+
+    /// <summary><c>ln(1 + eˣ)</c> without overflow.</summary>
+    public static double Softplus(double x) => Math.Max(x, 0.0) + Math.Log(1.0 + Math.Exp(-Math.Abs(x)));
 
     /// <summary>Relative density of ozone at <paramref name="altitudeMetres"/> above sea level (the tent).</summary>
     public double OzoneDensity(double altitudeMetres) =>
@@ -109,7 +196,8 @@ public sealed record AtmosphereModel
         double top = TopAltitudeMetres;
         double h = Math.Clamp(altitudeMetres, 0.0, top);
         double Exponential(double scale) => scale * (Math.Exp(-h / scale) - Math.Exp(-top / scale));
-        return new DensityColumns(Exponential(RayleighScaleHeightMetres), Exponential(AerosolScaleHeightMetres), OzoneColumnAbove(h));
+        return new DensityColumns(Exponential(RayleighScaleHeightMetres),
+            HazeScale * Exponential(AerosolScaleHeightMetres) + ValleyHazeColumn(h, top), OzoneColumnAbove(h));
     }
 
     /// <summary>Zenith optical depths from <paramref name="altitudeMetres"/> at <paramref name="nm"/>: (Rayleigh, aerosol, ozone).</summary>
@@ -142,6 +230,11 @@ public sealed record AtmosphereModel
             errors.Add("The haze asymmetry must be in (−1, 1).");
         if (OzonePeakAltitudeMetres + OzoneHalfWidthMetres > TopAltitudeMetres || OzonePeakAltitudeMetres - OzoneHalfWidthMetres < 0.0)
             errors.Add("The ozone layer must lie between sea level and the top of the atmosphere.");
+        Positive(nameof(ValleyHazeSoftnessMetres), ValleyHazeSoftnessMetres);
+        if (!(ValleyHazeExtinction550 >= 0.0) || !double.IsFinite(ValleyHazeExtinction550))
+            errors.Add("The valley haze's extinction must not be negative.");
+        if (!(ValleyHazeTopMetres >= 0.0 && ValleyHazeTopMetres <= TopAltitudeMetres))
+            errors.Add("The valley haze's lid must lie between sea level and the top of the atmosphere.");
         return errors;
     }
 

@@ -65,10 +65,13 @@ void CSColumns(uint3 tid : SV_DispatchThreadID)
     float pathLength = DistanceToShellAbove(SeaRadius, h, TopAltitude, mu);
     float dt = pathLength / float(COLUMN_STEPS);
     float3 sum = 0.0;
+    float start = AltitudeAlong(SeaRadius, h, mu, 0.0);
     for (uint k = 0u; k < COLUMN_STEPS; k++)
     {
         float a = AltitudeAlong(SeaRadius, h, mu, (float(k) + 0.5) * dt);
-        sum += float3(RayleighDensity(a), AerosolDensity(a), OzoneDensity(a));
+        float end = AltitudeAlong(SeaRadius, h, mu, float(k + 1u) * dt);
+        sum += float3(RayleighDensity(a), AerosolStepDensity(start, a, end), OzoneDensity(a));
+        start = end;
     }
     LutOut[item * 4u] = sum.x * dt;
     LutOut[item * 4u + 1u] = sum.y * dt;
@@ -194,6 +197,19 @@ float RayLength(ScatterPoint p)
     return p.Ground ? DistanceToSphereBelow(rb, p.Height, p.Mu) : DistanceToShellAbove(rb, p.Height, ScatterTop(), p.Mu);
 }
 
+// Step s of `steps` along a ray from `height` above the ground sphere at cos = mu: (midpoint, length, its height, the haze's
+// relative density over it). C# reference: AtmosphereScattering.StepAt and the sky march's step.
+float4 MarchStep(float pathLength, uint s, uint steps, bool denseAtEnd, float height, float mu)
+{
+    float rb = GroundRadius();
+    float2 ends = SegmentEnds(pathLength, s, steps, denseAtEnd);
+    float t = 0.5 * (ends.x + ends.y);
+    float hg = AltitudeAlong(rb, height, mu, t);
+    float aerosol = AerosolStepDensity(GroundAltitude + AltitudeAlong(rb, height, mu, ends.x), GroundAltitude + hg,
+        GroundAltitude + AltitudeAlong(rb, height, mu, ends.y));
+    return float4(t, ends.y - ends.x, hg, aerosol);
+}
+
 [numthreads(64, 1, 1)]
 void CSSingleScattering(uint3 tid : SV_DispatchThreadID)
 {
@@ -210,13 +226,12 @@ void CSSingleScattering(uint3 tid : SV_DispatchThreadID)
     float transmittance = 1.0, rayleigh = 0.0, mie = 0.0;
     for (uint s = 0u; s < SCATTER_STEPS; s++)
     {
-        float2 step2 = Segment(pathLength, s, SCATTER_STEPS, p.Ground);
-        float t = step2.x, dt = step2.y;
-        float hg = AltitudeAlong(rb, p.Height, p.Mu, t);
+        float4 step4 = MarchStep(pathLength, s, SCATTER_STEPS, p.Ground, p.Height, p.Mu);
+        float t = step4.x, dt = step4.y, hg = step4.z;
         float rp = rb + hg;
         float muSp = (r0 * p.MuS + t * p.Nu) / rp;
         float altitude = GroundAltitude + hg;
-        float4 medium = MediumAt(k, altitude);
+        float4 medium = MediumWith(k, altitude, step4.w);
         float sunMu;
         float visible = SunVisibility(hg, muSp, sunMu);
         float sun = visible > 0.0 ? visible * exp(-OpticalDepth(k, SampleColumns(altitude, sunMu))) : 0.0;
@@ -321,9 +336,8 @@ void CSMultipleScattering(uint3 tid : SV_DispatchThreadID)
     float transmittance = 1.0, radiance = 0.0;
     for (uint s = 0u; s < SCATTER_STEPS; s++)
     {
-        float2 step2 = Segment(pathLength, s, SCATTER_STEPS, p.Ground);
-        float t = step2.x, dt = step2.y;
-        float hg = AltitudeAlong(rb, p.Height, p.Mu, t);
+        float4 step4 = MarchStep(pathLength, s, SCATTER_STEPS, p.Ground, p.Height, p.Mu);
+        float t = step4.x, dt = step4.y, hg = step4.z;
         float rp = rb + hg;
         ScatterPoint q;
         q.Height = hg;
@@ -331,8 +345,8 @@ void CSMultipleScattering(uint3 tid : SV_DispatchThreadID)
         q.MuS = (r0 * p.MuS + t * p.Nu) / rp;
         q.Nu = ClampNu(q.Mu, q.MuS, p.Nu);
         q.Ground = p.Ground;
-        float extinction = MediumAt(k, GroundAltitude + hg).y;
-        radiance += transmittance * ScatterDensity(ScatterWeighted, k, float(l), q) * StepIntegral(extinction, dt);
+        float extinction = MediumWith(k, GroundAltitude + hg, step4.w).y;
+        radiance += transmittance * ScatterDensityWith(ScatterWeighted, k, float(l), q, step4.w) * StepIntegral(extinction, dt);
         transmittance *= exp(-extinction * dt);
     }
     LutOut[item] = radiance;
@@ -350,14 +364,13 @@ float2 SkyMarch(float4 k, uint lambda, float height, float mu, float muS, float 
     float transmittance = 1.0, rayleigh = 0.0, mie = 0.0, multiple = 0.0;
     for (uint s = 0u; s < SKY_STEPS; s++)
     {
-        float2 step2 = Segment(pathLength, s, SKY_STEPS, toGround);
-        float t = step2.x, dt = step2.y;
-        float hg = AltitudeAlong(groundRadius, height, mu, t);
+        float4 step4 = MarchStep(pathLength, s, SKY_STEPS, toGround, height, mu);
+        float t = step4.x, dt = step4.y, hg = step4.z;
         float rp = groundRadius + hg;
         float muP = (r0 * mu + t) / rp;
         float muSp = (r0 * muS + t * nu) / rp;
         float altitude = GroundAltitude + hg;
-        float4 medium = MediumAt(k, altitude);
+        float4 medium = MediumWith(k, altitude, step4.w);
         float sunMu;
         float visible = SunVisibility(hg, muSp, sunMu);
         float sun = visible > 0.0 ? visible * exp(-OpticalDepth(k, SampleColumns(altitude, sunMu))) : 0.0;
@@ -371,7 +384,7 @@ float2 SkyMarch(float4 k, uint lambda, float height, float mu, float muS, float 
         rayleigh += step * sun * medium.z;
         mie += step * sun * medium.w;
 #ifndef SINGLE_SCATTERING_ONLY
-        multiple += step * ScatterDensity(ScatterWeighted, k, AtmSun[lambda].w, q);
+        multiple += step * ScatterDensityWith(ScatterWeighted, k, AtmSun[lambda].w, q, step4.w);
 #endif
         transmittance *= exp(-medium.y * dt);
     }
