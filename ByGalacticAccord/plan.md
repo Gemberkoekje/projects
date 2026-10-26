@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-25):** S1 done ([log](log/S1.md)); S2 is next. The UI mockup is at
-<https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
+**Status (2026-10-26):** S1 and S2 done ([S1 log](log/S1.md), [S2 log](log/S2.md)); S3 is next. The UI mockup
+is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
 ---
@@ -34,14 +34,16 @@ foundation is sound; most of the game logic on top of it changes shape.
 
 | Defect | Fixed in |
 |---|---|
-| The board and the event log show the buyer's hidden reservation fee, so haggling is solved | S5 |
+| The board and the event log show the buyer's hidden reservation fee, so haggling is solved. *Since S2 neither prints it, but the posted late fee and its cap (the bond) are still scaled from it, so the terms give it away.* | S5 |
 | The player never pays running costs (heartbeats skip the player) | S3 |
 | Charges stop at ₵0, so nobody can go broke; a broke player still takes escrow jobs with a ₵0 bond | S8 |
-| `AcceptHaul` doesn't check the contract is still open | S3 |
+| `AcceptHaul` doesn't check the contract is still open | S2 (fixed: the client calls it) |
 | Food decays below its warranty on even the shortest run | S3 (the §15.3 targets) |
 | Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 |
 | Incident outcomes don't shift with danger, despite the comment saying they do | S8 |
 | The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
+| *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 |
+| *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 |
 
 ## 2. How we work
 
@@ -99,7 +101,10 @@ foundation is sound; most of the game logic on top of it changes shape.
   - A Playwright script that loads the client, runs time forward and screenshots it.
 - **Verify:** the client runs locally; the script reports no console errors; screenshots match the
   mockup's layout and visual language.
-- **Status:** not started.
+- **Status (2026-10-26):** done. The client runs the engine in WebAssembly at about 21,800 game hours a second
+  (16× needs 16) and reaches exactly the state desktop .NET does; the browser check passes with no console
+  errors and screenshots the main screen in both themes and at phone width. The player can take a haul as
+  posted. See [`log/S2.md`](log/S2.md).
 
 ### S3 — Possession, Sale and Haul
 

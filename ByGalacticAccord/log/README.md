@@ -9,3 +9,4 @@ line that links here. Section references (§n) in a log are to the design,
 | Log | Step |
 |---|---|
 | [`S1.md`](S1.md) | Groundwork |
+| [`S2.md`](S2.md) | The Blazor client, on the current engine (screenshots in [`S2/`](S2/)) |
