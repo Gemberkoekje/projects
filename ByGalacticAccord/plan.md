@@ -6,7 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-26):** S1 and S2 done ([S1 log](log/S1.md), [S2 log](log/S2.md)); S3 is next. The UI mockup
+**Status (2026-10-26):** S1, S2 and S3 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md)); S4
+is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -34,16 +35,19 @@ foundation is sound; most of the game logic on top of it changes shape.
 
 | Defect | Fixed in |
 |---|---|
-| The board and the event log show the buyer's hidden reservation fee, so haggling is solved. *Since S2 neither prints it, but the posted late fee and its cap (the bond) are still scaled from it, so the terms give it away.* | S5 |
-| The player never pays running costs (heartbeats skip the player) | S3 |
+| The board and the event log show the buyer's hidden reservation fee, so haggling is solved. *Since S2 neither prints it, but the posted late fee and its cap (the bond) are still scaled from it, so the terms give it away.* | S3 (fixed early: every term now scales from the posted price) |
+| The player never pays running costs (heartbeats skip the player) | S3 (fixed) |
 | Charges stop at ₵0, so nobody can go broke; a broke player still takes escrow jobs with a ₵0 bond | S8 |
 | `AcceptHaul` doesn't check the contract is still open | S2 (fixed: the client calls it) |
-| Food decays below its warranty on even the shortest run | S3 (the §15.3 targets) |
+| Food decays below its warranty on even the shortest run | S3 (fixed: the §15.3 keep-times) |
 | Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 |
 | Incident outcomes don't shift with danger, despite the comment saying they do | S8 |
 | The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
-| *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 |
-| *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 |
+| *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
+| *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
+| *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7, S8 (growth and insolvency replace it) |
+| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (cancellation, grace), S5 (raising the offer by negotiation) |
+| *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
 
 ## 2. How we work
 
@@ -124,7 +128,11 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Client: possessions in the ledger; kinds on the board.
 - **Verify:** invariants hold over a million-tick soak; the economy stays stable (telemetry against
   S1's baseline); lifecycle tests for Sale, Haul and Storage pass.
-- **Status:** not started.
+- **Status (2026-10-26):** done. Goods are owned and somewhere (stock, storage, a hold) and conserved; Sales and
+  Hauls replace the bundled contract; every role trades through one set of market commands, the player's too.
+  Over a million ticks invariants hold, the money supply drifts 1–2%, and about 109,000 contracts settle where S1
+  settled 5,600–25,000, with consumers using 51–98% of what they want. The client shows each contract's kind and
+  a ledger of what the player owns and where. See [`log/S3.md`](log/S3.md).
 
 ### S4 — Terms and failure
 

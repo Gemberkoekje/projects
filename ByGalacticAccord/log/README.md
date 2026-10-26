@@ -10,3 +10,4 @@ line that links here. Section references (§n) in a log are to the design,
 |---|---|
 | [`S1.md`](S1.md) | Groundwork |
 | [`S2.md`](S2.md) | The Blazor client, on the current engine (screenshots in [`S2/`](S2/)) |
+| [`S3.md`](S3.md) | Possession, Sale and Haul (screenshots in [`S3/`](S3/)) |
