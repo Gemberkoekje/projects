@@ -1,0 +1,60 @@
+@* The board (design §11.3): the open contracts you can see, each with kind, jurisdiction, danger and take-home. *@
+<section class="panel board-panel">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+    </div>
+    <p class="muted small">@Model.Hint</p>
+    <div class="board-rows" data-testid="board">
+        @if (Model.Rows.Count == 0)
+        {
+            <p class="empty small muted">@Model.Empty</p>
+        }
+        @foreach (BoardRow row in Model.Rows)
+        {
+            bool on = Selected == row.Id;
+            <button type="button" class="board-row @(on ? "on" : null) @(row.Blocked ? "blocked" : null)" aria-pressed="@(on ? "true" : "false")"
+                    @key="row.Id" @onclick="() => OnSelect.InvokeAsync(row.Id)">
+                <span class="row-line">
+                    <span class="kind caps mono">@row.Kind</span>
+                    <span class="take mono tone-@row.TakeHomeTone">@row.TakeHome</span>
+                </span>
+                <span class="row-line">
+                    <span class="row-title">@row.Title</span>
+                    <span class="mono small muted">@row.Rate</span>
+                </span>
+                <span class="row-facts small muted">
+                    <span>@row.Route</span>
+                    <span class="danger"><svg width="18" height="6" aria-hidden="true"><line class="route band-@row.Band" x1="1" y1="3" x2="17" y2="3" /></svg>@row.Danger</span>
+                    <span>@row.Jurisdiction</span>
+                    <span>@row.Due</span>
+                </span>
+                @if (row.Note is not null)
+                {
+                    <span class="row-note small tone-@row.NoteTone">@row.Note</span>
+                }
+            </button>
+        }
+    </div>
+</section>
+
+@code {
+    private BoardViewModel? _rendered;
+    private ContractId? _renderedSelection;
+
+    [Parameter, EditorRequired]
+    public BoardViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public ContractId? Selected { get; set; }
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model) || _renderedSelection != Selected;
+        _rendered = Model;
+        _renderedSelection = Selected;
+        return changed;
+    }
+}

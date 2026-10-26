@@ -1,0 +1,20 @@
+@* Ships at their interpolated positions: the only part of the map that changes every frame. *@
+<g class="ships">
+    @foreach (MapShip ship in Ships)
+    {
+        <g class="ship @(ship.Yours ? "yours" : null)" @key="ship.Id">
+            <title>@ship.Tip</title>
+            <circle cx="@X(ship.X)" cy="@X(ship.Y)" r="@(ship.Yours ? 6 : 5)" />
+            <text class="ship-label" x="@X(ship.X - 10)" y="@X(ship.Y + 3)" text-anchor="end">@(ship.Yours ? YouLabel : null)</text>
+        </g>
+    }
+</g>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<MapShip> Ships { get; set; } = default!;
+
+    private static readonly string YouLabel = Templates.Get("Map.Ship.You");
+
+    private static string X(double value) => value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+}

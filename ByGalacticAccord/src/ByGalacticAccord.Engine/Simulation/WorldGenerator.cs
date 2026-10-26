@@ -23,13 +23,15 @@ public static class WorldGenerator
         DeterministicRandom rng = context.Rng;
 
         // ---- locations ----
-        Location meridian = AddLocation(context, "Meridian Station", LocationType.IndustrialWorld, "Helios", AccordReach.AccordEdge);
-        Location verdant = AddLocation(context, "Verdant", LocationType.AgriculturalWorld, "Helios", AccordReach.AccordEdge);
-        Location heliosPrime = AddLocation(context, "Helios Prime", LocationType.CoreWorld, "Helios", AccordReach.DeepAccord);
-        Location tycho = AddLocation(context, "Tycho Foundry", LocationType.IndustrialWorld, "Helios", AccordReach.AccordEdge);
-        Location halcyon = AddLocation(context, "Halcyon Refinery", LocationType.RefineryStation, "Helios", AccordReach.AccordEdge);
-        Location rustBelt = AddLocation(context, "Rust Belt", LocationType.MiningColony, "Marches", AccordReach.OutsideAccord);
-        Location edge = AddLocation(context, "Edge Station", LocationType.FrontierOutpost, "Marches", AccordReach.OutsideAccord);
+        // Map points place the sector schematically (design §11.1): the Accord core on the left, the Marches
+        // on the right. They are the UI mockup's layout, in its 860 × 540 frame.
+        Location meridian = AddLocation(context, "Meridian Station", LocationType.IndustrialWorld, "Helios", AccordReach.AccordEdge, new MapPoint(120, 262));
+        Location verdant = AddLocation(context, "Verdant", LocationType.AgriculturalWorld, "Helios", AccordReach.AccordEdge, new MapPoint(200, 96));
+        Location heliosPrime = AddLocation(context, "Helios Prime", LocationType.CoreWorld, "Helios", AccordReach.DeepAccord, new MapPoint(282, 430));
+        Location tycho = AddLocation(context, "Tycho Foundry", LocationType.IndustrialWorld, "Helios", AccordReach.AccordEdge, new MapPoint(452, 238));
+        Location halcyon = AddLocation(context, "Halcyon Refinery", LocationType.RefineryStation, "Helios", AccordReach.AccordEdge, new MapPoint(520, 420));
+        Location rustBelt = AddLocation(context, "Rust Belt", LocationType.MiningColony, "Marches", AccordReach.OutsideAccord, new MapPoint(684, 250));
+        Location edge = AddLocation(context, "Edge Station", LocationType.FrontierOutpost, "Marches", AccordReach.OutsideAccord, new MapPoint(800, 410));
 
         // ---- routes (undirected). Danger climbs as you head out of the Accord. ----
         AddRoute(context, meridian, verdant, 30, 0.05m, AccordReach.AccordEdge);
@@ -125,9 +127,9 @@ public static class WorldGenerator
         return new WorldHandles(context, playerId, meridian.Id);
     }
 
-    private static Location AddLocation(SimulationContext context, string name, LocationType type, string region, AccordReach reach)
+    private static Location AddLocation(SimulationContext context, string name, LocationType type, string region, AccordReach reach, MapPoint map)
     {
-        var loc = new Location(context.NextLocationId(), name, type, region, reach);
+        var loc = new Location(context.NextLocationId(), name, type, region, reach) { Map = map };
         context.Add(loc);
         return loc;
     }

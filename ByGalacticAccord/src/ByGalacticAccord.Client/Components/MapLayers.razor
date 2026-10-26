@@ -1,0 +1,69 @@
+@* The map's still parts: ground, regions, routes, the selected contract's legs, locations. They change
+   only when the shell rebuilds the map's view model, not every frame as the ships do. *@
+<g class="layers">
+    <rect class="map-ground" x="0" y="0" width="@Model.Width" height="@Model.Height" rx="8" />
+    @foreach (MapRegion region in Model.Regions)
+    {
+        <g class="region">
+            @if (region.Framed)
+            {
+                <rect class="region-frame" x="@region.X" y="@region.Y" width="@region.Width" height="@region.Height" rx="14" />
+            }
+            <text class="region-label" x="@(region.Framed ? region.X + 14 : region.X)" y="@(region.Y + (region.Framed ? 20 : 10))">@region.Label</text>
+            <text class="region-label" x="@(region.X + 14)" y="@(region.Y + 34)">@region.Note</text>
+        </g>
+    }
+    @foreach (MapRoute route in Model.Routes)
+    {
+        <line class="route band-@route.Band @(route.Dimmed ? "dimmed" : null)" x1="@route.X1" y1="@route.Y1" x2="@route.X2" y2="@route.Y2"><title>@route.Tip</title></line>
+    }
+    @foreach (MapLeg leg in Model.Overlay)
+    {
+        <line class="leg @(leg.Empty ? "leg-empty" : "leg-laden band-" + leg.Band)" x1="@leg.X1" y1="@leg.Y1" x2="@leg.X2" y2="@leg.Y2" />
+    }
+    <g class="route-labels">
+        @foreach (MapRoute route in Model.Routes)
+        {
+            <g><text class="route-hours" x="@route.LabelX" y="@route.LabelY" text-anchor="middle">@route.Hours</text></g>
+        }
+    </g>
+    @foreach (MapNode node in Model.Nodes)
+    {
+        <g class="node @(node.Here ? "here" : null)">
+            <title>@node.Tip</title>
+            @if (node.Here)
+            {
+                <circle class="here-ring" cx="@node.X" cy="@node.Y" r="@(node.Radius + 7)" />
+            }
+            <circle class="node-dot" cx="@node.X" cy="@node.Y" r="@node.Radius" />
+            <text class="node-name" x="@node.LabelX" y="@LabelY(node, 0)" text-anchor="@Anchor(node)">@node.Name</text>
+            <text class="node-meta" x="@node.LabelX" y="@LabelY(node, 1)" text-anchor="@Anchor(node)">@node.Meta</text>
+            <text class="node-makes" x="@node.LabelX" y="@LabelY(node, 2)" text-anchor="@Anchor(node)">@node.Makes</text>
+        </g>
+    }
+</g>
+
+@code {
+    private MapViewModel? _rendered;
+
+    [Parameter, EditorRequired]
+    public MapViewModel Model { get; set; } = default!;
+
+    // Three label lines, 14 units apart, below the location or ending just above it.
+    private static int LabelY(MapNode node, int line) =>
+        node.LabelAbove ? node.Y - node.Radius - 10 - ((2 - line) * 14) : node.Y + node.Radius + 17 + (line * 14);
+
+    private static string Anchor(MapNode node) => node.Anchor switch
+    {
+        LabelAnchor.Start => "start",
+        LabelAnchor.End => "end",
+        _ => "middle",
+    };
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model);
+        _rendered = Model;
+        return changed;
+    }
+}

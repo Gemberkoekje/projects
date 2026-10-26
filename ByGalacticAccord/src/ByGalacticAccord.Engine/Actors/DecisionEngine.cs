@@ -154,7 +154,7 @@ public static class DecisionEngine
 
         context.Add(contract);
         context.Schedule(new ContractExpiryCheck(deadline, contract.Id));
-        context.Record("Posted", $"{contract.Id}: {consumer.Name} wants {quantity:0} {demand.Good} from {producer.Name} (≤{maxFee} fee).");
+        context.Record(new ContractPostedEntry(context.CurrentTick, contract.Id, consumer.Id, producer.Id));
     }
 
     // ---- haulers (shipping companies + independent pilots) ----
@@ -303,8 +303,21 @@ public static class DecisionEngine
             contract.SetLockedBond(bond);
         }
 
-        pick.Ship.Reserve(context.CurrentTick, contract.Id);
+        pick.Ship.Reserve(context.CurrentTick, contract.Id, RepositioningCourse(context, pick.Ship, contract, pick.RepoTicks));
         context.Schedule(new ShipDeparted(context.CurrentTick + pick.RepoTicks, contract.Id));
-        context.Record("Accepted", $"{contract.Id}: {hauler.Name} took the {contract.Good} haul for {pick.Fee}.");
+        context.Record(new HaulTakenEntry(context.CurrentTick, contract.Id, hauler.Id, pick.Fee));
+    }
+
+    /// <summary>The empty leg from where a ship sits to a contract's pickup, or null if it is already there.</summary>
+    internal static ShipCourse? RepositioningCourse(SimulationContext context, Ship ship, Contract contract, long repoTicks)
+    {
+        if (ship.Location == contract.OriginLocationId)
+        {
+            return null;
+        }
+
+        RoutePlan repo = context.FindPath(ship.Location, contract.OriginLocationId)
+                         ?? throw new InvalidOperationException("A committed ship has no route to its pickup.");
+        return ShipCourse.Along(repo, context.CurrentTick, repoTicks);
     }
 }

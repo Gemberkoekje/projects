@@ -19,6 +19,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\ByGalacticAccord.Engine\ByGalacticAccord.Engine.csproj" />
+    <ProjectReference Include="..\..\src\ByGalacticAccord.Presentation\ByGalacticAccord.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

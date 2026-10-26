@@ -1,0 +1,131 @@
+@* The contract as a document (design §11.3): beside the map, never a modal, so the world stays in view. *@
+<section class="panel contract-panel" data-testid="contract">
+    @if (Model is null)
+    {
+        <p class="empty small muted">@NoneText</p>
+    }
+    else
+    {
+        <div class="contract-head">
+            <span class="caps mono xsmall muted">@Model.KindLine</span>
+            <h2 class="contract-title">@Model.Head</h2>
+            <span class="small muted">@Model.Sub</span>
+        </div>
+
+        @if (Model.Status is not null)
+        {
+            <p class="status small tone-@Model.StatusTone">@Model.Status</p>
+        }
+
+        @if (Model.Lines.Count > 0)
+        {
+            <div class="block">
+                <h3 class="block-title">@Model.CertainTitle</h3>
+                @foreach (MoneyLine line in Model.Lines)
+                {
+                    <div class="line" title="@line.Note">
+                        <span class="line-label">
+                            <span class="small">@line.Label</span>
+                            <span class="xsmall muted">@line.Note</span>
+                        </span>
+                        <span class="mono small tone-@line.Tone">@line.Amount</span>
+                    </div>
+                }
+                <div class="line total">
+                    <span class="strong">@Model.TakeHomeLabel</span>
+                    <span class="line-value">
+                        <span class="mono big tone-@Model.TakeHomeTone" data-testid="take-home">@Model.TakeHome</span>
+                        <span class="mono xsmall muted">@Model.TakeHomeNote</span>
+                    </span>
+                </div>
+            </div>
+        }
+
+        @if (Model.Schedule.Count > 0)
+        {
+            <div class="block schedule">
+                @foreach (InfoLine line in Model.Schedule)
+                {
+                    <div class="line plain small">
+                        <span class="muted">@line.Label</span>
+                        <span class="mono tone-@line.Tone">@line.Value</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (Model.Uncertain.Count > 0)
+        {
+            <div class="block">
+                <h3 class="block-title">@Model.UncertainTitle</h3>
+                @foreach (InfoLine line in Model.Uncertain)
+                {
+                    <div class="line" title="@line.Note">
+                        <span class="line-label">
+                            <span class="small">@line.Label</span>
+                            <span class="xsmall muted">@line.Note</span>
+                        </span>
+                        <span class="mono small tone-@line.Tone">@line.Value</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="block">
+            <h3 class="block-title">@Model.TermsTitle</h3>
+            @foreach (string term in Model.Terms)
+            {
+                <p class="term small">@term</p>
+            }
+        </div>
+
+        <div class="party">
+            <span class="party-name">
+                <span class="strong small">@Model.Party</span>
+                <span class="xsmall muted">@Model.PartyRole</span>
+            </span>
+        </div>
+
+        @if (Outcome is not null)
+        {
+            <p class="outcome small" role="status">@Outcome</p>
+        }
+        else if (Model.IsOpen)
+        {
+            @if (Model.Blocked is not null)
+            {
+                <p class="blocked small muted">@Model.Blocked</p>
+            }
+            <div class="actions">
+                <button type="button" class="button primary" disabled="@(!Model.CanAccept)" @onclick="OnAccept">@Model.AcceptLabel</button>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private ContractViewModel? _rendered;
+    private string? _renderedOutcome;
+    private bool _renderedOnce;
+
+    [Parameter]
+    public ContractViewModel? Model { get; set; }
+
+    [Parameter]
+    public string? Outcome { get; set; }
+
+    [Parameter, EditorRequired]
+    public string NoneText { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnAccept { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !_renderedOnce || !ReferenceEquals(_rendered, Model) || _renderedOutcome != Outcome;
+        _rendered = Model;
+        _renderedOutcome = Outcome;
+        _renderedOnce = true;
+        return changed;
+    }
+}

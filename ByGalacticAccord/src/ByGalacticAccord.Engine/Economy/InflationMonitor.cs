@@ -25,12 +25,12 @@ public static class InflationMonitor
         if (drift > context.Config.InflationThreshold)
         {
             context.FaucetMultiplier = Math.Clamp(context.FaucetMultiplier * (1m - context.Config.InflationCorrection), 0.02m, 2.0m);
-            context.Record("Inflation", $"Supply +{drift:P1} over baseline → faucet trimmed to {context.FaucetMultiplier:0.00}x.");
+            context.Record(new FaucetAdjustedEntry(context.CurrentTick, drift, context.FaucetMultiplier));
         }
         else if (drift < -context.Config.InflationThreshold)
         {
             context.FaucetMultiplier = Math.Clamp(context.FaucetMultiplier * (1m + context.Config.InflationCorrection), 0.02m, 2.0m);
-            context.Record("Inflation", $"Supply {drift:P1} below baseline → faucet raised to {context.FaucetMultiplier:0.00}x.");
+            context.Record(new FaucetAdjustedEntry(context.CurrentTick, drift, context.FaucetMultiplier));
         }
     }
 }

@@ -34,7 +34,7 @@ public static class Settlement
         }
 
         // The ship carries exactly what was loaded — never more than the origin could supply.
-        ship.Depart(context.CurrentTick, Cargo.Fresh(contract.Good, taken), contract.Id);
+        ship.Depart(context.CurrentTick, contract.OriginLocationId, Cargo.Fresh(contract.Good, taken), contract.Id);
     }
 
     /// <summary>On a successful delivery: pay the pilot, settle warranty/penalty clauses, tax the fee, deliver the goods, update reputation.</summary>
@@ -76,7 +76,7 @@ public static class Settlement
                 BreachReputation(context, contract, consumer, ticksLate, blameConsumer: true);
                 context.NoteBreached();
                 Close(context, contract, ship, breached: true);
-                context.Record("Breach", $"{contract.Id}: frontier consumer {consumer.Name} defaulted on payment.");
+                context.Record(new PaymentDefaultedEntry(context.CurrentTick, contract.Id, consumer.Id, pilot.Id));
                 return;
             }
 
@@ -90,12 +90,12 @@ public static class Settlement
         context.NoteFulfilled();
         Close(context, contract, ship, breached: false);
 
-        string late = ticksLate > 0 ? $" ({ticksLate} ticks late)" : string.Empty;
-        context.Record("Fulfilled", $"{contract.Id}: {pilot.Name} delivered {cargo.Quantity:0} {contract.Good} to {consumer.Name}{late}. Fee {fee}.");
+        context.Record(new HaulDeliveredEntry(
+            context.CurrentTick, contract.Id, pilot.Id, cargo.Quantity, cargo.Quality, ticksLate, fee, penalty, warrantyRefund));
     }
 
     /// <summary>On a failed delivery (total cargo loss): the pilot forfeits its bond, the consumer is refunded, reputation takes a hit.</summary>
-    public static void Breach(SimulationContext context, Contract contract, Ship ship, long arrivalTick, string reason)
+    public static void Breach(SimulationContext context, Contract contract, Ship ship, long arrivalTick)
     {
         ActorState consumer = context.Actor(contract.PostedBy);
         ActorState pilot = context.Actor(contract.CounterpartyId!.Value);
@@ -110,7 +110,7 @@ public static class Settlement
         BreachReputation(context, contract, pilot, ticksLate, blameConsumer: false);
         context.NoteBreached();
         Close(context, contract, ship, breached: true);
-        context.Record("Breach", $"{contract.Id}: {pilot.Name} failed delivery to {consumer.Name} — {reason}.");
+        context.Record(new DeliveryFailedEntry(context.CurrentTick, contract.Id, pilot.Id));
     }
 
     private static void Close(SimulationContext context, Contract contract, Ship ship, bool breached)

@@ -31,7 +31,7 @@ public sealed class SimulationContext
     // it leaves it, so OpenContracts prunes this list instead of scanning every contract ever posted.
     private readonly List<Contract> _openCandidates = new();
 
-    private readonly List<string> _playerAlerts = new();
+    private readonly List<JournalEntry> _playerAlerts = new();
 
     private long _nextActorId = 1;
     private long _nextShipId = 1;
@@ -195,7 +195,7 @@ public sealed class SimulationContext
         return Queue.HasEvents ? RunStop.ReachedTarget : RunStop.Drained;
     }
 
-    public void Record(string category, string text) => Journal.Record(CurrentTick, category, text);
+    public void Record(JournalEntry entry) => Journal.Record(entry);
 
     // ---- world graph helpers ----
     public Route? RouteBetween(LocationId a, LocationId b) =>
@@ -473,11 +473,12 @@ public sealed class SimulationContext
         _scoutedUntil.TryGetValue((actor, location), out long until) && until >= CurrentTick;
 
     // ---- player hard-pause alerts (§3.4). In headless runs PlayerActorId is null and these never fire. ----
-    public IReadOnlyList<string> PlayerAlerts => _playerAlerts;
+    // An alert is the journal entry that needs the player's attention; the interface words it.
+    public IReadOnlyList<JournalEntry> PlayerAlerts => _playerAlerts;
 
     public bool HasPlayerAlerts => _playerAlerts.Count > 0;
 
-    public void RaisePlayerAlert(string text) => _playerAlerts.Add(text);
+    public void RaisePlayerAlert(JournalEntry entry) => _playerAlerts.Add(entry);
 
     public void ClearPlayerAlerts() => _playerAlerts.Clear();
 }

@@ -1,0 +1,57 @@
+@* The time bar (design §11.3): who you are, the speed controls and the date, your money, and the theme. *@
+<header class="timebar panel">
+    <div class="timebar-who">
+        <span class="wordmark">@Model.Title</span>
+        <span class="muted small">@Model.Who</span>
+    </div>
+    <div class="timebar-clock">
+        @foreach (SpeedButton speed in Model.Speeds)
+        {
+            <button type="button" class="button speed @(speed.On ? "on" : null)" aria-pressed="@(speed.On ? "true" : "false")"
+                    data-speed="@speed.Speed" @onclick="() => OnSpeed.InvokeAsync(speed.Speed)">@speed.Label</button>
+        }
+        <span class="date mono" data-testid="date">@Model.Date</span>
+        <span class="muted small">@Model.SpeedNote</span>
+    </div>
+    <div class="timebar-money mono">
+        <span class="money-item" title="@Model.CreditsTip"><span class="muted">@Model.CreditsLabel</span><strong data-testid="credits">@Model.Credits</strong></span>
+        <span class="money-item" title="@Model.EscrowTip"><span class="muted">@Model.EscrowLabel</span><span>@Model.Escrow</span></span>
+        <span class="money-item" title="@Model.RunningTip"><span class="muted">@Model.RunningLabel</span><span class="tone-Loss">@Model.Running</span></span>
+        <label class="theme small">
+            <span class="muted">@Templates.Get("Theme.Label")</span>
+            <select value="@Theme" @onchange="ThemeChanged">
+                <option value="system">@Templates.Get("Theme.System")</option>
+                <option value="dark">@Templates.Get("Theme.Dark")</option>
+                <option value="light">@Templates.Get("Theme.Light")</option>
+            </select>
+        </label>
+    </div>
+</header>
+
+@code {
+    private HeaderViewModel? _rendered;
+    private string? _renderedTheme;
+
+    [Parameter, EditorRequired]
+    public HeaderViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public string Theme { get; set; } = "system";
+
+    [Parameter]
+    public EventCallback<ClockSpeed> OnSpeed { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnTheme { get; set; }
+
+    private Task ThemeChanged(ChangeEventArgs e) => OnTheme.InvokeAsync(e.Value?.ToString() ?? "system");
+
+    // The shell passes the same model until something changes; skip the work when it hasn't.
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model) || _renderedTheme != Theme;
+        _rendered = Model;
+        _renderedTheme = Theme;
+        return changed;
+    }
+}

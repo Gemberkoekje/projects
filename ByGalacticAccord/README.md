@@ -18,14 +18,17 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
 ## The current build
 
-**S1 (groundwork) is done; S2 is next.** The engine still implements the earlier v0.2 slice: consumers
-post haul contracts, AI haulers negotiate, carry the goods and settle through escrow, and transit
-incidents make dangerous routes cost something. Most of that game logic changes shape in S3–S8; the
-foundation it stands on (the event queue, the seeded random numbers, the money primitives, the
-invariants and the soak harness) stays.
+**S1 (groundwork) and S2 (the browser client) are done; S3 is next.** The engine still implements the
+earlier v0.2 slice: consumers post haul contracts, AI haulers negotiate, carry the goods and settle
+through escrow, and transit incidents make dangerous routes cost something. Most of that game logic
+changes shape in S3–S8; the foundation it stands on (the event queue, the seeded random numbers, the
+money primitives, the invariants and the soak harness) stays.
 
-There is no client to play yet. The WPF client and the console game were retired in S1 (design D23);
-the Blazor WebAssembly client arrives in S2.
+The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
+routes styled by danger and ships moving along them, the time bar (pause, 1×, 4×, 16×), the board of open
+contracts with each one's take-home, the contract as a document, and the captain's log, in dark and light
+themes. You play an independent pilot at Meridian Station with a Light Freighter and can take a haul as
+posted; posting, haggling and the rest of the contract web arrive in S3–S8.
 
 ## Running it
 
@@ -42,6 +45,19 @@ dotnet test --filter Category=Soak
 
 # The soak harness: run the world headless, print economy telemetry, assert every invariant.
 dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42
+
+# The client, at http://localhost:5180 (add ?seed=42 for another world).
+dotnet run --project src/ByGalacticAccord.Client
+```
+
+The browser check needs Node 22 as well. It publishes the client, drives it in Chromium, screenshots it to
+`artifacts/client-check/screenshots/`, and fails on any console error:
+
+```bash
+cd tools/client-check
+npm ci
+npx playwright install chromium   # once
+node check.cjs
 ```
 
 Any `--filter` on the command line replaces the default one, so a filter that matches soak tests runs them.
@@ -49,9 +65,12 @@ Any `--filter` on the command line replaces the default one, so a filter that ma
 ## Layout
 
 ```
-src/ByGalacticAccord.Engine/   the whole simulation: no UI, no I/O, deterministic
-src/ByGalacticAccord.Cli/      the soak harness
-tests/ByGalacticAccord.Tests/  xUnit: fast by default; soak-length tests carry [Trait("Category", "Soak")]
+src/ByGalacticAccord.Engine/        the whole simulation: no UI, no I/O, deterministic
+src/ByGalacticAccord.Presentation/  what the interface shows, as data: text templates, view models, the clock
+src/ByGalacticAccord.Client/        the Blazor WebAssembly client
+src/ByGalacticAccord.Cli/           the soak harness
+tests/ByGalacticAccord.Tests/       xUnit: fast by default; soak-length tests carry [Trait("Category", "Soak")]
+tools/client-check/                 the browser check (Playwright)
 ```
 
 [`CODEMAP.md`](CODEMAP.md) goes file by file.
@@ -68,6 +87,9 @@ tests/ByGalacticAccord.Tests/  xUnit: fast by default; soak-length tests carry [
   (total = initial + faucet − sinks), escrow reconciles and is never negative, cargo picked up equals
   cargo delivered, lost or still aboard, and no contract is left active without a ship carrying it.
 - **Money is `decimal`**, never floating point, so conservation is exact.
+- **Text is data** (§11.5). Every sentence the client shows is a template in
+  `src/ByGalacticAccord.Presentation/Text/Templates.resx`, filled from structured events and the engine's
+  own figures; the journal records typed entries, not prose.
 
 Balance values live in [`SimulationConfig`](src/ByGalacticAccord.Engine/Simulation/SimulationConfig.cs)
 and in world generation. They are tuning, moved by reading soak telemetry.

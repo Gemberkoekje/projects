@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What the interface shows, as data (design §11): the text templates, the view models and the game
+       clock. No Razor and no browser, so it runs and is tested on desktop .NET as well as in the client. -->
+  <PropertyGroup>
+    <AssemblyName>ByGalacticAccord.Presentation</AssemblyName>
+    <RootNamespace>ByGalacticAccord.Presentation</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ByGalacticAccord.Engine\ByGalacticAccord.Engine.csproj" />
+  </ItemGroup>
+
+</Project>

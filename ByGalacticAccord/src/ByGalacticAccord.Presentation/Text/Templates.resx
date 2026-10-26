@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Interface text (design §11.5). Every sentence and label the client shows is one of these templates,
+  filled from structured data: {name} is a field the code supplies. Keys are event types (the journal
+  entries) and fact types (goods, jurisdictions, the panels' lines). Translations go beside this file as
+  Templates.<culture>.resx with the same keys.
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Journal entries, keyed by entry type. A '.You' twin words the player's own event. -->
+  <data name="ContractPosted" xml:space="preserve">
+    <value>{poster} posted a haul: {quantity} {good} from {supplier} at {origin} to {destination}, fee {postedFee}.</value>
+  </data>
+  <data name="HaulTaken" xml:space="preserve">
+    <value>{hauler} took {poster}'s haul of {quantity} {good}, {origin} → {destination}, for {fee}.</value>
+  </data>
+  <data name="HaulTaken.You" xml:space="preserve">
+    <value>You took {poster}'s haul of {quantity} {good}, {origin} → {destination}, for {fee}.</value>
+  </data>
+  <data name="HaulDelivered.OnTime" xml:space="preserve">
+    <value>{hauler} delivered {delivered} {good} to {poster} at {destination}, on time. Fee {fee}.</value>
+  </data>
+  <data name="HaulDelivered.OnTime.You" xml:space="preserve">
+    <value>You delivered {delivered} {good} to {poster} at {destination}, on time. Fee {fee}.</value>
+  </data>
+  <data name="HaulDelivered.Late" xml:space="preserve">
+    <value>{hauler} delivered {delivered} {good} to {poster} at {destination}, {late} late. Fee {fee}, late fee {lateFee}.</value>
+  </data>
+  <data name="HaulDelivered.Late.You" xml:space="preserve">
+    <value>You delivered {delivered} {good} to {poster} at {destination}, {late} late. Fee {fee}, late fee {lateFee}.</value>
+  </data>
+  <data name="HaulDelivered.Refund" xml:space="preserve">
+    <value>Quality on arrival {quality}: {refund} of the fee went back under the warranty.</value>
+  </data>
+  <data name="PaymentDefaulted" xml:space="preserve">
+    <value>{payer} did not pay {hauler} for the {good} at {destination}: a default outside the Accord. The goods were written off.</value>
+  </data>
+  <data name="PaymentDefaulted.You" xml:space="preserve">
+    <value>{payer} did not pay you for the {good} at {destination}: a default outside the Accord. The goods were written off.</value>
+  </data>
+  <data name="DeliveryFailed" xml:space="preserve">
+    <value>{hauler} lost the whole cargo of {good} bound for {destination}. The haul for {poster} failed.</value>
+  </data>
+  <data name="DeliveryFailed.You" xml:space="preserve">
+    <value>You lost the whole cargo of {good} bound for {destination}. The haul for {poster} failed.</value>
+  </data>
+  <data name="ContractExpired" xml:space="preserve">
+    <value>Nobody took {poster}'s haul of {quantity} {good} to {destination} before its deadline.</value>
+  </data>
+  <data name="Incident.MinorDelay" xml:space="preserve">
+    <value>{hauler} hit a navigational delay on the way to {destination}: {delay} added to the trip.</value>
+  </data>
+  <data name="Incident.MinorDelay.You" xml:space="preserve">
+    <value>You hit a navigational delay on the way to {destination}: {delay} added to the trip.</value>
+  </data>
+  <data name="Incident.CargoDamage" xml:space="preserve">
+    <value>Cargo damage on {hauler}'s run to {destination}: the {good} lost {qualityLoss} points of quality.</value>
+  </data>
+  <data name="Incident.CargoDamage.You" xml:space="preserve">
+    <value>Cargo damage on your run to {destination}: the {good} lost {qualityLoss} points of quality.</value>
+  </data>
+  <data name="Incident.PartialLoss" xml:space="preserve">
+    <value>{hauler} lost {lostShare} of the {good} on the way to {destination}.</value>
+  </data>
+  <data name="Incident.PartialLoss.You" xml:space="preserve">
+    <value>You lost {lostShare} of the {good} on the way to {destination}.</value>
+  </data>
+  <data name="Incident.CreditCost" xml:space="preserve">
+    <value>{hauler} paid {cost} in unplanned costs on the way to {destination}.</value>
+  </data>
+  <data name="Incident.CreditCost.You" xml:space="preserve">
+    <value>You paid {cost} in unplanned costs on the way to {destination}.</value>
+  </data>
+  <data name="Incident.TotalLoss" xml:space="preserve">
+    <value>{hauler} lost the entire cargo of {good} on the way to {destination}.</value>
+  </data>
+  <data name="Incident.TotalLoss.You" xml:space="preserve">
+    <value>You lost the entire cargo of {good} on the way to {destination}.</value>
+  </data>
+  <data name="FaucetAdjusted" xml:space="preserve">
+    <value>The inflation monitor set the faucet to {multiplier}× (supply {drift} from baseline).</value>
+  </data>
+  <!-- Fact types: words for the engine's enums. -->
+  <data name="Good.Food" xml:space="preserve">
+    <value>Food</value>
+  </data>
+  <data name="Good.Ore" xml:space="preserve">
+    <value>Ore</value>
+  </data>
+  <data name="Good.Fuel" xml:space="preserve">
+    <value>Fuel</value>
+  </data>
+  <data name="Good.Parts" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="Good.Machinery" xml:space="preserve">
+    <value>Machinery</value>
+  </data>
+  <data name="Good.Medicine" xml:space="preserve">
+    <value>Medicine</value>
+  </data>
+  <data name="Good.Luxury" xml:space="preserve">
+    <value>Luxury</value>
+  </data>
+  <data name="Kind.Haul" xml:space="preserve">
+    <value>Haul</value>
+  </data>
+  <data name="Kind.Procure" xml:space="preserve">
+    <value>Procure</value>
+  </data>
+  <data name="Kind.Service" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Kind.Insurance" xml:space="preserve">
+    <value>Insurance</value>
+  </data>
+  <data name="Kind.Brokered" xml:space="preserve">
+    <value>Brokered</value>
+  </data>
+  <data name="Kind.Bond" xml:space="preserve">
+    <value>Bond</value>
+  </data>
+  <data name="Jurisdiction.DeepAccord" xml:space="preserve">
+    <value>deep Accord</value>
+  </data>
+  <data name="Jurisdiction.AccordEdge" xml:space="preserve">
+    <value>Accord edge</value>
+  </data>
+  <data name="Jurisdiction.OutsideAccord" xml:space="preserve">
+    <value>outside the Accord</value>
+  </data>
+  <data name="Jurisdiction.BlackMarket" xml:space="preserve">
+    <value>black market</value>
+  </data>
+  <data name="Jurisdiction.DeepAccord.Short" xml:space="preserve">
+    <value>deep Accord</value>
+  </data>
+  <data name="Jurisdiction.AccordEdge.Short" xml:space="preserve">
+    <value>Accord edge</value>
+  </data>
+  <data name="Jurisdiction.OutsideAccord.Short" xml:space="preserve">
+    <value>outside</value>
+  </data>
+  <data name="Jurisdiction.BlackMarket.Short" xml:space="preserve">
+    <value>black market</value>
+  </data>
+  <data name="Jurisdiction.DeepAccord.Long" xml:space="preserve">
+    <value>deep Accord: escrow, bonds and arbitration</value>
+  </data>
+  <data name="Jurisdiction.AccordEdge.Long" xml:space="preserve">
+    <value>Accord edge: escrow and bonds</value>
+  </data>
+  <data name="Jurisdiction.OutsideAccord.Long" xml:space="preserve">
+    <value>outside the Accord: no escrow</value>
+  </data>
+  <data name="Jurisdiction.BlackMarket.Long" xml:space="preserve">
+    <value>black market: no enforcement at all</value>
+  </data>
+  <data name="Danger.Green" xml:space="preserve">
+    <value>green</value>
+  </data>
+  <data name="Danger.Amber" xml:space="preserve">
+    <value>amber</value>
+  </data>
+  <data name="Danger.Red" xml:space="preserve">
+    <value>red</value>
+  </data>
+  <data name="LocationType.CoreWorld" xml:space="preserve">
+    <value>Core world</value>
+  </data>
+  <data name="LocationType.IndustrialWorld" xml:space="preserve">
+    <value>Industrial</value>
+  </data>
+  <data name="LocationType.AgriculturalWorld" xml:space="preserve">
+    <value>Agricultural</value>
+  </data>
+  <data name="LocationType.MiningColony" xml:space="preserve">
+    <value>Mining colony</value>
+  </data>
+  <data name="LocationType.FrontierOutpost" xml:space="preserve">
+    <value>Frontier outpost</value>
+  </data>
+  <data name="LocationType.RefineryStation" xml:space="preserve">
+    <value>Refinery</value>
+  </data>
+  <data name="Role.Producer" xml:space="preserve">
+    <value>Producer</value>
+  </data>
+  <data name="Role.Consumer" xml:space="preserve">
+    <value>Consumer</value>
+  </data>
+  <data name="Role.ShippingCompany" xml:space="preserve">
+    <value>Shipping company</value>
+  </data>
+  <data name="Role.IndependentPilot" xml:space="preserve">
+    <value>Independent pilot</value>
+  </data>
+  <data name="Role.Government" xml:space="preserve">
+    <value>Government</value>
+  </data>
+  <data name="Role.Factory" xml:space="preserve">
+    <value>Factory</value>
+  </data>
+  <data name="Role.Pirate" xml:space="preserve">
+    <value>Pirate</value>
+  </data>
+  <data name="Role.BondingAgent" xml:space="preserve">
+    <value>Bonding agent</value>
+  </data>
+  <data name="Role.DataBroker" xml:space="preserve">
+    <value>Data broker</value>
+  </data>
+  <data name="Role.Multinational" xml:space="preserve">
+    <value>Multinational</value>
+  </data>
+  <data name="ShipClass.LightFreighter" xml:space="preserve">
+    <value>Light Freighter</value>
+  </data>
+  <data name="ShipClass.BulkHauler" xml:space="preserve">
+    <value>Bulk Hauler</value>
+  </data>
+  <data name="ShipClass.FastCourier" xml:space="preserve">
+    <value>Fast Courier</value>
+  </data>
+  <data name="ShipClass.RefrigeratedTransport" xml:space="preserve">
+    <value>Refrigerated Transport</value>
+  </data>
+  <data name="ShipClass.ArmedFreighter" xml:space="preserve">
+    <value>Armed Freighter</value>
+  </data>
+  <!-- Shared fragments. -->
+  <data name="Route" xml:space="preserve">
+    <value>{origin} → {destination}</value>
+  </data>
+  <data name="PerDay" xml:space="preserve">
+    <value>{amount}/day</value>
+  </data>
+  <!-- The time bar and the player's position. -->
+  <data name="Header.Title" xml:space="preserve">
+    <value>By Galactic Accord</value>
+  </data>
+  <data name="Header.Who" xml:space="preserve">
+    <value>{role} · {location}</value>
+  </data>
+  <data name="Header.Credits" xml:space="preserve">
+    <value>Credits</value>
+  </data>
+  <data name="Header.Credits.Tip" xml:space="preserve">
+    <value>Cash on hand</value>
+  </data>
+  <data name="Header.Escrow" xml:space="preserve">
+    <value>Escrow</value>
+  </data>
+  <data name="Header.Escrow.Tip" xml:space="preserve">
+    <value>Your money locked in Accord escrow: bonds on signed hauls</value>
+  </data>
+  <data name="Header.Running" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="Header.Running.Tip" xml:space="preserve">
+    <value>Your {shipClass}: {rate} per hour, earning or idle</value>
+  </data>
+  <data name="Speed.Paused" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="Speed.X1" xml:space="preserve">
+    <value>1×</value>
+  </data>
+  <data name="Speed.X4" xml:space="preserve">
+    <value>4×</value>
+  </data>
+  <data name="Speed.X16" xml:space="preserve">
+    <value>16×</value>
+  </data>
+  <data name="SpeedNote.Paused" xml:space="preserve">
+    <value>paused</value>
+  </data>
+  <data name="SpeedNote.One" xml:space="preserve">
+    <value>1 game hour per second</value>
+  </data>
+  <data name="SpeedNote.Many" xml:space="preserve">
+    <value>{hours} game hours per second</value>
+  </data>
+  <data name="Fleet.Docked" xml:space="preserve">
+    <value>Your {shipClass} · cargo {load} / {capacity} · docked at {location} · free</value>
+  </data>
+  <data name="Fleet.Laden" xml:space="preserve">
+    <value>Your {shipClass} · cargo {load} / {capacity} · carrying {good} to {destination}, due {when}</value>
+  </data>
+  <data name="Fleet.Repositioning" xml:space="preserve">
+    <value>Your {shipClass} · empty · heading to {origin} to load {good}, arriving {when}</value>
+  </data>
+  <data name="Fleet.Loading" xml:space="preserve">
+    <value>Your {shipClass} · loading {good} at {origin} for {destination}, leaving when the clock runs</value>
+  </data>
+  <data name="Alert.Title" xml:space="preserve">
+    <value>Paused for you</value>
+  </data>
+  <data name="Alert.Resume" xml:space="preserve">
+    <value>Resume</value>
+  </data>
+  <data name="Theme.Label" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <!-- The map. -->
+  <data name="Map.Title" xml:space="preserve">
+    <value>The sector</value>
+  </data>
+  <data name="Map.Hint" xml:space="preserve">
+    <value>Select a contract on the board to draw its route</value>
+  </data>
+  <data name="Map.Description" xml:space="preserve">
+    <value>Schematic map of the sector: locations, routes by danger, and ships</value>
+  </data>
+  <data name="Map.Hours" xml:space="preserve">
+    <value>{hours}h</value>
+  </data>
+  <data name="Map.Route.Tip" xml:space="preserve">
+    <value>{a} – {b}: {hours} h, {band} (danger {danger})</value>
+  </data>
+  <data name="Map.Legend.Empty" xml:space="preserve">
+    <value>empty leg</value>
+  </data>
+  <data name="Map.Node.Meta" xml:space="preserve">
+    <value>{type} · {jurisdiction}</value>
+  </data>
+  <data name="Map.Node.Makes" xml:space="preserve">
+    <value>makes {goods}</value>
+  </data>
+  <data name="Map.Node.Tip" xml:space="preserve">
+    <value>{name}: {meta}</value>
+  </data>
+  <data name="Map.Node.Tip.Here" xml:space="preserve">
+    <value>{name}: {meta}. Your ship is here.</value>
+  </data>
+  <data name="Map.Region.Accord" xml:space="preserve">
+    <value>Accord space · {region}</value>
+  </data>
+  <data name="Map.Region.Outside" xml:space="preserve">
+    <value>The {region}</value>
+  </data>
+  <data name="Map.Region.Outside.Note" xml:space="preserve">
+    <value>outside the Accord</value>
+  </data>
+  <data name="Map.Ship.Moving" xml:space="preserve">
+    <value>{owner} · {shipClass} · {from} → {to}, due {when}</value>
+  </data>
+  <data name="Map.Ship.Docked" xml:space="preserve">
+    <value>{owner} · {shipClass} · at {location}</value>
+  </data>
+  <data name="Map.Ship.You" xml:space="preserve">
+    <value>You</value>
+  </data>
+  <data name="Map.Overlay.Title" xml:space="preserve">
+    <value>Haul {quantity} {good}: {origin} → {destination}</value>
+  </data>
+  <data name="Map.Overlay.Spare" xml:space="preserve">
+    <value>arrive {arrive} · deadline {deadline} ({spare} spare)</value>
+  </data>
+  <data name="Map.Overlay.Late" xml:space="preserve">
+    <value>arrive {arrive} · deadline {deadline} ({late} late)</value>
+  </data>
+  <!-- The board. -->
+  <data name="Board.Title" xml:space="preserve">
+    <value>Board · {count}</value>
+  </data>
+  <data name="Board.Hint" xml:space="preserve">
+    <value>Open contracts you can see. Take-home is what is left after the costs the game knows for certain.</value>
+  </data>
+  <data name="Board.Empty" xml:space="preserve">
+    <value>Nothing open that you can see yet. Run the clock: consumers post when their stock runs low.</value>
+  </data>
+  <data name="Board.Title.Haul" xml:space="preserve">
+    <value>{quantity} {good}</value>
+  </data>
+  <data name="Board.Due" xml:space="preserve">
+    <value>due {when}</value>
+  </data>
+  <data name="Board.Note.Goods" xml:space="preserve">
+    <value>No escrow: you pay {cost} for the goods at pickup, and only the fee comes back</value>
+  </data>
+  <data name="Board.Note.Late" xml:space="preserve">
+    <value>Arrives {late} after the deadline</value>
+  </data>
+  <data name="Board.Note.Refund" xml:space="preserve">
+    <value>{good} arrives {quality} fresh: {refund} back under the warranty</value>
+  </data>
+  <!-- The contract panel. -->
+  <data name="Contract.None" xml:space="preserve">
+    <value>Select a contract on the board to read it here.</value>
+  </data>
+  <data name="Contract.Kind" xml:space="preserve">
+    <value>Contract · {kind}</value>
+  </data>
+  <data name="Contract.Head" xml:space="preserve">
+    <value>{quantity} {good}, {origin} → {destination}</value>
+  </data>
+  <data name="Contract.Sub" xml:space="preserve">
+    <value>Posted by {poster} · {jurisdiction}</value>
+  </data>
+  <data name="Contract.Certain" xml:space="preserve">
+    <value>What it is worth to you, for certain</value>
+  </data>
+  <data name="Contract.Uncertain" xml:space="preserve">
+    <value>What you can't know for sure</value>
+  </data>
+  <data name="Contract.Terms" xml:space="preserve">
+    <value>Terms</value>
+  </data>
+  <data name="Line.Fee" xml:space="preserve">
+    <value>Fee</value>
+  </data>
+  <data name="Line.Fee.Note" xml:space="preserve">
+    <value>As posted. {poster} pays the {tax} Accord tax.</value>
+  </data>
+  <data name="Line.Goods" xml:space="preserve">
+    <value>Goods, paid by you at pickup</value>
+  </data>
+  <data name="Line.Goods.Note" xml:space="preserve">
+    <value>No escrow outside the Accord: you pay {supplier} for the {good}, and only the fee comes back.</value>
+  </data>
+  <data name="Line.Running" xml:space="preserve">
+    <value>Running costs</value>
+  </data>
+  <data name="Line.Running.Note" xml:space="preserve">
+    <value>{hours} h laden at {rate}/h (your {shipClass})</value>
+  </data>
+  <data name="Line.Running.Note.Repo" xml:space="preserve">
+    <value>{hours} h at {rate}/h (your {shipClass}): {repoHours} empty to {origin}, {ladenHours} laden</value>
+  </data>
+  <data name="Line.Docking" xml:space="preserve">
+    <value>Docking at {destination}</value>
+  </data>
+  <data name="Line.Docking.Note" xml:space="preserve">
+    <value>Station fee on arrival</value>
+  </data>
+  <data name="Line.Refund" xml:space="preserve">
+    <value>Quality refund</value>
+  </data>
+  <data name="Line.Refund.Note" xml:space="preserve">
+    <value>{good} arrives {quality} fresh after {hours} h; the warranty wants {min}</value>
+  </data>
+  <data name="Line.LateFee" xml:space="preserve">
+    <value>Late fee</value>
+  </data>
+  <data name="Line.LateFee.Note" xml:space="preserve">
+    <value>Arrives {late} late at {perHour}/h, taken from your bond</value>
+  </data>
+  <data name="TakeHome" xml:space="preserve">
+    <value>Take-home</value>
+  </data>
+  <data name="TakeHome.Note" xml:space="preserve">
+    <value>{rate}/day · ties up your {shipClass} {duration}</value>
+  </data>
+  <data name="Eta.Free" xml:space="preserve">
+    <value>Your {shipClass} is free at {where}</value>
+  </data>
+  <data name="Eta.Pickup" xml:space="preserve">
+    <value>At {origin}</value>
+  </data>
+  <data name="Eta.Arrive" xml:space="preserve">
+    <value>Arrive {destination}</value>
+  </data>
+  <data name="Eta.Deadline" xml:space="preserve">
+    <value>Deadline</value>
+  </data>
+  <data name="Eta.Deadline.Spare" xml:space="preserve">
+    <value>{date} · {spare} spare</value>
+  </data>
+  <data name="Eta.Deadline.Late" xml:space="preserve">
+    <value>{date} · {late} late</value>
+  </data>
+  <data name="Uncertain.Incident" xml:space="preserve">
+    <value>Incident odds</value>
+  </data>
+  <data name="Uncertain.Incident.Note" xml:space="preserve">
+    <value>One check on the laden trip, at its worst leg ({band}, danger {danger}). If one strikes: a delay {delay}, cargo damage {damage}, part of the cargo lost {partial}, unplanned costs {costs}, the whole cargo lost {total}.</value>
+  </data>
+  <data name="Uncertain.Bond" xml:space="preserve">
+    <value>Bond at risk</value>
+  </data>
+  <data name="Uncertain.Bond.Note" xml:space="preserve">
+    <value>Locked in Accord escrow on signing; late fees are taken from it</value>
+  </data>
+  <data name="Uncertain.Payment" xml:space="preserve">
+    <value>Will they pay at handover?</value>
+  </data>
+  <data name="Uncertain.Payment.Note" xml:space="preserve">
+    <value>Outside the Accord there is no escrow</value>
+  </data>
+  <data name="Uncertain.Unknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <data name="Term.Deliver" xml:space="preserve">
+    <value>Deliver {quantity} {good} to {poster} at {destination} by {deadline}. No grace.</value>
+  </data>
+  <data name="Term.Late" xml:space="preserve">
+    <value>If late: {perHour} per hour, up to {cap}, taken from your bond.</value>
+  </data>
+  <data name="Term.Late.Frontier" xml:space="preserve">
+    <value>If late: {perHour} per hour, up to {cap}. Outside the Accord there is no bond to take it from.</value>
+  </data>
+  <data name="Term.Warranty" xml:space="preserve">
+    <value>{good} must arrive at least {min} fresh, or up to {maxRefund} of the fee goes back to the poster.</value>
+  </data>
+  <data name="Term.Escrow" xml:space="preserve">
+    <value>On signing, {poster} locks the goods' cost, the fee and the tax in Accord escrow, and you lock a bond of {bond}. The goods are paid for at pickup and the fee at handover.</value>
+  </data>
+  <data name="Term.Frontier" xml:space="preserve">
+    <value>Outside the Accord there is no escrow: you pay for the {good} at pickup and are paid the fee at handover, if they pay.</value>
+  </data>
+  <data name="Party.Role" xml:space="preserve">
+    <value>{role} · {location}</value>
+  </data>
+  <data name="Action.Accept" xml:space="preserve">
+    <value>Accept as posted</value>
+  </data>
+  <data name="Status.Yours" xml:space="preserve">
+    <value>Yours, signed for {fee}. Deliver to {destination}.</value>
+  </data>
+  <data name="Status.Taken" xml:space="preserve">
+    <value>Taken by {hauler} for {fee}. No longer open.</value>
+  </data>
+  <data name="Status.Fulfilled" xml:space="preserve">
+    <value>Delivered by {hauler} and settled.</value>
+  </data>
+  <data name="Status.Fulfilled.You" xml:space="preserve">
+    <value>Delivered by you and settled.</value>
+  </data>
+  <data name="Status.Breached" xml:space="preserve">
+    <value>Breached: {hauler}'s haul did not settle as agreed.</value>
+  </data>
+  <data name="Status.Breached.You" xml:space="preserve">
+    <value>Breached: your haul did not settle as agreed.</value>
+  </data>
+  <data name="Status.Expired" xml:space="preserve">
+    <value>Expired: nobody took it before the deadline.</value>
+  </data>
+  <data name="Block.NotOpen" xml:space="preserve">
+    <value>No longer open.</value>
+  </data>
+  <data name="Block.NoFreeShip" xml:space="preserve">
+    <value>Your {shipClass} is busy until {when}, at {where}.</value>
+  </data>
+  <data name="Block.TooLarge" xml:space="preserve">
+    <value>Needs {quantity} cargo; your {shipClass} holds {capacity}.</value>
+  </data>
+  <data name="Block.OriginShort" xml:space="preserve">
+    <value>{origin} can't supply {quantity} {good} right now.</value>
+  </data>
+  <data name="Block.NoRoute" xml:space="preserve">
+    <value>No route connects {origin} and {destination}.</value>
+  </data>
+  <data name="Block.PickupUnreachable" xml:space="preserve">
+    <value>Your {shipClass} can't reach {origin}.</value>
+  </data>
+  <data name="Outcome.Signed.Here" xml:space="preserve">
+    <value>Signed for {fee}. Your {shipClass} loads at {origin} and leaves as soon as the clock runs.</value>
+  </data>
+  <data name="Outcome.Signed.Away" xml:space="preserve">
+    <value>Signed for {fee}. Your {shipClass} heads to {origin} to load, arriving {when}.</value>
+  </data>
+  <data name="Outcome.Signed.Bond" xml:space="preserve">
+    <value>Your bond of {bond} is in escrow until delivery.</value>
+  </data>
+  <data name="Outcome.PosterCannotFund" xml:space="preserve">
+    <value>{poster} can no longer fund the escrow, so the deal fell through.</value>
+  </data>
+  <data name="Outcome.CannotFrontGoods" xml:space="preserve">
+    <value>Outside the Accord you pay for the goods at pickup: {cost}, and you have {credits}.</value>
+  </data>
+  <!-- The log. -->
+  <data name="Log.Title" xml:space="preserve">
+    <value>Captain's log</value>
+  </data>
+  <data name="Log.Empty" xml:space="preserve">
+    <value>Nothing has happened that you can see yet.</value>
+  </data>
+  <!-- The speed probe (?bench=N), a developer view. -->
+  <data name="Bench.Title" xml:space="preserve">
+    <value>Engine speed in this browser</value>
+  </data>
+  <data name="Bench.Result" xml:space="preserve">
+    <value>{ticks} game hours of a world with no player in {ms} ms: {rate} hours a second.</value>
+  </data>
+</root>

@@ -1,0 +1,47 @@
+@* The sector map (design §11.1, §11.3): drawn from data, routes coloured and dashed by danger, the selected
+   contract's path over them, and the ships, which move every frame. *@
+<section class="panel map-panel">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+        <span class="muted small">@Model.Hint</span>
+    </div>
+    <div class="map-frame">
+        <svg class="map" viewBox="0 0 @Model.Width @Model.Height" role="img" aria-label="@Model.Description">
+            <MapLayers Model="Model" />
+            <ShipLayer Ships="Ships" />
+        </svg>
+    </div>
+    <div class="map-foot">
+        @if (Model.OverlayTitle is not null)
+        {
+            <div class="overlay-card">
+                <span class="strong small">@Model.OverlayTitle</span>
+                @if (Model.OverlayEta is not null)
+                {
+                    <span class="mono xsmall tone-@Model.OverlayTone">@Model.OverlayEta</span>
+                }
+            </div>
+        }
+        <div class="legend xsmall muted">
+            @foreach (MapLegendItem item in Model.Legend)
+            {
+                <span class="legend-item">
+                    <svg width="24" height="8" aria-hidden="true"><line class="@(item.Empty ? "leg leg-empty" : "route band-" + item.Band)" x1="1" y1="4" x2="23" y2="4" /></svg>
+                    @item.Label
+                </span>
+            }
+        </div>
+    </div>
+    <p class="fleet small" data-testid="fleet"><span class="tone-Yours strong">@Fleet</span></p>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public MapViewModel Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<MapShip> Ships { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Fleet { get; set; } = string.Empty;
+}

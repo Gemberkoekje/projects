@@ -43,6 +43,7 @@ public sealed class ShipDeparted : ISimEvent
         long midRoute = Tick + Math.Max(1, travel / 2);
         long scheduledArrival = Tick + travel;
 
+        ship.SetCourse(ShipCourse.Along(laden, Tick, travel));
         context.Schedule(new TransitIncidentCheck(midRoute, Contract, scheduledArrival, laden.MaxDanger));
     }
 }
@@ -149,11 +150,13 @@ public sealed class TransitIncidentOccurred : ISimEvent
 
         context.NoteIncident();
         ship.Log(Tick, $"Transit incident: {_incident.Description}.");
-        context.Record("Incident", $"{Contract}: {pilot.Name} hit by {_incident.Description}.");
+        ship.DelayArrival(_incident.DelayTicks);
+        var entry = new IncidentEntry(Tick, Contract, pilot.Id, _incident);
+        context.Record(entry);
 
         if (context.PlayerActorId == pilot.Id)
         {
-            context.RaisePlayerAlert($"Transit incident on {Contract}: {_incident.Description}.");
+            context.RaisePlayerAlert(entry);
         }
 
         context.Schedule(new ShipArrived(_scheduledArrival + _incident.DelayTicks, Contract));
@@ -200,7 +203,7 @@ public sealed class ShipArrived : ISimEvent
         decimal deliveredQuantity = ship.Manifest?.Quantity ?? 0m;
         if (deliveredQuantity <= 0m)
         {
-            Settlement.Breach(context, contract, ship, Tick, "cargo lost in transit");
+            Settlement.Breach(context, contract, ship, Tick);
         }
         else
         {

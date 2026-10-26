@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>By Galactic Accord</title>
+    <base href="/" />
+    <script>
+        // Apply a stored theme before the first paint (js/client.js changes it later).
+        try {
+            const theme = localStorage.getItem('bga-theme');
+            if (theme === 'dark' || theme === 'light') {
+                document.documentElement.dataset.theme = theme;
+            }
+        } catch {
+            // Storage can be unavailable (private windows, blocked site data): the system theme applies.
+        }
+    </script>
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <p class="booting">Loading the sector…</p>
+    </div>
+
+    <div id="blazor-error-ui" role="alert">
+        Something went wrong in the client.
+        <a href="." class="reload">Reload</a>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

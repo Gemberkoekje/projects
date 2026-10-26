@@ -1,0 +1,218 @@
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@if (_benchTicks is { } benchTicks)
+{
+    <BenchPanel Seed="_seed" Ticks="benchTicks" />
+}
+else if (_session is not null)
+{
+    <div class="screen" data-ready="@(_ready ? "true" : null)" data-tick="@_session.Now">
+        <TimeBar Model="_header" Theme="@_theme" OnSpeed="SetSpeed" OnTheme="SetTheme" />
+
+        @if (_header.Alerts.Count > 0)
+        {
+            <section class="alert panel" role="alert">
+                <div class="alert-text">
+                    <span class="alert-title">@_header.AlertTitle</span>
+                    @foreach (string alert in _header.Alerts)
+                    {
+                        <span>@alert</span>
+                    }
+                </div>
+                <button type="button" class="button primary" @onclick="() => SetSpeed(ClockSpeed.X1)">@_header.ResumeLabel</button>
+            </section>
+        }
+
+        <div class="columns">
+            <div class="column-main">
+                <SectorMap Model="_map" Ships="_ships" Fleet="@_header.Fleet" />
+                <CaptainsLog Model="_log" OnSelect="Select" />
+            </div>
+            <div class="column-side">
+                <BoardPanel Model="_board" Selected="_selected" OnSelect="Select" />
+                <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" />
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // The clock's frame: about 30 a second. Each frame advances the session by the real time since the last.
+    private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(33);
+
+    private readonly CancellationTokenSource _stop = new();
+    private GameSession? _session;
+    private long _seed = 20260619;
+    private long? _benchTicks;
+    private bool _ready;
+    private string _theme = "system";
+    private IJSObjectReference? _module;
+
+    private ContractId? _selected;
+    private string? _outcome;
+
+    // View models, rebuilt only when the session's revision or the selection changes.
+    private long _builtRevision = -1;
+    private ContractId? _builtSelection;
+    private HeaderViewModel _header = default!;
+    private BoardViewModel _board = default!;
+    private MapViewModel _map = default!;
+    private LogViewModel _log = default!;
+    private ContractViewModel? _contract;
+    private IReadOnlyList<MapShip> _ships = Array.Empty<MapShip>();
+
+    protected override void OnInitialized()
+    {
+        Dictionary<string, string> query = Query(Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+        if (query.TryGetValue("seed", out string? seed) && long.TryParse(seed, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long s))
+        {
+            _seed = s;
+        }
+
+        if (query.TryGetValue("bench", out string? bench) && long.TryParse(bench, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long b) && b > 0)
+        {
+            _benchTicks = b;
+            return;
+        }
+
+        // The world has run for a day and a few hours before the player looks at it, so the board has posts.
+        _session = new GameSession(_seed, startTick: ByGalacticAccord.Engine.Simulation.GameTime.At(1, 6));
+        Rebuild();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _session is null)
+        {
+            return;
+        }
+
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/client.js");
+        _theme = await _module.InvokeAsync<string>("storedTheme");
+        _ready = true;
+        StateHasChanged();
+        _ = RunClock();
+    }
+
+    private async Task RunClock()
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        double last = 0;
+        using var timer = new PeriodicTimer(FrameInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+            {
+                double now = watch.Elapsed.TotalSeconds;
+                double frame = now - last;
+                last = now;
+                if (_session is null || _session.Speed == ClockSpeed.Paused)
+                {
+                    continue;
+                }
+
+                _session.Advance(frame);
+                Rebuild();
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is going away.
+        }
+    }
+
+    private void Rebuild()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        if (_builtRevision != _session.Revision || _builtSelection != _selected)
+        {
+            _header = HeaderView.Build(_session);
+            _board = BoardView.Build(_session);
+            _map = MapView.Build(_session, _selected);
+            _log = LogView.Build(_session);
+            _contract = _selected is { } id ? ContractView.Build(_session, id) : null;
+            _builtRevision = _session.Revision;
+            _builtSelection = _selected;
+        }
+
+        _ships = MapView.Ships(_session, _session.Clock);
+    }
+
+    private void SetSpeed(ClockSpeed speed)
+    {
+        _session?.SetSpeed(speed);
+        Rebuild();
+    }
+
+    private async Task SetTheme(string theme)
+    {
+        _theme = theme;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("setTheme", theme);
+        }
+    }
+
+    private void Select(ContractId id)
+    {
+        if (_selected != id)
+        {
+            _outcome = null;
+        }
+
+        _selected = id;
+        Rebuild();
+    }
+
+    private void Accept()
+    {
+        if (_session is null || _selected is not { } id)
+        {
+            return;
+        }
+
+        var contract = _session.Context.Contract(id);
+        HaulOutcome outcome = _session.TakeHaul(id);
+        _outcome = ContractView.OutcomeText(_session, contract, outcome);
+        Rebuild();
+    }
+
+    private static Dictionary<string, string> Query(string query)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int eq = pair.IndexOf('=', StringComparison.Ordinal);
+            if (eq > 0)
+            {
+                values[Uri.UnescapeDataString(pair[..eq])] = Uri.UnescapeDataString(pair[(eq + 1)..]);
+            }
+        }
+
+        return values;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stop.CancelAsync();
+        _stop.Dispose();
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Nothing to release once the page is gone.
+            }
+        }
+    }
+}

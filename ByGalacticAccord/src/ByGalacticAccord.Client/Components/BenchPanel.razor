@@ -1,0 +1,49 @@
+@* The engine speed probe (?bench=N, plan risk R4): runs a world with no player for N game hours in this
+   browser and reports the time it took and the state fingerprint, which the browser check compares with
+   the same run on desktop .NET (risk R6). A developer view, not part of the game. *@
+<section class="panel bench" data-testid="bench" data-done="@(_result is null ? null : "true")">
+    <h1 class="caps">@Templates.Get("Bench.Title")</h1>
+    @if (_result is null)
+    {
+        <p class="muted">…</p>
+    }
+    else
+    {
+        <p data-testid="bench-result">@_result</p>
+        <output class="mono xsmall fingerprint" data-testid="bench-fingerprint" data-ms="@_ms">@_fingerprint</output>
+    }
+</section>
+
+@code {
+    private string? _result;
+    private string? _fingerprint;
+    private long _ms;
+
+    [Parameter]
+    public long Seed { get; set; }
+
+    [Parameter]
+    public long Ticks { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Task.Yield();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var context = ByGalacticAccord.Engine.Simulation.WorldGenerator.Generate(Seed, withPlayer: false).Context;
+        context.RunTo(Ticks);
+        watch.Stop();
+        _ms = Math.Max(1, watch.ElapsedMilliseconds);
+        _fingerprint = ByGalacticAccord.Engine.Simulation.StateFingerprint.Of(context);
+        _result = Templates.Fill(
+            "Bench.Result",
+            ("ticks", Format.Hours(Ticks)),
+            ("ms", Format.Hours(_ms)),
+            ("rate", Format.Hours(Ticks * 1000 / _ms)));
+        StateHasChanged();
+    }
+}

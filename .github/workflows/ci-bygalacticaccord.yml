@@ -18,7 +18,7 @@ jobs:
   build-test:
     name: Build + test (ubuntu)
     # The same check as the plan's "green before main" rule (ByGalacticAccord/plan.md §2):
-    # a Release build with warnings as errors, then the fast tests, then the soak-length tests.
+    # a Release build with warnings as errors, the fast tests, the soak-length tests, then the browser check.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -40,3 +40,28 @@ jobs:
 
       - name: Test (soak)
         run: dotnet test ./ByGalacticAccord/ByGalacticAccord.slnx --no-build --configuration Release --verbosity normal --filter Category=Soak
+
+      # The browser check (plan §2): publishes the client, drives it in Chromium, screenshots it, fails on
+      # console errors, and compares the engine's state in WebAssembly with desktop .NET.
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install the browser check
+        working-directory: ./ByGalacticAccord/tools/client-check
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Browser check
+        working-directory: ./ByGalacticAccord/tools/client-check
+        run: node check.cjs
+
+      - name: Upload the browser check's screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-check-screenshots
+          path: ByGalacticAccord/artifacts/client-check/screenshots
+          if-no-files-found: ignore

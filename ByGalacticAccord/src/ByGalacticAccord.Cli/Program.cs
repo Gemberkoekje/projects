@@ -15,6 +15,13 @@ switch (mode)
             : 200_000L;
         return Soak.Run(seed, ticks);
 
+    case "fingerprint":
+        long until = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long f)
+            ? f
+            : 20_000L;
+        Console.WriteLine(Fingerprint.Of(seed, until));
+        return 0;
+
     case "help":
     case "--help":
     case "-h":
@@ -33,6 +40,7 @@ static void PrintHelp()
     Console.WriteLine();
     Console.WriteLine("Usage:");
     Console.WriteLine("  soak  [ticks] [--seed N]    Run headless, print economy telemetry, assert invariants (default).");
+    Console.WriteLine("  fingerprint [ticks] [--seed N]  Print the state fingerprint after a headless run (default 20,000).");
     Console.WriteLine("  help                        Show this help.");
     Console.WriteLine();
     Console.WriteLine("One tick is one game hour. Examples:");

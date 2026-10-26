@@ -1,0 +1,122 @@
+using System.Linq;
+using ByGalacticAccord.Engine.Actors;
+using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Simulation;
+using ByGalacticAccord.Presentation.Session;
+
+namespace ByGalacticAccord.Tests;
+
+/// <summary>The client's game clock (design §8.3): speeds, the hard pause, and the player's commands.</summary>
+public sealed class SessionTests
+{
+    [Fact]
+    public void A_session_starts_paused_and_a_paused_clock_does_not_move()
+    {
+        var session = new GameSession(42L, startTick: 30);
+
+        Assert.Equal(ClockSpeed.Paused, session.Speed);
+        Assert.Equal(30, session.Now);
+        Assert.False(session.Advance(0.25));
+        Assert.Equal(30, session.Now);
+        Assert.Equal(30.0, session.Clock);
+    }
+
+    [Theory]
+    [InlineData(ClockSpeed.X1, 1)]
+    [InlineData(ClockSpeed.X4, 4)]
+    [InlineData(ClockSpeed.X16, 16)]
+    public void Each_speed_runs_that_many_game_hours_per_real_second(ClockSpeed speed, int hoursPerSecond)
+    {
+        var session = new GameSession(42L);
+        session.SetSpeed(speed);
+        for (int frame = 0; frame < 32; frame++)
+        {
+            session.Advance(0.125); // four real seconds in all, in steps a double holds exactly
+        }
+
+        Assert.Equal(4 * hoursPerSecond, session.Now);
+    }
+
+    [Fact]
+    public void The_clock_keeps_its_fraction_for_drawing_and_runs_whole_ticks()
+    {
+        var session = new GameSession(42L);
+        session.SetSpeed(ClockSpeed.X1);
+
+        Assert.False(session.Advance(0.25));
+        Assert.Equal(0, session.Now);
+        Assert.Equal(0.25, session.Clock);
+
+        Assert.False(session.Advance(0.25));
+        Assert.False(session.Advance(0.25));
+        Assert.True(session.Advance(0.25));
+        Assert.Equal(1, session.Now);
+        Assert.Equal(1.0, session.Clock);
+    }
+
+    [Fact]
+    public void A_long_frame_is_capped_so_a_hidden_tab_does_not_leap_ahead()
+    {
+        var session = new GameSession(42L);
+        session.SetSpeed(ClockSpeed.X16);
+
+        session.Advance(30.0);
+
+        Assert.Equal((long)(GameSession.MaxFrameSeconds * 16), session.Now);
+    }
+
+    [Fact]
+    public void The_clock_runs_the_same_world_as_one_RunTo()
+    {
+        var session = new GameSession(20260619L);
+        session.SetSpeed(ClockSpeed.X16);
+        while (session.Now < 2_000)
+        {
+            session.Advance(0.05);
+        }
+
+        SimulationContext direct = WorldGenerator.Generate(20260619L, withPlayer: true).Context;
+        direct.RunTo(session.Now);
+        Assert.Equal(TestWorld.Signature(direct), TestWorld.Signature(session.Context));
+    }
+
+    [Fact]
+    public void A_player_alert_stops_the_clock_and_resuming_acknowledges_it()
+    {
+        var session = new GameSession(42L);
+        session.SetSpeed(ClockSpeed.X16);
+        session.Context.RaisePlayerAlert(new IncidentEntry(0, new ContractId(1), session.Player.Id, default));
+
+        session.Advance(0.25);
+
+        Assert.Equal(ClockSpeed.Paused, session.Speed);
+        Assert.Equal(session.Now, session.Clock);
+        Assert.Single(session.Alerts);
+
+        session.SetSpeed(ClockSpeed.X1);
+        Assert.Empty(session.Alerts);
+        Assert.Equal(ClockSpeed.X1, session.Speed);
+    }
+
+    [Fact]
+    public void Taking_a_haul_signs_it_or_says_why_not()
+    {
+        var session = new GameSession(42L, startTick: 48);
+        Contract contract = session.Context.OpenContracts.First(c => PlayerActions.CheckHaul(session.Context, session.Player, c).Ok && c.UsesEscrow);
+        long revision = session.Revision;
+
+        HaulOutcome signed = session.TakeHaul(contract.Id);
+
+        Assert.True(signed.Signed);
+        Assert.True(session.Revision > revision);
+        Assert.Equal(contract.Id, session.PlayerShip.ActiveContract);
+        Assert.Single(session.PlayerActiveContracts);
+
+        Contract other = session.Context.OpenContracts.First(c => c.Status == ContractStatus.Open);
+        HaulOutcome refused = session.TakeHaul(other.Id);
+        Assert.False(refused.Signed);
+        Assert.Equal(HaulBlock.NoFreeShip, refused.Block);
+        Assert.Null(refused.Acceptance);
+        Assert.Equal(HaulBlock.NotOpen, session.TakeHaul(contract.Id).Block);
+    }
+}

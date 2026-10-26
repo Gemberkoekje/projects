@@ -78,7 +78,7 @@ public sealed class ContractExpiryCheck : ISimEvent
         if (contract.Status is ContractStatus.Open or ContractStatus.Negotiating)
         {
             contract.MarkExpired();
-            context.Record("Expired", $"{Contract}: no hauler took it before the deadline.");
+            context.Record(new ContractExpiredEntry(context.CurrentTick, Contract));
         }
     }
 }

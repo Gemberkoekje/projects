@@ -30,6 +30,23 @@ public readonly record struct TransitIncident(
 /// </summary>
 public static class IncidentResolver
 {
+    // The outcome table: one roll, and each kind takes the rolls below its bound.
+    private const decimal DelayBelow = 0.40m;
+    private const decimal DamageBelow = 0.66m;
+    private const decimal PartialLossBelow = 0.85m;
+    private const decimal CreditCostBelow = 0.96m;
+
+    /// <summary>The share of incidents that turn out as <paramref name="kind"/>, so the interface can quote the table.</summary>
+    public static decimal Share(TransitIncidentKind kind) => kind switch
+    {
+        TransitIncidentKind.MinorDelay => DelayBelow,
+        TransitIncidentKind.CargoDamage => DamageBelow - DelayBelow,
+        TransitIncidentKind.PartialLoss => PartialLossBelow - DamageBelow,
+        TransitIncidentKind.CreditCost => CreditCostBelow - PartialLossBelow,
+        TransitIncidentKind.TotalLoss => 1m - CreditCostBelow,
+        _ => 0m,
+    };
+
     public static TransitIncident Resolve(DeterministicRandom rng, decimal dangerRating, ShipClassInfo ship)
     {
         decimal severity = ship.IncidentSeverityModifier;
@@ -38,28 +55,28 @@ public static class IncidentResolver
         // Higher danger pushes the roll toward the nastier end of the table.
         decimal danger = Math.Clamp(dangerRating, 0m, 1m);
 
-        if (roll < 0.40m)
+        if (roll < DelayBelow)
         {
             long delay = (long)(rng.NextDecimal(4m, 18m) * (1m + danger) * severity);
             return new TransitIncident(TransitIncidentKind.MinorDelay, delay, 0m, 0m, Credits.Zero,
                 $"navigational delay (+{delay} ticks)");
         }
 
-        if (roll < 0.66m)
+        if (roll < DamageBelow)
         {
             decimal qLoss = rng.NextDecimal(0.08m, 0.22m) * severity;
             return new TransitIncident(TransitIncidentKind.CargoDamage, 0, qLoss, 0m, Credits.Zero,
                 $"cargo damage (-{qLoss:P0} quality)");
         }
 
-        if (roll < 0.85m)
+        if (roll < PartialLossBelow)
         {
             decimal qtyLoss = rng.NextDecimal(0.10m, 0.30m) * severity;
             return new TransitIncident(TransitIncidentKind.PartialLoss, 0, 0m, qtyLoss, Credits.Zero,
                 $"partial cargo loss (-{qtyLoss:P0})");
         }
 
-        if (roll < 0.96m)
+        if (roll < CreditCostBelow)
         {
             decimal cost = rng.NextDecimal(40m, 160m) * (1m + danger) * severity;
             return new TransitIncident(TransitIncidentKind.CreditCost, 0, 0m, 0m, Credits.Of(cost),

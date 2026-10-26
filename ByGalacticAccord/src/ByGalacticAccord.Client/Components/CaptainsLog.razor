@@ -1,0 +1,44 @@
+@* The captain's log (design §11.4): what happened that you can see, newest first. A line about a contract
+   opens it in the contract panel. *@
+<section class="panel log-panel">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+    </div>
+    <ol class="log-lines" data-testid="log">
+        @if (Model.Lines.Count == 0)
+        {
+            <li class="empty small muted">@Model.Empty</li>
+        }
+        @foreach (LogLine line in Model.Lines)
+        {
+            <li class="log-line @(line.Yours ? "yours" : null)">
+                <span class="when mono xsmall muted">@line.When</span>
+                @if (line.Contract is { } id)
+                {
+                    <button type="button" class="link-text small" @onclick="() => OnSelect.InvokeAsync(id)">@line.Text</button>
+                }
+                else
+                {
+                    <span class="small">@line.Text</span>
+                }
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    private LogViewModel? _rendered;
+
+    [Parameter, EditorRequired]
+    public LogViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model);
+        _rendered = Model;
+        return changed;
+    }
+}

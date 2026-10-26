@@ -33,6 +33,12 @@ public enum LocationType
 }
 
 /// <summary>
+/// Where a location sits on the schematic sector map (design §11.1), in map units. Map distance means
+/// nothing to the simulation: travel time is the route's hours.
+/// </summary>
+public readonly record struct MapPoint(int X, int Y);
+
+/// <summary>
 /// A node in the route graph with resident actors. Production and consumption here are
 /// decoupled (§4.7.1): a farming world that receives luxuries does not grow more food.
 /// </summary>
@@ -59,6 +65,9 @@ public sealed class Location
     public string Region { get; }
 
     public AccordReach Reach { get; }
+
+    /// <summary>Its place on the schematic map. World data, like a route's hours; never read by the simulation.</summary>
+    public MapPoint Map { get; init; }
 
     public IReadOnlyList<ActorId> Residents => _residents;
 
