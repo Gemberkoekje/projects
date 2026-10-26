@@ -16,5 +16,7 @@
   v0.3 as "design §n".
 - Work follows the steps of [`plan.md`](plan.md). A finished step gets a log in `log/` (see
   [`log/README.md`](log/README.md)) and a status line in the plan that links to it.
+- **A finished step lands directly on `main`, with no PR**, once it passes the "green before main" check
+  in plan §2 (Release build, fast and soak tests). Then work stops for the user's review.
 - `dotnet build`, `dotnet test` (fast), `dotnet test --filter Category=Soak` (long runs), and
   `dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42`, all from this folder.

@@ -59,6 +59,15 @@ foundation is sound; most of the game logic on top of it changes shape.
 - **The code map stays true.** [`CODEMAP.md`](CODEMAP.md) changes in the same commit as the code it describes.
 - **Checked in a browser.** The client is driven by Playwright scripts that screenshot key screens and
   fail on console errors, so interface work is checked like the rest of the code.
+- **Lands directly on `main`, then work stops for review.** There is no PR gate (the user's choice,
+  2026-10-26, as for the RayTracer's Vista slices): the user reviews each step on `main`. Its commits and
+  its log say what was measured and with which commands.
+- **Green before main.** No CI workflow watches this project, so nothing checks a push afterwards. Before
+  pushing, from a clean working tree: the whole solution builds in Release with no warnings
+  (`dotnet build -c Release`), and every test passes, fast and soak (`dotnet test -c Release`, then
+  `dotnet test -c Release --filter Category=Soak`). Once the client exists (S2), its Playwright checks pass
+  too. Fetch `main` just before pushing; the push must be a fast-forward. If `main` has moved, bring it in
+  and run the checks again.
 
 ## 3. Steps
 
