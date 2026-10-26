@@ -12,7 +12,10 @@ namespace ByGalacticAccord.Engine.Actors;
 public sealed class ActorState
 {
     private readonly Dictionary<GoodType, decimal> _stock = new();
+    private readonly Dictionary<GoodType, decimal> _reserved = new();
     private readonly List<ShipId> _ships = new();
+    private readonly Dictionary<PriceKey, PriceMemory> _prices = new();
+    private readonly Dictionary<GoodType, decimal> _consumed = new();
 
     public ActorState(
         ActorId id,
@@ -52,17 +55,61 @@ public sealed class ActorState
     /// <summary>Consumer income (the faucet, §4.2.1): credits injected per heartbeat.</summary>
     public Credits IncomePerHeartbeat { get; init; } = Credits.Zero;
 
+    /// <summary>A station operator's terms: what it charges for storage, and the float it keeps (design §8.1).</summary>
+    public StationProfile? Station { get; init; }
+
     public IReadOnlyList<ShipId> Ships => _ships;
 
     public decimal Stock(GoodType good) => _stock.TryGetValue(good, out decimal q) ? q : 0m;
 
-    public IReadOnlyDictionary<GoodType, decimal> AllStock => _stock;
+    /// <summary>Stock set aside for a sale: posted for sale, or sold and waiting to be handed over or picked up.</summary>
+    public decimal Reserved(GoodType good) => _reserved.TryGetValue(good, out decimal q) ? q : 0m;
 
-    public void AddStock(GoodType good, decimal quantity) =>
+    /// <summary>Stock that is not set aside.</summary>
+    public decimal Available(GoodType good) => System.Math.Max(0m, Stock(good) - Reserved(good));
+
+    /// <summary>Whether the actor keeps goods at home: a producer's warehouse, a consumer's larder (design §16.1).</summary>
+    public bool KeepsStock => Producer is not null || Demands.Count > 0;
+
+    /// <summary>Stock by good, in the goods' order.</summary>
+    public IEnumerable<(GoodType Good, decimal Quantity)> AllStock =>
+        Goods.All.Where(g => Stock(g) > 0m).Select(g => (g, Stock(g)));
+
+    // Stock changes go through SimulationContext, which keeps the goods ledger (design §20.2).
+    internal void AddStock(GoodType good, decimal quantity) =>
         _stock[good] = Stock(good) + quantity;
 
-    public void RemoveStock(GoodType good, decimal quantity) =>
-        _stock[good] = System.Math.Max(0m, Stock(good) - quantity);
+    /// <summary>Remove up to <paramref name="quantity"/>; returns what was removed. Never below zero.</summary>
+    internal decimal RemoveStock(GoodType good, decimal quantity)
+    {
+        decimal removed = System.Math.Min(Stock(good), System.Math.Max(0m, quantity));
+        _stock[good] = Stock(good) - removed;
+        return removed;
+    }
+
+    /// <summary>How much of a good this actor has used up, ever: a consumer's met demand.</summary>
+    public decimal Consumed(GoodType good) => _consumed.TryGetValue(good, out decimal q) ? q : 0m;
+
+    internal void NoteConsumed(GoodType good, decimal quantity) => _consumed[good] = Consumed(good) + quantity;
+
+    internal void Reserve(GoodType good, decimal quantity) => _reserved[good] = Reserved(good) + quantity;
+
+    internal void Unreserve(GoodType good, decimal quantity) => _reserved[good] = System.Math.Max(0m, Reserved(good) - quantity);
+
+    /// <summary>
+    /// What an AI poster has learned about one kind of post it makes, from its own past posts (design §4.3: it decides on
+    /// what it knows). <paramref name="initial"/> is the factor it starts from.
+    /// </summary>
+    internal PriceMemory Prices(PriceKey key, decimal initial)
+    {
+        if (!_prices.TryGetValue(key, out PriceMemory? memory))
+        {
+            memory = new PriceMemory(initial);
+            _prices[key] = memory;
+        }
+
+        return memory;
+    }
 
     public void Credit(Credits amount) => Credits += amount;
 
@@ -87,10 +134,6 @@ public sealed class ActorState
             _ships.Add(ship);
         }
     }
-
-    public void RemoveShip(ShipId ship) => _ships.Remove(ship);
-
-    public bool Owns(ShipId ship) => _ships.Contains(ship);
 
     public bool MovesCargo => Role is ActorRole.ShippingCompany or ActorRole.IndependentPilot;
 

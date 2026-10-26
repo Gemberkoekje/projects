@@ -15,7 +15,7 @@ public sealed record LogViewModel(string Title, string Empty, IReadOnlyList<LogL
 /// <summary>
 /// The captain's log (design §11.4): the journal's entries about contracts the player can see, newest
 /// first, each worded by its template. The faucet adjustments are the economy's own bookkeeping and never
-/// shown.
+/// shown; others' routine (lots nobody bought, withdrawn posts, storage) is left out.
 /// </summary>
 public static class LogView
 {
@@ -35,15 +35,24 @@ public static class LogView
             }
 
             Contract contract = context.Contract(id);
-            if (!Visibility.CanSee(context, session.Player, contract))
+            bool yours = JournalText.Subject(entry) == session.Player.Id || contract.Involves(session.Player.Id);
+            if (!yours && (Routine(entry, contract) || !Visibility.CanSee(context, session.Player, contract)))
             {
                 continue;
             }
 
-            bool yours = JournalText.Subject(entry) == session.Player.Id || contract.CounterpartyId == session.Player.Id;
             lines.Add(new LogLine(Format.Date(entry.Tick), JournalText.Describe(context, entry), yours, id));
         }
 
         return new LogViewModel(Templates.Get("Log.Title"), Templates.Get("Log.Empty"), lines);
     }
+
+    // Other people's routine: lots nobody bought, posts taken down, stores opened and emptied. True, and in the
+    // journal, but not news; the player's own always shows.
+    private static bool Routine(JournalEntry entry, Contract contract) => entry switch
+    {
+        ContractExpiredEntry => contract is SaleContract { Side: SaleSide.ForSale },
+        ContractWithdrawnEntry or StorageOpenedEntry or StorageClosedEntry => true,
+        _ => false,
+    };
 }

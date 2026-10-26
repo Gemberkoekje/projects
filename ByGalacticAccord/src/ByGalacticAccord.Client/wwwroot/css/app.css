@@ -253,6 +253,12 @@ a:hover { color: var(--accent-hover); }
 .blocked { margin: 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* ---- the ledger ---- */
+.ledger-panel { display: flex; flex-direction: column; gap: 12px; }
+.ledger-line .line-value { gap: 4px; }
+.ledger-line .line-value .mono { white-space: nowrap; }
+.button.small { min-height: 30px; padding: 0 10px; font-size: 12px; }
+
 /* ---- the log ---- */
 .log-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 380px; overflow-y: auto; }
 .log-line { display: flex; gap: 10px; border-top: 1px solid var(--divider); padding: 6px 0; }

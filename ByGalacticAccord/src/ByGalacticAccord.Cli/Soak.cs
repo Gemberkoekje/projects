@@ -62,31 +62,69 @@ internal static class Soak
         Line("Sink (costs/tax destroyed)", ctx.TotalSink.ToString());
         Line("Faucet multiplier (monitor)", ctx.FaucetMultiplier.ToString("0.00", CultureInfo.InvariantCulture));
         Line("Government revenue (taxed)", ctx.GovernmentRevenue.ToString());
+        Line("Goods sold under Sales", ctx.GoodsSold.ToString("N0", CultureInfo.InvariantCulture));
         Console.WriteLine();
         Line("Contracts fulfilled", ctx.ContractsFulfilled.ToString("N0", CultureInfo.InvariantCulture));
-        Line("Contracts breached", ctx.ContractsBreached.ToString("N0", CultureInfo.InvariantCulture));
+        Line("Contracts breached (performer)", ctx.ContractsBreached.ToString("N0", CultureInfo.InvariantCulture));
+        Line("Contracts defaulted (payer)", ctx.ContractsDefaulted.ToString("N0", CultureInfo.InvariantCulture));
         Line("Transit incidents", ctx.IncidentsOccurred.ToString("N0", CultureInfo.InvariantCulture));
-        Line("Cargo: picked up / delivered / lost", $"{ctx.CargoPickedUp:N0} / {ctx.CargoDelivered:N0} / {ctx.CargoLost:N0}");
         Line("RNG draws consumed", ctx.Rng.DrawCount.ToString("N0", CultureInfo.InvariantCulture));
         Line("Journal entries recorded", ctx.Journal.TotalRecorded.ToString("N0", CultureInfo.InvariantCulture));
 
         Console.WriteLine();
-        var byStatus = new Dictionary<ContractStatus, int>();
-        foreach (Contract c in ctx.Contracts.Values)
+        Console.WriteLine("Goods (produced = consumed + held + lost):");
+        Console.WriteLine($"   {"",-10} {"produced",12} {"consumed",12} {"held",10} {"lost",10}");
+        foreach (GoodType good in Goods.All)
         {
-            byStatus[c.Status] = byStatus.GetValueOrDefault(c.Status) + 1;
+            Console.WriteLine($"   {good,-10} {ctx.GoodsProduced(good),12:N0} {ctx.GoodsConsumed(good),12:N0} {ctx.GoodsHeld(good),10:N0} {ctx.GoodsLost(good),10:N0}");
         }
-
-        Console.Write("Contracts by status: ");
-        foreach (var kv in byStatus)
-        {
-            Console.Write($"{kv.Key}={kv.Value}  ");
-        }
-
-        Console.WriteLine($"(total {ctx.Contracts.Count})");
 
         Console.WriteLine();
-        Console.WriteLine("Hauler solvency (idle fleets bleed running cost, §3.6):");
+        Console.WriteLine("Demand met (what each consumer used, of what it wanted to; plan risk R1 watches the frontier):");
+        foreach (var actor in ctx.ActorsOrdered)
+        {
+            if (actor.Demands.Count == 0)
+            {
+                continue;
+            }
+
+            decimal beats = Math.Max(1m, ctx.CurrentTick / (decimal)ctx.Config.HeartbeatInterval);
+            var shares = new List<string>();
+            foreach (var demand in actor.Demands)
+            {
+                decimal share = actor.Consumed(demand.Good) / (demand.ConsumptionPerHeartbeat * beats);
+                shares.Add($"{demand.Good} {share:P0}");
+            }
+
+            Console.WriteLine($"   {actor.Name,-24} {string.Join(", ", shares)}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Contracts by kind and status:");
+        foreach (ContractType kind in new[] { ContractType.Sale, ContractType.Haul, ContractType.Storage })
+        {
+            var byStatus = new SortedDictionary<ContractStatus, int>();
+            foreach (Contract c in ctx.Contracts.Values)
+            {
+                if (c.Type == kind)
+                {
+                    byStatus[c.Status] = byStatus.GetValueOrDefault(c.Status) + 1;
+                }
+            }
+
+            Console.Write($"   {kind,-8}");
+            foreach (var kv in byStatus)
+            {
+                Console.Write($" {kv.Key}={kv.Value.ToString("N0", CultureInfo.InvariantCulture)}");
+            }
+
+            Console.WriteLine();
+        }
+
+        Console.WriteLine($"   (total {ctx.Contracts.Count.ToString("N0", CultureInfo.InvariantCulture)})");
+
+        Console.WriteLine();
+        Console.WriteLine("Trader solvency (idle fleets bleed running cost, design §6.5):");
         foreach (var actor in ctx.ActorsOrdered)
         {
             if (actor.MovesCargo)

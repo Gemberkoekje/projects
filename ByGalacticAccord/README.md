@@ -18,17 +18,24 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
 ## The current build
 
-**S1 (groundwork) and S2 (the browser client) are done; S3 is next.** The engine still implements the
-earlier v0.2 slice: consumers post haul contracts, AI haulers negotiate, carry the goods and settle
-through escrow, and transit incidents make dangerous routes cost something. Most of that game logic
-changes shape in S3–S8; the foundation it stands on (the event queue, the seeded random numbers, the
-money primitives, the invariants and the soak harness) stays.
+**S1 (groundwork), S2 (the browser client) and S3 (possession, Sale and Haul) are done; S4 is next.** Goods
+belong to someone and are somewhere: in an actor's stock, in storage it rents from a station, or in a ship's
+hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed over at a place; a
+**Haul** carries a shipper's goods from one place to another. Consumers post the Sales they need delivered,
+producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying, posting Hauls
+when their ships are busy. Accord space locks escrow and bonds when a contract is signed; outside it the payer
+pays at handover, or defaults. Transit incidents make dangerous routes cost something, and everyone, the
+player included, pays their ships' running costs. Terms, haggling, information and ships change shape in
+S4–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
+the soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
 routes styled by danger and ships moving along them, the time bar (pause, 1×, 4×, 16×), the board of open
-contracts with each one's take-home, the contract as a document, and the captain's log, in dark and light
-themes. You play an independent pilot at Meridian Station with a Light Freighter and can take a haul as
-posted; posting, haggling and the rest of the contract web arrive in S3–S8.
+Sales and Hauls with each one's take-home, the contract as a document, the ledger of what you own and where,
+and the captain's log, in dark and light themes. You play an independent pilot at Meridian Station with a
+Light Freighter. You can carry a haul, fill a wanted Sale by buying the goods and delivering them, buy a lot
+for sale and collect it, and store goods at a station, all as posted; posting your own contracts and haggling
+arrive in S5.
 
 ## Running it
 
@@ -84,8 +91,9 @@ tools/client-check/                 the browser check (Playwright)
 - **Determinism** (§20.1). Every random draw comes from the seeded PRNG, and everything that consumes
   randomness iterates in a stable order, so a seed reproduces a run exactly. The tests check it.
 - **Invariants** (§20.2), checked by the soak harness and the tests: credits are conserved to the cent
-  (total = initial + faucet − sinks), escrow reconciles and is never negative, cargo picked up equals
-  cargo delivered, lost or still aboard, and no contract is left active without a ship carrying it.
+  (total = initial + faucet − sinks), escrow reconciles and is never negative, goods are conserved per good
+  (produced = consumed + lost + held in stock, storage and holds), nothing is set aside that isn't there, and
+  every signed contract is being performed.
 - **Money is `decimal`**, never floating point, so conservation is exact.
 - **Text is data** (§11.5). Every sentence the client shows is a template in
   `src/ByGalacticAccord.Presentation/Text/Templates.resx`, filled from structured events and the engine's

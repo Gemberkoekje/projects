@@ -1,7 +1,7 @@
 # By Galactic Accord — code map
 
 What is where, what calls what, and where money and goods move. Use it to find the file, then read the
-file: the code is the truth. **Last checked against the code: 2026-10-26, after S2.**
+file: the code is the truth. **Last checked against the code: 2026-10-26, after S3.**
 
 **Keep it true.** A commit that adds, removes, renames or moves a file or a type, changes who calls a
 public member, adds or removes an event, or changes a money or goods path updates this map in the same
@@ -9,12 +9,17 @@ commit. If you find the map wrong, fix it. Section 12 has the commands that rege
 
 ## 1. Orientation
 
-- **What the build is:** the v0.2 hauling slice, slimmed by S1, with the browser client of S2 on top.
-  Consumers post Haul contracts, AI haulers take them, carry goods from producers and settle through
-  escrow. Headless runs (soak harness, most tests) have no player; the client's `GameSession` generates
-  the world with the player (`withPlayer: true`), who can take a haul as posted.
-- **Where it is going:** Slice 1 of the design, in the steps of [`plan.md`](plan.md) (S3, possession, Sale
-  and Haul, is next). Most game logic changes shape in S3–S8; plan §1 lists what is kept, reworked and retired.
+- **What the build is:** S3's contract web of two kinds, with the browser client of S2 on top. Goods belong
+  to an actor and sit in its stock, in storage it rents from a station operator, or in a ship's hold. A
+  **Sale** (wanted, or for sale) hands goods over at a place; a **Haul** carries a shipper's goods from one
+  place to another. Consumers post delivered wanted Sales; producers sell lots, answer wanted Sales at their
+  location and sell delivered (posting a Haul); traders carry Hauls, fill Sales by buying and carrying, and post
+  Hauls when their ships are busy. Every one of them, and the player, acts through `Market`. Headless runs
+  (soak harness, most tests) have no player; the client's `GameSession` generates the world with one
+  (`withPlayer: true`), who can carry a haul, fill a wanted Sale, buy a lot, and store goods, all as posted.
+- **Where it is going:** Slice 1 of the design, in the steps of [`plan.md`](plan.md) (S4, terms and failure,
+  is next). Terms (S4), negotiation (S5), information (S6), ships (S7) and money's limits (S8) change shape next;
+  plan §1 lists what is kept, reworked and retired.
 - **Documents:** design [`../by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md) ·
   plan [`plan.md`](plan.md) · step logs [`log/`](log/README.md) · humans' overview [`README.md`](README.md) ·
   agent rules [`CLAUDE.md`](CLAUDE.md).
@@ -26,11 +31,11 @@ commit. If you find the map wrong, fix it. Section 12 has the commands that rege
 
 | Project | Path | References | Role |
 |---|---|---|---|
-| Engine | `src/ByGalacticAccord.Engine/` | nothing (BCL only) | The whole simulation. No UI, no I/O, deterministic. |
+| Engine | `src/ByGalacticAccord.Engine/` | nothing (BCL only) | The whole simulation. No UI, no I/O, deterministic. `InternalsVisibleTo` the tests. |
 | Presentation | `src/ByGalacticAccord.Presentation/` | Engine | What the interface shows, as data: the text templates, the view models, the game clock. No Razor, no browser. |
 | Client | `src/ByGalacticAccord.Client/` | Presentation, Blazor WebAssembly | The browser client: renders the view models, runs the clock's frames. |
 | Soak harness | `src/ByGalacticAccord.Cli/` | Engine | Console app: headless runs, telemetry, invariant checks, state fingerprints. |
-| Tests | `tests/ByGalacticAccord.Tests/` | Engine, Presentation, xUnit | Fast by default; `[Trait("Category", "Soak")]` for long runs. |
+| Tests | `tests/ByGalacticAccord.Tests/` | Engine (and its internals), Presentation, xUnit | Fast by default; `[Trait("Category", "Soak")]` for long runs. |
 | Browser check | `tools/client-check/` | Node, Playwright (`package.json`) | Publishes the client, drives it in Chromium, screenshots it, compares WebAssembly with desktop. |
 
 - `ByGalacticAccord.slnx` lists the five .NET projects. `Directory.Build.props`: net10.0, nullable on, **implicit usings off**
@@ -49,7 +54,8 @@ commit. If you find the map wrong, fix it. Section 12 has the commands that rege
 ```
 WorldGenerator.Generate(seed, withPlayer, config)          Simulation/WorldGenerator.cs
   └─ new SimulationContext(seed, config)                    Simulation/SimulationContext.cs
-     adds 7 Locations, 9 Routes, 8 producers, 7 consumers, 1 government, 7 haulers (+ the player if asked)
+     adds 7 Locations, 9 Routes, 8 producers, 7 consumers, 1 government, 7 traders, the player if asked,
+     and a station operator ("<Location> Docks") at every location; starting stock through Produce
      schedules: ActorHeartbeat per actor (random first tick), InflationCheck, ReputationDecay
      sets FaucetMultiplier = 0.6, CaptureInitialCredits()
 
@@ -65,78 +71,125 @@ time passes, and stops the clock on `RunStop.PlayerAlert`.
 
 | Event | File | Does | Schedules |
 |---|---|---|---|
-| `ActorHeartbeat` | `Events/ControlEvents.cs` | Non-player actors: `DecisionEngine.RunProducer` / `RunConsumer` / `RunHauler` by role. **Skips the player.** | Itself, `HeartbeatInterval` (24) later |
-| `ContractExpiryCheck` | `Events/ControlEvents.cs` | Open or negotiating contract → `MarkExpired` | — |
+| `ActorHeartbeat` | `Events/ControlEvents.cs` | `DecisionEngine.ChargeRunningCosts` for every actor, **the player too**; then `DecisionEngine.Run` unless it is the player | Itself, `HeartbeatInterval` (24) later |
+| `ContractExpiryCheck` | `Events/ControlEvents.cs` | Still open at its deadline → `Market.Expire` (frees what the post set aside) | — |
+| `ContractDefaultCheck` | `Events/ControlEvents.cs` | Signed but not being performed (`Market.UnderWay`) once the late fee has reached its cap (`Contract.DefaultTick`) → `Settlement.Fail(NotDelivered)`: S3's stand-in for cancellation for default | — |
 | `InflationCheck` | `Events/ControlEvents.cs` | `InflationMonitor.Evaluate` | Itself, every 400 |
 | `ReputationDecay` | `Events/ControlEvents.cs` | `ReputationLedger.DecayTowardNeutral` | Itself, every 400 |
-| `ShipDeparted` | `Events/TransitEvents.cs` | `Settlement.Pickup` (the ship's `Location` becomes the pickup), then `Ship.SetCourse` for the laden leg | `TransitIncidentCheck` at mid-route |
+| `ShipDeparted` | `Events/TransitEvents.cs` | The ship reaches its job's pickup (`Ship.ReachPickup`) and `Settlement.Load`s; a job with no destination (collecting a lot) ends here; nothing aboard → the Sale it serves fails; else `Ship.DepartLaden` | `TransitIncidentCheck` at mid-route |
 | `TransitIncidentCheck` | `Events/TransitEvents.cs` | `Rng.Chance(scale × danger × ship modifier)` | `TransitIncidentOccurred`, or `ShipArrived` |
-| `TransitIncidentOccurred` | `Events/TransitEvents.cs` | Applies the `TransitIncident` (damage, loss, cost, delay), `Ship.DelayArrival`, records an `IncidentEntry`; raises it as a player alert if the ship is theirs | `ShipArrived` (plus any delay) |
-| `ShipArrived` | `Events/TransitEvents.cs` | Perishable decay, `Ship.Arrive` (clears the course), docking fee, `Scout` the destination | → `Settlement.Fulfill` or `Settlement.Breach` |
+| `TransitIncidentOccurred` | `Events/TransitEvents.cs` | Applies the `TransitIncident` to the job owner's lot (`Ship.Alter`: damage, partial or total loss through `Lose`), a credit cost (`ApplySink`), `Ship.DelayArrival`; records an `IncidentEntry`; raises it as a player alert if the ship is theirs | `ShipArrived` (plus any delay) |
+| `ShipArrived` | `Events/TransitEvents.cs` | `Ship.Arrive`, docking fee, `Scout` the destination, `Settlement.Unload`, `Ship.FinishJob` | — |
 
-**A haul's life:** `RunConsumer` → `TryPostDemand` creates a `Contract` (Haul), `context.Add`, schedules
-`ContractExpiryCheck` at the deadline, records a `ContractPostedEntry` → a hauler's `RunHauler` →
-`BestCandidate` (reads `Visibility.OpenContractsVisibleTo`, `FindPath`, `Score`) → `Commit` (`Contract.Activate`,
-escrow and bond locks, `Ship.Reserve` with the repositioning course from `RepositioningCourse`, schedules
-`ShipDeparted` after any repositioning, records a `HaulTakenEntry`) → `ShipDeparted` → `TransitIncidentCheck` →
-(`TransitIncidentOccurred` →) `ShipArrived` → `Settlement.Fulfill` / `Breach`. The player's way in is
-`PlayerActions.CheckHaul` and `AcceptHaul`, the same steps as `Commit`, called by `GameSession.TakeHaul`.
+Every transit event carries the `ShipJob` it belongs to and does nothing if the ship's job is no longer that
+one (`ReferenceEquals`).
 
-**The journal** (`Simulation/EventJournal.cs`) records typed entries, not prose. Who records what:
+**A delivered Sale's life** (consumer → trader): `RunConsumer` → `PostWanted` → `Market.PostSale` (Wanted,
+receipt = the consumer's stock at home; schedules `ContractExpiryCheck`; records `ContractPostedEntry`;
+`DecisionEngine.AnswerAtOnce` lets an AI producer at the place answer it at once) → a trader's `RunTrader` →
+`BestOption` (`Visibility`, `FillSources`, `ScoreFill`) → `Commit` → `Market.FillWithShip` (signs; buys the
+goods at the source with `BuyAtSource`, a wanted Sale at the producer's location that it answers at once;
+`Dispatch`es the ship with a `ShipJob`) → `ShipDeparted` (`Settlement.Load`: the purchase is handed over into
+the hold) → `TransitIncidentCheck` → (`TransitIncidentOccurred` →) `ShipArrived` → `Settlement.Unload` →
+`HandOverCargo` (into the consumer's stock, paid) or `Fail`. A trader with no free ship `Broker`s instead:
+`Market.FillViaHaul` buys into storage at the source and posts a Haul that serves the Sale; the Haul's
+delivery hands the goods over. A producer selling delivered (`SellDelivered`) does the same from its own stock
+(`FillViaHaul` with `FillSource.FromStock`). On later heartbeats `ArrangeTransport` reposts an untaken Haul a
+quarter dearer (`RaiseHaulOffers`), or arranges transport again for a signed Sale whose Haul expired.
+
+**A lot's life:** `RunProducer` → `PostLot` → `Market.PostSale` (ForSale, the producer's stock set aside) → a
+consumer's `TryBuyLot` → `Market.BuyLot` into storage at the place (handed over at once, `HandOverReserved`),
+then `BringHome` posts a Haul home; or a ship collects it (`PickupSource.Purchase`), as the player's `Buy` does.
+
+**The player's way in** is `PlayerActions` (`CheckHaul`/`TakeHaul`, `CheckFill`/`Fill`, `CheckBuy`/`Buy`,
+`Store`, `Retrieve`), the same `Market` commands an AI decision makes, called by `GameSession.Accept`,
+`Store` and `Retrieve`.
+
+**The journal** (`Simulation/EventJournal.cs`, a ring buffer of 5,000) records typed entries, not prose:
 
 | Entry | Recorded by |
 |---|---|
-| `ContractPostedEntry` (poster, supplier) | `DecisionEngine.TryPostDemand` |
-| `HaulTakenEntry` (hauler, fee) | `DecisionEngine.Commit`, `PlayerActions.AcceptHaul` |
-| `HaulDeliveredEntry` (quantity, quality, ticks late, fee, late fee, refund) | `Settlement.Fulfill` |
-| `PaymentDefaultedEntry` (payer, hauler) | `Settlement.Fulfill` (frontier default) |
-| `DeliveryFailedEntry` (hauler) | `Settlement.Breach` |
-| `ContractExpiredEntry` | `ContractExpiryCheck` |
+| `ContractPostedEntry` (poster) | `Market.PostSale`, `PostHaul` |
+| `ContractSignedEntry` (taker, price) | `Market.Sign` (every signing) |
+| `GoodsHandedOverEntry` (seller, buyer, quantity, quality, ticks late, price, late fee, refund) | `Settlement.Complete` (via `HandOverReserved`, `HandOverCargo`) |
+| `HaulDeliveredEntry` (hauler, quantity, quality, ticks late, fee, late fee, refund) | `Settlement.DeliverHaul` |
+| `PaymentDefaultedEntry` (payer, payee) | `Settlement.PayerDefault` (outside the Accord) |
+| `DeliveryFailedEntry` (performer, `FailureReason`: `CargoLost`, `NotDelivered`) | `Settlement.Fail` |
+| `ContractExpiredEntry` | `Market.Expire` |
+| `ContractWithdrawnEntry` | `Market.Withdraw` |
+| `StorageOpenedEntry` (renter), `StorageClosedEntry` (renter, rent paid) | `SimulationContext.PutInStorage`, `TakeFromStorage` |
 | `IncidentEntry` (hauler, the `TransitIncident`) | `TransitIncidentOccurred`; also the player's alert |
 | `FaucetAdjustedEntry` (drift, multiplier) | `InflationMonitor.Evaluate`; never shown in the client |
 
 `Presentation/Text/JournalText.cs` words each one from `Templates.resx`, keyed by the entry type's name
-(without "Entry"), with a `.You` twin for the player's own events.
+(without "Entry") and the contract's kind (`Sale.Wanted`, `Sale.ForSale`, `Haul`), with a `.You` twin when the
+player is the subject and a `.ToYou` twin when the player is the other party.
 
 ## 4. Where state lives: `SimulationContext`
 
-`Simulation/SimulationContext.cs` (483 lines) is the world and the hub; nearly everything takes it.
+`Simulation/SimulationContext.cs` (782 lines) is the world and the hub; nearly everything takes it.
 
 - **Collections:** `Actors`, `Ships`, `Locations`, `Contracts` (dictionaries by typed id; contracts are never
   removed), `Routes` (list). Registered with the `Add(...)` overloads; `Actor(id)`, `Ship(id)`,
   `Location(id)`, `Contract(id)` look up.
-- **Ordered views (use these where order matters):** `ActorsOrdered` (by id), `OpenContracts` (open or
-  negotiating, by id; a pruned list, because a contract never returns to Open).
+- **Ordered views (use these where order matters):** `ActorsOrdered` (by id, cached), `OpenContracts` (open or
+  negotiating, by id; a pruned list, because a contract never returns to Open), `LiveContractsOf(actor)` (the
+  actor's open and active contracts in the order it joined them; pruned as they settle), `ProducersOf(good)`,
+  `StationOperatorAt(location)`.
 - **Graph:** `FindPath(from, to)` → `RoutePlan?` (Dijkstra in `SolvePath`, cached per pair; `Add(Location)` and
-  `Add(Route)` clear the cache), `RouteBetween(a, b)`, `Neighbours(id)`.
-- **Services it owns:** `Rng` (`DeterministicRandom`), `Queue` (`EventQueue`), `Journal` (`EventJournal`, capped
-  at 5,000 entries), `Reputation` (`ReputationLedger`), `Config` (`SimulationConfig`).
+  `Add(Route)` clear the cache), `RouteBetween(a, b)`, `Adjacent(a, b)` (cached), `Neighbours(id)`.
+- **Storage:** the active `StorageContract`s, by renter and location: `StorageOf(renter, location)`,
+  `StoragesOf(renter)`, `StoragesAt(location)`. `PutInStorage` opens one at the location's station operator on
+  first use; `TakeFromStorage` closes it when it empties.
+- **Services it owns:** `Rng` (`DeterministicRandom`), `Queue` (`EventQueue`), `Journal` (`EventJournal`, a ring
+  of 5,000 entries), `Reputation` (`ReputationLedger`), `Config` (`SimulationConfig`).
 - **Bookkeeping the invariants read:** `InitialCredits`, `TotalFaucet`, `TotalSink`, `EscrowLockedTotal` /
-  `ReleasedTotal` / `ForfeitedTotal`, `GovernmentRevenue`, `CargoPickedUp` / `Delivered` / `Lost`, counters
-  `ContractsFulfilled` / `Breached`, `IncidentsOccurred`, and `FaucetMultiplier` (the inflation monitor's knob).
-- **Other:** `ProducerAt(location, good)` (first resident producer of that good), scouting
-  (`Scout`, `HasFreshScout`), player alerts (`RaisePlayerAlert(JournalEntry)`, `HasPlayerAlerts`, `PlayerAlerts`,
-  `ClearPlayerAlerts`: an alert is the entry that needs the player), `Record(JournalEntry)`.
+  `ReleasedTotal` / `ForfeitedTotal`, `TotalEscrowHeld` (over the contracts that ever held escrow),
+  `GovernmentRevenue`, the goods ledger per good (`GoodsProduced`, `GoodsConsumed`, `GoodsLost`, `GoodsHeld`:
+  stock, storage and holds), counters `ContractsFulfilled` / `Breached` / `Defaulted`, `GoodsSold`,
+  `IncidentsOccurred`, and `FaucetMultiplier` (the inflation monitor's knob).
+- **Other:** `Sign` (internal: `Market.Sign`'s record-keeping), scouting (`Scout`, `HasFreshScout`), player
+  alerts (`RaisePlayerAlert(JournalEntry)`, `HasPlayerAlerts`, `PlayerAlerts`, `ClearPlayerAlerts`: an alert is
+  the entry that needs the player), `Record(JournalEntry)`.
 
 ## 5. Money and goods: the only paths
 
 Every credit and unit moves through these `SimulationContext` primitives. Anything else is a bug.
 
+**Money:**
+
 | Primitive | Effect | Called from |
 |---|---|---|
-| `ApplyFaucet` | Creates credits | `DecisionEngine.RunConsumer` (income × `FaucetMultiplier`) |
-| `ApplySink` | Destroys credits, **capped at the actor's balance** (nobody goes below ₵0) | `RunProducer` (production cost), `RunHauler` (running costs), `ShipArrived` (docking fee), `TransitIncidentOccurred` (credit-cost incident) |
-| `TaxFromEscrow`, `TaxDirect` | Destroys credits as tax, books `GovernmentRevenue` | `Settlement.Fulfill` |
-| `TryTransfer` | Moves credits between actors | `Settlement.Pickup` and `Fulfill` on the frontier |
-| `LockToEscrow` | Actor → a contract's escrow | `DecisionEngine.Commit`, `PlayerActions.AcceptHaul` (from `GameSession.TakeHaul`): consumer locks goods cost + fee + tax; hauler locks a bond (≤ its credits) |
-| `ReleaseFromEscrow`, `ForfeitFromEscrow` | Escrow → an actor, capped at what the contract holds | `Settlement.Pickup` (goods cost to the producer), `Fulfill`, `Breach` |
-| `NotePickup`, `NoteDelivered`, `NoteLost` | Goods bookkeeping | `Pickup`; `Fulfill`; `TransitIncidentOccurred` and frontier default in `Fulfill` |
+| `ApplyFaucet` | Creates credits | `RunConsumer` (income × `FaucetMultiplier`) |
+| `ApplySink` | Destroys credits, **capped at the actor's balance** (nobody goes below ₵0) | `Produce` in `RunProducer` (production cost), `ChargeRunningCosts` (every ship, every heartbeat), `PayOut` (above working capital), `ShipArrived` (docking fee), `TransitIncidentOccurred` (credit-cost incident) |
+| `TaxFromEscrow` | Destroys credits as tax from a contract's escrow, books `GovernmentRevenue` | `Settlement.Pay` (Accord space only: the frontier is untaxed) |
+| `TryTransfer` | Moves credits between actors, all or nothing | `Settlement.Pay` outside the Accord (the payer pays at handover, or `PayerDefault`) |
+| `TransferUpTo` | Moves at most what the payer has | `SettleRent` (renter → station operator) |
+| `LockToEscrow` | Actor → a contract's escrow | `Market.Sign`: the payer locks price + tax, the performer a bond (≤ its credits) |
+| `ReleaseFromEscrow`, `ForfeitFromEscrow` | Escrow → an actor, capped at what the contract holds | `Settlement.Pay` (price less refund to the performer, bond less late fee back, the rest to the payer), `Settlement.Fail` (bond to the payer, escrow back) |
 
-Goods sit in `ActorState` stock (`AddStock`, `RemoveStock` floors at 0) or in a ship's `Manifest` (one `Cargo`).
-They move producer stock → `Settlement.Pickup` → manifest → consumer stock in `Settlement.Fulfill`.
-Jurisdiction decides the branch: `Contract.UsesEscrow` (deep Accord and Accord edge) or the frontier
-(no escrow; the pilot pays the producer the goods cost at pickup and the consumer pays only the fee at
-handover, or defaults: the pilot is never paid back for the goods, see section 8).
+A station operator's rent above its float leaves through `PayOut`, as upkeep. `TaxDirect` has no callers since
+S3.
+
+**Goods** live in three places: an actor's stock (`ActorState`, with a reserved part), its storage at a
+location (`StorageContract.Lots`), or a ship's hold (`Ship.Hold`, `Lot`s by owner). Perishables decay lazily:
+a `Lot` remembers when it was last fresh-stamped and `At(tick, preservation)` computes its quality.
+
+| Primitive | Effect | Called from |
+|---|---|---|
+| `Produce` | Creates goods in stock (ledger: produced) | `RunProducer`, `WorldGenerator` (starting stock) |
+| `Consume` | Destroys goods from stock (ledger: consumed) | `RunConsumer` |
+| `Lose` | Books goods destroyed in transit or written off (ledger: lost) | `TransitIncidentOccurred`, `SellOff` (a trader's stale stored goods) |
+| `TakeFromStock`, `PutInStock`, `ReserveStock`, `UnreserveStock` | Stock out, in, set aside, freed | `Settlement` (handover, haul pickup, `Keep`, `Unreserve`); `Market.Reserve` |
+| `PutInStorage`, `TakeFromStorage`, `ReserveStorage`, `UnreserveStorage` | Storage in (opens it), out (closes it when empty), set aside, freed | `Settlement`, `Market.Reserve`, `PlayerActions.Store`/`Retrieve`, `Stow` and `SellOff` in `RunTrader` |
+| `SettleRent` | Charges rent due (rate × units × days) to the renter, up to its credits | `RunStation`; `PutInStorage` and `TakeFromStorage`, before what is held changes |
+| `Load`, `Unload` | Into and out of a hold, by owner | `Settlement.Load`/`Unload`/`Receive`, `Market.FillWithShip` (goods already aboard), `PlayerActions`, `Stow` |
+
+Goods move only at handovers (`Settlement.HandOverReserved`, `HandOverCargo`), a ship's pickup and arrival
+(`Settlement.Load`, `Unload`, `DeliverHaul`), and storage commands. Jurisdiction is where a contract is
+performed (a Sale's place, a Haul's destination, a storage's location): Accord space (`Contract.UsesEscrow`)
+locks the price and tax and the performer's bond at signing and settles from escrow; outside it nothing is
+locked, the payer pays at handover or defaults (a seller then keeps its goods), and no tax is due.
 
 ## 6. File by file
 
@@ -146,14 +199,15 @@ handover, or defaults: the pilot is never paid back for the goods, see section 8
 |---|---|---|
 | `Ids.cs` | `ActorId`, `ShipId`, `LocationId`, `ContractId`: long-backed record structs from counters in `SimulationContext` | everywhere |
 | `Credits.cs` | `Credits(decimal)`: arithmetic, comparison, `ToString` "₡1,234" | everywhere money is |
-| `Goods.cs` | `GoodType` (7), `GoodCategory`, `GoodInfo`, `Goods.Info` table (base value, perishable, decay per tick) | `Cargo`, `PriceModel`, `DecisionEngine`, `Settlement`, `Reputation` |
-| `Cargo.cs` | `Cargo(good, quantity, quality)`: `Fresh`, `Decayed(ticks, preservation)`, `LosingUnits`, `Damaged` | `Ship`, `TransitEvents`, `Settlement` |
+| `Goods.cs` | `GoodType` (7), `GoodCategory`, `GoodInfo` (base value, `KeepsHours` in a standard hold, `Refrigeratable`; `Perishable`, `QualityDecayPerTick` from the keep-time), `Goods.Info` table (Food 7 days, Medicine 2: design §15.3), `Goods.StandardWarranty` (0.7) | `Cargo`, `Lot`, `PriceModel`, `Terms`, `DecisionEngine`, `Settlement`, the views |
+| `Cargo.cs` | `Cargo(good, quantity, quality)`: `Fresh`, `Decayed(ticks, preservation)`, `LosingUnits`, `Damaged`, `Merged` (weighted quality) | `Lot`, `Ship`, `StorageContract`, `Settlement`, `TransitEvents` |
+| `Lot.cs` | `Lot(owner, cargo, since)`: goods held somewhere, decaying lazily; `At(tick, preservation)` | `Ship.Hold`, `StorageContract.Lots`, the ledger |
 | `Location.cs` | `AccordReach` (jurisdiction), `LocationType`, `MapPoint` (schematic map units), `Location` (region, reach, residents, `Map`) | `WorldGenerator`, `Visibility`, `DecisionEngine`, `MapView` |
-| `Route.cs` | `Route` (two ends, hours, danger 0..1, law, `Band`), `RoutePlan` (distance, worst leg's danger, hops, path, `Band`), `DangerBand` | `SimulationContext.FindPath`, `DecisionEngine`, `TransitEvents`, `PlayerActions`, the views |
-| `Contract.cs` | `ContractType` (only `Haul` is created), `ContractStatus`, `Contract`: parties, good, quantity, origin, destination, offered fee, the poster's hidden `BuyerReservationFee`, goods cost, tax rate, deadline, jurisdiction, clauses, escrow held, locked bond; transitions `BeginNegotiation`, `Activate`, `MarkFulfilled`/`Breached`/`Expired` | `DecisionEngine`, `Settlement`, events, `Visibility`, `Invariants` |
-| `Clause.cs` | `ContractClause` base; `PenaltyOnLateDelivery` (per tick late, capped; the cap is the bond); `QualityWarranty` (refund fraction below a minimum quality) | `Contract`, `DecisionEngine.TryPostDemand`, `Settlement.Fulfill` |
-| `Ship.cs` | `ShipStatus` (Docked, InTransit), `ShipCourse` (path, departed, arrival: the leg the client draws the ship along), `Ship`: type, owner, location, capacity, `ActiveContract`, `Manifest`, `DepartedTick`, `Course`, a text log; `Reserve` (with the repositioning course), `Depart` (at the pickup), `SetCourse`, `DelayArrival`, `Arrive`, `Unload` | `DecisionEngine`, `PlayerActions`, `TransitEvents`, `Settlement`, `Invariants`, `HaulEstimate`, `MapView` |
-| `ShipType.cs` | `ShipType` (5 hulls), `ShipClassInfo` (capacity, speed, running cost per tick, incident modifiers, preservation), `ShipClasses.Info` table | `Ship`, `PriceModel`, `IncidentResolver` |
+| `Route.cs` | `Route` (two ends, hours, danger 0..1, law, `Band`), `RoutePlan` (distance, worst leg's danger, hops, path, `Band`), `DangerBand` | `SimulationContext.FindPath`, `DecisionEngine`, `TransitEvents`, `Market`, the views |
+| `Contract.cs` | `ContractType` (Sale, Haul, Storage created; Build and the rest named), `ContractStatus` (Negotiating is never set yet), `SaleSide`, `HoldingKind`, `Holding` (stock, storage or aboard a ship, at a location); abstract `Contract` (poster, counterparty, offered and agreed price, hidden `Reservation`, tax, deadline, `DefaultTick`, status, clauses, jurisdiction, escrow held, locked bond, `Payer`/`Performer`, `Places`, `LatePenalty`, `Warranty`, `PerformanceBond`; internal transitions); `SaleContract` (side, good, quantity, place, buyer/seller, receipt, reserved, delivered, `UnitPrice`); `HaulContract` (good, quantity, origin, destination, pickup holding, the Sale it `Serves`, shipper/carrier, assigned ship); `StorageContract` (operator, renter, rate per unit-day, lots, reservations, rent charged; signs itself) | `Market`, `Settlement`, `DecisionEngine`, events, `Visibility`, `Invariants`, the views |
+| `Clause.cs` | `ContractClause` base; `PenaltyOnLateDelivery` (per hour late, capped; `HoursToCap`; the cap is the bond); `QualityWarranty` (refund fraction below a minimum quality) | `Contract`, `Terms`, `Settlement`, `DealEstimate`, `ContractView` |
+| `Ship.cs` | `ShipStatus` (Docked, InTransit), `PickupSource` (Purchase, Haul, Storage, Aboard), `ShipCourse` (path, departed, arrival: what the client draws along), `ShipJob` (goods owner, good, quantity, pickup, source, destination, and the haul, purchase and delivery it serves), `Ship`: type, owner, location, capacity, `Hold` (lots by owner), `FreeSpace`, `Job`, `Course`, `Preservation`, `IsFree`, `LotOf`; `Reserve`, `ReachPickup`, `Load` (merges an owner's lot), `Unload`, `Alter`, `DepartLaden`, `DelayArrival`, `Arrive`, `FinishJob`; a text log | `Market`, `Settlement`, `TransitEvents`, `DecisionEngine`, `PlayerActions`, `Invariants`, the views |
+| `ShipType.cs` | `ShipType` (5 hulls), `ShipClassInfo` (capacity, speed, running cost per tick, incident modifiers, preservation: refrigerated 0.8, so goods keep five times as long), `ShipClasses.Info` table | `Ship`, `PriceModel`, `IncidentResolver`, `WorkingCapital` (`MarketValue`) |
 | `Personality.cs` | `Personality` (risk tolerance, liquidity preference, quality bias, growth ambition, trust threshold, concession rate) | `ActorState`, `DecisionEngine`, `PriceModel`, `WorldGenerator` |
 | `Reputation.cs` | `ReputationContext` (Accord standing, region, good category, counterparty), `ReputationLedger` (scores −1..1, decay toward 0) | `Settlement` (writes), `Visibility` (reads region) |
 
@@ -161,19 +215,23 @@ handover, or defaults: the pilot is never paid back for the goods, see section 8
 
 | File | Contents | Used by |
 |---|---|---|
-| `ActorState.cs` | One model for every actor: credits, stock, ships, home, personality, `Producer` profile, consumer `Demands`, `IncomePerHeartbeat`, `IsPlayer`, `MovesCargo` | everywhere |
-| `ActorRole.cs` | `ActorRole`: Producer, Consumer, ShippingCompany, IndependentPilot, Government in use; Factory and the rest named, never created | `ActorState`, `WorldGenerator` |
-| `Profiles.cs` | `ProducerProfile` (good, output, unit cost, cap, margin), `ConsumerDemand` (good, rate, target stock) | `ActorState`, `PriceModel`, `DecisionEngine`, `WorldGenerator` |
-| `DecisionEngine.cs` | `RunProducer` (make goods up to cap, paying cost), `RunConsumer` (income, consume, post when below 60% of target), `TryPostDemand`, `RunHauler`, `BestCandidate`, `Score` (utility = profit × risk × growth − opportunity cost, over a liquidity threshold), `Commit`, `RepositioningCourse` (internal: the empty leg to a pickup) | `ActorHeartbeat`; `RepositioningCourse` also `PlayerActions` |
-| `Negotiation.cs` | `Negotiation.ResolveAi` (closed form: deal if buyer max ≥ seller min, price split by concession rates); `NegotiationSession` (interactive rounds with tells) | `DecisionEngine.Score`; the session only by `NegotiationTests` |
-| `PlayerActions.cs` | `HaulBlock`, `HaulAcceptance` (codes, worded by the templates), `HaulFeasibility`; `CheckHaul`, `AcceptHaul` (refuses a contract that is no longer open): the player's way to take a haul through the same steps as `Commit` | `GameSession.TakeHaul`, `BoardView`, `ContractView`; S3 reworks it |
+| `ActorState.cs` | One model for every actor: credits, stock with a reserved part (`Stock`, `Reserved`, `Available`), ships, home, personality, `Producer`, `Station` and consumer `Demands` profiles, `IncomePerHeartbeat`, `IsPlayer`, `MovesCargo`, `KeepsStock`; per-good `Consumed`; its `PriceMemory`s (internal) | everywhere |
+| `ActorRole.cs` | `ActorRole`: Producer, Consumer, ShippingCompany, IndependentPilot, Government, StationOperator in use; Factory and the rest named, never created | `ActorState`, `WorldGenerator`, the views |
+| `Profiles.cs` | `ProducerProfile` (good, output, unit cost, cap, margin; `Fullness`), `StationProfile` (storage rate, float), `ConsumerDemand` (good, rate, target stock) | `ActorState`, `PriceModel`, `DecisionEngine`, `WorldGenerator` |
+| `PriceMemory.cs` | `PriceKind` (Wanted, Lot, Haul), `PriceKey`, `PriceMemory`: a per-actor price factor that learns from each of its closed posts (taken within a day: lower; expired: higher, or the other way for a seller), clamped | `DecisionEngine` (consumers' wanted Sales, producers' lots, everyone's hauls) |
+| `DecisionEngine.cs` | Partial class, the shared part: `Run` (by profile: station, producer, consumer, trader; then `PayOut` above `WorkingCapital`, except the government), `WorkingCapital`, `ChargeRunningCosts`, `AnswerAtOnce`, `HaulFeeEstimate`, `Ask` (a producer's unit ask), and private `HaulTerms`, `PostPricedHaul`, `ArrangeTransport` (post a Haul for a signed Sale, or send one's own ship), `RaiseHaulOffers` (repost an untaken haul higher) | `ActorHeartbeat`; `Market.PostSale` (`AnswerAtOnce`); `PlayerActions` (`FillSources`) |
+| `DecisionEngine.Producers.cs` | `RunProducer`: `Produce` (paying cost), `TryAnswer` (local wanted Sales, as posted, at or above its ask), `SellDelivered` (a remote wanted Sale it can profit on: `Market.FillViaHaul` from its stock, which posts the Haul), `PostLot` (when 75% full, priced by its `PriceMemory`, never below cost) | `DecisionEngine.Run`, `AnswerAtOnce` |
+| `DecisionEngine.Consumers.cs` | `RunConsumer`: income (`ApplyFaucet`), `Consume`, `BringHome` (a Haul home for goods in storage elsewhere), then per demand below 60% of target, counting `Inbound`: `TryBuyLot` (a cheap lot plus a haul home) or `PostWanted` (delivered, priced from the cheapest source and its `PriceMemory`); `Willingness` (affordability-aware) | `DecisionEngine.Run` |
+| `DecisionEngine.Traders.cs` | `RunTrader`: per free ship `BestOption` over visible Hauls (`ScoreHaul`) and wanted Sales by source (`FillSources`, `ScoreFill`) by `Utility` over a `Threshold`, `Commit`; `Stow` (goods left aboard into storage); `Broker` (no free ship: `FillViaHaul`); `SellOff` (stored goods as lots, written off after 30 days); `RunStation` (rent) | `DecisionEngine.Run`; `FillSources` also `PlayerActions` |
+| `Negotiation.cs` | `Negotiation.ResolveAi` (closed form), `NegotiationSession` (interactive rounds with tells): both **tests only** since S3 (AI actors take posts as posted until S5) | `NegotiationTests` |
+| `PlayerActions.cs` | `DealBlock` (codes, worded by the templates), `HaulFeasibility`, `FillFeasibility`, `BuyFeasibility`; `ShipFor`, `CheckHaul`/`TakeHaul`, `CheckFill` (the cheapest source)/`Fill`, `CheckBuy`/`Buy`, `Store`, `Retrieve`: the player's commands through `Market` | `GameSession`, `ContractView`, `BoardView`, `DealEstimate` |
 
 ### Engine: `Economy/`
 
 | File | Contents | Used by |
 |---|---|---|
-| `PriceModel.cs` | `ProducerAsk` (cost × margin × fullness), `ConsumerWillingness` (base value × shortage), `PilotMinimumFee`, `TravelTicks` (distance ÷ speed, rounded up) | `DecisionEngine`, `TransitEvents`, `PlayerActions` |
-| `Visibility.cs` | `CanSee`: own contracts, home or adjacent location, home region, region reputation over 0.05, or a fresh scout; `OpenContractsVisibleTo` | `DecisionEngine.BestCandidate` |
+| `PriceModel.cs` | `ProducerAsk` (cost × margin × fullness; with credits, a rich producer gives up its margin), `ConsumerWillingness` (base value × shortage; with credits and income, × affordability), `PilotMinimumFee`, `TravelTicks` (distance ÷ speed, rounded up) | `DecisionEngine`, `TransitEvents`, `Market`, `PlayerActions`, `DealEstimate` |
+| `Visibility.cs` | `CanSee`: own contracts, the contract's region or any of its places in the home region, a place at home or adjacent, region reputation over 0.05, or a fresh scout; `OpenContractsVisibleTo` | `DecisionEngine`, `BoardView`, `LogView` |
 | `InflationMonitor.cs` | `Evaluate`: drift of total credits beyond ±8% moves `FaucetMultiplier` by 7% | `InflationCheck` |
 
 ### Engine: `Events/`
@@ -182,31 +240,34 @@ handover, or defaults: the pilot is never paid back for the goods, see section 8
 |---|---|---|
 | `ISimEvent.cs` | `ISimEvent`; `IPlayerPrompt` (**no implementations**) | events, `EventQueue`, `SimulationContext` |
 | `EventQueue.cs` | Min-heap by tick, ties by insertion sequence | `SimulationContext` |
-| `ControlEvents.cs` | `ActorHeartbeat`, `ContractExpiryCheck`, `InflationCheck`, `ReputationDecay` | scheduled by `WorldGenerator`, `DecisionEngine`, and themselves |
-| `TransitEvents.cs` | `ShipDeparted`, `TransitIncidentCheck`, `TransitIncidentOccurred`, `ShipArrived` | `ShipDeparted` scheduled by `DecisionEngine.Commit`, `PlayerActions.AcceptHaul`; the rest by each other |
+| `ControlEvents.cs` | `ActorHeartbeat`, `ContractExpiryCheck`, `ContractDefaultCheck`, `InflationCheck`, `ReputationDecay` | scheduled by `WorldGenerator`, `Market` (expiry at posting; default at signing a Sale), and themselves |
+| `TransitEvents.cs` | `ShipDeparted`, `TransitIncidentCheck`, `TransitIncidentOccurred`, `ShipArrived` | `ShipDeparted` scheduled by `Market.Dispatch`; the rest by each other |
 
-### Engine: `Random/` and `Simulation/`
+### Engine: `Random/`, `Simulation/` and `Properties/`
 
 | File | Contents | Used by |
 |---|---|---|
 | `Random/DeterministicRandom.cs` | xorshift128+ seeded by SplitMix64; `NextDecimal`, `NextLong`, `Chance`, `Pick`; counts `DrawCount` | `SimulationContext.Rng` → `WorldGenerator`, `TransitIncidentCheck`, `IncidentResolver` |
 | `Simulation/SimulationContext.cs` | The world (section 4) | everything |
-| `Simulation/SimulationConfig.cs` | Tuning knobs: heartbeat 24, inflation check 400 / ±8% / 7%, reputation decay, tax 4%, docking ₵3, incident scale, reputation gain and loss, scout freshness | `SimulationContext.Config` |
-| `Simulation/WorldGenerator.cs` | The sector: locations (with map points), routes (hours and danger), producers, consumers, government, haulers, optional player; `WorldHandles` | `Soak`, `Fingerprint`, `GameSession`, `BenchPanel`, tests |
-| `Simulation/Settlement.cs` | `Pickup`, `Fulfill` (fee, warranty refund, late penalty from the bond, tax; frontier default), `Breach` (cargo lost: bond forfeited, consumer refunded); reputation changes | `TransitEvents` |
+| `Simulation/Market.cs` | `Signing` (Signed, NotOpen, PayerCannotFund, SupplierDeclined), `FillSourceKind`, `FillSource`; `Market`: `PostSale`, `PostHaul`, `Withdraw`, `Expire` (internal), `CanFund`, `CanFundHaul`, `Supply`, `BuyLot`, `TakeHaul`, `BuyAtSource`, `FillWithShip`, `FillViaHaul`, `UnderWay`, `NextFree` (where and when a ship is next free), `TravelTo`, `Dispatch` (internal); private `Sign` (locks escrow and bond), `Reserve`, `ReleaseOpen` | `DecisionEngine`, `PlayerActions`, `ControlEvents`, the views (`NextFree`) |
+| `Simulation/Settlement.cs` | `SettlementTerms` and `Due` (gross pro rata, warranty refund, late fee limited by the bond in the Accord or by what is due outside, tax); `CanPay`; `HandOverReserved`, `HandOverCargo`, `DeliverHaul`; `Fail` (bond to the payer, escrow back, set-aside goods freed, a haul's failure fails the Sale it serves); `PayerDefault`; `Keep` (goods delivered under no Sale go to stock or storage); `Unreserve`; `Load`, `Unload` (a ship's job at its pickup and destination); reputation rewards and blame | `Market`, `TransitEvents`, `ControlEvents` |
+| `Simulation/Terms.cs` | The S3 terms every Sale and Haul carries, scaled from the posted price: late fee per hour and cap (Sale 0.5%/h to 15%, Haul 1%/h to 30%; the cap is the bond), a quality warranty for perishables (up to half the price back); `TaxRate` (none outside the Accord) | `Market`, `DecisionEngine`, `DealEstimate` |
+| `Simulation/SimulationConfig.cs` | Tuning knobs: heartbeat 24, inflation check 400 / ±8% / 7%, reputation decay, tax 4%, docking ₵3, incident scale, reputation gain and loss, scout freshness, working capital (consumer 90 days' income, producer 4 warehouses at cost, trader 1.5 × fleet value) | `SimulationContext.Config` |
+| `Simulation/WorldGenerator.cs` | The sector: locations (with map points), routes (hours and danger), producers, consumers, government, traders, optional player, station operators (₵0.10 a unit-day, ₵2,000 float); `WorldHandles` | `Soak`, `Fingerprint`, `GameSession`, `BenchPanel`, tests |
 | `Simulation/IncidentResolver.cs` | `TransitIncidentKind`, `TransitIncident`, `Resolve` (roll → delay, damage, partial loss, credit cost, total loss; severity from the ship), `Share(kind)` (the table's odds per kind) | `TransitIncidentCheck`, `TransitIncidentTests`; `Share` by `ContractView` |
-| `Simulation/Invariants.cs` | `Check`: credit conservation, escrow reconciliation and non-negative escrow, cargo conservation, no orphan active contracts; `InvariantViolation` | `Soak`, `InvariantTests` |
-| `Simulation/EventJournal.cs` | `JournalEntry` and its eight kinds (section 3), `EventJournal` (capped at 5,000, `Entries`, `Tail`, `TotalRecorded`) | `SimulationContext.Record`; `LogView`, `JournalText` |
-| `Simulation/StateFingerprint.cs` | `Of(context)`: tick, draws, money supply, settlement counters and every actor's credits, as one string | `TestWorld.Signature`, the CLI's `fingerprint`, the client's `BenchPanel` |
-| `Simulation/GameTime.cs` | One tick = one game hour. `Day`, `HourOfDay`, `At`, `Days`, `FormatDate` ("Day 4 · 14:00"), `FormatDuration` ("1d 6h"), `FormatRelative` ("in 1d 6h") | `Soak`, `InvariantTests`, `GameTimeTests`, `Format` (every date the client shows) |
+| `Simulation/Invariants.cs` | `Check`: credit conservation, escrow reconciliation and non-negative escrow, goods conservation per good (produced = consumed + lost + held) with no negative or over-reserved stock or storage and no overfull hold, and every signed contract being performed (a haul has a ship flying it; a Sale has its goods set aside or under way); `InvariantViolation` | `Soak`, tests (`TestWorld.AssertSound`) |
+| `Simulation/EventJournal.cs` | `JournalEntry` and its twelve kinds (section 3), `FailureReason`, `EventJournal` (a ring of 5,000: `Entries`, `Tail`, `TotalRecorded`) | `SimulationContext.Record`; `LogView`, `JournalText` |
+| `Simulation/StateFingerprint.cs` | `Of(context)`: tick, draws, money supply, settlement counters (fulfilled, breached, defaulted, goods sold) and every actor's credits, as one string | `TestWorld.Signature`, the CLI's `fingerprint`, the client's `BenchPanel` |
+| `Simulation/GameTime.cs` | One tick = one game hour. `Day`, `HourOfDay`, `At`, `Days`, `FormatDate` ("Day 4 · 14:00"), `FormatDuration` ("1d 6h"), `FormatRelative` ("in 1d 6h") | `Soak`, tests, `Format` (every date the client shows) |
 | `Simulation/RunStop.cs` | Why `RunTo` returned: `ReachedTarget`, `Drained`, `PlayerAlert` | `SimulationContext.RunTo` |
+| `Properties/AssemblyInfo.cs` | `InternalsVisibleTo("ByGalacticAccord.Tests")` | the tests (internal `Sign`, `Dispatch`, stock reservations) |
 
 ### Soak harness: `src/ByGalacticAccord.Cli/`
 
 | File | Contents |
 |---|---|
 | `Program.cs` | Commands `soak [ticks] [--seed N]` (default 200,000 ticks, seed 20260619), `fingerprint [ticks] [--seed N]` (default 20,000) and `help` |
-| `Soak.cs` | Runs in 5,000-tick chunks, `Invariants.Check` after each (exit code 1 on a violation), then prints telemetry |
+| `Soak.cs` | Runs in 5,000-tick chunks, `Invariants.Check` after each (exit code 1 on a violation), then prints telemetry: money, settlement counters, the goods table, demand met per consumer, contracts by kind and status, trader solvency, wealth |
 | `Fingerprint.cs` | A headless run's `StateFingerprint`, which the browser check compares with the client's |
 
 ### Presentation: `src/ByGalacticAccord.Presentation/`
@@ -216,17 +277,18 @@ them. A view never changes the world; commands go through `GameSession`.
 
 | File | Contents | Used by |
 |---|---|---|
-| `Text/Templates.resx` | Every interface sentence and label (design §11.5): ~190 templates with named `{fields}`, keyed by journal entry type (`HaulTaken`, `Incident.CargoDamage`, each with a `.You` twin) and fact type (`Good.Food`, `Jurisdiction.AccordEdge.Long`, `Line.Running.Note`, …) | `Templates` |
-| `Text/Templates.cs` | `Get`, `Fill(key, (name, value)…)` (throws on a missing key or field), words for the engine's enums (`Good`, `Jurisdiction`, `JurisdictionShort`, `JurisdictionLong`, `Danger`, `LocationKind`, `Role`, `ContractKind`, `ShipClass`) | every view, the client's components |
+| `Text/Templates.resx` | Every interface sentence and label (design §11.5): 321 templates with named `{fields}`, keyed by journal entry type and contract kind (`ContractSigned.Sale.Wanted`, each with `.You` and `.ToYou` twins where the player can be either party) and fact type (`Good.Food`, `Jurisdiction.AccordEdge.Long`, `Line.Running.Note`, `Ledger.Storage`, …) | `Templates` |
+| `Text/Templates.cs` | `Get`, `Fill(key, (name, value)…)` (throws on a missing key or field), words for the engine's enums (`Good`, `Jurisdiction`, `JurisdictionShort`, `JurisdictionLong`, `Danger`, `LocationKind`, `Role`, `ContractKind`, `Side`, `ShipClass`), `KindLine` ("Sale · wanted") | every view, the client's components |
 | `Text/Format.cs` | `Money` ("₵1,234", "−₵42"), `MoneyCents`, `Quantity`, `Percent`, `Points`, `Hours`, and `GameTime`'s dates, all invariant | every view |
-| `Text/JournalText.cs` | `Describe(context, entry)` (the entry's sentence), `Subject`, `ContractOf` | `LogView`, `HeaderView` (alerts) |
-| `Session/GameSession.cs` | `ClockSpeed`, `HaulOutcome`, `GameSession`: the world with the player, the clock (`SetSpeed`, `Advance(realSeconds)` capped at `MaxFrameSeconds`, `Clock` with its fraction, `Revision`), `Alerts`, `PlayerShip`, `TakeHaul` | `Shell`, the views, tests |
-| `Views/HaulEstimate.cs` | What a haul is worth to the player's ship by the engine's rules: fee, running costs (empty and laden legs), docking, goods paid at pickup (frontier), the certain warranty refund and late fee, the bond, incident odds; `TakeHome`, `PerDay`, `NextFree` (where and when a busy ship is free) | `BoardView`, `ContractView`, `MapView` |
-| `Views/BoardView.cs` | `BoardRow`, `BoardViewModel`: open hauls the player can see (`Visibility`), newest first, with take-home and one note | `Shell` |
-| `Views/ContractView.cs` | `MoneyLine`, `InfoLine`, `ContractViewModel`: the contract as a document (breakdown, schedule, uncertain inputs, terms as sentences, party, status); `BlockText`, `OutcomeText` | `Shell`, `BoardView` (`BlockText`) |
-| `Views/MapView.cs` | `MapNode`, `MapRoute`, `MapLeg`, `MapRegion`, `MapShip`, `MapViewModel`, `LabelAnchor`: the schematic map, the selected contract's overlay, region frames, label placement; `Ships(session, clock)` and `Along` (a course's position by share of hours) | `Shell`, `SectorMap`, `MapLayers`, `ShipLayer` |
-| `Views/LogView.cs` | `LogLine`, `LogViewModel`: the journal's visible entries, newest first, 40 at most | `Shell` |
-| `Views/HeaderView.cs` | `SpeedButton`, `HeaderViewModel`: speeds, date, credits, escrow, running cost, the fleet line, alerts | `Shell` |
+| `Text/JournalText.cs` | `Describe(context, entry)` (the entry's sentence), `Subject`, `ContractOf`, `Kind(contract)` | `LogView`, `HeaderView` (alerts) |
+| `Session/GameSession.cs` | `ClockSpeed`, `DealOutcome` (a `DealBlock`, or the `Signing`), `GameSession`: the world with the player, the clock (`SetSpeed`, `Advance(realSeconds)` capped at `MaxFrameSeconds`, `Clock` with its fraction, `Revision`), `Alerts`, `PlayerShip`, `Accept` (haul, fill or buy by kind), `Store`, `Retrieve`, `PlayerActiveContracts` | `Shell`, the views, tests |
+| `Views/DealEstimate.cs` | `DealKind` (Haul, Fill, Buy), `DealEstimate`: what a contract is worth to the player's ship by the engine's rules (income; goods bought and their tax; running costs for the empty and laden legs; docking; the certain warranty refund and late fee; the bond; incident odds; the source), `TakeHome`, `Cost`, `PerDay`, from where and when the ship is next free | `BoardView`, `ContractView`, `MapView` |
+| `Views/BoardView.cs` | `BoardRow` (with its `ContractType`), `BoardViewModel`: open Sales and Hauls the player can see (`Visibility`), newest first, with take-home (or a lot's cost) and one note | `Shell` |
+| `Views/ContractView.cs` | `MoneyLine`, `InfoLine`, `ContractViewModel`: the contract as a document per kind (breakdown, schedule, uncertain inputs, terms as sentences, party, status, the accept label: "Accept", "Fill" or "Buy as posted"); `Check`, `Head`, `BlockText`, `OutcomeText` | `Shell`, `BoardView`, `LedgerView` (`Head`) |
+| `Views/MapView.cs` | `MapNode`, `MapRoute`, `MapLeg`, `MapRegion`, `MapShip`, `MapViewModel`, `LabelAnchor`: the schematic map, the selected contract's overlay and title per kind, region frames, label placement; `Ships(session, clock)` and `Along` (a course's position by share of hours) | `Shell`, `SectorMap`, `MapLayers`, `ShipLayer` |
+| `Views/LogView.cs` | `LogLine`, `LogViewModel`: the journal's visible entries, newest first, 40 at most; other actors' routine (lots that expired, withdrawals, storage) left out | `Shell` |
+| `Views/HeaderView.cs` | `SpeedButton`, `HeaderViewModel`: speeds, date, credits, escrow (the player's share), running cost, the fleet line (by the ship's job), alerts | `Shell`, `LedgerView` |
+| `Views/LedgerView.cs` | `LedgerAction` (store here, or load aboard), `LedgerLine`, `LedgerViewModel`: money, what the player owns and where (holds and storage, with freshness and rent), and its signed contracts with its role and the figure | `Shell` |
 | `Views/Tone.cs` | `Tone`: what a value's colour encodes (gain, loss, warn, yours, muted, plain) | every view; CSS classes `tone-*` |
 
 ### Client: `src/ByGalacticAccord.Client/`
@@ -234,12 +296,13 @@ them. A view never changes the world; commands go through `GameSession`.
 | File | Contents |
 |---|---|
 | `Program.cs` | The Blazor host; `Shell` is the root component |
-| `Shell.razor` | Reads `?seed=` (default 20260619) and `?bench=`; builds the `GameSession` (started at Day 1 · 06:00); runs the frame loop; holds the selection and the last command's outcome; rebuilds the view models when `Revision` or the selection changes, and the ships every frame |
+| `Shell.razor` | Reads `?seed=` (default 20260619) and `?bench=`; builds the `GameSession` (started at Day 1 · 06:00); runs the frame loop; holds the selection and the last command's outcome; rebuilds the view models when `Revision` or the selection changes, and the ships every frame; `Accept` and the ledger's `Act` (store or load) |
 | `Components/TimeBar.razor` | Title, speed buttons (`data-speed`), date, money, theme picker |
 | `Components/SectorMap.razor` | The map panel: `MapLayers` and `ShipLayer` in one SVG, the overlay card, the legend, the fleet line |
 | `Components/MapLayers.razor` | Ground, regions, routes (`band-*` classes carry colour and dash), overlay legs, hours, locations; renders only when its model changes |
 | `Components/ShipLayer.razor` | Ships at their interpolated positions; renders every frame |
-| `Components/BoardPanel.razor`, `ContractPanel.razor`, `CaptainsLog.razor` | The board, the contract document with "Accept as posted", the log (a line about a contract selects it) |
+| `Components/BoardPanel.razor`, `ContractPanel.razor`, `CaptainsLog.razor` | The board (each row's kind), the contract document with its accept button, the log (a line about a contract selects it) |
+| `Components/LedgerPanel.razor` | The ledger: money, possessions with their store or load button, contracts (each selects itself) |
 | `Components/BenchPanel.razor` | `?bench=N`: runs a world with no player for N hours, shows the time and the `StateFingerprint` |
 | `wwwroot/index.html`, `css/app.css`, `js/client.js`, `fonts/` | The page; colour tokens with dark (default) and light themes (`prefers-color-scheme`, or `data-theme` on `<html>`); the theme's storage, guarded; IBM Plex |
 
@@ -247,29 +310,33 @@ them. A view never changes the world; commands go through `GameSession`.
 
 | File | Contents |
 |---|---|
-| `check.cjs` | With no arguments: `dotnet publish` the client to `artifacts/client-check/publish`, get the desktop fingerprint from the CLI, serve the site, then in Chromium: load (paused, Day 1 · 06:00, board, map), select a contract, accept it, run 16× (resuming alerts), light theme, phone width (no sideways scroll), the speed probe and the fingerprint; screenshots to `artifacts/client-check/screenshots`; fails on any console error, page error or failed request. `--site`, `--out`, `--fingerprint` override. |
+| `check.cjs` | With no arguments: `dotnet publish` the client to `artifacts/client-check/publish`, get the desktop fingerprint from the CLI, serve the site, then in Chromium: load (paused, Day 1 · 06:00, the board with each row's kind, map, ledger), select a contract, accept it (the log and the ledger record it), run 16× (resuming alerts), the goods aboard in the ledger, light theme, phone width (no sideways scroll), the speed probe and the fingerprint; screenshots to `artifacts/client-check/screenshots`; fails on any console error, page error or failed request. `--site`, `--out`, `--fingerprint` override. |
 | `package.json`, `package-lock.json` | Playwright 1.63.0 |
 
 ### Tests: `tests/ByGalacticAccord.Tests/`
 
 | File | Covers | Soak variants |
 |---|---|---|
-| `TestWorld.cs` | Helpers: `RunHeadless`, `Signature` (`StateFingerprint.Of`), `FastTicks` (20,000), the `Soak` trait constants | — |
+| `TestWorld.cs` | Helpers: `RunHeadless`, `Quiet` (no heartbeats, incidents off unless asked: a test drives the market itself), `Signature`, `Actor`/`Place`/`Player`/`ShipOf` by name, `RunUntilSettled`, `PostWanted`, `AssertSound` (every invariant), the `Soak` trait constants | — |
 | `DomainTests.cs` | `Credits`, `PenaltyOnLateDelivery`, `QualityWarranty`, `Cargo` decay, `FindPath` (multi-hop, unreachable, cache), `OpenContracts`, the good and hull tables | — |
+| `GoodsTests.cs` | Keep-times against design §15.3 and refrigeration (food reaches the frontier in a standard hold, medicine only refrigerated); merging parcels; lazy decay; conservation catches a unit that vanishes unbooked | — |
+| `SaleTests.cs` | A Sale's lifecycle: answered at once at a producer's door; filled by buying and carrying; a lot bought whole and collected, or expiring; a default outside the Accord; the late fee from the bond; a warranty refund; a short delivery pro rata; failure when nothing delivers; lost cargo failing a haul and its Sale; buying below the ask | — |
+| `HaulAndStorageTests.cs` | A producer's delivered Sale and its Haul; a lot bought into storage and hauled home; an untaken haul expiring; storage rent and spoilage; goods set aside in storage not used twice | — |
+| `DecisionTests.cs` | Each role's rules in a quiet world: consumers post and learn their price, producers' lots and asks, traders fill and broker, the working-capital payout | — |
 | `NegotiationTests.cs` | `Negotiation.ResolveAi`, `NegotiationSession` | — |
 | `TransitIncidentTests.cs` | `IncidentResolver`: deterministic, armour milder than courier, danger raises credit costs | — |
 | `GameTimeTests.cs` | `GameTime` | — |
 | `DeterminismTests.cs` | Same seed → same `Signature`; stepped replay; seeds diverge | 150k, 120k |
 | `InvariantTests.cs` | `Invariants.Check` at checkpoints; credits, escrow, no negative balances | 1M, 250k |
-| `EconomyTests.cs` | Economy comes alive; frontier reachable | 200k; money supply over 1M; no monopoly over 500k |
-| `JournalTests.cs` | Entries match the contracts they describe; the cap | — |
-| `ShipCourseTests.cs` | A course agrees with its ship and contract every hour; a haul settles at its course's arrival, delays included | — |
-| `PlayerActionsTests.cs` | Signing through the engine path; each refusal (not open, busy, too large, origin short, can't front the goods); an alert stops `RunTo` | — |
-| `TemplateTests.cs` | `Fill`; every template well formed; every enum word; every journal entry worded for an AI and for the player | — |
+| `EconomyTests.cs` | Economy comes alive (every kind settles, every consumer consumes every good); frontier reachable | 200k; money supply over 1M; no monopoly over 500k |
+| `JournalTests.cs` | Entries match how each contract ended; the ring buffer | — |
+| `ShipCourseTests.cs` | A course agrees with its ship and job every hour; a haul settles at its course's arrival, delays included | — |
+| `PlayerActionsTests.cs` | Each player command through `Market` and each refusal; storing and retrieving; running costs every day; an alert stops `RunTo` | — |
+| `TemplateTests.cs` | `Fill`; every template well formed; every enum word; every journal entry worded for each kind, for an AI and for the player on either side | — |
 | `FormatTests.cs` | Money, cents, percentages, quantities | — |
-| `SessionTests.cs` | Speeds, the clock's fraction, the frame cap, the same world as one `RunTo`, the hard pause, `TakeHaul` | — |
-| `HaulEstimateTests.cs` | The estimate predicts a clean run's settlement to the cent; frontier goods; empty legs; a busy ship; food's warranty refund | — |
-| `ViewTests.cs` | Every view builds through a played game; the board's order; the overlay's legs; interpolation along a path | — |
+| `SessionTests.cs` | Speeds, the clock's fraction, the frame cap, the same world as one `RunTo`, the hard pause, `Accept`, `Store` and `Retrieve` | — |
+| `DealEstimateTests.cs` | The estimate predicts the settlement of a clean haul, a late haul, a fill bought at the source and a lot, to the cent; empty legs; a busy ship | — |
+| `ViewTests.cs` | Every view builds through a played game (deals of every kind, storing goods); the board's kinds and order; the ledger; the overlay's legs; interpolation along a path | — |
 
 ## 7. Determinism rules (design §20.1)
 
@@ -277,8 +344,9 @@ them. A view never changes the world; commands go through `GameSession`.
   `WorldGenerator` (personalities, first heartbeats), `TransitIncidentCheck`, `IncidentResolver`. The client
   draws nothing: its clock decides only *when* `RunTo` is called, and runs in any increments give the same world.
 - Anything that draws randomly or changes state in a loop iterates a stable order: `ActorsOrdered`,
-  `OpenContracts`, lists in insertion order. A dictionary's enumeration order is used only where order
-  cannot change the result (sums, counts, the invariant checks, reputation decay).
+  `OpenContracts`, `LiveContractsOf`, `ProducersOf`, a location's `Residents`, storages and holds (lists in
+  insertion order). A dictionary's enumeration order is used only where order cannot change the result (sums,
+  counts, the goods ledger, the invariant checks, reputation decay).
 - `EventQueue` breaks tick ties by insertion order.
 - Money is `decimal` throughout.
 - Checked by `DeterminismTests` (fast and soak), `SessionTests.The_clock_runs_the_same_world_as_one_RunTo`, the
@@ -287,28 +355,27 @@ them. A view never changes the world; commands go through `GameSession`.
 
 ## 8. Known defects and where they live
 
-From plan §1 (the frontier-goods and same-place rows were found in S2); the step named fixes each.
+From plan §1; the step named fixes each. S3 fixed the player's running costs, food's keep-time, the frontier's
+goods cost, the same-place hauls and (early) the reservation leak through the terms.
 
 | Defect | Where | Step |
 |---|---|---|
-| The poster's hidden reservation fee leaks through the terms | `TryPostDemand` scales the late fee (1% an hour) and its cap, which is the bond (30%), from `maxFee`; the client shows both, as it must. (The journal line that printed `≤{maxFee}` is gone since S2.) | S5 |
-| The player never pays running costs | `ActorHeartbeat.Process` skips `IsPlayer`; running costs are charged in `RunHauler`. The client's take-home counts them anyway, as the design defines it | S3 |
-| Outside the Accord the pilot pays for the goods and is paid only the fee | `Settlement.Pickup` transfers `GoodsCost` pilot → producer; `Fulfill` transfers only the fee back. Nearly every frontier haul's take-home is negative; AI haulers take them because `Score` ignores the goods cost | S3 (Sale and Haul replace the bundled contract) |
-| Hauls with the same origin and destination | `TryPostDemand` sources from the cheapest producer anywhere, including one at the consumer's own location (Helios Prime's Luxury and Medicine): a one-hour "haul" | S3 |
-| Nobody can go below ₵0 | `SimulationContext.ApplySink` caps at the balance; `Commit` bonds `min(bond, credits)` | S8 |
-| Food decays below its warranty on any route | `Goods` (Food 0.012 a tick) against the 0.7 warranty in `TryPostDemand`: about 25 hours; the shortest route is 30 | S3 |
+| Nobody can go below ₵0 | `SimulationContext.ApplySink` and `TransferUpTo` cap at the balance; `Market.Sign` bonds `min(bond, credits)` | S8 |
+| AI actors pay out whatever they hold above a working capital (a sink standing in for spending, growth and failure) | `DecisionEngine.WorkingCapital`, `PayOut` | S7, S8 |
+| A producer selling delivered fails the Sale when nobody takes its Haul in time | `DecisionEngine.ArrangeTransport`, `RaiseHaulOffers`; `ContractDefaultCheck` | S4, S5 |
+| An actor can't change its fleet, so a hull that doesn't pay (Dust Runner Kael's armoured freighter) bleeds its owner | `WorldGenerator`; `ChargeRunningCosts` | S7 |
 | Visibility is nearly omniscient | `Visibility.CanSee`'s home-region rule (Helios is 5 of 7 locations) | S6 |
 | Incident outcomes don't shift with danger | `IncidentResolver.Resolve`: the roll isn't weighted by danger, despite its comment | S8 |
 
 ## 9. No callers (left from the retired clients, or waiting for a step)
 
-`NegotiationSession` (tests only); `IPlayerPrompt`; `ISimEvent.Describe` (never called); `Ship.History`,
-`TransferOwnership`, `SetManifest`; `ActorState.RemoveShip`, `Owns`, `AllStock`; `EventJournal.Tail` (tests
-only); `SimulationContext.Neighbours`; `ProducerProfile.IsIdle`; `DeterministicRandom.Pick`;
-`Location.HasEscrow`, `HasArbitration`; `ShipClassInfo.Niche`, `MarketValue`, `RunsHot` (data only: push is not
-implemented); `TransitIncident.Description` (only the ship's text log; the journal's text comes from the
-templates); `Contract.ExtendDeadline`; `ReputationLedger.Snapshot`; `SimulationConfig.NegotiationMaxRounds`.
-Delete or wire them as the steps rework their areas.
+`Negotiation.ResolveAi` and `NegotiationSession` (tests only); `IPlayerPrompt`; `ISimEvent.Describe` (never
+called); `ContractStatus.Negotiating` (never set); `Ship.History` (written, never read), `TransferOwnership`;
+`ActorState.AllStock`; `EventJournal.Tail` (tests only); `SimulationContext.Neighbours`, `TaxDirect`;
+`DeterministicRandom.Pick`; `Location.HasEscrow`, `HasArbitration`; `ShipClassInfo.Niche`, `RunsHot` (data only:
+push is not implemented); `TransitIncident.Description` (only `Describe` and the ship's text log; the journal's
+text comes from the templates); `ReputationLedger.Snapshot`; `SimulationConfig.NegotiationMaxRounds`. Delete or
+wire them as the steps rework their areas.
 
 ## 10. The client's frame
 
@@ -317,10 +384,11 @@ Shell.OnInitialized → new GameSession(seed, startTick: Day 1 · 06:00), paused
 Shell.RunClock: PeriodicTimer, 33 ms
   └─ each frame while running: GameSession.Advance(real seconds since the last frame, at most 0.25)
        clock += seconds × speed → RunTo(floor(clock)) → Revision++ ; a PlayerAlert stops the clock
-     → Rebuild(): if Revision or the selection changed, Header/Board/Map/Log/ContractView.Build
+     → Rebuild(): if Revision or the selection changed, Header/Board/Map/Log/Ledger/ContractView.Build
                   always MapView.Ships(session, clock)  (positions along ShipCourse, by share of hours)
      → StateHasChanged: components whose model object is the same skip rendering; ShipLayer always renders
-Player input → Shell.SetSpeed / Select / Accept (GameSession.TakeHaul → PlayerActions) → Rebuild
+Player input → Shell.SetSpeed / Select / Accept (GameSession.Accept → PlayerActions → Market)
+             / Act (GameSession.Store or Retrieve → PlayerActions) → Rebuild
 ```
 
 ## 11. Design section numbers: v0.2 (old comments) → v0.3

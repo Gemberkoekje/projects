@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 
 namespace ByGalacticAccord.Engine.Simulation;
@@ -22,7 +24,7 @@ public static class Invariants
         var violations = new List<InvariantViolation>();
         CheckCreditConservation(context, violations);
         CheckEscrow(context, violations);
-        CheckCargo(context, violations);
+        CheckGoods(context, violations);
         CheckActiveContracts(context, violations);
         return violations;
     }
@@ -59,28 +61,62 @@ public static class Invariants
         }
     }
 
-    /// <summary>Goods removed from origins == delivered + lost + still aboard in-transit ships (§5.6).</summary>
-    private static void CheckCargo(SimulationContext context, List<InvariantViolation> violations)
+    /// <summary>
+    /// Goods conservation (design §20.2): for every good, produced = consumed + held anywhere (stock, storage, holds) +
+    /// lost; and no stock, store, reservation or hold is ever negative or set aside beyond what is there.
+    /// </summary>
+    private static void CheckGoods(SimulationContext context, List<InvariantViolation> violations)
     {
-        decimal aboard = 0m;
-        foreach (Ship ship in context.Ships.Values)
+        foreach (GoodType good in Goods.All)
         {
-            if (ship.Status == ShipStatus.InTransit && ship.Manifest is { } m)
+            decimal produced = context.GoodsProduced(good);
+            decimal accounted = context.GoodsConsumed(good) + context.GoodsHeld(good) + context.GoodsLost(good);
+            if (Math.Abs(produced - accounted) > 0.01m)
             {
-                aboard += m.Quantity;
+                violations.Add(new InvariantViolation(
+                    "GoodsConservation",
+                    $"{good}: produced {produced}, accounted {accounted} (consumed {context.GoodsConsumed(good)}, held {context.GoodsHeld(good)}, lost {context.GoodsLost(good)})."));
             }
         }
 
-        decimal accountedFor = context.CargoDelivered + context.CargoLost + aboard;
-        if (Math.Abs(context.CargoPickedUp - accountedFor) > 0.01m)
+        foreach (ActorState actor in context.Actors.Values)
         {
-            violations.Add(new InvariantViolation(
-                "CargoConservation",
-                $"picked up {context.CargoPickedUp}, accounted {accountedFor} (delivered {context.CargoDelivered}, lost {context.CargoLost}, aboard {aboard})."));
+            foreach (GoodType good in Goods.All)
+            {
+                if (actor.Stock(good) < 0m || actor.Reserved(good) > actor.Stock(good) + Epsilon)
+                {
+                    violations.Add(new InvariantViolation("NegativeStock", $"{actor.Name} holds {actor.Stock(good)} {good}, {actor.Reserved(good)} set aside."));
+                }
+            }
+        }
+
+        foreach (Contract contract in context.Contracts.Values)
+        {
+            if (contract is StorageContract { Status: ContractStatus.Active } storage)
+            {
+                foreach (GoodType good in Goods.All)
+                {
+                    if (storage.Held(good) < 0m || storage.ReservedOf(good) > storage.Held(good) + Epsilon)
+                    {
+                        violations.Add(new InvariantViolation("NegativeStock", $"{storage.Id} holds {storage.Held(good)} {good}, {storage.ReservedOf(good)} set aside."));
+                    }
+                }
+            }
+        }
+
+        foreach (Ship ship in context.Ships.Values)
+        {
+            if (ship.Hold.Any(l => l.Quantity < 0m) || ship.HoldQuantity > ship.CargoCapacity + Epsilon)
+            {
+                violations.Add(new InvariantViolation("Hold", $"{ship.Id} carries {ship.HoldQuantity} in a hold of {ship.CargoCapacity}."));
+            }
         }
     }
 
-    /// <summary>No orphan contracts: every Active contract is assigned to an in-transit ship that will arrive (§5.6).</summary>
+    /// <summary>
+    /// No orphan contracts (design §20.2): every signed Haul is flown by a ship whose job it is, and every signed Sale
+    /// is being performed or has a default check coming (its handover waits on goods that are set aside or on their way).
+    /// </summary>
     private static void CheckActiveContracts(SimulationContext context, List<InvariantViolation> violations)
     {
         foreach (Contract c in context.Contracts.Values)
@@ -90,16 +126,17 @@ public static class Invariants
                 continue;
             }
 
-            if (c.AssignedShip is null)
+            switch (c)
             {
-                violations.Add(new InvariantViolation("OrphanContract", $"{c.Id} is Active with no assigned ship."));
-                continue;
-            }
-
-            Ship ship = context.Ship(c.AssignedShip.Value);
-            if (ship.Status != ShipStatus.InTransit || ship.ActiveContract != c.Id)
-            {
-                violations.Add(new InvariantViolation("OrphanContract", $"{c.Id} is Active but ship {ship.Id} is not carrying it."));
+                case HaulContract haul when haul.AssignedShip is not { } shipId:
+                    violations.Add(new InvariantViolation("OrphanContract", $"{haul.Id} is signed with no ship."));
+                    break;
+                case HaulContract haul when context.Ship(haul.AssignedShip!.Value).Job?.Haul != haul.Id:
+                    violations.Add(new InvariantViolation("OrphanContract", $"{haul.Id} is signed but its ship is not flying it."));
+                    break;
+                case SaleContract sale when sale.Reserved is null && !Market.UnderWay(context, sale):
+                    violations.Add(new InvariantViolation("OrphanContract", $"{sale.Id} is signed with no goods set aside and nothing on its way."));
+                    break;
             }
         }
     }

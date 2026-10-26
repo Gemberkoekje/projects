@@ -25,7 +25,7 @@ public sealed record SimulationConfig
 
     public decimal ReputationDecayRate { get; init; } = 0.04m;
 
-    /// <summary>Flat government skim on every fulfilled haul fee (§4.2.3).</summary>
+    /// <summary>The Accord's tax on a contract's price, paid by the payer when it is performed in Accord space (§4.2.3).</summary>
     public decimal TaxRate { get; init; } = 0.04m;
 
     public Credits DockingFee { get; init; } = Credits.Of(3m);
@@ -43,4 +43,13 @@ public sealed record SimulationConfig
 
     /// <summary>How long a scouted location's intel stays fresh (§4.6).</summary>
     public long ScoutFreshnessTicks { get; init; } = 1200;
+
+    /// <summary>The most a consumer keeps in hand, in days of income; the rest goes on things outside the sector (a sink).</summary>
+    public decimal ConsumerSavingsDays { get; init; } = 90m;
+
+    /// <summary>The working capital a producer keeps, in full warehouses at production cost; profit above it is paid out (a sink).</summary>
+    public decimal ProducerReserveWarehouses { get; init; } = 4m;
+
+    /// <summary>The working capital a trader keeps, as a multiple of its fleet's value; profit above it is paid out (a sink).</summary>
+    public decimal TraderReserveFleets { get; init; } = 1.5m;
 }

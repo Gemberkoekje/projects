@@ -1,0 +1,86 @@
+@* The ledger (design §11.2, §11.3): your money, what you own and where it is, and the contracts you are in. Goods
+   aboard a docked ship can go into storage here; stored goods can come aboard when the ship is at their station. *@
+<section class="panel ledger-panel" data-testid="ledger">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+    </div>
+
+    <div class="block">
+        @foreach (LedgerLine line in Model.Money)
+        {
+            <div class="line" title="@line.Detail">
+                <span class="small">@line.Label</span>
+                <span class="mono small tone-@line.Tone">@line.Value</span>
+            </div>
+        }
+    </div>
+
+    <div class="block" data-testid="possessions">
+        <h3 class="block-title">@Model.PossessionsTitle</h3>
+        @if (Model.Possessions.Count == 0)
+        {
+            <p class="empty small muted">@Model.PossessionsEmpty</p>
+        }
+        @foreach (LedgerLine line in Model.Possessions)
+        {
+            <div class="line ledger-line">
+                <span class="line-label">
+                    <span class="small strong">@line.Label</span>
+                    <span class="xsmall muted">@line.Detail</span>
+                </span>
+                <span class="line-value">
+                    <span class="mono small tone-@line.Tone">@line.Value</span>
+                    @if (line.Action is { } action)
+                    {
+                        <button type="button" class="button small" @onclick="() => OnAction.InvokeAsync(action)">@action.Label</button>
+                    }
+                </span>
+            </div>
+        }
+    </div>
+
+    <div class="block" data-testid="ledger-contracts">
+        <h3 class="block-title">@Model.ContractsTitle</h3>
+        @if (Model.Contracts.Count == 0)
+        {
+            <p class="empty small muted">@Model.ContractsEmpty</p>
+        }
+        @foreach (LedgerLine line in Model.Contracts)
+        {
+            <div class="line ledger-line">
+                <span class="line-label">
+                    @if (line.Contract is { } id)
+                    {
+                        <button type="button" class="link-text small strong" @onclick="() => OnSelect.InvokeAsync(id)">@line.Label</button>
+                    }
+                    else
+                    {
+                        <span class="small strong">@line.Label</span>
+                    }
+                    <span class="xsmall muted">@line.Detail</span>
+                </span>
+                <span class="mono small tone-@line.Tone">@line.Value</span>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private LedgerViewModel? _rendered;
+
+    [Parameter, EditorRequired]
+    public LedgerViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback<LedgerAction> OnAction { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model);
+        _rendered = Model;
+        return changed;
+    }
+}

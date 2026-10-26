@@ -58,6 +58,7 @@ public sealed class TemplateTests
         Assert.All(Enum.GetValues<LocationType>(), t => Assert.False(string.IsNullOrEmpty(Templates.LocationKind(t))));
         Assert.All(Enum.GetValues<ActorRole>(), r => Assert.False(string.IsNullOrEmpty(Templates.Role(r))));
         Assert.All(Enum.GetValues<ContractType>(), k => Assert.False(string.IsNullOrEmpty(Templates.ContractKind(k))));
+        Assert.All(Enum.GetValues<SaleSide>(), s => Assert.False(string.IsNullOrEmpty(Templates.Side(s))));
         Assert.All(Enum.GetValues<ShipType>(), s => Assert.False(string.IsNullOrEmpty(Templates.ShipClass(s))));
     }
 
@@ -68,31 +69,57 @@ public sealed class TemplateTests
         ActorId player = context.PlayerActorId!.Value;
         ActorState consumer = context.ActorsOrdered.First(a => a.Demands.Count > 0);
         ActorState producer = context.ActorsOrdered.First(a => a.Producer is not null);
-        ActorId ai = context.ActorsOrdered.First(a => a.MovesCargo && !a.IsPlayer).Id;
-        var contract = new Contract(
-            context.NextContractId(), ContractType.Haul, consumer.Id, producer.Producer!.Good, 40m, producer.Home, consumer.Home,
-            Credits.Of(120m), Credits.Of(200m), Credits.Of(300m), 0.04m, 500, AccordReach.AccordEdge, "Helios",
-            Array.Empty<ContractClause>());
-        context.Add(contract);
-        ContractId id = contract.Id;
+        ActorId trader = context.ActorsOrdered.First(a => a.MovesCargo && !a.IsPlayer).Id;
+        ActorId station = context.StationOperatorAt(consumer.Home)!.Id;
 
-        var entries = new List<JournalEntry>
+        // Each kind of contract, posted by an AI actor and by the player, and signed by the other side.
+        var contracts = new List<Contract>();
+        foreach ((ActorId poster, ActorId taker) in new[] { (consumer.Id, player), (player, trader), (consumer.Id, trader) })
         {
-            new ContractPostedEntry(1, id, consumer.Id, producer.Id),
-            new ContractExpiredEntry(2, id),
-            new FaucetAdjustedEntry(3, 0.09m, 0.56m),
-        };
-        foreach (ActorId hauler in new[] { ai, player })
+            contracts.Add(Signed(context, Sale(context, poster, SaleSide.Wanted, producer, consumer), taker));
+            contracts.Add(Signed(context, Sale(context, poster == player ? player : producer.Id, SaleSide.ForSale, producer, consumer), taker == player ? player : consumer.Id));
+            contracts.Add(Signed(context, Haul(context, poster == player ? player : producer.Id, producer, consumer), taker));
+        }
+
+        var entries = new List<JournalEntry> { new FaucetAdjustedEntry(1, 0.09m, 0.56m) };
+        foreach (Contract contract in contracts)
         {
-            entries.Add(new HaulTakenEntry(4, id, hauler, Credits.Of(120m)));
-            entries.Add(new HaulDeliveredEntry(5, id, hauler, 40m, 1m, 0, Credits.Of(120m), Credits.Zero, Credits.Zero));
-            entries.Add(new HaulDeliveredEntry(6, id, hauler, 38m, 0.5m, 7, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m)));
-            entries.Add(new PaymentDefaultedEntry(7, id, consumer.Id, hauler));
-            entries.Add(new DeliveryFailedEntry(8, id, hauler));
+            ContractId id = contract.Id;
+            ActorId payer = contract.Payer!.Value;
+            ActorId performer = contract.Performer!.Value;
+            entries.Add(new ContractPostedEntry(1, id, contract.PostedBy));
+            entries.Add(new ContractSignedEntry(2, id, contract.CounterpartyId!.Value, Credits.Of(120m)));
+            entries.Add(new ContractExpiredEntry(3, id));
+            entries.Add(new ContractWithdrawnEntry(3, id));
+            entries.Add(new PaymentDefaultedEntry(7, id, payer, performer));
+            foreach (FailureReason reason in Enum.GetValues<FailureReason>())
+            {
+                entries.Add(new DeliveryFailedEntry(8, id, performer, reason));
+            }
+
+            if (contract is SaleContract)
+            {
+                entries.Add(new GoodsHandedOverEntry(5, id, performer, payer, 40m, 1m, 0, Credits.Of(120m), Credits.Zero, Credits.Zero));
+                entries.Add(new GoodsHandedOverEntry(6, id, performer, payer, 38m, 0.5m, 7, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m)));
+            }
+            else
+            {
+                entries.Add(new HaulDeliveredEntry(5, id, performer, 40m, 1m, 0, Credits.Of(120m), Credits.Zero, Credits.Zero));
+                entries.Add(new HaulDeliveredEntry(6, id, performer, 38m, 0.5m, 7, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m)));
+            }
+
             foreach (TransitIncidentKind kind in Enum.GetValues<TransitIncidentKind>())
             {
-                entries.Add(new IncidentEntry(9, id, hauler, new TransitIncident(kind, 6, 0.14m, 0.2m, Credits.Of(75m), "unused")));
+                entries.Add(new IncidentEntry(9, id, performer, new TransitIncident(kind, 6, 0.14m, 0.2m, Credits.Of(75m), "unused")));
             }
+        }
+
+        foreach (ActorId renter in new[] { trader, player })
+        {
+            var storage = new StorageContract(context.NextContractId(), station, renter, 0, consumer.Home, Credits.Of(0.1m), AccordReach.AccordEdge, "Helios");
+            context.Add(storage);
+            entries.Add(new StorageOpenedEntry(1, storage.Id, renter));
+            entries.Add(new StorageClosedEntry(2, storage.Id, renter, Credits.Of(4m)));
         }
 
         foreach (JournalEntry entry in entries)
@@ -100,14 +127,17 @@ public sealed class TemplateTests
             string text = JournalText.Describe(context, entry);
             Assert.DoesNotContain("{", text, StringComparison.Ordinal);
             Assert.DoesNotContain("unused", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("  ", text, StringComparison.Ordinal); // no field filled with nothing
             Assert.EndsWith(".", text, StringComparison.Ordinal);
-            if (JournalText.Subject(entry) == player)
-            {
-                Assert.DoesNotContain(" You ", text, StringComparison.Ordinal); // the player's name is only ever sentence-initial
-            }
+
+            // The player is "You" only at the start of a sentence, and "you" or "your" inside one, never "You's".
+            Assert.False(Regex.IsMatch(text, @"(?<!^|\. )You\b"), $"The player's name inside a sentence: {text}");
+            Assert.DoesNotContain("You's", text, StringComparison.Ordinal);
         }
 
-        Assert.StartsWith("You took", JournalText.Describe(context, new HaulTakenEntry(4, id, player, Credits.Of(120m))), StringComparison.Ordinal);
+        Contract yourHaul = contracts.OfType<HaulContract>().Single(h => h.PostedBy == player);
+        Assert.StartsWith("You took", JournalText.Describe(context, new ContractSignedEntry(4, contracts[2].Id, player, Credits.Of(120m))), StringComparison.Ordinal);
+        Assert.Contains("took your haul", JournalText.Describe(context, new ContractSignedEntry(4, yourHaul.Id, trader, Credits.Of(120m))), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -122,6 +152,32 @@ public sealed class TemplateTests
         Assert.Contains("1d 6h late", late, StringComparison.Ordinal);
         Assert.Contains("late fee ₵14", late, StringComparison.Ordinal);
         Assert.Contains("Quality on arrival 50%: ₵9", late, StringComparison.Ordinal);
+    }
+
+    // A Sale of the producer's good at the consumer's home, posted by poster.
+    private static SaleContract Sale(SimulationContext context, ActorId poster, SaleSide side, ActorState producer, ActorState consumer)
+    {
+        var sale = new SaleContract(
+            context.NextContractId(), poster, 0, side, producer.Producer!.Good, 40m, consumer.Home, Credits.Of(120m), Credits.Of(150m), 0.04m, 500,
+            AccordReach.AccordEdge, "Helios", Array.Empty<ContractClause>());
+        context.Add(sale);
+        return sale;
+    }
+
+    // A haul of the producer's good from its home to the consumer's.
+    private static HaulContract Haul(SimulationContext context, ActorId shipper, ActorState producer, ActorState consumer)
+    {
+        var haul = new HaulContract(
+            context.NextContractId(), shipper, 0, producer.Producer!.Good, 40m, producer.Home, consumer.Home, Holding.StockAt(producer.Home), null,
+            Credits.Of(120m), Credits.Of(150m), 0.04m, 500, AccordReach.AccordEdge, "Helios", Array.Empty<ContractClause>());
+        context.Add(haul);
+        return haul;
+    }
+
+    private static Contract Signed(SimulationContext context, Contract contract, ActorId taker)
+    {
+        contract.Sign(taker, contract.OfferedPrice, 1);
+        return contract;
     }
 
     private static IEnumerable<(string Key, string Template)> AllTemplates()

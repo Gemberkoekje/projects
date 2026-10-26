@@ -99,24 +99,41 @@ public sealed class SessionTests
     }
 
     [Fact]
-    public void Taking_a_haul_signs_it_or_says_why_not()
+    public void Accepting_a_contract_signs_it_or_says_why_not()
     {
         var session = new GameSession(42L, startTick: 48);
-        Contract contract = session.Context.OpenContracts.First(c => PlayerActions.CheckHaul(session.Context, session.Player, c).Ok && c.UsesEscrow);
+        HaulContract first = PlayerActionsTests.FarmHaul(session.Context);
+        HaulContract second = PlayerActionsTests.FarmHaul(session.Context);
         long revision = session.Revision;
 
-        HaulOutcome signed = session.TakeHaul(contract.Id);
+        DealOutcome signed = session.Accept(first.Id);
 
         Assert.True(signed.Signed);
         Assert.True(session.Revision > revision);
-        Assert.Equal(contract.Id, session.PlayerShip.ActiveContract);
-        Assert.Single(session.PlayerActiveContracts);
+        Assert.Equal(first.Id, session.PlayerShip.Job!.Haul);
+        Assert.Same(first, Assert.Single(session.PlayerActiveContracts));
 
-        Contract other = session.Context.OpenContracts.First(c => c.Status == ContractStatus.Open);
-        HaulOutcome refused = session.TakeHaul(other.Id);
+        DealOutcome refused = session.Accept(second.Id);
         Assert.False(refused.Signed);
-        Assert.Equal(HaulBlock.NoFreeShip, refused.Block);
-        Assert.Null(refused.Acceptance);
-        Assert.Equal(HaulBlock.NotOpen, session.TakeHaul(contract.Id).Block);
+        Assert.Equal(DealBlock.NoFreeShip, refused.Block);
+        Assert.Null(refused.Signing);
+        Assert.Equal(DealBlock.NotOpen, session.Accept(first.Id).Block);
+    }
+
+    [Fact]
+    public void Goods_aboard_go_into_storage_and_come_back()
+    {
+        var session = new GameSession(42L, startTick: 48);
+        SaleTests.GiveAboard(session.Context, session.PlayerShip, session.Player, GoodType.Parts, 25m);
+        long revision = session.Revision;
+
+        Assert.True(session.Store(GoodType.Parts));
+        Assert.True(session.Revision > revision);
+        Assert.Null(session.PlayerShip.LotOf(session.Player.Id, GoodType.Parts));
+        Assert.False(session.Store(GoodType.Parts)); // nothing left aboard
+
+        Assert.True(session.Retrieve(GoodType.Parts));
+        Assert.Equal(25m, session.PlayerShip.LotOf(session.Player.Id, GoodType.Parts)!.Quantity);
+        session.Context.AssertSound();
     }
 }

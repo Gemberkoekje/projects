@@ -43,7 +43,7 @@ public sealed class DomainTests
     {
         Cargo food = Cargo.Fresh(GoodType.Food, 100m);
         Cargo plain = food.Decayed(50, preservation: 0m);
-        Cargo chilled = food.Decayed(50, preservation: 0.85m);
+        Cargo chilled = food.Decayed(50, preservation: 0.8m);
 
         Assert.True(plain.Quality < 1m);
         Assert.True(chilled.Quality > plain.Quality);
@@ -125,28 +125,36 @@ public sealed class DomainTests
         ContractId third = ctx.NextContractId();
 
         // Added out of id order on purpose: the board is still in id order.
-        Contract c3 = AddHaul(ctx, third, here);
-        Contract c1 = AddHaul(ctx, first, here);
-        Contract c2 = AddHaul(ctx, second, here);
+        Contract c3 = AddSale(ctx, third, here);
+        Contract c1 = AddSale(ctx, first, here);
+        Contract c2 = AddSale(ctx, second, here);
         Assert.Equal(new[] { first, second, third }, ctx.OpenContracts.Select(c => c.Id));
+        Assert.Equal(new[] { third, first, second }, ctx.LiveContractsOf(new ActorId(1)).Select(c => c.Id));
 
-        c2.BeginNegotiation();
         c1.MarkExpired();
         Assert.Equal(new[] { second, third }, ctx.OpenContracts.Select(c => c.Id));
 
-        c3.MarkExpired();
+        c3.MarkWithdrawn();
         c2.MarkExpired();
         Assert.Empty(ctx.OpenContracts);
+        Assert.Empty(ctx.LiveContractsOf(new ActorId(1)));
         Assert.Equal(3, ctx.Contracts.Count);
     }
 
-    private static Contract AddHaul(SimulationContext ctx, ContractId id, Location at)
+    private static Contract AddSale(SimulationContext ctx, ContractId id, Location at)
     {
-        var contract = new Contract(
-            id, ContractType.Haul, new ActorId(1), GoodType.Ore, 10m, at.Id, at.Id, Credits.Of(10m), Credits.Of(20m),
-            Credits.Of(40m), 0.04m, 100, at.Reach, at.Region, System.Array.Empty<ContractClause>());
+        var contract = new SaleContract(
+            id, new ActorId(1), 0, SaleSide.Wanted, GoodType.Ore, 10m, at.Id, Credits.Of(10m), Credits.Of(20m),
+            0.04m, 100, at.Reach, at.Region, System.Array.Empty<ContractClause>());
         ctx.Add(contract);
         return contract;
+    }
+
+    [Fact]
+    public void A_late_fee_reaches_its_cap_after_so_many_hours()
+    {
+        Assert.Equal(25, new PenaltyOnLateDelivery(2m, Credits.Of(50m)).HoursToCap);
+        Assert.Equal(26, new PenaltyOnLateDelivery(2m, Credits.Of(51m)).HoursToCap);
     }
 
     [Fact]

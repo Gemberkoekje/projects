@@ -13,9 +13,15 @@ public sealed record ProducerProfile(
     decimal StockCap,
     decimal Margin)
 {
-    /// <summary>An "idle" producer is at or near stock cap: a leading indicator of a price drop (§4.2.2, §3.3).</summary>
-    public bool IsIdle(decimal currentStock) => currentStock >= StockCap * 0.92m;
+    /// <summary>How full the warehouse is, 0..1.</summary>
+    public decimal Fullness(decimal currentStock) => StockCap <= 0m ? 1m : System.Math.Clamp(currentStock / StockCap, 0m, 1m);
 }
+
+/// <summary>
+/// A station operator's terms (design §8.1): the storage rate per unit per day, and the float it keeps; rent
+/// above the float goes on station upkeep (a sink, design §5.1).
+/// </summary>
+public sealed record StationProfile(Credits StorageRatePerUnitDay, Credits Float);
 
 /// <summary>One good a consumer wants, with how fast it burns through it and the buffer it tries to keep.</summary>
 public sealed record ConsumerDemand(

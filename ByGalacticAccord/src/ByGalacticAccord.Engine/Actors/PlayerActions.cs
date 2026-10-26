@@ -2,131 +2,217 @@ using System;
 using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Economy;
-using ByGalacticAccord.Engine.Events;
 using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Engine.Actors;
 
-/// <summary>Why the player can't take a haul right now. The interface words each one (design §11.5).</summary>
-public enum HaulBlock
+/// <summary>Why the player can't take a contract right now. The interface words each one (design §11.5).</summary>
+public enum DealBlock
 {
     None,
     NotOpen,
     NoFreeShip,
     TooLarge,
-    OriginShort,
+    NoSource,
     NoRoute,
     PickupUnreachable,
-}
-
-/// <summary>How an attempt to sign a haul ended.</summary>
-public enum HaulAcceptance
-{
-    Accepted,
-    NotOpen,
-    PosterCannotFund,
-    CannotFrontGoods,
+    CannotAfford,
 }
 
 /// <summary>
-/// Player-initiated contract actions, shared by every front-end so the player commits to a haul through
-/// exactly the same path as the simulation uses elsewhere. The player is just an actor (§4.7.3); the only
-/// difference is a human picks the contract instead of the decision engine. Results are codes, not
-/// sentences: the interface's templates turn them into text.
+/// The player's commands, through exactly the market commands an AI decision uses (plan §2, "symmetric by
+/// construction"). The player is just an actor (§4.7.3); the only difference is that a human picks the contract
+/// and takes it as posted, where AI actors settle the price in closed form. Checks return codes, not sentences:
+/// the interface's templates turn them into text.
 /// </summary>
 public static class PlayerActions
 {
-    /// <summary>Whether the player can take a haul, and if so with which ship and after how long repositioning.</summary>
-    public sealed record HaulFeasibility(HaulBlock Block, Ship? Ship, long RepoTicks)
+    /// <summary>Whether the player can take a haul, and with which ship from where.</summary>
+    public sealed record HaulFeasibility(DealBlock Block, Ship? Ship)
     {
-        public bool Ok => Block == HaulBlock.None;
+        public bool Ok => Block == DealBlock.None;
     }
 
-    /// <summary>Can the player take this haul right now? Returns the ship that would fly it and any repositioning time.</summary>
-    public static HaulFeasibility CheckHaul(SimulationContext context, ActorState player, Contract contract)
+    /// <summary>Whether the player can fill a delivered Sale, with which ship, and from which source.</summary>
+    public sealed record FillFeasibility(DealBlock Block, Ship? Ship, FillSource? Source)
     {
-        if (contract.Type != ContractType.Haul || contract.Status != ContractStatus.Open)
+        public bool Ok => Block == DealBlock.None;
+    }
+
+    /// <summary>Whether the player can buy a lot for sale and collect it with a ship.</summary>
+    public sealed record BuyFeasibility(DealBlock Block, Ship? Ship)
+    {
+        public bool Ok => Block == DealBlock.None;
+    }
+
+    /// <summary>The player's ship that would do the job: a free one, else the first (busy, for estimates).</summary>
+    public static Ship? ShipFor(SimulationContext context, ActorState player) =>
+        player.Ships.Select(context.Ship).FirstOrDefault(s => s.IsFree)
+        ?? player.Ships.Select(context.Ship).FirstOrDefault();
+
+    /// <summary>Can the player take this haul right now?</summary>
+    public static HaulFeasibility CheckHaul(SimulationContext context, ActorState player, HaulContract haul)
+    {
+        if (!haul.IsOpen || haul.PostedBy == player.Id)
         {
-            return new HaulFeasibility(HaulBlock.NotOpen, null, 0);
+            return new HaulFeasibility(DealBlock.NotOpen, null);
         }
 
-        Ship? ship = player.Ships.Select(context.Ship).FirstOrDefault(s => s.Status == ShipStatus.Docked);
+        Ship? ship = ShipFor(context, player);
         if (ship is null)
         {
-            return new HaulFeasibility(HaulBlock.NoFreeShip, null, 0);
+            return new HaulFeasibility(DealBlock.NoFreeShip, null);
         }
 
-        if (contract.Quantity > ship.CargoCapacity)
+        if (context.FindPath(haul.Origin, haul.Destination) is null)
         {
-            return new HaulFeasibility(HaulBlock.TooLarge, ship, 0);
+            return new HaulFeasibility(DealBlock.NoRoute, ship);
         }
 
-        var producer = context.ProducerAt(contract.OriginLocationId, contract.Good);
-        if (producer is null || producer.Stock(contract.Good) < contract.Quantity)
+        (LocationId from, _) = Market.NextFree(context, ship);
+        if (context.FindPath(from, haul.Origin) is null)
         {
-            return new HaulFeasibility(HaulBlock.OriginShort, ship, 0);
+            return new HaulFeasibility(DealBlock.PickupUnreachable, ship);
         }
 
-        if (context.FindPath(contract.OriginLocationId, contract.DestinationLocationId) is null)
+        if (haul.Quantity > ship.FreeSpace)
         {
-            return new HaulFeasibility(HaulBlock.NoRoute, ship, 0);
+            return new HaulFeasibility(DealBlock.TooLarge, ship);
         }
 
-        long repoTicks = 0;
-        if (ship.Location != contract.OriginLocationId)
-        {
-            RoutePlan? repo = context.FindPath(ship.Location, contract.OriginLocationId);
-            if (repo is null)
-            {
-                return new HaulFeasibility(HaulBlock.PickupUnreachable, ship, 0);
-            }
-
-            repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, ship.Class.SpeedMultiplier);
-        }
-
-        return new HaulFeasibility(HaulBlock.None, ship, repoTicks);
+        return new HaulFeasibility(ship.IsFree ? DealBlock.None : DealBlock.NoFreeShip, ship);
     }
 
-    /// <summary>Commit a ship to a haul at an agreed fee: lock escrow, reserve the ship, schedule departure.</summary>
-    public static HaulAcceptance AcceptHaul(
-        SimulationContext context, ActorState player, Contract contract, Ship ship, Credits fee, long repoTicks)
+    /// <summary>Take a haul as posted.</summary>
+    public static Signing TakeHaul(SimulationContext context, ActorState player, HaulContract haul, Ship ship) =>
+        Market.TakeHaul(context, player, haul, ship, haul.OfferedPrice);
+
+    /// <summary>
+    /// Can the player fill this delivered Sale? The source is the one a trader would pick: its own goods if it has them,
+    /// else the producer that gets the goods to the place for least (the price plus the running cost of the trip).
+    /// </summary>
+    public static FillFeasibility CheckFill(SimulationContext context, ActorState player, SaleContract wanted)
     {
-        if (contract.Status != ContractStatus.Open)
+        if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
         {
-            return HaulAcceptance.NotOpen;
+            return new FillFeasibility(DealBlock.NotOpen, null, null);
         }
 
-        var consumer = context.Actor(contract.PostedBy);
-
-        if (contract.UsesEscrow)
+        Ship? ship = ShipFor(context, player);
+        if (ship is null)
         {
-            Credits tax = Credits.Of(fee.Amount * contract.TaxRate);
-            Credits outlay = contract.GoodsCost + fee + tax;
-            if (consumer.Credits.Amount < outlay.Amount)
+            return new FillFeasibility(DealBlock.NoFreeShip, null, null);
+        }
+
+        (LocationId from, _) = Market.NextFree(context, ship);
+        FillSource? best = null;
+        decimal bestCost = decimal.MaxValue;
+        foreach (FillSource source in DecisionEngine.FillSources(context, player, wanted, ship.IsFree ? ship : null))
+        {
+            LocationId pickup = source.Kind == FillSourceKind.Aboard ? ship.Location : source.At;
+            if (context.FindPath(from, pickup) is not { } repo || context.FindPath(pickup, wanted.Place) is not { } laden)
             {
-                return HaulAcceptance.PosterCannotFund;
+                continue;
+            }
+
+            long hours = PriceModel.TravelTicks(repo.DistanceTicks, ship.Class.SpeedMultiplier) + PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier);
+            decimal cost = source.PurchasePrice.Amount + (ship.Class.RunningCostPerTick.Amount * hours);
+            if (cost < bestCost)
+            {
+                best = source;
+                bestCost = cost;
             }
         }
-        else if (player.Credits.Amount < contract.GoodsCost.Amount)
+
+        if (best is null)
         {
-            return HaulAcceptance.CannotFrontGoods;
+            return new FillFeasibility(DealBlock.NoSource, ship, null);
         }
 
-        contract.BeginNegotiation();
-        contract.Activate(player.Id, ship.Id, fee);
-
-        if (contract.UsesEscrow)
+        if (best.Kind != FillSourceKind.Aboard && wanted.Quantity > ship.FreeSpace)
         {
-            Credits tax = Credits.Of(fee.Amount * contract.TaxRate);
-            context.LockToEscrow(contract, consumer, contract.GoodsCost + fee + tax);
-            Credits bond = Credits.Of(Math.Min(contract.PerformanceBond.Amount, player.Credits.Amount));
-            context.LockToEscrow(contract, player, bond);
-            contract.SetLockedBond(bond);
+            return new FillFeasibility(DealBlock.TooLarge, ship, best);
         }
 
-        ship.Reserve(context.CurrentTick, contract.Id, DecisionEngine.RepositioningCourse(context, ship, contract, repoTicks));
-        context.Schedule(new ShipDeparted(context.CurrentTick + repoTicks, contract.Id));
-        context.Record(new HaulTakenEntry(context.CurrentTick, contract.Id, player.Id, fee));
-        return HaulAcceptance.Accepted;
+        decimal purchase = best.PurchasePrice.Amount * (1m + Terms.TaxRate(context, context.Location(best.At).Reach));
+        if (player.Credits.Amount < purchase)
+        {
+            return new FillFeasibility(DealBlock.CannotAfford, ship, best);
+        }
+
+        return new FillFeasibility(ship.IsFree ? DealBlock.None : DealBlock.NoFreeShip, ship, best);
+    }
+
+    /// <summary>Fill a delivered Sale as posted, from the source the check chose.</summary>
+    public static Signing Fill(SimulationContext context, ActorState player, SaleContract wanted, Ship ship, FillSource source) =>
+        Market.FillWithShip(context, player, wanted, wanted.OfferedPrice, ship, source);
+
+    /// <summary>Can the player buy this lot as posted and collect it with a ship?</summary>
+    public static BuyFeasibility CheckBuy(SimulationContext context, ActorState player, SaleContract lot)
+    {
+        if (!lot.IsOpen || lot.Side != SaleSide.ForSale || lot.PostedBy == player.Id)
+        {
+            return new BuyFeasibility(DealBlock.NotOpen, null);
+        }
+
+        Ship? ship = ShipFor(context, player);
+        if (ship is null)
+        {
+            return new BuyFeasibility(DealBlock.NoFreeShip, null);
+        }
+
+        (LocationId from, _) = Market.NextFree(context, ship);
+        if (context.FindPath(from, lot.Place) is null)
+        {
+            return new BuyFeasibility(DealBlock.PickupUnreachable, ship);
+        }
+
+        if (lot.Quantity > ship.FreeSpace)
+        {
+            return new BuyFeasibility(DealBlock.TooLarge, ship);
+        }
+
+        if (!Market.CanFund(lot, player, lot.OfferedPrice) || player.Credits < lot.OfferedPrice)
+        {
+            return new BuyFeasibility(DealBlock.CannotAfford, ship);
+        }
+
+        return new BuyFeasibility(ship.IsFree ? DealBlock.None : DealBlock.NoFreeShip, ship);
+    }
+
+    /// <summary>Buy a lot as posted; the ship goes to collect it.</summary>
+    public static Signing Buy(SimulationContext context, ActorState player, SaleContract lot, Ship ship) =>
+        Market.BuyLot(context, player, lot, lot.OfferedPrice, Holding.Aboard(ship.Id, lot.Place));
+
+    /// <summary>Put the player's goods aboard a free ship into storage where it is docked.</summary>
+    public static bool Store(SimulationContext context, ActorState player, Ship ship, GoodType good)
+    {
+        if (!ship.IsFree || ship.Owner != player.Id || ship.LotOf(player.Id, good) is not { } lot || context.StationOperatorAt(ship.Location) is null)
+        {
+            return false;
+        }
+
+        Cargo goods = context.Unload(ship, player.Id, good, lot.Quantity);
+        context.PutInStorage(player, ship.Location, goods);
+        return true;
+    }
+
+    /// <summary>Load the player's free goods in storage where a free ship is docked, as much as the hold takes.</summary>
+    public static bool Retrieve(SimulationContext context, ActorState player, Ship ship, GoodType good)
+    {
+        if (!ship.IsFree || ship.Owner != player.Id || context.StorageOf(player.Id, ship.Location) is not { } storage)
+        {
+            return false;
+        }
+
+        decimal quantity = Math.Min(storage.Available(good), ship.FreeSpace);
+        if (quantity <= 0m)
+        {
+            return false;
+        }
+
+        Cargo goods = context.TakeFromStorage(player, ship.Location, good, quantity, reserved: false);
+        context.Load(ship, player.Id, goods);
+        return true;
     }
 }

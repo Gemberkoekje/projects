@@ -1,3 +1,6 @@
+using System.Linq;
+using ByGalacticAccord.Engine.Actors;
+using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Tests;
@@ -23,6 +26,47 @@ internal static class TestWorld
         return context;
     }
 
+    /// <summary>
+    /// The sector with nobody acting on their own: every heartbeat is pushed far beyond any test's horizon, so a test
+    /// drives the market itself and only the events it causes run. The world, its stocks and its money are as generated;
+    /// transit incidents are off unless asked for, so a trip takes exactly its hours.
+    /// </summary>
+    public static SimulationContext Quiet(bool withPlayer = false, long seed = 42L, bool incidents = false) =>
+        WorldGenerator.Generate(
+            seed, withPlayer,
+            new SimulationConfig { HeartbeatInterval = 1_000_000_000, IncidentProbabilityScale = incidents ? 0.6m : 0m }).Context;
+
     /// <summary>A compact fingerprint of world state, used to prove deterministic replay (design §20.1).</summary>
     public static string Signature(SimulationContext context) => StateFingerprint.Of(context);
+
+    public static ActorState Actor(this SimulationContext context, string name) => context.Actors.Values.Single(a => a.Name == name);
+
+    public static Location Place(this SimulationContext context, string name) => context.Locations.Values.Single(l => l.Name == name);
+
+    public static ActorState Player(this SimulationContext context) => context.Actor(context.PlayerActorId!.Value);
+
+    public static Ship ShipOf(this SimulationContext context, ActorState owner) => context.Ship(owner.Ships[0]);
+
+    /// <summary>Run until a contract is settled one way or another (or the horizon passes).</summary>
+    public static void RunUntilSettled(this SimulationContext context, Contract contract, long horizon = 2_000)
+    {
+        long end = context.CurrentTick + horizon;
+        while (contract.IsLive && context.CurrentTick < end)
+        {
+            context.RunTo(context.CurrentTick + 1);
+        }
+    }
+
+    /// <summary>Post a delivered wanted Sale as a consumer would: at its home, for its stock.</summary>
+    public static SaleContract PostWanted(this SimulationContext context, ActorState buyer, GoodType good, decimal quantity, decimal price, long hours = 400) =>
+        Market.PostSale(
+            context, buyer, SaleSide.Wanted, good, quantity, buyer.Home, Credits.Of(price), Credits.Of(price * 1.5m),
+            context.CurrentTick + hours, Holding.StockAt(buyer.Home));
+
+    /// <summary>The goods conservation and every other invariant hold.</summary>
+    public static void AssertSound(this SimulationContext context)
+    {
+        var violations = Invariants.Check(context);
+        Assert.True(violations.Count == 0, string.Join("; ", violations.Select(v => $"[{v.Name}] {v.Detail}")));
+    }
 }

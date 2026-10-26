@@ -3,8 +3,8 @@ using System;
 namespace ByGalacticAccord.Engine.Domain;
 
 /// <summary>
-/// A parcel of goods in transit. Quality runs 0..1 and decays for perishables (§4.3);
-/// it is read by <c>QualityWarranty</c> clauses (§4.1.5) on delivery.
+/// A parcel of goods. Quality runs 0..1 and decays for perishables outside a facility's own stock (design
+/// §15.3); it is read by <c>QualityWarranty</c> clauses (§4.1.5) at handover.
 /// </summary>
 public readonly record struct Cargo(GoodType Good, decimal Quantity, decimal Quality)
 {
@@ -29,4 +29,17 @@ public readonly record struct Cargo(GoodType Good, decimal Quantity, decimal Qua
 
     /// <summary>Reduce quality (e.g. cargo damage in a transit incident).</summary>
     public Cargo Damaged(decimal qualityLoss) => this with { Quality = Math.Max(0m, Quality - qualityLoss) };
+
+    /// <summary>Two parcels of the same good as one: the quantities add and the quality is their weighted mean.</summary>
+    public Cargo Merged(Cargo other)
+    {
+        if (other.Good != Good)
+        {
+            throw new ArgumentException("Only parcels of the same good merge.", nameof(other));
+        }
+
+        decimal quantity = Quantity + other.Quantity;
+        decimal quality = quantity <= 0m ? Math.Max(Quality, other.Quality) : ((Quality * Quantity) + (other.Quality * other.Quantity)) / quantity;
+        return new Cargo(Good, quantity, quality);
+    }
 }

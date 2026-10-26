@@ -6,97 +6,166 @@ using ByGalacticAccord.Engine.Simulation;
 namespace ByGalacticAccord.Tests;
 
 /// <summary>
-/// The player's way to take a haul, through the same signing steps an AI hauler uses, and each way it can
-/// refuse. The interface words the codes these return.
+/// The player's commands, through the same market commands an AI decision uses, and each way they refuse. The
+/// interface words the codes these return. The player also pays running costs like everyone else (plan S3).
 /// </summary>
 public sealed class PlayerActionsTests
 {
     [Fact]
-    public void The_player_signs_an_open_haul_through_the_engine_path()
+    public void The_player_takes_a_haul_as_posted_through_the_market()
     {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        (Contract contract, PlayerActions.HaulFeasibility check) = FirstTakeable(context, player);
-        Ship ship = check.Ship!;
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        HaulContract haul = FarmHaul(context);
 
-        HaulAcceptance result = PlayerActions.AcceptHaul(context, player, contract, ship, contract.OfferedPayment, check.RepoTicks);
-
-        Assert.Equal(HaulAcceptance.Accepted, result);
-        Assert.Equal(ContractStatus.Active, contract.Status);
-        Assert.Equal(player.Id, contract.CounterpartyId);
-        Assert.Equal(ship.Id, contract.AssignedShip);
-        Assert.Equal(ShipStatus.InTransit, ship.Status);
-        Assert.Equal(contract.Id, ship.ActiveContract);
-        HaulTakenEntry taken = Assert.IsType<HaulTakenEntry>(context.Journal.Entries[^1]);
-        Assert.Equal((contract.Id, player.Id, contract.OfferedPayment), (taken.Contract, taken.Hauler, taken.Fee));
-        Assert.Empty(Invariants.Check(context));
-    }
-
-    [Fact]
-    public void Signing_a_haul_that_is_no_longer_open_is_refused()
-    {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        (Contract contract, PlayerActions.HaulFeasibility check) = FirstTakeable(context, player);
-        Assert.Equal(HaulAcceptance.Accepted, PlayerActions.AcceptHaul(context, player, contract, check.Ship!, contract.OfferedPayment, check.RepoTicks));
-        long recorded = context.Journal.TotalRecorded;
-        Credits credits = player.Credits;
-
-        HaulAcceptance again = PlayerActions.AcceptHaul(context, player, contract, check.Ship!, contract.OfferedPayment, check.RepoTicks);
-
-        Assert.Equal(HaulAcceptance.NotOpen, again);
-        Assert.Equal(recorded, context.Journal.TotalRecorded);
-        Assert.Equal(credits, player.Credits);
-        Assert.Equal(HaulBlock.NotOpen, PlayerActions.CheckHaul(context, player, contract).Block);
-    }
-
-    [Fact]
-    public void A_busy_ship_cannot_take_a_second_haul()
-    {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        (Contract first, PlayerActions.HaulFeasibility check) = FirstTakeable(context, player);
-        PlayerActions.AcceptHaul(context, player, first, check.Ship!, first.OfferedPayment, check.RepoTicks);
-
-        Contract? other = context.OpenContracts.FirstOrDefault(c => c.Status == ContractStatus.Open);
-        Assert.NotNull(other);
-        Assert.Equal(HaulBlock.NoFreeShip, PlayerActions.CheckHaul(context, player, other).Block);
-    }
-
-    [Fact]
-    public void A_haul_larger_than_the_hold_is_blocked_with_the_ship_named()
-    {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        Ship ship = context.Ship(player.Ships[0]);
-        Contract big = AddHaul(context, quantity: ship.CargoCapacity + 1m);
-
-        PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(context, player, big);
-
-        Assert.Equal(HaulBlock.TooLarge, check.Block);
-        Assert.False(check.Ok);
-        Assert.Same(ship, check.Ship);
-    }
-
-    [Fact]
-    public void A_haul_the_origin_cannot_supply_is_blocked()
-    {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        Contract huge = AddHaul(context, quantity: 100m);
-        ActorState producer = context.ProducerAt(huge.OriginLocationId, huge.Good)!;
-        producer.RemoveStock(huge.Good, producer.Stock(huge.Good));
-
-        Assert.Equal(HaulBlock.OriginShort, PlayerActions.CheckHaul(context, player, huge).Block);
-    }
-
-    [Fact]
-    public void A_frontier_haul_the_player_cannot_front_is_refused()
-    {
-        (SimulationContext context, ActorState player) = PlayerWorld();
-        Contract frontier = AddHaul(context, quantity: 10m, frontier: true, goodsCost: player.Credits + Credits.Of(1m));
-        PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(context, player, frontier);
+        PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(context, player, haul);
         Assert.True(check.Ok);
+        Assert.Equal(Signing.Signed, PlayerActions.TakeHaul(context, player, haul, check.Ship!));
 
-        HaulAcceptance result = PlayerActions.AcceptHaul(context, player, frontier, check.Ship!, frontier.OfferedPayment, check.RepoTicks);
+        Assert.Equal((ContractStatus.Active, player.Id, haul.OfferedPrice), (haul.Status, haul.Carrier!.Value, haul.Price));
+        Assert.Equal(haul.Id, check.Ship!.Job!.Haul);
+        ContractSignedEntry signed = Assert.IsType<ContractSignedEntry>(context.Journal.Entries[^1]);
+        Assert.Equal((haul.Id, player.Id), (signed.Contract, signed.Taker));
+        Assert.Equal(DealBlock.NotOpen, PlayerActions.CheckHaul(context, player, haul).Block);
+        Assert.Equal(Signing.NotOpen, PlayerActions.TakeHaul(context, player, haul, check.Ship!));
+        context.RunUntilSettled(haul);
+        Assert.Equal(ContractStatus.Fulfilled, haul.Status);
+        context.AssertSound();
+    }
 
-        Assert.Equal(HaulAcceptance.CannotFrontGoods, result);
-        Assert.Equal(ContractStatus.Open, frontier.Status);
+    [Fact]
+    public void A_busy_ship_cannot_take_a_second_contract_and_says_when_it_is_free()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        HaulContract first = FarmHaul(context);
+        HaulContract second = FarmHaul(context);
+        PlayerActions.TakeHaul(context, player, first, context.ShipOf(player));
+
+        PlayerActions.HaulFeasibility busy = PlayerActions.CheckHaul(context, player, second);
+
+        Assert.Equal(DealBlock.NoFreeShip, busy.Block);
+        Assert.Same(context.ShipOf(player), busy.Ship);
+        (LocationId at, long tick) = Market.NextFree(context, busy.Ship!);
+        Assert.Equal(first.Destination, at);
+        Assert.True(tick > context.CurrentTick);
+    }
+
+    [Fact]
+    public void A_haul_larger_than_the_hold_is_blocked()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        HaulContract big = FarmHaul(context, quantity: context.ShipOf(player).CargoCapacity + 1m);
+
+        Assert.Equal(DealBlock.TooLarge, PlayerActions.CheckHaul(context, player, big).Block);
+    }
+
+    [Fact]
+    public void The_player_fills_a_delivered_sale_by_buying_at_the_source_like_a_trader()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState camp = context.Actor("Rust Belt Camp");
+        SaleContract wanted = context.PostWanted(camp, GoodType.Food, 60m, 1400m, hours: 400);
+
+        PlayerActions.FillFeasibility check = PlayerActions.CheckFill(context, player, wanted);
+        Assert.True(check.Ok);
+        Assert.Equal((FillSourceKind.Producer, context.Actor("Verdant Agricombine").Id), (check.Source!.Kind, check.Source.Producer!.Value));
+        Assert.Equal(Signing.Signed, PlayerActions.Fill(context, player, wanted, check.Ship!, check.Source));
+        Credits before = player.Credits;
+        context.RunUntilSettled(wanted);
+
+        // Outside the Accord the camp pays at handover: the price, with nothing held back for the 6-day-old food.
+        Assert.Equal(ContractStatus.Fulfilled, wanted.Status);
+        Assert.Equal(System.Math.Round(before.Amount + 1400m - context.Config.DockingFee.Amount, 2), System.Math.Round(player.Credits.Amount, 2));
+        context.AssertSound();
+    }
+
+    [Fact]
+    public void A_sale_nobody_can_supply_is_blocked_and_one_the_player_cannot_afford_too()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState habs = context.Actor("Meridian Habs");
+        ActorState farm = context.Actor("Verdant Agricombine");
+        SaleContract wanted = context.PostWanted(habs, GoodType.Food, 60m, 900m);
+
+        context.ApplySink(player, player.Credits);
+        Assert.Equal(DealBlock.CannotAfford, PlayerActions.CheckFill(context, player, wanted).Block);
+
+        context.Consume(farm, GoodType.Food, farm.Stock(GoodType.Food)); // the farm has nothing to sell
+        Assert.Equal(DealBlock.NoSource, PlayerActions.CheckFill(context, player, wanted).Block);
+    }
+
+    [Fact]
+    public void The_player_fills_from_goods_already_aboard_and_hands_them_over_on_the_spot()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState habs = context.Actor("Meridian Habs"); // at Meridian Station, where the player starts
+        Ship ship = context.ShipOf(player);
+        SaleTests.GiveAboard(context, ship, player, GoodType.Food, 70m);
+        SaleContract wanted = context.PostWanted(habs, GoodType.Food, 50m, 700m);
+
+        PlayerActions.FillFeasibility check = PlayerActions.CheckFill(context, player, wanted);
+        Assert.Equal(FillSourceKind.Aboard, check.Source!.Kind);
+        Assert.Equal(Signing.Signed, PlayerActions.Fill(context, player, wanted, ship, check.Source));
+
+        Assert.Equal(ContractStatus.Fulfilled, wanted.Status);
+        Assert.Equal(20m, ship.LotOf(player.Id, GoodType.Food)!.Quantity);
+        Assert.True(ship.IsFree);
+        context.AssertSound();
+    }
+
+    [Fact]
+    public void The_player_buys_a_lot_collects_it_and_stores_and_retrieves_it()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState fabworks = context.Actor("Meridian Fabworks"); // parts, at the player's own station
+        Ship ship = context.ShipOf(player);
+        SaleContract lot = Market.PostSale(
+            context, fabworks, SaleSide.ForSale, GoodType.Parts, 30m, fabworks.Home, Credits.Of(600m), Credits.Of(550m), 168, Holding.StockAt(fabworks.Home));
+
+        PlayerActions.BuyFeasibility check = PlayerActions.CheckBuy(context, player, lot);
+        Assert.True(check.Ok);
+        Assert.Equal(Signing.Signed, PlayerActions.Buy(context, player, lot, ship));
+        context.RunUntilSettled(lot);
+        Assert.Equal(30m, ship.LotOf(player.Id, GoodType.Parts)!.Quantity);
+
+        Assert.True(PlayerActions.Store(context, player, ship, GoodType.Parts));
+        Assert.Empty(ship.Hold);
+        Assert.Equal(30m, context.StorageOf(player.Id, ship.Location)!.Held(GoodType.Parts));
+
+        Assert.True(PlayerActions.Retrieve(context, player, ship, GoodType.Parts));
+        Assert.Equal(30m, ship.LotOf(player.Id, GoodType.Parts)!.Quantity);
+        Assert.Null(context.StorageOf(player.Id, ship.Location));
+        context.AssertSound();
+    }
+
+    [Fact]
+    public void The_player_pays_running_costs_every_day_like_everyone_else()
+    {
+        SimulationContext context = WorldGenerator.Generate(42L, withPlayer: true).Context;
+        ActorState player = context.Player();
+        Ship ship = context.ShipOf(player);
+        Credits daily = Credits.Of(ship.Class.RunningCostPerTick.Amount * context.Config.HeartbeatInterval);
+        var charged = new System.Collections.Generic.List<long>();
+        Credits last = player.Credits;
+        for (long t = 1; t <= 72; t++)
+        {
+            context.RunTo(t);
+            if (player.Credits != last)
+            {
+                Assert.Equal(last - daily, player.Credits);
+                charged.Add(t);
+                last = player.Credits;
+            }
+        }
+
+        Assert.Equal(3, charged.Count);
+        Assert.Equal(new long[] { 24, 24 }, new[] { charged[1] - charged[0], charged[2] - charged[1] });
     }
 
     [Fact]
@@ -115,38 +184,12 @@ public sealed class PlayerActionsTests
         Assert.Equal(100, context.CurrentTick);
     }
 
-    internal static (SimulationContext Context, ActorState Player) PlayerWorld(long seed = 42L, long ticks = 48)
+    // A haul of the farm's own food from Verdant to Meridian Station, posted as the farm would after selling it delivered.
+    internal static HaulContract FarmHaul(SimulationContext context, decimal quantity = 40m, long hours = 200)
     {
-        WorldHandles handles = WorldGenerator.Generate(seed, withPlayer: true);
-        handles.Context.RunTo(ticks);
-        return (handles.Context, handles.Context.Actor(handles.Player!.Value));
-    }
-
-    internal static (Contract Contract, PlayerActions.HaulFeasibility Check) FirstTakeable(SimulationContext context, ActorState player)
-    {
-        foreach (Contract contract in context.OpenContracts)
-        {
-            PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(context, player, contract);
-            if (check.Ok && contract.UsesEscrow)
-            {
-                return (contract, check);
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException("No haul the player could take.");
-    }
-
-    // A haul from Verdant's food producer to Meridian (or to Rust Belt, on the frontier), posted directly.
-    private static Contract AddHaul(SimulationContext context, decimal quantity, bool frontier = false, Credits? goodsCost = null)
-    {
-        Location verdant = context.Locations.Values.Single(l => l.Name == "Verdant");
-        Location to = context.Locations.Values.Single(l => l.Name == (frontier ? "Rust Belt" : "Meridian Station"));
-        ActorState poster = context.Actor(to.Residents.First(id => context.Actor(id).Demands.Count > 0));
-        var contract = new Contract(
-            context.NextContractId(), ContractType.Haul, poster.Id, GoodType.Food, quantity, verdant.Id, to.Id,
-            Credits.Of(100m), Credits.Of(200m), goodsCost ?? Credits.Of(quantity * 6m), 0.04m, context.CurrentTick + 200,
-            to.Reach, to.Region, new ContractClause[] { new PenaltyOnLateDelivery(1m, Credits.Of(60m)) });
-        context.Add(contract);
-        return contract;
+        ActorState farm = context.Actor("Verdant Agricombine");
+        return Market.PostHaul(
+            context, farm, GoodType.Food, quantity, Holding.StockAt(farm.Home), context.Place("Meridian Station").Id,
+            Credits.Of(70m), Credits.Of(90m), context.CurrentTick + hours, serves: null);
     }
 }

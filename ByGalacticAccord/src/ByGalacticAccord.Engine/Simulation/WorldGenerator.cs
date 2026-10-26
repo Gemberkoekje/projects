@@ -10,13 +10,19 @@ namespace ByGalacticAccord.Engine.Simulation;
 public sealed record WorldHandles(SimulationContext Context, ActorId? Player, LocationId PlayerHome);
 
 /// <summary>
-/// Builds the slice-0 sector: one connected graph spanning a green Accord core (Helios) and an
-/// amber/red frontier (the Marches), populated with decoupled producers and consumers, AI haulers,
-/// a government tax sink, and — optionally — the player as an Independent Pilot at a mid-tier colony
-/// (§3.3, §4.7.1). Everything downstream of the seed is deterministic.
+/// Builds the sector (design §15): one connected graph spanning a green Accord core (Helios) and an
+/// amber/red frontier (the Marches), populated with decoupled producers and consumers, AI traders,
+/// a government tax sink, a station operator at every location, and — optionally — the player as an
+/// Independent Pilot at Meridian Station (design §13). Everything downstream of the seed is deterministic.
 /// </summary>
 public static class WorldGenerator
 {
+    /// <summary>What every station charges for storage, per unit per day (design §3.2's example is ₵2 a week).</summary>
+    public static readonly Credits StorageRate = Credits.Of(0.10m);
+
+    /// <summary>What a station operator keeps in hand; rent above it goes on upkeep.</summary>
+    public static readonly Credits StationFloat = Credits.Of(2000m);
+
     public static WorldHandles Generate(long seed, bool withPlayer, SimulationConfig? config = null)
     {
         var context = new SimulationContext(seed, config);
@@ -111,6 +117,17 @@ public static class WorldGenerator
             playerId = player.Id;
         }
 
+        // ---- station operators: docking and storage at every location (design §8.1) ----
+        foreach (Location location in new[] { meridian, verdant, heliosPrime, tycho, halcyon, rustBelt, edge })
+        {
+            var station = new ActorState(context.NextActorId(), location.Name + " Docks", ActorRole.StationOperator, location.Id, Personality.Balanced, StationFloat)
+            {
+                Station = new StationProfile(StorageRate, StationFloat),
+            };
+            context.Add(station);
+            location.AddResident(station.Id);
+        }
+
         // ---- bootstrap recurring events ----
         foreach (ActorState actor in context.ActorsOrdered)
         {
@@ -145,8 +162,8 @@ public static class WorldGenerator
         {
             Producer = new ProducerProfile(good, output, Credits.Of(unitCost), cap, margin),
         };
-        actor.AddStock(good, startStock);
         context.Add(actor);
+        context.Produce(actor, good, startStock);
         loc.AddResident(actor.Id);
     }
 
@@ -166,13 +183,15 @@ public static class WorldGenerator
             IncomePerHeartbeat = Credits.Of(income),
         };
 
-        // Seed half-stocked larders so the economy doesn't cold-start into a posting stampede.
+        context.Add(actor);
+
+        // Seed half-stocked larders so the economy doesn't cold-start into a posting stampede. Starting goods count as
+        // produced, so the goods ledger balances from tick 0.
         foreach (ConsumerDemand d in list)
         {
-            actor.AddStock(d.Good, d.TargetStock * 0.5m);
+            context.Produce(actor, d.Good, d.TargetStock * 0.5m);
         }
 
-        context.Add(actor);
         loc.AddResident(actor.Id);
     }
 

@@ -22,20 +22,21 @@ public static class Visibility
             return true;
         }
 
-        // Be there: the local board is home + directly adjacent locations.
-        if (IsLocal(context, actor.Home, contract.OriginLocationId) ||
-            IsLocal(context, actor.Home, contract.DestinationLocationId))
+        // Be there: the local board is home + directly adjacent locations. Your home region's boards are part of your
+        // everyday reach too (§4.6).
+        IReadOnlyList<LocationId> places = contract.Places;
+        string homeRegion = context.Location(actor.Home).Region;
+        if (contract.Region == homeRegion)
         {
             return true;
         }
 
-        // The boards of your home region are part of your everyday reach (§4.6).
-        string homeRegion = context.Location(actor.Home).Region;
-        if (contract.Region == homeRegion ||
-            context.Location(contract.OriginLocationId).Region == homeRegion ||
-            context.Location(contract.DestinationLocationId).Region == homeRegion)
+        for (int i = 0; i < places.Count; i++)
         {
-            return true;
+            if (IsLocal(context, actor.Home, places[i]) || context.Location(places[i]).Region == homeRegion)
+            {
+                return true;
+            }
         }
 
         // Reach is reputation: a region you have standing in surfaces its board to you.
@@ -45,8 +46,15 @@ public static class Visibility
         }
 
         // Scouted intel (§4.6, mechanism 2).
-        return context.HasFreshScout(actor.Id, contract.OriginLocationId)
-            || context.HasFreshScout(actor.Id, contract.DestinationLocationId);
+        for (int i = 0; i < places.Count; i++)
+        {
+            if (context.HasFreshScout(actor.Id, places[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static IEnumerable<Contract> OpenContractsVisibleTo(SimulationContext context, ActorState actor) =>
@@ -59,6 +67,6 @@ public static class Visibility
             return true;
         }
 
-        return context.RouteBetween(home, target) is not null;
+        return context.Adjacent(home, target);
     }
 }

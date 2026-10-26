@@ -203,51 +203,56 @@ public static class MapView
         GameSession session, Contract contract, List<MapLeg> overlay, HashSet<(LocationId, LocationId)> covered)
     {
         SimulationContext context = session.Context;
-        string origin = context.Location(contract.OriginLocationId).Name;
-        string destination = context.Location(contract.DestinationLocationId).Name;
-        string title = Templates.Fill(
-            "Map.Overlay.Title",
-            ("quantity", Format.Quantity(contract.Quantity)), ("good", Templates.Good(contract.Good)), ("origin", origin), ("destination", destination));
+        string title = OverlayTitle(context, contract);
+        Ship ship = session.PlayerShip;
+        long arrival;
+        bool collect = contract is SaleContract { Side: SaleSide.ForSale };
 
-        bool yours = contract.CounterpartyId == session.Player.Id && contract.Status == ContractStatus.Active;
-        bool open = contract.Status is ContractStatus.Open or ContractStatus.Negotiating;
-        HaulEstimate? estimate = open || yours ? HaulEstimate.For(context, session.Player, session.PlayerShip, contract) : null;
-
-        if (yours && session.PlayerShip.Course is { } course)
+        if (contract.Status == ContractStatus.Active && ship.Job is { } job && job.Serves(contract.Id))
         {
-            // Your own haul: draw what is left of it from the ship's current leg.
-            AddLegs(context, course.Path, empty: session.PlayerShip.Manifest is null, overlay, covered);
-            if (session.PlayerShip.Manifest is null && context.FindPath(contract.OriginLocationId, contract.DestinationLocationId) is { } rest)
+            // Your own job: what is left of it, from the ship's current leg.
+            bool laden = ship.Location == job.Pickup;
+            if (ship.Course is { } course)
+            {
+                AddLegs(context, course.Path, empty: !laden, overlay, covered);
+            }
+
+            if ((!laden || ship.Course is null) && job.Destination is { } destination && context.FindPath(job.Pickup, destination) is { } rest)
             {
                 AddLegs(context, rest.Path, empty: false, overlay, covered);
             }
+
+            arrival = Market.NextFree(context, ship).Tick;
+            collect = job.Destination is null;
         }
-        else if (estimate is not null)
+        else if (contract.IsOpen && DealEstimate.For(context, session.Player, ship, contract) is { } estimate)
         {
             if (estimate.Repositioning is { } repo)
             {
                 AddLegs(context, repo.Path, empty: true, overlay, covered);
             }
 
-            AddLegs(context, estimate.Laden.Path, empty: false, overlay, covered);
-        }
-        else if (context.FindPath(contract.OriginLocationId, contract.DestinationLocationId) is { } laden)
-        {
-            AddLegs(context, laden.Path, empty: false, overlay, covered);
-        }
+            if (estimate.Laden is { } laden)
+            {
+                AddLegs(context, laden.Path, empty: false, overlay, covered);
+            }
 
-        long arrival;
-        if (yours)
-        {
-            arrival = HaulEstimate.NextFree(context, session.PlayerShip).Tick;
-        }
-        else if (estimate is not null)
-        {
-            arrival = estimate.ArrivalTick;
+            arrival = estimate.Kind == DealKind.Buy ? estimate.PickupTick : estimate.ArrivalTick;
         }
         else
         {
+            if (contract is HaulContract haul && context.FindPath(haul.Origin, haul.Destination) is { } path)
+            {
+                AddLegs(context, path.Path, empty: false, overlay, covered);
+            }
+
             return (title, null, Tone.Muted);
+        }
+
+        if (collect)
+        {
+            string at = Templates.Fill("Map.Overlay.Collect", ("arrive", Format.Date(arrival)), ("deadline", Format.Date(contract.DeadlineTick)));
+            return (title, at, arrival > contract.DeadlineTick ? Tone.Loss : Tone.Muted);
         }
 
         bool late = arrival > contract.DeadlineTick;
@@ -256,6 +261,18 @@ public static class MapView
             : Templates.Fill("Map.Overlay.Spare", ("arrive", Format.Date(arrival)), ("deadline", Format.Date(contract.DeadlineTick)), ("spare", Format.Duration(contract.DeadlineTick - arrival)));
         return (title, eta, late ? Tone.Loss : Tone.Muted);
     }
+
+    private static string OverlayTitle(SimulationContext context, Contract contract) => contract switch
+    {
+        HaulContract haul => Templates.Fill(
+            "Map.Overlay.Title.Haul",
+            ("quantity", Format.Quantity(haul.Quantity)), ("good", Templates.Good(haul.Good)),
+            ("origin", context.Location(haul.Origin).Name), ("destination", context.Location(haul.Destination).Name)),
+        SaleContract sale => Templates.Fill(
+            "Map.Overlay.Title.Sale." + sale.Side,
+            ("quantity", Format.Quantity(sale.Quantity)), ("good", Templates.Good(sale.Good)), ("place", context.Location(sale.Place).Name)),
+        _ => string.Empty,
+    };
 
     private static void AddLegs(SimulationContext context, IReadOnlyList<LocationId> path, bool empty, List<MapLeg> overlay, HashSet<(LocationId, LocationId)> covered)
     {

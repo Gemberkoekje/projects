@@ -33,6 +33,7 @@ else if (_session is not null)
             <div class="column-side">
                 <BoardPanel Model="_board" Selected="_selected" OnSelect="Select" />
                 <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" />
+                <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" />
             </div>
         </div>
     </div>
@@ -60,6 +61,7 @@ else if (_session is not null)
     private BoardViewModel _board = default!;
     private MapViewModel _map = default!;
     private LogViewModel _log = default!;
+    private LedgerViewModel _ledger = default!;
     private ContractViewModel? _contract;
     private IReadOnlyList<MapShip> _ships = Array.Empty<MapShip>();
 
@@ -137,6 +139,7 @@ else if (_session is not null)
             _board = BoardView.Build(_session);
             _map = MapView.Build(_session, _selected);
             _log = LogView.Build(_session);
+            _ledger = LedgerView.Build(_session);
             _contract = _selected is { } id ? ContractView.Build(_session, id) : null;
             _builtRevision = _session.Revision;
             _builtSelection = _selected;
@@ -179,8 +182,19 @@ else if (_session is not null)
         }
 
         var contract = _session.Context.Contract(id);
-        HaulOutcome outcome = _session.TakeHaul(id);
+        DealOutcome outcome = _session.Accept(id);
         _outcome = ContractView.OutcomeText(_session, contract, outcome);
+        Rebuild();
+    }
+
+    private void Act(LedgerAction action)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _ = action.Store ? _session.Store(action.Good) : _session.Retrieve(action.Good);
         Rebuild();
     }
 

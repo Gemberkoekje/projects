@@ -26,6 +26,19 @@ public static class PriceModel
         return Credits.Of(Math.Max(producer.UnitProductionCost.Amount, ask));
     }
 
+    /// <summary>
+    /// What a producer asks per unit, given its stock and its savings (design §5.2: from its cost, its margin and how
+    /// full its warehouse is). A producer with more than twice a full warehouse's worth of production cost in hand
+    /// gives up its margin, all of it by four times (its working capital): savings it can't use don't make it hold
+    /// out for more.
+    /// </summary>
+    public static Credits ProducerAsk(ProducerProfile producer, decimal currentStock, Credits credits)
+    {
+        decimal reserve = Math.Max(1m, producer.UnitProductionCost.Amount * producer.StockCap);
+        decimal marginShare = Math.Clamp(2m - (credits.Amount / (2m * reserve)), 0m, 1m);
+        return ProducerAsk(producer with { Margin = producer.Margin * marginShare }, currentStock);
+    }
+
     /// <summary>The most a consumer will pay per unit at the destination, given how short it is of its buffer.</summary>
     public static Credits ConsumerWillingness(GoodType good, decimal currentStock, decimal targetStock)
     {
@@ -35,6 +48,18 @@ public static class PriceModel
         // Scarcity drives the price up: empty larder -> 1.6x base value, full -> 0.9x.
         decimal demandFactor = 0.9m + (0.7m * needRatio);
         return Credits.Of(info.BaseValue * demandFactor);
+    }
+
+    /// <summary>
+    /// The most a consumer will pay per unit, given how short it is and what it can afford (design §5.2): a consumer
+    /// with a month's income in hand pays as <see cref="ConsumerWillingness(GoodType, decimal, decimal)"/> says; one with
+    /// more pays more, up to 1.6 times, and a broke one less, down to 0.85.
+    /// </summary>
+    public static Credits ConsumerWillingness(GoodType good, decimal currentStock, decimal targetStock, Credits credits, Credits incomePerDay)
+    {
+        decimal reserve = Math.Max(1m, incomePerDay.Amount * 30m);
+        decimal affordability = Math.Clamp(0.85m + (0.15m * credits.Amount / reserve), 0.85m, 1.6m);
+        return Credits.Of(ConsumerWillingness(good, currentStock, targetStock).Amount * affordability);
     }
 
     /// <summary>The pilot's floor fee for a haul: running cost over the route + a risk premium + a thin margin.</summary>

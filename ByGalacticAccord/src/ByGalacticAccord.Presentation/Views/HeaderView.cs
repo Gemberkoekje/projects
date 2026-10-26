@@ -56,7 +56,8 @@ public static class HeaderView
             _ => Templates.Fill("SpeedNote.Many", ("hours", ((int)session.Speed).ToString(System.Globalization.CultureInfo.InvariantCulture))),
         };
 
-        decimal escrow = session.PlayerActiveContracts.Sum(c => c.LockedBond.Amount);
+        // What of the player's own money escrow holds: its payments where it pays, its bond where it performs.
+        decimal escrow = session.PlayerActiveContracts.Sum(c => c.Payer == session.Player.Id ? c.EscrowHeld.Amount - c.LockedBond.Amount : c.LockedBond.Amount);
         decimal runningPerDay = session.Player.Ships.Sum(id => context.Ship(id).Class.RunningCostPerTick.Amount) * GameTime.HoursPerDay;
         string shipClass = Templates.ShipClass(ship.Type);
 
@@ -93,24 +94,28 @@ public static class HeaderView
         var facts = new List<(string Name, string Value)>
         {
             ("shipClass", shipClass),
-            ("load", Format.Quantity(ship.Manifest?.Quantity ?? 0m)),
+            ("load", Format.Quantity(ship.HoldQuantity)),
             ("capacity", Format.Quantity(ship.CargoCapacity)),
             ("location", context.Location(ship.Location).Name),
         };
 
-        if (ship.Status == ShipStatus.Docked || ship.ActiveContract is not { } id)
+        if (ship.Job is not { } job)
         {
             return Templates.Fill("Fleet.Docked", facts.ToArray());
         }
 
-        Contract contract = context.Contract(id);
-        facts.Add(("good", Templates.Good(contract.Good)));
-        facts.Add(("origin", context.Location(contract.OriginLocationId).Name));
-        facts.Add(("destination", context.Location(contract.DestinationLocationId).Name));
+        facts.Add(("good", Templates.Good(job.Good)));
+        facts.Add(("origin", context.Location(job.Pickup).Name));
+        facts.Add(("destination", context.Location(job.Destination ?? job.Pickup).Name));
         facts.Add(("when", Format.Date(ship.Course?.ArrivalTick ?? session.Now)));
-        if (ship.Manifest is not null)
+        if (ship.Location == job.Pickup && ship.Course is not null)
         {
             return Templates.Fill("Fleet.Laden", facts.ToArray());
+        }
+
+        if (job.Destination is null)
+        {
+            return Templates.Fill(ship.Course is null ? "Fleet.Loading.Collect" : "Fleet.Collecting", facts.ToArray());
         }
 
         return Templates.Fill(ship.Course is null ? "Fleet.Loading" : "Fleet.Repositioning", facts.ToArray());

@@ -7,13 +7,13 @@ namespace ByGalacticAccord.Engine.Actors;
 /// </summary>
 public enum ActorRole
 {
-    /// <summary>Producer / "Conjurer": posts sell-side haul demand, generates goods (§4.2.3).</summary>
+    /// <summary>Producer / "Conjurer": makes goods, sells them as lots and answers wanted Sales (§4.2.3).</summary>
     Producer,
 
-    /// <summary>Consumer / "Eater": posts buy contracts, the credit faucet (§4.2.3).</summary>
+    /// <summary>Consumer / "Eater": posts wanted Sales for what it uses, the credit faucet (§4.2.3).</summary>
     Consumer,
 
-    /// <summary>Owns a fleet, fulfils haul contracts, accumulates capital and expands.</summary>
+    /// <summary>Owns a fleet: carries hauls and fills Sales by buying and carrying.</summary>
     ShippingCompany,
 
     /// <summary>One ship, scrappier than a company. The player archetype.</summary>
@@ -21,6 +21,9 @@ public enum ActorRole
 
     /// <summary>Tax sink and (later) law enforcement.</summary>
     Government,
+
+    /// <summary>Runs a station: docking, and storage rented to anyone (design §8.1).</summary>
+    StationOperator,
 
     // ---- documented later-slice roles (not instantiated in slice 0) ----
     Factory,

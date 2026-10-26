@@ -24,8 +24,8 @@ public enum ClauseType
 public abstract record ContractClause(ClauseType Type);
 
 /// <summary>
-/// Trigger: delivery tick &gt; DeadlineTick. Effect: transfer a penalty from the fulfiller's
-/// performance bond to the poster. <see cref="MaxPenalty"/> sizes the bond the pilot must post.
+/// Trigger: delivery tick &gt; DeadlineTick. Effect: a fee per hour late from the performer to the payer,
+/// taken from the performer's bond in Accord space. <see cref="MaxPenalty"/> sizes that bond.
 /// </summary>
 public sealed record PenaltyOnLateDelivery(decimal PenaltyPerTickLate, Credits MaxPenalty)
     : ContractClause(ClauseType.PenaltyOnLateDelivery)
@@ -40,16 +40,19 @@ public sealed record PenaltyOnLateDelivery(decimal PenaltyPerTickLate, Credits M
         decimal raw = PenaltyPerTickLate * ticksLate;
         return raw >= MaxPenalty.Amount ? MaxPenalty : Credits.Of(raw);
     }
+
+    /// <summary>How many hours late it takes for the fee to reach its cap.</summary>
+    public long HoursToCap => PenaltyPerTickLate <= 0m ? 0 : (long)System.Math.Ceiling(MaxPenalty.Amount / PenaltyPerTickLate);
 }
 
 /// <summary>
-/// Trigger: delivered quality &lt; threshold. Effect: reduce payment / partial refund, scaled by
+/// Trigger: delivered quality &lt; threshold. Effect: part of the price goes back to the payer, scaled by
 /// how far below threshold the goods arrived.
 /// </summary>
 public sealed record QualityWarranty(decimal MinQuality, decimal MaxRefundFraction)
     : ContractClause(ClauseType.QualityWarranty)
 {
-    /// <summary>Fraction of the haul fee refunded for sub-threshold quality (0 if quality is fine).</summary>
+    /// <summary>Fraction of the price refunded for sub-threshold quality (0 if quality is fine).</summary>
     public decimal RefundFraction(decimal deliveredQuality)
     {
         if (deliveredQuality >= MinQuality || MinQuality <= 0m)

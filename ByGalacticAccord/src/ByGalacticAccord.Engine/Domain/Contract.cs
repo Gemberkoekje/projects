@@ -3,18 +3,26 @@ using System.Linq;
 
 namespace ByGalacticAccord.Engine.Domain;
 
-/// <summary>Contract participation modes / kinds (§4.1.1). Slice 0 exercises Haul and Procure.</summary>
+/// <summary>
+/// Contract kinds (design §3.2). Slice 1 has Sale, Haul, Build and Storage; S3 creates Sale, Haul and Storage.
+/// The later kinds are named so the schema is whole.
+/// </summary>
 public enum ContractType
 {
+    Sale,
     Haul,
-    Procure,
+    Storage,
+    Build,
     Service,
     Insurance,
-    Brokered,
     Bond,
+    Information,
 }
 
-/// <summary>Contract lifecycle states (§4.1.2).</summary>
+/// <summary>
+/// Contract lifecycle states (design §16.2). <see cref="Active"/> is signed and being performed;
+/// <see cref="Breached"/> means the performer failed; <see cref="Defaulted"/> means the payer didn't pay.
+/// </summary>
 public enum ContractStatus
 {
     Open,
@@ -22,27 +30,56 @@ public enum ContractStatus
     Active,
     Fulfilled,
     Breached,
+    Defaulted,
     Expired,
-    Disputed,
+    Withdrawn,
+}
+
+/// <summary>Who posted a Sale: the buyer ("wanted") or the seller ("for sale") (design §3.2).</summary>
+public enum SaleSide
+{
+    Wanted,
+    ForSale,
+}
+
+/// <summary>The three places goods can sit (design §16.1).</summary>
+public enum HoldingKind
+{
+    /// <summary>An actor's own stock at its home: a producer's warehouse, a consumer's larder.</summary>
+    Stock,
+
+    /// <summary>Space rented from a station operator under a Storage contract.</summary>
+    Storage,
+
+    /// <summary>A ship's hold.</summary>
+    Ship,
+}
+
+/// <summary>Where an actor's goods are, or are to be put: its stock, its storage at a location, or one of its ships.</summary>
+public readonly record struct Holding(HoldingKind Kind, LocationId Location, ShipId? Ship = null)
+{
+    public static Holding StockAt(LocationId home) => new(HoldingKind.Stock, home);
+
+    public static Holding StorageAt(LocationId location) => new(HoldingKind.Storage, location);
+
+    public static Holding Aboard(ShipId ship, LocationId location) => new(HoldingKind.Ship, location, ship);
 }
 
 /// <summary>
-/// The Accord-standard contract aggregate (§4.1.1). Short-lived; in the GDD's Marten design it is
-/// a live aggregation with no snapshot. Here it is a plain mutable aggregate the events advance.
+/// The Accord standard contract (design §3.1): parties, a price, a schedule, terms, security and jurisdiction.
+/// Each kind adds its obligation. A contract is a plain mutable aggregate that events advance; it is never
+/// removed from the world, so the journal can always refer back to it.
 /// </summary>
-public sealed class Contract
+public abstract class Contract
 {
-    public Contract(
+    private readonly List<ContractClause> _clauses;
+
+    protected Contract(
         ContractId id,
-        ContractType type,
         ActorId postedBy,
-        GoodType good,
-        decimal quantity,
-        LocationId origin,
-        LocationId destination,
-        Credits offeredPayment,
-        Credits buyerReservationFee,
-        Credits goodsCost,
+        long postedTick,
+        Credits offeredPrice,
+        Credits reservation,
         decimal taxRate,
         long deadlineTick,
         AccordReach jurisdiction,
@@ -50,112 +87,385 @@ public sealed class Contract
         IEnumerable<ContractClause> clauses)
     {
         Id = id;
-        Type = type;
         PostedBy = postedBy;
-        Good = good;
-        Quantity = quantity;
-        OriginLocationId = origin;
-        DestinationLocationId = destination;
-        OfferedPayment = offeredPayment;
-        BuyerReservationFee = buyerReservationFee;
-        GoodsCost = goodsCost;
+        PostedTick = postedTick;
+        OfferedPrice = offeredPrice;
+        Reservation = reservation;
         TaxRate = taxRate;
         DeadlineTick = deadlineTick;
         Jurisdiction = jurisdiction;
         Region = region;
-        Clauses = clauses.ToList();
+        _clauses = clauses.ToList();
         Status = ContractStatus.Open;
-        AccordCompliant = jurisdiction is AccordReach.DeepAccord or AccordReach.AccordEdge;
     }
 
     public ContractId Id { get; }
 
-    public ContractType Type { get; }
+    public abstract ContractType Type { get; }
 
     public ActorId PostedBy { get; }
 
+    /// <summary>Who took it; empty while it is open.</summary>
     public ActorId? CounterpartyId { get; private set; }
 
-    public GoodType Good { get; }
+    public long PostedTick { get; }
 
-    public decimal Quantity { get; }
+    public long? SignedTick { get; private set; }
 
-    public LocationId OriginLocationId { get; }
+    /// <summary>The price as posted: the goods' price for a Sale, the fee for a Haul, the daily rate per unit for Storage.</summary>
+    public Credits OfferedPrice { get; }
 
-    public LocationId DestinationLocationId { get; }
+    /// <summary>
+    /// The poster's hidden walk-away price (design §3.6). Never shown and never used to set terms; AI-to-AI
+    /// deals settle against it in closed form.
+    /// </summary>
+    public Credits Reservation { get; }
 
-    public Credits OfferedPayment { get; }
+    /// <summary>The price signed at, once taken (null while open).</summary>
+    public Credits? AgreedPrice { get; private set; }
 
-    /// <summary>The poster's hidden walk-away fee (§4.1.6). Never shown to a player — only soft tells leak it.</summary>
-    public Credits BuyerReservationFee { get; }
+    public Credits Price => AgreedPrice ?? OfferedPrice;
 
-    /// <summary>Haul fee agreed after negotiation (null until concluded).</summary>
-    public Credits? AgreedPayment { get; private set; }
-
-    /// <summary>Price paid to the origin producer for the goods (fixed at posting in slice 0).</summary>
-    public Credits GoodsCost { get; }
-
-    /// <summary>Government tax rate snapshot applied to the haul fee on settlement.</summary>
+    /// <summary>The Accord tax rate on the price; zero outside the Accord, where nobody collects it.</summary>
     public decimal TaxRate { get; }
+
+    /// <summary>The tax on the price, paid by the payer.</summary>
+    public Credits Tax => Credits.Of(Price.Amount * TaxRate);
 
     public long DeadlineTick { get; private set; }
 
     public ContractStatus Status { get; private set; }
 
-    public IReadOnlyList<ContractClause> Clauses { get; }
+    public IReadOnlyList<ContractClause> Clauses => _clauses;
 
     public Credits EscrowHeld { get; private set; }
 
-    public bool AccordCompliant { get; }
-
+    /// <summary>Where it is performed: a Sale's handover place, a Haul's destination, a store's location (design §3.5).</summary>
     public AccordReach Jurisdiction { get; }
 
     public string Region { get; }
 
-    public ShipId? AssignedShip { get; private set; }
+    /// <summary>The bond the performer actually locked: at most its <see cref="PerformanceBond"/>, at most its cash then.</summary>
+    public Credits LockedBond { get; private set; }
 
-    /// <summary>Whether enforcement here locks escrow (Accord reach) or is reputation-only (frontier).</summary>
+    /// <summary>Whether enforcement here locks escrow (Accord reach) or is reputation-only (the frontier).</summary>
     public bool UsesEscrow => Jurisdiction is AccordReach.DeepAccord or AccordReach.AccordEdge;
 
-    public Credits Fee => AgreedPayment ?? OfferedPayment;
+    public bool AccordCompliant => UsesEscrow;
 
-    public PenaltyOnLateDelivery? LatePenalty =>
-        Clauses.OfType<PenaltyOnLateDelivery>().FirstOrDefault();
+    /// <summary>Who pays: a Sale's buyer, a Haul's shipper, a store's renter. Empty while that side is open.</summary>
+    public abstract ActorId? Payer { get; }
 
-    public QualityWarranty? Warranty =>
-        Clauses.OfType<QualityWarranty>().FirstOrDefault();
+    /// <summary>Who performs: a Sale's seller, a Haul's carrier, a store's operator. Empty while that side is open.</summary>
+    public abstract ActorId? Performer { get; }
 
-    /// <summary>The worst-case late penalty the clause allows — the bond a fully-solvent pilot posts.</summary>
+    /// <summary>The locations it concerns, for who can see it (design §7).</summary>
+    public abstract IReadOnlyList<LocationId> Places { get; }
+
+    public bool IsOpen => Status is ContractStatus.Open or ContractStatus.Negotiating;
+
+    /// <summary>Open, or signed and not yet settled.</summary>
+    public bool IsLive => IsOpen || Status == ContractStatus.Active;
+
+    public bool Involves(ActorId actor) => PostedBy == actor || CounterpartyId == actor;
+
+    /// <summary>The other party to <paramref name="actor"/>, if there is one yet.</summary>
+    public ActorId? Other(ActorId actor) => PostedBy == actor ? CounterpartyId : PostedBy;
+
+    public PenaltyOnLateDelivery? LatePenalty => _clauses.OfType<PenaltyOnLateDelivery>().FirstOrDefault();
+
+    public QualityWarranty? Warranty => _clauses.OfType<QualityWarranty>().FirstOrDefault();
+
+    /// <summary>The bond a fully solvent performer posts: the late fee's cap (design §16.4).</summary>
     public Credits PerformanceBond => LatePenalty?.MaxPenalty ?? Credits.Zero;
 
     /// <summary>
-    /// The bond actually locked at acceptance: min(<see cref="PerformanceBond"/>, the pilot's cash). A
-    /// near-broke pilot can still take a job (locking less), which is what lets the AI economy recover
-    /// from a bad run without the §7.8 bankruptcy machinery (deferred). Penalties cap at this amount.
+    /// When an unperformed contract fails (S3's stand-in for cancellation for default, which S4 makes a decision):
+    /// once the late fee has reached its cap.
     /// </summary>
-    public Credits LockedBond { get; private set; }
+    public long DefaultTick => DeadlineTick == long.MaxValue ? long.MaxValue : DeadlineTick + (LatePenalty?.HoursToCap ?? 24);
 
-    public void BeginNegotiation() => Status = ContractStatus.Negotiating;
-
-    public void Activate(ActorId counterparty, ShipId ship, Credits agreedPayment)
+    internal void Sign(ActorId counterparty, Credits price, long tick)
     {
         CounterpartyId = counterparty;
-        AssignedShip = ship;
-        AgreedPayment = agreedPayment;
+        AgreedPrice = price;
+        SignedTick = tick;
         Status = ContractStatus.Active;
     }
 
-    public void SetLockedBond(Credits bond) => LockedBond = bond;
+    internal void SetLockedBond(Credits bond) => LockedBond = bond;
 
-    public void AddEscrow(Credits amount) => EscrowHeld += amount;
+    internal void AddEscrow(Credits amount) => EscrowHeld += amount;
 
-    public void ReleaseEscrow(Credits amount) => EscrowHeld -= amount;
+    internal void ReleaseEscrow(Credits amount) => EscrowHeld -= amount;
 
-    public void MarkFulfilled() => Status = ContractStatus.Fulfilled;
+    internal void MarkFulfilled() => Status = ContractStatus.Fulfilled;
 
-    public void MarkBreached() => Status = ContractStatus.Breached;
+    internal void MarkBreached() => Status = ContractStatus.Breached;
 
-    public void MarkExpired() => Status = ContractStatus.Expired;
+    internal void MarkDefaulted() => Status = ContractStatus.Defaulted;
 
-    public void ExtendDeadline(long newDeadline) => DeadlineTick = newDeadline;
+    internal void MarkExpired() => Status = ContractStatus.Expired;
+
+    internal void MarkWithdrawn() => Status = ContractStatus.Withdrawn;
+}
+
+/// <summary>
+/// A Sale (design §3.2): goods change hands at a named place by a deadline. Posted by the buyer ("wanted") or
+/// the seller ("for sale"). When the place is the buyer's own location the Sale is "delivered" and moving the
+/// goods is the seller's problem; when it is the seller's, the buyer collects.
+/// </summary>
+public sealed class SaleContract : Contract
+{
+    private LocationId[]? _places;
+
+    public SaleContract(
+        ContractId id,
+        ActorId postedBy,
+        long postedTick,
+        SaleSide side,
+        GoodType good,
+        decimal quantity,
+        LocationId place,
+        Credits offeredPrice,
+        Credits reservation,
+        decimal taxRate,
+        long deadlineTick,
+        AccordReach jurisdiction,
+        string region,
+        IEnumerable<ContractClause> clauses)
+        : base(id, postedBy, postedTick, offeredPrice, reservation, taxRate, deadlineTick, jurisdiction, region, clauses)
+    {
+        Side = side;
+        Good = good;
+        Quantity = quantity;
+        Place = place;
+    }
+
+    public override ContractType Type => ContractType.Sale;
+
+    public SaleSide Side { get; }
+
+    public GoodType Good { get; }
+
+    public decimal Quantity { get; }
+
+    /// <summary>Where the goods change hands.</summary>
+    public LocationId Place { get; }
+
+    public ActorId? Buyer => Side == SaleSide.Wanted ? PostedBy : CounterpartyId;
+
+    public ActorId? Seller => Side == SaleSide.ForSale ? PostedBy : CounterpartyId;
+
+    public override ActorId? Payer => Buyer;
+
+    public override ActorId? Performer => Seller;
+
+    public override IReadOnlyList<LocationId> Places => _places ??= new[] { Place };
+
+    /// <summary>Where the buyer takes the goods at the place: its stock, its storage, or one of its ships collecting.</summary>
+    public Holding? Receipt { get; private set; }
+
+    /// <summary>Where the seller's goods for this sale are set aside, if they are: its stock or its storage.</summary>
+    public Holding? Reserved { get; private set; }
+
+    /// <summary>Goods actually handed over (less than the quantity after a loss on the way).</summary>
+    public decimal Delivered { get; private set; }
+
+    public Credits UnitPrice => Credits.Of(Quantity <= 0m ? 0m : Price.Amount / Quantity);
+
+    internal void SetReceipt(Holding receipt) => Receipt = receipt;
+
+    internal void SetReserved(Holding? reserved) => Reserved = reserved;
+
+    internal void NoteDelivered(decimal quantity) => Delivered = quantity;
+}
+
+/// <summary>
+/// A Haul (design §3.2): move goods the carrier doesn't own, from an origin to a destination by a deadline.
+/// Posted by whoever owns the goods. A haul may serve a Sale: the shipper sold the goods delivered and the
+/// carrier's arrival is the handover.
+/// </summary>
+public sealed class HaulContract : Contract
+{
+    private LocationId[]? _places;
+
+    public HaulContract(
+        ContractId id,
+        ActorId shipper,
+        long postedTick,
+        GoodType good,
+        decimal quantity,
+        LocationId origin,
+        LocationId destination,
+        Holding pickupFrom,
+        ContractId? serves,
+        Credits offeredFee,
+        Credits reservation,
+        decimal taxRate,
+        long deadlineTick,
+        AccordReach jurisdiction,
+        string region,
+        IEnumerable<ContractClause> clauses)
+        : base(id, shipper, postedTick, offeredFee, reservation, taxRate, deadlineTick, jurisdiction, region, clauses)
+    {
+        Good = good;
+        Quantity = quantity;
+        Origin = origin;
+        Destination = destination;
+        PickupFrom = pickupFrom;
+        Serves = serves;
+    }
+
+    public override ContractType Type => ContractType.Haul;
+
+    public GoodType Good { get; }
+
+    public decimal Quantity { get; }
+
+    public LocationId Origin { get; }
+
+    public LocationId Destination { get; }
+
+    /// <summary>Where the shipper's goods wait at the origin: its stock there, or its storage.</summary>
+    public Holding PickupFrom { get; }
+
+    /// <summary>The Sale whose handover this haul's arrival is, if the shipper sold the goods delivered.</summary>
+    public ContractId? Serves { get; }
+
+    public ActorId Shipper => PostedBy;
+
+    public ActorId? Carrier => CounterpartyId;
+
+    public Credits Fee => Price;
+
+    public ShipId? AssignedShip { get; private set; }
+
+    public override ActorId? Payer => Shipper;
+
+    public override ActorId? Performer => Carrier;
+
+    public override IReadOnlyList<LocationId> Places => _places ??= new[] { Origin, Destination };
+
+    internal void Assign(ShipId ship) => AssignedShip = ship;
+}
+
+/// <summary>
+/// A Storage contract (design §3.2): a station operator provides space for goods at its location. Rent is
+/// charged per unit per day on what is held; the contract runs while the renter keeps goods there and ends
+/// when they are all taken out. Station storage is a standard hold: perishables decay in it.
+/// </summary>
+public sealed class StorageContract : Contract
+{
+    private readonly List<Lot> _lots = new();
+    private readonly Dictionary<GoodType, decimal> _reserved = new();
+
+    public StorageContract(
+        ContractId id,
+        ActorId stationOperator,
+        ActorId renter,
+        long tick,
+        LocationId location,
+        Credits ratePerUnitDay,
+        AccordReach jurisdiction,
+        string region)
+        : base(id, stationOperator, tick, ratePerUnitDay, ratePerUnitDay, 0m, long.MaxValue, jurisdiction, region, System.Array.Empty<ContractClause>())
+    {
+        Location = location;
+        LastChargedTick = tick;
+        Sign(renter, ratePerUnitDay, tick);
+    }
+
+    public override ContractType Type => ContractType.Storage;
+
+    public LocationId Location { get; }
+
+    public ActorId Operator => PostedBy;
+
+    public ActorId Renter => CounterpartyId!.Value;
+
+    public Credits RatePerUnitDay => Price;
+
+    public override ActorId? Payer => Renter;
+
+    public override ActorId? Performer => Operator;
+
+    public override IReadOnlyList<LocationId> Places => new[] { Location };
+
+    /// <summary>Rent is settled up to this tick.</summary>
+    public long LastChargedTick { get; private set; }
+
+    public Credits RentPaid { get; private set; }
+
+    public IReadOnlyList<Lot> Lots => _lots;
+
+    public decimal QuantityHeld => _lots.Sum(l => l.Quantity);
+
+    public decimal Held(GoodType good) => _lots.Where(l => l.Good == good).Sum(l => l.Quantity);
+
+    public decimal ReservedOf(GoodType good) => _reserved.TryGetValue(good, out decimal q) ? q : 0m;
+
+    /// <summary>Held and not set aside for a sale or haul.</summary>
+    public decimal Available(GoodType good) => System.Math.Max(0m, Held(good) - ReservedOf(good));
+
+    /// <summary>The goods of <paramref name="good"/> as they stand at <paramref name="tick"/>, or null.</summary>
+    public Cargo? Peek(GoodType good, long tick) =>
+        _lots.FirstOrDefault(l => l.Good == good)?.At(tick, 0m).Cargo;
+
+    /// <summary>Rent owed since it was last settled, on what is held now.</summary>
+    public Credits RentDue(long tick) =>
+        tick <= LastChargedTick ? Credits.Zero : Credits.Of(RatePerUnitDay.Amount * QuantityHeld * (tick - LastChargedTick) / 24m);
+
+    internal void Charged(long tick, Credits paid)
+    {
+        LastChargedTick = tick;
+        RentPaid += paid;
+    }
+
+    internal void Reserve(GoodType good, decimal quantity) => _reserved[good] = ReservedOf(good) + quantity;
+
+    internal void Unreserve(GoodType good, decimal quantity) => _reserved[good] = System.Math.Max(0m, ReservedOf(good) - quantity);
+
+    internal void Deposit(Cargo cargo, long tick)
+    {
+        int index = _lots.FindIndex(l => l.Good == cargo.Good);
+        if (index < 0)
+        {
+            _lots.Add(new Lot(Renter, cargo, tick));
+            return;
+        }
+
+        Lot current = _lots[index].At(tick, 0m);
+        _lots[index] = current with { Cargo = current.Cargo.Merged(cargo) };
+    }
+
+    /// <summary>Take out up to <paramref name="quantity"/> of a good, as it stands now: goods set aside for this, or free ones.</summary>
+    internal Cargo Withdraw(GoodType good, decimal quantity, long tick, bool reserved)
+    {
+        int index = _lots.FindIndex(l => l.Good == good);
+        if (index < 0)
+        {
+            return new Cargo(good, 0m, 1m);
+        }
+
+        Lot current = _lots[index].At(tick, 0m);
+        decimal taken = System.Math.Min(quantity, reserved ? current.Quantity : Available(good));
+        if (reserved)
+        {
+            Unreserve(good, taken);
+        }
+
+        if (taken >= current.Quantity)
+        {
+            _lots.RemoveAt(index);
+        }
+        else
+        {
+            _lots[index] = current with { Cargo = current.Cargo.LosingUnits(taken) };
+        }
+
+        return current.Cargo with { Quantity = taken };
+    }
+
+    internal void Close() => MarkFulfilled();
 }

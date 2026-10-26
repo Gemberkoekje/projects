@@ -11,8 +11,9 @@ namespace ByGalacticAccord.Engine.Simulation;
 /// <summary>
 /// The whole world (the GDD's "SimulationContext", §5.4). Holds every aggregate, the event queue,
 /// the seeded RNG, the journal, and the economy bookkeeping the invariants (§5.6) read. Exposes the
-/// low-level, conservation-correct primitives (faucet, sink, transfer, escrow) that events build on;
-/// the higher-level behaviour lives in the decision/economy/negotiation classes.
+/// low-level, conservation-correct primitives that events build on: for money (faucet, sink, transfer,
+/// escrow) and for goods (produce, consume, lose, and moves between stock, storage and holds). The
+/// higher-level behaviour lives in <see cref="Market"/>, <see cref="Settlement"/> and the decision engine.
 /// </summary>
 public sealed class SimulationContext
 {
@@ -31,7 +32,31 @@ public sealed class SimulationContext
     // it leaves it, so OpenContracts prunes this list instead of scanning every contract ever posted.
     private readonly List<Contract> _openCandidates = new();
 
+    // Each actor's contracts that were open or signed when last looked at, in the order it joined them.
+    // A settled contract never becomes live again, so LiveContractsOf prunes these lists the same way.
+    private readonly Dictionary<ActorId, List<Contract>> _liveByActor = new();
+
+    // Storage: the open stores, in the order they were opened, and each renter's open one per location. A store
+    // closes when it is emptied, so a closed one holds nothing the goods ledger needs.
+    private readonly List<StorageContract> _storages = new();
+    private readonly Dictionary<(ActorId Renter, LocationId Location), StorageContract> _storageByRenter = new();
+
+    // The goods ledger (design §20.2): what was produced, consumed and lost, per good.
+    private readonly Dictionary<GoodType, decimal> _produced = new();
+    private readonly Dictionary<GoodType, decimal> _consumed = new();
+    private readonly Dictionary<GoodType, decimal> _lost = new();
+
     private readonly List<JournalEntry> _playerAlerts = new();
+
+    // Contracts that have held escrow and may still: TotalEscrowHeld sums these rather than every contract ever.
+    private readonly List<Contract> _escrowed = new();
+
+    // Each location's neighbours by route, for the local board (visibility); rebuilt when a route is added.
+    private readonly Dictionary<LocationId, HashSet<LocationId>> _adjacent = new();
+
+    // Actors in id order, and the producers of each good, rebuilt only when an actor is added.
+    private readonly Dictionary<GoodType, ActorState[]> _producersOf = new();
+    private ActorState[]? _actorsOrdered;
 
     private long _nextActorId = 1;
     private long _nextShipId = 1;
@@ -76,22 +101,22 @@ public sealed class SimulationContext
 
     public Credits GovernmentRevenue { get; private set; } = Credits.Zero;
 
-    /// <summary>Goods removed from origin owners (cargo conservation accounting, §5.6).</summary>
-    public decimal CargoPickedUp { get; private set; }
-
-    public decimal CargoDelivered { get; private set; }
-
-    public decimal CargoLost { get; private set; }
-
     // ---- inflation-monitor state (§5.8) ----
     public decimal FaucetMultiplier { get; set; } = 1.0m;
 
     // ---- counters surfaced as telemetry ----
     public long ContractsFulfilled { get; private set; }
 
+    /// <summary>Contracts whose performer failed: cargo lost, or never delivered.</summary>
     public long ContractsBreached { get; private set; }
 
+    /// <summary>Contracts whose payer didn't pay (outside the Accord).</summary>
+    public long ContractsDefaulted { get; private set; }
+
     public long IncidentsOccurred { get; private set; }
+
+    /// <summary>Goods handed over under Sales, all goods together.</summary>
+    public decimal GoodsSold { get; private set; }
 
     public IReadOnlyDictionary<ActorId, ActorState> Actors => _actors;
 
@@ -113,7 +138,12 @@ public sealed class SimulationContext
     public ContractId NextContractId() => new(_nextContractId++);
 
     // ---- registration ----
-    public void Add(ActorState actor) => _actors[actor.Id] = actor;
+    public void Add(ActorState actor)
+    {
+        _actors[actor.Id] = actor;
+        _actorsOrdered = null;
+        _producersOf.Clear();
+    }
 
     public void Add(Ship ship) => _ships[ship.Id] = ship;
 
@@ -127,11 +157,23 @@ public sealed class SimulationContext
     {
         _routes.Add(route);
         _pathCache.Clear();
+        _adjacent.Clear();
     }
 
     public void Add(Contract contract)
     {
         _contracts[contract.Id] = contract;
+        Index(contract.PostedBy, contract);
+        if (contract.CounterpartyId is { } counterparty)
+        {
+            Index(counterparty, contract);
+        }
+
+        if (contract is StorageContract storage)
+        {
+            _storages.Add(storage);
+            _storageByRenter[(storage.Renter, storage.Location)] = storage;
+        }
 
         // Keep the open list in id order. Contracts arrive in id order, so this is usually an append.
         int index = _openCandidates.FindLastIndex(c => c.Id.Value <= contract.Id.Value);
@@ -197,9 +239,68 @@ public sealed class SimulationContext
 
     public void Record(JournalEntry entry) => Journal.Record(entry);
 
+    /// <summary>Sign a contract for <paramref name="taker"/> at <paramref name="price"/>. Escrow and bonds are <see cref="Market"/>'s.</summary>
+    internal void Sign(Contract contract, ActorState taker, Credits price)
+    {
+        contract.Sign(taker.Id, price, CurrentTick);
+        Index(taker.Id, contract);
+    }
+
+    private void Index(ActorId actor, Contract contract)
+    {
+        if (!_liveByActor.TryGetValue(actor, out List<Contract>? list))
+        {
+            list = new List<Contract>();
+            _liveByActor[actor] = list;
+        }
+
+        if (!list.Contains(contract))
+        {
+            list.Add(contract);
+        }
+    }
+
+    /// <summary>The contracts <paramref name="actor"/> is party to that are open or signed and unsettled, as they stand now.</summary>
+    public IEnumerable<Contract> LiveContractsOf(ActorId actor)
+    {
+        if (!_liveByActor.TryGetValue(actor, out List<Contract>? list))
+        {
+            return Array.Empty<Contract>();
+        }
+
+        list.RemoveAll(c => !c.IsLive);
+        return list.ToArray();
+    }
+
     // ---- world graph helpers ----
     public Route? RouteBetween(LocationId a, LocationId b) =>
         _routes.FirstOrDefault(r => r.Connects(a, b));
+
+    /// <summary>Whether a route joins two locations directly.</summary>
+    public bool Adjacent(LocationId a, LocationId b)
+    {
+        if (_adjacent.Count == 0)
+        {
+            foreach (Route route in _routes)
+            {
+                Neighbour(route.A).Add(route.B);
+                Neighbour(route.B).Add(route.A);
+            }
+        }
+
+        return _adjacent.TryGetValue(a, out HashSet<LocationId>? set) && set.Contains(b);
+    }
+
+    private HashSet<LocationId> Neighbour(LocationId id)
+    {
+        if (!_adjacent.TryGetValue(id, out HashSet<LocationId>? set))
+        {
+            set = new HashSet<LocationId>();
+            _adjacent[id] = set;
+        }
+
+        return set;
+    }
 
     public IEnumerable<Location> Neighbours(LocationId from) =>
         _routes.Where(r => r.A == from || r.B == from)
@@ -295,19 +396,30 @@ public sealed class SimulationContext
         }
     }
 
-    private static bool IsOpen(Contract contract) =>
-        contract.Status is ContractStatus.Open or ContractStatus.Negotiating;
+    private static bool IsOpen(Contract contract) => contract.IsOpen;
 
-    public IEnumerable<ActorState> ActorsOrdered =>
-        _actors.Values.OrderBy(a => a.Id.Value);
+    /// <summary>Every actor, in id order. Actors are never removed, so the order is kept until one is added.</summary>
+    public IReadOnlyList<ActorState> ActorsOrdered => _actorsOrdered ??= _actors.Values.OrderBy(a => a.Id.Value).ToArray();
 
-    /// <summary>Finds the resident producer of a good at a location, if any.</summary>
-    public ActorState? ProducerAt(LocationId location, GoodType good)
+    /// <summary>The producers of a good, in id order.</summary>
+    public IReadOnlyList<ActorState> ProducersOf(GoodType good)
+    {
+        if (!_producersOf.TryGetValue(good, out ActorState[]? producers))
+        {
+            producers = ActorsOrdered.Where(a => a.Producer is { } p && p.Good == good).ToArray();
+            _producersOf[good] = producers;
+        }
+
+        return producers;
+    }
+
+    /// <summary>The station operator at a location, who rents out storage there (design §8.1).</summary>
+    public ActorState? StationOperatorAt(LocationId location)
     {
         foreach (ActorId id in _locations[location].Residents)
         {
             ActorState a = _actors[id];
-            if (a.Producer is { } p && p.Good == good)
+            if (a.Station is not null)
             {
                 return a;
             }
@@ -328,10 +440,12 @@ public sealed class SimulationContext
         return Credits.Of(sum);
     }
 
+    /// <summary>Everything held in escrow, summed over the contracts that hold any (a settled contract holds nothing).</summary>
     public Credits TotalEscrowHeld()
     {
+        _escrowed.RemoveAll(c => c.EscrowHeld.Amount == 0m && !c.IsLive);
         decimal sum = 0m;
-        foreach (Contract c in _contracts.Values)
+        foreach (Contract c in _escrowed)
         {
             sum += c.EscrowHeld.Amount;
         }
@@ -380,6 +494,21 @@ public sealed class SimulationContext
         return true;
     }
 
+    /// <summary>Move as much of <paramref name="amount"/> as the payer has. Returns what moved.</summary>
+    public Credits TransferUpTo(ActorState from, ActorState to, Credits amount)
+    {
+        decimal actual = Math.Min(amount.Amount, Math.Max(0m, from.Credits.Amount));
+        if (actual <= 0m)
+        {
+            return Credits.Zero;
+        }
+
+        var moved = Credits.Of(actual);
+        from.ForceDebit(moved);
+        to.Credit(moved);
+        return moved;
+    }
+
     // ---- escrow (held by the Accord clearing house; counted in TotalCredits) ----
     public bool LockToEscrow(Contract contract, ActorState payer, Credits amount)
     {
@@ -391,6 +520,11 @@ public sealed class SimulationContext
         if (!payer.TryDebit(amount))
         {
             return false;
+        }
+
+        if (contract.EscrowHeld.Amount == 0m && !_escrowed.Contains(contract))
+        {
+            _escrowed.Add(contract);
         }
 
         contract.AddEscrow(amount);
@@ -451,19 +585,183 @@ public sealed class SimulationContext
         GovernmentRevenue += sunk;
     }
 
-    // ---- cargo accounting (§5.6 cargo conservation) ----
-    public void NotePickup(decimal quantity) => CargoPickedUp += quantity;
+    // ---- goods (design §16.1, §20.2). Goods are created only by Produce, destroyed only by Consume and Lose,
+    // and otherwise move between an actor's stock, its storage and ships' holds through the methods below. ----
+    public decimal GoodsProduced(GoodType good) => _produced.GetValueOrDefault(good);
 
-    public void NoteDelivered(decimal quantity) => CargoDelivered += quantity;
+    public decimal GoodsConsumed(GoodType good) => _consumed.GetValueOrDefault(good);
 
-    public void NoteLost(decimal quantity) => CargoLost += quantity;
+    public decimal GoodsLost(GoodType good) => _lost.GetValueOrDefault(good);
+
+    /// <summary>Everything of a good that exists: in stock, in storage and in holds.</summary>
+    public decimal GoodsHeld(GoodType good)
+    {
+        decimal sum = 0m;
+        foreach (ActorState a in _actors.Values)
+        {
+            sum += a.Stock(good);
+        }
+
+        foreach (StorageContract s in _storages)
+        {
+            sum += s.Held(good);
+        }
+
+        foreach (Ship ship in _ships.Values)
+        {
+            foreach (Lot lot in ship.Hold)
+            {
+                if (lot.Good == good)
+                {
+                    sum += lot.Quantity;
+                }
+            }
+        }
+
+        return sum;
+    }
+
+    /// <summary>Make goods into an actor's stock (a producer's output, or a world's starting stock).</summary>
+    public void Produce(ActorState actor, GoodType good, decimal quantity)
+    {
+        if (quantity <= 0m)
+        {
+            return;
+        }
+
+        actor.AddStock(good, quantity);
+        _produced[good] = GoodsProduced(good) + quantity;
+    }
+
+    /// <summary>Use up to <paramref name="quantity"/> from an actor's stock; returns what was used.</summary>
+    public decimal Consume(ActorState actor, GoodType good, decimal quantity)
+    {
+        decimal used = actor.RemoveStock(good, Math.Min(quantity, actor.Available(good)));
+        _consumed[good] = GoodsConsumed(good) + used;
+        actor.NoteConsumed(good, used);
+        return used;
+    }
+
+    /// <summary>Book goods already taken out of a holding as lost (a transit incident).</summary>
+    public void Lose(GoodType good, decimal quantity)
+    {
+        if (quantity > 0m)
+        {
+            _lost[good] = GoodsLost(good) + quantity;
+        }
+    }
+
+    /// <summary>Take goods out of an actor's stock: set-aside goods for the sale they were set aside for, or free ones. Stock is fresh.</summary>
+    public Cargo TakeFromStock(ActorState owner, GoodType good, decimal quantity, bool reserved)
+    {
+        decimal taken = owner.RemoveStock(good, Math.Min(quantity, reserved ? owner.Stock(good) : owner.Available(good)));
+        if (reserved)
+        {
+            owner.Unreserve(good, taken);
+        }
+
+        return Cargo.Fresh(good, taken);
+    }
+
+    /// <summary>Put goods into an actor's stock. A facility's stock doesn't track quality.</summary>
+    public void PutInStock(ActorState owner, Cargo cargo) => owner.AddStock(cargo.Good, cargo.Quantity);
+
+    public void ReserveStock(ActorState owner, GoodType good, decimal quantity) => owner.Reserve(good, quantity);
+
+    public void UnreserveStock(ActorState owner, GoodType good, decimal quantity) => owner.Unreserve(good, quantity);
+
+    /// <summary>The renter's open store at a location, if it has one.</summary>
+    public StorageContract? StorageOf(ActorId renter, LocationId location) =>
+        _storageByRenter.TryGetValue((renter, location), out StorageContract? storage) ? storage : null;
+
+    /// <summary>The open stores at a location, in the order they were opened.</summary>
+    public IEnumerable<StorageContract> StoragesAt(LocationId location) =>
+        _storages.Where(s => s.Location == location).ToArray();
+
+    /// <summary>The renter's open stores, in the order they were opened.</summary>
+    public IEnumerable<StorageContract> StoragesOf(ActorId renter) =>
+        _storages.Where(s => s.Renter == renter).ToArray();
+
+    /// <summary>Put goods into the owner's storage at a location, renting it from the station operator first if needed.</summary>
+    public StorageContract PutInStorage(ActorState owner, LocationId location, Cargo cargo)
+    {
+        StorageContract storage = StorageOf(owner.Id, location) ?? OpenStorage(owner, location);
+        SettleRent(storage);
+        storage.Deposit(cargo, CurrentTick);
+        return storage;
+    }
+
+    /// <summary>Take goods out of the owner's storage at a location; the store closes when it is empty.</summary>
+    public Cargo TakeFromStorage(ActorState owner, LocationId location, GoodType good, decimal quantity, bool reserved)
+    {
+        StorageContract? storage = StorageOf(owner.Id, location);
+        if (storage is null)
+        {
+            return new Cargo(good, 0m, 1m);
+        }
+
+        SettleRent(storage);
+        Cargo taken = storage.Withdraw(good, quantity, CurrentTick, reserved);
+        if (storage.QuantityHeld <= 0m)
+        {
+            storage.Close();
+            _storageByRenter.Remove((owner.Id, location));
+            _storages.Remove(storage);
+            Record(new StorageClosedEntry(CurrentTick, storage.Id, owner.Id, storage.RentPaid));
+        }
+
+        return taken;
+    }
+
+    public void ReserveStorage(StorageContract storage, GoodType good, decimal quantity) => storage.Reserve(good, quantity);
+
+    public void UnreserveStorage(StorageContract storage, GoodType good, decimal quantity) => storage.Unreserve(good, quantity);
+
+    /// <summary>Charge the rent owed on a store since it was last settled: what the renter can pay goes to the operator.</summary>
+    public void SettleRent(StorageContract storage)
+    {
+        Credits due = storage.RentDue(CurrentTick);
+        Credits paid = due.Amount > 0m
+            ? TransferUpTo(Actor(storage.Renter), Actor(storage.Operator), due)
+            : Credits.Zero;
+        storage.Charged(CurrentTick, paid);
+    }
+
+    private StorageContract OpenStorage(ActorState renter, LocationId location)
+    {
+        ActorState station = StationOperatorAt(location)
+                             ?? throw new InvalidOperationException($"No station operator at {location} to rent storage from.");
+        Location place = Location(location);
+        var storage = new StorageContract(
+            NextContractId(), station.Id, renter.Id, CurrentTick, location, station.Station!.StorageRatePerUnitDay, place.Reach, place.Region);
+        Add(storage);
+        Record(new StorageOpenedEntry(CurrentTick, storage.Id, renter.Id));
+        return storage;
+    }
+
+    /// <summary>Put goods aboard a ship, owned by <paramref name="owner"/>.</summary>
+    public void Load(Ship ship, ActorId owner, Cargo cargo)
+    {
+        if (cargo.Quantity > 0m)
+        {
+            ship.Load(CurrentTick, owner, cargo);
+        }
+    }
+
+    /// <summary>Take an owner's goods out of a ship's hold, as they stand now.</summary>
+    public Cargo Unload(Ship ship, ActorId owner, GoodType good, decimal quantity) =>
+        ship.Unload(CurrentTick, owner, good, quantity);
 
     // ---- counters ----
     public void NoteFulfilled() => ContractsFulfilled++;
 
     public void NoteBreached() => ContractsBreached++;
 
+    public void NoteDefaulted() => ContractsDefaulted++;
+
     public void NoteIncident() => IncidentsOccurred++;
+
+    public void NoteSold(decimal quantity) => GoodsSold += quantity;
 
     // ---- scouting / visibility (§4.6) ----
     public void Scout(ActorId actor, LocationId location) =>

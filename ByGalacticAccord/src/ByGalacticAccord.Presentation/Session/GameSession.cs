@@ -16,10 +16,10 @@ public enum ClockSpeed
     X16 = 16,
 }
 
-/// <summary>What happened when the player tried to take a haul: blocked before signing, or the signing's result.</summary>
-public sealed record HaulOutcome(HaulBlock Block, HaulAcceptance? Acceptance)
+/// <summary>What happened when the player tried to take a contract: blocked before signing, or the signing's result.</summary>
+public sealed record DealOutcome(DealBlock Block, Signing? Signing)
 {
-    public bool Signed => Acceptance == HaulAcceptance.Accepted;
+    public bool Signed => Signing == Engine.Simulation.Signing.Signed;
 }
 
 /// <summary>
@@ -106,22 +106,62 @@ public sealed class GameSession
         return true;
     }
 
-    /// <summary>Take an open haul as posted, through the same checks and signing an AI hauler uses.</summary>
-    public HaulOutcome TakeHaul(ContractId id)
+    /// <summary>
+    /// Take an open contract as posted, through the same checks and market commands an AI actor uses: carry a haul,
+    /// fill a delivered Sale (buying the goods at the source the check picks), or buy a lot and collect it.
+    /// </summary>
+    public DealOutcome Accept(ContractId id)
     {
-        Contract contract = Context.Contract(id);
-        PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(Context, Player, contract);
-        if (!check.Ok)
+        DealOutcome outcome;
+        switch (Context.Contract(id))
         {
-            return new HaulOutcome(check.Block, null);
+            case HaulContract haul:
+            {
+                PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(Context, Player, haul);
+                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.TakeHaul(Context, Player, haul, check.Ship!)) : new DealOutcome(check.Block, null);
+                break;
+            }
+
+            case SaleContract { Side: SaleSide.Wanted } wanted:
+            {
+                PlayerActions.FillFeasibility check = PlayerActions.CheckFill(Context, Player, wanted);
+                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.Fill(Context, Player, wanted, check.Ship!, check.Source!)) : new DealOutcome(check.Block, null);
+                break;
+            }
+
+            case SaleContract lot:
+            {
+                PlayerActions.BuyFeasibility check = PlayerActions.CheckBuy(Context, Player, lot);
+                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.Buy(Context, Player, lot, check.Ship!)) : new DealOutcome(check.Block, null);
+                break;
+            }
+
+            default:
+                outcome = new DealOutcome(DealBlock.NotOpen, null);
+                break;
         }
 
-        HaulAcceptance result = PlayerActions.AcceptHaul(Context, Player, contract, check.Ship!, contract.OfferedPayment, check.RepoTicks);
         Revision++;
-        return new HaulOutcome(HaulBlock.None, result);
+        return outcome;
     }
 
-    /// <summary>The player's contracts that are signed and not yet settled.</summary>
+    /// <summary>Put the player's goods of <paramref name="good"/> from the free ship's hold into storage where it is docked.</summary>
+    public bool Store(GoodType good) => Changed(PlayerActions.Store(Context, Player, PlayerShip, good));
+
+    /// <summary>Load the player's goods of <paramref name="good"/> from storage where the free ship is docked.</summary>
+    public bool Retrieve(GoodType good) => Changed(PlayerActions.Retrieve(Context, Player, PlayerShip, good));
+
+    /// <summary>The player's contracts that are signed and not yet settled, in the order it joined them.</summary>
     public IEnumerable<Contract> PlayerActiveContracts =>
-        PlayerShip.ActiveContract is { } id ? new[] { Context.Contract(id) } : Enumerable.Empty<Contract>();
+        Context.LiveContractsOf(Player.Id).Where(c => c.Status == ContractStatus.Active && c is not StorageContract);
+
+    private bool Changed(bool done)
+    {
+        if (done)
+        {
+            Revision++;
+        }
+
+        return done;
+    }
 }

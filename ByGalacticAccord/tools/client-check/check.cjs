@@ -157,6 +157,9 @@ async function main() {
         check(await page.getAttribute('button[data-speed="Paused"]', 'aria-pressed') === 'true', 'starts paused');
         const rows = await page.locator('.board-row').count();
         check(rows > 0, `the board lists open contracts (${rows})`);
+        const kinds = (await page.locator('.board-row .kind').allTextContents()).map(k => k.trim());
+        check(kinds.every(k => /^(Sale · (wanted|for sale)|Haul)$/.test(k)), `each row names its kind (${[...new Set(kinds)].join(', ')})`);
+        check(await page.locator('[data-testid="ledger"]').count() === 1, 'the ledger is on the screen');
         check(await page.locator('svg.map .node').count() === 7, 'the map draws seven locations');
         check(await page.locator('svg.map .route').count() === 9, 'the map draws nine routes');
         check(await page.locator('svg.map .ship').count() === 10, 'the map draws ten ships');
@@ -172,12 +175,14 @@ async function main() {
         check(await page.locator('.contract-panel .term').count() >= 2, 'the terms read as sentences');
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
 
-        // 3. Accepting it signs it through the engine, while paused.
+        // 3. Accepting it signs it through the engine, while paused, and the ledger lists it.
         await page.click('.contract-panel .button.primary');
         const outcome = (await page.textContent('.contract-panel .outcome')).trim();
-        check(outcome.startsWith('Signed for'), `accepting signs the haul ("${outcome}")`);
-        const firstLog = (await page.locator('.log-line').first().textContent()).trim();
-        check(firstLog.includes('You took'), `the log records it ("${firstLog.slice(0, 80)}…")`);
+        check(outcome.startsWith('Signed for'), `accepting signs it ("${outcome}")`);
+        const firstLog = (await page.locator('.log-line .link-text').first().textContent()).trim();
+        check(firstLog.startsWith('You '), `the log records it ("${firstLog.slice(0, 80)}…")`);
+        const signed = await page.locator('[data-testid="ledger-contracts"] .ledger-line').count();
+        check(signed >= 1, `the ledger lists your contracts (${signed})`);
 
         // 4. The clock runs at 16×; ships move.
         const before = await tick(page);
@@ -192,22 +197,28 @@ async function main() {
         check(shipBefore !== shipAfter, `your ship moved (x ${shipBefore} → ${shipAfter})`);
         await page.screenshot({ path: path.join(shots, '03-running.png'), fullPage: true });
 
-        // 5. Paused, the light theme uses the same layout from the other token set.
+        // 5. Paused, the ledger shows what you own and where: the goods bought for the sale, aboard.
         await page.click('button[data-speed="Paused"]');
+        await page.waitForTimeout(200);
+        const owned = (await page.locator('[data-testid="possessions"] .ledger-line').allTextContents()).map(t => t.trim());
+        check(owned.some(t => t.includes('hold')), `the ledger shows your goods aboard ("${(owned[0] ?? '').slice(0, 80)}")`);
+        await page.locator('[data-testid="ledger"]').screenshot({ path: path.join(shots, '04-ledger.png') });
+
+        // 6. The light theme uses the same layout from the other token set.
         await page.selectOption('.theme select', 'light');
         check(await page.getAttribute('html', 'data-theme') === 'light', 'the light theme applies');
         await page.waitForTimeout(200);
-        await page.screenshot({ path: path.join(shots, '04-light.png'), fullPage: true });
+        await page.screenshot({ path: path.join(shots, '05-light.png'), fullPage: true });
         await page.selectOption('.theme select', 'system');
 
-        // 6. At phone width nothing scrolls sideways.
+        // 7. At phone width nothing scrolls sideways.
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForTimeout(200);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         check(overflow <= 0, `no sideways scroll at 390 px (${overflow} px over)`);
-        await page.screenshot({ path: path.join(shots, '05-phone.png'), fullPage: true });
+        await page.screenshot({ path: path.join(shots, '06-phone.png'), fullPage: true });
 
-        // 7. The engine speed probe, and the same state as desktop .NET.
+        // 8. The engine speed probe, and the same state as desktop .NET.
         await page.setViewportSize({ width: 1024, height: 600 });
         await page.goto(`${base}/?bench=${BENCH_TICKS}&seed=${SEED}`);
         await page.waitForSelector('[data-testid="bench"][data-done="true"]', { timeout: 300000 });

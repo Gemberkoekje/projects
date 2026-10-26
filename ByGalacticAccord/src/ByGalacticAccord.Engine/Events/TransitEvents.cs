@@ -1,5 +1,4 @@
 using System;
-using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
@@ -7,44 +6,64 @@ using ByGalacticAccord.Engine.Simulation;
 namespace ByGalacticAccord.Engine.Events;
 
 /// <summary>
-/// A ship leaves origin for destination (§4.7.3). Goods are picked up here; an incident check is
-/// scheduled mid-route. Nothing tracks the ship in between — it is purely a scheduled arrival.
+/// A ship reaches its job's pickup and loads (§4.7.3): the shipper's goods under a Haul, a lot it bought, or its
+/// owner's goods from storage. A job with a destination leaves laden, with an incident check scheduled
+/// mid-route; nothing tracks the ship in between. A collect-only job ends here. Each transit event names the
+/// job it belongs to and does nothing if the ship has since moved on to another.
 /// </summary>
 public sealed class ShipDeparted : ISimEvent
 {
-    public ShipDeparted(long tick, ContractId contract)
+    public ShipDeparted(long tick, ShipId ship, ShipJob job)
     {
         Tick = tick;
-        Contract = contract;
+        Ship = ship;
+        Job = job;
     }
 
     public long Tick { get; }
 
-    public ContractId Contract { get; }
+    public ShipId Ship { get; }
 
-    public string Describe(SimulationContext context) => $"Ship departs for contract {Contract}.";
+    public ShipJob Job { get; }
+
+    public string Describe(SimulationContext context) => $"Ship {Ship} loads for contract {Job.Main}.";
 
     public void Process(SimulationContext context)
     {
-        Contract contract = context.Contract(Contract);
-        if (contract.Status != ContractStatus.Active || contract.AssignedShip is null)
+        Ship ship = context.Ship(Ship);
+        if (!ReferenceEquals(ship.Job, Job))
         {
             return;
         }
 
-        Ship ship = context.Ship(contract.AssignedShip.Value);
-        ActorState pilot = context.Actor(contract.CounterpartyId!.Value);
+        ship.ReachPickup(Job.Pickup);
+        decimal loaded = Settlement.Load(context, ship, Job);
+        if (Job.Destination is not { } destination)
+        {
+            ship.FinishJob(Tick);
+            return;
+        }
 
-        Settlement.Pickup(context, contract, ship, pilot);
+        if (loaded <= 0m)
+        {
+            // Nothing to carry: the purchase behind it fell through (a default outside the Accord).
+            if (Job.Delivery is { } delivery)
+            {
+                Settlement.Fail(context, context.Contract(delivery), FailureReason.NotDelivered);
+            }
 
-        RoutePlan laden = context.FindPath(contract.OriginLocationId, contract.DestinationLocationId)
-                          ?? throw new InvalidOperationException("Active haul has no laden route.");
+            ship.FinishJob(Tick);
+            return;
+        }
+
+        RoutePlan laden = context.FindPath(Job.Pickup, destination)
+                          ?? throw new InvalidOperationException("A laden job has no route to its destination.");
         long travel = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
         long midRoute = Tick + Math.Max(1, travel / 2);
         long scheduledArrival = Tick + travel;
 
-        ship.SetCourse(ShipCourse.Along(laden, Tick, travel));
-        context.Schedule(new TransitIncidentCheck(midRoute, Contract, scheduledArrival, laden.MaxDanger));
+        ship.DepartLaden(Tick, ShipCourse.Along(laden, Tick, travel));
+        context.Schedule(new TransitIncidentCheck(midRoute, Ship, Job, scheduledArrival, laden.MaxDanger));
     }
 }
 
@@ -54,94 +73,98 @@ public sealed class TransitIncidentCheck : ISimEvent
     private readonly decimal _danger;
     private readonly long _scheduledArrival;
 
-    public TransitIncidentCheck(long tick, ContractId contract, long scheduledArrival, decimal danger)
+    public TransitIncidentCheck(long tick, ShipId ship, ShipJob job, long scheduledArrival, decimal danger)
     {
         Tick = tick;
-        Contract = contract;
+        Ship = ship;
+        Job = job;
         _scheduledArrival = scheduledArrival;
         _danger = danger;
     }
 
     public long Tick { get; }
 
-    public ContractId Contract { get; }
+    public ShipId Ship { get; }
 
-    public string Describe(SimulationContext context) => $"Transit incident check for {Contract}.";
+    public ShipJob Job { get; }
+
+    public string Describe(SimulationContext context) => $"Transit incident check for {Job.Main}.";
 
     public void Process(SimulationContext context)
     {
-        Contract contract = context.Contract(Contract);
-        if (contract.Status != ContractStatus.Active || contract.AssignedShip is null)
+        Ship ship = context.Ship(Ship);
+        if (!ReferenceEquals(ship.Job, Job))
         {
             return;
         }
 
-        Ship ship = context.Ship(contract.AssignedShip.Value);
         decimal probability = context.Config.IncidentProbabilityScale * _danger * ship.Class.IncidentChanceModifier;
-
         if (context.Rng.Chance(probability))
         {
             TransitIncident incident = IncidentResolver.Resolve(context.Rng, _danger, ship.Class);
-            context.Schedule(new TransitIncidentOccurred(Tick, Contract, _scheduledArrival, incident));
+            context.Schedule(new TransitIncidentOccurred(Tick, Ship, Job, _scheduledArrival, incident));
         }
         else
         {
-            context.Schedule(new ShipArrived(_scheduledArrival, Contract));
+            context.Schedule(new ShipArrived(_scheduledArrival, Ship, Job));
         }
     }
 }
 
-/// <summary>Applies a resolved incident's effect to the haul, then schedules arrival (possibly delayed).</summary>
+/// <summary>Applies a resolved incident's effect to the goods aboard, then schedules arrival (possibly delayed).</summary>
 public sealed class TransitIncidentOccurred : ISimEvent
 {
     private readonly long _scheduledArrival;
     private readonly TransitIncident _incident;
 
-    public TransitIncidentOccurred(long tick, ContractId contract, long scheduledArrival, TransitIncident incident)
+    public TransitIncidentOccurred(long tick, ShipId ship, ShipJob job, long scheduledArrival, TransitIncident incident)
     {
         Tick = tick;
-        Contract = contract;
+        Ship = ship;
+        Job = job;
         _scheduledArrival = scheduledArrival;
         _incident = incident;
     }
 
     public long Tick { get; }
 
-    public ContractId Contract { get; }
+    public ShipId Ship { get; }
 
-    public string Describe(SimulationContext context) => $"Transit incident on {Contract}: {_incident.Description}.";
+    public ShipJob Job { get; }
+
+    public string Describe(SimulationContext context) => $"Transit incident on {Job.Main}: {_incident.Description}.";
 
     public void Process(SimulationContext context)
     {
-        Contract contract = context.Contract(Contract);
-        if (contract.Status != ContractStatus.Active || contract.AssignedShip is null)
+        Ship ship = context.Ship(Ship);
+        if (!ReferenceEquals(ship.Job, Job))
         {
             return;
         }
 
-        Ship ship = context.Ship(contract.AssignedShip.Value);
-        ActorState pilot = context.Actor(contract.CounterpartyId!.Value);
-        Cargo cargo = ship.Manifest ?? Cargo.Fresh(contract.Good, contract.Quantity);
-
+        ActorId owner = Job.GoodsOwner;
         switch (_incident.Kind)
         {
             case TransitIncidentKind.CargoDamage:
-                ship.DamageManifest(cargo.Damaged(_incident.QualityLoss));
+                ship.Alter(Tick, owner, Job.Good, cargo => cargo.Damaged(_incident.QualityLoss));
                 break;
             case TransitIncidentKind.PartialLoss:
-            {
-                decimal lost = cargo.Quantity * _incident.QuantityLossFraction;
-                context.NoteLost(lost);
-                ship.DamageManifest(cargo.LosingUnits(lost));
+                ship.Alter(Tick, owner, Job.Good, cargo =>
+                {
+                    decimal lost = cargo.Quantity * _incident.QuantityLossFraction;
+                    context.Lose(Job.Good, lost);
+                    return cargo.LosingUnits(lost);
+                });
                 break;
-            }
-
             case TransitIncidentKind.TotalLoss:
-                context.NoteLost(cargo.Quantity);
-                ship.DamageManifest(cargo.LosingUnits(cargo.Quantity));
+                ship.Alter(Tick, owner, Job.Good, cargo =>
+                {
+                    context.Lose(Job.Good, cargo.Quantity);
+                    return cargo.LosingUnits(cargo.Quantity);
+                });
                 break;
             case TransitIncidentKind.CreditCost:
-                context.ApplySink(pilot, _incident.CreditCost);
+                context.ApplySink(context.Actor(ship.Owner), _incident.CreditCost);
                 break;
             case TransitIncidentKind.MinorDelay:
             default:
@@ -151,63 +174,51 @@ public sealed class TransitIncidentOccurred : ISimEvent
         context.NoteIncident();
         ship.Log(Tick, $"Transit incident: {_incident.Description}.");
         ship.DelayArrival(_incident.DelayTicks);
-        var entry = new IncidentEntry(Tick, Contract, pilot.Id, _incident);
+        var entry = new IncidentEntry(Tick, Job.Main, ship.Owner, _incident);
         context.Record(entry);
 
-        if (context.PlayerActorId == pilot.Id)
+        if (context.PlayerActorId == ship.Owner)
         {
             context.RaisePlayerAlert(entry);
         }
 
-        context.Schedule(new ShipArrived(_scheduledArrival + _incident.DelayTicks, Contract));
+        context.Schedule(new ShipArrived(_scheduledArrival + _incident.DelayTicks, Ship, Job));
     }
 }
 
-/// <summary>Arrival resolves the haul: decay is applied, then the contract is fulfilled or breached (§4.7.3).</summary>
+/// <summary>
+/// Arrival settles the job (§4.7.3): a carrier delivers the shipper's goods under its Haul, a seller hands its own
+/// over under its Sale, or, if the goods were lost on the way, the contract fails.
+/// </summary>
 public sealed class ShipArrived : ISimEvent
 {
-    public ShipArrived(long tick, ContractId contract)
+    public ShipArrived(long tick, ShipId ship, ShipJob job)
     {
         Tick = tick;
-        Contract = contract;
+        Ship = ship;
+        Job = job;
     }
 
     public long Tick { get; }
 
-    public ContractId Contract { get; }
+    public ShipId Ship { get; }
 
-    public string Describe(SimulationContext context) => $"Ship arrives for contract {Contract}.";
+    public ShipJob Job { get; }
+
+    public string Describe(SimulationContext context) => $"Ship {Ship} arrives for contract {Job.Main}.";
 
     public void Process(SimulationContext context)
     {
-        Contract contract = context.Contract(Contract);
-        if (contract.Status != ContractStatus.Active || contract.AssignedShip is null)
+        Ship ship = context.Ship(Ship);
+        if (!ReferenceEquals(ship.Job, Job) || Job.Destination is not { } destination)
         {
             return;
         }
 
-        Ship ship = context.Ship(contract.AssignedShip.Value);
-        ActorState pilot = context.Actor(contract.CounterpartyId!.Value);
-
-        // Perishable quality decays over the actual time in transit, slowed by refrigeration.
-        long transitTicks = Tick - ship.DepartedTick;
-        if (ship.Manifest is { } manifest)
-        {
-            ship.DamageManifest(manifest.Decayed(transitTicks, ship.Class.Preservation));
-        }
-
-        ship.Arrive(Tick, contract.DestinationLocationId);
-        context.ApplySink(pilot, context.Config.DockingFee);
-        context.Scout(pilot.Id, contract.DestinationLocationId);
-
-        decimal deliveredQuantity = ship.Manifest?.Quantity ?? 0m;
-        if (deliveredQuantity <= 0m)
-        {
-            Settlement.Breach(context, contract, ship, Tick);
-        }
-        else
-        {
-            Settlement.Fulfill(context, contract, ship, Tick);
-        }
+        ship.Arrive(Tick, destination);
+        context.ApplySink(context.Actor(ship.Owner), context.Config.DockingFee);
+        context.Scout(ship.Owner, destination);
+        Settlement.Unload(context, ship, Job);
+        ship.FinishJob(Tick);
     }
 }

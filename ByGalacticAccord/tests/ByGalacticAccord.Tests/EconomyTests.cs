@@ -1,3 +1,4 @@
+using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 
@@ -94,9 +95,25 @@ public sealed class EconomyTests
 
     private static void AssertEconomyAlive(SimulationContext context)
     {
-        Assert.True(context.ContractsFulfilled > 500, $"only {context.ContractsFulfilled} hauls fulfilled — the world is too quiet.");
-        Assert.True(context.CargoDelivered > 0m);
-        // Most posted contracts should clear, not rot on the board.
-        Assert.True(context.ContractsFulfilled > context.ContractsBreached * 10);
+        Assert.True(context.ContractsFulfilled > 500, $"only {context.ContractsFulfilled} contracts fulfilled — the world is too quiet.");
+        Assert.True(context.GoodsSold > 0m);
+
+        // Most signed contracts should settle, not fail.
+        Assert.True(context.ContractsFulfilled > (context.ContractsBreached + context.ContractsDefaulted) * 10);
+
+        // All three of S3's kinds are in use, by the AI alone.
+        foreach (ContractType kind in new[] { ContractType.Sale, ContractType.Haul, ContractType.Storage })
+        {
+            Assert.Contains(context.Contracts.Values, c => c.Type == kind && c.Status == ContractStatus.Fulfilled);
+        }
+
+        // Every consumer, frontier included, gets some of everything it wants (plan risk R1).
+        foreach (var actor in context.ActorsOrdered.Where(a => a.Demands.Count > 0))
+        {
+            foreach (var demand in actor.Demands)
+            {
+                Assert.True(actor.Consumed(demand.Good) > 0m, $"{actor.Name} never got any {demand.Good}.");
+            }
+        }
     }
 }

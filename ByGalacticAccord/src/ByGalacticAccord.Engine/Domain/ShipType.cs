@@ -25,6 +25,7 @@ public sealed record ShipClassInfo(
     Credits MarketValue,
     decimal IncidentChanceModifier,
     decimal IncidentSeverityModifier,
+    // How much the hold slows perishable decay: a refrigeration unit leaves a fifth of it (design §15.4).
     decimal Preservation,
     bool RunsHot)
 {
@@ -67,7 +68,7 @@ public static class ShipClasses
             ShipType.RefrigeratedTransport, "Refrigerated Transport",
             CargoCapacity: 140m, SpeedMultiplier: 0.9m,
             RunningCostPerTick: Credits.Of(0.4m), MarketValue: Credits.Of(18_000m),
-            IncidentChanceModifier: 1.0m, IncidentSeverityModifier: 1.0m, Preservation: 0.85m, RunsHot: false),
+            IncidentChanceModifier: 1.0m, IncidentSeverityModifier: 1.0m, Preservation: 0.8m, RunsHot: false),
 
         [ShipType.ArmedFreighter] = new(
             ShipType.ArmedFreighter, "Armed Freighter",

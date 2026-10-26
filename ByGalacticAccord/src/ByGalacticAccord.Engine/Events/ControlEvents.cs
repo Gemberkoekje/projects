@@ -30,30 +30,20 @@ public sealed class ActorHeartbeat : ISimEvent
             return;
         }
 
+        // Ships cost money every day, earning or idle, whoever owns them: the player too (design §6.5).
+        DecisionEngine.ChargeRunningCosts(context, actor);
+
         // The player's actor is driven by the human, not the decision engine (§4.7.3).
         if (!actor.IsPlayer)
         {
-            if (actor.Producer is not null)
-            {
-                DecisionEngine.RunProducer(context, actor);
-            }
-
-            if (actor.Demands.Count > 0)
-            {
-                DecisionEngine.RunConsumer(context, actor);
-            }
-
-            if (actor.MovesCargo)
-            {
-                DecisionEngine.RunHauler(context, actor);
-            }
+            DecisionEngine.Run(context, actor);
         }
 
         context.Schedule(new ActorHeartbeat(Tick + context.Config.HeartbeatInterval, Actor));
     }
 }
 
-/// <summary>Times out an open contract nobody took, keeping the board clean and avoiding orphans (§5.6).</summary>
+/// <summary>Times out an open contract nobody took, keeping the board clean (design §16.2: expired).</summary>
 public sealed class ContractExpiryCheck : ISimEvent
 {
     public ContractExpiryCheck(long tick, ContractId contract)
@@ -70,15 +60,37 @@ public sealed class ContractExpiryCheck : ISimEvent
 
     public void Process(SimulationContext context)
     {
-        if (!context.Contracts.TryGetValue(Contract, out Contract? contract))
+        if (context.Contracts.TryGetValue(Contract, out Contract? contract))
         {
-            return;
+            Market.Expire(context, contract);
         }
+    }
+}
 
-        if (contract.Status is ContractStatus.Open or ContractStatus.Negotiating)
+/// <summary>
+/// S3's stand-in for cancellation for default (S4 makes it the payer's decision): once a signed Sale's late fee
+/// has reached its cap with nothing on its way, it fails, and the seller's bond goes to the buyer.
+/// </summary>
+public sealed class ContractDefaultCheck : ISimEvent
+{
+    public ContractDefaultCheck(long tick, ContractId contract)
+    {
+        Tick = tick;
+        Contract = contract;
+    }
+
+    public long Tick { get; }
+
+    public ContractId Contract { get; }
+
+    public string Describe(SimulationContext context) => $"Default check for {Contract}.";
+
+    public void Process(SimulationContext context)
+    {
+        Contract contract = context.Contract(Contract);
+        if (contract.Status == ContractStatus.Active && !Market.UnderWay(context, contract))
         {
-            contract.MarkExpired();
-            context.Record(new ContractExpiredEntry(context.CurrentTick, Contract));
+            Settlement.Fail(context, contract, FailureReason.NotDelivered);
         }
     }
 }
