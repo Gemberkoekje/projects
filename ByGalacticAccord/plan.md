@@ -56,6 +56,7 @@ foundation is sound; most of the game logic on top of it changes shape.
   about intent or hidden state.
 - **Every failure path gets a test,** for an AI actor and for the player.
 - **Invariants on, always.** Fast tests check them on short runs; soak runs check them over a million ticks.
+- **The code map stays true.** [`CODEMAP.md`](CODEMAP.md) changes in the same commit as the code it describes.
 - **Checked in a browser.** The client is driven by Playwright scripts that screenshot key screens and
   fail on console errors, so interface work is checked like the rest of the code.
 

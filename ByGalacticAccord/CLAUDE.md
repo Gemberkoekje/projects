@@ -1,29 +1,20 @@
-## graphify
+# By Galactic Accord — instructions for agents
 
-Knowledge graph at graphify-out/ (god nodes, communities, cross-file
-relationships). If you generated one, an Obsidian vault lives at
-graphify-out/obsidian/.
+## The code map
 
-INVOCATION: the `graphify` CLI may not be on PATH. The interpreter recorded at
-graphify-out/.graphify_python always works — prefer it:
-  bash:       "$(cat graphify-out/.graphify_python)" -m graphify <args>
-  powershell: & (Get-Content graphify-out/.graphify_python) -m graphify <args>
-(If that file is missing, run graphify once in this folder to recreate it.)
+- **Read [`CODEMAP.md`](CODEMAP.md) first.** It says what is where, what calls what, which events schedule
+  which, and the only paths money and goods move through. Use it to find the file, then read the file:
+  the code is the truth.
+- **Keep it true.** Any commit that adds, removes, renames or moves a file or a type, changes who calls a
+  public member, adds or removes an event, or changes a money or goods path updates `CODEMAP.md` in the
+  same commit, including its "last checked" line. If you find the map wrong, fix it.
 
-Rules:
-- Codebase questions: run `... -m graphify query "<question>"` first (also
-  `path "<A>" "<B>"`, `explain "<concept>"`). Every result line carries
-  `src=<file>` — the real source. Use query to LOCATE, then Read/Edit the actual
-  src= file. Never treat graph or vault text as the source of truth for a fix;
-  it is derived and may lag the code.
-- Staleness: the graph/vault reflect the last extraction and go stale on edit.
-  `... -m graphify update .` re-runs AST and refreshes CODE-derived nodes cheaply
-  (no API cost). Nodes from SEMANTIC extraction (docs, config/YAML, papers,
-  images) are NOT refreshed by AST-only update — those need a full re-extract.
-  So: code edits -> `update .`; doc/config edits -> re-extract, or treat the
-  graph as describing the prior state.
-- graphify-out/obsidian/ (if present) is the human entry point (open in
-  Obsidian): _COMMUNITY_*.md per subsystem, [[wikilinks]] between notes,
-  graph.canvas for the spatial view. For agent work prefer `query` — same
-  relationships, already scoped, with real file paths.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review.
+## Working here
+
+- The design is [`../by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md); Part II is Slice 1.
+  Code comments with a bare `§n` cite the old v0.2 design; `CODEMAP.md` §10 translates. New comments cite
+  v0.3 as "design §n".
+- Work follows the steps of [`plan.md`](plan.md). A finished step gets a log in `log/` (see
+  [`log/README.md`](log/README.md)) and a status line in the plan that links to it.
+- `dotnet build`, `dotnet test` (fast), `dotnet test --filter Category=Soak` (long runs), and
+  `dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42`, all from this folder.

@@ -6,14 +6,15 @@ The `## graphify` section below applies **only to the projects that actually hav
 knowledge graph** — each of these has its own graphify-out/ (graph.json + Obsidian
 vault):
 
-  RayTracer/ · SpaceTraders/ · TheCuratool/ · ByGalacticAccord/ · AdventureEngine/
+  RayTracer/ · SpaceTraders/ · TheCuratool/ · AdventureEngine/
 
 It does **not** apply anywhere else. sts2_decompiled/, DatumPrikker/,
 AiUsageMonitoring/, and HackerMinigames/ were only summarized (not graphed) and have
 no graphify-out/graph.json — ignore the graphify guidance in those folders; see
 graphify-out/PROJECTS_OVERVIEW.md for their summaries. the-curator/ (The Curator, a
 Godot 4 + C# game) is newer than the graph and has none either; follow its own
-the-curator/CLAUDE.md. The root itself has no
+the-curator/CLAUDE.md. ByGalacticAccord/ dropped its graph for a hand-kept code map:
+read and maintain ByGalacticAccord/CODEMAP.md, as ByGalacticAccord/CLAUDE.md says. The root itself has no
 graph.json either, so **cd into one of the graphed project folders above** before
 running the graphify query/path/explain commands; they resolve graphify-out/
 relative to the current directory.

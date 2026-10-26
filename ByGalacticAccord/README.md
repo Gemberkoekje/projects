@@ -14,6 +14,7 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 | [`../by_galactic_accord_gdd_v0.3.md`](../by_galactic_accord_gdd_v0.3.md) | The design. Part II is the spec for **Slice 1, the contract web**: Sale, Haul, Build and Storage contracts, posted and taken by anyone; terms and failure; haggling over game time; ships built from graded parts; information that ages with distance; the browser client. |
 | [`plan.md`](plan.md) | How the current build becomes Slice 1, in ten steps (S1–S10), each with a goal, a deliverable, a check and a status line. |
 | [`log/`](log/README.md) | One log per finished step: what was built, checked and measured, and what the next step should know. |
+| [`CODEMAP.md`](CODEMAP.md) | The code map: what is where, what calls what, and where money and goods move. Kept current with every code change. |
 
 ## The current build
 
@@ -49,16 +50,11 @@ Any `--filter` on the command line replaces the default one, so a filter that ma
 
 ```
 src/ByGalacticAccord.Engine/   the whole simulation: no UI, no I/O, deterministic
-  Domain/        value objects and aggregates: Credits, goods, ships, locations, routes, contracts, typed ids
-  Random/        DeterministicRandom: the seeded, counted PRNG
-  Events/        the discrete events and the stable min-heap queue they run from
-  Actors/        actor state, the greedy-utility decision engine, negotiation
-  Economy/       prices, visibility, the inflation monitor
-  Simulation/    the world (SimulationContext), settlement, invariants, incidents, world
-                 generation, the journal, game time
 src/ByGalacticAccord.Cli/      the soak harness
 tests/ByGalacticAccord.Tests/  xUnit: fast by default; soak-length tests carry [Trait("Category", "Soak")]
 ```
+
+[`CODEMAP.md`](CODEMAP.md) goes file by file.
 
 ## How it works
 
