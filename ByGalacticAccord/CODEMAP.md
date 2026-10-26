@@ -32,6 +32,9 @@ commit. If you find the map wrong, fix it. Section 11 has the commands that rege
 - `ByGalacticAccord.slnx` lists the three. `Directory.Build.props`: net10.0, nullable on, **implicit usings off**
   (every file has explicit `using`s), **warnings are errors**.
 - The test project's `VSTestTestCaseFilter` is `Category!=Soak` unless `--filter` is given.
+- CI: [`../.github/workflows/ci-bygalacticaccord.yml`](../.github/workflows/ci-bygalacticaccord.yml) runs on every
+  push and pull request that touches `ByGalacticAccord/` (or the workflow): restore, Release build, fast tests,
+  soak tests, on Ubuntu.
 
 ## 3. How a run flows
 

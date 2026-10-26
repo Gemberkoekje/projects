@@ -62,12 +62,12 @@ foundation is sound; most of the game logic on top of it changes shape.
 - **Lands directly on `main`, then work stops for review.** There is no PR gate (the user's choice,
   2026-10-26, as for the RayTracer's Vista slices): the user reviews each step on `main`. Its commits and
   its log say what was measured and with which commands.
-- **Green before main.** No CI workflow watches this project, so nothing checks a push afterwards. Before
-  pushing, from a clean working tree: the whole solution builds in Release with no warnings
-  (`dotnet build -c Release`), and every test passes, fast and soak (`dotnet test -c Release`, then
-  `dotnet test -c Release --filter Category=Soak`). Once the client exists (S2), its Playwright checks pass
-  too. Fetch `main` just before pushing; the push must be a fast-forward. If `main` has moved, bring it in
-  and run the checks again.
+- **Green before main.** Before pushing, from a clean working tree: the whole solution builds in Release
+  with no warnings (`dotnet build -c Release`), and every test passes, fast and soak (`dotnet test -c Release`,
+  then `dotnet test -c Release --filter Category=Soak`). Once the client exists (S2), its Playwright checks
+  pass too. Fetch `main` just before pushing; the push must be a fast-forward. If `main` has moved, bring it
+  in and run the checks again. CI (`.github/workflows/ci-bygalacticaccord.yml`, the same build and tests on
+  Ubuntu) then confirms the push; a red run on `main` is fixed before anything else lands.
 
 ## 3. Steps
 

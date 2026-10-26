@@ -1,0 +1,42 @@
+name: CI - By Galactic Accord
+
+on:
+  push:
+    paths:
+      - 'ByGalacticAccord/**'
+      - '.github/workflows/ci-bygalacticaccord.yml'
+  pull_request:
+    paths:
+      - 'ByGalacticAccord/**'
+      - '.github/workflows/ci-bygalacticaccord.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test (ubuntu)
+    # The same check as the plan's "green before main" rule (ByGalacticAccord/plan.md §2):
+    # a Release build with warnings as errors, then the fast tests, then the soak-length tests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore ./ByGalacticAccord/ByGalacticAccord.slnx
+
+      - name: Build
+        run: dotnet build ./ByGalacticAccord/ByGalacticAccord.slnx --no-restore --configuration Release
+
+      # The test project's default filter skips soak-length tests.
+      - name: Test (fast)
+        run: dotnet test ./ByGalacticAccord/ByGalacticAccord.slnx --no-build --configuration Release --verbosity normal
+
+      - name: Test (soak)
+        run: dotnet test ./ByGalacticAccord/ByGalacticAccord.slnx --no-build --configuration Release --verbosity normal --filter Category=Soak
