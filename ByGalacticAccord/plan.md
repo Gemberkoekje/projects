@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-26):** S1, S2 and S3 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md)); S4
-is next. The UI mockup
+**Status (2026-10-26):** S1–S4 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md)); S5 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -46,7 +46,9 @@ foundation is sound; most of the game logic on top of it changes shape.
 | *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
 | *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
 | *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7, S8 (growth and insolvency replace it) |
-| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (cancellation, grace), S5 (raising the offer by negotiation) |
+| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond), S5 (raising the offer by negotiation) |
+| *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (posting and haggling), S6 (what carriers can see) |
+| *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (the player posts wanted Sales and so receives defaults and inspections) |
 | *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
 
 ## 2. How we work
@@ -149,7 +151,12 @@ foundation is sound; most of the game logic on top of it changes shape.
   - A test per §16.3 path, both for an AI actor and through player commands.
   - Soak telemetry counts every failure kind above zero.
   - Escrow reconciles exactly.
-- **Status:** not started.
+- **Status (2026-10-26):** done. Every Sale and Haul carries structured terms in a strict, standard or lenient
+  package, settled per jurisdiction; AI actors decide cancel-or-wait and accept-or-reject by utility, the player
+  at a hard pause; every journal entry records its cause. Over a million ticks invariants hold, escrow reconciles
+  to the cent, every failure kind occurs, and about 110,000 contracts settle with 4.3–4.8% failing. The client
+  reads the terms as sentences and a contract's "why", and lets the player fill through a carrier, walk away,
+  cancel for default and raise an untaken haul. See [`log/S4.md`](log/S4.md).
 
 ### S5 — Posting, responses and haggling
 
