@@ -881,6 +881,28 @@ for a slice hold for every milestone.
   the milestone it belongs to, not added as a slice. A milestone takes its parked items when its
   slices are planned.
 
+*Truth references: the Sunnegga webcam* (since 2026-10-26). Real photos of a known place and time are
+the truth references for judging physics (stock photos and the user's paintings are references for
+taste and composition only). The best source found is Zermatt Bergbahnen's Sunnegga panoramic webcam
+(a Roundshot, about 2290 m above Zermatt, its archive browsable by date and time back to 2020, the
+Matterhorn to the south-west): unedited, at a known place, in every season. Clear mornings and
+evenings are found from MeteoSwiss's open station data (sunshine minutes on Gornergrat in the hours
+after sunrise and before sunset; Zermatt's humidity for mist under a clear sky). The frames are not
+the user's, so they stay local: the user keeps them in the Downloads folder as
+`DD-MM-YYYY-HHMM.webp` (Swiss local time), and a slice that needs one renders Zermatt at the same
+date and time. The frames so far, with the slice that judges each:
+
+| Frame | What it shows | Judges |
+|---|---|---|
+| `12-10-2026-0740` | First light on the Matterhorn's summit over a sea of valley fog, clear sky | M1.13b (the fog), M1.17 (alpenglow) |
+| `25-10-2026-1700` | Overcast; fog filling the valley, wisps lapping the slopes; gold larches; fresh snow among dark trees | M1.13b (the fog's edges); M5 (larches) |
+| `23-08-2026-0630`, `23-08-2026-0640` | Ten minutes either side of first light: the Belt of Venus over shadowed mountains, then only the highest summits orange | M1.17 (the alpenglow match) |
+| `07-05-2026-0600` | Before sunrise in spring: snow down to the forest, blue-grey under the sky's light alone, the forest dark | M1.17 (the snowline and snow in skylight) |
+| `23-08-2026-2010` | Low evening sun on the Matterhorn's upper face, the valley in flat blue shade; a banner cloud | M1.17 (golden hour at +2°); M4 (the banner cloud) |
+| `12-10-2026-1820` | Flat light after the sun has gone behind the western ridge: grey rock, gold larches, soft haze | M1.17 (white balance and rock colour) |
+| `12-10-2026-1810` | Straight into the sun: silhouettes, flare, the webcam's exposure | M1.17 (exposure toward the sun; the flare is the camera's) |
+| `07-05-2026-2040` | Spring sunset: clouds lit pink and orange from below around the summit | M4 (lit clouds) |
+
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
 `Vista.App` / `Vista.Tests` in `RayTracer.slnx`; confirm which `RayTracer.Gpu` pieces
@@ -1729,7 +1751,11 @@ Keep the larger tables (3 s more per atmosphere build), or the old speed? Log: [
   image check), with and without the shadow; the self-test's parity for the pool map, the density and the volume; a dawn sheet in
   which peaks rise out of mist lying in the valleys, judged against real photos (the user's own; others stay local) rather than the
   paintings; a shadow sheet (mist in a ridge's shadow, against the shadowed reference); a morning from formation to break-up; a
-  sheet of the noise's strength; a cost-ledger row and the cost of a misty view (at most 2×).
+  sheet of the noise's strength; a cost-ledger row and the cost of a misty view (at most 2×). **Against the webcam**
+  (`12-10-2026-0740` and `25-10-2026-1700`, the truth references above): under a strong inversion the fog's top is
+  flat and sharp and its body opaque, a white surface seen from above, with frayed, wispy edges where it laps the
+  slopes and ridges standing clear; so the patches and the thinning upward belong at the edges and in weaker pools,
+  not on a strong pool's top. A Zermatt render at the frame's date and time beside it.
 
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
@@ -1812,7 +1838,12 @@ Keep the larger tables (3 s more per atmosphere build), or the old speed? Log: [
   saturated blue-grey under thick haze beside bright snow, where the renders' rock is warm beige-grey (the built-in rocks reflect
   8–19%, so the rock is not too bright). Re-render that sheet's cells under each candidate, with the visibility slider lowered to the
   photo's haze, so the comparison is of the ground's colour and not the air's; the forest's share (the photo's ground lies lower,
-  most of it forest) stays M5's.
+  most of it forest) stays M5's. *Added 2026-10-26:* the Sunnegga webcam's frames (the truth references at the top of this
+  section), each beside a Zermatt render at its date and time: the alpenglow's timing and colour (`23-08-2026-0630` and
+  `-0640`, `12-10-2026-0740`); the snowline and snow under the sky's light alone (`07-05-2026-0600`); golden hour on the high
+  ground only (`23-08-2026-2010`); the rock's colour and the white balance in flat light (`12-10-2026-1820`); the exposure
+  toward the sun (`12-10-2026-1810`). The terrain is not the Matterhorn's, so the comparison is of light, colour and snow,
+  not of shapes.
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).
@@ -1929,7 +1960,13 @@ any of them.
 - **Farmland on the valley floors** (M1.12b): forest covers valley floors where real alpine ones are
   fields and meadows. *Belongs:* M8 (fields beside the props), and Hamlet's fields.
 - **One forest for every place and season** (M1.12b): a single conifer canopy in July colours.
-  *Belongs:* M5 (deciduous and mixed forest, the season's colours).
+  Around Zermatt much of it is larch, a conifer that turns gold in October and drops its needles
+  (`25-10-2026-1700`, `12-10-2026-1820`). *Belongs:* M5 (deciduous and mixed forest, larch, the
+  season's colours).
+- **Banner clouds** (the webcam, `23-08-2026-2010`): the flag of cloud that forms in the lee of a
+  sharp summit when the wind blows across it, the Matterhorn's trademark. *Belongs:* M4, once clouds exist.
+- **Clouds lit from below at sunset** (the webcam, `07-05-2026-2040`; both stock photos): the classic
+  wallpaper sky. *Belongs:* M4.
 - **The meadow's regular banding** (M1.12's close-ups): wavy bands that look like a single-frequency
   pattern. *Belongs:* M5 (grass), checked when grass geometry lands.
 - **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
