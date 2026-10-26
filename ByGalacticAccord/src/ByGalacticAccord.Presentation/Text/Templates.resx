@@ -140,13 +140,13 @@
     <value>The {good} {performer} sold you were lost on the way to {place}. The sale failed.</value>
   </data>
   <data name="DeliveryFailed.NotDelivered.Sale" xml:space="preserve">
-    <value>{performer} did not hand {quantity} {good} to {buyer} at {place} in time. The sale failed and the bond went to the buyer.</value>
+    <value>{performer} never got the {good} for {buyer}: its purchase fell through. The sale failed and its bond went to {buyer}.</value>
   </data>
   <data name="DeliveryFailed.NotDelivered.Sale.You" xml:space="preserve">
-    <value>You did not hand {quantity} {good} to {buyer} at {place} in time. The sale failed and your bond went to the buyer.</value>
+    <value>You never got the {good} for {buyer}: your purchase fell through. The sale failed and your bond went to {buyer}.</value>
   </data>
   <data name="DeliveryFailed.NotDelivered.Sale.ToYou" xml:space="preserve">
-    <value>{performer} did not hand you {quantity} {good} at {place} in time. The sale failed and its bond went to you.</value>
+    <value>{performer} never got the {good} it sold you: its purchase fell through. The sale failed and its bond went to you.</value>
   </data>
   <data name="DeliveryFailed.NotDelivered.Haul" xml:space="preserve">
     <value>{performer} did not deliver {poster}'s {quantity} {good} to {destination} in time. The haul failed.</value>
@@ -776,19 +776,19 @@
     <value>unknown</value>
   </data>
   <data name="Term.Haul" xml:space="preserve">
-    <value>Carry {quantity} {good} of {poster}'s from {origin} to {destination} by {deadline}. No grace. The goods stay {poster}'s.</value>
+    <value>Carry {quantity} {good} of {poster}'s from {origin} to {destination} by {deadline}. The goods stay {poster}'s.</value>
   </data>
   <data name="Term.Sale.Wanted" xml:space="preserve">
-    <value>Hand {quantity} {good} to {poster} at {place} by {deadline}. No grace.</value>
+    <value>Hand {quantity} {good} to {poster} at {place} by {deadline}.</value>
   </data>
   <data name="Term.Sale.ForSale" xml:space="preserve">
     <value>Collect {quantity} {good} from {poster} at {place} by {deadline}; they are yours once handed over.</value>
   </data>
   <data name="Term.Late" xml:space="preserve">
-    <value>If late: {perHour} per hour, up to {cap}, taken from your bond.</value>
+    <value>If late: {perHour} per hour from the deadline, up to {cap}, taken from your bond.</value>
   </data>
   <data name="Term.Late.Frontier" xml:space="preserve">
-    <value>If late: {perHour} per hour, up to {cap}, off what you are paid. Outside the Accord there is no bond to take it from.</value>
+    <value>If late: {perHour} per hour from the deadline, up to {cap}, off what you are paid. Outside the Accord there is no bond to take it from.</value>
   </data>
   <data name="Term.Warranty" xml:space="preserve">
     <value>{good} must arrive at least {min} fresh, or up to {maxRefund} of the price goes back.</value>
@@ -990,5 +990,338 @@
   </data>
   <data name="Bench.Result" xml:space="preserve">
     <value>{ticks} game hours of a world with no player in {ms} ms: {rate} hours a second.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Sale" xml:space="preserve">
+    <value>{performer} handed over only {delivered} of {quantity} {good} at {place}, which these terms count as a failure. The sale failed and its bond went to {buyer}.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Sale.You" xml:space="preserve">
+    <value>You handed over only {delivered} of {quantity} {good} at {place}, which these terms count as a failure. The sale failed and your bond went to {buyer}.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Sale.ToYou" xml:space="preserve">
+    <value>{performer} handed you only {delivered} of {quantity} {good} at {place}, which these terms count as a failure. The sale failed and its bond went to you.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Haul" xml:space="preserve">
+    <value>{performer} delivered only {delivered} of {poster}'s {quantity} {good} to {destination}, which these terms count as a failure: no fee, and its bond went to {poster}.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Haul.You" xml:space="preserve">
+    <value>You delivered only {delivered} of {poster}'s {quantity} {good} to {destination}, which these terms count as a failure: no fee, and your bond went to {poster}.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Haul.ToYou" xml:space="preserve">
+    <value>{performer} delivered only {delivered} of your {quantity} {good} to {destination}, which these terms count as a failure: no fee, and its bond went to you.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Sale" xml:space="preserve">
+    <value>{buyer} rejected the {good} {performer} handed over at {place}, {quality} fresh. The sale failed and its bond went to {buyer}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Sale.You" xml:space="preserve">
+    <value>{buyer} rejected the {good} you handed over at {place}, {quality} fresh. The sale failed and your bond went to {buyer}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Sale.ToYou" xml:space="preserve">
+    <value>You rejected the {good} {performer} handed over at {place}, {quality} fresh. The sale failed and its bond went to you.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Haul" xml:space="preserve">
+    <value>{poster} refused {performer}'s carriage of its {good} to {destination}: they kept only {quality} of their freshness in the hold. No fee, and its bond went to {poster}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Haul.You" xml:space="preserve">
+    <value>{poster} refused your carriage of its {good} to {destination}: they kept only {quality} of their freshness in your hold. No fee, and your bond went to {poster}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Haul.ToYou" xml:space="preserve">
+    <value>You refused {performer}'s carriage of your {good} to {destination}: they kept only {quality} of their freshness in its hold. No fee, and its bond went to you.</value>
+  </data>
+  <data name="Delivered.Liability" xml:space="preserve">
+    <value>Goods lost on the way: {liability} owed for them.</value>
+  </data>
+  <data name="ContractInDefault.Sale" xml:space="preserve">
+    <value>{performer} is in default on the {quantity} {good} for {payer} at {place}: its grace ended with nothing handed over. {payer} may cancel.</value>
+  </data>
+  <data name="ContractInDefault.Sale.You" xml:space="preserve">
+    <value>You are in default on the {quantity} {good} for {payer} at {place}: the grace ended with nothing handed over. {payer} may cancel.</value>
+  </data>
+  <data name="ContractInDefault.Sale.ToYou" xml:space="preserve">
+    <value>{performer} is in default on the {quantity} {good} it owes you at {place}: its grace ended with nothing handed over. You may cancel.</value>
+  </data>
+  <data name="ContractInDefault.Haul" xml:space="preserve">
+    <value>{performer} is in default on {poster}'s haul of {quantity} {good} to {destination}: its grace ended with the goods not delivered.</value>
+  </data>
+  <data name="ContractInDefault.Haul.You" xml:space="preserve">
+    <value>You are in default on {poster}'s haul of {quantity} {good} to {destination}: the grace ended with the goods not delivered.</value>
+  </data>
+  <data name="ContractInDefault.Haul.ToYou" xml:space="preserve">
+    <value>{performer} is in default on your haul of {quantity} {good} to {destination}: its grace ended with the goods not delivered. You may cancel.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Sale" xml:space="preserve">
+    <value>{by} cancelled its purchase of {quantity} {good} from {other} for default and took the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Sale.You" xml:space="preserve">
+    <value>You cancelled your purchase of {quantity} {good} from {other} for default and took the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Sale.ToYou" xml:space="preserve">
+    <value>{by} cancelled the {quantity} {good} you owed it for default and took your bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Haul" xml:space="preserve">
+    <value>{by} cancelled its haul of {quantity} {good} with {other} for default and took the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Haul.You" xml:space="preserve">
+    <value>You cancelled your haul of {quantity} {good} with {other} for default and took the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Haul.ToYou" xml:space="preserve">
+    <value>{by} cancelled the haul of its {quantity} {good} you were carrying for default and took your bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Sale" xml:space="preserve">
+    <value>{by} walked away from selling {quantity} {good} to {other} at {place}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Sale.You" xml:space="preserve">
+    <value>You walked away from selling {quantity} {good} to {other} at {place}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Sale.ToYou" xml:space="preserve">
+    <value>{by} walked away from selling you {quantity} {good} at {place}, paying you a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Sale" xml:space="preserve">
+    <value>{by} walked away from buying {quantity} {good} from {other} at {place}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Sale.You" xml:space="preserve">
+    <value>You walked away from buying {quantity} {good} from {other} at {place}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Sale.ToYou" xml:space="preserve">
+    <value>{by} walked away from buying your {quantity} {good} at {place}, paying you a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Haul" xml:space="preserve">
+    <value>{by} walked away from carrying {poster}'s {quantity} {good} to {destination}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Haul.You" xml:space="preserve">
+    <value>You walked away from carrying {poster}'s {quantity} {good} to {destination}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Haul.ToYou" xml:space="preserve">
+    <value>{by} walked away from carrying your {quantity} {good} to {destination}, paying you a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Haul" xml:space="preserve">
+    <value>{by} called off its haul of {quantity} {good} to {destination} with {other}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Haul.You" xml:space="preserve">
+    <value>You called off your haul of {quantity} {good} to {destination} with {other}, paying a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Haul.ToYou" xml:space="preserve">
+    <value>{by} called off the haul of its {quantity} {good} you were carrying, paying you a break fee of {paid}.</value>
+  </data>
+  <data name="Package.Strict" xml:space="preserve">
+    <value>strict</value>
+  </data>
+  <data name="Package.Standard" xml:space="preserve">
+    <value>standard</value>
+  </data>
+  <data name="Package.Lenient" xml:space="preserve">
+    <value>lenient</value>
+  </data>
+  <data name="Contract.Terms.Package" xml:space="preserve">
+    <value>Terms · {package}</value>
+  </data>
+  <data name="Term.Haul.Them" xml:space="preserve">
+    <value>Carried by {performer}: your {quantity} {good}, from {origin} to {destination} by {deadline}. The goods stay yours.</value>
+  </data>
+  <data name="Term.Grace" xml:space="preserve">
+    <value>After the deadline, {grace} of grace; past that it is in default.</value>
+  </data>
+  <data name="Term.Late.Them" xml:space="preserve">
+    <value>If {performer} is late: {perHour} per hour from the deadline, up to {cap}, paid to you.</value>
+  </data>
+  <data name="Term.Default" xml:space="preserve">
+    <value>Still undelivered when the grace ends, you are in default: {payer} may cancel, take back the escrow and keep your bond, or keep waiting.</value>
+  </data>
+  <data name="Term.Default.Frontier" xml:space="preserve">
+    <value>Still undelivered when the grace ends, you are in default: {payer} may cancel. Outside the Accord there is no bond to lose.</value>
+  </data>
+  <data name="Term.Default.Them" xml:space="preserve">
+    <value>If {performer} hasn't delivered when the grace ends, it is in default: you may cancel, take back the escrow and keep its bond, or keep waiting.</value>
+  </data>
+  <data name="Term.Default.Them.Frontier" xml:space="preserve">
+    <value>If {performer} hasn't delivered when the grace ends, it is in default: you may cancel. Outside the Accord there is no bond to take.</value>
+  </data>
+  <data name="Term.BreakFee" xml:space="preserve">
+    <value>Either side may walk away by paying a break fee of {fee}.</value>
+  </data>
+  <data name="Term.Partial.Failure" xml:space="preserve">
+    <value>A short delivery counts as a failure: nothing is paid for it.</value>
+  </data>
+  <data name="Term.Warranty.Reject" xml:space="preserve">
+    <value>Below {floor} fresh, {payer} may reject it.</value>
+  </data>
+  <data name="Term.Warranty.Reject.You" xml:space="preserve">
+    <value>Below {floor} fresh, you may reject it.</value>
+  </data>
+  <data name="Term.Warranty.Haul" xml:space="preserve">
+    <value>{good} must arrive at least {min} as fresh as when loaded, or up to {maxRefund} of the fee goes back.</value>
+  </data>
+  <data name="Term.Warranty.Haul.Reject" xml:space="preserve">
+    <value>Below {floor} of that, the carriage is refused: no fee, and the bond is forfeited.</value>
+  </data>
+  <data name="Term.Liability" xml:space="preserve">
+    <value>Goods lost on the way cost you {perUnit} a unit, up to {cap}.</value>
+  </data>
+  <data name="Term.Liability.Them" xml:space="preserve">
+    <value>Goods lost on the way cost {performer} {perUnit} a unit, up to {cap}.</value>
+  </data>
+  <data name="Term.Courts.DeepAccord" xml:space="preserve">
+    <value>Deep Accord: its courts collect what escrow can't cover from the party that owes it.</value>
+  </data>
+  <data name="Term.Courts.AccordEdge" xml:space="preserve">
+    <value>At the Accord's edge, remedies go only as far as escrow holds.</value>
+  </data>
+  <data name="Term.Escrow.Haul.Them" xml:space="preserve">
+    <value>On signing, you lock the fee and the tax in Accord escrow, and {performer} locks a bond of {bond}. It is paid at delivery.</value>
+  </data>
+  <data name="Term.Frontier.Haul.Them" xml:space="preserve">
+    <value>Outside the Accord there is no escrow: you pay the fee at delivery.</value>
+  </data>
+  <data name="Status.PartlyFulfilled" xml:space="preserve">
+    <value>Settled short: {performer} delivered part, paid pro rata.</value>
+  </data>
+  <data name="Status.PartlyFulfilled.You" xml:space="preserve">
+    <value>Settled short: you delivered part, paid pro rata.</value>
+  </data>
+  <data name="Status.PartlyFulfilled.ToYou" xml:space="preserve">
+    <value>Settled short: {performer} delivered part, and you paid pro rata.</value>
+  </data>
+  <data name="Status.Cancelled.ForDefault" xml:space="preserve">
+    <value>Cancelled for default by {payer}: {performer}'s bond of {paid} went to it.</value>
+  </data>
+  <data name="Status.Cancelled.ForDefault.You" xml:space="preserve">
+    <value>Cancelled for default by {payer}: your bond of {paid} went to it.</value>
+  </data>
+  <data name="Status.Cancelled.ForDefault.ToYou" xml:space="preserve">
+    <value>Cancelled for default: you took {performer}'s bond of {paid}.</value>
+  </data>
+  <data name="Status.Cancelled.AtWill" xml:space="preserve">
+    <value>Cancelled by {by}, who paid a break fee of {paid}.</value>
+  </data>
+  <data name="Status.Cancelled.AtWill.You" xml:space="preserve">
+    <value>Cancelled: you walked away and paid a break fee of {paid}.</value>
+  </data>
+  <data name="Status.Cancelled.AtWill.ToYou" xml:space="preserve">
+    <value>Cancelled by {by}, who paid you a break fee of {paid}.</value>
+  </data>
+  <data name="Status.InDefault.You" xml:space="preserve">
+    <value>In default since {when}: {payer} may cancel and take your bond.</value>
+  </data>
+  <data name="Status.InDefault.ToYou" xml:space="preserve">
+    <value>{performer} has been in default since {when}. You may cancel for default.</value>
+  </data>
+  <data name="Status.Yours.Haul.Shipper" xml:space="preserve">
+    <value>Your haul, taken by {performer} for {price}. Due at {destination} {deadline}.</value>
+  </data>
+  <data name="Status.Posted" xml:space="preserve">
+    <value>Your post, open until {deadline}: waiting for a taker.</value>
+  </data>
+  <data name="Action.Broker" xml:space="preserve">
+    <value>Fill via a carrier</value>
+  </data>
+  <data name="Action.Broker.Note" xml:space="preserve">
+    <value>Buy at {source} for {goods}, post a haul to {place} at {fee}: {takeHome} if a carrier takes it in time. If none does, {poster} may cancel and keep your bond of {bond}.</value>
+  </data>
+  <data name="Action.CancelAtWill" xml:space="preserve">
+    <value>Walk away · {fee}</value>
+  </data>
+  <data name="Action.CancelAtWill.Note" xml:space="preserve">
+    <value>Pay the break fee and the contract ends. Anything already moving still finishes its trip.</value>
+  </data>
+  <data name="Action.CancelForDefault" xml:space="preserve">
+    <value>Cancel for default</value>
+  </data>
+  <data name="Action.CancelForDefault.Note" xml:space="preserve">
+    <value>Its bond of {bond} is yours, and your escrow comes back.</value>
+  </data>
+  <data name="Action.CancelForDefault.Note.Frontier" xml:space="preserve">
+    <value>The contract ends. Outside the Accord there is no bond to take.</value>
+  </data>
+  <data name="Action.HaulAgain" xml:space="preserve">
+    <value>Raise the haul · {fee}</value>
+  </data>
+  <data name="Action.HaulAgain.Note" xml:space="preserve">
+    <value>Repost the haul of the goods from {origin} to {destination} a quarter dearer, due {deadline}.</value>
+  </data>
+  <data name="Block.TooLate" xml:space="preserve">
+    <value>Too late for a carrier to find it and deliver in time.</value>
+  </data>
+  <data name="Outcome.Brokered" xml:space="preserve">
+    <value>Signed for {price}. {quantity} {good} bought into storage at {source}, and your haul to {place} posted at {fee}.</value>
+  </data>
+  <data name="Outcome.CancelledAtWill" xml:space="preserve">
+    <value>Cancelled: you paid a break fee of {paid}.</value>
+  </data>
+  <data name="Outcome.CancelledForDefault" xml:space="preserve">
+    <value>Cancelled for default: {paid} of bond is yours.</value>
+  </data>
+  <data name="Outcome.HaulAgain" xml:space="preserve">
+    <value>Posted the haul again at {fee}.</value>
+  </data>
+  <data name="Contract.Why" xml:space="preserve">
+    <value>Why</value>
+  </data>
+  <data name="Why.Lost" xml:space="preserve">
+    <value>Earlier history is no longer kept.</value>
+  </data>
+  <data name="Why.Hidden" xml:space="preserve">
+    <value>Earlier history is out of your sight.</value>
+  </data>
+  <data name="Decision.Title" xml:space="preserve">
+    <value>Paused for your decision</value>
+  </data>
+  <data name="Decision.CancelForDefault.Haul" xml:space="preserve">
+    <value>{performer} is in default on your haul of {quantity} {good} to {destination}: its grace ended {when} with the goods not delivered.</value>
+  </data>
+  <data name="Decision.CancelForDefault.Sale" xml:space="preserve">
+    <value>{performer} is in default on the {quantity} {good} it owes you at {place}: its grace ended {when} with nothing handed over.</value>
+  </data>
+  <data name="Decision.UnderWay" xml:space="preserve">
+    <value>Its ship is due {eta}.</value>
+  </data>
+  <data name="Decision.NothingComing" xml:space="preserve">
+    <value>Nothing is on its way.</value>
+  </data>
+  <data name="Decision.Cancel" xml:space="preserve">
+    <value>Cancel for default</value>
+  </data>
+  <data name="Decision.Cancel.Note" xml:space="preserve">
+    <value>Your {escrow} back from escrow and its bond of {bond}. Anything already on its way is still set down for you.</value>
+  </data>
+  <data name="Decision.Cancel.Note.Frontier" xml:space="preserve">
+    <value>Nothing is held outside the Accord: it ends, and neither side owes the other.</value>
+  </data>
+  <data name="Decision.Wait" xml:space="preserve">
+    <value>Keep waiting</value>
+  </data>
+  <data name="Decision.Wait.Note" xml:space="preserve">
+    <value>The late fee runs at {perHour} an hour up to {cap}. You can still cancel later from the contract.</value>
+  </data>
+  <data name="Decision.Inspection" xml:space="preserve">
+    <value>{performer} hands over {quantity} {good} at {place}, {quality} fresh: below the {floor} under which your warranty lets you reject them.</value>
+  </data>
+  <data name="Decision.Accept" xml:space="preserve">
+    <value>Accept them</value>
+  </data>
+  <data name="Decision.Accept.Note" xml:space="preserve">
+    <value>Pay {payment}: the price less a warranty refund of {refund}.</value>
+  </data>
+  <data name="Decision.Reject" xml:space="preserve">
+    <value>Reject them</value>
+  </data>
+  <data name="Decision.Reject.Note" xml:space="preserve">
+    <value>They stay {performer}'s; your escrow comes back with its bond of {bond}.</value>
+  </data>
+  <data name="Decision.Reject.Note.Frontier" xml:space="preserve">
+    <value>They stay {performer}'s, and you pay nothing.</value>
+  </data>
+  <data name="Ledger.Role.Shipping" xml:space="preserve">
+    <value>shipping with</value>
+  </data>
+  <data name="Ledger.Contract.InDefault" xml:space="preserve">
+    <value>{role} {party} · in default since {when}</value>
+  </data>
+  <data name="Ledger.Post" xml:space="preserve">
+    <value>your post · waiting for a carrier · until {when}</value>
+  </data>
+  <data name="SpeedNote.Decision" xml:space="preserve">
+    <value>waiting for your decision</value>
+  </data>
+  <data name="Party.Taker" xml:space="preserve">
+    <value>whoever takes it</value>
   </data>
 </root>

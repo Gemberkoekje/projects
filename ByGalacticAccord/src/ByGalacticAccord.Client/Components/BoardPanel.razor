@@ -1,4 +1,4 @@
-@* The board (design §11.3): the open contracts you can see, each with kind, jurisdiction, danger and take-home. *@
+@* The board (design §11.3): the open contracts you can see, each with kind, jurisdiction, danger, terms and take-home. *@
 <section class="panel board-panel">
     <div class="panel-head">
         <h2 class="caps">@Model.Title</h2>
@@ -26,6 +26,7 @@
                     <span>@row.Route</span>
                     <span class="danger"><svg width="18" height="6" aria-hidden="true"><line class="route band-@row.Band" x1="1" y1="3" x2="17" y2="3" /></svg>@row.Danger</span>
                     <span>@row.Jurisdiction</span>
+                    <span class="terms">@row.Terms</span>
                     <span>@row.Due</span>
                 </span>
                 @if (row.Note is not null)

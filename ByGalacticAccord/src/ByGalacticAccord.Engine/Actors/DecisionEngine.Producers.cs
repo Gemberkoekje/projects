@@ -112,6 +112,12 @@ public static partial class DecisionEngine
                 continue;
             }
 
+            // Its goods keep fresh in its warehouse; a carrier's standard hold must get them there before the buyer could reject them.
+            if (wanted.Warranty is { } warranty && warranty.Rejectable(new Cargo(wanted.Good, 1m, 1m).Decayed(hours, 0m).Quality))
+            {
+                continue;
+            }
+
             // As posted (S5 brings haggling): the price must cover its ask and a carrier's fee with room to spare.
             Credits fee = HaulFeeEstimate(context, producer.Home, wanted.Place);
             decimal margin = wanted.OfferedPrice.Amount - (ask.Amount * wanted.Quantity) - (fee.Amount * 1.3m);
@@ -143,7 +149,7 @@ public static partial class DecisionEngine
         if (Market.FillViaHaul(context, producer, best, best.OfferedPrice, FillSource.FromStock(producer), offer, reservation, out HaulContract? haul) == Signing.Signed
             && haul is not null)
         {
-            producer.Prices(new PriceKey(PriceKind.Haul, profile.Good), 1.6m).Posted(haul.Id);
+            producer.Prices(new PriceKey(PriceKind.Haul, profile.Good), UsualHaulMarkup).Posted(haul.Id);
         }
     }
 

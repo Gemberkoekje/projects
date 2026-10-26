@@ -25,6 +25,24 @@ public sealed class EconomyTests
     public void The_economy_stays_alive_over_200k_ticks(long seed) =>
         AssertEconomyAlive(TestWorld.RunHeadless(seed, 200_000));
 
+    /// <summary>Plan S4's check: over a long run every failure path of design §16.3 that S4 brings happens, and is settled by its terms.</summary>
+    [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
+    [InlineData(42L)]
+    [InlineData(20260619L)]
+    public void Every_failure_path_happens_over_a_million_ticks(long seed)
+    {
+        SimulationContext context = TestWorld.RunHeadless(seed, 1_000_000);
+
+        foreach (FailureKind kind in System.Enum.GetValues<FailureKind>())
+        {
+            Assert.True(context.Failures(kind) > 0, $"No {kind} in a million ticks of seed {seed}.");
+        }
+
+        Assert.True(context.ContractsCancelled > 0 && context.ContractsBreached > 0 && context.ContractsDefaulted > 0);
+        context.AssertSound();
+    }
+
     [Theory]
     [Trait(TestWorld.Category, TestWorld.Soak)]
     [InlineData(1L)]

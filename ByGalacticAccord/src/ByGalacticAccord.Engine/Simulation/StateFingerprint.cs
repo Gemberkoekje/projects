@@ -5,7 +5,7 @@ namespace ByGalacticAccord.Engine.Simulation;
 
 /// <summary>
 /// A compact fingerprint of world state (design §20.1): the clock, the random draws consumed, the money
-/// supply, the settlement counters, the goods sold, and every actor's credits. Two runs with the same seed and commands
+/// supply, the settlement counters (fulfilled, breached, defaulted, cancelled), the goods sold, and every actor's credits. Two runs with the same seed and commands
 /// must match exactly. The tests use it for replay, and the browser check compares the client's
 /// WebAssembly run with a desktop one (plan risk R6).
 /// </summary>
@@ -20,6 +20,7 @@ public static class StateFingerprint
         sb.Append(";ful=").Append(context.ContractsFulfilled.ToString(CultureInfo.InvariantCulture));
         sb.Append(";brc=").Append(context.ContractsBreached.ToString(CultureInfo.InvariantCulture));
         sb.Append(";dft=").Append(context.ContractsDefaulted.ToString(CultureInfo.InvariantCulture));
+        sb.Append(";can=").Append(context.ContractsCancelled.ToString(CultureInfo.InvariantCulture));
         sb.Append(";inc=").Append(context.IncidentsOccurred.ToString(CultureInfo.InvariantCulture));
         sb.Append(";sold=").Append(context.GoodsSold.ToString(CultureInfo.InvariantCulture));
 

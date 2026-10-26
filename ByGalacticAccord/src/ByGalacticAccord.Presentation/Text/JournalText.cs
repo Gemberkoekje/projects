@@ -23,6 +23,10 @@ public static class JournalText
             Key("PaymentDefaulted." + Kind(context, e.Contract, side: false), context, e.Payer, e.Payee),
             Facts(context, e.Contract, ("payer", Name(context, e.Payer)), ("payee", Name(context, e.Payee)))),
         DeliveryFailedEntry e => Failed(context, e),
+        ContractInDefaultEntry e => Templates.Fill(
+            Key("ContractInDefault." + Kind(context, e.Contract, side: false), context, e.Performer, e.Payer),
+            Facts(context, e.Contract, ("performer", Name(context, e.Performer)), ("payer", Name(context, e.Payer)))),
+        ContractCancelledEntry e => Cancelled(context, e),
         ContractExpiredEntry e => Templates.Fill(
             Key("ContractExpired." + Kind(context, e.Contract), context, context.Contract(e.Contract).PostedBy), Facts(context, e.Contract)),
         ContractWithdrawnEntry e => Templates.Fill(
@@ -44,6 +48,8 @@ public static class JournalText
         HaulDeliveredEntry e => e.Hauler,
         PaymentDefaultedEntry e => e.Payer,
         DeliveryFailedEntry e => e.Performer,
+        ContractInDefaultEntry e => e.Performer,
+        ContractCancelledEntry e => e.By,
         StorageOpenedEntry e => e.Renter,
         StorageClosedEntry e => e.Renter,
         IncidentEntry e => e.Hauler,
@@ -51,21 +57,7 @@ public static class JournalText
     };
 
     /// <summary>The contract an entry concerns, if any.</summary>
-    public static ContractId? ContractOf(JournalEntry entry) => entry switch
-    {
-        ContractPostedEntry e => e.Contract,
-        ContractSignedEntry e => e.Contract,
-        GoodsHandedOverEntry e => e.Contract,
-        HaulDeliveredEntry e => e.Contract,
-        PaymentDefaultedEntry e => e.Contract,
-        DeliveryFailedEntry e => e.Contract,
-        ContractExpiredEntry e => e.Contract,
-        ContractWithdrawnEntry e => e.Contract,
-        StorageOpenedEntry e => e.Contract,
-        StorageClosedEntry e => e.Contract,
-        IncidentEntry e => e.Contract,
-        _ => null,
-    };
+    public static ContractId? ContractOf(JournalEntry entry) => entry is IContractEntry e ? e.Contract : null;
 
     /// <summary>A contract's kind as a template key part: "Sale.Wanted", "Sale.ForSale", "Haul", "Storage".</summary>
     public static string Kind(Contract contract, bool side = true) => contract switch
@@ -109,7 +101,10 @@ public static class JournalText
             ("lateFee", Format.Money(e.LateFee)));
         string sentence = Templates.Fill(
             Key(e.TicksLate > 0 ? "HaulDelivered.Late" : "HaulDelivered.OnTime", context, e.Hauler, context.Contract(e.Contract).PostedBy), facts);
-        return Refund(sentence, e.Quality, e.QualityRefund);
+        sentence = Refund(sentence, e.Quality, e.QualityRefund);
+        return e.Liability.Amount > 0m
+            ? sentence + " " + Templates.Fill("Delivered.Liability", ("liability", Format.Money(e.Liability)))
+            : sentence;
     }
 
     private static string Refund(string sentence, decimal quality, Credits refund) =>
@@ -122,7 +117,28 @@ public static class JournalText
         Contract contract = context.Contract(e.Contract);
         return Templates.Fill(
             Key("DeliveryFailed." + e.Reason + "." + Kind(contract, side: false), context, e.Performer, contract.Payer),
-            Facts(context, e.Contract, ("performer", Name(context, e.Performer))));
+            Facts(
+                context, e.Contract,
+                ("performer", Name(context, e.Performer)),
+                ("payer", contract.Payer is { } p ? Name(context, p) : string.Empty),
+                ("delivered", Format.Quantity(e.Delivered)),
+                ("quality", Format.Percent(e.Quality))));
+    }
+
+    // Cancelled for default by the payer, who took the bond; or at will by either party, who paid the break fee.
+    private static string Cancelled(SimulationContext context, ContractCancelledEntry e)
+    {
+        Contract contract = context.Contract(e.Contract);
+        ActorId? other = contract.Other(e.By);
+        string key = "ContractCancelled." + e.Reason + "." + (e.Reason == CancelReason.AtWill && e.By == contract.Payer ? "Payer." : string.Empty)
+                     + Kind(contract, side: false);
+        return Templates.Fill(
+            Key(key, context, e.By, other),
+            Facts(
+                context, e.Contract,
+                ("by", Name(context, e.By)),
+                ("other", other is { } o ? Name(context, o) : string.Empty),
+                ("paid", Format.Money(e.Paid))));
     }
 
     private static string Incident(SimulationContext context, IncidentEntry e)

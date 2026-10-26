@@ -51,6 +51,7 @@ public static class HeaderView
         };
         string speedNote = session.Speed switch
         {
+            ClockSpeed.Paused when session.Decisions.Count > 0 => Templates.Get("SpeedNote.Decision"),
             ClockSpeed.Paused => Templates.Get("SpeedNote.Paused"),
             ClockSpeed.X1 => Templates.Get("SpeedNote.One"),
             _ => Templates.Fill("SpeedNote.Many", ("hours", ((int)session.Speed).ToString(System.Globalization.CultureInfo.InvariantCulture))),

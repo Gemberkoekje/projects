@@ -164,7 +164,7 @@ public sealed class SaleTests
         FillSource source = DecisionEngine.FillSources(context, juno, wanted, ship).Single();
         Assert.Equal(Signing.Signed, Market.FillWithShip(context, juno, wanted, wanted.OfferedPrice, ship, source));
         Credits bond = wanted.LockedBond;
-        Assert.Equal(Credits.Of(800m * Terms.SaleLateCap), bond);
+        Assert.Equal(Credits.Of(120m), bond); // standard terms: the late fee's cap, 15% of the price
         Credits habsBefore = habs.Credits;
 
         context.RunUntilSettled(wanted);
@@ -172,7 +172,7 @@ public sealed class SaleTests
         GoodsHandedOverEntry handed = context.Journal.Entries.OfType<GoodsHandedOverEntry>().Single(e => e.Contract == wanted.Id);
         Assert.Equal(20, handed.TicksLate);
         Credits lateFee = wanted.LatePenalty!.PenaltyFor(20);
-        Assert.Equal(Credits.Of(800m * Terms.SaleLatePerHour * 20m), lateFee);
+        Assert.Equal(Credits.Of(80m), lateFee); // 0.5% of the price an hour, 20 hours
         Assert.Equal(lateFee, handed.LateFee);
 
         // The buyer gets the late fee back out of escrow, on top of its goods.
@@ -226,7 +226,7 @@ public sealed class SaleTests
     }
 
     [Fact]
-    public void A_sale_nothing_is_delivering_fails_when_its_late_fee_is_capped_and_the_bond_goes_to_the_buyer()
+    public void A_sale_nothing_is_delivering_goes_into_default_and_its_buyer_cancels_for_the_bond()
     {
         SimulationContext context = TestWorld.Quiet();
         ActorState habs = context.Actor("Meridian Habs");
@@ -241,13 +241,19 @@ public sealed class SaleTests
         Assert.Equal(60m, farm.Reserved(GoodType.Food));
         Credits bond = wanted.LockedBond;
 
-        context.RunTo(wanted.DefaultTick);
+        context.RunTo(wanted.GraceEndsTick - 1);
+        Assert.Equal(ContractStatus.Active, wanted.Status); // late, but inside its grace
+        context.RunTo(wanted.GraceEndsTick);
 
-        Assert.Equal(ContractStatus.Breached, wanted.Status);
+        // In default, with nothing on its way: the buyer cancels by utility, and takes the seller's bond.
+        Assert.Equal(ContractStatus.Cancelled, wanted.Status);
+        Assert.Equal(new Cancellation(habs.Id, CancelReason.ForDefault, wanted.GraceEndsTick, bond), wanted.Cancellation);
         Assert.Equal(ContractStatus.Expired, haul!.Status);
         Assert.Equal(0m, farm.Reserved(GoodType.Food));
-        DeliveryFailedEntry failed = context.Journal.Entries.OfType<DeliveryFailedEntry>().Single();
-        Assert.Equal((wanted.Id, farm.Id, FailureReason.NotDelivered), (failed.Contract, failed.Performer, failed.Reason));
+        ContractInDefaultEntry inDefault = context.Journal.Entries.OfType<ContractInDefaultEntry>().Single();
+        Assert.Equal((wanted.Id, farm.Id, habs.Id), (inDefault.Contract, inDefault.Performer, inDefault.Payer));
+        ContractCancelledEntry cancelled = context.Journal.Entries.OfType<ContractCancelledEntry>().Single();
+        Assert.Equal((wanted.Id, habs.Id, CancelReason.ForDefault, bond, (long?)inDefault.Seq), (cancelled.Contract, cancelled.By, cancelled.Reason, cancelled.Paid, cancelled.Cause));
 
         // The buyer's escrow came back with the seller's bond on top; the seller lost its bond.
         Assert.Equal(Round(habsBefore.Amount + bond.Amount), Round(habs.Credits.Amount));

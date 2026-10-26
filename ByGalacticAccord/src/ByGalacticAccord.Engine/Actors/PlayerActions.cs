@@ -17,13 +17,14 @@ public enum DealBlock
     NoRoute,
     PickupUnreachable,
     CannotAfford,
+    TooLate,
 }
 
 /// <summary>
 /// The player's commands, through exactly the market commands an AI decision uses (plan §2, "symmetric by
 /// construction"). The player is just an actor (§4.7.3); the only difference is that a human picks the contract
-/// and takes it as posted, where AI actors settle the price in closed form. Checks return codes, not sentences:
-/// the interface's templates turn them into text.
+/// and takes it as posted, and answers the decisions the terms hand it (design §3.4) where an AI decides by
+/// utility. Checks return codes, not sentences: the interface's templates turn them into text.
 /// </summary>
 public static class PlayerActions
 {
@@ -41,6 +42,21 @@ public static class PlayerActions
 
     /// <summary>Whether the player can buy a lot for sale and collect it with a ship.</summary>
     public sealed record BuyFeasibility(DealBlock Block, Ship? Ship)
+    {
+        public bool Ok => Block == DealBlock.None;
+    }
+
+    /// <summary>
+    /// Whether the player can fill a delivered Sale through a carrier, as a trader with no free ship does: buy the goods
+    /// into storage at the source and post a Haul to the place at <see cref="Fee"/>, the usual offer for the trip.
+    /// </summary>
+    public sealed record BrokerFeasibility(DealBlock Block, FillSource? Source, Credits Fee)
+    {
+        public bool Ok => Block == DealBlock.None;
+    }
+
+    /// <summary>Whether the player can post a haul for a Sale it sold whose goods wait with nothing moving them, and at what fee.</summary>
+    public sealed record HaulAgainFeasibility(DealBlock Block, Holding? From, Credits Fee)
     {
         public bool Ok => Block == DealBlock.None;
     }
@@ -183,6 +199,153 @@ public static class PlayerActions
     /// <summary>Buy a lot as posted; the ship goes to collect it.</summary>
     public static Signing Buy(SimulationContext context, ActorState player, SaleContract lot, Ship ship) =>
         Market.BuyLot(context, player, lot, lot.OfferedPrice, Holding.Aboard(ship.Id, lot.Place));
+
+    /// <summary>
+    /// Can the player fill this delivered Sale through a carrier? The source is the producer that gets the goods to the
+    /// place for least, the goods' price and the usual haul fee together. A carrier needs two days to find the haul and
+    /// the trip at standard speed, as a trader brokering allows. The player must be able to pay for the goods and
+    /// their tax, fund the haul, and post its bond on the sale.
+    /// </summary>
+    public static BrokerFeasibility CheckBroker(SimulationContext context, ActorState player, SaleContract wanted)
+    {
+        if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
+        {
+            return new BrokerFeasibility(DealBlock.NotOpen, null, Credits.Zero);
+        }
+
+        FillSource? best = null;
+        Credits bestFee = Credits.Zero;
+        decimal bestCost = decimal.MaxValue;
+        bool late = false;
+        foreach (FillSource source in DecisionEngine.FillSources(context, player, wanted, ship: null))
+        {
+            if (source.At == wanted.Place || context.FindPath(source.At, wanted.Place) is not { } laden || context.StationOperatorAt(source.At) is null)
+            {
+                continue;
+            }
+
+            if (context.CurrentTick + 48 + laden.DistanceTicks > wanted.DeadlineTick)
+            {
+                late = true;
+                continue;
+            }
+
+            Credits fee = DecisionEngine.UsualHaulOffer(context, source.At, wanted.Place);
+            decimal cost = source.PurchasePrice.Amount + fee.Amount;
+            if (cost < bestCost)
+            {
+                best = source;
+                bestFee = fee;
+                bestCost = cost;
+            }
+        }
+
+        if (best is null)
+        {
+            return new BrokerFeasibility(late ? DealBlock.TooLate : DealBlock.NoSource, null, Credits.Zero);
+        }
+
+        decimal goods = best.PurchasePrice.Amount * (1m + Terms.TaxRate(context, context.Location(best.At).Reach));
+        decimal haul = bestFee.Amount * (1m + wanted.TaxRate);
+        decimal bond = wanted.UsesEscrow ? wanted.PerformanceBond.Amount : 0m;
+        if (player.Credits.Amount < goods + haul + bond)
+        {
+            return new BrokerFeasibility(DealBlock.CannotAfford, best, bestFee);
+        }
+
+        return new BrokerFeasibility(DealBlock.None, best, bestFee);
+    }
+
+    /// <summary>Fill a delivered Sale as posted through a carrier: buy the goods into storage at the source and post the haul.</summary>
+    public static Signing Broker(SimulationContext context, ActorState player, SaleContract wanted, FillSource source, Credits fee) =>
+        Market.FillViaHaul(context, player, wanted, wanted.OfferedPrice, source, fee, fee);
+
+    /// <summary>
+    /// Can the player post a haul again for a Sale it sold whose goods wait away from the place with nothing moving them?
+    /// Its untaken haul is withdrawn and reposted a quarter dearer, as an AI seller raises its offer; one that expired
+    /// or was cancelled is replaced the same way. While a carrier near the goods could still deliver inside the sale's grace.
+    /// </summary>
+    public static HaulAgainFeasibility CheckHaulAgain(SimulationContext context, ActorState player, SaleContract sale)
+    {
+        if (sale.Status != ContractStatus.Active || sale.Seller != player.Id || sale.Reserved is not { } from || from.Location == sale.Place
+            || Market.UnderWay(context, sale))
+        {
+            return new HaulAgainFeasibility(DealBlock.NotOpen, null, Credits.Zero);
+        }
+
+        if (context.FindPath(from.Location, sale.Place) is not { } plan)
+        {
+            return new HaulAgainFeasibility(DealBlock.NoRoute, from, Credits.Zero);
+        }
+
+        HaulContract? last = context.Contracts.Values.OfType<HaulContract>().LastOrDefault(h => h.Serves == sale.Id);
+        Credits fee = last is not null ? DecisionEngine.RaisedHaulOffer(last) : DecisionEngine.UsualHaulOffer(context, from.Location, sale.Place);
+        if (context.CurrentTick + plan.DistanceTicks + 24 > sale.GraceEndsTick)
+        {
+            return new HaulAgainFeasibility(DealBlock.TooLate, from, fee);
+        }
+
+        if (!Market.CanFundHaul(context, player, from.Location, sale.Place, fee))
+        {
+            return new HaulAgainFeasibility(DealBlock.CannotAfford, from, fee);
+        }
+
+        return new HaulAgainFeasibility(DealBlock.None, from, fee);
+    }
+
+    /// <summary>Post a haul again for a Sale the player sold, as the check found it: any untaken one is withdrawn first.</summary>
+    public static HaulContract HaulAgain(SimulationContext context, ActorState player, SaleContract sale, Holding from, Credits fee)
+    {
+        foreach (Contract open in context.LiveContractsOf(player.Id))
+        {
+            if (open is HaulContract { IsOpen: true } haul && haul.Serves == sale.Id)
+            {
+                Market.Withdraw(context, haul);
+            }
+        }
+
+        RoutePlan plan = context.FindPath(from.Location, sale.Place)!;
+        return Market.PostHaul(context, player, sale.Good, sale.Quantity, from, sale.Place, fee, fee, DecisionEngine.HaulDeadline(context, sale, plan), sale.Id);
+    }
+
+    /// <summary>Walk away from a signed contract and pay the break fee.</summary>
+    public static bool CancelAtWill(SimulationContext context, ActorState player, Contract contract) =>
+        Market.CancelAtWill(context, contract, player);
+
+    /// <summary>Cancel a contract whose counterparty is in default: the player's escrow back and their bond.</summary>
+    public static bool CancelForDefault(SimulationContext context, ActorState player, Contract contract) =>
+        Market.CancelForDefault(context, contract, player);
+
+    /// <summary>
+    /// Answer a decision the terms handed the player, through the same commands an AI's choice runs: cancel for default
+    /// or wait; accept goods below the warranty's floor, with the refund, or reject them. False if the answer doesn't fit.
+    /// </summary>
+    public static bool Decide(SimulationContext context, ActorState player, PlayerDecision decision, DecisionChoice choice)
+    {
+        if (!decision.Choices.Contains(choice) || context.Contract(decision.Contract) is not { Status: ContractStatus.Active } contract
+            || !context.ResolvePlayerDecision(decision))
+        {
+            return false;
+        }
+
+        switch (choice)
+        {
+            case DecisionChoice.Cancel:
+                Market.CancelForDefault(context, contract, player);
+                break;
+            case DecisionChoice.Accept:
+                Settlement.HandOverReserved(context, (SaleContract)contract, inspected: decision.Quality);
+                break;
+            case DecisionChoice.Reject:
+                Settlement.Fail(context, contract, FailureReason.Rejected, decision.Quantity, decision.Quality);
+                break;
+            case DecisionChoice.Wait:
+            default:
+                break; // the right to cancel stays; the late fee keeps running to its cap
+        }
+
+        return true;
+    }
 
     /// <summary>Put the player's goods aboard a free ship into storage where it is docked.</summary>
     public static bool Store(SimulationContext context, ActorState player, Ship ship, GoodType good)

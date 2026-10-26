@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
@@ -13,10 +14,31 @@ public sealed record MoneyLine(string Label, string Note, string Amount, Tone To
 /// <summary>A labelled value with its explanation: a date, an odds figure, a bond.</summary>
 public sealed record InfoLine(string Label, string Note, string Value, Tone Tone);
 
+/// <summary>What the player can do with a contract besides taking it as posted.</summary>
+public enum ContractCommand
+{
+    /// <summary>Fill a wanted Sale through a carrier.</summary>
+    Broker,
+
+    /// <summary>Walk away from a signed contract and pay the break fee.</summary>
+    CancelAtWill,
+
+    /// <summary>Cancel a contract whose counterparty is in default.</summary>
+    CancelForDefault,
+
+    /// <summary>Post a haul again for a Sale whose goods wait with nothing moving them.</summary>
+    HaulAgain,
+}
+
+/// <summary>One of those commands as a button: its label, what it does, and whether it can be done now.</summary>
+public sealed record ContractAction(ContractCommand Command, string Label, string Note, bool Enabled);
+
 /// <summary>
 /// The contract as a document (design §11.3): parties, obligation, schedule, what it is worth to the player (or, for a
 /// lot, what it costs) line by line, what can't be known for sure, and the terms as plain sentences. For a contract
-/// that is no longer open, the status says what became of it and the estimate is left out.
+/// that is no longer open, the status says what became of it and the estimate is left out. <see cref="Actions"/> are
+/// what else the player can do with it (fill it through a carrier, walk away, cancel for default); <see cref="Why"/>
+/// is its record read back through its causes (design §11.2: "why did this happen?"), newest first.
 /// </summary>
 public sealed record ContractViewModel(
     ContractId Id,
@@ -41,7 +63,11 @@ public sealed record ContractViewModel(
     bool IsOpen,
     bool CanAccept,
     string AcceptLabel,
-    string? Blocked);
+    string? Blocked,
+    IReadOnlyList<ContractAction> Actions,
+    string WhyTitle,
+    IReadOnlyList<LogLine> Why,
+    string? WhyEnd);
 
 /// <summary>Builds the contract panel and words the outcomes of the player's commands.</summary>
 public static class ContractView
@@ -68,7 +94,8 @@ public static class ContractView
         bool canAccept = false;
         string? blocked = null;
 
-        if (contract.IsOpen)
+        var actions = new List<ContractAction>();
+        if (contract.IsOpen && contract.PostedBy != session.Player.Id)
         {
             DealBlock block = Check(session, contract);
             canAccept = block == DealBlock.None;
@@ -78,6 +105,11 @@ public static class ContractView
                 Estimate(session, contract, e, lines, schedule, uncertain);
                 (takeHome, takeTone, takeHomeNote) = Total(session, contract, e);
             }
+
+            if (contract is SaleContract { Side: SaleSide.Wanted } wanted)
+            {
+                actions.Add(BrokerAction(session, wanted));
+            }
         }
         else
         {
@@ -85,15 +117,134 @@ public static class ContractView
             if (contract.Status == ContractStatus.Active && contract.Involves(session.Player.Id))
             {
                 YourSchedule(session, contract, schedule);
+                YourActions(session, contract, actions);
             }
         }
 
+        (List<LogLine> why, string? whyEnd) = Why(session, contract);
         return new ContractViewModel(
             id, kindLine, Head(context, contract), sub, status, statusTone,
             Templates.Get(buying ? "Contract.Cost" : "Contract.Certain"), lines, Templates.Get(buying ? "Cost" : "TakeHome"), takeHome, takeTone, takeHomeNote,
             schedule, Templates.Get("Contract.Uncertain"), uncertain,
-            Templates.Get("Contract.Terms"), Terms(session, contract), poster.Name, partyRole,
-            contract.IsOpen, canAccept, Templates.Get(AcceptKey(contract)), blocked);
+            Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(contract.Terms.Package))), Terms(session, contract), poster.Name, partyRole,
+            contract.IsOpen && contract.PostedBy != session.Player.Id, canAccept, Templates.Get(AcceptKey(contract)), blocked,
+            actions, Templates.Get("Contract.Why"), why, whyEnd);
+    }
+
+    /// <summary>The most a "why" chain reads back.</summary>
+    public const int WhyLines = 6;
+
+    /// <summary>
+    /// A contract's record read back through its causes (design §11.2, §16.2), newest first: from its latest entry to
+    /// whatever led to it, while the journal still keeps it and the player can see it.
+    /// </summary>
+    public static (List<LogLine> Lines, string? End) Why(GameSession session, Contract contract)
+    {
+        SimulationContext context = session.Context;
+        var lines = new List<LogLine>();
+        long? seq = contract.LastEntry;
+        while (seq is { } s && lines.Count < WhyLines)
+        {
+            if (context.Journal.Find(s) is not { } entry)
+            {
+                return (lines, Templates.Get("Why.Lost"));
+            }
+
+            ContractId? about = JournalText.ContractOf(entry);
+            Contract? other = about is { } a ? context.Contract(a) : null;
+            bool yours = JournalText.Subject(entry) == session.Player.Id || other?.Involves(session.Player.Id) == true;
+            if (!yours && other is not null && !Engine.Economy.Visibility.CanSee(context, session.Player, other))
+            {
+                return (lines, Templates.Get("Why.Hidden"));
+            }
+
+            lines.Add(new LogLine(Format.Date(entry.Tick), JournalText.Describe(context, entry), yours, about));
+            seq = entry.Cause;
+        }
+
+        return (lines, null);
+    }
+
+    // Fill a wanted Sale through a carrier: what it would take home, or why it can't.
+    private static ContractAction BrokerAction(GameSession session, SaleContract wanted)
+    {
+        SimulationContext context = session.Context;
+        PlayerActions.BrokerFeasibility check = PlayerActions.CheckBroker(context, session.Player, wanted);
+        string note = check.Ok && DealEstimate.ForBroker(context, session.Player, session.PlayerShip, wanted) is { } e
+            ? Templates.Fill(
+                "Action.Broker.Note",
+                ("source", context.Location(e.Pickup).Name), ("goods", Format.Money(e.Goods + e.GoodsTax)), ("place", context.Location(wanted.Place).Name),
+                ("fee", Format.Money(e.HaulFee)), ("takeHome", Format.Money(e.TakeHome)),
+                ("poster", context.Actor(wanted.PostedBy).Name), ("bond", Format.Money(e.Bond)))
+            : BlockText(session, wanted, check.Block);
+        return new ContractAction(ContractCommand.Broker, Templates.Get("Action.Broker"), note, check.Ok);
+    }
+
+    // On the player's signed contract: post a haul again, cancel for default, or walk away.
+    private static void YourActions(GameSession session, Contract contract, List<ContractAction> actions)
+    {
+        SimulationContext context = session.Context;
+        ActorState player = session.Player;
+        if (contract is SaleContract sale && PlayerActions.CheckHaulAgain(context, player, sale) is { Block: not DealBlock.NotOpen } again)
+        {
+            string note = again.Ok
+                ? Templates.Fill(
+                    "Action.HaulAgain.Note", ("origin", context.Location(again.From!.Value.Location).Name), ("destination", context.Location(sale.Place).Name),
+                    ("deadline", Format.Date(DecisionEngine.HaulDeadline(context, sale, context.FindPath(again.From!.Value.Location, sale.Place)!))))
+                : BlockText(session, sale, again.Block);
+            actions.Add(new ContractAction(ContractCommand.HaulAgain, Templates.Fill("Action.HaulAgain", ("fee", Format.Money(again.Fee))), note, again.Ok));
+        }
+
+        if (contract.Payer == player.Id && contract.InDefault(session.Now))
+        {
+            actions.Add(new ContractAction(
+                ContractCommand.CancelForDefault, Templates.Get("Action.CancelForDefault"),
+                contract.UsesEscrow ? Templates.Fill("Action.CancelForDefault.Note", ("bond", Format.Money(contract.LockedBond))) : Templates.Get("Action.CancelForDefault.Note.Frontier"),
+                true));
+        }
+
+        actions.Add(new ContractAction(
+            ContractCommand.CancelAtWill, Templates.Fill("Action.CancelAtWill", ("fee", Format.Money(contract.Terms.BreakFee))), Templates.Get("Action.CancelAtWill.Note"), true));
+    }
+
+    /// <summary>What came of one of the player's commands on <paramref name="contract"/>.</summary>
+    public static string CommandText(GameSession session, Contract contract, ContractCommand command, bool done)
+    {
+        if (!done)
+        {
+            return Templates.Get("Block.NotOpen");
+        }
+
+        return command switch
+        {
+            ContractCommand.CancelAtWill => Templates.Fill("Outcome.CancelledAtWill", ("paid", Format.Money(contract.Cancellation?.Paid ?? Credits.Zero))),
+            ContractCommand.CancelForDefault => Templates.Fill("Outcome.CancelledForDefault", ("paid", Format.Money(contract.Cancellation?.Paid ?? Credits.Zero))),
+            ContractCommand.HaulAgain => Templates.Fill(
+                "Outcome.HaulAgain",
+                ("fee", Format.Money(session.Context.Contracts.Values.OfType<HaulContract>().Last(h => h.Serves == contract.Id).OfferedPrice))),
+            _ => string.Empty,
+        };
+    }
+
+    /// <summary>What came of the player's attempt to fill <paramref name="wanted"/> through a carrier.</summary>
+    public static string BrokerText(GameSession session, SaleContract wanted, DealOutcome outcome)
+    {
+        SimulationContext context = session.Context;
+        if (outcome.Signing is not { } signing)
+        {
+            return BlockText(session, wanted, outcome.Block);
+        }
+
+        if (signing != Signing.Signed)
+        {
+            return OutcomeText(session, wanted, outcome);
+        }
+
+        HaulContract? haul = context.Contracts.Values.OfType<HaulContract>().LastOrDefault(h => h.Serves == wanted.Id);
+        return Templates.Fill(
+            "Outcome.Brokered", ("price", Format.Money(wanted.Price)), ("quantity", Format.Quantity(wanted.Quantity)), ("good", Templates.Good(wanted.Good)),
+            ("source", context.Location(haul?.Origin ?? wanted.Place).Name), ("place", context.Location(wanted.Place).Name),
+            ("fee", Format.Money(haul?.OfferedPrice ?? Credits.Zero)));
     }
 
     /// <summary>Whether the player could take <paramref name="contract"/> now, and if not, why.</summary>
@@ -153,6 +304,8 @@ public static class ContractView
                 return Templates.Fill("Block.CannotAfford", ("cost", Format.Money(cost)), ("credits", Format.Money(session.Player.Credits)));
             }
 
+            case DealBlock.TooLate:
+                return Templates.Get("Block.TooLate");
             case DealBlock.NotOpen:
             default:
                 return Templates.Get("Block.NotOpen");
@@ -420,71 +573,136 @@ public static class ContractView
         SimulationContext context = session.Context;
         ActorId player = session.Player.Id;
         string Name(ActorId? id) => id is { } a ? context.Actor(a).Name : string.Empty;
+        Cancellation? cancelled = contract.Cancellation;
         var facts = new[]
         {
             ("price", Format.Money(contract.Price)),
             ("taker", Name(contract.CounterpartyId)),
             ("performer", Name(contract.Performer)),
             ("payer", Name(contract.Payer)),
+            ("by", Name(cancelled?.By)),
+            ("paid", Format.Money(cancelled?.Paid ?? Credits.Zero)),
             ("destination", context.Location(Shape(contract).Destination).Name),
             ("place", context.Location(Shape(contract).Pickup).Name),
+            ("deadline", Format.Date(contract.DeadlineTick)),
+            ("when", Format.Date(contract.GraceEndsTick)),
         };
         string Key(string key, ActorId? subject, ActorId? other) =>
             subject == player ? key + ".You" : other == player ? key + ".ToYou" : key;
+        Tone Yours(Tone tone) => contract.Involves(player) ? tone : Tone.Muted;
 
         return contract.Status switch
         {
+            ContractStatus.Open or ContractStatus.Negotiating => (Templates.Fill("Status.Posted", facts), Tone.Yours),
+            ContractStatus.Active when contract.Involves(player) && contract.InDefault(session.Now) =>
+                (Templates.Fill(contract.Performer == player ? "Status.InDefault.You" : "Status.InDefault.ToYou", facts), Tone.Warn),
+            ContractStatus.Active when contract is HaulContract && contract.Payer == player => (Templates.Fill("Status.Yours.Haul.Shipper", facts), Tone.Yours),
             ContractStatus.Active when contract.Involves(player) => (Templates.Fill("Status.Yours." + JournalText.Kind(contract), facts), Tone.Yours),
             ContractStatus.Active => (Templates.Fill("Status.Taken", facts), Tone.Muted),
-            ContractStatus.Fulfilled => (Templates.Fill(Key("Status.Fulfilled", contract.Performer, contract.Payer), facts), contract.Involves(player) ? Tone.Gain : Tone.Muted),
-            ContractStatus.Breached => (Templates.Fill(Key("Status.Breached", contract.Performer, contract.Payer), facts), contract.Involves(player) ? Tone.Loss : Tone.Muted),
-            ContractStatus.Defaulted => (Templates.Fill(Key("Status.Defaulted", contract.Payer, contract.Performer), facts), contract.Involves(player) ? Tone.Loss : Tone.Muted),
+            ContractStatus.Fulfilled => (Templates.Fill(Key("Status.Fulfilled", contract.Performer, contract.Payer), facts), Yours(Tone.Gain)),
+            ContractStatus.PartlyFulfilled => (Templates.Fill(Key("Status.PartlyFulfilled", contract.Performer, contract.Payer), facts), Yours(Tone.Warn)),
+            ContractStatus.Breached => (Templates.Fill(Key("Status.Breached", contract.Performer, contract.Payer), facts), Yours(Tone.Loss)),
+            ContractStatus.Defaulted => (Templates.Fill(Key("Status.Defaulted", contract.Payer, contract.Performer), facts), Yours(Tone.Loss)),
+            ContractStatus.Cancelled when cancelled is { Reason: CancelReason.ForDefault } =>
+                (Templates.Fill(Key("Status.Cancelled.ForDefault", contract.Performer, contract.Payer), facts), Yours(Tone.Loss)),
+            ContractStatus.Cancelled when cancelled is { } c =>
+                (Templates.Fill(Key("Status.Cancelled.AtWill", c.By, contract.Other(c.By)), facts), Yours(Tone.Warn)),
             ContractStatus.Withdrawn => (Templates.Get("Status.Withdrawn"), Tone.Muted),
             _ => (Templates.Get("Status.Expired"), Tone.Muted),
         };
     }
 
+    // The terms as sentences (design §3.4, §11.3), from the player's side: as the performer it would be (or is), or as the
+    // payer, for a lot it would buy or a haul it posted.
     private static IReadOnlyList<string> Terms(GameSession session, Contract contract)
     {
         SimulationContext context = session.Context;
+        ActorId player = session.Player.Id;
         string poster = context.Actor(contract.PostedBy).Name;
+        bool buying = contract is SaleContract { Side: SaleSide.ForSale };
+        bool youPerform = contract.Performer is { } p ? p == player : contract.PostedBy != player && !buying;
+        string performer = contract.Performer is { } q ? context.Actor(q).Name : youPerform || buying ? poster : Templates.Get("Party.Taker");
+        string payer = contract.Payer is { } r ? context.Actor(r).Name : poster;
         (LocationId from, LocationId to, GoodType good, decimal quantity) = Shape(contract);
+        decimal bond = contract.Status == ContractStatus.Open
+            ? System.Math.Min(contract.PerformanceBond.Amount, System.Math.Max(0m, session.Player.Credits.Amount))
+            : contract.LockedBond.Amount;
         var facts = new List<(string Name, string Value)>
         {
             ("poster", poster),
+            ("performer", performer),
+            ("payer", payer),
             ("quantity", Format.Quantity(quantity)),
             ("good", Templates.Good(good)),
             ("origin", context.Location(from).Name),
             ("destination", context.Location(to).Name),
             ("place", context.Location(to).Name),
             ("deadline", Format.Date(contract.DeadlineTick)),
+            ("grace", Format.Duration(contract.Terms.GraceHours)),
             ("tax", Format.Percent(contract.TaxRate)),
-            ("bond", Format.Money(System.Math.Min(contract.PerformanceBond.Amount, System.Math.Max(0m, session.Player.Credits.Amount)))),
+            ("bond", Format.Money(bond)),
+            ("fee", Format.Money(contract.Terms.BreakFee)),
         };
+        string Fill(string key, params (string Name, string Value)[] extra)
+        {
+            var all = new List<(string Name, string Value)>(extra);
+            all.AddRange(facts);
+            return Templates.Fill(key, all.ToArray());
+        }
 
         string kind = JournalText.Kind(contract);
-        var terms = new List<string> { Templates.Fill("Term." + kind, facts.ToArray()) };
-        bool buying = contract is SaleContract { Side: SaleSide.ForSale };
-        if (!buying && contract.LatePenalty is { } late)
+        string them = youPerform ? string.Empty : ".Them";
+        string frontier = contract.UsesEscrow ? string.Empty : ".Frontier";
+        var terms = new List<string> { Fill(contract is HaulContract && !youPerform ? "Term.Haul.Them" : "Term." + kind) };
+        if (!buying)
         {
-            terms.Add(Templates.Fill(
-                contract.UsesEscrow ? "Term.Late" : "Term.Late.Frontier",
-                ("perHour", Format.MoneyCents(late.PenaltyPerTickLate)), ("cap", Format.Money(late.MaxPenalty))));
+            if (contract.Terms.GraceHours > 0)
+            {
+                terms.Add(Fill("Term.Grace"));
+            }
+
+            if (contract.LatePenalty is { } late)
+            {
+                var lateFacts = new[] { ("perHour", Format.MoneyCents(late.PenaltyPerTickLate)), ("cap", Format.Money(late.MaxPenalty)) };
+                terms.Add(Fill(youPerform ? "Term.Late" + frontier : "Term.Late.Them", lateFacts));
+            }
+
+            terms.Add(Fill("Term.Default" + them + frontier));
+        }
+
+        terms.Add(Fill("Term.BreakFee"));
+        if (!buying)
+        {
+            terms.Add(Fill(contract.Terms.Partial == PartialDelivery.ProRata ? "Term.Partial" : "Term.Partial.Failure"));
         }
 
         if (contract.Warranty is { } warranty)
         {
-            terms.Add(Templates.Fill(
-                buying ? "Term.Warranty.Collect" : "Term.Warranty",
-                ("good", Templates.Good(good)), ("min", Format.Percent(warranty.MinQuality)), ("maxRefund", Format.Percent(warranty.MaxRefundFraction))));
+            var w = new[]
+            {
+                ("min", Format.Percent(warranty.MinQuality)),
+                ("maxRefund", Format.Percent(warranty.MaxRefundFraction)),
+                ("floor", Format.Percent(warranty.RejectBelow ?? 0m)),
+            };
+            string key = buying ? "Term.Warranty.Collect" : contract is HaulContract ? "Term.Warranty.Haul" : "Term.Warranty";
+            terms.Add(Fill(key, w));
+            if (warranty.RejectBelow is not null)
+            {
+                terms.Add(Fill(contract is HaulContract ? "Term.Warranty.Haul.Reject" : youPerform ? "Term.Warranty.Reject" : "Term.Warranty.Reject.You", w));
+            }
         }
 
-        if (contract is SaleContract { Side: SaleSide.Wanted })
+        if (contract.Terms.Liability is { } liability)
         {
-            terms.Add(Templates.Get("Term.Partial"));
+            terms.Add(Fill("Term.Liability" + them, ("perUnit", Format.MoneyCents(liability.PerUnit)), ("cap", Format.Money(liability.Cap))));
         }
 
-        terms.Add(Templates.Fill((contract.UsesEscrow ? "Term.Escrow." : "Term.Frontier.") + kind, facts.ToArray()));
+        terms.Add(Fill((contract.UsesEscrow ? "Term.Escrow." : "Term.Frontier.") + kind + (contract is HaulContract ? them : string.Empty)));
+        if (contract.UsesEscrow)
+        {
+            terms.Add(Templates.Get(contract.Arbitrated ? "Term.Courts.DeepAccord" : "Term.Courts.AccordEdge"));
+        }
+
         return terms;
     }
 }

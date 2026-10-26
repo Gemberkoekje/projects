@@ -81,8 +81,9 @@ public sealed class ShipCourseTests
 
             foreach ((ContractId id, long due) in dueAt)
             {
+                // A contract cancelled on the way ends before its ship arrives; every other ends at the arrival.
                 ContractStatus status = context.Contract(id).Status;
-                if (status is not ContractStatus.Active && settled.Add(id))
+                if (status is not ContractStatus.Active && settled.Add(id) && status != ContractStatus.Cancelled)
                 {
                     Assert.Equal(due, t);
                     checkedArrivals++;

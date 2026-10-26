@@ -60,6 +60,7 @@ public sealed class TemplateTests
         Assert.All(Enum.GetValues<ContractType>(), k => Assert.False(string.IsNullOrEmpty(Templates.ContractKind(k))));
         Assert.All(Enum.GetValues<SaleSide>(), s => Assert.False(string.IsNullOrEmpty(Templates.Side(s))));
         Assert.All(Enum.GetValues<ShipType>(), s => Assert.False(string.IsNullOrEmpty(Templates.ShipClass(s))));
+        Assert.All(Enum.GetValues<TermPackage>(), p => Assert.False(string.IsNullOrEmpty(Templates.Package(p))));
     }
 
     [Fact]
@@ -92,9 +93,13 @@ public sealed class TemplateTests
             entries.Add(new ContractExpiredEntry(3, id));
             entries.Add(new ContractWithdrawnEntry(3, id));
             entries.Add(new PaymentDefaultedEntry(7, id, payer, performer));
+            entries.Add(new ContractInDefaultEntry(7, id, performer, payer));
+            entries.Add(new ContractCancelledEntry(8, id, payer, CancelReason.ForDefault, Credits.Of(18m)));
+            entries.Add(new ContractCancelledEntry(8, id, payer, CancelReason.AtWill, Credits.Of(12m)));
+            entries.Add(new ContractCancelledEntry(8, id, performer, CancelReason.AtWill, Credits.Of(12m)));
             foreach (FailureReason reason in Enum.GetValues<FailureReason>())
             {
-                entries.Add(new DeliveryFailedEntry(8, id, performer, reason));
+                entries.Add(new DeliveryFailedEntry(8, id, performer, reason, 30m, 0.4m));
             }
 
             if (contract is SaleContract)
@@ -104,8 +109,8 @@ public sealed class TemplateTests
             }
             else
             {
-                entries.Add(new HaulDeliveredEntry(5, id, performer, 40m, 1m, 0, Credits.Of(120m), Credits.Zero, Credits.Zero));
-                entries.Add(new HaulDeliveredEntry(6, id, performer, 38m, 0.5m, 7, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m)));
+                entries.Add(new HaulDeliveredEntry(5, id, performer, 40m, 1m, 0, Credits.Of(120m), Credits.Zero, Credits.Zero, Credits.Zero));
+                entries.Add(new HaulDeliveredEntry(6, id, performer, 38m, 0.5m, 7, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m), Credits.Of(30m)));
             }
 
             foreach (TransitIncidentKind kind in Enum.GetValues<TransitIncidentKind>())
@@ -147,7 +152,7 @@ public sealed class TemplateTests
         Contract contract = context.Contracts.Values.First();
         ActorId hauler = context.ActorsOrdered.First(a => a.MovesCargo).Id;
 
-        string late = JournalText.Describe(context, new HaulDeliveredEntry(5, contract.Id, hauler, 40m, 0.5m, 30, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m)));
+        string late = JournalText.Describe(context, new HaulDeliveredEntry(5, contract.Id, hauler, 40m, 0.5m, 30, Credits.Of(120m), Credits.Of(14m), Credits.Of(9m), Credits.Zero));
 
         Assert.Contains("1d 6h late", late, StringComparison.Ordinal);
         Assert.Contains("late fee ₵14", late, StringComparison.Ordinal);
@@ -159,7 +164,7 @@ public sealed class TemplateTests
     {
         var sale = new SaleContract(
             context.NextContractId(), poster, 0, side, producer.Producer!.Good, 40m, consumer.Home, Credits.Of(120m), Credits.Of(150m), 0.04m, 500,
-            AccordReach.AccordEdge, "Helios", Array.Empty<ContractClause>());
+            AccordReach.AccordEdge, "Helios", ContractTerms.None);
         context.Add(sale);
         return sale;
     }
@@ -169,7 +174,7 @@ public sealed class TemplateTests
     {
         var haul = new HaulContract(
             context.NextContractId(), shipper, 0, producer.Producer!.Good, 40m, producer.Home, consumer.Home, Holding.StockAt(producer.Home), null,
-            Credits.Of(120m), Credits.Of(150m), 0.04m, 500, AccordReach.AccordEdge, "Helios", Array.Empty<ContractClause>());
+            Credits.Of(120m), Credits.Of(150m), 0.04m, 500, AccordReach.AccordEdge, "Helios", ContractTerms.None);
         context.Add(haul);
         return haul;
     }

@@ -9,8 +9,8 @@ using ByGalacticAccord.Presentation.Text;
 namespace ByGalacticAccord.Presentation.Views;
 
 /// <summary>
-/// One open contract on the board: kind, jurisdiction and danger at a glance, and what it is worth to the player
-/// (design §11.3): the take-home of a haul or a delivered Sale, or the cost of a lot.
+/// One open contract on the board: kind, jurisdiction, danger and term package at a glance, and what it is worth to the
+/// player (design §11.3): the take-home of a haul or a delivered Sale, or the cost of a lot.
 /// </summary>
 public sealed record BoardRow(
     ContractId Id,
@@ -24,6 +24,7 @@ public sealed record BoardRow(
     DangerBand Band,
     string Danger,
     string Jurisdiction,
+    string Terms,
     string Due,
     string? Note,
     Tone NoteTone,
@@ -107,7 +108,7 @@ public static class BoardView
         (string? note, Tone noteTone) = Note(session, contract, block, estimate);
         return new BoardRow(
             contract.Id, contract.Type, Templates.KindLine(contract), title, route, value, tone, rate,
-            band, Templates.Danger(band), Templates.Jurisdiction(contract.Jurisdiction), due, note, noteTone, blocked);
+            band, Templates.Danger(band), Templates.Jurisdiction(contract.Jurisdiction), Templates.Package(contract.Terms.Package), due, note, noteTone, blocked);
     }
 
     // The one thing a row most needs to say beyond its figures: why you can't take it, or what the figures already count against you.

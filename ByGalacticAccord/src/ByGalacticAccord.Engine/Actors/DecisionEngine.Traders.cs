@@ -136,9 +136,32 @@ public static partial class DecisionEngine
             return null;
         }
 
-        long late = Math.Max(0, context.CurrentTick + repoTicks + ladenTicks - haul.DeadlineTick);
-        decimal lateFee = Math.Min(haul.LatePenalty?.PenaltyFor(late).Amount ?? 0m, fee.Amount * Terms.HaulLateCap);
-        decimal profit = fee.Amount - running - context.Config.DockingFee.Amount - lateFee;
+        long arrival = context.CurrentTick + repoTicks + ladenTicks;
+        if (arrival > haul.GraceEndsTick)
+        {
+            return null; // it would be in default before it got there
+        }
+
+        // What the hold does to perishables on the laden leg, as the warranty judges it: against their quality when loaded
+        // (fresh from stock, or as they will stand in storage when the ship comes).
+        decimal quality = 1m;
+        if (haul.Warranty is { } warranty)
+        {
+            decimal loaded = haul.PickupFrom.Kind == HoldingKind.Storage
+                ? context.StorageOf(haul.Shipper, haul.Origin)?.Peek(haul.Good, context.CurrentTick)?.Decayed(repoTicks, 0m).Quality ?? 1m
+                : 1m;
+            decimal arrived = new Cargo(haul.Good, 1m, loaded).Decayed(ladenTicks, cls.Preservation).Quality;
+            quality = loaded <= 0m ? 1m : arrived / loaded;
+            if (warranty.Rejectable(quality))
+            {
+                return null; // the shipper would refuse the carriage
+            }
+        }
+
+        long late = Math.Max(0, arrival - haul.DeadlineTick);
+        decimal lateFee = haul.LatePenalty?.PenaltyFor(late).Amount ?? 0m;
+        decimal refund = fee.Amount * (haul.Warranty?.RefundFraction(quality) ?? 0m);
+        decimal profit = fee.Amount - running - context.Config.DockingFee.Amount - lateFee - refund - TermsRisk(context, trader, haul, ship, laden);
         decimal utility = Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks);
         return utility < Threshold(trader) ? null : new TraderOption(OptionKind.Haul, haul, fee, null, utility);
     }
@@ -161,9 +184,9 @@ public static partial class DecisionEngine
         long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.SpeedMultiplier);
         long ladenTicks = pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.SpeedMultiplier));
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
-        if (arrival > wanted.DefaultTick)
+        if (arrival > wanted.GraceEndsTick)
         {
-            return null; // it would fail before the goods arrived
+            return null; // it would be in default before the goods arrived
         }
 
         decimal purchase = source.PurchasePrice.Amount;
@@ -180,6 +203,11 @@ public static partial class DecisionEngine
         decimal transportMin = ladenTicks > 0
             ? PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount + (cls.RunningCostPerTick.Amount * repoTicks)
             : cls.RunningCostPerTick.Amount * repoTicks;
+        if (wanted.Warranty?.Rejectable(quality) == true)
+        {
+            return null; // the buyer would reject them
+        }
+
         decimal refundShare = wanted.Warranty?.RefundFraction(quality) ?? 0m;
         long late = Math.Max(0, arrival - wanted.DeadlineTick);
         decimal lateFee = wanted.LatePenalty?.PenaltyFor(late).Amount ?? 0m;
@@ -192,7 +220,8 @@ public static partial class DecisionEngine
             return null; // taken as posted (S5 brings haggling), if the price meets the trader's floor
         }
 
-        decimal profit = price.Amount - purchase - purchaseTax - running - docking - lateFee - (price.Amount * refundShare);
+        decimal risk = ladenTicks > 0 ? TermsRisk(context, trader, wanted, ship, laden) : 0m;
+        decimal profit = price.Amount - purchase - purchaseTax - running - docking - lateFee - (price.Amount * refundShare) - risk;
         decimal utility = Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks);
         return utility < Threshold(trader) ? null : new TraderOption(OptionKind.Fill, wanted, price, source, utility);
     }
@@ -203,6 +232,27 @@ public static partial class DecisionEngine
         FillSourceKind.Storage => context.StorageOf(trader.Id, source.At)?.Peek(good, context.CurrentTick)?.Quality ?? 1m,
         _ => 1m,
     };
+
+    /// <summary>
+    /// What a contract's terms stand to cost a carrier if an incident strikes on the laden trip (design §4.3's risk
+    /// adjustment, and §3.4: stricter terms cost more): a total loss forfeits the price and the bond; a partial loss
+    /// fails a strict contract outright and otherwise costs its share and any cargo liability; a delay can push it past
+    /// a short grace. Weighted by the incident odds and by how much the trader minds risk.
+    /// </summary>
+    private static decimal TermsRisk(SimulationContext context, ActorState trader, Contract contract, Ship ship, RoutePlan laden)
+    {
+        decimal odds = Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Class.IncidentChanceModifier, 0m, 1m);
+        decimal price = contract.OfferedPrice.Amount;
+        decimal bond = contract.UsesEscrow ? Math.Min(contract.PerformanceBond.Amount, Math.Max(0m, trader.Credits.Amount)) : 0m;
+        decimal partial = contract.Terms.Partial == PartialDelivery.Failure
+            ? price + bond
+            : (price * 0.2m) + ((contract.Terms.Liability?.Cap.Amount ?? 0m) * 0.2m);
+        decimal delay = contract.Terms.GraceHours < 18 ? bond * 0.5m : 0m;
+        decimal expected = odds * ((IncidentResolver.Share(TransitIncidentKind.PartialLoss) * partial)
+                                   + (IncidentResolver.Share(TransitIncidentKind.TotalLoss) * (price + bond))
+                                   + (IncidentResolver.Share(TransitIncidentKind.MinorDelay) * delay));
+        return expected * (1.5m - trader.Personality.RiskTolerance);
+    }
 
     // utility = expected credit change × risk adjustment × personality weight − opportunity cost (design §4.3).
     private static decimal Utility(ActorState trader, decimal profit, decimal danger, long hours)
@@ -282,6 +332,11 @@ public static partial class DecisionEngine
                 decimal purchaseTax = purchase * Terms.TaxRate(context, context.Location(source.At).Reach);
                 decimal storage = station.Station!.StorageRatePerUnitDay.Amount * wanted.Quantity * 3m;
                 decimal quality = new Cargo(wanted.Good, 1m, 1m).Decayed(48 + laden.DistanceTicks, 0m).Quality;
+                if (wanted.Warranty?.Rejectable(quality) == true)
+                {
+                    continue; // a carrier's standard hold would deliver it spoiled
+                }
+
                 decimal refundShare = wanted.Warranty?.RefundFraction(quality) ?? 0m;
                 decimal costs = purchase + purchaseTax + storage + (fee.Amount * 1.4m);
                 decimal floor = (costs / Math.Max(0.01m, 1m - refundShare)) + 5m;
@@ -314,7 +369,7 @@ public static partial class DecisionEngine
         (Credits offer, Credits reservation) = HaulTerms(context, trader, best.Good, bestFee, bestBudget);
         if (Market.FillViaHaul(context, trader, best, bestPrice, bestSource, offer, reservation, out HaulContract? haul) == Signing.Signed && haul is not null)
         {
-            trader.Prices(new PriceKey(PriceKind.Haul, best.Good), 1.6m).Posted(haul.Id);
+            trader.Prices(new PriceKey(PriceKind.Haul, best.Good), UsualHaulMarkup).Posted(haul.Id);
         }
     }
 
@@ -340,7 +395,8 @@ public static partial class DecisionEngine
                     continue;
                 }
 
-                decimal unit = Goods.Info(lot.Good).BaseValue * 0.7m * Math.Max(0.2m, storage.Peek(lot.Good, context.CurrentTick)?.Quality ?? 1m);
+                decimal quality = storage.Peek(lot.Good, context.CurrentTick)?.Quality ?? 1m;
+                decimal unit = Goods.Info(lot.Good).BaseValue * 0.7m * Math.Max(0.2m, quality);
                 Credits price = Credits.Of(Math.Round(unit * free, 2));
                 Market.PostSale(
                     context, trader, SaleSide.ForSale, lot.Good, free, storage.Location, price, Credits.Of(Math.Round(price.Amount * 0.7m, 2)),

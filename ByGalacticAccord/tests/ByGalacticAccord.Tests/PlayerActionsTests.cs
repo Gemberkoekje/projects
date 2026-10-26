@@ -185,11 +185,61 @@ public sealed class PlayerActionsTests
     }
 
     // A haul of the farm's own food from Verdant to Meridian Station, posted as the farm would after selling it delivered.
-    internal static HaulContract FarmHaul(SimulationContext context, decimal quantity = 40m, long hours = 200)
+    [Fact]
+    public void The_player_fills_a_sale_through_a_carrier_and_is_paid_when_the_haul_hands_it_over()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState habs = context.Actor("Meridian Habs");
+        ActorState juno = context.Actor("Juno Okafor");
+        SaleContract wanted = context.PostWanted(habs, GoodType.Food, 40m, 700m, hours: 200);
+
+        PlayerActions.BrokerFeasibility check = PlayerActions.CheckBroker(context, player, wanted);
+        Assert.True(check.Ok);
+        Assert.Equal((FillSourceKind.Producer, context.Actor("Verdant Agricombine").Id), (check.Source!.Kind, check.Source.Producer!.Value));
+        Assert.Equal(DecisionEngine.UsualHaulOffer(context, check.Source.At, habs.Home), check.Fee);
+        Assert.Equal(Signing.Signed, PlayerActions.Broker(context, player, wanted, check.Source, check.Fee));
+
+        // The goods are the player's, in storage at Verdant, set aside for the sale; the haul is posted at the usual offer.
+        HaulContract haul = context.Contracts.Values.OfType<HaulContract>().Single(h => h.Serves == wanted.Id);
+        Assert.Equal((player.Id, check.Fee, Holding.StorageAt(check.Source.At)), (haul.Shipper, haul.OfferedPrice, haul.PickupFrom));
+        Assert.Equal(40m, context.StorageOf(player.Id, check.Source.At)!.ReservedOf(GoodType.Food));
+        Assert.True(context.ShipOf(player).IsFree); // the player's own ship isn't used
+
+        Assert.Equal(Signing.Signed, Market.TakeHaul(context, juno, haul, context.ShipOf(juno), haul.OfferedPrice));
+        Credits before = player.Credits;
+        context.RunUntilSettled(wanted);
+
+        // Paid the price at the handover, with its bond on the sale back, and nothing for the haul it already locked.
+        Assert.Equal((ContractStatus.Fulfilled, ContractStatus.Fulfilled), (haul.Status, wanted.Status));
+        Assert.Equal(System.Math.Round(before.Amount + wanted.Price.Amount + wanted.LockedBond.Amount, 2), System.Math.Round(player.Credits.Amount, 2));
+        context.AssertSound();
+    }
+
+    [Fact]
+    public void Filling_through_a_carrier_is_refused_when_no_carrier_could_make_it_or_the_player_cant_pay()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        ActorState player = context.Player();
+        ActorState habs = context.Actor("Meridian Habs");
+
+        SaleContract soon = context.PostWanted(habs, GoodType.Food, 40m, 700m, hours: 60); // two days for a carrier to find it, then 30 h
+        Assert.Equal(DealBlock.TooLate, PlayerActions.CheckBroker(context, player, soon).Block);
+
+        SaleContract later = context.PostWanted(habs, GoodType.Food, 40m, 700m, hours: 200);
+        context.ApplySink(player, player.Credits - Credits.Of(50m));
+        Assert.Equal(DealBlock.CannotAfford, PlayerActions.CheckBroker(context, player, later).Block);
+
+        SaleContract lot = Market.PostSale(
+            context, habs, SaleSide.ForSale, GoodType.Food, 10m, habs.Home, Credits.Of(50m), Credits.Of(50m), context.CurrentTick + 10, Holding.StockAt(habs.Home));
+        Assert.Equal(DealBlock.NotOpen, PlayerActions.CheckBroker(context, player, lot).Block);
+    }
+
+    internal static HaulContract FarmHaul(SimulationContext context, decimal quantity = 40m, long hours = 200, TermPackage package = TermPackage.Standard)
     {
         ActorState farm = context.Actor("Verdant Agricombine");
         return Market.PostHaul(
             context, farm, GoodType.Food, quantity, Holding.StockAt(farm.Home), context.Place("Meridian Station").Id,
-            Credits.Of(70m), Credits.Of(90m), context.CurrentTick + hours, serves: null);
+            Credits.Of(70m), Credits.Of(90m), context.CurrentTick + hours, serves: null, package);
     }
 }

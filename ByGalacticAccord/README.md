@@ -18,24 +18,30 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
 ## The current build
 
-**S1 (groundwork), S2 (the browser client) and S3 (possession, Sale and Haul) are done; S4 is next.** Goods
-belong to someone and are somewhere: in an actor's stock, in storage it rents from a station, or in a ship's
-hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed over at a place; a
-**Haul** carries a shipper's goods from one place to another. Consumers post the Sales they need delivered,
-producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying, posting Hauls
-when their ships are busy. Accord space locks escrow and bonds when a contract is signed; outside it the payer
-pays at handover, or defaults. Transit incidents make dangerous routes cost something, and everyone, the
-player included, pays their ships' running costs. Terms, haggling, information and ships change shape in
-S4–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
+**S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul) and S4 (terms and failure) are
+done; S5 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
+over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
+need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
+posting Hauls when their ships are busy. Every contract carries **terms** in a strict, standard or lenient
+package: a deadline and grace, a late fee up to a cap (the bond), cancellation for default or at will for a
+break fee, what a short delivery is, a quality warranty below whose floor goods may be rejected, and a haul's
+liability for goods lost. When a contract goes wrong its terms settle it, and a decision they hand a party
+(cancel or wait, reject or accept) is made by AI actors by utility and by the player at a pause. The deep Accord
+enforces remedies in full, its edge as far as escrow holds, the frontier not at all. Every event in the log
+records its cause, so any outcome reads back as a chain. Haggling, information and ships change shape in
+S5–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
 the soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
 routes styled by danger and ships moving along them, the time bar (pause, 1×, 4×, 16×), the board of open
 Sales and Hauls with each one's take-home, the contract as a document, the ledger of what you own and where,
 and the captain's log, in dark and light themes. You play an independent pilot at Meridian Station with a
-Light Freighter. You can carry a haul, fill a wanted Sale by buying the goods and delivering them, buy a lot
-for sale and collect it, and store goods at a station, all as posted; posting your own contracts and haggling
-arrive in S5.
+Light Freighter. You can carry a haul, fill a wanted Sale by buying the goods and delivering them (or by buying
+them and posting a haul for someone else to carry), buy a lot for sale and collect it, and store goods at a
+station, all as posted; you can walk away from a contract, cancel one whose counterparty is in default, raise
+an untaken haul, and answer the decisions the terms hand you, and every contract shows its terms as sentences
+and what led to it. Posting your own contracts and haggling arrive in S5.
 
 ## Running it
 
@@ -47,7 +53,7 @@ dotnet build
 # Fast tests (the default): unit tests plus short world runs. A few seconds.
 dotnet test
 
-# Soak-length tests: million-tick invariant runs, money supply, monopoly checks. Under a minute.
+# Soak-length tests: million-tick invariant runs, every failure path, money supply, monopoly checks. About a minute.
 dotnet test --filter Category=Soak
 
 # The soak harness: run the world headless, print economy telemetry, assert every invariant.
@@ -91,7 +97,8 @@ tools/client-check/                 the browser check (Playwright)
 - **Determinism** (§20.1). Every random draw comes from the seeded PRNG, and everything that consumes
   randomness iterates in a stable order, so a seed reproduces a run exactly. The tests check it.
 - **Invariants** (§20.2), checked by the soak harness and the tests: credits are conserved to the cent
-  (total = initial + faucet − sinks), escrow reconciles and is never negative, goods are conserved per good
+  (total = initial + faucet − sinks), escrow (held in whole cents) reconciles exactly, is never negative, and
+  is empty once a contract settles, goods are conserved per good
   (produced = consumed + lost + held in stock, storage and holds), nothing is set aside that isn't there, and
   every signed contract is being performed.
 - **Money is `decimal`**, never floating point, so conservation is exact.

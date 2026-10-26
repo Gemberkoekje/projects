@@ -57,11 +57,12 @@ internal static class TestWorld
         }
     }
 
-    /// <summary>Post a delivered wanted Sale as a consumer would: at its home, for its stock.</summary>
-    public static SaleContract PostWanted(this SimulationContext context, ActorState buyer, GoodType good, decimal quantity, decimal price, long hours = 400) =>
+    /// <summary>Post a delivered wanted Sale as a consumer would: at its home, for its stock, on standard terms unless asked.</summary>
+    public static SaleContract PostWanted(
+        this SimulationContext context, ActorState buyer, GoodType good, decimal quantity, decimal price, long hours = 400, TermPackage package = TermPackage.Standard) =>
         Market.PostSale(
             context, buyer, SaleSide.Wanted, good, quantity, buyer.Home, Credits.Of(price), Credits.Of(price * 1.5m),
-            context.CurrentTick + hours, Holding.StockAt(buyer.Home));
+            context.CurrentTick + hours, Holding.StockAt(buyer.Home), package);
 
     /// <summary>The goods conservation and every other invariant hold.</summary>
     public static void AssertSound(this SimulationContext context)

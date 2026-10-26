@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 using ByGalacticAccord.Presentation.Session;
@@ -24,6 +25,8 @@ public sealed class ViewTests
         var kinds = new HashSet<ContractType>();
         int signed = 0;
         int stored = 0;
+        int brokered = 0;
+        int decided = 0;
         bool boughtLot = false;
         int frame = 0;
         while (session.Now < 2_400)
@@ -33,6 +36,14 @@ public sealed class ViewTests
             if (session.Speed == ClockSpeed.Paused)
             {
                 AssertFilled(HeaderView.Build(session).Alerts);
+                foreach (DecisionPrompt prompt in DecisionView.Build(session))
+                {
+                    AssertFilled(prompt.Title, prompt.Text);
+                    AssertFilled(prompt.Options.Select(o => o.Label).Concat(prompt.Options.Select(o => o.Note)));
+                    CheckContract(session, prompt.Contract);
+                    session.Decide(prompt.Decision, prompt.Options[decided++ % prompt.Options.Count].Choice);
+                }
+
                 session.SetSpeed(ClockSpeed.X16);
             }
 
@@ -88,10 +99,21 @@ public sealed class ViewTests
                 CheckContract(session, best.Id);
                 CheckLedger(session);
             }
+
+            // With the ship busy, fill a wanted Sale through a carrier now and then, as a trader brokers.
+            if (!session.PlayerShip.IsFree && brokered < 3 && frame % 48 == 0
+                && board.Rows.FirstOrDefault(r => ContractView.Build(session, r.Id).Actions.Any(a => a.Command == ContractCommand.Broker && a.Enabled)) is { } wanted
+                && session.Broker(wanted.Id).Signed)
+            {
+                brokered++;
+                CheckContract(session, wanted.Id);
+                CheckLedger(session);
+            }
         }
 
         Assert.True(signed >= 3, $"The player signed {signed} deals.");
         Assert.True(boughtLot && stored > 0, $"Bought a lot: {boughtLot}; stored goods {stored} times.");
+        Assert.True(brokered > 0, "The player filled a sale through a carrier.");
         Assert.Contains(ContractType.Sale, kinds);
         Assert.Contains(ContractType.Haul, kinds);
         Assert.Contains(LogView.Build(session, 400).Lines, l => l.Yours);
@@ -171,6 +193,107 @@ public sealed class ViewTests
         Assert.Equal((tycho.Map.Y + rust.Map.Y) / 2.0, y, precision: 6);
     }
 
+    [Theory]
+    [InlineData(TermPackage.Strict)]
+    [InlineData(TermPackage.Standard)]
+    [InlineData(TermPackage.Lenient)]
+    public void The_terms_read_as_sentences_from_the_players_side_for_every_package(TermPackage package)
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        var session = new GameSession(context);
+        ActorState habs = context.Actor("Meridian Habs");
+        ActorState camp = context.Actor("Rust Belt Camp");
+        ActorState farm = context.Actor("Verdant Agricombine");
+
+        // What the player would perform, in the Accord and outside it; a lot it would buy; a haul it posted as shipper.
+        SaleContract wanted = context.PostWanted(habs, GoodType.Food, 40m, 700m, hours: 200, package);
+        SaleContract frontier = context.PostWanted(camp, GoodType.Food, 40m, 900m, hours: 400, package);
+        HaulContract haul = PlayerActionsTests.FarmHaul(context, package: package);
+        SaleContract lot = Market.PostSale(
+            context, farm, SaleSide.ForSale, GoodType.Food, 20m, farm.Home, Credits.Of(150m), Credits.Of(140m), context.CurrentTick + 48, Holding.StockAt(farm.Home), package);
+        session.Broker(frontier.Id);
+        HaulContract posted = context.Contracts.Values.OfType<HaulContract>().Single(h => h.Serves == frontier.Id);
+
+        foreach (Contract contract in new Contract[] { wanted, haul, lot, frontier, posted })
+        {
+            ContractViewModel view = ContractView.Build(session, contract.Id);
+            AssertFilled(view.Terms);
+            AssertFilled(view.TermsTitle);
+            Assert.EndsWith(Presentation.Text.Templates.Package(contract == posted ? TermPackage.Standard : package), view.TermsTitle, System.StringComparison.Ordinal);
+            Assert.All(view.Terms, t => Assert.EndsWith(".", t, System.StringComparison.Ordinal));
+            Assert.Contains(view.Terms, t => t.Contains("break fee", System.StringComparison.Ordinal));
+            if (contract != lot)
+            {
+                Assert.Contains(view.Terms, t => t.Contains("in default", System.StringComparison.Ordinal));
+                Assert.Contains(view.Terms, t => t.Contains("short delivery", System.StringComparison.Ordinal));
+            }
+        }
+
+        // Its own haul reads from the shipper's side; the haul it would carry, from the carrier's; outside the Accord, no bond.
+        Assert.Contains(ContractView.Build(session, posted.Id).Terms, t => t.StartsWith("If ", System.StringComparison.Ordinal) && t.Contains("you may cancel", System.StringComparison.Ordinal));
+        Assert.Contains(ContractView.Build(session, haul.Id).Terms, t => t.StartsWith("Goods lost on the way cost you", System.StringComparison.Ordinal) || package == TermPackage.Lenient);
+        Assert.Contains(ContractView.Build(session, frontier.Id).Terms, t => t.Contains("no bond to lose", System.StringComparison.Ordinal));
+        Assert.Contains(ContractView.Build(session, wanted.Id).Terms, t => t.StartsWith("At the Accord's edge", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_decision_prompt_says_what_happened_and_what_each_answer_does()
+    {
+        (SimulationContext context, SaleContract _, HaulContract haul) = FailurePathTests.PlayerBrokerWithLateCarrier();
+        var session = new GameSession(context);
+        session.Context.RunTo(session.Now + 500);
+
+        DecisionPrompt prompt = Assert.Single(DecisionView.Build(session));
+        Assert.Equal(haul.Id, prompt.Contract);
+        Assert.StartsWith("Pell Mirza is in default on your haul of 40 Food to Meridian Station", prompt.Text, System.StringComparison.Ordinal);
+        Assert.Contains("Its ship is due in", prompt.Text, System.StringComparison.Ordinal);
+        Assert.Equal(new[] { DecisionChoice.Cancel, DecisionChoice.Wait }, prompt.Options.Select(o => o.Choice));
+        Assert.Contains("bond of " + Presentation.Text.Format.Money(haul.LockedBond), prompt.Options[0].Note, System.StringComparison.Ordinal);
+
+        (SimulationContext stale, SaleContract lot, Ship _) = FailurePathTests.PlayerCollectsAStaleLot();
+        DecisionPrompt inspect = Assert.Single(DecisionView.Build(new GameSession(stale)));
+        Assert.Equal(lot.Id, inspect.Contract);
+        Assert.StartsWith("Sable Vance hands over 40 Food at Halcyon Refinery", inspect.Text, System.StringComparison.Ordinal);
+        Assert.Equal(new[] { DecisionChoice.Accept, DecisionChoice.Reject }, inspect.Options.Select(o => o.Choice));
+    }
+
+    [Fact]
+    public void The_why_chain_reads_a_late_sale_back_through_its_late_haul()
+    {
+        (SimulationContext context, SaleContract sale, HaulContract haul) = FailurePathTests.PlayerBrokerWithLateCarrier();
+        var session = new GameSession(context);
+        context.RunTo(context.CurrentTick + 500);
+        session.Decide(session.Decisions.Single(), DecisionChoice.Wait);
+        context.RunUntilSettled(sale);
+
+        ContractViewModel view = ContractView.Build(session, sale.Id);
+
+        // Newest first: handed over late, because the haul delivered late, after it went into default; each line is the player's.
+        Assert.StartsWith("You handed 40 Food to Meridian Habs", view.Why[0].Text, System.StringComparison.Ordinal);
+        Assert.Equal(haul.Id, view.Why[1].Contract);
+        Assert.StartsWith("Pell Mirza delivered your 40 Food", view.Why[1].Text, System.StringComparison.Ordinal);
+        Assert.Contains(view.Why, l => l.Text.StartsWith("Pell Mirza is in default on your haul", System.StringComparison.Ordinal));
+        Assert.All(view.Why, l => Assert.True(l.Yours));
+        Assert.Equal(ContractView.WhyLines, view.Why.Count);
+    }
+
+    [Fact]
+    public void The_contract_offers_what_the_player_can_still_do_with_it()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        var session = new GameSession(context);
+        SaleContract wanted = context.PostWanted(context.Actor("Meridian Habs"), GoodType.Food, 40m, 700m, hours: 200);
+
+        ContractAction broker = Assert.Single(ContractView.Build(session, wanted.Id).Actions);
+        Assert.Equal((ContractCommand.Broker, true), (broker.Command, broker.Enabled));
+        Assert.StartsWith("Buy at Verdant for", broker.Note, System.StringComparison.Ordinal);
+
+        session.Broker(wanted.Id);
+        ContractViewModel yours = ContractView.Build(session, wanted.Id);
+        Assert.Equal(new[] { ContractCommand.HaulAgain, ContractCommand.CancelAtWill }, yours.Actions.Select(a => a.Command));
+        Assert.Equal("Walk away · " + Presentation.Text.Format.Money(wanted.Terms.BreakFee), yours.Actions[1].Label);
+    }
+
     private static int DuplicateLegs(IReadOnlyList<MapLeg> overlay) =>
         overlay.Count - overlay.Select(l => (System.Math.Min(l.X1, l.X2), System.Math.Max(l.X1, l.X2), System.Math.Min(l.Y1, l.Y2), System.Math.Max(l.Y1, l.Y2))).Distinct().Count();
 
@@ -191,6 +314,14 @@ public sealed class ViewTests
             AssertFilled(line.Label, line.Note, line.Value);
         }
 
+        AssertFilled(c.TermsTitle, c.WhyTitle, c.WhyEnd ?? string.Empty);
+        AssertFilled(c.Actions.Select(a => a.Label).Concat(c.Actions.Select(a => a.Note)));
+        foreach (LogLine line in c.Why)
+        {
+            AssertFilled(line.When, line.Text);
+        }
+
+        Assert.True(c.Why.Count <= ContractView.WhyLines);
         Assert.Equal(c.IsOpen, c.Status is null);
         MapViewModel map = MapView.Build(session, id);
         AssertFilled(map.OverlayTitle ?? string.Empty, map.OverlayEta ?? string.Empty);
@@ -207,7 +338,7 @@ public sealed class ViewTests
             AssertFilled(line.Label, line.Detail, line.Value, line.Action?.Label ?? string.Empty);
         }
 
-        Assert.Equal(session.PlayerActiveContracts.Count(), ledger.Contracts.Count);
+        Assert.Equal(session.PlayerActiveContracts.Count() + session.PlayerOpenPosts.Count(), ledger.Contracts.Count);
         return ledger;
     }
 

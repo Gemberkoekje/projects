@@ -9,6 +9,9 @@ public enum RunStop
     /// <summary>The event queue emptied (only happens if heartbeats are not running).</summary>
     Drained,
 
-    /// <summary>A player decision/alert hard-paused the loop (§3.4).</summary>
+    /// <summary>Something the player should see stopped the clock (an incident on its ship).</summary>
     PlayerAlert,
+
+    /// <summary>A decision landed on the player: the hard pause (design §8.3). Nothing moves until it is made.</summary>
+    PlayerDecision,
 }

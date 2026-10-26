@@ -231,10 +231,13 @@ public static partial class DecisionEngine
             return; // it must be able to pay: into escrow in Accord space, at handover outside it
         }
 
+        // Terms no carrier could meet from the cheapest source only deter sellers: it relaxes them to what a standard hold meets.
+        TermPackage package = Terms.Meetable(Terms.PackageFor(consumer), demand.Good, new Cargo(demand.Good, 1m, 1m).Decayed(hours, 0m).Quality);
+
         long deadline = local ? context.CurrentTick + 48 : context.CurrentTick + (hours * 2) + 80;
         SaleContract posted = Market.PostSale(
             context, consumer, SaleSide.Wanted, demand.Good, quantity, consumer.Home,
-            Credits.Of(price), Credits.Of(Math.Round(worth, 2)), deadline, Holding.StockAt(consumer.Home));
+            Credits.Of(price), Credits.Of(Math.Round(worth, 2)), deadline, Holding.StockAt(consumer.Home), package);
         if (!local)
         {
             memory.Posted(posted.Id);

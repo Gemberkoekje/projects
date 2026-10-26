@@ -20,8 +20,11 @@ public enum ContractType
 }
 
 /// <summary>
-/// Contract lifecycle states (design §16.2). <see cref="Active"/> is signed and being performed;
-/// <see cref="Breached"/> means the performer failed; <see cref="Defaulted"/> means the payer didn't pay.
+/// Contract lifecycle states (design §16.2). <see cref="Active"/> is signed and being performed. It ends
+/// <see cref="Fulfilled"/> (on time or late), <see cref="PartlyFulfilled"/> (a short delivery paid pro rata),
+/// <see cref="Breached"/> (the performer failed by the terms: the goods lost, a short delivery treated as a failure,
+/// goods rejected on inspection), <see cref="Cancelled"/> (at will, or for default), or <see cref="Defaulted"/> (the
+/// payer didn't pay). An open post ends <see cref="Expired"/> or <see cref="Withdrawn"/>.
 /// </summary>
 public enum ContractStatus
 {
@@ -29,7 +32,9 @@ public enum ContractStatus
     Negotiating,
     Active,
     Fulfilled,
+    PartlyFulfilled,
     Breached,
+    Cancelled,
     Defaulted,
     Expired,
     Withdrawn,
@@ -72,8 +77,6 @@ public readonly record struct Holding(HoldingKind Kind, LocationId Location, Shi
 /// </summary>
 public abstract class Contract
 {
-    private readonly List<ContractClause> _clauses;
-
     protected Contract(
         ContractId id,
         ActorId postedBy,
@@ -84,7 +87,7 @@ public abstract class Contract
         long deadlineTick,
         AccordReach jurisdiction,
         string region,
-        IEnumerable<ContractClause> clauses)
+        ContractTerms terms)
     {
         Id = id;
         PostedBy = postedBy;
@@ -95,7 +98,7 @@ public abstract class Contract
         DeadlineTick = deadlineTick;
         Jurisdiction = jurisdiction;
         Region = region;
-        _clauses = clauses.ToList();
+        Terms = terms;
         Status = ContractStatus.Open;
     }
 
@@ -136,7 +139,8 @@ public abstract class Contract
 
     public ContractStatus Status { get; private set; }
 
-    public IReadOnlyList<ContractClause> Clauses => _clauses;
+    /// <summary>What happens when it goes wrong (design §3.4).</summary>
+    public ContractTerms Terms { get; }
 
     public Credits EscrowHeld { get; private set; }
 
@@ -153,6 +157,12 @@ public abstract class Contract
 
     public bool AccordCompliant => UsesEscrow;
 
+    /// <summary>
+    /// Whether Accord courts enforce it (deep Accord, design §3.5): a remedy the escrow can't cover is collected from the
+    /// party's account. At the Accord's edge remedies stop at what escrow holds; on the frontier nobody enforces them.
+    /// </summary>
+    public bool Arbitrated => Jurisdiction == AccordReach.DeepAccord;
+
     /// <summary>Who pays: a Sale's buyer, a Haul's shipper, a store's renter. Empty while that side is open.</summary>
     public abstract ActorId? Payer { get; }
 
@@ -161,6 +171,15 @@ public abstract class Contract
 
     /// <summary>The locations it concerns, for who can see it (design §7).</summary>
     public abstract IReadOnlyList<LocationId> Places { get; }
+
+    /// <summary>Who cancelled it and why, if it was cancelled.</summary>
+    public Cancellation? Cancellation { get; private set; }
+
+    /// <summary>
+    /// The journal's sequence number of the latest entry about this contract (or a haul delivering it): the default cause
+    /// of the next one, so its record reads as a chain of causes (design §16.2).
+    /// </summary>
+    public long? LastEntry { get; internal set; }
 
     public bool IsOpen => Status is ContractStatus.Open or ContractStatus.Negotiating;
 
@@ -172,18 +191,18 @@ public abstract class Contract
     /// <summary>The other party to <paramref name="actor"/>, if there is one yet.</summary>
     public ActorId? Other(ActorId actor) => PostedBy == actor ? CounterpartyId : PostedBy;
 
-    public PenaltyOnLateDelivery? LatePenalty => _clauses.OfType<PenaltyOnLateDelivery>().FirstOrDefault();
+    public PenaltyOnLateDelivery? LatePenalty => Terms.LateFee;
 
-    public QualityWarranty? Warranty => _clauses.OfType<QualityWarranty>().FirstOrDefault();
+    public QualityWarranty? Warranty => Terms.Warranty;
 
     /// <summary>The bond a fully solvent performer posts: the late fee's cap (design §16.4).</summary>
-    public Credits PerformanceBond => LatePenalty?.MaxPenalty ?? Credits.Zero;
+    public Credits PerformanceBond => Terms.Bond;
 
-    /// <summary>
-    /// When an unperformed contract fails (S3's stand-in for cancellation for default, which S4 makes a decision):
-    /// once the late fee has reached its cap.
-    /// </summary>
-    public long DefaultTick => DeadlineTick == long.MaxValue ? long.MaxValue : DeadlineTick + (LatePenalty?.HoursToCap ?? 24);
+    /// <summary>When the grace after the deadline ends: from then a signed contract not yet performed is in default.</summary>
+    public long GraceEndsTick => DeadlineTick == long.MaxValue ? long.MaxValue : DeadlineTick + Terms.GraceHours;
+
+    /// <summary>Signed, not performed, and past its grace: the payer may cancel for default (design §3.4).</summary>
+    public bool InDefault(long now) => Status == ContractStatus.Active && now >= GraceEndsTick;
 
     internal void Sign(ActorId counterparty, Credits price, long tick)
     {
@@ -201,7 +220,15 @@ public abstract class Contract
 
     internal void MarkFulfilled() => Status = ContractStatus.Fulfilled;
 
+    internal void MarkPartlyFulfilled() => Status = ContractStatus.PartlyFulfilled;
+
     internal void MarkBreached() => Status = ContractStatus.Breached;
+
+    internal void MarkCancelled(Cancellation cancellation)
+    {
+        Cancellation = cancellation;
+        Status = ContractStatus.Cancelled;
+    }
 
     internal void MarkDefaulted() => Status = ContractStatus.Defaulted;
 
@@ -233,8 +260,8 @@ public sealed class SaleContract : Contract
         long deadlineTick,
         AccordReach jurisdiction,
         string region,
-        IEnumerable<ContractClause> clauses)
-        : base(id, postedBy, postedTick, offeredPrice, reservation, taxRate, deadlineTick, jurisdiction, region, clauses)
+        ContractTerms terms)
+        : base(id, postedBy, postedTick, offeredPrice, reservation, taxRate, deadlineTick, jurisdiction, region, terms)
     {
         Side = side;
         Good = good;
@@ -268,6 +295,12 @@ public sealed class SaleContract : Contract
 
     /// <summary>Where the seller's goods for this sale are set aside, if they are: its stock or its storage.</summary>
     public Holding? Reserved { get; private set; }
+
+    /// <summary>
+    /// Whether the buyer collects with its own ship at the place, so the seller performs by having the goods ready: a
+    /// lot it bought, or goods bought at a producer's door. Nobody waits on the seller, so it can't be late.
+    /// </summary>
+    public bool Collected => Receipt?.Kind == HoldingKind.Ship;
 
     /// <summary>Goods actually handed over (less than the quantity after a loss on the way).</summary>
     public decimal Delivered { get; private set; }
@@ -306,8 +339,8 @@ public sealed class HaulContract : Contract
         long deadlineTick,
         AccordReach jurisdiction,
         string region,
-        IEnumerable<ContractClause> clauses)
-        : base(id, shipper, postedTick, offeredFee, reservation, taxRate, deadlineTick, jurisdiction, region, clauses)
+        ContractTerms terms)
+        : base(id, shipper, postedTick, offeredFee, reservation, taxRate, deadlineTick, jurisdiction, region, terms)
     {
         Good = good;
         Quantity = quantity;
@@ -341,6 +374,18 @@ public sealed class HaulContract : Contract
 
     public ShipId? AssignedShip { get; private set; }
 
+    /// <summary>Whether the carrier has loaded the goods: from then on they travel with its ship, whatever becomes of the haul.</summary>
+    public bool PickedUp { get; private set; }
+
+    /// <summary>
+    /// The goods' quality when the carrier loaded them. A carrier answers only for what happens in its hold, so the
+    /// warranty judges the goods it delivers against this (<see cref="InTransitQuality"/>).
+    /// </summary>
+    public decimal PickupQuality { get; private set; } = 1m;
+
+    /// <summary>What the warranty judges delivered goods at: their quality as a share of what they were when loaded.</summary>
+    public decimal InTransitQuality(decimal delivered) => PickupQuality <= 0m ? 1m : System.Math.Min(1m, delivered / PickupQuality);
+
     public override ActorId? Payer => Shipper;
 
     public override ActorId? Performer => Carrier;
@@ -348,6 +393,12 @@ public sealed class HaulContract : Contract
     public override IReadOnlyList<LocationId> Places => _places ??= new[] { Origin, Destination };
 
     internal void Assign(ShipId ship) => AssignedShip = ship;
+
+    internal void MarkPickedUp(decimal quality)
+    {
+        PickedUp = true;
+        PickupQuality = quality;
+    }
 }
 
 /// <summary>
@@ -369,7 +420,7 @@ public sealed class StorageContract : Contract
         Credits ratePerUnitDay,
         AccordReach jurisdiction,
         string region)
-        : base(id, stationOperator, tick, ratePerUnitDay, ratePerUnitDay, 0m, long.MaxValue, jurisdiction, region, System.Array.Empty<ContractClause>())
+        : base(id, stationOperator, tick, ratePerUnitDay, ratePerUnitDay, 0m, long.MaxValue, jurisdiction, region, ContractTerms.None)
     {
         Location = location;
         LastChargedTick = tick;

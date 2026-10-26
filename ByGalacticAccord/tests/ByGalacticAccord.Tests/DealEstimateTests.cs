@@ -40,7 +40,7 @@ public sealed class DealEstimateTests
         SimulationContext context = TestWorld.Quiet(withPlayer: true);
         ActorState player = context.Player();
         Ship ship = context.ShipOf(player);
-        HaulContract haul = PlayerActionsTests.FarmHaul(context, hours: 20); // it can't be done in time from Meridian
+        HaulContract haul = PlayerActionsTests.FarmHaul(context, hours: 50); // 60 h from Meridian and back: 10 h late, inside the grace
 
         DealEstimate estimate = DealEstimate.ForHaul(context, player, ship, haul)!;
         Assert.True(estimate.TicksLate > 0);

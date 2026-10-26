@@ -87,14 +87,17 @@ public sealed class InvariantTests
         Assert.Equal(expected, actual, precision: 2);
     }
 
+    // Escrow reconciles exactly (plan S4): what is held is exactly what was locked less what was paid out, no contract ever
+    // holds a negative amount, and a contract that has settled, however it ended, holds exactly nothing.
     private static void AssertEscrowReconciles(SimulationContext context)
     {
         decimal expected = context.EscrowLockedTotal.Amount - context.EscrowReleasedTotal.Amount - context.EscrowForfeitedTotal.Amount;
-        Assert.Equal(expected, context.TotalEscrowHeld().Amount, precision: 2);
+        Assert.Equal(expected, context.TotalEscrowHeld().Amount);
 
         foreach (Contract c in context.Contracts.Values)
         {
             Assert.True(c.EscrowHeld.Amount >= 0m, $"{c.Id} holds negative escrow {c.EscrowHeld}.");
+            Assert.True(c.IsLive || c.EscrowHeld.Amount == 0m, $"{c.Id} is {c.Status} and still holds {c.EscrowHeld.Amount}.");
         }
     }
 

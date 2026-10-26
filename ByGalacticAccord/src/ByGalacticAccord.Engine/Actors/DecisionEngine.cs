@@ -17,7 +17,9 @@ namespace ByGalacticAccord.Engine.Actors;
 /// <item>traders take Hauls, fill delivered Sales by buying and carrying, and post Hauls when overcommitted;</item>
 /// <item>station operators collect rent.</item>
 /// </list>
-/// Every action goes through <see cref="Market"/>, the same commands the player uses.
+/// Every role also invokes its terms (design §3.4, §4.3): a payer whose counterparty is in default cancels or waits, a
+/// buyer handed spoiled goods rejects or accepts them, and a seller that can no longer deliver walks away rather than
+/// default. Every action goes through <see cref="Market"/>, the same commands the player uses.
 /// </summary>
 public static partial class DecisionEngine
 {
@@ -156,14 +158,24 @@ public static partial class DecisionEngine
         return count == 0 ? 0m : sum / count;
     }
 
+    /// <summary>How long an AI payer waits before looking again at a contract in default it chose to wait on.</summary>
+    private const long DefaultReviewHours = 24;
+
+    /// <summary>What a shipper first offers for a haul, as a multiple of the usual fee (<see cref="HaulFeeEstimate"/>).</summary>
+    public const decimal UsualHaulMarkup = 1.6m;
+
+    /// <summary>What a shipper offers for a haul it has no experience of: the usual fee with the usual markup. The player's offer.</summary>
+    public static Credits UsualHaulOffer(SimulationContext context, LocationId from, LocationId to) =>
+        Credits.Of(Math.Round(HaulFeeEstimate(context, from, to).Amount * UsualHaulMarkup, 2));
+
     /// <summary>
     /// What a shipper offers for a haul (and the most it would go to), given the usual fee and what moving the goods is
-    /// worth to it. It starts at 1.6 times the usual fee and learns from its own hauls: taken within a day, it offers a
-    /// little less next time; expired, more.
+    /// worth to it. It starts at the usual markup on the usual fee and learns from its own hauls: taken within a day, it
+    /// offers a little less next time; expired, more.
     /// </summary>
     private static (Credits Offer, Credits Reservation) HaulTerms(SimulationContext context, ActorState shipper, GoodType good, Credits estimate, decimal budget)
     {
-        PriceMemory memory = shipper.Prices(new PriceKey(PriceKind.Haul, good), 1.6m);
+        PriceMemory memory = shipper.Prices(new PriceKey(PriceKind.Haul, good), UsualHaulMarkup);
         decimal factor = memory.Next(context, onQuickTake: 0.95m, onExpiry: 1.25m, min: 1.1m, max: 3m);
         decimal offer = Math.Min(budget * 0.9m, estimate.Amount * factor);
         decimal reservation = Math.Min(budget * 0.95m, estimate.Amount * 3m);
@@ -176,7 +188,7 @@ public static partial class DecisionEngine
         Credits offer, Credits reservation, long deadline, ContractId? serves)
     {
         HaulContract haul = Market.PostHaul(context, shipper, good, quantity, from, destination, offer, reservation, deadline, serves);
-        shipper.Prices(new PriceKey(PriceKind.Haul, good), 1.6m).Posted(haul.Id);
+        shipper.Prices(new PriceKey(PriceKind.Haul, good), UsualHaulMarkup).Posted(haul.Id);
         return haul;
     }
 
@@ -186,7 +198,9 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// Sellers whose signed delivered Sale has goods set aside away from the place and nothing moving them (its haul
-    /// expired unsigned) arrange transport again: their own free ship, or a new haul, while there is still time.
+    /// expired unsigned) arrange transport again: their own free ship, or a new haul, while a carrier near the goods
+    /// could still make it before the sale's grace runs out. Once none could, the seller walks away
+    /// (<see cref="WouldWalkAway"/>) rather than wait to be cancelled for default.
     /// </summary>
     private static void ArrangeTransport(SimulationContext context, ActorState seller)
     {
@@ -194,16 +208,27 @@ public static partial class DecisionEngine
         foreach (Contract contract in context.LiveContractsOf(seller.Id))
         {
             if (contract is not SaleContract { Status: ContractStatus.Active } sale || sale.Seller != seller.Id
-                || sale.Reserved is not { } from || from.Location == sale.Place || Market.UnderWay(context, sale)
-                || context.LiveContractsOf(seller.Id).Any(c => c is HaulContract h && h.Serves == sale.Id))
+                || sale.Reserved is not { } from || from.Location == sale.Place || Market.UnderWay(context, sale))
             {
                 continue;
             }
 
-            RoutePlan? plan = context.FindPath(from.Location, sale.Place);
-            if (plan is null || context.CurrentTick + (plan.DistanceTicks * 2) + 24 > sale.DefaultTick)
+            if (context.LiveContractsOf(seller.Id).Any(c => c is HaulContract h && h.Serves == sale.Id))
             {
-                continue; // too late for a carrier to come and make it: the sale will fail on its own
+                continue; // a haul for it is up: RaiseHaulOffers reprices it
+            }
+
+            // Nothing is up for it. Too late even for a carrier near the pickup to deliver inside the grace: walk away now,
+            // or leave it to the buyer.
+            RoutePlan? plan = context.FindPath(from.Location, sale.Place);
+            if (plan is null || context.CurrentTick + plan.DistanceTicks + 24 > sale.GraceEndsTick)
+            {
+                if (WouldWalkAway(seller, sale))
+                {
+                    Market.CancelAtWill(context, sale, seller);
+                }
+
+                continue;
             }
 
             Ship? ship = from.Kind == HoldingKind.Storage ? seller.Ships.Select(context.Ship).FirstOrDefault(s => s.IsFree) : null;
@@ -218,9 +243,69 @@ public static partial class DecisionEngine
             (Credits offer, Credits reservation) = HaulTerms(context, seller, sale.Good, estimate, budget);
             if (Market.CanFundHaul(context, seller, from.Location, sale.Place, offer))
             {
-                PostPricedHaul(context, seller, sale.Good, sale.Quantity, from, sale.Place, offer, reservation, sale.DeadlineTick, sale.Id);
+                PostPricedHaul(context, seller, sale.Good, sale.Quantity, from, sale.Place, offer, reservation, HaulDeadline(context, sale, plan), sale.Id);
             }
         }
+    }
+
+    /// <summary>
+    /// When a haul for a signed Sale must deliver: the sale's deadline, or later if that is past reach, but always inside
+    /// the sale's grace, where a late delivery still costs only the late fee.
+    /// </summary>
+    public static long HaulDeadline(SimulationContext context, SaleContract sale, RoutePlan plan) =>
+        Math.Max(sale.DeadlineTick, Math.Min(sale.GraceEndsTick, context.CurrentTick + (plan.DistanceTicks * 2) + 24));
+
+    /// <summary>
+    /// Whether a seller that can no longer deliver walks away, paying the break fee, rather than wait to be cancelled for
+    /// default. In Accord space default forfeits its bond, so it walks when the break fee is less. Outside the Accord
+    /// nothing is enforced: only an actor that minds its record pays (design §4.2).
+    /// </summary>
+    public static bool WouldWalkAway(ActorState seller, Contract contract) =>
+        contract.UsesEscrow ? contract.Terms.BreakFee < contract.LockedBond : seller.Personality.TrustThreshold >= 0.5m;
+
+    /// <summary>
+    /// An AI payer whose contract is in default cancels for default, or waits and looks again tomorrow (design §4.3: invoke
+    /// a term). Cancelling gets its money back and the performer's bond. Waiting gets what it signed for, late, and the
+    /// late fee as it runs to its cap. With nothing on its way there is nothing to wait for; a haul's goods are the
+    /// shipper's and arrive whatever it decides, so a shipper always cancels.
+    /// </summary>
+    public static void ReviewDefault(SimulationContext context, ActorState payer, Contract contract)
+    {
+        if (WouldCancel(context, payer, contract))
+        {
+            Market.CancelForDefault(context, contract, payer);
+            return;
+        }
+
+        context.Schedule(new Events.DefaultReview(context.CurrentTick + DefaultReviewHours, contract.Id));
+    }
+
+    /// <summary>The utility comparison behind <see cref="ReviewDefault"/>.</summary>
+    public static bool WouldCancel(SimulationContext context, ActorState payer, Contract contract)
+    {
+        if (contract is not SaleContract sale || Market.ExpectedArrival(context, contract) is not { } arrival)
+        {
+            return true;
+        }
+
+        decimal cancel = sale.UsesEscrow ? sale.LockedBond.Amount : 0m;
+        decimal worth = (sale.PostedBy == payer.Id ? sale.Reservation : sale.Price).Amount;
+        decimal lateFee = sale.LatePenalty?.PenaltyFor(arrival - sale.DeadlineTick).Amount ?? 0m;
+        decimal wait = worth - sale.Price.Amount + Math.Min(lateFee, cancel);
+        return cancel > wait;
+    }
+
+    /// <summary>
+    /// Whether a buyer rejects goods below the warranty's floor (design §3.4): accepting gets the goods, worth to it what
+    /// they are worth at their quality, for the price less the refund; rejecting gets its money back and the seller's bond.
+    /// </summary>
+    public static bool WouldReject(SimulationContext context, ActorState buyer, SaleContract sale, decimal quantity, decimal quality)
+    {
+        decimal unitWorth = (sale.PostedBy == buyer.Id ? sale.Reservation : sale.Price).Amount / Math.Max(1m, sale.Quantity);
+        SettlementTerms terms = Settlement.Due(context, sale, sale.Quantity, quantity, quality, 0);
+        decimal accept = (unitWorth * quantity * quality) - terms.Payment.Amount;
+        decimal reject = sale.UsesEscrow ? sale.LockedBond.Amount : 0m;
+        return reject > accept;
     }
 
     /// <summary>What a producer asks per unit now: its cost, margin, warehouse and savings (design §5.2).</summary>
@@ -229,7 +314,8 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// A haul a seller posted to deliver a Sale that nobody has taken in a day is reposted a quarter dearer, while a
-    /// carrier still has time to come and make the deadline: the shipper raises its offer rather than let the Sale fail.
+    /// carrier still has time to come and make it inside the sale's grace: the shipper raises its offer rather than let
+    /// the Sale fail.
     /// </summary>
     private static void RaiseHaulOffers(SimulationContext context, ActorState seller)
     {
@@ -242,17 +328,20 @@ public static partial class DecisionEngine
             }
 
             RoutePlan? plan = context.FindPath(haul.Origin, haul.Destination);
-            Credits offer = Credits.Of(Math.Round(haul.OfferedPrice.Amount * 1.25m, 2));
-            if (plan is null || context.CurrentTick + (plan.DistanceTicks * 2) > haul.DeadlineTick
+            Credits offer = RaisedHaulOffer(haul);
+            if (plan is null || context.CurrentTick + (plan.DistanceTicks * 2) > sale.GraceEndsTick
                 || offer > haul.Reservation || !Market.CanFundHaul(context, seller, haul.Origin, haul.Destination, offer))
             {
                 continue;
             }
 
             Market.Withdraw(context, haul);
-            PostPricedHaul(context, seller, haul.Good, haul.Quantity, haul.PickupFrom, haul.Destination, offer, haul.Reservation, haul.DeadlineTick, sale.Id);
+            PostPricedHaul(context, seller, haul.Good, haul.Quantity, haul.PickupFrom, haul.Destination, offer, haul.Reservation, HaulDeadline(context, sale, plan), sale.Id);
         }
     }
+
+    /// <summary>What a shipper reposts an untaken haul at: a quarter dearer.</summary>
+    public static Credits RaisedHaulOffer(HaulContract haul) => Credits.Of(Math.Round(haul.OfferedPrice.Amount * 1.25m, 2));
 
     /// <summary>A visible open contract of a kind, in id order.</summary>
     private static IEnumerable<T> Visible<T>(SimulationContext context, ActorState actor)

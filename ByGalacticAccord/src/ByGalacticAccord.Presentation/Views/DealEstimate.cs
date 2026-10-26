@@ -6,12 +6,13 @@ using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Presentation.Views;
 
-/// <summary>What the player would do to take a contract: carry a haul, fill a delivered Sale, or buy a lot.</summary>
+/// <summary>What the player would do to take a contract: carry a haul, fill a delivered Sale (with its ship, or through a carrier), or buy a lot.</summary>
 public enum DealKind
 {
     Haul,
     Fill,
     Buy,
+    Broker,
 }
 
 /// <summary>
@@ -19,7 +20,8 @@ public enum DealKind
 /// §11.5): what it pays, minus the costs the game knows for certain if nothing goes wrong (goods bought at the source
 /// and their tax, running costs, docking, a warranty refund the trip's length makes certain, a late fee the arrival
 /// time makes certain). The incident odds stay separate, as the uncertain input. It never collapses into one
-/// "expected value". For a lot the player buys there is no income: the take-home is the cost, negative.
+/// "expected value". For a lot the player buys there is no income: the take-home is the cost, negative. Filled through
+/// a carrier, the player's ship isn't used: the costs are the goods and the haul fee, each with its tax.
 /// </summary>
 public sealed record DealEstimate(
     DealKind Kind,
@@ -42,9 +44,11 @@ public sealed record DealEstimate(
     Credits LateFee,
     Credits Bond,
     decimal IncidentOdds,
-    FillSource? Source)
+    FillSource? Source,
+    Credits HaulFee = default,
+    Credits HaulTax = default)
 {
-    public Credits TakeHome => Income - Goods - GoodsTax - Running - Docking - QualityRefund - LateFee;
+    public Credits TakeHome => Income - Goods - GoodsTax - Running - Docking - QualityRefund - LateFee - HaulFee - HaulTax;
 
     /// <summary>What it costs to buy: the goods, their tax and the trip to collect them.</summary>
     public Credits Cost => Goods + GoodsTax + Running;
@@ -87,11 +91,17 @@ public sealed record DealEstimate(
 
         long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
         Credits fee = haul.OfferedPrice;
-        decimal quality = Cargo.Fresh(haul.Good, 1m).Decayed(ladenTicks, ship.Preservation).Quality;
+
+        // The warranty judges what the hold does to the goods: their quality on arrival as a share of what it was when loaded.
+        decimal loaded = haul.PickupFrom.Kind == HoldingKind.Storage
+            ? context.StorageOf(haul.Shipper, haul.Origin)?.Peek(haul.Good, context.CurrentTick)?.Decayed(startTick + repo.Ticks - context.CurrentTick, 0m).Quality ?? 1m
+            : 1m;
+        decimal arrived = new Cargo(haul.Good, 1m, loaded).Decayed(ladenTicks, ship.Preservation).Quality;
+        decimal quality = loaded <= 0m ? 1m : arrived / loaded;
         Credits refund = Credits.Of(fee.Amount * (haul.Warranty?.RefundFraction(quality) ?? 0m));
         Credits bond = haul.UsesEscrow ? Credits.Of(Math.Min(haul.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount))) : Credits.Zero;
         long arrival = startTick + repo.Ticks + ladenTicks;
-        (long late, Credits lateFee) = Late(haul, arrival, fee - refund, bond);
+        (long late, Credits lateFee) = Late(haul, arrival, fee - refund, bond, player.Credits);
 
         return new DealEstimate(
             DealKind.Haul, ship, startAt, startTick, haul.Origin, repo.Plan, repo.Ticks, laden, ladenTicks,
@@ -134,7 +144,7 @@ public sealed record DealEstimate(
             ? Credits.Of(Math.Min(wanted.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount - goods.Amount - goodsTax.Amount)))
             : Credits.Zero;
         long arrival = startTick + repo.Ticks + ladenTicks;
-        (long late, Credits lateFee) = Late(wanted, arrival, price - refund, bond);
+        (long late, Credits lateFee) = Late(wanted, arrival, price - refund, bond, player.Credits - goods - goodsTax);
 
         return new DealEstimate(
             DealKind.Fill, ship, startAt, startTick, pickup, repo.Plan, repo.Ticks, onTheSpot ? null : laden, ladenTicks,
@@ -158,6 +168,29 @@ public sealed record DealEstimate(
             1m, Credits.Zero, 0, Credits.Zero, Credits.Zero, 0m, null);
     }
 
+    /// <summary>
+    /// Fill a delivered Sale through a carrier, as the check found it: the price, less the goods bought into storage at the
+    /// source and their tax, and the haul fee and its tax. When a carrier takes the haul, how late it is and what the
+    /// goods are worth on arrival are not known yet: they stay with the uncertain inputs.
+    /// </summary>
+    public static DealEstimate? ForBroker(SimulationContext context, ActorState player, Ship ship, SaleContract wanted)
+    {
+        PlayerActions.BrokerFeasibility check = PlayerActions.CheckBroker(context, player, wanted);
+        if (check.Source is not { } source || context.FindPath(source.At, wanted.Place) is not { } laden)
+        {
+            return null;
+        }
+
+        Credits goodsTax = Credits.Of(source.PurchasePrice.Amount * Terms.TaxRate(context, context.Location(source.At).Reach));
+        Credits haulTax = Credits.Of(check.Fee.Amount * wanted.TaxRate);
+        Credits bond = wanted.UsesEscrow ? Credits.Of(Math.Min(wanted.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount - source.PurchasePrice.Amount - goodsTax.Amount))) : Credits.Zero;
+        return new DealEstimate(
+            DealKind.Broker, ship, source.At, context.CurrentTick, source.At, null, 0, laden, laden.DistanceTicks,
+            wanted.OfferedPrice, source.PurchasePrice, goodsTax, Credits.Zero, Credits.Zero,
+            1m, Credits.Zero, 0, Credits.Zero, bond, Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger, 0m, 1m), source,
+            check.Fee, haulTax);
+    }
+
     // The empty leg from where the ship will be free to a pickup, or none if it is there already.
     private static (RoutePlan? Plan, long Ticks)? Leg(SimulationContext context, Ship ship, LocationId from, LocationId to)
     {
@@ -175,12 +208,11 @@ public sealed record DealEstimate(
     private static decimal Odds(SimulationContext context, Ship ship, RoutePlan laden) =>
         Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Class.IncidentChanceModifier, 0m, 1m);
 
-    // A late fee the arrival makes certain, limited as Settlement limits it: by the bond in the Accord, by what is due outside.
-    private static (long Late, Credits Fee) Late(Contract contract, long arrival, Credits due, Credits bond)
+    // A late fee the arrival makes certain, limited as Settlement limits it: by what the jurisdiction can collect.
+    private static (long Late, Credits Fee) Late(Contract contract, long arrival, Credits due, Credits bond, Credits credits)
     {
         long late = Math.Max(0, arrival - contract.DeadlineTick);
         decimal fee = contract.LatePenalty?.PenaltyFor(late).Amount ?? 0m;
-        decimal limit = contract.UsesEscrow ? bond.Amount : Math.Max(0m, due.Amount);
-        return (late, Credits.Of(Math.Min(fee, limit)));
+        return (late, Credits.Of(Math.Min(fee, Settlement.Collectable(contract, due, bond, credits - bond).Amount)));
     }
 }

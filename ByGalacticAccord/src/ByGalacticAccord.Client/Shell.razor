@@ -11,6 +11,11 @@ else if (_session is not null)
     <div class="screen" data-ready="@(_ready ? "true" : null)" data-tick="@_session.Now">
         <TimeBar Model="_header" Theme="@_theme" OnSpeed="SetSpeed" OnTheme="SetTheme" />
 
+        @foreach (DecisionPrompt prompt in _decisions)
+        {
+            <DecisionPanel Model="prompt" OnDecide="choice => Decide(prompt, choice)" OnSelect="Select" />
+        }
+
         @if (_header.Alerts.Count > 0)
         {
             <section class="alert panel" role="alert">
@@ -32,7 +37,7 @@ else if (_session is not null)
             </div>
             <div class="column-side">
                 <BoardPanel Model="_board" Selected="_selected" OnSelect="Select" />
-                <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" />
+                <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" OnCommand="Command" OnSelect="Select" />
                 <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" />
             </div>
         </div>
@@ -63,6 +68,7 @@ else if (_session is not null)
     private LogViewModel _log = default!;
     private LedgerViewModel _ledger = default!;
     private ContractViewModel? _contract;
+    private IReadOnlyList<DecisionPrompt> _decisions = Array.Empty<DecisionPrompt>();
     private IReadOnlyList<MapShip> _ships = Array.Empty<MapShip>();
 
     protected override void OnInitialized()
@@ -140,6 +146,7 @@ else if (_session is not null)
             _map = MapView.Build(_session, _selected);
             _log = LogView.Build(_session);
             _ledger = LedgerView.Build(_session);
+            _decisions = DecisionView.Build(_session);
             _contract = _selected is { } id ? ContractView.Build(_session, id) : null;
             _builtRevision = _session.Revision;
             _builtSelection = _selected;
@@ -163,13 +170,10 @@ else if (_session is not null)
         }
     }
 
+    // Selecting a contract shows it afresh, even the one already open: the last command's outcome gives way to what can be done now.
     private void Select(ContractId id)
     {
-        if (_selected != id)
-        {
-            _outcome = null;
-        }
-
+        _outcome = null;
         _selected = id;
         Rebuild();
     }
@@ -184,6 +188,38 @@ else if (_session is not null)
         var contract = _session.Context.Contract(id);
         DealOutcome outcome = _session.Accept(id);
         _outcome = ContractView.OutcomeText(_session, contract, outcome);
+        Rebuild();
+    }
+
+    private void Command(ContractCommand command)
+    {
+        if (_session is null || _selected is not { } id)
+        {
+            return;
+        }
+
+        var contract = _session.Context.Contract(id);
+        _outcome = command switch
+        {
+            ContractCommand.Broker when contract is SaleContract wanted => ContractView.BrokerText(_session, wanted, _session.Broker(id)),
+            ContractCommand.CancelAtWill => ContractView.CommandText(_session, contract, command, _session.CancelAtWill(id)),
+            ContractCommand.CancelForDefault => ContractView.CommandText(_session, contract, command, _session.CancelForDefault(id)),
+            ContractCommand.HaulAgain => ContractView.CommandText(_session, contract, command, _session.HaulAgain(id)),
+            _ => null,
+        };
+        Rebuild();
+    }
+
+    private void Decide(DecisionPrompt prompt, DecisionChoice choice)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.Decide(prompt.Decision, choice);
+        _outcome = null;
+        _selected = prompt.Contract;
         Rebuild();
     }
 

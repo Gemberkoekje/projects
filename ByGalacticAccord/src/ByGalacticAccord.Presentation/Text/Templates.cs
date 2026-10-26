@@ -86,6 +86,8 @@ public static class Templates
 
     public static string Side(SaleSide side) => Get("Side." + side);
 
+    public static string Package(TermPackage package) => Get("Package." + package);
+
     /// <summary>A contract's kind as the board shows it: "Haul", or a Sale with its side, "Sale · wanted".</summary>
     public static string KindLine(Contract contract) => contract is SaleContract sale
         ? Fill("Kind.Line.Sale", ("kind", ContractKind(ContractType.Sale)), ("side", Side(sale.Side)))

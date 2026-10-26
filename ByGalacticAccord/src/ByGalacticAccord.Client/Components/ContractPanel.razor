@@ -1,4 +1,5 @@
-@* The contract as a document (design §11.3): beside the map, never a modal, so the world stays in view. *@
+@* The contract as a document (design §11.3): beside the map, never a modal, so the world stays in view. Its terms read
+   as sentences; below them, what led to it, newest first (design §11.2: "why did this happen?"). *@
 <section class="panel contract-panel" data-testid="contract">
     @if (Model is null)
     {
@@ -71,13 +72,40 @@
             </div>
         }
 
-        <div class="block">
+        <div class="block" data-testid="terms">
             <h3 class="block-title">@Model.TermsTitle</h3>
             @foreach (string term in Model.Terms)
             {
                 <p class="term small">@term</p>
             }
         </div>
+
+        @if (Model.Why.Count > 0)
+        {
+            <div class="block" data-testid="why">
+                <h3 class="block-title">@Model.WhyTitle</h3>
+                <ol class="why">
+                    @foreach (LogLine line in Model.Why)
+                    {
+                        <li class="why-line @(line.Yours ? "yours" : null)">
+                            <span class="when mono xsmall muted">@line.When</span>
+                            @if (line.Contract is { } id && id != Model.Id)
+                            {
+                                <button type="button" class="link-text small" @onclick="() => OnSelect.InvokeAsync(id)">@line.Text</button>
+                            }
+                            else
+                            {
+                                <span class="small">@line.Text</span>
+                            }
+                        </li>
+                    }
+                </ol>
+                @if (Model.WhyEnd is not null)
+                {
+                    <p class="xsmall muted why-end">@Model.WhyEnd</p>
+                }
+            </div>
+        }
 
         <div class="party">
             <span class="party-name">
@@ -90,15 +118,25 @@
         {
             <p class="outcome small" role="status">@Outcome</p>
         }
-        else if (Model.IsOpen)
+        else
         {
-            @if (Model.Blocked is not null)
+            @if (Model.IsOpen)
             {
-                <p class="blocked small muted">@Model.Blocked</p>
+                @if (Model.Blocked is not null)
+                {
+                    <p class="blocked small muted">@Model.Blocked</p>
+                }
+                <div class="actions">
+                    <button type="button" class="button primary" disabled="@(!Model.CanAccept)" @onclick="OnAccept">@Model.AcceptLabel</button>
+                </div>
             }
-            <div class="actions">
-                <button type="button" class="button primary" disabled="@(!Model.CanAccept)" @onclick="OnAccept">@Model.AcceptLabel</button>
-            </div>
+            @foreach (ContractAction action in Model.Actions)
+            {
+                <div class="action" data-command="@action.Command">
+                    <button type="button" class="button" disabled="@(!action.Enabled)" @onclick="() => OnCommand.InvokeAsync(action.Command)">@action.Label</button>
+                    <span class="xsmall muted">@action.Note</span>
+                </div>
+            }
         }
     }
 </section>
@@ -119,6 +157,12 @@
 
     [Parameter]
     public EventCallback OnAccept { get; set; }
+
+    [Parameter]
+    public EventCallback<ContractCommand> OnCommand { get; set; }
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
 
     protected override bool ShouldRender()
     {

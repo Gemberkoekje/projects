@@ -42,7 +42,7 @@ public static class Invariants
         }
     }
 
-    /// <summary>Σ escrow_held == Σlocked − Σreleased − Σforfeited, and never negative (§5.6).</summary>
+    /// <summary>Σ escrow_held == Σlocked − Σreleased − Σforfeited; never negative; and a settled contract holds exactly nothing (design §20.2).</summary>
     private static void CheckEscrow(SimulationContext context, List<InvariantViolation> violations)
     {
         decimal expected = context.EscrowLockedTotal.Amount - context.EscrowReleasedTotal.Amount - context.EscrowForfeitedTotal.Amount;
@@ -57,6 +57,10 @@ public static class Invariants
             if (c.EscrowHeld.Amount < -Epsilon)
             {
                 violations.Add(new InvariantViolation("EscrowNegative", $"{c.Id} holds {c.EscrowHeld}."));
+            }
+            else if (!c.IsLive && c.EscrowHeld.Amount != 0m)
+            {
+                violations.Add(new InvariantViolation("EscrowLeft", $"{c.Id} is {c.Status} and still holds {c.EscrowHeld.Amount}."));
             }
         }
     }

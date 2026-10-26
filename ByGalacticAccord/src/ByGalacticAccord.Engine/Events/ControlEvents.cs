@@ -68,12 +68,14 @@ public sealed class ContractExpiryCheck : ISimEvent
 }
 
 /// <summary>
-/// S3's stand-in for cancellation for default (S4 makes it the payer's decision): once a signed Sale's late fee
-/// has reached its cap with nothing on its way, it fails, and the seller's bond goes to the buyer.
+/// A signed contract's grace runs out (design §3.4, §19). If it still isn't performed it is in default: the journal
+/// records it, and its payer may cancel for default or keep waiting while the late fee runs to its cap. An AI payer
+/// decides by utility and, if it waits, reviews daily (<see cref="DefaultReview"/>); the player is asked, and the
+/// world pauses until it answers (design §8.3).
 /// </summary>
-public sealed class ContractDefaultCheck : ISimEvent
+public sealed class GraceEnded : ISimEvent
 {
-    public ContractDefaultCheck(long tick, ContractId contract)
+    public GraceEnded(long tick, ContractId contract)
     {
         Tick = tick;
         Contract = contract;
@@ -83,14 +85,50 @@ public sealed class ContractDefaultCheck : ISimEvent
 
     public ContractId Contract { get; }
 
-    public string Describe(SimulationContext context) => $"Default check for {Contract}.";
+    public string Describe(SimulationContext context) => $"Grace ends for {Contract}.";
 
     public void Process(SimulationContext context)
     {
         Contract contract = context.Contract(Contract);
-        if (contract.Status == ContractStatus.Active && !Market.UnderWay(context, contract))
+        if (!contract.InDefault(Tick))
         {
-            Settlement.Fail(context, contract, FailureReason.NotDelivered);
+            return; // performed, or ended some other way, in time
+        }
+
+        context.NoteFailure(FailureKind.InDefault);
+        JournalEntry entry = context.Record(new ContractInDefaultEntry(Tick, contract.Id, contract.Performer!.Value, contract.Payer!.Value));
+        ActorState payer = context.Actor(contract.Payer!.Value);
+        if (payer.IsPlayer)
+        {
+            context.RaisePlayerDecision(new PlayerDecision(DecisionKind.CancelForDefault, contract.Id, Tick, entry.Seq));
+            return;
+        }
+
+        DecisionEngine.ReviewDefault(context, payer, contract);
+    }
+}
+
+/// <summary>An AI payer that chose to wait on a contract in default looks at it again (design §4.3: a deadline approaching).</summary>
+public sealed class DefaultReview : ISimEvent
+{
+    public DefaultReview(long tick, ContractId contract)
+    {
+        Tick = tick;
+        Contract = contract;
+    }
+
+    public long Tick { get; }
+
+    public ContractId Contract { get; }
+
+    public string Describe(SimulationContext context) => $"Default review for {Contract}.";
+
+    public void Process(SimulationContext context)
+    {
+        Contract contract = context.Contract(Contract);
+        if (contract.InDefault(Tick) && context.Actor(contract.Payer!.Value) is { IsPlayer: false } payer)
+        {
+            DecisionEngine.ReviewDefault(context, payer, contract);
         }
     }
 }

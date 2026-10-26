@@ -1,0 +1,29 @@
+@* A decision the terms handed you (design §8.3): the clock stays stopped until you answer. Each answer says what the
+   terms make of it; the contract it concerns opens beside it. *@
+<section class="panel decision" role="alertdialog" aria-labelledby="decision-title" data-testid="decision">
+    <div class="decision-text">
+        <span class="decision-title" id="decision-title">@Model.Title</span>
+        <button type="button" class="link-text" @onclick="() => OnSelect.InvokeAsync(Model.Contract)">@Model.Text</button>
+    </div>
+    <div class="decision-options">
+        @foreach (DecisionOption option in Model.Options)
+        {
+            <div class="decision-option">
+                <button type="button" class="button @(option == Model.Options[0] ? "primary" : null)" data-choice="@option.Choice"
+                        @onclick="() => OnDecide.InvokeAsync(option.Choice)">@option.Label</button>
+                <span class="xsmall muted">@option.Note</span>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DecisionPrompt Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<DecisionChoice> OnDecide { get; set; }
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+}

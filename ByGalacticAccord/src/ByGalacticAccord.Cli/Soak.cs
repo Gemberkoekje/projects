@@ -67,9 +67,40 @@ internal static class Soak
         Line("Contracts fulfilled", ctx.ContractsFulfilled.ToString("N0", CultureInfo.InvariantCulture));
         Line("Contracts breached (performer)", ctx.ContractsBreached.ToString("N0", CultureInfo.InvariantCulture));
         Line("Contracts defaulted (payer)", ctx.ContractsDefaulted.ToString("N0", CultureInfo.InvariantCulture));
+        Line("Contracts cancelled", ctx.ContractsCancelled.ToString("N0", CultureInfo.InvariantCulture));
         Line("Transit incidents", ctx.IncidentsOccurred.ToString("N0", CultureInfo.InvariantCulture));
         Line("RNG draws consumed", ctx.Rng.DrawCount.ToString("N0", CultureInfo.InvariantCulture));
         Line("Journal entries recorded", ctx.Journal.TotalRecorded.ToString("N0", CultureInfo.InvariantCulture));
+
+        Console.WriteLine();
+        Console.WriteLine("Failure paths (design §16.3; a contract can count under several):");
+        foreach (FailureKind kind in Enum.GetValues<FailureKind>())
+        {
+            Line("  " + kind, ctx.Failures(kind).ToString("N0", CultureInfo.InvariantCulture));
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Signed Sales and Hauls by term package:");
+        foreach (TermPackage package in Enum.GetValues<TermPackage>())
+        {
+            int signed = 0;
+            int failed = 0;
+            foreach (Contract c in ctx.Contracts.Values)
+            {
+                if (c is StorageContract || c.Terms.Package != package || c.SignedTick is null)
+                {
+                    continue;
+                }
+
+                signed++;
+                if (c.Status is ContractStatus.Breached or ContractStatus.Cancelled or ContractStatus.Defaulted)
+                {
+                    failed++;
+                }
+            }
+
+            Line("  " + package, $"{signed.ToString("N0", CultureInfo.InvariantCulture)} signed, {(signed == 0 ? 0m : (decimal)failed / signed):P1} failed or cancelled");
+        }
 
         Console.WriteLine();
         Console.WriteLine("Goods (produced = consumed + held + lost):");

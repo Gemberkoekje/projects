@@ -103,16 +103,27 @@ public static class LedgerView
             bool paying = contract.Payer == session.Player.Id;
             string role = Templates.Get(contract switch
             {
+                HaulContract when paying => "Ledger.Role.Shipping",
                 HaulContract => "Ledger.Role.Carrying",
                 SaleContract when paying => "Ledger.Role.Buying",
                 _ => "Ledger.Role.Selling",
             });
-            string detail = Templates.Fill(
-                "Ledger.Contract", ("role", role), ("party", context.Actor(contract.Other(session.Player.Id) ?? contract.PostedBy).Name),
-                ("when", Format.Relative(contract.DeadlineTick, session.Now)));
+            string party = context.Actor(contract.Other(session.Player.Id) ?? contract.PostedBy).Name;
+            bool inDefault = contract.InDefault(session.Now);
+            string detail = inDefault
+                ? Templates.Fill("Ledger.Contract.InDefault", ("role", role), ("party", party), ("when", Format.Date(contract.GraceEndsTick)))
+                : Templates.Fill("Ledger.Contract", ("role", role), ("party", party), ("when", Format.Relative(contract.DeadlineTick, session.Now)));
             lines.Add(new LedgerLine(
                 ContractView.Head(context, contract), detail, Format.Money(paying ? -contract.Price.Amount : contract.Price.Amount),
-                paying ? Tone.Loss : Tone.Gain, Contract: contract.Id));
+                inDefault ? Tone.Warn : paying ? Tone.Loss : Tone.Gain, Contract: contract.Id));
+        }
+
+        // The player's own posts still waiting for a taker: a haul it posted for a carrier.
+        foreach (Contract post in session.PlayerOpenPosts)
+        {
+            lines.Add(new LedgerLine(
+                ContractView.Head(context, post), Templates.Fill("Ledger.Post", ("when", Format.Relative(post.DeadlineTick, session.Now))),
+                Format.Money(-post.OfferedPrice.Amount), Tone.Muted, Contract: post.Id));
         }
 
         return lines;

@@ -114,12 +114,35 @@ async function tick(page) {
     return Number(await page.getAttribute('.screen', 'data-tick'));
 }
 
-// Run the clock until the game reaches a tick, resuming whenever an alert stops it.
+const decisions = [];
+
+// Answer a decision prompt if one stopped the clock: screenshot the first, then keep waiting (the second answer).
+async function answerDecision(page) {
+    const prompt = page.locator('[data-testid="decision"]');
+    if (await prompt.count() === 0) {
+        return false;
+    }
+
+    const text = (await prompt.first().locator('.decision-text .link-text').textContent()).trim();
+    if (decisions.length === 0) {
+        await page.screenshot({ path: path.join(shots, '08-decision.png'), fullPage: true });
+    }
+
+    decisions.push(text);
+    await prompt.first().locator('.decision-options button').last().click();
+    return true;
+}
+
+// Run the clock until the game reaches a tick, resuming whenever an alert stops it and answering any decision.
 async function runUntil(page, target, timeoutMs) {
     const started = Date.now();
     while (await tick(page) < target) {
         if (Date.now() - started > timeoutMs) {
             return false;
+        }
+
+        if (await answerDecision(page)) {
+            await page.click('button[data-speed="X16"]');
         }
 
         const resume = page.locator('.alert button');
@@ -159,6 +182,8 @@ async function main() {
         check(rows > 0, `the board lists open contracts (${rows})`);
         const kinds = (await page.locator('.board-row .kind').allTextContents()).map(k => k.trim());
         check(kinds.every(k => /^(Sale · (wanted|for sale)|Haul)$/.test(k)), `each row names its kind (${[...new Set(kinds)].join(', ')})`);
+        const packages = (await page.locator('.board-row .terms').allTextContents()).map(k => k.trim());
+        check(packages.length === rows && packages.every(k => /^(strict|standard|lenient)$/.test(k)), `each row names its terms (${[...new Set(packages)].join(', ')})`);
         check(await page.locator('[data-testid="ledger"]').count() === 1, 'the ledger is on the screen');
         check(await page.locator('svg.map .node').count() === 7, 'the map draws seven locations');
         check(await page.locator('svg.map .route').count() === 9, 'the map draws nine routes');
@@ -172,7 +197,11 @@ async function main() {
         const takeHome = (await page.textContent('[data-testid="take-home"]')).trim();
         check(/^−?₵[\d,]+$/.test(takeHome), `the contract panel shows a take-home (${takeHome})`);
         check(await page.locator('svg.map .leg').count() > 0, 'the selected contract is drawn on the map');
-        check(await page.locator('.contract-panel .term').count() >= 2, 'the terms read as sentences');
+        const terms = (await page.locator('.contract-panel [data-testid="terms"] .term').allTextContents()).map(t => t.trim());
+        const termsTitle = (await page.textContent('.contract-panel [data-testid="terms"] .block-title')).trim();
+        check(terms.length >= 6 && terms.some(t => t.includes('grace')) && terms.some(t => t.includes('break fee')),
+            `the terms read as sentences: ${termsTitle}, ${terms.length} of them`);
+        check(await page.locator('.contract-panel [data-testid="why"] .why-line').count() >= 1, 'the contract reads back what led to it');
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
 
         // 3. Accepting it signs it through the engine, while paused, and the ledger lists it.
@@ -183,6 +212,35 @@ async function main() {
         check(firstLog.startsWith('You '), `the log records it ("${firstLog.slice(0, 80)}…")`);
         const signed = await page.locator('[data-testid="ledger-contracts"] .ledger-line').count();
         check(signed >= 1, `the ledger lists your contracts (${signed})`);
+
+        // 3b. Still paused, fill another wanted Sale through a carrier: the goods are bought, the haul is posted, and the contract says what the
+        //    player can still do with it and what led to it.
+        let brokered = false;
+        let brokeredTitle = '';
+        const wanted = page.locator('.board-row').filter({ has: page.locator('.kind', { hasText: 'Sale · wanted' }) });
+        for (let i = 0; i < await wanted.count() && !brokered; i++) {
+            await wanted.nth(i).click();
+            const broker = page.locator('.contract-panel .action[data-command="Broker"] button');
+            if (await broker.count() > 0 && await broker.isEnabled()) {
+                brokeredTitle = (await page.textContent('.contract-panel .contract-title')).trim();
+                await broker.click();
+                brokered = true;
+            }
+        }
+
+        check(brokered, 'a wanted Sale can be filled through a carrier');
+        if (brokered) {
+            const said = (await page.textContent('.contract-panel .outcome')).trim();
+            check(said.startsWith('Signed for') && said.includes('haul'), `filling it through a carrier posts the haul ("${said}")`);
+            const posts = (await page.locator('[data-testid="ledger-contracts"] .ledger-line').allTextContents()).map(t => t.trim());
+            check(posts.some(t => t.includes('your post')), 'the ledger lists the haul the player posted');
+            await page.locator('[data-testid="ledger-contracts"] .ledger-line .link-text').filter({ hasText: brokeredTitle }).first().click();
+            const actions = (await page.locator('.contract-panel .action button').allTextContents()).map(t => t.trim());
+            check(actions.some(a => a.startsWith('Walk away')) && actions.some(a => a.startsWith('Raise the haul')),
+                `the signed sale offers what can still be done (${actions.join('; ')})`);
+            check(await page.locator('.contract-panel [data-testid="why"] .why-line').count() >= 3, 'the sale reads back through its haul');
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '07-broker.png') });
+        }
 
         // 4. The clock runs at 16×; ships move.
         const before = await tick(page);
@@ -204,21 +262,30 @@ async function main() {
         check(owned.some(t => t.includes('hold')), `the ledger shows your goods aboard ("${(owned[0] ?? '').slice(0, 80)}")`);
         await page.locator('[data-testid="ledger"]').screenshot({ path: path.join(shots, '04-ledger.png') });
 
-        // 6. The light theme uses the same layout from the other token set.
+        // 6. Run on: any decision the terms hand the player stops the clock, and is answered.
+        const beforeRun = await tick(page);
+        await page.click('button[data-speed="X16"]');
+        await runUntil(page, beforeRun + 240, 60000);
+        await page.click('button[data-speed="Paused"]');
+        results.push(decisions.length > 0
+            ? `info  ${decisions.length} decision(s) stopped the clock; the first: "${decisions[0].slice(0, 90)}…"`
+            : 'info  no decision landed on the player in this run');
+
+        // 7. The light theme uses the same layout from the other token set.
         await page.selectOption('.theme select', 'light');
         check(await page.getAttribute('html', 'data-theme') === 'light', 'the light theme applies');
         await page.waitForTimeout(200);
         await page.screenshot({ path: path.join(shots, '05-light.png'), fullPage: true });
         await page.selectOption('.theme select', 'system');
 
-        // 7. At phone width nothing scrolls sideways.
+        // 8. At phone width nothing scrolls sideways.
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForTimeout(200);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
         check(overflow <= 0, `no sideways scroll at 390 px (${overflow} px over)`);
         await page.screenshot({ path: path.join(shots, '06-phone.png'), fullPage: true });
 
-        // 8. The engine speed probe, and the same state as desktop .NET.
+        // 9. The engine speed probe, and the same state as desktop .NET.
         await page.setViewportSize({ width: 1024, height: 600 });
         await page.goto(`${base}/?bench=${BENCH_TICKS}&seed=${SEED}`);
         await page.waitForSelector('[data-testid="bench"][data-done="true"]', { timeout: 300000 });

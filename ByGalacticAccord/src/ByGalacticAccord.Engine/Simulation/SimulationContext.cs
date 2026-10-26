@@ -47,6 +47,10 @@ public sealed class SimulationContext
     private readonly Dictionary<GoodType, decimal> _lost = new();
 
     private readonly List<JournalEntry> _playerAlerts = new();
+    private readonly List<PlayerDecision> _playerDecisions = new();
+
+    // How often each failure path of design §16.3 has happened, for the soak's telemetry.
+    private readonly long[] _failures = new long[Enum.GetValues<FailureKind>().Length];
 
     // Contracts that have held escrow and may still: TotalEscrowHeld sums these rather than every contract ever.
     private readonly List<Contract> _escrowed = new();
@@ -112,6 +116,9 @@ public sealed class SimulationContext
 
     /// <summary>Contracts whose payer didn't pay (outside the Accord).</summary>
     public long ContractsDefaulted { get; private set; }
+
+    /// <summary>Signed contracts cancelled, at will or for default.</summary>
+    public long ContractsCancelled { get; private set; }
 
     public long IncidentsOccurred { get; private set; }
 
@@ -207,10 +214,17 @@ public sealed class SimulationContext
     /// <summary>
     /// Advance the world by processing events up to and including <paramref name="targetTick"/> (§5.4).
     /// "Running" is just dequeuing as the clock moves. Stops early and returns <see cref="RunStop.PlayerAlert"/>
-    /// if a player hard-pause was raised (§3.4); in headless runs that never happens.
+    /// if a player alert was raised, and <see cref="RunStop.PlayerDecision"/> if a decision landed on the player
+    /// (the hard pause, design §8.3); while that decision is pending the world doesn't move at all. In headless
+    /// runs neither happens.
     /// </summary>
     public RunStop RunTo(long targetTick)
     {
+        if (PlayerActorId is not null && HasPlayerDecisions)
+        {
+            return RunStop.PlayerDecision;
+        }
+
         while (Queue.HasEvents)
         {
             long next = Queue.NextTick!.Value;
@@ -222,6 +236,11 @@ public sealed class SimulationContext
             ISimEvent simEvent = Queue.Dequeue();
             CurrentTick = simEvent.Tick;
             simEvent.Process(this);
+
+            if (PlayerActorId is not null && HasPlayerDecisions)
+            {
+                return RunStop.PlayerDecision;
+            }
 
             if (PlayerActorId is not null && HasPlayerAlerts)
             {
@@ -237,7 +256,30 @@ public sealed class SimulationContext
         return Queue.HasEvents ? RunStop.ReachedTarget : RunStop.Drained;
     }
 
-    public void Record(JournalEntry entry) => Journal.Record(entry);
+    /// <summary>
+    /// Record what happened, with its cause (design §16.2): the entry's own, else the contract's latest entry. The
+    /// contract it is about, and the Sale a haul delivers, then take it as their latest. Returns the entry as kept.
+    /// </summary>
+    public JournalEntry Record(JournalEntry entry)
+    {
+        Contract? about = entry is IContractEntry e && _contracts.TryGetValue(e.Contract, out Contract? c) ? c : null;
+        if (entry.Cause is null && about?.LastEntry is { } last)
+        {
+            entry = entry with { Cause = last };
+        }
+
+        JournalEntry recorded = Journal.Record(entry);
+        if (about is not null)
+        {
+            about.LastEntry = recorded.Seq;
+            if (about is HaulContract { Serves: { } served } && _contracts.TryGetValue(served, out Contract? sale) && sale.IsLive)
+            {
+                sale.LastEntry = recorded.Seq;
+            }
+        }
+
+        return recorded;
+    }
 
     /// <summary>Sign a contract for <paramref name="taker"/> at <paramref name="price"/>. Escrow and bonds are <see cref="Market"/>'s.</summary>
     internal void Sign(Contract contract, ActorState taker, Credits price)
@@ -509,9 +551,20 @@ public sealed class SimulationContext
         return moved;
     }
 
-    // ---- escrow (held by the Accord clearing house; counted in TotalCredits) ----
+    // ---- escrow (held by the Accord clearing house in whole cents, so its books reconcile exactly; counted in TotalCredits) ----
+
+    /// <summary>
+    /// Lock <paramref name="amount"/>, to the cent, from <paramref name="payer"/> into a contract's escrow. A payer with just
+    /// the amount but not its rounding-up locks the cents it has.
+    /// </summary>
     public bool LockToEscrow(Contract contract, ActorState payer, Credits amount)
     {
+        amount = Cents(amount);
+        if (amount > payer.Credits && payer.Credits.Amount > 0m)
+        {
+            amount = Credits.Of(Math.Floor(payer.Credits.Amount * 100m) / 100m);
+        }
+
         if (amount.Amount <= 0m)
         {
             return true;
@@ -573,11 +626,12 @@ public sealed class SimulationContext
         GovernmentRevenue += actual;
     }
 
-    // A contract can never disburse more than it holds. Independent decimal divisions in the price and
-    // quality maths can leave a settlement's recomputed shares a sub-cent over the held amount; capping
-    // keeps per-contract escrow exactly >= 0 while global reconciliation stays exact.
+    // Escrow pays out in whole cents and never more than a contract holds: a settlement's shares (pro rata, refunds, tax)
+    // are rounded to the cent, and the last payout of a settlement takes exactly what is left.
     private static Credits CapToHeld(Contract contract, Credits amount) =>
-        amount.Amount <= 0m ? Credits.Zero : Credits.Of(System.Math.Min(amount.Amount, contract.EscrowHeld.Amount));
+        amount.Amount <= 0m ? Credits.Zero : Credits.Of(System.Math.Min(Cents(amount).Amount, contract.EscrowHeld.Amount));
+
+    private static Credits Cents(Credits amount) => Credits.Of(Math.Round(amount.Amount, 2, MidpointRounding.AwayFromZero));
 
     public void TaxDirect(ActorState payer, Credits amount)
     {
@@ -759,6 +813,14 @@ public sealed class SimulationContext
 
     public void NoteDefaulted() => ContractsDefaulted++;
 
+    public void NoteCancelled() => ContractsCancelled++;
+
+    /// <summary>Count one occurrence of a failure path (design §16.3).</summary>
+    public void NoteFailure(FailureKind kind) => _failures[(int)kind]++;
+
+    /// <summary>How often a failure path has happened.</summary>
+    public long Failures(FailureKind kind) => _failures[(int)kind];
+
     public void NoteIncident() => IncidentsOccurred++;
 
     public void NoteSold(decimal quantity) => GoodsSold += quantity;
@@ -779,4 +841,24 @@ public sealed class SimulationContext
     public void RaisePlayerAlert(JournalEntry entry) => _playerAlerts.Add(entry);
 
     public void ClearPlayerAlerts() => _playerAlerts.Clear();
+
+    // ---- decisions waiting on the player (design §8.3). While any is pending RunTo doesn't move the world. A decision
+    // about a contract that has since ended some other way (the player cancelled it at will) lapses. ----
+    public IReadOnlyList<PlayerDecision> PlayerDecisions
+    {
+        get
+        {
+            _playerDecisions.RemoveAll(d => _contracts[d.Contract].Status != ContractStatus.Active);
+            return _playerDecisions;
+        }
+    }
+
+    public bool HasPlayerDecisions => PlayerDecisions.Count > 0;
+
+    /// <summary>The pending decision about a contract, if there is one.</summary>
+    public PlayerDecision? PlayerDecisionFor(ContractId contract) => PlayerDecisions.FirstOrDefault(d => d.Contract == contract);
+
+    internal void RaisePlayerDecision(PlayerDecision decision) => _playerDecisions.Add(decision);
+
+    internal bool ResolvePlayerDecision(PlayerDecision decision) => _playerDecisions.Remove(decision);
 }

@@ -145,7 +145,7 @@ public sealed class DomainTests
     {
         var contract = new SaleContract(
             id, new ActorId(1), 0, SaleSide.Wanted, GoodType.Ore, 10m, at.Id, Credits.Of(10m), Credits.Of(20m),
-            0.04m, 100, at.Reach, at.Region, System.Array.Empty<ContractClause>());
+            0.04m, 100, at.Reach, at.Region, ContractTerms.None);
         ctx.Add(contract);
         return contract;
     }

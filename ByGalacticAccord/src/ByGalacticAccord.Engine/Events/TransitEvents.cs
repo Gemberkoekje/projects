@@ -38,6 +38,13 @@ public sealed class ShipDeparted : ISimEvent
 
         ship.ReachPickup(Job.Pickup);
         decimal loaded = Settlement.Load(context, ship, Job);
+        if (Job.Purchase is { } purchase && context.PlayerDecisionFor(purchase) is not null)
+        {
+            // The player is inspecting what it bought: the ship waits at the pickup until it decides.
+            context.Schedule(new ShipDeparted(Tick, Ship, Job));
+            return;
+        }
+
         if (Job.Destination is not { } destination)
         {
             ship.FinishJob(Tick);
@@ -46,7 +53,7 @@ public sealed class ShipDeparted : ISimEvent
 
         if (loaded <= 0m)
         {
-            // Nothing to carry: the purchase behind it fell through (a default outside the Accord).
+            // Nothing to carry: the purchase behind it fell through (a default outside the Accord, or the goods rejected).
             if (Job.Delivery is { } delivery)
             {
                 Settlement.Fail(context, context.Contract(delivery), FailureReason.NotDelivered);
@@ -174,8 +181,7 @@ public sealed class TransitIncidentOccurred : ISimEvent
         context.NoteIncident();
         ship.Log(Tick, $"Transit incident: {_incident.Description}.");
         ship.DelayArrival(_incident.DelayTicks);
-        var entry = new IncidentEntry(Tick, Job.Main, ship.Owner, _incident);
-        context.Record(entry);
+        JournalEntry entry = context.Record(new IncidentEntry(Tick, Job.Main, ship.Owner, _incident));
 
         if (context.PlayerActorId == ship.Owner)
         {

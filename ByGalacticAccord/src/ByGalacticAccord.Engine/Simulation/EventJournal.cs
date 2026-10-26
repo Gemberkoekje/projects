@@ -9,16 +9,36 @@ namespace ByGalacticAccord.Engine.Simulation;
 /// was true at that moment; anything the contract itself still holds (its good, places, posted fee) is
 /// read from the contract, which is never removed. Nothing here is hidden state: the poster's
 /// reservation fee is deliberately absent.
+/// <para>
+/// Every entry records its cause (design §16.2, §19): <see cref="Cause"/> is the <see cref="Seq"/> of the entry
+/// that led to it. By default that is the previous entry about the same contract, or about a haul delivering it,
+/// so a contract's record reads back as a chain: handed over late, because the haul was late, because of an
+/// incident on the Rust Belt run. Where something else caused it (a haul's failure failing the Sale it served),
+/// the recorder names that entry.
+/// </para>
 /// </summary>
-public abstract record JournalEntry(long Tick);
+public abstract record JournalEntry(long Tick)
+{
+    /// <summary>Its place in the journal: how many entries were recorded before it. Set when it is recorded.</summary>
+    public long Seq { get; init; } = -1;
+
+    /// <summary>The entry that led to this one, if any.</summary>
+    public long? Cause { get; init; }
+}
+
+/// <summary>An entry about one contract. The journal keeps each contract's latest entry as its next default cause.</summary>
+public interface IContractEntry
+{
+    ContractId Contract { get; }
+}
 
 /// <summary>Someone posted a contract: a Sale (wanted or for sale) or a Haul.</summary>
 public sealed record ContractPostedEntry(long Tick, ContractId Contract, ActorId Poster)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>Someone took a posted contract at a price: supplied a wanted Sale, bought a lot, took a Haul.</summary>
 public sealed record ContractSignedEntry(long Tick, ContractId Contract, ActorId Taker, Credits Price)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>A Sale settled: goods handed over, how late, what the seller was paid and what the terms took off.</summary>
 public sealed record GoodsHandedOverEntry(
@@ -32,9 +52,9 @@ public sealed record GoodsHandedOverEntry(
     Credits Price,
     Credits LateFee,
     Credits QualityRefund)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
-/// <summary>A Haul settled: what arrived, how late, and what the terms took off the fee.</summary>
+/// <summary>A Haul settled: what arrived, how late, and what the terms took off the fee (lateness, quality, goods lost).</summary>
 public sealed record HaulDeliveredEntry(
     long Tick,
     ContractId Contract,
@@ -44,46 +64,70 @@ public sealed record HaulDeliveredEntry(
     long TicksLate,
     Credits Fee,
     Credits LateFee,
-    Credits QualityRefund)
-    : JournalEntry(Tick);
+    Credits QualityRefund,
+    Credits Liability)
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>Outside the Accord, the payer could not pay at handover: a default. A seller keeps its goods.</summary>
 public sealed record PaymentDefaultedEntry(long Tick, ContractId Contract, ActorId Payer, ActorId Payee)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
-/// <summary>Why a performer failed.</summary>
+/// <summary>Why a performer failed by the terms.</summary>
 public enum FailureReason
 {
     /// <summary>The goods were lost in transit.</summary>
     CargoLost,
 
-    /// <summary>Nothing was delivered by the time the late fee reached its cap.</summary>
+    /// <summary>The goods never came aboard: the purchase behind the delivery fell through.</summary>
     NotDelivered,
+
+    /// <summary>Short, under terms that treat a short delivery as a failure.</summary>
+    ShortDelivery,
+
+    /// <summary>Below the warranty's floor, and the receiver rejected them on inspection.</summary>
+    Rejected,
 }
 
-/// <summary>A Sale or Haul failed: its performer's bond went to the payer and the payer's escrow came back.</summary>
-public sealed record DeliveryFailedEntry(long Tick, ContractId Contract, ActorId Performer, FailureReason Reason)
-    : JournalEntry(Tick);
+/// <summary>
+/// A Sale or Haul failed by its terms: its performer's bond went to the payer and the payer's escrow came back.
+/// <see cref="Delivered"/> and <see cref="Quality"/> are what arrived, for a short delivery or a rejection.
+/// </summary>
+public sealed record DeliveryFailedEntry(long Tick, ContractId Contract, ActorId Performer, FailureReason Reason, decimal Delivered = 0m, decimal Quality = 1m)
+    : JournalEntry(Tick), IContractEntry;
+
+/// <summary>
+/// A signed contract's grace ran out with it not performed (design §3.4): it is in default, and its payer may cancel
+/// for default or keep waiting while the late fee runs to its cap.
+/// </summary>
+public sealed record ContractInDefaultEntry(long Tick, ContractId Contract, ActorId Performer, ActorId Payer)
+    : JournalEntry(Tick), IContractEntry;
+
+/// <summary>
+/// A signed contract was cancelled (design §16.2): for default by its payer (<see cref="Paid"/> is the bond it took),
+/// or at will by either party (<see cref="Paid"/> is the break fee it paid).
+/// </summary>
+public sealed record ContractCancelledEntry(long Tick, ContractId Contract, ActorId By, CancelReason Reason, Credits Paid)
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>Nobody took an open contract before its deadline.</summary>
 public sealed record ContractExpiredEntry(long Tick, ContractId Contract)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>The poster took an open contract down: it no longer needs it, or it is posting new terms.</summary>
 public sealed record ContractWithdrawnEntry(long Tick, ContractId Contract)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>Someone rented storage from a station operator.</summary>
 public sealed record StorageOpenedEntry(long Tick, ContractId Contract, ActorId Renter)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>The last goods left a store, which ended its contract.</summary>
 public sealed record StorageClosedEntry(long Tick, ContractId Contract, ActorId Renter, Credits RentPaid)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>A transit incident struck a laden ship, on the job for <see cref="Contract"/>.</summary>
 public sealed record IncidentEntry(long Tick, ContractId Contract, ActorId Hauler, TransitIncident Incident)
-    : JournalEntry(Tick);
+    : JournalEntry(Tick), IContractEntry;
 
 /// <summary>The inflation monitor moved the faucet (design §5.5). Internal bookkeeping, not news.</summary>
 public sealed record FaucetAdjustedEntry(long Tick, decimal Drift, decimal Multiplier)
@@ -110,8 +154,10 @@ public sealed class EventJournal
 
     public long TotalRecorded { get; private set; }
 
-    public void Record(JournalEntry entry)
+    /// <summary>Keep an entry, stamped with its sequence number, and return it as kept.</summary>
+    public JournalEntry Record(JournalEntry entry)
     {
+        entry = entry with { Seq = TotalRecorded };
         TotalRecorded++;
         if (_count < _ring.Length)
         {
@@ -123,6 +169,15 @@ public sealed class EventJournal
             _ring[_start] = entry; // overwrite the oldest
             _start = (_start + 1) % _ring.Length;
         }
+
+        return entry;
+    }
+
+    /// <summary>The entry with sequence number <paramref name="seq"/>, if the ring still keeps it.</summary>
+    public JournalEntry? Find(long seq)
+    {
+        long first = TotalRecorded - _count;
+        return seq < first || seq >= TotalRecorded ? null : Entries[(int)(seq - first)];
     }
 
     public IEnumerable<JournalEntry> Tail(int count)

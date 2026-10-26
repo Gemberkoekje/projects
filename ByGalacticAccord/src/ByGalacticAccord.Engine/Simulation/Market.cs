@@ -45,11 +45,11 @@ public sealed record FillSource(FillSourceKind Kind, LocationId At, ActorId? Pro
 }
 
 /// <summary>
-/// The market's commands: post, withdraw, sign, and the compound deals built from them (fill a delivered Sale,
-/// buy a lot, take a haul). Every one is the same path for an AI decision and a player command (plan §2,
+/// The market's commands: post, withdraw, sign, cancel, and the compound deals built from them (fill a delivered
+/// Sale, buy a lot, take a haul). Every one is the same path for an AI decision and a player command (plan §2,
 /// "symmetric by construction"): the decision engine and <see cref="PlayerActions"/> differ only in who
-/// chooses. Signing locks escrow and bonds in Accord space (design §16.4); goods move only at handovers,
-/// pickups and arrivals, through <see cref="Settlement"/>.
+/// chooses. Signing locks escrow and bonds in Accord space (design §16.4) and, for a contract someone waits on,
+/// schedules the end of its grace; goods move only at handovers, pickups and arrivals, through <see cref="Settlement"/>.
 /// </summary>
 public static class Market
 {
@@ -57,17 +57,23 @@ public static class Market
 
     /// <summary>
     /// Post a Sale. For a wanted Sale <paramref name="holding"/> is where the buyer will take the goods at the place;
-    /// for one for sale it is where the seller's goods are, and they are set aside. AI producers at the place answer
-    /// a wanted Sale at once (design §4.3: an actor re-evaluates when a contract it can see appears).
+    /// for one for sale it is where the seller's goods are, and they are set aside. The terms are the poster's package
+    /// (its habit, unless <paramref name="package"/> says otherwise); a lot waiting in storage is warranted as seen. AI
+    /// producers at the place answer a wanted Sale at once (design §4.3: an actor re-evaluates when a contract it can
+    /// see appears).
     /// </summary>
     public static SaleContract PostSale(
         SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
-        Credits price, Credits reservation, long deadline, Holding holding)
+        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null)
     {
         Location location = context.Location(place);
+        decimal? stored = side == SaleSide.ForSale && holding.Kind == HoldingKind.Storage
+            ? context.StorageOf(poster.Id, holding.Location)?.Peek(good, context.CurrentTick)?.Quality
+            : null;
+        ContractTerms terms = Terms.ForSale(package ?? Terms.PackageFor(poster), good, price, stored, deadline - context.CurrentTick);
         var sale = new SaleContract(
             context.NextContractId(), poster.Id, context.CurrentTick, side, good, quantity, place, price, reservation,
-            Terms.TaxRate(context, location.Reach), deadline, location.Reach, location.Region, Terms.ForSale(good, price));
+            Terms.TaxRate(context, location.Reach), deadline, location.Reach, location.Region, terms);
         if (side == SaleSide.Wanted)
         {
             sale.SetReceipt(holding);
@@ -90,17 +96,22 @@ public static class Market
     }
 
     /// <summary>
-    /// Post a Haul of the shipper's goods from where they wait to <paramref name="destination"/>. A haul that serves a
-    /// Sale moves goods the Sale already set aside; any other haul sets its goods aside here.
+    /// Post a Haul of the shipper's goods from where they wait to <paramref name="destination"/>, on the shipper's package
+    /// unless <paramref name="package"/> says otherwise. The goods are declared at the unit price of the Sale the haul
+    /// serves, or else at their base value, for the carrier's liability. A haul that serves a Sale moves goods the Sale
+    /// already set aside, and its posting follows from that Sale; any other haul sets its goods aside here.
     /// </summary>
     public static HaulContract PostHaul(
         SimulationContext context, ActorState shipper, GoodType good, decimal quantity, Holding pickupFrom, LocationId destination,
-        Credits fee, Credits reservation, long deadline, ContractId? serves)
+        Credits fee, Credits reservation, long deadline, ContractId? serves, TermPackage? package = null, long? cause = null)
     {
         Location to = context.Location(destination);
+        SaleContract? served = serves is { } id ? context.Contract(id) as SaleContract : null;
+        Credits unitValue = served?.UnitPrice ?? Credits.Of(Goods.Info(good).BaseValue);
         var haul = new HaulContract(
             context.NextContractId(), shipper.Id, context.CurrentTick, good, quantity, pickupFrom.Location, destination, pickupFrom, serves,
-            fee, reservation, Terms.TaxRate(context, to.Reach), deadline, to.Reach, to.Region, Terms.ForHaul(good, fee));
+            fee, reservation, Terms.TaxRate(context, to.Reach), deadline, to.Reach, to.Region,
+            Terms.ForHaul(package ?? Terms.PackageFor(shipper), good, fee, quantity, unitValue));
         if (serves is null)
         {
             Reserve(context, shipper, pickupFrom, good, quantity);
@@ -108,12 +119,12 @@ public static class Market
 
         context.Add(haul);
         context.Schedule(new ContractExpiryCheck(deadline, haul.Id));
-        context.Record(new ContractPostedEntry(context.CurrentTick, haul.Id, shipper.Id));
+        context.Record(new ContractPostedEntry(context.CurrentTick, haul.Id, shipper.Id) { Cause = cause ?? served?.LastEntry });
         return haul;
     }
 
     /// <summary>The poster takes an open contract down; anything it set aside for it is free again.</summary>
-    public static void Withdraw(SimulationContext context, Contract contract)
+    public static void Withdraw(SimulationContext context, Contract contract, long? cause = null)
     {
         if (!contract.IsOpen)
         {
@@ -122,7 +133,7 @@ public static class Market
 
         ReleaseOpen(context, contract);
         contract.MarkWithdrawn();
-        context.Record(new ContractWithdrawnEntry(context.CurrentTick, contract.Id));
+        context.Record(new ContractWithdrawnEntry(context.CurrentTick, contract.Id) { Cause = cause });
     }
 
     /// <summary>Nobody took an open contract before its deadline.</summary>
@@ -135,7 +146,37 @@ public static class Market
 
         ReleaseOpen(context, contract);
         contract.MarkExpired();
+        context.NoteFailure(FailureKind.Expired);
         context.Record(new ContractExpiredEntry(context.CurrentTick, contract.Id));
+    }
+
+    // ---- cancelling (design §3.4) ----
+
+    /// <summary>
+    /// The payer cancels a contract in default: its grace has passed and it is not performed. Its escrow comes back and
+    /// the performer's bond is its. False if it may not.
+    /// </summary>
+    public static bool CancelForDefault(SimulationContext context, Contract contract, ActorState payer)
+    {
+        if (contract.Payer != payer.Id || !contract.InDefault(context.CurrentTick))
+        {
+            return false;
+        }
+
+        Settlement.Cancel(context, contract, payer, CancelReason.ForDefault);
+        return true;
+    }
+
+    /// <summary>Either party walks away from a signed contract and pays the break fee. False if it may not.</summary>
+    public static bool CancelAtWill(SimulationContext context, Contract contract, ActorState party)
+    {
+        if (contract.Status != ContractStatus.Active || contract is StorageContract || (contract.Payer != party.Id && contract.Performer != party.Id))
+        {
+            return false;
+        }
+
+        Settlement.Cancel(context, contract, party, CancelReason.AtWill);
+        return true;
     }
 
     // ---- signing ----
@@ -177,9 +218,9 @@ public static class Market
         {
             Settlement.HandOverReserved(context, wanted);
         }
-        else
+        else if (!wanted.Collected)
         {
-            context.Schedule(new ContractDefaultCheck(wanted.DefaultTick, wanted.Id));
+            AwaitPerformance(context, wanted);
         }
 
         return Signing.Signed;
@@ -205,9 +246,9 @@ public static class Market
         lot.SetReceipt(receipt);
         if (receipt.Kind == HoldingKind.Ship)
         {
+            // The goods wait, set aside, for the buyer's ship: nobody waits on the seller, so there is no grace to run out.
             Ship ship = context.Ship(receipt.Ship!.Value);
             Dispatch(context, ship, new ShipJob(buyer.Id, lot.Good, lot.Quantity, lot.Place, PickupSource.Purchase, Destination: null, Purchase: lot.Id));
-            context.Schedule(new ContractDefaultCheck(lot.DefaultTick, lot.Id));
         }
         else
         {
@@ -228,6 +269,7 @@ public static class Market
 
         haul.Assign(ship.Id);
         Dispatch(context, ship, new ShipJob(haul.Shipper, haul.Good, haul.Quantity, haul.Origin, PickupSource.Haul, haul.Destination, Haul: haul.Id));
+        AwaitPerformance(context, haul);
         return Signing.Signed;
     }
 
@@ -278,9 +320,9 @@ public static class Market
             if (signed == Signing.Signed)
             {
                 Cargo goods = context.Unload(ship, seller.Id, wanted.Good, wanted.Quantity);
-                if (!Settlement.HandOverCargo(context, wanted, goods))
+                if (Settlement.HandOverCargo(context, wanted, goods) is HandOver.Defaulted or HandOver.Refused)
                 {
-                    context.Load(ship, seller.Id, goods); // a default: the seller keeps its goods
+                    context.Load(ship, seller.Id, goods); // the seller keeps its goods
                 }
             }
 
@@ -395,6 +437,31 @@ public static class Market
         return false;
     }
 
+    /// <summary>When the goods for a signed contract are due to arrive, if anything is bringing them: a ship's job, or a haul's.</summary>
+    public static long? ExpectedArrival(SimulationContext context, Contract contract)
+    {
+        foreach (Ship ship in context.Ships.Values)
+        {
+            if (ship.Job is { } job && job.Serves(contract.Id))
+            {
+                return NextFree(context, ship).Tick;
+            }
+        }
+
+        if (contract is SaleContract { Seller: { } seller } sale)
+        {
+            foreach (Contract c in context.LiveContractsOf(seller))
+            {
+                if (c is HaulContract { Status: ContractStatus.Active, AssignedShip: { } id } haul && haul.Serves == sale.Id)
+                {
+                    return NextFree(context, context.Ship(id)).Tick;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Where and when a ship is next free: now where it sits, or where and when its job ends.</summary>
     public static (LocationId At, long Tick) NextFree(SimulationContext context, Ship ship)
     {
@@ -451,6 +518,15 @@ public static class Market
         context.Schedule(new ShipDeparted(context.CurrentTick + ticks, ship.Id, job));
     }
 
+    // Someone now waits on the performer: when its grace runs out, the payer may cancel for default.
+    private static void AwaitPerformance(SimulationContext context, Contract contract)
+    {
+        if (contract.GraceEndsTick != long.MaxValue)
+        {
+            context.Schedule(new GraceEnded(contract.GraceEndsTick, contract.Id));
+        }
+    }
+
     // Sign, then lock the payer's price and tax and the performer's bond in Accord escrow (design §16.4).
     private static Signing Sign(SimulationContext context, Contract contract, ActorState taker, Credits price)
     {
@@ -474,7 +550,7 @@ public static class Market
         {
             ActorState performer = context.Actor(contract.Performer!.Value);
             context.LockToEscrow(contract, payer, price + contract.Tax);
-            Credits bond = Credits.Of(Math.Min(contract.PerformanceBond.Amount, Math.Max(0m, performer.Credits.Amount)));
+            Credits bond = Credits.Of(Math.Min(contract.PerformanceBond.Amount, Math.Floor(Math.Max(0m, performer.Credits.Amount) * 100m) / 100m));
             context.LockToEscrow(contract, performer, bond);
             contract.SetLockedBond(bond);
         }

@@ -136,4 +136,57 @@ public sealed class SessionTests
         Assert.Equal(25m, session.PlayerShip.LotOf(session.Player.Id, GoodType.Parts)!.Quantity);
         session.Context.AssertSound();
     }
+
+    [Fact]
+    public void A_decision_stops_the_clock_and_it_wont_run_again_until_the_player_answers()
+    {
+        (SimulationContext context, SaleContract sale, HaulContract haul) = FailurePathTests.PlayerBrokerWithLateCarrier();
+        var session = new GameSession(context);
+        session.SetSpeed(ClockSpeed.X16);
+        while (session.Speed != ClockSpeed.Paused)
+        {
+            session.Advance(0.25);
+        }
+
+        Assert.Equal(haul.GraceEndsTick, session.Now);
+        PlayerDecision decision = Assert.Single(session.Decisions);
+        Assert.Equal("waiting for your decision", Presentation.Views.HeaderView.Build(session).SpeedNote);
+
+        // The speed buttons don't start it: the world waits for the answer.
+        session.SetSpeed(ClockSpeed.X16);
+        Assert.Equal(ClockSpeed.Paused, session.Speed);
+        Assert.False(session.Advance(0.25));
+
+        long revision = session.Revision;
+        Assert.True(session.Decide(decision, DecisionChoice.Wait));
+        Assert.True(session.Revision > revision);
+        Assert.Empty(session.Decisions);
+        session.SetSpeed(ClockSpeed.X16);
+        Assert.True(session.Advance(0.25));
+        Assert.Equal(ContractStatus.Active, sale.Status);
+    }
+
+    [Fact]
+    public void The_player_fills_through_a_carrier_walks_away_and_raises_its_haul_through_the_session()
+    {
+        SimulationContext context = TestWorld.Quiet(withPlayer: true);
+        var session = new GameSession(context);
+        SaleContract wanted = context.PostWanted(context.Actor("Meridian Habs"), GoodType.Food, 40m, 700m, hours: 200);
+
+        DealOutcome brokered = session.Broker(wanted.Id);
+        Assert.True(brokered.Signed);
+        Assert.Equal(session.Player.Id, wanted.Seller);
+        HaulContract haul = Assert.IsType<HaulContract>(Assert.Single(session.PlayerOpenPosts));
+        Assert.Equal(DealBlock.NotOpen, session.Broker(wanted.Id).Block);
+
+        Assert.True(session.HaulAgain(wanted.Id));
+        Assert.Equal(ContractStatus.Withdrawn, haul.Status);
+        Assert.Single(session.PlayerOpenPosts);
+
+        Assert.True(session.CancelAtWill(wanted.Id));
+        Assert.Equal(ContractStatus.Cancelled, wanted.Status);
+        Assert.Empty(session.PlayerOpenPosts); // the haul for it went with it
+        Assert.False(session.CancelForDefault(wanted.Id));
+        context.AssertSound();
+    }
 }
