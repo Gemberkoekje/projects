@@ -99,7 +99,7 @@ public sealed class SliderFileTests
         Assert.AreEqual(10, sidecar.Sun.Date.Month, "autumn in the north");
         Assert.AreEqual("dusk: sun at −4°, setting", sidecar.Sun.SolarTimeFrom);
         CollectionAssert.AreEquivalent(
-            new[] { "location", "altitude", "season", "date", "time", "solarTime", "temperature", "humidity", "snow", "haze", "valleyHaze" },
+            new[] { "location", "altitude", "season", "date", "time", "solarTime", "temperature", "humidity", "snow", "haze", "valleyHaze", "mist" },
             sliders.Values.Keys.ToArray());
         CollectionAssert.AreEquivalent(new[] { "location", "season", "time", "temperature", "haze" },
             sliders.Values.Where(v => v.Value.Pinned).Select(v => v.Key).ToArray());

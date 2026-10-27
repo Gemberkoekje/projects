@@ -58,8 +58,10 @@ public sealed class PreviewPipelineTests
         CollectionAssert.AreEquivalent(new[] { "firn", "forest", "grass", "ice", "rock.hard", "rock.soft", "scree", "snow", "snow.wet", "soil" },
             sidecar.DataTiers.Keys.ToArray());
         Assert.IsTrue(sidecar.DataTiers.Values.All(t => t == DataTier.BuiltIn));
-        CollectionAssert.AreEquivalent(new[] { "heightMap", "materialMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
+        // Since M1.13b the valleys' pools at the hour too, when there are any (this default scene's morning has them).
+        CollectionAssert.AreEquivalent(new[] { "heightMap", "materialMap", "poolMap", "sidecar" }, sidecar.Outputs.Keys.ToArray());
         Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.materials.png")));
+        Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.pools.png")));
         Assert.IsTrue(File.Exists(Path.Combine(_dir, "p.heightmap.png")));
         Assert.IsFalse(File.Exists(Path.Combine(_dir, "p.png")));
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("worldGen"));

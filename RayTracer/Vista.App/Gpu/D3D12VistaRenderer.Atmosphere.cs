@@ -33,8 +33,11 @@ internal sealed partial class D3D12VistaRenderer
     private const string LutShaderFile = "VistaAtmosphereLuts.hlsl";
     private const int LutGroupSize = 64;
 
-    /// <summary>Work items per LUT dispatch: the 4D density at 32 × 32 directions takes about 0.1 s per million, far below the TDR.</summary>
-    private const int LutItemsPerDispatch = 1 << 20;
+    /// <summary>
+    /// Work items per LUT dispatch: the 4D density at 32 × 32 directions takes about 0.1 s per million, far below the TDR; a quarter
+    /// of that on a shared GPU (<see cref="GpuShare"/>), so each dispatch stays short.
+    /// </summary>
+    private static readonly int LutItemsPerDispatch = GpuShare.Capped ? 1 << 18 : 1 << 20;
 
     /// <summary>The LUT builders' bindings, by root parameter slot (registers in the comments).</summary>
     private enum LutSlot
@@ -230,7 +233,7 @@ internal sealed partial class D3D12VistaRenderer
     private void WriteAtmosphereConstants(AtmosphereFrame frame)
     {
         AtmosphereModel model = frame.Model;
-        Write(_atmosphereConstants, new AtmosphereConstants
+        var constants = new AtmosphereConstants
         {
             SeaRadius = (float)model.PlanetRadiusMetres,
             GroundAltitude = (float)frame.GroundAltitudeMetres,
@@ -250,7 +253,9 @@ internal sealed partial class D3D12VistaRenderer
             ValleyHazeSoftness = (float)model.ValleyHazeSoftnessMetres,
             ValleyHazeDensity = (float)model.ValleyHazeDensity,
             HazeScale = (float)model.HazeScale,
-        });
+        };
+        FillLowAirConstants(ref constants);
+        Write(_atmosphereConstants, constants);
     }
 
     /// <summary>
@@ -323,8 +328,9 @@ internal sealed partial class D3D12VistaRenderer
         ArgumentNullException.ThrowIfNull(directions);
         if (directions.Count == 0 || chunks <= 0 || pathsPerThread <= 0 || pathsPerDispatch <= 0 || !(segmentLength >= 0.0))
             throw new ArgumentException("A sky check needs directions, chunks, paths and a length of zero or more.");
+        EnsureLowAirCells(null); // the air alone
         EnsureAtmosphere(frame, wavelengths);
-        _checkPipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine), "CSSkyCheck", ShaderFile);
+        _checkPipeline ??= CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, ReferenceDefine, LowAirDefine), "CSSkyCheck", ShaderFile);
 
         var packed = new float[directions.Count * 4];
         for (int i = 0; i < directions.Count; i++)

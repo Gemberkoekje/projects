@@ -354,6 +354,61 @@ public static class DebugImages
     }
 
     /// <summary>
+    /// The valleys' pools at the hour (vista-plan §10 M1.13b) over a grey hillshade of the surface, top-down with north up like
+    /// <see cref="HeightMap"/>: blue where a pool's haze lies over the ground (full where it stands 150 m deep), white where mist does
+    /// (full at 60 m), on the world's level of the pools' map (<see cref="Weather.ValleyPools"/>), the world standing
+    /// <paramref name="baseMetres"/> above sea level. At most <paramref name="maxSize"/> pixels a side.
+    /// </summary>
+    public static (byte[] Rgb, int Size) PoolImage(HeightField surface, Weather.ValleyPools pools, double baseMetres, CameraSpec? camera, int maxSize = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(pools);
+        int n = surface.Size;
+        int size = Math.Min(n, maxSize);
+        double step = (n - 1) / (double)Math.Max(size - 1, 1);
+        var bytes = new byte[size * size * 3];
+        PoolLevel? level = pools.Levels.Count > 0 ? pools.Levels[0] : null;
+        Weather.PoolCell[]? cells = pools.Cells.Count > 0 ? pools.Cells[0] : null;
+        double Sample(Func<Weather.PoolCell, double> value, double x, double z)
+        {
+            double u = Math.Clamp((x - level!.OriginX) / level.CellMetres, 0.0, level.Size - 1);
+            double v = Math.Clamp((z - level.OriginZ) / level.CellMetres, 0.0, level.Size - 1);
+            int i = Math.Min((int)u, level.Size - 2), j = Math.Min((int)v, level.Size - 2);
+            double fu = u - i, fv = v - j;
+            double a = value(cells![j * level.Size + i]) * (1.0 - fu) + value(cells[j * level.Size + i + 1]) * fu;
+            double b = value(cells[(j + 1) * level.Size + i]) * (1.0 - fu) + value(cells[(j + 1) * level.Size + i + 1]) * fu;
+            return a * (1.0 - fv) + b * fv;
+        }
+        Parallel.For(0, size, row =>
+        {
+            int j = (int)Math.Round((size - 1 - row) * step);
+            int j0 = Math.Max(j - 1, 0), j1 = Math.Min(j + 1, n - 1);
+            for (int col = 0; col < size; col++)
+            {
+                int i = (int)Math.Round(col * step);
+                int i0 = Math.Max(i - 1, 0), i1 = Math.Min(i + 1, n - 1);
+                double dhdx = (surface[i1, j] - surface[i0, j]) / ((i1 - i0) * surface.CellSize);
+                double dhdz = (surface[i, j1] - surface[i, j0]) / ((j1 - j0) * surface.CellSize);
+                double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                double grey = 50 + 170 * shade;
+                (double r, double g, double b) = (grey, grey, grey);
+                if (level is not null)
+                {
+                    double x = surface.XOf(i), z = surface.ZOf(j), ground = baseMetres + surface[i, j];
+                    double haze = Math.Clamp((Sample(c => c.FloorMetres + c.DepthMetres, x, z) - ground) / 150.0, 0.0, 1.0) * 0.7;
+                    double mist = Math.Clamp((Sample(c => c.FloorMetres + c.MistMetres, x, z) - ground) / 60.0, 0.0, 1.0);
+                    (r, g, b) = (r + (150 - r) * haze, g + (190 - g) * haze, b + (255 - b) * haze);
+                    (r, g, b) = (r + (255 - r) * mist, g + (255 - g) * mist, b + (255 - b) * mist);
+                }
+                Put(bytes, row * size + col, ((byte)Math.Round(r), (byte)Math.Round(g), (byte)Math.Round(b)));
+            }
+        });
+        if (camera is not null)
+            MarkCamera(bytes, size, surface, camera);
+        return (bytes, size);
+    }
+
+    /// <summary>
     /// The rock's hardness at the bedrock's surface (M1.11d, <see cref="ErosionResult.Hardness"/>) over a hillshade of the eroded
     /// surface, top-down with north up like <see cref="ErosionMap"/>: soft rock in rust, hard rock in pale blue-grey, so the beds
     /// show as bands where slopes cut through them. At most <paramref name="maxSize"/> pixels a side (nearest samples).

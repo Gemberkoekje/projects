@@ -20,6 +20,7 @@ public sealed class WorldCache
     private TerrainWorld? _world;
     private MaterialField? _materials;
     private MaterialField? _forested;
+    private PoolMap? _pools;
     private TerrainHierarchy? _hierarchy;
     private (bool Detail, bool Materials, ForestPlacement Forest)? _hierarchyKey;
     private (MeshView View, MeshSettings Settings)? _meshKey;
@@ -43,7 +44,7 @@ public sealed class WorldCache
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
             (_key, _recipe) = (key, recipe);
-            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh) = (null, null, null, null, null, null);
+            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh, _pools) = (null, null, null, null, null, null, null);
         }
         return _world!;
     }
@@ -87,6 +88,23 @@ public sealed class WorldCache
             _materials = MaterialField.For(_world.Surface, _world.Erosion, strata, rock.Tints, MaterialRules.Default, MaterialNoise.SeedOf(seed));
         }
         return _materials;
+    }
+
+    /// <summary>
+    /// The cached world's pool map (vista-plan §10 M1.13b): where its cold air pools, from its drainage (worked out here for a world that
+    /// was not eroded), and around it the far field's base terrain; built the first time a render asks for it, about two seconds.
+    /// </summary>
+    public PoolMap Pools()
+    {
+        if (_world is null || _key is null || _recipe is null)
+            throw new InvalidOperationException("Ask for the world before its pools.");
+        if (_pools is null)
+        {
+            (_, ulong seed, WorldGrid grid, _, _) = _key.Value;
+            DrainageMap drainage = _world.Erosion?.Drainage ?? DrainageMap.Of(_world.Surface);
+            _pools = PoolMap.For(_world.Surface, drainage, PoolMap.FarTerrain(_recipe, seed, grid));
+        }
+        return _pools;
     }
 
     /// <summary>

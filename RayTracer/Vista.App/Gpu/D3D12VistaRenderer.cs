@@ -43,8 +43,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const string ShaderFile = "VistaIntegrator.hlsl";
     private const string ReferenceDefine = "ATMOSPHERE_REFERENCE";
     private const string TerrainShadowsDefine = "REFERENCE_TERRAIN_SHADOWS";
+    private const string LowAirDefine = "LOW_AIR";   // the valleys' pools' code (M1.13b), compiled only into the variant that renders them
     private const int GroupSize = 8;
     private const int ConstantBufferBytes = 256;
+    private const int AtmosphereConstantBytes = 512;   // the valleys' pools (M1.13b) took the atmosphere's past 256
 
     /// <summary>
     /// The most triangles one acceleration structure is built from (vista-plan §10 M1.9): the build is one submission, and it must
@@ -63,7 +65,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private const int SlotXyz = 12, SlotLuma = 13, SlotAlbedoSum = 14, SlotNormalSum = 15, SlotFirstHit = 16, SlotRayCounter = 17, SlotCheckSums = 18;
     private const int SlotConstants = 19, SlotAtmosphereConstants = 20, SlotCheckConstants = 21, SlotScatterSum = 22;
     private const int SlotSkyDistribution = 23, SlotSkyLuminance = 24, SlotMapNormals = 25, SlotNormalMap0 = 26, SlotNormalMap1 = 27;
-    private const int SlotMaterialMap = 28, SlotBedTable = 29, SlotMaterialConstants = 30;
+    private const int SlotMaterialMap = 28, SlotBedTable = 29, SlotMaterialConstants = 30, SlotLowAir = 31;
 
     private readonly AutoResetEvent _fenceEvent = new(false);
     private readonly SortedDictionary<string, double> _initSeconds = new(StringComparer.Ordinal);
@@ -85,6 +87,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     private ID3D12PipelineState _pipeline = null!;
     private ID3D12PipelineState? _referencePipeline;
     private ID3D12PipelineState? _shadowedPipeline;
+    private ID3D12PipelineState? _lowAirPipeline;
     private ID3D12QueryHeap _timestamps = null!;
     private ID3D12Resource _timestampReadback = null!;
     private ID3D12Resource _constants = null!;
@@ -134,6 +137,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _initSeconds[RenderStageKeys.DeviceInit] = Lap(stopwatch);
         CreatePipeline();
         CreateAtmospherePipelines();
+        CreateLowAirPipelines();
         CreateSkyLightPipelines();
         CreateIncidentPipeline();
         CreateFixedResources();
@@ -173,6 +177,28 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         public float ToSunX, ToSunY, ToSunZ, MieG;
         public float CameraAltitude, TerrainLowAltitude, TerrainHighAltitude, SunOneMinusCos;
         public float ValleyHazeTop, ValleyHazeSoftness, ValleyHazeDensity, HazeScale;
+        public uint LowMode, LowLevels, LowNoiseSeed, LowVolumeLayers;                   // the valleys' pools (M1.13b)
+        public float Level0OriginX, Level0OriginZ, Level0Cell, Level0Size;
+        public float Level1OriginX, Level1OriginZ, Level1Cell, Level1Size;
+        public uint Level1Offset, Volume0Offset, Volume1Offset, VolumeRatio;
+        public float SlabTop, SlabBottom, HazeMax, MistMax;
+        public float BlendMetres, HazeSoftness, VolumeMargin, MistG;
+        public float WispAmplitude, WispScale, WispVertical, PatchStrength;
+        public float PatchScale, MistWaterLimit, MistAlbedo, MarchStep;
+        public float MsA, MsB, MsC;
+        public uint MsOctaves;
+        public uint MarchMaxSteps;
+        public float Ambient;
+        public uint CeilingOffset, CeilingBlock;
+        public float MarchGrowth;
+        public uint BounceSteps;
+        public float BounceStep, MistSoftness;
+        public float MsForward, MsForwardPower, MsDiffuse, MsDiffusePower;
+        public uint SkySteps;
+        public float SkyGrowth, MistStep, MistBandStep;
+        public float Fray, ShadowedScattering;
+        public uint VolumePoolLayers;
+        public float Pad8;
     }
 
     /// <summary>
@@ -184,7 +210,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         foreach ((string name, int size, int capacity) in new[]
         {
             (nameof(IntegratorConstants), Unsafe.SizeOf<IntegratorConstants>(), ConstantBufferBytes),
-            (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>(), ConstantBufferBytes),
+            (nameof(AtmosphereConstants), Unsafe.SizeOf<AtmosphereConstants>(), AtmosphereConstantBytes),
             (nameof(BuildConstants), Unsafe.SizeOf<BuildConstants>(), ConstantBufferBytes),
             (nameof(CheckConstants), Unsafe.SizeOf<CheckConstants>(), ConstantBufferBytes),
             (nameof(ErosionConstants), Unsafe.SizeOf<ErosionConstants>(), ConstantBufferBytes),
@@ -228,6 +254,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         {
             AtmosphereMode.Reference => ReferencePipeline(stages, shadows: false),
             AtmosphereMode.ReferenceShadowed => ReferencePipeline(stages, shadows: true),
+            _ when scene.LowAir is not null => LowAirPipeline(stages),
             _ => _pipeline,
         };
         stopwatch.Restart();
@@ -245,7 +272,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             _mesh = scene.Mesh;
         }
 
-        // Each part of the air is rebuilt only when the frame changed what it depends on (M1.8 reports which).
+        // Each part of the air is rebuilt only when the frame changed what it depends on (M1.8 reports which). The valleys' pools
+        // (M1.13b) go up first: the atmosphere's constants carry their layout.
+        EnsureLowAirCells(scene.LowAir);
         AtmosphereFrame frame = scene.AirFrame();
         WavelengthTable wavelengths = scene.Wavelengths();
         LutBuild luts = EnsureAtmosphere(frame, wavelengths);
@@ -258,6 +287,13 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
                 stages[RenderStageKeys.ScatteringOrders] = luts.OrdersSeconds;
             if (luts.SkyView)
                 stages[RenderStageKeys.SkyView] = luts.SkyViewSeconds;
+        }
+
+        double volumeSeconds = EnsureSunlightVolume(scene, frame);
+        if (volumeSeconds > 0.0)
+        {
+            stages["sunlightVolume"] = Lap(stopwatch);
+            stages[RenderStageKeys.SunlightVolume] = volumeSeconds;
         }
 
         IntegratorTables tables = IntegratorTables.Build(scene.Materials, wavelengths);
@@ -282,19 +318,14 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask, skySampling);
         Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Canopy, settings.Height));
         double traceSeconds = 0.0;
-        double longest = 0.0;
         double maxCostNs = 0.0;
+        var pace = new DispatchPace();
         while (planner.HasNext)
         {
             SampleBatch batch = planner.Next();
-            constants.RowStart = (uint)batch.RowStart;
-            constants.RowCount = (uint)batch.RowCount;
-            constants.FirstSample = (uint)batch.FirstSample;
-            constants.SampleCount = (uint)batch.SampleCount;
-            double seconds = Dispatch(pipeline, constants, window.Width, batch.RowCount);
+            double seconds = DispatchBatch(pipeline, constants, window.Width, batch, ref pace);
             planner.Complete(batch, TimeSpan.FromSeconds(seconds));
             traceSeconds += seconds;
-            longest = Math.Max(longest, seconds);
             maxCostNs = Math.Max(maxCostNs, seconds * 1e9 / batch.PixelSamples(window.Width));
         }
         stages["trace"] = Lap(stopwatch);
@@ -325,7 +356,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             PixelSamples = planner.PixelSamplesCompleted,
             Dispatches = planner.Dispatches,
             TraceSeconds = traceSeconds,
-            LongestDispatchSeconds = longest,
+            LongestDispatchSeconds = pace.Longest,
             MaxCostNsPerPixelSample = maxCostNs,
             StageSeconds = stages,
             AccelerationStructureBytes = _blasBytes,
@@ -513,6 +544,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             Srv(18), Uav(7),                                          // 23–24: the sky distribution, its measurement (M1.5)
             Srv(19), Srv(20), Srv(21),                                // 25–27: the vertices' map normals, the two normal maps (M1.9)
             Srv(22), Srv(23), Cbv(3),                                 // 28–30: the material map, the bed table, the material constants (M1.12)
+            Srv(24),                                                  // 31: the valleys' pools and their sunlight volumes (M1.13b); 64 of 64 words
         };
         _rootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         _pipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile), "CSMain", ShaderFile);
@@ -535,11 +567,26 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         if (pipeline is null)
         {
             var stopwatch = Stopwatch.StartNew();
-            string source = shadows ? ShaderSource.Load(ShaderFile, ReferenceDefine, TerrainShadowsDefine) : ShaderSource.Load(ShaderFile, ReferenceDefine);
+            string source = shadows ? ShaderSource.Load(ShaderFile, ReferenceDefine, LowAirDefine, TerrainShadowsDefine) : ShaderSource.Load(ShaderFile, ReferenceDefine, LowAirDefine);
             pipeline = CompilePipeline(_rootSignature, source, "CSMain", ShaderFile);
             stages[RenderStageKeys.ReferenceShaderCompile] = stopwatch.Elapsed.TotalSeconds;
         }
         return pipeline;
+    }
+
+    /// <summary>
+    /// The integrator with the valleys' pools (M1.13b), compiled the first time a render has them: their code costs registers, which
+    /// cost a view without pools 40% of its speed (the aerial view, 7.0 against 9.9 ns a sample), so the plain one leaves it out.
+    /// </summary>
+    private ID3D12PipelineState LowAirPipeline(SortedDictionary<string, double> stages)
+    {
+        if (_lowAirPipeline is null)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _lowAirPipeline = CompilePipeline(_rootSignature, ShaderSource.Load(ShaderFile, LowAirDefine), "CSMain", ShaderFile);
+            stages[RenderStageKeys.LowAirShaderCompile] = stopwatch.Elapsed.TotalSeconds;
+        }
+        return _lowAirPipeline;
     }
 
     private void CreateFixedResources()
@@ -547,7 +594,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _timestamps = _device.CreateQueryHeap<ID3D12QueryHeap>(new QueryHeapDescription(QueryHeapType.Timestamp, 2));
         _timestampReadback = CreateBuffer(HeapType.Readback, 2 * sizeof(ulong), ResourceStates.CopyDest);
         _constants = CreateBuffer(HeapType.Upload, ConstantBufferBytes, ResourceStates.GenericRead);
-        _atmosphereConstants = CreateBuffer(HeapType.Upload, ConstantBufferBytes, ResourceStates.GenericRead);
+        _atmosphereConstants = CreateBuffer(HeapType.Upload, AtmosphereConstantBytes, ResourceStates.GenericRead);
         _rayCounter = CreateUavBuffer(2 * sizeof(uint));
         _rayCounterZero = CreateUploadBuffer<uint>([0u, 0u]);
         _rayCounterReadback = CreateBuffer(HeapType.Readback, 2 * sizeof(uint), ResourceStates.CopyDest);
@@ -715,7 +762,61 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         WaitForGpu();
     }
 
-    /// <summary>Runs one batch and returns its GPU time in seconds.</summary>
+    /// <summary>
+    /// Runs one planned batch; with the GPU shared (<see cref="GpuShare"/>) as several shorter dispatches of fewer rows, and of fewer
+    /// samples when one row takes too long, each under <see cref="GpuShare.MaxDispatchMs"/> at the last cost per pixel-sample and at
+    /// most <see cref="DispatchPace.Growth"/> times the last's pixel-samples (<paramref name="pace"/>, updated): a render's first
+    /// dispatch is one row of one sample, so a costly view (a reference through dense mist) never runs a long dispatch before its
+    /// cost is known, nor does a cheap row of sky size a costly one. Each row band runs all its samples in order before the next, so
+    /// every pixel adds its samples in order and the image is the batch's own, bit for bit. Returns the GPU seconds.
+    /// </summary>
+    private double DispatchBatch(ID3D12PipelineState pipeline, IntegratorConstants constants, int width, SampleBatch batch, ref DispatchPace pace)
+    {
+        double seconds = 0.0;
+        for (int row = 0; row < batch.RowCount;)
+        {
+            int rows = (int)Math.Clamp(pace.Allowed() / ((double)width * batch.SampleCount), 1.0, batch.RowCount - row);
+            for (int sample = 0; sample < batch.SampleCount;)
+            {
+                int count = rows == 1 ? (int)Math.Clamp(pace.Allowed() / width, 1.0, batch.SampleCount - sample) : batch.SampleCount;
+                constants.RowStart = (uint)(batch.RowStart + row);
+                constants.RowCount = (uint)rows;
+                constants.FirstSample = (uint)(batch.FirstSample + sample);
+                constants.SampleCount = (uint)count;
+                double s = Dispatch(pipeline, constants, width, rows);
+                seconds += s;
+                pace.Ran(s, (double)rows * width * count);
+                sample += count;
+            }
+            row += rows;
+        }
+        return seconds;
+    }
+
+    /// <summary>The trace's dispatches so far, which size the next with the GPU shared (<see cref="DispatchBatch"/>).</summary>
+    private struct DispatchPace
+    {
+        /// <summary>How many times the last dispatch's pixel-samples the next may take.</summary>
+        public const double Growth = 4.0;
+
+        private double _costNs, _lastPixelSamples;
+
+        /// <summary>The longest dispatch so far, s.</summary>
+        public double Longest { get; private set; }
+
+        /// <summary>The pixel-samples the next dispatch may take: all of them at full speed, one before the cost is known.</summary>
+        public readonly double Allowed() => !GpuShare.Capped ? double.MaxValue
+            : _costNs > 0.0 ? Math.Min(GpuShare.MaxDispatchMs * 1e6 / _costNs, Growth * _lastPixelSamples) : 1.0;
+
+        /// <summary>Records a dispatch of <paramref name="pixelSamples"/> that took <paramref name="seconds"/>.</summary>
+        public void Ran(double seconds, double pixelSamples)
+        {
+            _lastPixelSamples = pixelSamples;
+            _costNs = seconds * 1e9 / pixelSamples;
+            Longest = Math.Max(Longest, seconds);
+        }
+    }
+
     private double Dispatch(ID3D12PipelineState pipeline, IntegratorConstants constants, int width, int rows)
     {
         Write(_constants, constants);
@@ -760,6 +861,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         list.SetComputeRootShaderResourceView(SlotMaterialMap, (_materialMap ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootShaderResourceView(SlotBedTable, (_bedTable ?? _dummySrv).GPUVirtualAddress);
         list.SetComputeRootConstantBufferView(SlotMaterialConstants, _materialConstants.GPUVirtualAddress);
+        list.SetComputeRootShaderResourceView(SlotLowAir, (_lowAirBuffer ?? _dummySrv).GPUVirtualAddress);
     }
 
     /// <summary>Records <paramref name="record"/> between two timestamps, runs it, and returns its GPU time in seconds.</summary>
@@ -779,7 +881,9 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         Span<ulong> ticks = _timestampReadback.Map<ulong>(0, 2);
         ulong elapsed = ticks[1] - ticks[0];
         _timestampReadback.Unmap(0);
-        return (double)elapsed / _timestampFrequency;
+        double seconds = (double)elapsed / _timestampFrequency;
+        GpuShare.Pause(seconds); // the desktop's turn on a shared GPU
+        return seconds;
     }
 
     private static void Write<T>(ID3D12Resource upload, T value) where T : unmanaged
@@ -948,6 +1052,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _materialConstants?.Dispose();
         DisposeSkyLight();
         _incidentPipeline?.Dispose();
+        DisposeLowAirPipelines();
         DisposeAtmosphere();
         DisposeErosion();
         _dummyUav?.Dispose();
@@ -959,6 +1064,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         _timestampReadback?.Dispose();
         _timestamps?.Dispose();
         _shadowedPipeline?.Dispose();
+        _lowAirPipeline?.Dispose();
         _referencePipeline?.Dispose();
         _pipeline?.Dispose();
         _rootSignature?.Dispose();

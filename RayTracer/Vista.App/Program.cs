@@ -28,8 +28,13 @@ internal static class Program
     private static int Main(string[] args)
     {
         Console.OutputEncoding = Encoding.UTF8; // sizes print as 640×360
+        // The dev box is the user's own PC: below normal, the desktop stays responsive while the CPU builds worlds (GpuShare caps the GPU).
+        using (var self = System.Diagnostics.Process.GetCurrentProcess())
+            self.PriorityClass = System.Diagnostics.ProcessPriorityClass.BelowNormal;
         if (args is [SelfTestFlag])
             return RunGpu(() => GpuSelfTest.Run(Console.Out));
+        if (args is [GpuSelfTest.LowAirFlag])
+            return RunGpu(() => GpuSelfTest.RunLowAir(Console.Out));
         if (args.FirstOrDefault() == AtmosphereCheck.Flag)
             return RunGpu(() => AtmosphereCheck.Run(args, Console.Out));
         if (args.FirstOrDefault() == AtmosphereCompare.Flag)
@@ -46,6 +51,8 @@ internal static class Program
             return RunGpu(() => DiffuseCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == QuadratureCompare.Flag)
             return RunGpu(() => QuadratureCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == PoolsCompare.Flag)
+            return RunGpu(() => PoolsCompare.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -75,7 +82,8 @@ internal static class Program
         if (!PreviewCommandLine.TryParse(args, out PreviewRequest? request, out IReadOnlyList<string> errors))
             return Usage(errors);
 
-        if (request!.DryRun)
+        request = request! with { LowAir = LowAirOverrides.Apply(request.LowAir) };
+        if (request.DryRun)
             return Report(PreviewPipeline.Run(request, renderer: null, erosionCache: ErosionCache.Default));
 
         return RunGpu(() =>

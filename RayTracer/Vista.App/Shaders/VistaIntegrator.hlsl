@@ -48,6 +48,7 @@
 // One thread per pixel of a row band of the window; it traces samples [FirstSample, FirstSample + SampleCount).
 
 #include "VistaAtmosphere.hlsli"
+#include "VistaLowAir.hlsli"
 
 #define HERO_COUNT        50u
 #define COMPANIONS        4u
@@ -357,6 +358,247 @@ AirSegment SegmentBetween(float3 a, float3 b, out float3 dir)
     return seg;
 }
 
+// ── The valleys' pools on the way (vista-plan §10 M1.13b; VistaLowAir.hlsli) ─────────────────────────
+//
+// With pools (LowMode 1) a segment's part below the pools' highest reach (LowSlabTop) is marched through their density in three
+// dimensions, in steps of LowMarchStep (at most LowMarchMaxSteps, jittered by one random number a segment, so their edges turn into
+// noise that converges instead of bands), and the parts above it take AerialSegment as before. The tables carry the pools' haze as
+// their altitude average (the flat layer), which every march here leaves out: the pools take its place. In a step:
+//  - the sun reaches the point through the Earth's shadow and the clear air (the columns LUT), the terrain's shadow and the pools' own
+//    haze and mist (the sunlight volume, SunlightAt);
+//  - the air and the haze scatter it once, and the tables' multiple scattering (dimmed by the mist above the point) as before;
+//  - the mist scatters it in octaves (Wrenninge et al. 2013: each octave a times the light of the one before, seeing b times the
+//    optical depth toward the sun, with c times the asymmetry; the first is single scattering), the second weighted by LowMsForward
+//    and the rest, nearly diffuse, by LowMsDiffuse, each times a power of the sine of the sun's elevation (a deck catches the sun per
+//    unit of its top; LowAirSettings.ForwardLobeWeight), and the sky's light, the tables' haze radiance dimmed by the mist above.
+
+// What a pool's mist lets through to a surface or a point beneath it, of light that crosses an optical depth `tau` of it: its forward
+// scattering keeps most of the light going (the two-stream total transmission of a conservative slab, 1/(1 + ¾(1 − g)τ)).
+float MistTransmission(float tau) { return 1.0 / (1.0 + 0.75 * (1.0 - MistG) * max(tau, 0.0)); }
+
+// The part [t0, t1] of a segment below the pools' highest reach; false when it never dips that low.
+bool SlabInterval(AirSegment seg, out float t0, out float t1)
+{
+    float rb = GroundRadius();
+    float hs = LowSlabTop - GroundAltitude;
+    t0 = 0.0;
+    t1 = 0.0;
+    if (seg.Height <= hs)
+    {
+        t1 = min(seg.Length, DistanceToShellAbove(rb, seg.Height, hs, seg.Mu));
+        return t1 > 0.0;
+    }
+    float above = seg.Height - hs;
+    if (!HitsSphere(rb + hs, above, seg.Mu))
+        return false;
+    t0 = DistanceToSphereBelow(rb + hs, above, seg.Mu);
+    if (t0 >= seg.Length)
+        return false;
+    float rmu = (rb + seg.Height) * seg.Mu;
+    t1 = min(seg.Length, -rmu + sqrt(max(rmu * rmu - above * (2.0 * (rb + hs) + above), 0.0)));
+    return t1 > t0;
+}
+
+// The segment from `t` metres along `seg` to its end, described from there.
+AirSegment SegmentFrom(AirSegment seg, float t)
+{
+    ScatterPoint p = AirPointAt(seg, t);
+    AirSegment s;
+    s.Height = p.Height;
+    s.Mu = p.Mu;
+    s.MuS = p.MuS;
+    s.Nu = seg.Nu;
+    s.Length = max(seg.Length - t, 0.0);
+    return s;
+}
+
+// The air and the pools along [t0, t1] of a segment from frame point `a` along `dir`: transmittance and the light scattered toward
+// `a` per unit solar irradiance, as AerialSegment's. `poolsOnly` leaves the air out (a ray to the sky, whose air the sky view holds).
+// Where the ray runs above every pool near it (CeilingAt), it strides: to where it could meet the ceiling, at least a step and at most
+// a ceiling block (1 km over the world, 4 km over the far field), taking the air alone; below the ceiling it steps through the pools, LowMarchStep or LowMarchGrowth of its distance
+// from `a`, whichever is longer (a camera ray's far pools need fewer steps), except near a mist: in the band its top can reach (of the
+// pool the last step found) at most LowMistBandStep and the optical depth LowMistStep of the mist last found, above the band at most to it. A bounce's segment (`coarse`) takes at most LowBounceSteps
+// steps of LowBounceStep: indirect light, whose noise the samples average; a ray to the sky (`poolsOnly`) at most LowSkySteps, growing
+// by LowSkyGrowth: it meets the pools of valleys far along the horizon, soft haze there. Each step's point is jittered by `xi`; the last step takes
+// whatever is left.
+void LowMarch(float3 a, float3 dir, AirSegment seg, float t0, float t1, uint4 idx, float xi, bool poolsOnly, bool coarse, out float4 transmittance,
+    out float4 inscatter)
+{
+    float4 k0 = AtmCoefficients[idx.x], k1 = AtmCoefficients[idx.y], k2 = AtmCoefficients[idx.z], k3 = AtmCoefficients[idx.w];
+    float4 kR = float4(k0.x, k1.x, k2.x, k3.x);
+    float4 kMs = float4(k0.y, k1.y, k2.y, k3.y);
+    float4 kMe = float4(k0.z, k1.z, k2.z, k3.z);
+    float4 kO = float4(k0.w, k1.w, k2.w, k3.w);
+    float4 positions = float4(AtmSun[idx.x].w, AtmSun[idx.y].w, AtmSun[idx.z].w, AtmSun[idx.w].w);
+    float rb = GroundRadius();
+    float r0 = rb + seg.Height;
+    float len = t1 - t0;
+
+    float4 aR0 = 0.0, aM0 = 0.0, aR1 = 0.0, aM1 = 0.0;
+#ifndef SINGLE_SCATTERING_ONLY
+    LookupWeighted4(AirPointAt(seg, t0), positions, aR0, aM0);
+    LookupWeighted4(AirPointAt(seg, t1), positions, aR1, aM1);
+#endif
+    float phaseR = RayleighPhase(seg.Nu);
+    float phaseM = HenyeyGreenstein(seg.Nu, MieG);
+    float air = poolsOnly ? 0.0 : 1.0;
+    transmittance = 1.0;
+    inscatter = 0.0;
+    float t = t0;
+    uint maxSteps = coarse ? LowBounceSteps : poolsOnly ? LowSkySteps : LowMarchMaxSteps;
+    float step = coarse ? LowBounceStep : LowMarchStep;
+    float growth = poolsOnly ? LowSkyGrowth : LowMarchGrowth;
+    PoolSample last = (PoolSample)0;
+    float lastMist = 0.0;
+    for (uint i = 0u; i < maxSteps && t < t1; i++)
+    {
+        float h0 = max(AltitudeAlong(rb, seg.Height, seg.Mu, t), 0.0);
+        float2 here = WorldXZ(a + dir * t);
+        float stride;
+        float above = GroundAltitude + h0 - CeilingAt(here, stride);
+        float dt = max(step, growth * t);
+        // How fast the ray sinks here (the vertical at t, against the ray), and how far it may stride before it could meet the
+        // ceiling: a stride only when that is a step or more, so no step that strides ever passes under the ceiling.
+        float sink = -clamp((r0 * seg.Mu + t) / (rb + h0), -1.0, 1.0);
+        float reach = above / max(sink, 1.0e-3);
+        bool clear = above > 0.0 && reach >= dt;
+        if (clear)
+            dt = min(reach, max(stride, dt));
+        else if (last.Mist > 0.0 && !coarse)
+        {
+            float band = last.Floor + min(last.Mist * (1.0 + LowPatchStrength), last.Depth) + LowWispAmplitude + 8.0 * LowMistSoftness;
+            float over = GroundAltitude + h0 - band;
+            float limit = over > 0.0 ? over / max(sink, 1.0e-3) : min(LowMistBandStep, LowMistStep / max(lastMist, 1.0e-6));
+            dt = min(dt, max(limit, 5.0));
+        }
+        if (i + 1u == maxSteps || t + dt > t1)
+            dt = t1 - t;
+        float ts = t + xi * dt;
+        t += dt;
+        float h = max(AltitudeAlong(rb, seg.Height, seg.Mu, ts), 0.0);
+        float altitude = GroundAltitude + h;
+        float pool = 0.0, mist = 0.0;
+        bool any;
+        float2 world = WorldXZ(a + dir * ts);
+        PoolSample s = PoolAt(world, any);
+        if (!clear)
+        {
+            PoolDensity(s, world, altitude, pool, mist);
+            last = s;
+            lastMist = mist;
+        }
+        // A ray to the sky: the sky view holds the air and the tables' flat layer, which the pools replace here (a negative density
+        // where the layer stands over no pool).
+        if (poolsOnly)
+        {
+            pool -= ValleyHaze(altitude);
+            if (abs(pool) < 1.0e-6 && mist <= 0.0)
+                continue;
+        }
+        float aerosol = air * HazeScale * exp(-altitude / AerosolScaleHeight) + pool;
+        float4 sigmaR = air * kR * RayleighDensity(altitude);
+        float4 sigmaM = kMs * aerosol;
+        float4 extinction = sigmaR + kMe * aerosol + air * kO * OzoneDensity(altitude) + mist;
+
+        // The sun: the Earth's shadow and the clear air, then, anywhere under the pools' reach (in them or in the air over them, a
+        // stride's too), the terrain's shadow and the pools' haze and mist on the way.
+        float4 light = any ? SunlightAt(s, world, altitude) : float4(1.0, 0.0, 0.0, 0.0);
+#ifdef LOW_AIR_NO_SHADOW
+        light.x = 1.0; // a check against the reference, which knows no terrain in the air
+#endif
+        float4 sun = 0.0;
+        float sunMu;
+        float visible = SunVisibility(h, (r0 * seg.MuS + ts * seg.Nu) / (rb + h), sunMu);
+        if (visible > 0.0 && light.x > 0.0)
+        {
+            float3 c = SampleColumns(altitude, sunMu);
+            sun = visible * light.x * exp(-(kR * c.x + kMe * (c.y + light.y) + kO * c.z));
+        }
+        float f = saturate((ts - t0) / len);
+        // The tables' light scattered many times, dimmed by the mist above and, in the terrain's shadow, to LowShadowedMs of it.
+        float dim = MistTransmission(light.w) * lerp(LowShadowedMs, 1.0, light.x);
+        float4 aM = lerp(aM0, aM1, f) * dim;
+        float4 emission = sun * exp(-light.z) * (sigmaR * phaseR + sigmaM * phaseM) + sigmaR * lerp(aR0, aR1, f) * dim + sigmaM * aM;
+        if (mist > 0.0)
+        {
+            float octaves = 0.0, an = 1.0, bn = 1.0, gn = MistG;
+#ifdef SINGLE_SCATTERING_ONLY
+            octaves = HenyeyGreenstein(seg.Nu, MistG) * exp(-light.z);
+#else
+            float mu0 = max(sunMu, 0.01);
+            for (uint n = 0u; n < LowMsOctaves; n++)
+            {
+                float weight = n == 0u ? 1.0 : n == 1u ? LowMsForward * pow(mu0, LowMsForwardPower) : LowMsDiffuse * pow(mu0, LowMsDiffusePower);
+                octaves += weight * an * HenyeyGreenstein(seg.Nu, gn) * exp(-bn * light.z);
+                an *= LowMsA;
+                bn *= LowMsB;
+                gn *= LowMsC;
+            }
+#endif
+            emission += mist * MistAlbedo * (sun * octaves + LowAmbient * aM);
+        }
+        float4 integral = float4(StepIntegral(extinction.x, dt), StepIntegral(extinction.y, dt), StepIntegral(extinction.z, dt), StepIntegral(extinction.w, dt));
+        inscatter += transmittance * integral * emission;
+        transmittance *= exp(-extinction * dt);
+        if (all(transmittance < 1.0e-4))
+            break;
+    }
+}
+
+// The air along a segment from frame point `a` along `dir` (its AirSegment `seg`): AerialSegment, or with pools AerialSegment above
+// their reach and LowMarch below it, composed in order. `xi` jitters the march's steps; a bounce's (`coarse`) takes fewer.
+void AirAlong(float3 a, float3 dir, AirSegment seg, uint4 idx, float xi, bool coarse, out float4 transmittance, out float4 inscatter)
+{
+    float t0, t1;
+    if (!LOW_AIR_ON || !SlabInterval(seg, t0, t1))
+    {
+        AerialSegment(seg, idx, transmittance, inscatter);
+        return;
+    }
+    transmittance = 1.0;
+    inscatter = 0.0;
+    if (t0 > 0.0)
+    {
+        AirSegment before = seg;
+        before.Length = t0;
+        AerialSegment(before, idx, transmittance, inscatter);
+    }
+    float4 T, S;
+    LowMarch(a, dir, seg, t0, t1, idx, xi, false, coarse, T, S);
+    inscatter += transmittance * S;
+    transmittance *= T;
+    if (t1 < seg.Length)
+    {
+        AerialSegment(SegmentFrom(seg, t1), idx, T, S);
+        inscatter += transmittance * S;
+        transmittance *= T;
+    }
+}
+
+// What the pools let through to frame point `p` from the sun (toward_sun false: straight up, for the sky's light along `dir`), for four
+// wavelengths: their haze's extinction and the mist's total transmission (MistTransmission). 1 without pools or above them.
+float4 PoolLight(float3 p, float3 dir, bool towardSun, uint4 idx)
+{
+    if (!LOW_AIR_ON)
+        return 1.0;
+    float h = max(HeightAbove(p), 0.0);
+    float altitude = GroundAltitude + h;
+    if (altitude >= LowSlabTop)
+        return 1.0;
+    float2 world = WorldXZ(p);
+    bool any;
+    PoolSample s = PoolAt(world, any);
+    if (!any)
+        return 1.0;
+    float4 light = SunlightAt(s, world, altitude);
+    float4 kMe = float4(AtmCoefficients[idx.x].z, AtmCoefficients[idx.y].z, AtmCoefficients[idx.z].z, AtmCoefficients[idx.w].z);
+    if (towardSun)
+        return exp(-kMe * light.y) * MistTransmission(light.z);
+    // The sky view at this altitude has the tables' flat layer above the point in it already: the pool's own column replaces it.
+    float mu = max(dot(dir, LocalUp(p)), 0.1);
+    return exp(-kMe * (PoolHazeAbove(s, altitude) - ValleyHazeAbove(altitude)) / mu) * MistTransmission(light.w / mu);
+}
+
 #include "VistaMaterials.hlsli"
 
 // The surface a path hit: the ground's materials by rule (MatMode 1), or the single material of M0's table (MatMode 0).
@@ -395,22 +637,45 @@ float4 Brdf(GroundSurface g, float3 n, float3 wi, float3 wo)
 #define REF_MAX_STEPS     65536u
 #define REF_RR_START      4u
 
+// The haze of the reference's air at an altitude: with pools (LowMode 1) its own profile alone, since the pools take the place of
+// the tables' flat layer (vista-plan §10 M1.13b); without, the haze and that layer.
+float ReferenceAerosol(float altitude)
+{
+    return LOW_AIR_ON ? HazeScale * exp(-altitude / AerosolScaleHeight) : AerosolDensity(altitude);
+}
+
+// (total scattering, extinction, Rayleigh scattering, haze scattering) per metre at planet-centred point `p` (at `altitude`), the
+// pools' haze and mist included (VistaLowAir.hlsli); `mistScatter` is the mist's share of the scattering.
+float4 MediumIn(float4 k, float3 p, float altitude, out float mistScatter)
+{
+    float pool = 0.0, mist = 0.0;
+    if (LOW_AIR_ON && altitude < LowSlabTop)
+        LowDensityAt(WorldXZ(float3(p.x, p.y - GroundRadius(), p.z)), altitude, pool, mist);
+    float4 m = MediumWith(k, altitude, ReferenceAerosol(altitude) + pool);
+    mistScatter = MistAlbedo * mist;
+    return float4(m.x + mistScatter, m.y + mist, m.z, m.w);
+}
+
 // A bound on the extinction along a segment from `h0` above the ground at cos = mu, `segment` long: the lowest
 // altitude on it (the closest approach to the Earth's centre, clamped to the segment) for molecules and haze,
-// and the ozone peak for ozone. The 0.1% margin covers float rounding of the densities.
+// and the ozone peak for ozone; with pools, their densest haze and mist where the segment dips below their reach. The 0.1%
+// margin covers float rounding of the densities.
 float Majorant(float4 k, float h0, float mu, float segment)
 {
     float groundRadius = GroundRadius();
     float tClosest = clamp(-(groundRadius + h0) * mu, 0.0, segment);
     float lowest = GroundAltitude + max(AltitudeAlong(groundRadius, h0, mu, tClosest), 0.0);
-    return 1.001 * (k.x * RayleighDensity(lowest) + k.z * AerosolDensity(lowest) + k.w);
+    float pools = LOW_AIR_ON && lowest < LowSlabTop ? k.z * LowHazeMax + LowMistMax : 0.0;
+    return 1.001 * (k.x * RayleighDensity(lowest) + k.z * ReferenceAerosol(lowest) + k.w + pools);
 }
 
-// Transmittance to the top of the atmosphere by ratio tracking (unbiased); the ray must miss the ground.
-float RatioTrack(float4 k, float h0, float mu, inout uint rng)
+// Transmittance to the top of the atmosphere by ratio tracking (unbiased) from planet-centred point `p`, `h0` above the ground,
+// along `d`; the ray must miss the ground.
+float RatioTrack(float4 k, float3 p, float h0, float3 d, inout uint rng)
 {
     float groundRadius = GroundRadius();
     float top = SeaRadius + TopAltitude - groundRadius;
+    float mu = dot(d, normalize(p));
     float segment = DistanceToShellAbove(groundRadius, h0, top, mu);
     float sigmaBar = Majorant(k, h0, mu, segment);
     float transmittance = 1.0;
@@ -421,7 +686,8 @@ float RatioTrack(float4 k, float h0, float mu, inout uint rng)
         if (t >= segment)
             break;
         float altitude = GroundAltitude + AltitudeAlong(groundRadius, h0, mu, t);
-        transmittance *= saturate(1.0 - MediumAt(k, altitude).y / sigmaBar);
+        float unused;
+        transmittance *= saturate(1.0 - MediumIn(k, p + d * t, altitude, unused).y / sigmaBar);
     }
     return transmittance;
 }
@@ -456,10 +722,14 @@ float3 Scatter(float3 d, float cosTheta, float phi)
 // segment of open air, between the camera or a surface and the next surface or the sky, while later events of a path that
 // ignores the terrain may sit under the mountains or on the ground sphere beneath them, where the terrain would shadow
 // light that could never have got there (it darkened even the noon sky by 3%).
-bool TerrainShadows(uint events, float3 p, float3 toSun)
+//
+// With pools (LowMode 1) every event below their reach is checked too (vista-plan §10 M1.13b): light scattered many times in a
+// valley's mist must not reach the sun past the ridge that shades it. An event that wandered into the rock is shaded by it, as it
+// should be.
+bool TerrainShadows(uint events, float3 p, float altitude, float3 toSun)
 {
 #ifdef REFERENCE_TERRAIN_SHADOWS
-    if (events != 0u)
+    if (events != 0u && !(LOW_AIR_ON && altitude < LowSlabTop))
         return false;
     float3 world = float3(p.x, p.y - GroundRadius(), p.z);
     return Occluded(world + toSun * OriginOffset(world), toSun);
@@ -502,12 +772,13 @@ float AirPath(float4 k, float4 sun, float3 p, float h0, float3 dir, float surfac
         float t = 0.0;
         bool collided = false;
         float4 medium = 0.0;
+        float mistScatter = 0.0;
         for (uint n = 0u; n < REF_MAX_STEPS; n++)
         {
             t -= log(1.0 - NextFloat(rng)) / sigmaBar;
             if (t >= segment)
                 break;
-            medium = MediumAt(k, GroundAltitude + max(AltitudeAlong(groundRadius, h, mu, t), 0.0));
+            medium = MediumIn(k, p + d * t, GroundAltitude + max(AltitudeAlong(groundRadius, h, mu, t), 0.0), mistScatter);
             if (NextFloat(rng) * sigmaBar < medium.y)
             {
                 collided = true;
@@ -535,8 +806,8 @@ float AirPath(float4 k, float4 sun, float3 p, float h0, float3 dir, float surfac
             h = 0.0;
             float3 n = normalize(p);
             float cosS = dot(n, toSun);
-            if (cosS > 0.0 && !TerrainShadows(events, p, toSun))
-                radiance += throughput * sun.z * INV_PI * cosS * sun.y * RatioTrack(k, 0.0, cosS, rng);
+            if (cosS > 0.0 && !TerrainShadows(events, p, GroundAltitude, toSun))
+                radiance += throughput * sun.z * INV_PI * cosS * sun.y * RatioTrack(k, p, 0.0, toSun, rng);
             throughput *= sun.z;
             d = CosineHemisphere(n, NextFloat(rng), NextFloat(rng));
         }
@@ -547,18 +818,18 @@ float AirPath(float4 k, float4 sun, float3 p, float h0, float3 dir, float surfac
             float3 upHere = normalize(p);
             throughput *= medium.x / medium.y; // the single-scattering albedo of the mix here
             float muS = dot(toSun, upHere);
-            if (!HitsSphere(groundRadius, h, muS) && !TerrainShadows(events, p, toSun))
+            if (!HitsSphere(groundRadius, h, muS) && !TerrainShadows(events, p, GroundAltitude + h, toSun))
             {
                 float cosA = dot(d, toSun);
-                float phase = (medium.z * RayleighPhase(cosA) + medium.w * HenyeyGreenstein(cosA, MieG)) / medium.x;
-                radiance += throughput * phase * sun.y * RatioTrack(k, h, muS, rng);
+                float phase = (medium.z * RayleighPhase(cosA) + medium.w * HenyeyGreenstein(cosA, MieG) + mistScatter * HenyeyGreenstein(cosA, MistG)) / medium.x;
+                radiance += throughput * phase * sun.y * RatioTrack(k, p, h, toSun, rng);
             }
 #ifdef SINGLE_SCATTERING_ONLY
             break;
 #endif
-            float pick = NextFloat(rng);
+            float pick = NextFloat(rng) * medium.x;
             float u = NextFloat(rng);
-            float cosTheta = pick * medium.x < medium.z ? SampleRayleighCos(u) : SampleHenyeyGreensteinCos(u, MieG);
+            float cosTheta = pick < medium.z ? SampleRayleighCos(u) : SampleHenyeyGreensteinCos(u, pick < medium.z + medium.w ? MieG : MistG);
             d = Scatter(d, cosTheta, 2.0 * PI * NextFloat(rng));
         }
 
@@ -636,6 +907,30 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 #else
             float altitude = bounce == 0u ? CameraAltitude : ClampAltitude(GroundAltitude + HeightAbove(origin));
             float4 sky = SkyRadiance(bounce == 0u, altitude, dir, idx);
+            // The pools between: marched for the camera's own rays (their air is the sky view's), straight up through them for a bounce's.
+            float4 poolT = 1.0, poolS = 0.0;
+            if (LOW_AIR_ON)
+            {
+#ifdef LOW_AIR_NO_SKY_MARCH
+                if (false)
+#else
+                if (bounce == 0u)
+#endif
+                {
+                    float3 unused;
+                    AirSegment open = SegmentBetween(origin, origin + dir * 1.0e5, unused);
+                    float t0, t1;
+                    if (SlabInterval(open, t0, t1))
+                    {
+                        LowMarch(origin, dir, open, t0, t1, idx, NextFloat(rng), true, false, poolT, poolS);
+                        poolS = max(poolS, -sky / sunIrradiance); // the layer taken out never more than the sky it lit
+                    }
+                }
+                else
+                {
+                    poolT = PoolLight(origin, dir, false, idx);
+                }
+            }
             if (bounce == 0u)
             {
                 // A camera ray sees the disk itself.
@@ -654,7 +949,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                     sky += sunDisk * SunTransmittance4(idx, GroundAltitude + max(HeightAbove(origin), 0.0), dot(dir, LocalUp(origin)))
                          * PowerHeuristic(bsdfPdf, SunConePdf());
             }
-            radiance += throughput * sky;
+            radiance += throughput * (poolT * sky + sunIrradiance * poolS);
 #endif
             break;
         }
@@ -681,7 +976,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
         float4 skyB = SkyRadiance(false, ClampAltitude(GroundAltitude + HeightAbove(hit.Position)), dir, idx);
         airS = max(skyA - airT * skyB, 0.0) / sunIrradiance;
 #else
-        AerialSegment(air, idx, airT, airS);
+        AirAlong(origin, airDir, air, idx, LOW_AIR_ON ? NextFloat(rng) : 0.0, bounce != 0u, airT, airS);
 #endif
         radiance += throughput * sunIrradiance * airS;
         throughput *= airT;
@@ -731,13 +1026,14 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                 if (!Occluded(next, toSun))
                 {
 #ifdef ATMOSPHERE_REFERENCE
-                    float transmittance = RatioTrack(AtmCoefficients[idx.x], height, muS, rng);
+                    float transmittance = RatioTrack(AtmCoefficients[idx.x], float3(hit.Position.x, hit.Position.y + GroundRadius(), hit.Position.z), height,
+                                                     toSun, rng);
                     radiance.x += throughput.x * Brdf(surface, hit.ShadingNormal, toSun, wo).x * (INV_PI * cosS) * sunIrradiance.x * transmittance;
 #else
                     // The disk is 6.8·10⁻⁵ sr, so its density dwarfs the bounce's and the weight is 1 to float precision.
                     float weight = LightSampling != 0u ? PowerHeuristic(SunConePdf(), bsdfScale * cosS) : 1.0;
                     radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS) * sunIrradiance
-                              * SunTransmittance4(idx, GroundAltitude + height, muS) * weight;
+                              * SunTransmittance4(idx, GroundAltitude + height, muS) * PoolLight(hit.Position, toSun, true, idx) * weight;
 #endif
                 }
             }
@@ -764,7 +1060,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
                 result.Rays++;
                 if (!Occluded(next, toSky))
                 {
-                    float4 sky = SkyRadiance(false, ClampAltitude(GroundAltitude + HeightAbove(next)), toSky, idx);
+                    float4 sky = SkyRadiance(false, ClampAltitude(GroundAltitude + HeightAbove(next)), toSky, idx) * PoolLight(next, toSky, false, idx);
                     radiance += throughput * Brdf(surface, hit.ShadingNormal, toSky, wo) * sky * (INV_PI * cosK / skyPdf * PowerHeuristic(skyPdf, bsdfScale * cosK));
                 }
             }

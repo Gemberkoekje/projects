@@ -56,7 +56,7 @@ namespace Vista.App.Gpu;
 /// materials themselves (<see cref="MaterialChecks"/>): the world's material field is the same twice, the shader's rules match the
 /// C# reference at random places of the world, and the reference render shows several materials.</para>
 /// </summary>
-internal static class GpuSelfTest
+internal static partial class GpuSelfTest
 {
     /// <summary>Largest relative difference a GPU LUT texel may have from its C# reference (float against double).</summary>
     private const double LutTolerance = 2e-3;
@@ -146,6 +146,7 @@ internal static class GpuSelfTest
         pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
 
         pass &= AtmosphereChecks(renderer, scene, settings, tight, log);
+        pass &= LowAirChecks(renderer, recipe, seed, eroded, scene, settings, log);
         pass &= WatchChecks(renderer, hierarchy, scene, settings with { Width = 160, Height = 90 }, log);
         pass &= DenoiseChecks(reference, log);
         log.WriteLine(pass ? "PASS" : "FAIL");

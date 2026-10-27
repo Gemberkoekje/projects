@@ -197,7 +197,8 @@ public sealed class ValleyHazeTests
         Assert.IsTrue(layer.DepthMetres is > 300.0 and < 600.0, $"{layer.DepthMetres:0} m deep");
         Assert.AreEqual(dawn.ValleyFloorMetres + layer.DepthMetres, layer.TopMetres, 1e-9, "its lid stands on the valley floor's pool");
         Assert.IsTrue(layer.VisibilityKm < 0.5 * dawn.VisibilityKm, $"{layer.VisibilityKm:0.#} km under the lid, {dawn.VisibilityKm:0} km in the valley's own haze");
-        Assert.AreEqual($"{layer.VisibilityKm:0.#} km under a lid at {layer.TopMetres:0} m".Replace(',', '.'), dawn.Readings[Slider.ValleyHaze].Value);
+        // Since M1.13b the reading is the scene's own valley's pool: the visibility at its floor, its top.
+        Assert.AreEqual(string.Create(CultureInfo.InvariantCulture, $"{layer.VisibilityKm:0.#} km at the floor, its top at {layer.TopMetres:0} m"), dawn.Readings[Slider.ValleyHaze].Value);
         StringAssert.StartsWith(dawn.Readings[Slider.ValleyHaze].From, "auto: a cold pool");
         // The render's air carries it.
         AtmosphereModel air = dawn.Air(AtmosphereModel.Default);
@@ -235,9 +236,10 @@ public sealed class ValleyHazeTests
         double gone = Enumerable.Range(0, 96).Select(i => sunrise + i * 0.1)
             .First(h => !At(Place.Zermatt, "2026-04-15", TimeOnly.FromTimeSpan(TimeSpan.FromHours(h)).ToString("HH:mm:ss", CultureInfo.InvariantCulture)).ValleyHaze.Any);
         Assert.IsTrue(gone - sunrise is > 3.0 and < 5.5, $"gone {gone - sunrise:0.0} h after sunrise");
-        // After the day's high it forms again as the air cools: some by sunset, the whole of it by the next dawn.
-        double dusk = At(Place.Zermatt, "2026-10-15", "19:00").ValleyHaze.PoolShare;
-        double night = At(Place.Zermatt, "2026-10-15", "03:00").ValleyHaze.PoolShare;
+        // After the day's high it forms again as the air cools: some by sunset, the whole of it by the next dawn. Since M1.13b the pool
+        // is the scene's valley's (the evening's October air at Zermatt, by the humidity normals, is too dry to grow it any haze).
+        double dusk = ValleyPools.Share(At(Place.Zermatt, "2026-10-15", "19:00").Pools, 1.0);
+        double night = ValleyPools.Share(At(Place.Zermatt, "2026-10-15", "03:00").Pools, 1.0);
         Assert.IsTrue(dusk is > 0.0 and < 0.6 && night > dusk, $"dusk {dusk:P0}, night {night:P0}");
     }
 

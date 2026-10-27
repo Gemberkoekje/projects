@@ -16,6 +16,16 @@ namespace Vista.Weather;
 /// corrected for the snow the gauges miss: <see cref="SnowCover"/> does that), but for Lofoten: Skrova publishes no precipitation,
 /// so its precipitation is Leknes i Lofoten's, 43 km west in the middle of the islands and nearer Reine. Torres del Paine's stand-in,
 /// Punta Arenas, is far drier (390 mm a year) than the Paine massif beside the Patagonian ice field.</para>
+///
+/// <para>Since M1.13b each place's monthly mean vapour pressure too, which the valleys' mist reads (vista-plan §10 M1.13b), from the WMO
+/// climatological standard normals 1991–2020 where its station or a near one publishes them (NOAA NCEI's archive; MeteoSwiss's and JMA's
+/// own tables agree where checked). Four places have their own station's: Banff, Zermatt, Punta Arenas and Milford Sound (NIWA's 9 a.m.
+/// vapour pressure, 1981–2010, the only one published). Four take a near station's: Reykjavík for Iceland (coastal, so moister in winter
+/// than inland Þingvellir), Aviemore for the Highlands (east of the divide, so likely drier than Glen Spean), Dobbiaco for the Dolomites
+/// and Asahikawa for Hokkaido. Three have no station with humidity normals near enough, and take NASA POWER's monthly climatology
+/// (MERRA-2, 2001–2025) at the spot instead, its dew point converted by Magnus, at its grid cell's altitude: Yellowstone (its winters
+/// near saturation, where the Old Faithful fire-weather station's seven years read about 77%), Yosemite (its grid cell 1330 m above the
+/// valley floor) and Lofoten. The source of each is in its normals.</para>
 /// </summary>
 public static class ClimateTable
 {
@@ -28,6 +38,9 @@ public static class ClimateTable
             {
                 Precipitation = [52.8, 54.1, 56.9, 61.0, 68.1, 61.5, 31.8, 36.3, 43.2, 58.4, 56.4, 70.6],
                 PrecipitationSource = "Old Faithful, WY (NOAA USC00486845), NOAA NCEI U.S. Climate Normals 1991–2020 (inches converted)",
+                VapourPressure = [2.34, 2.52, 3.47, 4.32, 5.92, 7.76, 9.16, 7.53, 5.83, 4.41, 3.23, 2.30],
+                HumiditySource = "NASA POWER monthly climatology 2001–2025 (MERRA-2), dew/frost point at 2 m at 44.46 N, 110.83 W, converted by Magnus; no station near Old Faithful publishes humidity normals",
+                HumidityAltitudeMetres = 2437.5,
             }),
         (Place.Banff, new ClimateNormals("Banff (ECCC 3050519)", 1396.9, "1991–2020",
             "Environment and Climate Change Canada, Canadian Climate Normals 1991–2020",
@@ -36,6 +49,8 @@ public static class ClimateTable
             {
                 Precipitation = [18.8, 18.6, 29.3, 39.2, 50.0, 73.3, 46.9, 46.9, 44.9, 35.8, 27.8, 22.5],
                 PrecipitationSource = "Banff (ECCC 3050519), Canadian Climate Normals 1991–2020, total precipitation",
+                VapourPressure = [2.8, 2.7, 3.3, 4.2, 5.9, 7.9, 9.2, 8.9, 7.2, 5.1, 3.7, 2.6],
+                HumiditySource = "Banff CS (ECCC 3050519, WMO 71122), WMO climatological standard normals 1991–2020, mean vapour pressure (NOAA NCEI archive)",
             }),
         (Place.Yosemite, new ClimateNormals("Yosemite Park HQ, CA (NOAA USC00049855)", 1224.7, "1991–2020",
             "NOAA NCEI U.S. Climate Normals 1991–2020 (°F converted)",
@@ -44,6 +59,9 @@ public static class ClimateTable
             {
                 Precipitation = [177.3, 164.8, 138.9, 80.5, 48.8, 11.7, 7.4, 4.1, 10.2, 39.6, 102.9, 142.2],
                 PrecipitationSource = "Yosemite Park HQ, CA (NOAA USC00049855), NOAA NCEI U.S. Climate Normals 1991–2020 (inches converted)",
+                VapourPressure = [2.98, 3.16, 3.72, 4.31, 5.25, 5.81, 6.68, 5.66, 4.74, 3.80, 3.37, 2.95],
+                HumiditySource = "NASA POWER monthly climatology 2001–2025 (MERRA-2), dew/frost point at 2 m at 37.75 N, 119.59 W, converted by Magnus; its grid cell stands 1330 m above the valley; no station near the valley publishes humidity normals",
+                HumidityAltitudeMetres = 2554.6,
             }),
         (Place.Lofoten, new ClimateNormals("Skrova fyr (Met Norway, WMO 01160)", 11.0, "1991–2020",
             "Met Norway, WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
@@ -53,6 +71,9 @@ public static class ClimateTable
                 Precipitation = [152.7, 135.7, 126.5, 85.5, 61.0, 52.7, 50.6, 67.2, 123.1, 150.1, 154.3, 169.8],
                 PrecipitationSource = "Leknes i Lofoten (Met Norway SN 85540), WMO climatological standard normals 1991–2020 (NOAA NCEI archive); Skrova publishes none",
                 PrecipitationAltitudeMetres = 13.0,
+                VapourPressure = [5.06, 4.93, 5.05, 6.18, 7.67, 9.72, 12.27, 12.24, 10.27, 7.84, 6.54, 5.69],
+                HumiditySource = "NASA POWER monthly climatology 2001–2025 (MERRA-2), dew/frost point at 2 m at 68.15 N, 14.65 E (Skrova), converted by Magnus; Met Norway's Lofoten stations publish no vapour pressure in the WMO normals",
+                HumidityAltitudeMetres = 41.2,
             }),
         (Place.Iceland, new ClimateNormals("Hjarðarland (Icelandic Met Office, WMO 04042)", 89.0, "1991–2020",
             "Icelandic Met Office, WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
@@ -61,6 +82,9 @@ public static class ClimateTable
             {
                 Precipitation = [130.8, 130.7, 127.5, 84.4, 82.5, 78.2, 88.9, 104.1, 147.1, 120.3, 112.7, 129.2],
                 PrecipitationSource = "Hjarðarland (Icelandic Met Office, WMO 04042), WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
+                VapourPressure = [5.2, 5.1, 5.2, 5.9, 7.3, 9.2, 10.8, 10.6, 9.0, 6.9, 5.8, 5.3],
+                HumiditySource = "Reykjavík (Icelandic Met Office, WMO 04030), WMO climatological standard normals 1991–2020, mean vapour pressure (NOAA NCEI archive); coastal, 77 km west of Hjarðarland, which publishes no humidity",
+                HumidityAltitudeMetres = 52.0,
             }),
         (Place.ScottishHighlands, new ClimateNormals("Tulloch Bridge (Met Office, WMO 03047)", 249.0, "1991–2020",
             "Met Office UK climate averages 1991–2020 (as rounded in its WMO submission)",
@@ -69,6 +93,9 @@ public static class ClimateTable
             {
                 Precipitation = [250.0, 186.6, 154.0, 103.3, 95.3, 88.1, 94.2, 108.3, 129.7, 191.2, 203.4, 222.8],
                 PrecipitationSource = "Tulloch Bridge (Met Office, WMO 03047), Met Office UK climate averages 1991–2020",
+                VapourPressure = [6.3, 6.2, 6.6, 7.3, 8.6, 10.6, 12.2, 12.1, 10.8, 9.0, 7.5, 6.5],
+                HumiditySource = "Aviemore (Met Office, WMO 03063), WMO climatological standard normals 1991–2020, mean vapour pressure (NOAA NCEI archive); 65 km north-east in Strathspey, as Tulloch Bridge publishes none",
+                HumidityAltitudeMetres = 228.0,
             }),
         (Place.Zermatt, new ClimateNormals("Zermatt (MeteoSwiss ZER, WMO 06748)", 1638.0, "1991–2020",
             "MeteoSwiss, WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
@@ -77,6 +104,8 @@ public static class ClimateTable
             {
                 Precipitation = [42.2, 29.7, 33.3, 39.9, 77.4, 69.9, 58.9, 68.4, 51.2, 57.0, 65.2, 47.3],
                 PrecipitationSource = "Zermatt (MeteoSwiss ZER, WMO 06748), MeteoSwiss climate normals 1991–2020",
+                VapourPressure = [3.0, 3.0, 3.7, 4.6, 6.6, 8.7, 9.7, 9.8, 8.0, 6.1, 4.3, 3.3],
+                HumiditySource = "Zermatt (MeteoSwiss ZER, WMO 06748), MeteoSwiss climate normals 1991–2020, vapour pressure (the WMO normals agree)",
             }),
         (Place.Dolomites, new ClimateNormals("Cortina d'Ampezzo, Gilardon (ARPAV)", 1216.0, "1991–2020",
             "ISPRA, Valori climatici normali in Italia (SCIA) 1991–2020",
@@ -85,6 +114,9 @@ public static class ClimateTable
             {
                 Precipitation = [47.7, 40.7, 54.4, 74.2, 112.9, 115.1, 126.8, 142.7, 106.6, 120.6, 131.6, 62.3],
                 PrecipitationSource = "Cortina d'Ampezzo, Gilardon (ARPAV), ISPRA Valori climatici normali in Italia (SCIA) 1991–2020",
+                VapourPressure = [3.77, 3.82, 4.71, 6.16, 8.59, 10.95, 12.29, 12.65, 10.04, 7.90, 5.72, 4.08],
+                HumiditySource = "Dobbiaco/Toblach (WMO 16033), WMO climatological standard normals 1991–2020, mean vapour pressure (NOAA NCEI archive); 22 km north, as ARPAV publishes no mean humidity",
+                HumidityAltitudeMetres = 1222.0,
             }),
         (Place.TorresDelPaine, new ClimateNormals("Punta Arenas airport (DMC 520006, WMO 85934)", 36.0, "1991–2020",
             "Dirección Meteorológica de Chile, WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
@@ -93,6 +125,8 @@ public static class ClimateTable
             {
                 Precipitation = [38.1, 31.5, 42.9, 45.1, 36.9, 31.3, 30.9, 29.5, 24.5, 24.6, 23.1, 31.8],
                 PrecipitationSource = "Punta Arenas airport (DMC 520006, WMO 85934), WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
+                VapourPressure = [8.9, 9.0, 8.6, 7.8, 6.9, 6.1, 5.9, 6.1, 6.5, 6.9, 7.5, 8.3],
+                HumiditySource = "Punta Arenas airport (DMC 520006, WMO 85934), WMO climatological standard normals 1991–2020, mean vapour pressure (NOAA NCEI archive)",
             }),
         (Place.Fiordland, new ClimateNormals("Milford Sound AWS (NIWA 18309)", 3.0, "1991–2020",
             "NIWA climate normals 1991–2020",
@@ -101,6 +135,8 @@ public static class ClimateTable
             {
                 Precipitation = [667.2, 466.6, 571.3, 528.2, 645.1, 440.4, 468.0, 457.0, 541.3, 617.2, 557.7, 585.1],
                 PrecipitationSource = "Milford Sound AWS (NIWA 18309), NIWA mean monthly rainfall 1991–2020 (from at least 5 complete years)",
+                VapourPressure = [13.4, 13.4, 12.4, 10.7, 9.1, 7.7, 7.2, 7.7, 8.8, 9.8, 10.9, 12.6],
+                HumiditySource = "Milford Sound, NIWA, The Climate and Weather of Southland (2nd ed.), table 20: mean vapour pressure at 9 a.m., 1981–2010",
             }),
         (Place.Hokkaido, new ClimateNormals("Furano (JMA AMeDAS 0021)", 174.0, "1991–2020",
             "Japan Meteorological Agency, normals 1991–2020",
@@ -109,6 +145,9 @@ public static class ClimateTable
             {
                 Precipitation = [44.3, 36.5, 49.8, 55.4, 67.5, 64.5, 116.0, 168.6, 147.3, 106.8, 104.2, 71.2],
                 PrecipitationSource = "Furano (JMA AMeDAS 0021), Japan Meteorological Agency normals 1991–2020",
+                VapourPressure = [3.1, 3.1, 4.1, 5.9, 9.3, 13.9, 18.8, 19.7, 14.9, 9.3, 6.0, 3.8],
+                HumiditySource = "Asahikawa (JMA 47407), Japan Meteorological Agency normals 1991–2020, mean vapour pressure (the WMO normals agree); 47 km north, as Furano publishes no humidity",
+                HumidityAltitudeMetres = 119.6,
             }),
     ];
 

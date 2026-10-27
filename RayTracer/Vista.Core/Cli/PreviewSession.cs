@@ -8,6 +8,7 @@ using Vista.Recipes;
 using Vista.Rendering;
 using Vista.Scene;
 using Vista.Sliders;
+using Vista.Weather;
 using Vista.World;
 
 namespace Vista.Cli;
@@ -126,8 +127,13 @@ public sealed class PreviewSession
         warnings.AddRange(sliders.Hints);
         Almanac almanac = sliders.Almanac;
         IReadOnlyList<VistaMaterial> materials = MaterialCatalog.For(request.Mesh.Materials);
-        AtmosphereModel air = sliders.Air(AtmosphereModel.Default);
         double groundAltitude = sliders.BaseAltitudeMetres;
+        // The valleys' pools (vista-plan §10 M1.13b): each valley's from the night's pool and its shape; the air's tables carry their
+        // haze as its altitude average, and the march takes them in three dimensions.
+        ValleyPools pools = sliders.Pools.Any && request.Pools ? ValleyPools.Build(_worlds.Pools(), sliders.Pools, groundAltitude) : ValleyPools.None;
+        AtmosphereModel air = request.Pools ? sliders.Air(AtmosphereModel.Default, LowAir.TablesLayer(pools, request.LowAir)) : sliders.Air(AtmosphereModel.Default);
+        LowAir? lowAir = LowAir.For(pools, air, request.Seed, request.LowAir);
+        timings["pools"] = Lap(stopwatch);
         // The season's snow from the sliders, and the world's glaciers' line at this altitude (vista-plan §10 M1.13).
         GroundCover ground = GroundCover.For(sliders.Climate, almanac.Place.LatitudeDegrees) with
         {
@@ -191,6 +197,13 @@ public sealed class PreviewSession
                 PngEncoder.Write(Sibling(".hardness.png"), hardness, hardnessSize, hardnessSize, PngColor.Rgb);
                 outputs["hardnessMap"] = baseName + ".hardness.png";
             }
+            if (pools.Any)
+            {
+                // The valleys' pools at the hour (M1.13b): their haze and mist over the ground.
+                (byte[] lying, int lyingSize) = DebugImages.PoolImage(terrain, pools, groundAltitude, camera);
+                PngEncoder.Write(Sibling(".pools.png"), lying, lyingSize, lyingSize, PngColor.Rgb);
+                outputs["poolMap"] = baseName + ".pools.png";
+            }
             if (mesh.Materials is { } field)
             {
                 // The ground's materials from above (M1.12): every sample of the world grid under this place's grass line.
@@ -208,6 +221,7 @@ public sealed class PreviewSession
             {
                 Ground = ground,
                 Quadrature = request.Quadrature,
+                LowAir = lowAir,
             };
             var aovs = new HashSet<Aov>(PreviewPipeline.AovsFor(request.Debug));
             if (request.Denoise is not null)
@@ -388,7 +402,7 @@ public sealed class PreviewSession
                 Glaciers = GlacierInfo.Of(world.Erosion, world.Info.Settings),
             },
             Place = almanac.Place,
-            Sliders = SlidersInfo.From(sliders, request.SlidersPath, pinsFrom),
+            Sliders = SlidersInfo.From(sliders, request.SlidersPath, pinsFrom).WithPools(PoolsInfo.Of(request.Pools, sliders.Pools, pools, air)),
             Sun = SunInfo.From(almanac, frame),
             Atmosphere = AtmosphereInfo.From(frame, settings.Atmosphere, altitudeFrom),
             Exposure = exposure,
@@ -416,7 +430,8 @@ public sealed class PreviewSession
     private static void MarkRendererStages(SortedDictionary<PreviewStage, bool> stages, bool rendered, HashSet<string> built, RenderSettings settings)
     {
         void Mark(PreviewStage stage, params string[] keys) => stages[stage] = !rendered || !keys.Any(built.Contains);
-        Mark(PreviewStage.Device, RenderStageKeys.DeviceInit, RenderStageKeys.ShaderCompile, RenderStageKeys.ReferenceShaderCompile);
+        Mark(PreviewStage.Device, RenderStageKeys.DeviceInit, RenderStageKeys.ShaderCompile, RenderStageKeys.ReferenceShaderCompile,
+            RenderStageKeys.LowAirShaderCompile);
         Mark(PreviewStage.AccelerationStructure, RenderStageKeys.MeshUpload, RenderStageKeys.AccelerationBuild);
         Mark(PreviewStage.AtmosphereTables, RenderStageKeys.AtmosphereTables);
         Mark(PreviewStage.ScatteringOrders, RenderStageKeys.ScatteringOrders);
@@ -629,6 +644,7 @@ public sealed class PreviewSession
         double GroundAltitudeMetres,
         GroundCover Ground,
         Quadrature Quadrature,
+        LowAirKey? LowAir,
         RenderSettings Settings)
     {
         /// <summary>The <see cref="VistaScene"/> fields the key leaves out, because the renderer does not read them.</summary>
@@ -640,7 +656,7 @@ public sealed class PreviewSession
         /// <summary>The key of rendering <paramref name="scene"/> with <paramref name="settings"/>.</summary>
         public static RenderKey Of(VistaScene scene, RenderSettings settings) => new(
             scene.Mesh, scene.Terrain, scene.Camera with { ExposureEv = 0.0 }, scene.Sun, scene.Materials, scene.Air, scene.GroundAltitudeMetres, scene.Ground,
-            scene.Quadrature, settings);
+            scene.Quadrature, scene.LowAir?.Key, settings);
     }
 
     /// <summary>What a denoised image is made from: the render, the settings and the input scale (its bits; NaN lets the filter choose).</summary>

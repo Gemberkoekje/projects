@@ -157,6 +157,15 @@ public sealed record PreviewRequest
     public bool Snow { get; init; } = true;
 
     /// <summary>
+    /// How the valleys' pools are rendered (vista-plan §10 M1.13b): <c>--pools on</c> (the default), each valley's pool in three
+    /// dimensions with its mist, or <c>flat</c>, M1.13a's one layer at the scene's own valley's top for every valley, for comparisons.
+    /// </summary>
+    public bool Pools { get; init; } = true;
+
+    /// <summary>How the renderer takes the pools (vista-plan §10 M1.13b): the defaults, or a measurement's (no option sets it).</summary>
+    public Vista.Atmosphere.LowAirSettings LowAir { get; init; } = Vista.Atmosphere.LowAirSettings.Default;
+
+    /// <summary>
     /// Which hero wavelengths the render traces and how they weigh into colour (vista-plan §10 M1.12a, M1.13): <c>--quadrature blend</c>
     /// (the default since M1.13), <c>bins</c> (M1.12a's), <c>redTail</c> or <c>engine</c>.
     /// </summary>
@@ -176,7 +185,7 @@ public sealed record PreviewRequest
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
-///           [--forest on | off] [--canopy kernels | rough] [--snow on | off]
+///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--dither on | off] [--png16]
 /// </code>
@@ -187,7 +196,8 @@ public sealed record PreviewRequest
 /// date, <c>--time</c> a time-of-day preset (clearing a pinned solar time) or a local solar time, and <c>--sun-elevation</c> the
 /// time at which the sun stands that high (rising when the time is dawn); <c>--altitude</c> the scene's base altitude,
 /// <c>--temperature</c> (°C, or °F with an <c>F</c>), <c>--humidity</c> (%), <c>--snowline</c> (m) and <c>--visibility</c> (km)
-/// the weather; <c>--valley-haze</c> the visibility under the valley haze's lid (km), or <c>off</c> for none (M1.13a).
+/// the weather; <c>--valley-haze</c> the visibility at the floor of the densest valley's pool (km), or <c>off</c> for none (M1.13a,
+/// M1.13b), and <c>--mist</c> the visibility in the scene's valley's mist (km), or <c>off</c> for none (M1.13b).
 /// <c>--atmosphere reference</c> renders the slow, unbiased reference atmosphere instead of the LUTs (vista-plan §10
 /// M1.3), and <c>referenceShadowed</c> adds the terrain's shadow to the air's sunlight (M1.4). <c>--light-sampling
 /// sunOnly</c> renders with M1.4's estimator (the sky left to the bounce) instead of sampling the sky as a light too (M1.5);
@@ -203,7 +213,8 @@ public sealed record PreviewRequest
 /// <c>main</c>'s colours before M1.12a, cast and all.
 /// <c>--forest off</c> grows no forest below the tree line (M1.12's ground: meadow and soil there), and <c>--canopy rough</c> shades
 /// the forest as rough diffuse ground instead of by its canopy's kernels (M1.12b). <c>--snow off</c> lays no seasonal snow, whatever
-/// the snow slider says; the world's glaciers stay (M1.13).
+/// the snow slider says; the world's glaciers stay (M1.13). <c>--pools flat</c> renders M1.13a's single flat valley haze layer
+/// instead of each valley's pool and its mist in three dimensions (M1.13b).
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
@@ -238,6 +249,8 @@ public static class PreviewCommandLine
         "--forest on (default) | off: forest below the place's tree line, or M1.12's meadow and soil there.\n" +
         "  --canopy kernels (default) | rough: the canopy's own scattering (its crowns' shadows and hot spot), or rough diffuse ground.\n" +
         "--snow on (default) | off: the season's snow above the snow slider's snowline, or none (the world's glaciers stay).\n" +
+        "--pools on (default) | flat: each valley's cold pool and its mist in three dimensions, or one flat layer for every valley\n" +
+        "  (M1.13a's, for comparisons).\n" +
         "--dispatch-ms sets the GPU time per dispatch (at most 1000); it changes how the render is split, never the image.\n" +
         "--loupe renders only the window at column x, row y, w wide and h high of the --width frame: exactly a crop of it.\n" +
         "--sliders <sliders.json>: the slider file, the sliders pinned (any slider it does not name is auto). Each option below\n" +
@@ -252,8 +265,10 @@ public static class PreviewCommandLine
         "  --altitude <metres>: the scene's base altitude above sea level (default: the place's valley floor), 0 to 8000.\n" +
         "  --temperature <°C> (or <°F>F, e.g. 41F), --humidity <%>: the air at the valley floor (default: the climate's).\n" +
         "  --snowline <metres>: where seasonal snow begins, above sea level; --visibility <km>: the haze (default: the humidity's).\n" +
-        "  --valley-haze <km> | off: the visibility under the lid of the haze a cold pool holds in the valleys, or none\n" +
-        "  (default: the night's pool and what the sun has left of it).\n" +
+        "  --valley-haze <km> | off: the visibility at the floor of the densest valley's pool of haze, or none\n" +
+        "  (default: the night's pool and what the sun has left of it, each valley's by its shape).\n" +
+        "  --mist <km> | off: the visibility in the scene's valley's mist, 0.2 to 5, or none (default: where the pools' air\n" +
+        "  cools to its dew point, from the place's humidity normals).\n" +
         "--atmosphere luts (default) | reference | referenceShadowed: the precomputed air, or the air path-traced as a medium\n" +
         "  (slow, unbiased), optionally with the terrain's shadow in it.\n" +
         "--light-sampling mis (default) | sunOnly: sample the sun and the sky as lights, weighed against the bounce, or (M1.4)\n" +
@@ -284,6 +299,7 @@ public static class PreviewCommandLine
             ["--snowline"] = ["snowline"],
             ["--visibility"] = ["visibility"],
             ["--valley-haze"] = ["valleyHaze"],
+            ["--mist"] = ["mist"],
         };
 
     private static string PlaceList => string.Join(", ", Places.All.Select(p => JsonName(p.Place.ToString())));
@@ -315,9 +331,9 @@ public static class PreviewCommandLine
     {
         "--recipe", "--seed", "--camera", "--out", "--width", "--aspect", "--spp", "--bounces", "--debug", "--dispatch-ms", "--loupe",
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
-        "--snowline", "--visibility", "--valley-haze", "--atmosphere", "--light-sampling",
+        "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow",
+        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -408,6 +424,12 @@ public static class PreviewCommandLine
         bool forest = OnOff(values.GetValueOrDefault("--forest"), "--forest", problems);
         CanopyModel canopy = CanopyOf(values.GetValueOrDefault("--canopy"), problems);
         bool snow = OnOff(values.GetValueOrDefault("--snow"), "--snow", problems);
+        bool pools = values.GetValueOrDefault("--pools") switch
+        {
+            null or "on" => true,
+            "flat" => false,
+            string other => Problem(problems, $"--pools must be on or flat, got '{other}'."),
+        };
 
         if (problems.Count > before)
             return null;
@@ -445,7 +467,14 @@ public static class PreviewCommandLine
             Forest = forest,
             Canopy = canopy,
             Snow = snow,
+            Pools = pools,
         };
+    }
+
+    private static bool Problem(List<string> problems, string problem)
+    {
+        problems.Add(problem);
+        return true;
     }
 
     /// <summary>Parses an on/off option's value; on when it is not given.</summary>
@@ -820,6 +849,10 @@ public static class PreviewCommandLine
             overrides["valleyHaze"] = SliderPins.MaxVisibilityKm.ToString("R", CultureInfo.InvariantCulture);
         else
             Number("--valley-haze", "valleyHaze", SliderPins.MinVisibilityKm, SliderPins.MaxVisibilityKm, "km (or off)");
+        if (values.TryGetValue("--mist", out string? mistText) && mistText == "off")
+            overrides["mist"] = "0";
+        else
+            Number("--mist", "mist", SliderPins.MinMistKm, SliderPins.MaxMistKm, "km (or off)");
         return overrides;
 
         void Number(string option, string field, double min, double max, string unit)

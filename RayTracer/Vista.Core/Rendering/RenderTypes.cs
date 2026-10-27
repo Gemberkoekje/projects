@@ -223,6 +223,12 @@ public sealed record VistaScene(
     /// <summary>The wavelength table of <see cref="Quadrature"/>.</summary>
     public WavelengthTable Wavelengths() => WavelengthTable.For(Quadrature);
 
+    /// <summary>
+    /// The valleys' pools in the low air (vista-plan §10 M1.13b): each valley's haze and mist in three dimensions, which the march takes
+    /// instead of the air's flat valley haze layer (the tables keep that, as the pools' altitude average); null for none.
+    /// </summary>
+    public LowAir? LowAir { get; init; }
+
     /// <summary>The atmosphere frame of this view: the camera's altitude and the terrain's span set the sky-view slices.</summary>
     public AtmosphereFrame AirFrame() => FrameFor(Air, GroundAltitudeMetres, Sun, Camera, Mesh);
 
@@ -307,6 +313,9 @@ public static class RenderStageKeys
     /// <summary>Compiling a shader variant on its first use (the reference atmosphere).</summary>
     public const string ReferenceShaderCompile = "referenceShaderCompile";
 
+    /// <summary>Compiling the integrator's variant with the valleys' pools on its first use (M1.13b).</summary>
+    public const string LowAirShaderCompile = "lowAirShaderCompile";
+
     /// <summary>Uploading a new mesh.</summary>
     public const string MeshUpload = "meshUpload";
 
@@ -327,6 +336,9 @@ public static class RenderStageKeys
 
     /// <summary>GPU seconds measuring the light on the incident meter's card (every measurement).</summary>
     public const string IncidentMeter = "incidentMeterGpu";
+
+    /// <summary>GPU seconds building the valleys' pools' sunlight volumes (vista-plan §10 M1.13b: new pools, terrain or sun).</summary>
+    public const string SunlightVolume = "sunlightVolumeGpu";
 }
 
 /// <summary>

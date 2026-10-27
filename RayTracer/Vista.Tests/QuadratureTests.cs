@@ -228,7 +228,7 @@ public sealed class QuadratureTests
                 Erosion = false,
             };
             Sidecar blend = PreviewPipeline.Run(request, new FakeRenderer());
-            Assert.AreEqual(22, blend.Schema);
+            Assert.AreEqual(23, blend.Schema);
             Assert.AreEqual(Quadrature.Blend, blend.Image.Quadrature);
             Assert.AreEqual(new WavelengthsInfo(50, 416, 701), blend.Image.Wavelengths);
             Sidecar bins = PreviewPipeline.Run(request with { Quadrature = Quadrature.Bins }, new FakeRenderer());

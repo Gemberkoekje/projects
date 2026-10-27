@@ -54,12 +54,15 @@ namespace Vista.Output;
 /// for a render with the material and normal outputs, the share of its ground that is white by slope;
 /// the erosion's settings gained the glacial carving's and today's glaciers' own. Schema 22 (M1.13a) added the valley haze: its slider in
 /// <see cref="SlidersInfo.Values"/>, its layer in <see cref="SlidersInfo.Weather"/>, and in the atmosphere's model its lid, softness,
-/// extinction and the haze's unit.</para>
+/// extinction and the haze's unit. Schema 23 (M1.13b) added the mist's slider in <see cref="SlidersInfo.Values"/> and, in
+/// <see cref="SlidersInfo.Weather"/>, the valleys' pools (<see cref="PoolsInfo"/>): how they were rendered, what the weather told them,
+/// what they added up to and the flat layer the tables carried in their place; the valley haze's layer is now the scene's own
+/// valley's pool.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 22;
+    public const int CurrentSchema = 23;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;

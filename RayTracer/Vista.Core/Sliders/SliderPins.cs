@@ -7,7 +7,7 @@ namespace Vista.Sliders;
 /// <summary>
 /// The linked sliders (vista-plan §3.4, §3.6, §10 M1.11). Each is <b>auto</b> — derived from the controls upstream of it — or
 /// <b>pinned</b> to a value the user chose; pinning one stops only that one, and resetting it re-links it. Basic: season, time of
-/// day, snow, fog/haze. Advanced: location, altitude, date, the solar time, temperature, humidity and the valley haze.
+/// day, snow, fog/haze. Advanced: location, altitude, date, the solar time, temperature, humidity, the valley haze and the mist.
 /// </summary>
 public enum Slider
 {
@@ -46,9 +46,16 @@ public enum Slider
 
     /// <summary>
     /// Valley haze (advanced): the visibility under the lid of the haze an inversion holds in the valleys, km. Auto: from the night's
-    /// cold pool and what the sun has left of it (vista-plan §10 M1.13a).
+    /// cold pool and what the sun has left of it (vista-plan §10 M1.13a). Since M1.13b each valley's pool lies on its own floor, and
+    /// the value is the visibility at the floor of the densest.
     /// </summary>
     ValleyHaze,
+
+    /// <summary>
+    /// Mist (advanced): the visibility at the floor of the scene's valley's mist, km, or none. Auto: where the pools' air cools to its
+    /// dew point, from the place's humidity normals (vista-plan §10 M1.13b).
+    /// </summary>
+    Mist,
 }
 
 /// <summary>How a temperature is shown (vista-plan §3.3: °C, with °F on request). Values are always stored in °C.</summary>
@@ -91,6 +98,12 @@ public sealed record SliderPins
     /// <summary>The shortest and longest <see cref="Visibility"/> accepted, km. Fog proper (under 1 km) is M4's.</summary>
     public const double MinVisibilityKm = 1.0, MaxVisibilityKm = 500.0;
 
+    /// <summary>
+    /// The shortest and longest <see cref="Mist"/> accepted, km: a few hundred metres to see is mist (fog proper, under 200 m, is M4's),
+    /// and past 5 km the air is haze. A pinned <see cref="Mist"/> of 0 means none.
+    /// </summary>
+    public const double MinMistKm = 0.2, MaxMistKm = 5.0;
+
     /// <summary>The JSON field names that pin a slider, by slider (a sheet axis over one of them varies that slider).</summary>
     public static IReadOnlyDictionary<string, Slider> Fields { get; } = new Dictionary<string, Slider>(StringComparer.Ordinal)
     {
@@ -107,6 +120,7 @@ public sealed record SliderPins
         ["snowline"] = Slider.Snow,
         ["visibility"] = Slider.Haze,
         ["valleyHaze"] = Slider.ValleyHaze,
+        ["mist"] = Slider.Mist,
     };
 
     /// <summary>File format version.</summary>
@@ -164,6 +178,12 @@ public sealed record SliderPins
     /// </summary>
     public double? ValleyHaze { get; init; }
 
+    /// <summary>
+    /// The visibility at the floor of the scene's valley's mist, km (vista-plan §10 M1.13b), 0 for no mist; null for auto. A pinned mist
+    /// fills the lower part of every valley's pool and keeps the night's whole pool at any hour, as a pinned valley haze does.
+    /// </summary>
+    public double? Mist { get; init; }
+
     /// <summary>No pins: every slider auto.</summary>
     public static SliderPins None { get; } = new();
 
@@ -201,6 +221,7 @@ public sealed record SliderPins
         Slider.Snow => Snowline is not null,
         Slider.Haze => Visibility is not null,
         Slider.ValleyHaze => ValleyHaze is not null,
+        Slider.Mist => Mist is not null,
         _ => throw new ArgumentOutOfRangeException(nameof(slider), slider, "Unknown slider."),
     };
 
@@ -222,6 +243,7 @@ public sealed record SliderPins
         Slider.Snow => this with { Snowline = null },
         Slider.Haze => this with { Visibility = null },
         Slider.ValleyHaze => this with { ValleyHaze = null },
+        Slider.Mist => this with { Mist = null },
         _ => throw new ArgumentOutOfRangeException(nameof(slider), slider, "Unknown slider."),
     };
 
@@ -251,6 +273,8 @@ public sealed record SliderPins
         Range(Snowline, 0.0, MaxSnowlineMetres, "The snowline", "m above sea level", errors);
         Range(Visibility, MinVisibilityKm, MaxVisibilityKm, "The visibility", "km", errors);
         Range(ValleyHaze, MinVisibilityKm, MaxVisibilityKm, "The visibility under the valley haze", "km", errors);
+        if (Mist is not 0.0)
+            Range(Mist, MinMistKm, MaxMistKm, "The visibility in the mist", "km (or 0 for none)", errors);
         return errors;
     }
 

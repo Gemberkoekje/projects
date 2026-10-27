@@ -35,6 +35,22 @@ cbuffer AtmosphereConstants : register(b1)
     float3 AtmToSun;             float  MieG;
     float  CameraAltitude;       float  TerrainLowAltitude;  float TerrainHighAltitude;  float AtmSunOneMinusCos;
     float  ValleyHazeTop;        float  ValleyHazeSoftness;  float ValleyHazeDensity;    float HazeScale;
+    // The valleys' pools in the low air (vista-plan §10 M1.13b; VistaLowAir.hlsli): with LowMode 1 the march takes them in three
+    // dimensions and leaves the tables' flat layer (their altitude average) out.
+    uint   LowMode;              uint   LowLevels;           uint  LowNoiseSeed;         uint  LowVolumeLayers;
+    float4 LowLevel0;            // the world's level: origin x, origin z, cell, size
+    float4 LowLevel1;            // the far field's
+    uint   LowLevel1Offset;      uint   LowVolume0Offset;    uint  LowVolume1Offset;     uint  LowVolumeRatio;
+    float  LowSlabTop;           float  LowSlabBottom;       float LowHazeMax;           float LowMistMax;
+    float  LowBlendMetres;       float  LowHazeSoftness;     float LowVolumeMargin;      float MistG;
+    float  LowWispAmplitude;     float  LowWispScale;        float LowWispVertical;      float LowPatchStrength;
+    float  LowPatchScale;        float  MistWaterLimit;      float MistAlbedo;           float LowMarchStep;
+    float  LowMsA;               float  LowMsB;              float LowMsC;               uint  LowMsOctaves;
+    uint   LowMarchMaxSteps;     float  LowAmbient;          uint  LowCeilingOffset;     uint  LowCeilingBlock;
+    float  LowMarchGrowth;       uint   LowBounceSteps;      float LowBounceStep;        float LowMistSoftness;
+    float  LowMsForward;         float  LowMsForwardPower;   float LowMsDiffuse;         float LowMsDiffusePower;
+    uint   LowSkySteps;          float  LowSkyGrowth;        float LowMistStep;          float LowMistBandStep;
+    float  LowFray;              float  LowShadowedMs;       uint  LowVolumePoolLayers;  float LowPad8;
 };
 
 StructuredBuffer<float4> AtmCoefficients : register(t8);   // per wavelength: Rayleigh, haze scattering, haze extinction, ozone
@@ -105,6 +121,12 @@ float ValleyHazeMean(float a, float b)
 }
 
 float AerosolDensity(float altitude) { return HazeScale * exp(-altitude / AerosolScaleHeight) + ValleyHaze(altitude); }
+
+// The valley haze's column from `altitude` straight up, m of the haze's unit (C# reference: AtmosphereModel.ValleyHazeColumn to the top).
+float ValleyHazeAbove(float altitude)
+{
+    return ValleyHazeDensity > 0.0 ? ValleyHazeDensity * ValleyHazeSoftness * Softplus((ValleyHazeTop - altitude) / ValleyHazeSoftness) : 0.0;
+}
 
 // The haze over one step whose altitudes are start, middle and end: its own profile at the middle, the valley haze's mean
 // along the two halves (C# reference: AtmosphereModel.AerosolStepDensity).

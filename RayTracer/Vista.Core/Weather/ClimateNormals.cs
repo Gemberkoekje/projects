@@ -88,6 +88,31 @@ public sealed record ClimateNormals(string Station, double StationAltitudeMetres
         return Lerp(daily[before], daily[after], t);
     }
 
+    /// <summary>
+    /// The mean water vapour pressure of each month, January first, hPa (vista-plan §10 M1.13b), from <see cref="HumiditySource"/>; null
+    /// when the normals have none (a custom latitude), and the mist takes the day's low for the dew point. Vapour pressure barely moves
+    /// through a day, so the month's mean stands for the dawn's.
+    /// </summary>
+    public IReadOnlyList<double>? VapourPressure { get; init; }
+
+    /// <summary>The station and the table the humidity comes from: the temperatures' own station unless that one publishes none.</summary>
+    public string? HumiditySource { get; init; }
+
+    /// <summary>The altitude of the humidity's station above sea level, m (<see cref="StationAltitudeMetres"/> unless set).</summary>
+    public double? HumidityAltitudeMetres { get; init; }
+
+    /// <summary>
+    /// The dew point at the humidity's station on <paramref name="date"/>, °C: the months' mean vapour pressures interpolated as the
+    /// temperatures are, then <see cref="Humidity.DewPointCelsius(double)"/>; null without humidity normals.
+    /// </summary>
+    public double? DewPointOn(DateOnly date)
+    {
+        if (VapourPressure is null)
+            return null;
+        (int before, int after, double t) = Between(date);
+        return Humidity.DewPointCelsius(Lerp(VapourPressure[before], VapourPressure[after], t));
+    }
+
     /// <summary>The month's mean of the daily mean (the average of its low and high), °C.</summary>
     public double MonthlyMean(int month) => 0.5 * (Lows[month] + Highs[month]);
 
@@ -113,6 +138,13 @@ public sealed record ClimateNormals(string Station, double StationAltitudeMetres
                 errors.Add($"{Station}: twelve monthly precipitation totals, none negative, are needed.");
             if (string.IsNullOrWhiteSpace(PrecipitationSource))
                 errors.Add($"{Station}: the precipitation's source must be given.");
+        }
+        if (VapourPressure is not null)
+        {
+            if (VapourPressure.Count != 12 || VapourPressure.Any(e => !(e > 0.0) || !double.IsFinite(e)))
+                errors.Add($"{Station}: twelve monthly vapour pressures, all positive, are needed.");
+            if (string.IsNullOrWhiteSpace(HumiditySource))
+                errors.Add($"{Station}: the humidity's source must be given.");
         }
         return errors;
     }

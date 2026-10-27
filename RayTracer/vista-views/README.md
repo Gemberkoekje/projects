@@ -340,3 +340,22 @@ just above the pool (about 500 m over the valley floor), looking across valleys 
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/haze/render.ps1 [-Before ..\main\Vista.App.dll] [-Photo <photo>] [-Paintings <a.jpg,b.jpg>] [-Sheets check,morning,winter,strengths,places,photo,paintings,shadow,cost] [-Out folder]
 ```
+
+## Valley pools checks (M1.13b)
+
+`pools/render.ps1` makes the M1.13b sheets and checks: `--pools-compare` on the misty ridges at 07:30 on 15 October with a strong
+valley haze and mist pinned, the march against the reference without the terrain's shadow, with single scattering alone, without
+the mist, and with the shadow against the plain and the shadowed reference, and over the mist lake at Fiordland in autumn
+(`pools/mist-lake.camera.json`) a deck pinned at 600 m to see with the sun at 25° and 6° (`check`, in `pools.log`, and
+`check.png`); peaks out of mist at the places whose autumn dawns saturate and at Zermatt with the mist pinned, each beside M1.13a's
+flat layer for the same air (`dawn.png`); a morning over the mist lake from before sunrise to the break-up (`morning.png`);
+Zermatt at the two Sunnegga webcam frames' dates and times, fog pinned, from `pools/fog-sea.camera.json` (`webcam.png`; the frames
+themselves are not ours and stay local, vista-plan §10); the noise off, as chosen and stronger (`noise.png`); the misty ridges at autumn
+dawn at six places (`places.png`) and the pools from above at four (`maps.png`, the dry run's `.pools.png`); and with `-Before`
+(a `main` build) the cost against `main` and a misty view against the flat layer (`cost`). The views are M1.13a's shoulders
+(`haze/`) and the mist lake. `pools/mist-slab.py` is the Monte Carlo of a mist slab that the mist's multiple scattering is weighted
+against (`python vista-views/pools/mist-slab.py`, numpy, about two minutes).
+
+```
+powershell -ExecutionPolicy Bypass -File vista-views/pools/render.ps1 [-Before ..\main\Vista.App.dll] [-Sheets check,dawn,morning,noise,places,maps,cost] [-Out folder]
+```

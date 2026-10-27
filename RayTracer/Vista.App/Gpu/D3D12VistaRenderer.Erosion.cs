@@ -29,7 +29,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
     private const int ClearGroup = 64;
 
     /// <summary>GPU seconds a submission of erosion steps aims for.</summary>
-    private const double ErosionBudgetSeconds = 0.1;
+    private static readonly double ErosionBudgetSeconds = Rendering.GpuShare.Capped ? Rendering.GpuShare.CappedDispatchMs / 1000.0 : 0.1;
 
     /// <summary>The most steps one submission records.</summary>
     private const int MaxStepsPerSubmission = 256;
