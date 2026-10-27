@@ -955,6 +955,30 @@ date and time. The frames so far, with the slice that judges each:
 | `12-10-2026-1810` | Straight into the sun: silhouettes, flare, the webcam's exposure | M1.17 (exposure toward the sun; the flare is the camera's) |
 | `07-05-2026-2040` | Spring sunset: clouds lit pink and orange from below around the summit | M4 (lit clouds) |
 
+*Truth references: the user's own photos* (since 2026-10-27). Photos the user takes at a known date and
+time are truth references too. They show the view from the user's home and the repository is public,
+so they are not committed, and the user keeps them under no naming scheme: **a slice that needs one asks
+the user for it** when it reaches the comparison, naming it by date, time and what it shows (below).
+The photos carry no location, so a slice that needs the sun's height also asks for the nearest town;
+its log records the sun's height, never the place. The camera's settings are listed here in case a
+pasted copy has lost them. White balance is automatic in all of them, so they compare brightness, not
+colour.
+
+*Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
+facing the sunset; sunset between 17:13 and 17:25 depending on the town, so until it is asked the sun's
+height is known within about ±0.8°). Three of the five share one fixed exposure (the main lens, 1/180 s,
+ISO 125, f/1.8), so their brightness compares directly. Measured from the phone's JPEGs read as sRGB
+(rough): the trees about 20× darker at 17:24 than at 16:58 and about 50× at 17:31 (near black, so
+shaky), the sky about 10× at 17:24 (17:31 is zoomed out, so its sky does not compare).
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 16:58 | The fixed exposure, zoomed 1.8× | The sun 1–3° up but behind the cloud layer: the gold only in a thin clear strip on the horizon; the trees flat olive under the grey light, no shadows; the distance fading even over flat land | M4 (only what the sun reaches through the gap turns gold); M1.17 (the series' start) |
+| 17:18 | The wide lens, f/2.2, 1/50 s, ISO 100, automatic | Around sunset: the strip deep orange and wider; the warmth starting on the cloud's underside nearest the gap | M4 (the underside lighting from the gap's side) |
+| 17:24 | The fixed exposure | A few minutes later: the warm band higher up the underside, never overhead; small clouds in the gap lit along their edges and bottoms; the start of a sunbeam (a slanted shadow edge in the lit air) | M4 (lit undersides and their timing; the sunbeam); M1.17 |
+| 17:31 | The fixed exposure, zoomed out | About ten minutes after sunset: the warmth gone from the cloud; a thin yellow strip with red-pink cloud edges; lower ragged clouds darker than the layer behind them; the land nearly black | M4; M1.17 |
+| 17:43 | The zoom lens, f/2.4, 1/33 s, ISO 1250, automatic (low light, likely several frames merged) | A cat on the balcony rail: the phone made dusk look like the afternoon, at the cost of smeared detail and a pale sky | M1.17 (the exposure question) |
+
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
 `Vista.App` / `Vista.Tests` in `RayTracer.slnx`; confirm which `RayTracer.Gpu` pieces
@@ -1969,7 +1993,12 @@ own passes. The preview is no guide to the cost (the final ran at 0.10–0.72× 
   `-0640`, `12-10-2026-0740`); the snowline and snow under the sky's light alone (`07-05-2026-0600`); golden hour on the high
   ground only (`23-08-2026-2010`); the rock's colour and the white balance in flat light (`12-10-2026-1820`); the exposure
   toward the sun (`12-10-2026-1810`). The terrain is not the Matterhorn's, so the comparison is of light, colour and snow,
-  not of shapes.
+  not of shapes. *Added 2026-10-27:* the exposure at dusk, the user's call, from the user's dusk series (the truth references
+  at the top of this section; the slice asks the user for the photos). At one fixed exposure the land went from the afternoon
+  to nearly black in half an hour, while the phone's own low-light mode made the same dusk look like the afternoon (17:43).
+  Vista's meter can do either, or stop between, nearer what the eye saw: a dusk sheet of one view at the series' sun heights
+  (about +2° to −4°), each at a fixed exposure and at the meter's, shown to the user beside the photos for a pick. M1 renders no
+  clouds and the series' sky is overcast, so the comparison is of the exposure and the land's darkness, not of the sky.
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).
@@ -2004,10 +2033,16 @@ ahead of the cumulus (M1.13a's altitude-only inversion layer comes first; *since
 terrain-following, patchy mist that fills some valleys and not others, and the terrain's shadow on the low air, so M4 fine-tunes
 them and adds fog proper: ground fog that reaches the camera, a sea of clouds over the peaks' feet, the daytime haze lid); then cloud
 shadows on the terrain, then cumulus fields with full multiple scattering checked against a reference, then the optical effects
-(fogbows, glories).
+(fogbows, glories). *Added 2026-10-27:* a **grey cloud layer with a clear gap** on the horizon, a very common sky that the list
+above does not name: only what the sun reaches through the gap turns gold, the rest lies
+in the layer's grey light; around sunset the layer's underside lights from the gap's side, the warmth climbing toward the
+camera for some ten minutes and then gone; sunbeams through the gap; lower ragged clouds darker than the layer at dusk. Judged
+against the user's dusk series (the truth references at the top of this section; the slice asks the user for the photos).
 Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
 sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
-fades into valley mist from the defaults of a cool, still morning.
+fades into valley mist from the defaults of a cool, still morning; a grey layer with a gap on the horizon, at the dusk
+series' sun heights, shows the series' look: gold only in the gap before sunset, the underside warm from the gap's side
+just after, and gone some ten minutes later.
 
 **M5 — Vegetation.**
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
