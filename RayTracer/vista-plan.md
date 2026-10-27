@@ -1863,6 +1863,18 @@ the terrain's odd lit facets on a few faces; golden hour everywhere. *Questions:
 do they look right, or should the camera stand on the ground like a person? Which picks would you keep as a wallpaper, and which look
 wrong? Beside your paintings, is anything of their composition missing? Log: [`vista-log/M1.14.md`](vista-log/M1.14.md).
 
+*M1.14 follow-up, before M1.15 (the user's call, 2026-10-27): a detail budget.* The nearest faces lack detail (the parked item
+of that name), and lit faces show it most: raking sun reveals the relief a face lacks, while sky light hides it (the paintings'
+dark foreground under a lit distance is the same rule). Until that detail is built, the auto camera keeps such frames out of its
+picks. For each candidate pixel on rock or scree in the sun, it compares the ground one pixel covers at the final resolution
+(distance × the pixel's angle) with the finest detail the terrain carries there (the 8 m grid with its normal maps beyond the
+near-camera detail). A frame whose share of lit, over-magnified rock passes a recorded limit ranks down. It measures metres per
+pixel, not distance: a far face at 135 mm is as magnified as a near one at 24 mm, and a frame that passes at 4K can fail at 8K, so
+M11's larger targets tighten it on their own. The limit is chosen from a sheet of finalists by the user's eye. *Verify:* CI on
+synthetic buffers (a near lit face ranks down; the same face in shade, or under a shorter lens, does not; 8K stricter than 4K).
+3070: the finalists sheet again, with the big lit slopes in the corners of finalists 6, 7, 9 and 10 and seed 4's snow dome ranked
+down; each pick's share recorded; M1.14's log gains the follow-up.
+
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
 - *Deliverable:* rays per sample and rays per second measured from the preview and from a handful
@@ -2010,7 +2022,10 @@ perspective camera stretches the edges of a multi-monitor span, and of Hamlet's 
 (3840×120: even a 5° vertical field of view is about 110° across, the edges stretched about
 3×); the lens models, the loupe's frame-keyed pixels and the auto camera learn it, and the
 sidecar records it so a client can turn depth back into positions. It is independent of the
-tiling and can be pulled forward as its own slice if Hamlet's H4 comes first. Verify: a 16K
+tiling and can be pulled forward as its own slice if Hamlet's H4 comes first. **Needs the
+mid-distance rock detail first** (the parked "nearest faces lack detail"): at 8K and 16K a pixel
+covers half or a quarter of the ground it does at 4K, and M1.14's detail budget would reject most
+frames otherwise. Verify: a 16K
 render completes within the VRAM budget and resumes after an interruption; a span and a 32:1
 strip show no edge stretch (a sphere at the edge renders round).
 
@@ -2079,8 +2094,11 @@ any of them.
   bands, ribs and gullies down the fall line, ledges, scree streaks, colour) is missing. M5 and M7 take the ground within about 100 m;
   nothing takes this band. Options: shading and colour detail at those scales (no triangles, most of the perceived detail, smooth
   silhouettes), geometric detail of 5–50 m by material and slope on the nearest faces (rougher ridgelines, at a cost in triangles
-  against the 48 M ceiling), or a finer erosion tile around the shot. *Belongs:* a slice of its own (the user: "fine to pick up in a
-  separate slice"); before M1.17 if the user promotes it, since the hero render will show it.
+  against the 48 M ceiling), or a finer erosion tile around the shot. *Belongs (decided 2026-10-27):* a slice of its own, before
+  M11, whose 8K and 16K halve the metres per pixel and need it; the iconic shot needs it too (a lit face like the Matterhorn's
+  from Sunnegga, about 8 km off, filling much of the frame). Shading and colour detail first (no triangles), geometry only where a
+  silhouette needs it, a finer erosion tile if those fall short; judged by the same metres-per-pixel measure, after which M1.14's
+  detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks.
 
 ---
 
