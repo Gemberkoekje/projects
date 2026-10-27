@@ -11,7 +11,7 @@ measured decision to keep it for the far terrain), M1.10a (exposure and display)
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
 and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist) and M1.14
-(auto camera v1) are done, and M1.15 (time and VRAM estimate) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
+(auto camera v1, with its detail budget) are done, and M1.15 (time and VRAM estimate) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -1874,6 +1874,16 @@ M11's larger targets tighten it on their own. The limit is chosen from a sheet o
 synthetic buffers (a near lit face ranks down; the same face in shade, or under a shorter lens, does not; 8K stricter than 4K).
 3070: the finalists sheet again, with the big lit slopes in the corners of finalists 6, 7, 9 and 10 and seed 4's snow dome ranked
 down; each pick's share recorded; M1.14's log gains the follow-up.
+
+*Status (2026-10-27): done.* A pixel of lit rock, scree or snow on the world grid counts when the 8 m cell spans more than 12 pixels of
+the 4K frame there (about 3 km at 50 mm); a frame where such ground covers more than 5% breaks the new limit and ranks below every
+frame that keeps it. On M1.14's seed-42 finalists it breaks exactly 6, 7, 9 and 10 (6.2–14.5%; the rest 0–1.7%,
+`m1-14-budget.png`); of the sixteen seed picks it changes three, seed 4's snow dome among them (26.2% before), and every pick now stands
+at 0–4.8% (`m1-14-budget-changed.png`). `--debug detail` shows what counts (magenta; lit meadow and forest yellow) and records the
+shares at 2–16 pixels a cell; `--detail-budget off` runs M1.14's search as it was. Snow counts beside rock and scree (the snow dome);
+the far field never does. *Judge this:* the magenta on M1.14's finalists, and the three picks before and after. *Questions:* is
+magenta on exactly the faces that look too smooth to you, no more and no less? Are the three new picks better pictures than the ones
+they replace? Log: [`vista-log/M1.14.md`](vista-log/M1.14.md), its last section.
 
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
